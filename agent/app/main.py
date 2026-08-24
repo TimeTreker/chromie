@@ -79,6 +79,10 @@ from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
+try:
+    from chromie_contracts.reflection import ReflectionRequest
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.reflection import ReflectionRequest
 from .social_attention import (
     SocialAttentionContextBuilder,
     SocialAttentionPlanner,
@@ -440,7 +444,6 @@ fast_planner_resolver = (
             settings,
             goal_interpreter_settings,
         ),
-        min_confidence=settings.fast_planner_min_confidence,
         num_ctx=settings.fast_planner_num_ctx,
         num_predict=settings.fast_planner_num_predict,
         max_capabilities=settings.fast_planner_max_capabilities,
@@ -462,7 +465,6 @@ deep_planner_client = (
 deep_planner_resolver = (
     DeepPlannerResolver(
         deep_planner_client, capability_catalog,
-        min_confidence=settings.deep_planner_min_confidence,
         num_ctx=settings.deep_planner_num_ctx,
         num_predict=settings.deep_planner_num_predict,
         max_capabilities=settings.deep_planner_max_capabilities,
@@ -714,7 +716,7 @@ async def resolve_deep_plan(request: CognitiveWorkRequest):
 
 
 @app.post("/reflection")
-async def resolve_reflection(request: CognitiveWorkRequest):
+async def resolve_reflection(request: ReflectionRequest):
     if reflection_resolver is None:
         raise HTTPException(status_code=503, detail="Reflection is disabled")
     return await reflection_resolver.resolve(request)

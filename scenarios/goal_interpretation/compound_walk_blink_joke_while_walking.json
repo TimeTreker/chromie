@@ -41,8 +41,6 @@
                 "duration_s": 20
               },
               "output_mode": "body_action",
-              "completion_requires_work": true,
-              "completion_requires_fresh_evidence": false,
               "confidence": 0.91,
               "relationship": "new",
               "target_goal_ids": []
@@ -55,8 +53,6 @@
                 "count": 6
               },
               "output_mode": "body_action",
-              "completion_requires_work": true,
-              "completion_requires_fresh_evidence": false,
               "confidence": 0.86,
               "relationship": "new",
               "target_goal_ids": []
@@ -68,8 +64,6 @@
                 "coordinate_with": "r1"
               },
               "output_mode": "speech",
-              "completion_requires_work": false,
-              "completion_requires_fresh_evidence": false,
               "confidence": 0.88,
               "relationship": "new",
               "target_goal_ids": []
@@ -97,8 +91,6 @@
           "duration_s": 20
         },
         "output_mode": "body_action",
-        "completion_requires_work": true,
-        "completion_requires_fresh_evidence": false,
         "confidence": 0.91,
         "relationship": "new",
         "target_goal_ids": []
@@ -111,8 +103,6 @@
           "count": 6
         },
         "output_mode": "body_action",
-        "completion_requires_work": true,
-        "completion_requires_fresh_evidence": false,
         "confidence": 0.86,
         "relationship": "new",
         "target_goal_ids": []
@@ -124,8 +114,6 @@
           "coordinate_with": "r1"
         },
         "output_mode": "speech",
-        "completion_requires_work": false,
-        "completion_requires_fresh_evidence": false,
         "confidence": 0.88,
         "relationship": "new",
         "target_goal_ids": []

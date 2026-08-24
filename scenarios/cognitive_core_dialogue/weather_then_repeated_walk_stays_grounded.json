@@ -32,11 +32,10 @@
                     "location": "Beijing",
                     "date": "today"
                   },
-                  "completion_requires_work": true,
-                  "completion_requires_fresh_evidence": true,
                   "confidence": 0.96,
                   "relationship": "new",
-                  "target_goal_ids": []
+                  "target_goal_ids": [],
+                  "output_mode": "information"
                 }
               ],
               "unresolved": []
@@ -57,9 +56,8 @@
               "location": "Beijing",
               "date": "today"
             },
-            "completion_requires_work": true,
-            "completion_requires_fresh_evidence": true,
-            "confidence": 0.96
+            "confidence": 0.96,
+            "output_mode": "information"
           }
         ]
       }
@@ -83,11 +81,10 @@
                     "duration_s": 15,
                     "pace": "quickly"
                   },
-                  "completion_requires_work": true,
-                  "completion_requires_fresh_evidence": false,
                   "confidence": 0.97,
                   "relationship": "new",
-                  "target_goal_ids": []
+                  "target_goal_ids": [],
+                  "output_mode": "body_action"
                 }
               ],
               "unresolved": []
@@ -109,9 +106,8 @@
               "duration_s": 15,
               "pace": "quickly"
             },
-            "completion_requires_work": true,
-            "completion_requires_fresh_evidence": false,
-            "confidence": 0.97
+            "confidence": 0.97,
+            "output_mode": "body_action"
           }
         ],
         "history_contains": [
@@ -138,11 +134,10 @@
                     "duration_s": 15,
                     "pace": "quickly"
                   },
-                  "completion_requires_work": true,
-                  "completion_requires_fresh_evidence": false,
                   "confidence": 0.97,
                   "relationship": "new",
-                  "target_goal_ids": []
+                  "target_goal_ids": [],
+                  "output_mode": "body_action"
                 }
               ],
               "unresolved": []
@@ -164,9 +159,8 @@
               "duration_s": 15,
               "pace": "quickly"
             },
-            "completion_requires_work": true,
-            "completion_requires_fresh_evidence": false,
-            "confidence": 0.97
+            "confidence": 0.97,
+            "output_mode": "body_action"
           }
         ],
         "history_contains": [

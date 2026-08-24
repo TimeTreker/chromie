@@ -49,11 +49,10 @@
                 "date": "today",
                 "question": "rain"
               },
-              "completion_requires_work": true,
-              "completion_requires_fresh_evidence": true,
               "confidence": 0.95,
               "relationship": "new",
-              "target_goal_ids": []
+              "target_goal_ids": [],
+              "output_mode": "information"
             }
           ],
           "unresolved": []
@@ -77,11 +76,10 @@
           "date": "today",
           "question": "rain"
         },
-        "completion_requires_work": true,
-        "completion_requires_fresh_evidence": true,
         "confidence": 0.95,
         "relationship": "new",
-        "target_goal_ids": []
+        "target_goal_ids": [],
+        "output_mode": "information"
       }
     ]
   }

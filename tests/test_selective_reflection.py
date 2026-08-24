@@ -3,10 +3,8 @@ from __future__ import annotations
 import asyncio
 
 from agent.app.reflection import ReflectionResolver
-from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
 from shared.chromie_contracts.situation import CognitiveOpportunity
 
 
@@ -23,13 +21,13 @@ class FakeOllama:
         return self.payload
 
 
-def request_for(opportunity: CognitiveOpportunity) -> CognitiveWorkRequest:
-    return cognitive_work_request(
+def request_for(opportunity: CognitiveOpportunity) -> ReflectionRequest:
+    return ReflectionRequest(
         sid="sid-reflect",
         text="Please keep trying.",
         language="en-US",
+        opportunity=opportunity,
         context={
-            "cognitive_opportunity": opportunity.prompt_projection(),
             "execution_outcome_bundle": {
                 "outcome_id": opportunity.evidence_refs[0],
                 "goal_outcomes": [],
@@ -141,7 +139,9 @@ def test_reflection_replans_without_changing_responsibility_and_promotes_bounded
     assert first_result[0]["memory_promoted"] == 1
     assert first_result[0]["repeated_pattern"] is False
     assert context["semantic_goal"]["responsibility_status"] == "open"
-    assert context["plan_status"] == "reflection_future_replan_requested"
+    assert context["plan_status"] == "not_planned"
+    assert first_result[0]["planner_advisory_actions"] == ["replan"]
+    assert first_result[0]["planner_advisory"]["authority"] == "planner_advisory_only"
     assert any(
         item["kind"] == "experience"
         for item in manager.snapshot()["extracted_memory"]
@@ -177,12 +177,12 @@ def test_slow_reflection_without_trusted_evidence_does_not_invoke_model() -> Non
         recommended_cognition="slow",
     )
     ollama = FakeOllama({"actions": ["replan"]})
-    request = cognitive_work_request(
+    request = ReflectionRequest(
         sid="sid-reflect-no-evidence",
         text="Please keep trying.",
         language="en-US",
+        opportunity=opportunity,
         context={
-            "cognitive_opportunity": opportunity.prompt_projection(),
             "execution_outcome_bundle": {},
             "active_goal_snapshots": [{"goal_id": "goal-arm"}],
         },

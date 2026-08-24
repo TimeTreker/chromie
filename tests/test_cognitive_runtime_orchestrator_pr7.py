@@ -46,8 +46,6 @@ def _core_and_envelope(text: str, *, sid: str, language: str = "en-US"):
                 "local_ref": "r1",
                 "outcome": text,
                 "bindings": {},
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": False,
                 "confidence": 0.95,
             }
         ],
@@ -192,8 +190,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                         "local_ref": "weather",
                         "outcome": "Tell whether it is raining in Beijing today.",
                         "bindings": {"location": "北京", "time": "today"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     }
                 ],

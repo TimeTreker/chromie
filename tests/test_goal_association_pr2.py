@@ -227,8 +227,6 @@ def request(
                 "local_ref": f"r{index}",
                 "outcome": outcome,
                 "bindings": {},
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": False,
                 "confidence": 0.9,
             }
             for index, outcome in enumerate(outcomes, start=1)
@@ -604,8 +602,8 @@ class GoalExecutionContractTests(unittest.TestCase):
             [],
             responsibility_count=1,
             responsibility_refs=["weather"],
-            responsibility_output_modes={"weather": "capability_work"},
-            responsibility_fresh_evidence_refs={"weather"},
+            responsibility_output_modes={"weather": "information"},
+            responsibility_information_refs={"weather"},
         )
         fresh_evidence_branches = fresh_evidence_schema["$defs"][
             "GoalAssociationModelGoal"
@@ -1139,8 +1137,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "outcome": "sing a song",
                         "bindings": {},
                         "output_mode": "singing",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 0.98,
                     }
                 )
@@ -1176,8 +1172,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "distance": "50 meters",
                             "direction": "ahead",
                         },
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.98,
                     }
                 )
@@ -1241,7 +1235,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "outcome": "singing",
                         "bindings": {"action": "singing"},
                         "output_mode": "singing",
-                        "completion_requires_work": True,
                         "confidence": 0.98,
                     },
                     {
@@ -1252,7 +1245,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "simultaneously": "simultaneously",
                         },
                         "output_mode": "body_action",
-                        "completion_requires_work": True,
                         "confidence": 0.98,
                     },
                 )
@@ -1300,8 +1292,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "speed": "quickly",
                         },
                         "output_mode": "body_action",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 1.0,
                     }
                 )
@@ -1350,8 +1340,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "speed": "quickly",
                         },
                         "output_mode": "body_action",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 1.0,
                     }
                 )
@@ -1642,8 +1630,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "local_ref": "r1",
                         "outcome": "determine whether it will rain in Chongqing tonight",
                         "bindings": {"location": "重庆", "time": "tonight"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     }
                 )
@@ -1708,8 +1694,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "local_ref": "weather_1",
                         "outcome": "确认今晚是否有大雨",
                         "bindings": {"precipitation_severity": "heavy"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     }
                 ),
@@ -1754,8 +1738,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "source": "水瓶",
                             "recipient": "我",
                         },
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     }
                 ),
@@ -1903,8 +1885,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "outcome": "sing while moving",
                         "bindings": {},
                         "output_mode": "singing",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 0.98,
                     }
                 )
@@ -1996,8 +1976,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "local_ref": "r1",
                         "outcome": "determine the current local time",
                         "bindings": {"time": "now"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     }
                 )
@@ -2167,8 +2145,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                         "output_mode": "body_action",
                         "relationship": "continue",
                         "target_goal_ids": ["goal-walk"],
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 1.0,
                     }
                 ),
@@ -2277,8 +2253,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                         # generalized 大雨 to rain. GA coverage must not commit it.
                         "outcome": "确认重庆今晚是否下雨",
                         "bindings": {"location": "重庆", "time": "今天晚上"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     }
                 ),
@@ -2461,16 +2435,12 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                             "direction": "forward",
                             "duration": "15 seconds",
                         },
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     },
                     {
                         "local_ref": "r2",
                         "outcome": "Blink.",
                         "bindings": {"action": "blink"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.95,
                     },
                 ),
@@ -2625,7 +2595,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                         "outcome": "move forward for ten seconds",
                         "bindings": {"duration": "10 seconds"},
                         "output_mode": "body_action",
-                        "completion_requires_work": True,
                         "confidence": 0.95,
                     }
                 )
@@ -2671,7 +2640,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                             "duration": "10 秒",
                         },
                         "output_mode": "body_action",
-                        "completion_requires_work": True,
                         "confidence": 0.95,
                     }
                 )
@@ -2734,7 +2702,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                         "outcome": "move forward for ten seconds",
                         "bindings": {"duration": "10 秒"},
                         "output_mode": "body_action",
-                        "completion_requires_work": True,
                         "confidence": 0.95,
                     }
                 )
@@ -3328,8 +3295,8 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(len(result.new_goals), 1)
         semantic = result.new_goals[0]
         self.assertEqual(semantic.metadata["output_mode"], "capability_work")
-        self.assertTrue(semantic.metadata["completion_requires_work"])
-        self.assertFalse(semantic.metadata["completion_requires_fresh_evidence"])
+        self.assertNotIn("completion_requires_work", semantic.metadata)
+        self.assertNotIn("completion_requires_fresh_evidence", semantic.metadata)
         self.assertEqual(
             set(semantic.resource_responsibility.resource.attributes),
             {"location", "time", "aspects", "information_domain"},

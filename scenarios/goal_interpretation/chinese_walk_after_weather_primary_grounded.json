@@ -31,11 +31,10 @@
                 "duration_text": "十来秒",
                 "pace": "faster"
               },
-              "completion_requires_work": true,
-              "completion_requires_fresh_evidence": false,
               "confidence": 0.97,
               "relationship": "new",
-              "target_goal_ids": []
+              "target_goal_ids": [],
+              "output_mode": "body_action"
             }
           ],
           "unresolved": []
@@ -59,11 +58,10 @@
           "duration_text": "十来秒",
           "pace": "faster"
         },
-        "completion_requires_work": true,
-        "completion_requires_fresh_evidence": false,
         "confidence": 0.97,
         "relationship": "new",
-        "target_goal_ids": []
+        "target_goal_ids": [],
+        "output_mode": "body_action"
       }
     ]
   }

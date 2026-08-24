@@ -472,8 +472,9 @@ UserTurnEnvelope + Session Context
 Fast and Deep canonical planning use the same `CanonicalPlan` contract. Fast Goal
 Interpretation contributes provider-neutral Responsibility evidence; it does not author
 response wording, Work, a Primary-Activity contract, Plan steps, execution lanes,
-realization, exact Capabilities, or executable arguments. `completion_requires_work` is
-only a need-for-work fact, never a Work description. Fast Planner owns HOW; Goal
+realization, exact Capabilities, executable arguments, or readiness flags. Whether
+work or fresh Evidence is still needed is a Planner judgment over canonical Goal state,
+current Evidence, and current Capability truth. Fast Planner owns HOW; Goal
 Association owns only canonical Goal continuity and commit. Planner model reasoning
 then chooses semantic Work/Primary Activities, Plan steps, parameters, ordering, and
 per-goal prospective outcomes. Deterministic

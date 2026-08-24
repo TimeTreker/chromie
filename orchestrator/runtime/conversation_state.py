@@ -4589,11 +4589,7 @@ class ConversationStateManager:
                     continue
             goal = self._semantic_goal_from_context(context)
             goal_metadata = goal.metadata if isinstance(goal.metadata, dict) else {}
-            if not (
-                str(goal_metadata.get("output_mode") or "") == "speech"
-                and goal_metadata.get("completion_requires_work") is False
-                and goal_metadata.get("completion_requires_fresh_evidence") is False
-            ):
+            if str(goal_metadata.get("output_mode") or "") != "speech":
                 results.append(
                     {
                         "goal_id": goal_id,
@@ -4816,30 +4812,33 @@ class ConversationStateManager:
                 if isinstance(previous, dict)
             )
 
-            applied_actions: list[str] = []
+            advisory_actions: list[str] = []
             rejected_actions: list[str] = []
             for action in reflected.actions:
-                if action in responsibility_actions and not responsibility_open:
-                    rejected_actions.append(action)
-                    continue
-                if action == "replan":
-                    context["status"] = "planning"
-                    context["commitment_state"] = "evaluating"
-                    context["plan_status"] = "reflection_future_replan_requested"
-                    applied_actions.append(action)
-                elif action == "clarify":
-                    context["status"] = "waiting_for_user"
-                    context["commitment_state"] = "waiting_for_user"
-                    context["plan_status"] = "reflection_future_clarification_needed"
-                    applied_actions.append(action)
-                elif action == "correct_user":
-                    metadata["reflection_future_correction_candidate"] = {
-                        "text": reflected.correction_text,
-                        "opportunity_id": reflected.opportunity_id,
-                        "evidence_refs": list(reflected.evidence_refs),
-                    }
-                    applied_actions.append(action)
+                if action in responsibility_actions:
+                    if not responsibility_open:
+                        rejected_actions.append(action)
+                        continue
+                    advisory_actions.append(action)
 
+            planner_advisory: dict[str, Any] | None = None
+            if advisory_actions:
+                planner_advisory = {
+                    "opportunity_id": reflected.opportunity_id,
+                    "goal_id": goal_id,
+                    "actions": advisory_actions,
+                    "correction_text": (
+                        reflected.correction_text
+                        if "correct_user" in advisory_actions
+                        else ""
+                    ),
+                    "reason_codes": list(reflected.reason_codes),
+                    "reason_summary": reflected.reason_summary,
+                    "evidence_refs": list(reflected.evidence_refs),
+                    "authority": "planner_advisory_only",
+                }
+
+            applied_actions: list[str] = []
             promoted = 0
             if "propose_memory" in reflected.actions:
                 for candidate in reflected.memory_candidates:
@@ -4866,6 +4865,7 @@ class ConversationStateManager:
             history.append({
                 "opportunity_id": reflected.opportunity_id,
                 "actions": list(reflected.actions),
+                "planner_advisory_actions": advisory_actions,
                 "applied_actions": applied_actions,
                 "rejected_actions": rejected_actions,
                 "reason_codes": list(reflected.reason_codes),
@@ -4882,23 +4882,26 @@ class ConversationStateManager:
                 **metadata,
                 "reflection_history": history[-12:],
             }
-            if applied_actions or responsibility_open:
+            if advisory_actions or applied_actions or responsibility_open:
                 context["updated_ms"] = now
 
             result: dict[str, Any] = {
                 "goal_id": goal_id,
-                "applied": bool(applied_actions),
+                "applied": bool(advisory_actions or applied_actions),
                 "actions": list(reflected.actions),
+                "planner_advisory_actions": advisory_actions,
                 "applied_actions": applied_actions,
                 "rejected_actions": rejected_actions,
                 "memory_promoted": promoted,
                 "repeated_pattern": repeated_pattern,
                 "responsibility_status": responsibility_status,
-                "future_adaptation": bool(applied_actions),
+                "future_adaptation": bool(advisory_actions or applied_actions),
                 "terminal_history_learning": bool(
                     not responsibility_open and promoted
                 ),
             }
+            if planner_advisory is not None:
+                result["planner_advisory"] = planner_advisory
             if rejected_actions and not applied_actions:
                 result["reason"] = "reflection_terminal_responsibility_action_rejected"
             results.append(result)

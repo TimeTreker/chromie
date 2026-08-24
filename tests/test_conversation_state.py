@@ -225,8 +225,6 @@ class ConversationStateTests(unittest.TestCase):
                         "source_responsibility_refs": ["r1"],
                         "metadata": {
                             "output_mode": "speech",
-                            "completion_requires_work": False,
-                            "completion_requires_fresh_evidence": False,
                         },
                     },
                 }
@@ -272,8 +270,6 @@ class ConversationStateTests(unittest.TestCase):
                         "source_responsibility_refs": ["r1"],
                         "metadata": {
                             "output_mode": "capability_work",
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
                         },
                     },
                 }

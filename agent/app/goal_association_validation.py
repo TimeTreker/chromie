@@ -516,7 +516,11 @@ def responsibility_output_mode_conflicts(
     request: CognitiveWorkRequest,
 ) -> list[str]:
     expected = {
-        item.local_ref: item.output_mode
+        item.local_ref: (
+            "capability_work"
+            if item.output_mode in {"information", "stateful_effect"}
+            else item.output_mode
+        )
         for item in request.responsibilities
         if item.output_mode != "unspecified"
     }

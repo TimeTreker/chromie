@@ -148,6 +148,7 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.reflection import ReflectionRequest
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
     goal_completion_qualification_summary,
@@ -4336,18 +4337,11 @@ class VoiceAssistant:
                 reflection_calls.append(
                     reflection_call(
                         reflection_session,
-                        request=CognitiveWorkRequest(
+                        request=ReflectionRequest(
                             sid=session_id,
                             text=execution_outcome_user_text(response, plan),
                             language=str(response.metadata.get("language") or "en-US"),
-                            responsibilities=[
-                                CognitiveResponsibilityProposal(
-                                    local_ref=f"reflection:{opportunity.opportunity_id}",
-                                    outcome="Reflect on this trusted cognitive opportunity.",
-                                    confidence=1.0,
-                                )
-                            ],
-                            interpretation_confidence=1.0,
+                            opportunity=opportunity,
                             context=context,
                             history=self.conversation_state.get_history(),
                         ),
@@ -4388,6 +4382,14 @@ class VoiceAssistant:
                     )
             response.metadata["reflection_resolutions"] = reflection_resolutions
             response.metadata["reflection_state_results"] = reflection_state_results
+
+        reflection_planner_advisories = [
+            dict(item["planner_advisory"])
+            for item in reflection_state_results
+            if isinstance(item, dict) and isinstance(item.get("planner_advisory"), dict)
+        ]
+        if reflection_planner_advisories:
+            response.metadata["reflection_planner_advisories"] = reflection_planner_advisories
 
         self.session_log(
             session_id,
@@ -4470,6 +4472,7 @@ class VoiceAssistant:
             bundle.aggregate_status == "completed"
             and completed_evidence_ids
             and completed_evidence_ids.issubset(delivered_incremental_evidence)
+            and not reflection_planner_advisories
         ):
             self.session_log(
                 session_id,
@@ -4491,6 +4494,7 @@ class VoiceAssistant:
             and terminal_evidence_ids.issubset(
                 planner_handled_incremental_evidence
             )
+            and not reflection_planner_advisories
         ):
             self.session_log(
                 session_id,
@@ -4514,6 +4518,7 @@ class VoiceAssistant:
                 bundle=bundle,
                 plan=plan,
                 session_id=session_id,
+                reflection_advisories=reflection_planner_advisories,
             )
             if final_response is None:
                 self.session_log(
@@ -5573,6 +5578,7 @@ class VoiceAssistant:
         bundle: Any,
         plan: Any,
         session_id: str | None,
+        reflection_advisories: list[dict[str, Any]] | None = None,
     ) -> InteractionResponse | None:
         """Reactivate Fast Planner from bounded terminal Evidence.
 
@@ -5595,6 +5601,13 @@ class VoiceAssistant:
             or "en-US"
         )
 
+        bounded_reflection_advisories = [
+            dict(item)
+            for item in (reflection_advisories or [])
+            if isinstance(item, dict)
+        ]
+        reflection_reentry = bool(bounded_reflection_advisories)
+
         delivered_incremental_evidence = {
             str(item).strip()
             for item in metadata.get(
@@ -5613,9 +5626,9 @@ class VoiceAssistant:
         }
         evidence: list[ToolResultEvidence] = []
         for item in bundle.evidence:
-            if item.evidence_id in delivered_incremental_evidence:
+            if not reflection_reentry and item.evidence_id in delivered_incremental_evidence:
                 continue
-            if item.evidence_id in planner_handled_incremental_evidence:
+            if not reflection_reentry and item.evidence_id in planner_handled_incremental_evidence:
                 continue
             observation = item.observation
             observation_data = (
@@ -5685,6 +5698,7 @@ class VoiceAssistant:
                         "evidence_refs": evidence_refs,
                         "planner_authority": "planner",
                     },
+                    "reflection_advisories": bounded_reflection_advisories,
                     **extra_context,
                 },
                 fast_workflow_stage="fast_planner_evidence_reentry",

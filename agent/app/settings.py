@@ -338,9 +338,6 @@ class Settings(BaseModel):
     fast_planner_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500")), ge=100, le=120000
     )
-    fast_planner_min_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_FAST_PLANNER_MIN_CONFIDENCE", "0.80")), ge=0.0, le=1.0
-    )
     fast_planner_num_ctx: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "8192")), ge=2048, le=131072
     )
@@ -357,9 +354,6 @@ class Settings(BaseModel):
     deep_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_MODEL", "gemma4:e2b"))
     deep_planner_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_TIMEOUT_MS", "9000")), ge=100, le=120000
-    )
-    deep_planner_min_confidence: float = Field(
-        default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_CONFIDENCE", "0.65")), ge=0.0, le=1.0
     )
     deep_planner_num_ctx: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_CTX", "8192")), ge=4096, le=131072

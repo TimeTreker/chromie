@@ -92,8 +92,6 @@ def admitted_core(
             "local_ref": "r1",
             "outcome": text,
             "bindings": {},
-            "completion_requires_work": True,
-            "completion_requires_fresh_evidence": False,
             "confidence": 0.95,
         }
     ]
@@ -565,8 +563,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "outcome": "Continue the existing weather lookup.",
                     "relationship": "continue",
                     "target_goal_ids": ["goal-weather"],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.98,
                 }
             ],
@@ -652,8 +648,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "outcome": "Continue moving forward for ten seconds.",
                     "relationship": "continue",
                     "target_goal_ids": ["goal-walk"],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.98,
                 }
             ],
@@ -798,8 +792,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "bindings": {"location": "内乡", "date": "today"},
                     "relationship": "modify",
                     "target_goal_ids": ["goal-weather"],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.98,
                 }
             ],
@@ -1012,8 +1004,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "Tell the user whether it will rain in Chongqing this afternoon.",
                     "bindings": {"location": "重庆", "day_part": "afternoon"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -1163,8 +1153,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "tea",
                     "outcome": "Bring the requester a cup of tea.",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -1287,8 +1275,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "bindings": {},
                     "relationship": "modify",
                     "target_goal_ids": ["goal-1"],
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.98,
                 }
             ],
@@ -1445,8 +1431,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "Check Chongqing weather today.",
                     "bindings": {"location": "重庆", "date": "today"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.97,
                 }
             ],
@@ -1556,8 +1540,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                         "local_ref": "weather",
                         "outcome": "Check Chongqing weather today.",
                         "bindings": {"location": "重庆", "date": "today"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.97,
                     }
                 ],
@@ -1720,8 +1702,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "bindings": {"location": "内乡", "date": "today"},
                     "relationship": "modify",
                     "target_goal_ids": ["goal-weather"],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.98,
                 }
             ],
@@ -1885,8 +1865,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "bindings": {"location": "重庆", "date": "today"},
                     "relationship": "modify",
                     "target_goal_ids": ["goal-weather"],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.98,
                 }
             ],
@@ -1965,8 +1943,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "fetch-water",
                     "outcome": "Obtain the referenced water and bring it back to the requester.",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.94,
                 }
             ],
@@ -2210,8 +2186,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "restaurant",
                     "outcome": "recommend good nearby restaurants",
                     "bindings": {"proximity": "nearby"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 }
             ],

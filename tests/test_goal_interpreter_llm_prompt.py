@@ -35,9 +35,7 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
                 "local_ref": local_ref,
                 "outcome": "provide today's weather for Chongqing",
                 "bindings": {"location": "Chongqing", "time": "today"},
-                "output_mode": "capability_work",
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": True,
+                "output_mode": "information",
                 "confidence": 0.95,
             }
         ],
@@ -61,8 +59,6 @@ class GoalInterpreterContractTests(unittest.TestCase):
                         "preferred_resolution": "ask_user",
                     }
                 ],
-                completion_requires_work=True,
-                completion_requires_fresh_evidence=True,
                 confidence=0.95,
             )
 
@@ -75,12 +71,10 @@ class GoalInterpreterContractTests(unittest.TestCase):
                     "location": "Chongqing",
                     "capability_id": "chromie.weather.lookup",
                 },
-                completion_requires_work=True,
-                completion_requires_fresh_evidence=True,
                 confidence=0.95,
             )
 
-    def test_external_evidence_is_not_top_level_semantic_uncertainty(self) -> None:
+    def test_external_information_is_what_not_readiness(self) -> None:
         decision = GoalInterpretationDecision.model_validate(
             {
                 "confidence": 0.95,
@@ -93,29 +87,30 @@ class GoalInterpreterContractTests(unittest.TestCase):
                             "date": "today",
                             "time_of_day": "白天",
                         },
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
+                        "output_mode": "information",
                         "confidence": 0.95,
                     }
                 ],
                 "unresolved": [],
             }
         )
-        self.assertTrue(decision.responsibilities[0].completion_requires_fresh_evidence)
+        responsibility = decision.responsibilities[0]
+        self.assertEqual(responsibility.output_mode, "information")
+        self.assertNotIn("completion_requires_work", type(responsibility).model_fields)
+        self.assertNotIn("completion_requires_fresh_evidence", type(responsibility).model_fields)
         self.assertEqual(decision.unresolved, [])
 
-    def test_ordinary_speech_cannot_claim_downstream_work(self) -> None:
-        with self.assertRaisesRegex(
-            ValidationError, "immediate contextual answer.*downstream work"
-        ):
-            CognitiveResponsibilityProposal(
-                local_ref="weather",
-                outcome="determine whether it rains in Chongqing this afternoon",
-                bindings={"location": "重庆", "time": "afternoon"},
-                output_mode="speech",
-                completion_requires_work=True,
-                completion_requires_fresh_evidence=False,
-                confidence=0.95,
+    def test_responsibility_rejects_removed_readiness_fields(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "Extra inputs are not permitted"):
+            CognitiveResponsibilityProposal.model_validate(
+                {
+                    "local_ref": "weather",
+                    "outcome": "determine whether it rains in Chongqing this afternoon",
+                    "bindings": {"location": "重庆", "time": "afternoon"},
+                    "output_mode": "information",
+                    "completion_requires_work": True,
+                    "confidence": 0.95,
+                }
             )
 
     def test_already_bound_values_are_not_top_level_uncertainty(self) -> None:
@@ -228,12 +223,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
         self.assertIn(
             "Never combine coordinated positive effects",
-            responsibility["oneOf"][0]["properties"]["outcome"]["description"],
+            responsibility["properties"]["outcome"]["description"],
         )
 
     def test_system_prompt_preserves_speaker_and_immediate_conversation_boundaries(self) -> None:
         prompt = self._interpreter().load_system_prompt()
-        self.assertIn("downstream work beyond the immediate ordinary conversational response", prompt)
+        self.assertIn("Do not decide whether downstream work", prompt)
         self.assertIn("Preserve speaker, experiencer, actor, addressee", prompt)
         self.assertIn("most recent accepted assistant/Chromie utterance", prompt)
         self.assertIn("does not continue, resume, or modify the old Goal", prompt)
@@ -300,7 +295,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("whether the proposition is true", prompt)
         self.assertIn("must not become an assertion", prompt)
         self.assertIn("does not become unresolved merely because its answer is unknown", prompt)
-        self.assertIn("reasoning from facts already supplied by the user", prompt)
+        self.assertIn("unknown answer evidence is downstream evidence/readiness", prompt)
         self.assertIn("do not create or resolve an informationgap", prompt)
         self.assertIn("external or changing information", prompt)
         self.assertIn("declarative statement", prompt)
@@ -317,9 +312,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         self.assertIn("Missing execution inputs belong to Fast Planner", prompt)
         self.assertIn("External Evidence is fresh Evidence", prompt)
-        self.assertIn("fresh INFORMATION from later EXECUTION EVIDENCE", prompt)
-        self.assertIn("acquiring/carrying/handing over a physical object", prompt)
-        self.assertIn("keep completion_requires_fresh_evidence=false", prompt)
+        self.assertIn("External Evidence is fresh Evidence, not semantic uncertainty", prompt)
+        self.assertIn("Preserve body, media, and vocal effects", prompt)
+        self.assertIn("Do not decide whether downstream work, fresh Evidence", prompt)
         self.assertIn("semantically independent new outcome", prompt)
 
     def test_deep_payload_reasons_from_source_without_prior_dto(self) -> None:
@@ -380,144 +375,62 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         responsibility_schema = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        branches = responsibility_schema["oneOf"]
-        for branch in branches:
-            self.assertEqual(
-                set(branch["required"]),
-                {
-                    "local_ref",
-                    "outcome",
-                    "bindings",
-                    "output_mode",
-                    "completion_requires_work",
-                    "completion_requires_fresh_evidence",
-                    "confidence",
-                },
-            )
-            self.assertNotIn("relationship", branch["properties"])
-            self.assertNotIn("target_goal_ids", branch["properties"])
+        self.assertEqual(
+            set(responsibility_schema["required"]),
+            {"local_ref", "outcome", "bindings", "output_mode", "confidence"},
+        )
+        properties = responsibility_schema["properties"]
+        self.assertNotIn("relationship", properties)
+        self.assertNotIn("target_goal_ids", properties)
+        self.assertNotIn("completion_requires_work", properties)
+        self.assertNotIn("completion_requires_fresh_evidence", properties)
         self.assertNotIn("InformationGap", payload["format"]["$defs"])
-        immediate_speech_branch = next(
-            branch
-            for branch in branches
-            if branch["properties"]["output_mode"].get("const") == "speech"
-        )
-        self.assertIs(
-            immediate_speech_branch["properties"]["completion_requires_work"].get(
-                "const"
-            ),
-            False,
-        )
-        non_fresh_work_branch = next(
-            branch
-            for branch in branches
-            if branch["properties"]["completion_requires_fresh_evidence"].get(
-                "const"
-            )
-            is False
-            and branch["properties"]["completion_requires_work"].get("const")
-            is True
-        )
         output_modes = {
             item["const"]
-            for item in non_fresh_work_branch["properties"]["output_mode"]["oneOf"]
+            for item in properties["output_mode"]["oneOf"]
         }
-        self.assertNotIn("unspecified", output_modes)
-        self.assertNotIn("other", output_modes)
-        self.assertNotIn("speech", output_modes)
-        self.assertIn("singing", output_modes)
-        fresh_evidence_branch = next(
-            branch
-            for branch in branches
-            if branch.get("properties", {})
-            .get("completion_requires_fresh_evidence", {})
-            .get("const") is True
-        )
-        self.assertEqual(
-            fresh_evidence_branch["properties"]["output_mode"].get("const"),
-            "capability_work",
-        )
-        self.assertIn(
-            "human-facing outcome itself is to obtain information",
-            fresh_evidence_branch["properties"]["completion_requires_fresh_evidence"]["description"],
-        )
-        self.assertIn(
-            "execution evidence",
-            non_fresh_work_branch["properties"]["completion_requires_fresh_evidence"]["description"],
-        )
+        self.assertIn("information", output_modes)
+        self.assertIn("stateful_effect", output_modes)
+        self.assertIn("speech", output_modes)
+        self.assertIn("body_action", output_modes)
+        self.assertNotIn("capability_work", output_modes)
         nonverbal = next(
             item
-            for item in non_fresh_work_branch["properties"]["output_mode"]["oneOf"]
+            for item in properties["output_mode"]["oneOf"]
             if item.get("const") == "nonverbal_vocalization"
         )
         self.assertIn("excludes singing", nonverbal["description"])
 
-    def test_decoder_schema_structurally_rejects_fresh_evidence_as_speech(self) -> None:
+    def test_decoder_schema_structurally_rejects_removed_readiness_fields(self) -> None:
         responsibility_schema = self._interpreter()._goal_interpretation_response_schema(
             new_relationship_only=True
         )["$defs"]["CognitiveResponsibilityProposal"]
         Draft202012Validator.check_schema(responsibility_schema)
         validator = Draft202012Validator(responsibility_schema)
-        valid_fresh = {
+        invalid = {
             "local_ref": "weather",
-            "outcome": "determine whether Chongqing gets heavy rain this afternoon",
-            "bindings": {
-                "location": "重庆",
-                "day_part": "下午",
-                "precipitation_severity": "大雨",
-            },
-            "output_mode": "capability_work",
-            "completion_requires_work": True,
+            "outcome": "provide today's weather",
+            "bindings": {"location": "重庆"},
+            "output_mode": "information",
             "completion_requires_fresh_evidence": True,
             "confidence": 0.95,
         }
-        self.assertEqual(list(validator.iter_errors(valid_fresh)), [])
-        invalid_speech = {**valid_fresh, "output_mode": "speech"}
-        self.assertTrue(list(validator.iter_errors(invalid_speech)))
-        ordinary_speech = {
-            **valid_fresh,
-            "outcome": "answer from trusted supplied context",
-            "bindings": {},
-            "output_mode": "speech",
-            "completion_requires_work": False,
-            "completion_requires_fresh_evidence": False,
-        }
-        self.assertEqual(list(validator.iter_errors(ordinary_speech)), [])
-        invalid_work_speech = {
-            **ordinary_speech,
-            "completion_requires_work": True,
-        }
-        self.assertTrue(list(validator.iter_errors(invalid_work_speech)))
-        non_fresh_body_work = {
-            **ordinary_speech,
-            "outcome": "blink once",
-            "output_mode": "body_action",
-            "completion_requires_work": True,
-        }
-        self.assertEqual(list(validator.iter_errors(non_fresh_body_work)), [])
-        invalid_immediate_body = {
-            **non_fresh_body_work,
-            "completion_requires_work": False,
-        }
-        self.assertTrue(list(validator.iter_errors(invalid_immediate_body)))
+        self.assertTrue(list(validator.iter_errors(invalid)))
 
     def test_output_mode_prompt_distinguishes_work_from_response_transport(self) -> None:
         prompt = self._interpreter().load_system_prompt()
         self.assertIn("not the eventual response transport", prompt)
-        self.assertIn(
-            "Fresh external information is capability_work even when Chromie will later speak",
-            prompt,
-        )
-        self.assertIn("Apply an evidence gate before choosing", prompt)
-        self.assertIn("fresh capability work, not ordinary speech", prompt)
+        self.assertIn("Use output_mode=information", prompt)
+        self.assertIn("Do not decide whether downstream work", prompt)
+        self.assertIn("Planner owns that judgment", prompt)
         user_prompt = self._interpreter().build_interpretation_user_prompt(
             GoalInterpretationRequest(
                 text="Is the external state current?",
                 language="en-US",
             )
         )
-        self.assertIn("distinguish fresh INFORMATION from later EXECUTION EVIDENCE", user_prompt)
-        self.assertIn("eventually being spoken never makes", user_prompt)
+        self.assertIn("Use output_mode=information", user_prompt)
+        self.assertIn("Planner owns that judgment", user_prompt)
 
     def test_repair_schema_does_not_reintroduce_planning_gap_contract(self) -> None:
         interpreter = self._interpreter()
@@ -538,8 +451,6 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                         "preferred_resolution": "ask_user",
                     }
                 ],
-                completion_requires_work=True,
-                completion_requires_fresh_evidence=True,
                 confidence=0.95,
             )
         except ValidationError as exc:
@@ -578,12 +489,11 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         responsibility = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        for branch in responsibility["oneOf"]:
-            self.assertIn("relationship", branch["properties"])
-            self.assertIn("target_goal_ids", branch["properties"])
-            self.assertIn("relationship", branch["required"])
-            self.assertIn("target_goal_ids", branch["required"])
-        relationship = responsibility["oneOf"][0]["properties"]["relationship"]
+        self.assertIn("relationship", responsibility["properties"])
+        self.assertIn("target_goal_ids", responsibility["properties"])
+        self.assertIn("relationship", responsibility["required"])
+        self.assertIn("target_goal_ids", responsibility["required"])
+        relationship = responsibility["properties"]["relationship"]
         self.assertNotIn("enum", relationship)
         self.assertEqual(
             {item["const"] for item in relationship["oneOf"]},
@@ -605,11 +515,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("never inflect", relationship["description"])
         self.assertNotIn("continues", json.dumps(relationship))
         self.assertNotIn("resumes", json.dumps(relationship))
-        for branch in responsibility["oneOf"]:
-            self.assertEqual(
-                branch["properties"]["target_goal_ids"]["items"]["enum"],
-                ["goal-existing"],
-            )
+        self.assertEqual(
+            responsibility["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-existing"],
+        )
         relationship_targets = responsibility["allOf"][-1]
         self.assertEqual(
             relationship_targets["if"]["properties"]["relationship"],
@@ -647,18 +556,17 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         repair_responsibility = repair["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        for branch in repair_responsibility["oneOf"]:
-            self.assertEqual(
-                branch["properties"]["target_goal_ids"]["items"]["enum"],
-                ["goal-existing"],
-            )
-            self.assertIn(
-                "continue",
-                {
-                    item["const"]
-                    for item in branch["properties"]["relationship"]["oneOf"]
-                },
-            )
+        self.assertEqual(
+            repair_responsibility["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-existing"],
+        )
+        self.assertIn(
+            "continue",
+            {
+                item["const"]
+                for item in repair_responsibility["properties"]["relationship"]["oneOf"]
+            },
+        )
         repair_system, _, _ = _payload_message_texts(repair)
         self.assertIn("copy one exact protocol token", repair_system)
 
@@ -679,8 +587,6 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                             "description": "move forward for ten seconds",
                             "metadata": {
                                 "output_mode": "body_action",
-                                "completion_requires_work": True,
-                                "completion_requires_fresh_evidence": False,
                             },
                         },
                     }
@@ -697,11 +603,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         responsibility = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        for branch in responsibility["oneOf"]:
-            self.assertEqual(
-                branch["properties"]["target_goal_ids"]["items"]["enum"],
-                ["goal-walk"],
-            )
+        self.assertEqual(
+            responsibility["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-walk"],
+        )
 
     def test_repair_schema_excludes_bound_values_from_unresolved(self) -> None:
         interpreter = self._interpreter()
@@ -785,8 +690,6 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                                 "metadata": {
                                     "output_mode": "body_action",
                                     "provider_required": True,
-                                    "completion_requires_work": True,
-                                    "completion_requires_fresh_evidence": False,
                                 },
                             },
                         }
@@ -796,7 +699,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
 
         self.assertIn('"output_mode":"body_action"', prompt)
-        self.assertIn('"completion_requires_work":true', prompt)
+        self.assertNotIn("completion_requires_work", prompt)
         self.assertIn(
             "continues or resumes one supplied Goal must preserve", prompt
         )
@@ -832,7 +735,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             GoalInterpretationRequest(text="What's the weather in Chongqing today?")
         )
         self.assertEqual(result.responsibilities[0].local_ref, "r1")
-        self.assertTrue(result.responsibilities[0].completion_requires_fresh_evidence)
+        self.assertEqual(result.responsibilities[0].output_mode, "information")
         self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_provider_key_value_bindings_are_mechanically_normalized(self) -> None:
@@ -849,8 +752,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "output_mode": "body_action",
                     "relationship": "new",
                     "target_goal_ids": [],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],
@@ -885,8 +786,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "output_mode": "body_action",
                     "relationship": "new",
                     "target_goal_ids": [],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],
@@ -916,21 +815,18 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Audit declarative context before counting outcomes", system_text)
         self.assertIn("states a future plan is context", user_text)
 
-    def test_body_action_completion_is_not_fresh_information(self) -> None:
-        with self.assertRaisesRegex(
-            ValidationError, "not a fresh-information Responsibility"
-        ):
-            CognitiveResponsibilityProposal.model_validate(
-                {
-                    "local_ref": "walk",
-                    "outcome": "move forward for ten seconds",
-                    "bindings": {"duration": "10 seconds"},
-                    "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
-                    "confidence": 0.95,
-                }
-            )
+    def test_body_action_remains_a_what_modality_not_readiness(self) -> None:
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "walk",
+                "outcome": "move forward for ten seconds",
+                "bindings": {"duration": "10 seconds"},
+                "output_mode": "body_action",
+                "confidence": 0.95,
+            }
+        )
+        self.assertEqual(responsibility.output_mode, "body_action")
+        self.assertNotIn("completion_requires_fresh_evidence", type(responsibility).model_fields)
 
     async def test_continuation_cannot_turn_retained_body_work_into_speech(self) -> None:
         interpreter = self._interpreter()
@@ -944,8 +840,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "output_mode": "speech",
                     "relationship": "continue",
                     "target_goal_ids": ["goal-walk"],
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],
@@ -953,7 +847,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         }
         corrected = copy.deepcopy(wrong)
         corrected["responsibilities"][0]["output_mode"] = "body_action"
-        corrected["responsibilities"][0]["completion_requires_work"] = True
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
             side_effect=[
                 {"message": {"content": json.dumps(wrong, ensure_ascii=False)}},
@@ -978,8 +871,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                             "metadata": {
                                 "output_mode": "body_action",
                                 "provider_required": True,
-                                "completion_requires_work": True,
-                                "completion_requires_fresh_evidence": False,
                             },
                         },
                     }
@@ -991,7 +882,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         responsibility = result.responsibilities[0]
         self.assertEqual(responsibility.output_mode, "body_action")
-        self.assertTrue(responsibility.completion_requires_work)
         self.assertEqual(interpreter._chat.await_count, 2)
         self.assertEqual(
             interpreter._chat.await_args_list[1].kwargs["stage"],
@@ -1044,14 +934,13 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         responsibility_contract = deep_payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]
-        for branch in responsibility_contract["oneOf"]:
-            location_contract = branch["properties"]["bindings"]["properties"][
-                "location"
-            ]
-            self.assertIn("北京", location_contract["enum"])
-            self.assertNotIn("Beijing", location_contract["enum"])
+        location_contract = responsibility_contract["properties"]["bindings"]["properties"][
+            "location"
+        ]
+        self.assertIn("北京", location_contract["enum"])
+        self.assertNotIn("Beijing", location_contract["enum"])
 
-    async def test_multiple_fresh_evidence_claims_escalate_from_source(self) -> None:
+    async def test_multiple_information_responsibilities_do_not_force_deep_by_count(self) -> None:
         interpreter = self._interpreter()
         weather = _valid_output()
         oversegmented = {
@@ -1083,12 +972,8 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        self.assertEqual(len(result.responsibilities), 1)
-        self.assertEqual(interpreter._chat.await_count, 2)
-        self.assertEqual(
-            interpreter._chat.await_args_list[1].kwargs["stage"],
-            "goal_interpretation_deep",
-        )
+        self.assertEqual(len(result.responsibilities), 2)
+        self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_planner_gap_fields_escalate_once_from_source(self) -> None:
         interpreter = self._interpreter()
@@ -1119,8 +1004,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                         }
                     ],
                     "resolved_gap_ids": [],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 }
             ],
@@ -1139,8 +1022,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     },
                     "relationship": "new",
                     "target_goal_ids": [],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
+                    "output_mode": "information",
                     "confidence": 0.95,
                 }
             ],
@@ -1162,7 +1044,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         responsibility = result.responsibilities[0]
         self.assertFalse(hasattr(responsibility, "information_gaps"))
-        self.assertTrue(responsibility.completion_requires_fresh_evidence)
+        self.assertEqual(responsibility.output_mode, "information")
         self.assertEqual(interpreter._chat.await_count, 2)
         self.assertEqual(
             interpreter._chat.await_args_list[1].kwargs["stage"],
@@ -1178,8 +1060,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "device_action",
                     "outcome": "turn off the referenced device",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.72,
                 }
             ],
@@ -1215,8 +1095,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "weather",
                     "outcome": "provide today's weather for the requested location",
                     "bindings": {"date": "today"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.9,
                 }
             ],
@@ -1257,8 +1135,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                         }
                     ],
                     "resolved_gap_ids": [],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 }
             ],
@@ -1277,8 +1153,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     },
                     "relationship": "new",
                     "target_goal_ids": [],
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 }
             ],
@@ -1390,8 +1264,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "greeting",
                     "outcome": "respond naturally to the greeting",
                     "bindings": {"language": "zh-CN"},
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],
@@ -1424,8 +1296,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "outcome": "respond to the user's acknowledgement",
                     "bindings": {"user_input": "Yeah."},
                     "output_mode": "speech",
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],
@@ -1457,8 +1327,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                         "language": "zh-CN",
                         "text": "边走边唱歌",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 }
             ],
@@ -1471,16 +1339,12 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "walk",
                     "outcome": "walk forward",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "sing",
                     "outcome": "sing audibly while walking",
                     "bindings": {"coordinate_with": "walk"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.95,
                 },
             ],
@@ -1515,16 +1379,12 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "r1",
                     "outcome": "walk ahead",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "sing simultaneously",
                     "bindings": {"simultaneously": "with blinking eyes"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
             ],
@@ -1537,24 +1397,18 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "r1",
                     "outcome": "walk ahead",
                     "bindings": {"coordinate_with": ["r2", "r3"]},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "sing",
                     "bindings": {"coordinate_with": ["r1", "r3"]},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r3",
                     "outcome": "blink eyes",
                     "bindings": {"coordinate_with": ["r1", "r2"]},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
             ],
@@ -1590,8 +1444,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "outcome": "walk",
                     "bindings": {"mode": "simultaneous"},
                     "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
                 {
@@ -1599,8 +1451,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "outcome": "sing",
                     "bindings": {"simultaneously": "simultaneously"},
                     "output_mode": "singing",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
             ],
@@ -1632,9 +1482,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                     "local_ref": "r1",
                     "outcome": "combined request",
                     "bindings": {"action_combination": ["r1"]},
-                    "output_mode": "capability_work",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
+                    "output_mode": "information",
                     "confidence": 0.95,
                 }
             ],

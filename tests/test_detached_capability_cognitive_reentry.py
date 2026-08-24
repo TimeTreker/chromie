@@ -253,19 +253,15 @@ def _response() -> InteractionResponse:
                     {
                         "local_ref": "read-first",
                         "outcome": "Obtain the first requested result.",
-                        "output_mode": "capability_work",
+                        "output_mode": "information",
                         "relationship": "new",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 1.0,
                     },
                     {
                         "local_ref": "read-second",
                         "outcome": "Obtain the second requested result.",
-                        "output_mode": "capability_work",
+                        "output_mode": "information",
                         "relationship": "new",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 1.0,
                     },
                 ]

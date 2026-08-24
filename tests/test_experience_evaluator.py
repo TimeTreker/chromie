@@ -42,7 +42,6 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                             {
                                 "local_ref": "walk",
                                 "outcome": "Walk forward for 15 seconds, quickly.",
-                                "completion_requires_work": True,
                                 "confidence": 0.95,
                             }
                         ],
@@ -162,7 +161,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                             {
                                 "local_ref": "blink",
                                 "outcome": "Blink five times.",
-                                "completion_requires_work": True,
+                                "output_mode": "body_action",
                                 "confidence": 0.82,
                             }
                         ],
@@ -206,7 +205,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                             {
                                 "local_ref": "blink",
                                 "outcome": "Blink five times.",
-                                "completion_requires_work": True,
+                                "output_mode": "body_action",
                                 "confidence": 0.82,
                             }
                         ],

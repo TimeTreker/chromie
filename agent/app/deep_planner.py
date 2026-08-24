@@ -104,7 +104,6 @@ class DeepPlannerResolver:
         ollama: OllamaClient,
         catalog: CapabilityCatalog,
         *,
-        min_confidence: float = 0.65,
         num_ctx: int = 8192,
         num_predict: int = 1024,
         max_capabilities: int = 96,
@@ -113,7 +112,6 @@ class DeepPlannerResolver:
     ) -> None:
         self.ollama = ollama
         self.catalog = catalog
-        self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
         self.num_ctx = max(4096, int(num_ctx))
         self.num_predict = max(256, int(num_predict))
         self.max_capabilities = max(1, min(256, int(max_capabilities)))
@@ -511,7 +509,6 @@ class DeepPlannerResolver:
                 expected_goal_ids=expected_goal_ids_for_turn,
                 authoritative_goals=authoritative_goals,
                 requires_execution=requires_execution,
-                min_confidence=self.min_confidence,
                 min_goal_satisfaction=self.min_goal_satisfaction,
             )
             errors = [

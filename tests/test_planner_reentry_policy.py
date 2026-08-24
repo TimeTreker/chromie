@@ -43,19 +43,15 @@ def _response(*, include_interpretation: bool = True) -> InteractionResponse:
                 {
                     "local_ref": "responsibility-a",
                     "outcome": "Obtain the first requested result.",
-                    "output_mode": "capability_work",
+                    "output_mode": "information",
                     "relationship": "new",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 1.0,
                 },
                 {
                     "local_ref": "responsibility-b",
                     "outcome": "Obtain the second requested result.",
-                    "output_mode": "capability_work",
+                    "output_mode": "information",
                     "relationship": "new",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 1.0,
                 },
             ]
@@ -140,10 +136,8 @@ def test_one_unbound_responsibility_does_not_cover_multiple_goals() -> None:
             {
                 "local_ref": "responsibility-a",
                 "outcome": "Obtain one requested result.",
-                "output_mode": "capability_work",
+                "output_mode": "information",
                 "relationship": "new",
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": True,
                 "confidence": 1.0,
             }
         ]

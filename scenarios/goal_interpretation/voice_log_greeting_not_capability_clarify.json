@@ -32,11 +32,10 @@
               "local_ref": "r1",
               "outcome": "respond to the user's greeting",
               "bindings": {},
-              "completion_requires_work": false,
-              "completion_requires_fresh_evidence": false,
               "confidence": 0.94,
               "relationship": "new",
-              "target_goal_ids": []
+              "target_goal_ids": [],
+              "output_mode": "speech"
             }
           ],
           "unresolved": []
@@ -57,11 +56,10 @@
         "local_ref": "r1",
         "outcome": "respond to the user's greeting",
         "bindings": {},
-        "completion_requires_work": false,
-        "completion_requires_fresh_evidence": false,
         "confidence": 0.94,
         "relationship": "new",
-        "target_goal_ids": []
+        "target_goal_ids": [],
+        "output_mode": "speech"
       }
     ]
   }

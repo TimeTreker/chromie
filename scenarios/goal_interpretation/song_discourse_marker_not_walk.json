@@ -24,9 +24,8 @@
           "bindings": {},
           "relationship": "new",
           "target_goal_ids": [],
-          "completion_requires_work": true,
-          "completion_requires_fresh_evidence": false,
-          "confidence": 0.91
+          "confidence": 0.91,
+          "output_mode": "singing"
         }
       ],
       "unresolved": []
@@ -47,9 +46,8 @@
         "bindings": {},
         "relationship": "new",
         "target_goal_ids": [],
-        "completion_requires_work": true,
-        "completion_requires_fresh_evidence": false,
-        "confidence": 0.91
+        "confidence": 0.91,
+        "output_mode": "singing"
       }
     ]
   }

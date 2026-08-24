@@ -240,6 +240,18 @@ class CompleteResourceCatalog(FakeCatalog):
 
 
 
+def _test_what_mode(text: str, *, goal_metadata: dict | None = None) -> str:
+    configured = str((goal_metadata or {}).get("output_mode") or "").strip()
+    if configured and configured != "capability_work":
+        return configured
+    lowered = str(text or "").casefold()
+    if any(token in lowered for token in ("weather", "天气", "下雨", "rain", "temperature", "温度", "check", "determine whether")):
+        return "information"
+    if any(token in lowered for token in ("hello", "你好", "greet", "joke", "笑话", "feel", "feeling", "tired", "累")):
+        return "speech"
+    return "body_action"
+
+
 def _work_request(**kwargs):
     context = dict(kwargs.pop("context", {}) or {})
     responsibilities = kwargs.pop("responsibilities", None)
@@ -252,14 +264,18 @@ def _work_request(**kwargs):
                 "local_ref": "r1",
                 "outcome": text or "satisfy the current user outcome",
                 "bindings": {},
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": False,
+                "output_mode": _test_what_mode(text),
                 "confidence": 0.9,
             }
         ]
+    normalized_responsibilities = []
+    for item in responsibilities:
+        payload = dict(item) if isinstance(item, dict) else item.model_dump(mode="json")
+        payload.setdefault("output_mode", _test_what_mode(str(payload.get("outcome") or kwargs.get("text") or "")))
+        normalized_responsibilities.append(payload)
     return CognitiveWorkRequest(
         **kwargs,
-        responsibilities=responsibilities,
+        responsibilities=normalized_responsibilities,
         interpretation_confidence=0.9,
         context=context,
     )
@@ -286,8 +302,7 @@ def request(text: str, *, goal_ids=None, goal_metadata=None):
                 "local_ref": "r1",
                 "outcome": text,
                 "bindings": {},
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": False,
+                "output_mode": _test_what_mode(text, goal_metadata=goal_metadata),
                 "confidence": 0.9,
             }
         ],
@@ -1474,8 +1489,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "morning",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -1498,7 +1511,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         progress = schema["$defs"]["FastPlannerProgressAct"]
         self.assertEqual(
             progress["properties"]["progress_kind"]["enum"],
-            ["check_information"],
+            ["acknowledge_work", "check_information", "perform_action"],
         )
         self.assertNotIn("timing", progress["properties"])
         self.assertEqual(
@@ -1551,8 +1564,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "outcome": "greet the user warmly",
                     "bindings": {},
                     "output_mode": "speech",
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.98,
                 }
             ],
@@ -1590,8 +1601,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "output_mode": "body_action",
                 "relationship": "continue",
                 "target_goal_ids": ["goal-walk"],
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": False,
                 "confidence": 0.96,
             }
         )
@@ -1629,7 +1638,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             planner_prompt.fast_first_response_prompt(
                 request,
                 responsibilities=[responsibility],
-                needs_work=True,
             )
         )
 
@@ -1646,8 +1654,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         schema = planner_schema.fast_first_response_response_schema(
             ["walk"],
             responsibilities=[responsibility],
-            needs_work=True,
-            required_progress_kind="perform_action",
             language="zh-CN",
         )
         text_contract = schema["$defs"]["FastPlannerProgressAct"]["properties"][
@@ -1727,8 +1733,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "night",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -1794,8 +1798,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "outcome": "continue moving forward for 10 seconds",
                     "bindings": {"direction": "forward", "duration": "10 seconds"},
                     "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.96,
                 }
             ],
@@ -1838,8 +1840,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "outcome": "continue moving forward for 10 seconds",
                     "bindings": {"direction": "forward", "duration": "10 seconds"},
                     "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.96,
                 }
             ],
@@ -1899,8 +1899,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "night",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -1973,8 +1971,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "determine whether it rains in Chongqing tonight",
                     "bindings": {"location": "重庆", "time": "tonight"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -2026,8 +2022,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "night",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -2085,8 +2079,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "outcome": "sing a song",
                     "bindings": {},
                     "output_mode": "singing",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.99,
                 }
             ],
@@ -2136,8 +2128,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "outcome": "walk",
                     "bindings": {},
                     "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.99,
                 },
                 {
@@ -2145,8 +2135,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "outcome": "sing",
                     "bindings": {},
                     "output_mode": "singing",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.99,
                 },
             ],
@@ -2200,8 +2188,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "night",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -2238,15 +2224,12 @@ class FastPlannerResolverTests(unittest.TestCase):
             == ["execute", "mixed"]
         )
         self.assertEqual(
-            execute_constraint["then"]["properties"]["activities"][
-                "prefixItems"
-            ],
-            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
-        )
-        self.assertEqual(
             ollama.prompts[0][1]["response_format"]["properties"]["activities"]
             ["items"]["oneOf"],
-            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
+            [
+                {"$ref": "#/$defs/FastPlannerCapabilityActivity"},
+                {"$ref": "#/$defs/FastPlannerClarificationAct"},
+            ],
         )
 
     def test_advance_cannot_replace_explicit_quantity_with_capability_default(self):
@@ -2314,8 +2297,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "duration": "10 seconds",
                     },
                     "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],
@@ -2371,8 +2352,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "morning",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -2475,8 +2454,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "local_ref": "greeting",
                         "outcome": "Socially reciprocate the user's greeting.",
                         "bindings": {},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 0.98,
                     }
                 ],
@@ -2547,8 +2524,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "turn off the device the user means",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.72,
                 }
             ],
@@ -2581,8 +2556,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "turn off the device the user means",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.72,
                 }
             ],
@@ -2620,8 +2593,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "tell the user whether it will rain today",
                     "bindings": {"date": "today"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.94,
                 }
             ],
@@ -2675,8 +2646,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "clock",
                     "outcome": "determine the current local time",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -2703,8 +2672,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "local_ref": "clock",
                 "outcome": "determine the current local time",
                 "bindings": {},
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": True,
                 "confidence": 0.96,
             }
         )
@@ -2749,7 +2716,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             planner_prompt.fast_first_response_prompt(
                 run_request,
                 responsibilities=[responsibility],
-                needs_work=True,
             )
         )
         self.assertIn("An imperative addressed to Chromie makes Chromie the actor", author_prompt)
@@ -2797,16 +2763,13 @@ class FastPlannerResolverTests(unittest.TestCase):
     def test_first_response_schema_avoids_provider_think_control_token(self):
         schema = planner_schema.fast_first_response_response_schema(
             ["walk"],
-            needs_work=True,
-            needs_fresh_evidence=False,
-            required_progress_kind="perform_action",
             language="zh-CN",
         )
 
         progress = schema["$defs"]["FastPlannerProgressAct"]
         self.assertEqual(
             progress["properties"]["progress_kind"]["enum"],
-            ["perform_action"],
+            ["acknowledge_work", "check_information", "perform_action"],
         )
         self.assertNotIn("think", str(schema))
 
@@ -2839,8 +2802,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "tired",
                     "outcome": "acknowledge that the human feels tired",
                     "bindings": {"experiencer": "human"},
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.96,
                 }
             ],
@@ -2875,8 +2836,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "tired",
                     "outcome": "acknowledge that the human feels tired",
                     "bindings": {"experiencer": "human"},
-                    "completion_requires_work": False,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.96,
                 }
             ],
@@ -2919,8 +2878,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "tell the user whether it will rain today",
                     "bindings": {"date": "today"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.94,
                 }
             ],
@@ -2959,8 +2916,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "night",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -2993,8 +2948,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "tell the user whether it will rain in Chongqing today",
                     "bindings": {"location": "重庆", "date": "today"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -3039,8 +2992,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     {
                         "local_ref": "greeting",
                         "outcome": "Socially reciprocate the user's greeting.",
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 0.98,
                     }
                 ]
@@ -3089,8 +3040,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "local_ref": "greeting",
                         "outcome": "Socially reciprocate the user's greeting.",
                         "bindings": {},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 0.98,
                     }
                 ]
@@ -3118,8 +3067,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "location": "重庆",
                 "temporal_scope": "今晚",
             },
-            "completion_requires_work": True,
-            "completion_requires_fresh_evidence": True,
             "confidence": 0.95,
         }
         run_request = _work_request(
@@ -3159,8 +3106,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "location": "Chongqing",
                 "temporal_scope": "今天晚上",
             },
-            "completion_requires_work": True,
-            "completion_requires_fresh_evidence": True,
             "confidence": 0.95,
         }
         run_request = _work_request(
@@ -3300,8 +3245,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "date": "today",
                     "day_part": "morning",
                 },
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": True,
                 "confidence": 0.96,
             }
         )
@@ -3382,8 +3325,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "date": "today",
                     "time_of_day": "白天",
                 },
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": True,
                 "confidence": 0.96,
             }
         )
@@ -3408,6 +3349,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             activity_refs,
             {
+                "#/$defs/FastPlannerCompleteResponseAct",
                 "#/$defs/FastPlannerProgressAct",
                 "#/$defs/FastPlannerClarificationAct",
                 "#/$defs/FastPlannerCapabilityActivity",
@@ -3440,8 +3382,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "local_ref": "weather",
                 "outcome": "Describe today's weather at the requested location.",
                 "bindings": {"date": "today"},
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": True,
                 "confidence": 0.96,
             }
         )
@@ -3458,6 +3398,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             activity_refs,
             {
+                "#/$defs/FastPlannerCompleteResponseAct",
                 "#/$defs/FastPlannerProgressAct",
                 "#/$defs/FastPlannerClarificationAct",
                 "#/$defs/FastPlannerCapabilityActivity",
@@ -3471,8 +3412,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "outcome": "continue moving forward for 10 seconds",
                 "bindings": {"direction": "forward", "duration": "10 seconds"},
                 "output_mode": "body_action",
-                "completion_requires_work": True,
-                "completion_requires_fresh_evidence": False,
                 "confidence": 0.96,
             }
         )
@@ -3569,8 +3508,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "date": "today",
                         "day_part": "night",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.96,
                 }
             ],
@@ -3641,8 +3578,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "date": "today",
                             "time_of_day": "白天",
                         },
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.96,
                     }
                 ]
@@ -3683,8 +3618,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "local_ref": "weather",
                         "outcome": "Tell the user whether it will rain in Chongqing tonight.",
                         "bindings": {"location": "重庆", "time": "今晚"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.96,
                     }
                 ]
@@ -3751,8 +3684,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "date": "today",
                             "time_of_day": "上午",
                         },
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.96,
                     }
                 ]
@@ -3814,16 +3745,12 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "run forward",
                     "output_mode": "body_action",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "sing",
                     "output_mode": "singing",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 },
             ],
@@ -3868,18 +3795,14 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "determine whether it rains heavily in Chongqing tonight",
                     "bindings": {"location": "重庆", "time": "今天晚上"},
-                    "output_mode": "capability_work",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
+                    "output_mode": "information",
                     "confidence": 0.95,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "determine whether Chongqing is hot tonight",
                     "bindings": {"location": "重庆", "time": "今天晚上"},
-                    "output_mode": "capability_work",
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
+                    "output_mode": "information",
                     "confidence": 0.95,
                 },
             ],
@@ -3958,8 +3881,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "local_ref": "weather",
                         "outcome": "Tell the user whether it will rain in Chongqing tonight.",
                         "bindings": {"location": "重庆", "time": "今晚"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.96,
                     }
                 ]
@@ -4021,8 +3942,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "local_ref": "weather",
                         "outcome": "Tell the user today's Chongqing temperature.",
                         "bindings": {"location": "重庆", "time": "today"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": True,
                         "confidence": 0.96,
                     }
                 ]
@@ -6196,11 +6115,19 @@ class FastPlannerResolverTests(unittest.TestCase):
         first_schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("execute", first_schema["properties"]["disposition"]["enum"])
 
-    def test_low_confidence_complete_claim_is_forced_to_escalate(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.51,"goal_ids":["goal-blink"],"steps":[{"capability_id":"soridormi.blink_eyes","args":{"count":3}}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
-        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog(), min_confidence=0.8).resolve(request("眨眼。", goal_ids=["goal-blink"])))
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.steps, [])
+    def test_low_confidence_complete_plan_is_not_rejected_by_confidence_alone(self):
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            confidence=0.01,
+            goal_summary="Blink three times.",
+            steps=[execute_step("blink", "soridormi.blink_eyes", {"count": 3}, ["goal-blink"], "Blink as requested.")],
+            goal_outcomes={"goal-blink": execute_outcome("goal-blink", ["blink"], "The blink action exactly covers the Goal.")},
+            goal_satisfaction=exact_satisfaction(["goal-blink"]),
+        )
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨眼。", goal_ids=["goal-blink"])))
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(len(plan.steps), 1)
 
     def test_non_common_or_non_executable_skill_escalates(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"timing":"sequential","source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}

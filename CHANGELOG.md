@@ -16,34 +16,19 @@ remains available in Git history.
 
 ### Goal Progress Communication
 
-- Defined Fast Response as the first milestone of a shared Goal Progress
-  Communication responsibility rather than task confirmation or Social Attention.
-- All speech-capable cognitive stages now receive one shared progress-communication
-  principle: communicate only a new, trustworthy, user-relevant milestone and use
-  Interaction Context to avoid repeated acknowledgements or status narration.
-- Made the initial Fast Response normally responsive rather than silence-biased:
-  once Goal Interpretation has understood a nontrivial Goal that still needs
-  downstream work, it should give one tiny polite prospective notification unless
-  the substantive answer is immediate, an equivalent notification already exists,
-  the user requested silence, or another line would only repeat or add empty chatter.
-- Removed the production Fast-speech reviewer entirely. Goal Interpretation is the
-  sole semantic owner of its Fast Response; Host/runtime code validates only typed,
-  evidence, cancellation, and transport invariants. Semantic mistakes are fixed at
-  the source prompt/model boundary and measured by regression/benchmark scenarios.
-- Removed the redundant tool-only Fast Response gate and the pre-commit memory mute;
-  all eligible downstream-work routes use the same source-authored prospective
-  notification contract, while memory wording still cannot claim a completed commit.
-- Made the model-facing Fast Response decision required-but-nullable: Goal
-  Interpretation must return either one short `fast_speech` notification or explicit
-  `null`; it can no longer silently omit the responsibility. The Host now derives the
-  deterministic route-specific claim envelope instead of asking the fast model to
-  copy those invariants.
-- Removed the prompt contradiction between structured Goal Progress Communication
-  and the old blanket ban on "progress text"; only free-form progress narration
-  outside the structured speech field is forbidden.
-- Preserve a Fast Planner progress candidate across unrelated escalation only as an
-  `undelivered_advisory` for Deep Planning. It never counts as heard speech and must
-  still be reconciled with Interaction Context and current evidence.
+- Restored Goal Interpretation to WHAT-only authority. `CognitiveResponsibilityProposal`
+  no longer carries work/fresh-evidence readiness flags and cannot emit the old
+  `capability_work` planning category; information and durable state-change requests
+  remain provider-neutral WHAT categories until Goal Association/Planner project them.
+- Moved the latency-critical first Communicative Activity fully under Fast Planner.
+  The model may choose one useful progress/complete response **or explicit silence**;
+  entering a planning phase never forces a spoken acknowledgement.
+- Removed confidence-only Fast/Deep gates. Confidence remains telemetry; material
+  uncertainty, consequence, dependency complexity, or a bounded Fast failure decides
+  whether deeper planning is warranted.
+- Made Reflection an internal evidence-bound advisory path rather than a synthetic
+  user Responsibility. Reflection does not directly mutate Goal lifecycle state; any
+  replan, clarification, correction, or silence decision returns through Planner.
 
 ### Interaction-delta cognition contract
 

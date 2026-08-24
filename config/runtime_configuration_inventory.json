@@ -258,16 +258,6 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_DEEP_PLANNER_MIN_CONFIDENCE",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
       "key": "AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION",
       "owners": [
         ".env.common",
@@ -457,16 +447,6 @@
       "boolean": false,
       "category": "service_internal",
       "key": "AGENT_FAST_PLANNER_MAX_CAPABILITIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_FAST_PLANNER_MIN_CONFIDENCE",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -4032,10 +4012,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 130,
       "public_choice": 9,
-      "service_internal": 209
+      "service_internal": 207
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 385
+    "total_keys": 383
   }
 }

@@ -317,8 +317,6 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "socially reciprocate the greeting",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.93,
                 }
             ],
@@ -350,7 +348,6 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                         "vocal_mode": "singing",
                     },
                 },
-                completion_requires_work=True,
                 confidence=0.9,
             )
 
@@ -365,16 +362,12 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "provide current reference status",
                     "bindings": {"subject": "reference status"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": True,
                     "confidence": 0.98,
                 },
                 {
                     "local_ref": "r2",
                     "outcome": "move forward",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.96,
                 },
             ],
@@ -402,8 +395,6 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "answer the user's identity question",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.97,
                 }
             ],
@@ -429,8 +420,6 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "move forward",
                     "bindings": {},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.97,
                 }
             ],

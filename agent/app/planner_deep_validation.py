@@ -667,7 +667,6 @@ def deep_plan_validation_errors(
     expected_goal_ids: list[str],
     authoritative_goals: list[dict[str, Any]],
     requires_execution: bool,
-    min_confidence: float,
     min_goal_satisfaction: float,
 ) -> list[dict[str, Any]]:
     allowed = {item["capability_id"]: item for item in capabilities}
@@ -689,14 +688,6 @@ def deep_plan_validation_errors(
             {
                 "type": "canonical_goal_requires_executable_step",
                 "disposition": plan.disposition,
-            }
-        )
-    if plan.coverage == "complete" and plan.confidence < min_confidence:
-        errors.append(
-            {
-                "type": "confidence_below_threshold",
-                "confidence": plan.confidence,
-                "required": min_confidence,
             }
         )
     if plan.coverage == "complete":

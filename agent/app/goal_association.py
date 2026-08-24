@@ -192,14 +192,18 @@ class GoalAssociationResolver:
             responsibility_count=len(request.responsibilities),
             responsibility_refs=[item.local_ref for item in request.responsibilities],
             responsibility_output_modes={
-                item.local_ref: item.output_mode
+                item.local_ref: (
+                    "capability_work"
+                    if item.output_mode in {"information", "stateful_effect"}
+                    else item.output_mode
+                )
                 for item in request.responsibilities
                 if item.output_mode != "unspecified"
             },
-            responsibility_fresh_evidence_refs={
+            responsibility_information_refs={
                 item.local_ref
                 for item in request.responsibilities
-                if item.completion_requires_fresh_evidence
+                if item.output_mode == "information"
             },
             responsibility_bindings={
                 item.local_ref: {
@@ -1510,18 +1514,6 @@ class GoalAssociationResolver:
                         "execution_lane": item.execution_lane,
                         "output_mode": item.output_mode,
                         "provider_required": item.provider_required,
-                        "completion_requires_work": any(
-                            responsibility_by_ref[source_ref].completion_requires_work
-                            for source_ref in item.source_responsibility_refs
-                            if source_ref in responsibility_by_ref
-                        ),
-                        "completion_requires_fresh_evidence": any(
-                            responsibility_by_ref[
-                                source_ref
-                            ].completion_requires_fresh_evidence
-                            for source_ref in item.source_responsibility_refs
-                            if source_ref in responsibility_by_ref
-                        ),
                         "media_operation": item.media_operation,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)

@@ -885,7 +885,7 @@ certificate-repair fallback.
 | `AGENT_FAST_FIRST_RESPONSE_MODEL` | Defaults to the active Agent model; owns the latency-critical first natural Communicative Activity. |
 | `AGENT_FAST_TRUTH_MODEL` | Defaults to `AGENT_FAST_FIRST_RESPONSE_MODEL`; qualifies that model's immutable wording for truth and semantic consistency without authoring a replacement. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `2500`; Fast Planner model timeout. |
-| `AGENT_FAST_PLANNER_MIN_CONFIDENCE` | `0.80`; complete plans below this threshold are converted to escalation. |
+Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. |
 | `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
@@ -894,7 +894,6 @@ certificate-repair fallback.
 | `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
 | `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
-| `AGENT_DEEP_PLANNER_MIN_CONFIDENCE` | `0.65`; a complete Deep plan below this threshold fails closed. Confidence does not authorize another Deep semantic pass. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |

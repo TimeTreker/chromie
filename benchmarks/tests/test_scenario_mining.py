@@ -66,8 +66,6 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
                         "local_ref": "r1",
                         "outcome": "walk forward instead of making a social gesture",
                         "bindings": {"direction": "forward"},
-                        "completion_requires_work": True,
-                        "completion_requires_fresh_evidence": False,
                         "confidence": 0.95,
                     }
                 ],
@@ -84,8 +82,6 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
                     "local_ref": "r1",
                     "outcome": "walk forward instead of making a social gesture",
                     "bindings": {"direction": "forward"},
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.95,
                 }
             ],

@@ -17,7 +17,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerAdvance,
     FastPlannerFirstResponse,
 )
-from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
 from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -271,7 +271,7 @@ class AgentClient:
         self,
         session: aiohttp.ClientSession,
         *,
-        request: CognitiveWorkRequest,
+        request: ReflectionRequest,
         timeout_ms: int | None = None,
     ) -> ReflectionResolution:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))

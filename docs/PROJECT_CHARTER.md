@@ -281,21 +281,22 @@ Read the diagram with these boundaries:
 
 - Goal Interpretation owns **provider-neutral contextual Responsibility evidence**:
   what human outcome appears to be wanted, material semantic bindings already
-  present in the turn/context, whether the Responsibility creates, continues,
-  modifies, clarifies, or otherwise relates to a supplied Goal, whether downstream
-  work or fresh evidence is required, and bounded unresolved material meaning such
-  as an ambiguous outcome, scope, or referent. It may interpret a reply against a
-  pending clarification in Session Context and propose the resulting Goal
+  present in the turn/context, and whether the Responsibility creates, continues,
+  modifies, clarifies, or otherwise relates to a supplied Goal. It may preserve a
+  requested human-level modality such as speech, information, an embodied effect, or
+  a durable state change when that modality is part of WHAT. It does **not** decide
+  whether downstream work or fresh Evidence is required. It may interpret a reply
+  against a pending clarification in Session Context and propose the resulting Goal
   relationship, but it does not create or resolve planning `InformationGap` objects,
   declare Capability or execution inputs missing, classify them as blocking, or
   choose `ask_user`, context, observation, query, or default as their resolution.
   Absence of external result Evidence is not unresolved user meaning. GI may propose
   Goal relationships but cannot commit canonical Goal state. Neither GI depth may
-  author conversational response wording, Work, a
-  Primary-Activity contract, Plan steps, execution lanes, realization, Capability
-  selection, executable arguments, provider requests, or authorization.
-  `completion_requires_work` says only that work remains; it is not a description
-  of that Work.
+  author conversational response wording, Work, a Primary-Activity contract, Plan
+  steps, execution lanes, realization, Capability selection, executable arguments,
+  provider requests, authorization, or readiness flags. Planner derives whether work
+  or fresh Evidence is still needed from canonical Goal state, current Evidence, and
+  available Capability truth.
 - The same GI result first enters Fast Planner's bounded first-response phase. That
   phase may author one immediately realizable Communicative Activity, but it cannot
   select a Capability, resolve an execution input, or ask a planning clarification.

@@ -167,10 +167,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                             "local_ref": "weather-result",
                             "outcome": "Determine whether rain is expected this morning.",
                             "bindings": {},
-                            "output_mode": "capability_work",
+                            "output_mode": "information",
                             "relationship": "new",
-                            "completion_requires_work": True,
-                            "completion_requires_fresh_evidence": True,
                             "confidence": 1.0,
                         }
                     ]

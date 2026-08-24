@@ -119,7 +119,6 @@ def qualify_fast_canonical_plan(
     expected_goal_ids_for_turn: list[str],
     authoritative_goals: list[dict[str, Any]],
     evidence_reentry_goal_ids: set[str],
-    min_confidence: float,
 ) -> FastPlanQualification:
     allowed = {item["capability_id"]: item for item in capability_payload}
     contract_schema = (
@@ -176,14 +175,13 @@ def qualify_fast_canonical_plan(
                 "authority": "advisory",
                 "path_classification": "semantic_escalation",
                 "common_capability_count": len(capability_payload),
-                "min_confidence": min_confidence,
                 "contract_schema": contract_schema,
                 "canonical_contract": "CanonicalPlan",
                 **counts,
             }
         )
         return FastPlanQualification(True, plan.model_copy(update={"metadata": metadata}))
-    if plan.coverage != "complete" or plan.confidence < min_confidence:
+    if plan.coverage != "complete":
         return reject(
             "coverage_not_complete",
             unresolved=list(plan.unresolved),
@@ -237,7 +235,6 @@ def qualify_fast_canonical_plan(
             "status": "complete",
             "authority": "advisory",
             "common_capability_count": len(capability_payload),
-            "min_confidence": min_confidence,
             "contract_schema": contract_schema,
             "canonical_contract": "CanonicalPlan",
             "path_classification": "terminal",
@@ -404,15 +401,6 @@ def validate_fast_advance_output(
                 "disposition; missing="
                 + ",".join(sorted(missing_terminal_refs))
             )
-    if all(item.completion_requires_fresh_evidence for item in responsibilities) and not (
-        clarification_activities
-        or complete_response_activities
-        or any(item.role == "progress" for item in output.activities)
-        or first_response_phase_decided(request)
-    ):
-        raise PlannerDTOContractError(
-            "fresh-evidence Fast work requires a Communicative Main Activity"
-        )
     if clarification_activities:
         expected_disposition = "mixed" if capability_activities else "clarify"
         if output.disposition != expected_disposition:
@@ -440,14 +428,6 @@ def validate_fast_advance_output(
             raise PlannerDTOContractError(
                 "Fast Planner Activity references unknown Responsibilities: "
                 + ",".join(sorted(unknown_refs))
-            )
-        if activity.role == "complete_response" and any(
-            by_ref[ref].completion_requires_fresh_evidence
-            for ref in activity.source_responsibility_refs
-        ):
-            raise PlannerDTOContractError(
-                "Fast Planner cannot complete a fresh-evidence Responsibility "
-                "before trusted evidence"
             )
         if activity.role == "clarification":
             if output.disposition not in {"clarify", "mixed"}:

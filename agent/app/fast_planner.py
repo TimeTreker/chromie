@@ -153,7 +153,6 @@ class FastPlannerResolver:
         first_response_num_ctx: int | None = None,
         truth_ollama: OllamaClient | None = None,
         truth_num_ctx: int | None = None,
-        min_confidence: float = 0.8,
         num_ctx: int = 8192,
         num_predict: int = 2048,
         max_capabilities: int = 24,
@@ -191,7 +190,6 @@ class FastPlannerResolver:
             ),
         )
         self.catalog = catalog
-        self.min_confidence = max(0.0, min(1.0, float(min_confidence)))
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
@@ -214,43 +212,9 @@ class FastPlannerResolver:
             for item in request.responsibilities
         ]
         responsibility_refs = [item.local_ref for item in responsibilities]
-        needs_work = any(
-            item.completion_requires_work
-            or item.completion_requires_fresh_evidence
-            for item in responsibilities
-        )
-        needs_fresh_evidence = any(
-            item.completion_requires_fresh_evidence
-            for item in responsibilities
-        )
-        requested_output_modes = {
-            item.output_mode for item in responsibilities
-        }
-        effect_output_modes = {
-            "body_action",
-            "media_playback",
-            "styled_speech",
-            "recitation",
-            "singing",
-            "humming",
-            "nonverbal_vocalization",
-        }
-        required_progress_kind = (
-            "check_information"
-            if needs_fresh_evidence
-            else (
-                "perform_action"
-                if requested_output_modes
-                and requested_output_modes.issubset(effect_output_modes)
-                else None
-            )
-        )
         response_schema = fast_first_response_response_schema(
             responsibility_refs,
             responsibilities=responsibilities,
-            needs_work=needs_work,
-            needs_fresh_evidence=needs_fresh_evidence,
-            required_progress_kind=required_progress_kind,
             language=str(request.language or ""),
         )
         try:
@@ -258,7 +222,6 @@ class FastPlannerResolver:
                 fast_first_response_prompt(
                     request,
                     responsibilities=responsibilities,
-                    needs_work=needs_work,
                 ),
                 system=fast_first_response_system_prompt(),
                 options={
@@ -276,25 +239,38 @@ class FastPlannerResolver:
                 turn_id=request.sid,
                 attempt=1,
             )
-            if needs_work and isinstance(raw, dict):
+            if isinstance(raw, dict):
                 raw_activity = raw.get("activity")
                 if isinstance(raw_activity, dict):
                     activity_payload = dict(raw_activity)
                     if len(responsibility_refs) == 1:
                         # There is no semantic association choice in the single-
-                        # Responsibility case.  Keep that mechanical provenance out
+                        # Responsibility case. Keep that mechanical provenance out
                         # of the latency-critical model DTO and restore it before the
                         # authoritative Activity contract is validated.
                         activity_payload.setdefault(
                             "source_responsibility_refs", responsibility_refs
                         )
-                    activity_payload.setdefault("role", "progress")
+                    role = str(activity_payload.get("role") or "")
+                    if not role:
+                        # The latency-critical decoder omits the mechanical role
+                        # discriminator. Presence of progress_kind is the semantic
+                        # choice between a prospective progress act and a complete
+                        # conversational response; restore the contract tag here.
+                        role = (
+                            "progress"
+                            if activity_payload.get("progress_kind") not in (None, "")
+                            else "complete_response"
+                        )
+                        activity_payload["role"] = role
                     activity_payload.setdefault(
                         "activity_id",
-                        "progress_"
+                        ("progress_" if role == "progress" else "response_")
                         + hashlib.sha256(
                             (
                                 str(request.sid or "turn")
+                                + "|"
+                                + role
                                 + "|"
                                 + "|".join(responsibility_refs)
                             ).encode("utf-8")
@@ -303,32 +279,41 @@ class FastPlannerResolver:
                     raw = {**raw, "activity": activity_payload}
             output = FastPlannerFirstResponseModelOutput.model_validate(raw)
             activity = output.activity
+            if activity is None:
+                return FastPlannerFirstResponse(
+                    turn_id=str(request.sid or "turn-fast-first-response"),
+                    activity=None,
+                    metadata={
+                        "semantic_authority": "fast_planner_model",
+                        "phase": "first_communicative_activity",
+                        "decision": "silence",
+                        "execution_authority": "none",
+                    },
+                )
             refs = set(activity.source_responsibility_refs)
             if not refs or not refs.issubset(set(responsibility_refs)):
                 raise PlannerDTOContractError(
                     "Fast first response must cite supplied Responsibility refs"
                 )
-            if needs_work and activity.role != "progress":
+            if activity.role == "complete_response" and any(
+                item.output_mode != "speech" for item in responsibilities
+            ):
                 raise PlannerDTOContractError(
-                    "unfinished work requires a prospective progress response"
-                )
-            if not needs_work and activity.role != "complete_response":
-                raise PlannerDTOContractError(
-                    "immediate conversational work requires a complete response"
+                    "first-response completion is valid only for conversational speech WHAT; "
+                    "information and observable/stateful effects remain Planner work"
                 )
             speech_act = gateway_speech_act(request)
             deterministic_greeting = bool(
-                not needs_work
-                and speech_act == "greeting"
+                speech_act == "greeting"
                 and activity.role == "complete_response"
                 and activity.truth_stage == "context_grounded"
                 and not activity.evidence_refs
             )
             if deterministic_greeting:
                 # Gateway has already classified this admitted turn as a greeting,
-                # and GI says the single communicative outcome requires neither
-                # Work nor fresh Evidence. A second LLM cannot add authoritative
-                # truth here; it only lengthens the human-facing critical path.
+                # and the Planner selected a context-grounded conversational response.
+                # A second LLM cannot add authoritative truth here; it only lengthens
+                # the human-facing critical path.
                 # Keep the same immutable Activity acceptance surface, but let
                 # trusted contract evidence close the qualification locally.
                 truth_certificate = FastPlannerFirstResponseTruthCertificate(
@@ -554,18 +539,12 @@ class FastPlannerResolver:
                 if first_response.activity is not None:
                     committed_communicative_activities.append(first_response.activity)
 
-        # A fully qualified immediate conversational response already covers a
-        # Responsibility that GI says needs no downstream work.  Returning here
-        # keeps unrelated body/tool choices out of a second model decision; before
-        # this boundary, greetings and human feelings could acquire decorative
-        # stand/stop Activities despite requesting no physical effect.
+        # A fully qualified conversational response already covers an all-speech
+        # WHAT. Returning here keeps unrelated body/tool choices out of a second
+        # model decision; work/evidence readiness is not imported from GI.
         if (
             responsibilities
-            and all(
-                not item.completion_requires_work
-                and not item.completion_requires_fresh_evidence
-                for item in responsibilities
-            )
+            and all(item.output_mode == "speech" for item in responsibilities)
             and len(committed_communicative_activities) == 1
             and committed_communicative_activities[0].role == "complete_response"
         ):
@@ -610,7 +589,7 @@ class FastPlannerResolver:
             # A null first-response result is still a terminal decision for that
             # bounded speech phase.  Advance must not author a substitute progress
             # sentence and thereby bypass its one truth qualification.
-            committed_communicative=first_response_decided,
+            committed_communicative=bool(committed_communicative_activities),
             suppress_new_communicative=(
                 first_response_decided
                 and not committed_communicative_activities
@@ -1163,7 +1142,6 @@ class FastPlannerResolver:
                 evidence_reentry_goal_ids=(
                     reentry_goal_ids | cancellation_reentry_goal_ids
                 ),
-                min_confidence=self.min_confidence,
             )
             if not qualification.accepted:
                 return materialize_fast_escalation(

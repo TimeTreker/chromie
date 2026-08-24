@@ -26,7 +26,7 @@ def goal_association_response_schema(
     responsibility_count: int | None = None,
     responsibility_refs: list[str] | None = None,
     responsibility_output_modes: dict[str, str] | None = None,
-    responsibility_fresh_evidence_refs: set[str] | None = None,
+    responsibility_information_refs: set[str] | None = None,
     responsibility_bindings: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     schema = copy.deepcopy(output_type.model_json_schema())
@@ -49,8 +49,8 @@ def goal_association_response_schema(
     ]
     responsibility_refs = list(responsibility_refs or [])
     responsibility_output_modes = dict(responsibility_output_modes or {})
-    responsibility_fresh_evidence_refs = set(
-        responsibility_fresh_evidence_refs or set()
+    responsibility_information_refs = set(
+        responsibility_information_refs or set()
     )
     responsibility_bindings = {
         str(source_ref): dict(bindings)
@@ -298,12 +298,12 @@ def goal_association_response_schema(
 
         def resource_variants(source_ref: str) -> list[str]:
             output_mode = responsibility_output_modes.get(source_ref)
-            if source_ref in responsibility_fresh_evidence_refs:
-                # GI already authored the fresh-evidence semantic fact. At the
-                # trusted Goal boundary that fact has exactly one canonical
-                # representation: information resource work. Keeping the
-                # ordinary branch would silently downgrade evidence acquisition
-                # to conversational speech.
+            if source_ref in responsibility_information_refs:
+                # GI authored only the human-level information WHAT. At the
+                # canonical Goal boundary that category projects to the existing
+                # provider-neutral information-resource representation. This is
+                # a deterministic representation projection, not GI choosing a
+                # Capability, provider, or executable work item.
                 return ["information"]
             if output_mode == "body_action":
                 return ["ordinary", "physical_object"]

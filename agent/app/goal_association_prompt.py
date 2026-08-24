@@ -120,8 +120,12 @@ def build_segmentation_prompt(
         "a standalone social act is one speech Goal. One lookup and the requested "
         "judgment of that same evidence are one Goal. Acquisition, carrying, return, "
         "and handoff are stages of one requested physical delivery, not sibling Goals.\n\n"
-        "Copy a supplied Responsibility output_mode exactly; it is the only "
-        "model-authored execution discriminator. Preserve every supplied material "
+        "Project the supplied Responsibility WHAT output_mode into the canonical Goal "
+        "representation deterministically: information -> capability_work with one "
+        "information resource_responsibility; stateful_effect -> capability_work with "
+        "ordinary typed bindings and no information resource; every other explicit "
+        "mode is copied exactly. This representation projection never selects a "
+        "Capability, provider, executable operation, or Plan. Preserve every supplied material "
         "binding verbatim, including counts, durations, speeds, directions, targets, "
         "severity, thresholds, negation, comparison, and scope. For a non-resource "
         "Goal, put these in top-level typed bindings; the action itself may remain in "
@@ -256,12 +260,6 @@ def association_goal_projection(
             "source_text": goal.get("source_text"),
             "bindings": (goal.get("object") or {}).get("bindings", {}),
             "output_mode": metadata.get("output_mode"),
-            "completion_requires_work": metadata.get(
-                "completion_requires_work"
-            ),
-            "completion_requires_fresh_evidence": metadata.get(
-                "completion_requires_fresh_evidence"
-            ),
             "open_information_gaps": snapshot.get(
                 "open_information_gaps", []
             ),
@@ -345,14 +343,18 @@ def build_association_prompt(
         "continue, modify, clarify, confirm, reject, cancel, pause, resume, merge, "
         "split, or reference. Target only supplied Goal IDs.\n\n"
         "An association preserves the existing Goal's description, typed bindings, "
-        "output_mode, and completion contract. It cannot rewrite a material entity "
+        "and output_mode. It cannot rewrite a material entity "
         "or parameter. If current meaning changes one, create one complete replacement "
         "Goal and put the old ID in supersedes_goal_ids. If current meaning is "
         "independent, create a new Goal without reopening the old one. A recent "
         "terminal Goal may be referenced but not reopened. Preserve unresolved human "
         "meaning in the narrowest provisional Goal; Fast Planner alone decides any "
         "question.\n\n"
-        "For a new Goal, copy the GI output_mode and every material binding exactly. "
+        "For a new Goal, preserve every material binding exactly and project the GI "
+        "WHAT modality into the existing canonical Goal representation: information "
+        "becomes capability_work plus one information resource_responsibility; "
+        "stateful_effect becomes capability_work with ordinary typed bindings and no "
+        "information resource; every other explicit output_mode is copied exactly. "
         "Use resource_responsibility only when the owed outcome is to acquire and "
         "make a resource available. A physical_object is a concrete object independent "
         "of Chromie's body and uses physical_handover; locomotion, gaze, blinking, "
@@ -440,10 +442,13 @@ def build_prompt(
         "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
         "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, capabilities, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
         "Create one new goal for each independently satisfiable user responsibility. Copy every owning GI local_ref into that Goal's source_responsibility_refs; every GI Responsibility ref must map to exactly one association or new Goal. The authoritative user turn plus Responsibility evidence are the only sources of human Responsibility here; Fast Planner Activity is HOW authored concurrently and must never become, justify, or be copied into a sibling Goal. Responsibility conservation is strict: never create an extra Goal for acknowledgement, progress, response delivery, personality, or any other outcome that is absent from the authoritative Responsibility evidence. Emit exactly one new_goals item containing source_responsibility_refs, description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-        "Every new Goal must declare one exact output_mode that describes the semantic work completing the human outcome. output_mode is the only model-authored execution discriminator. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
-        "When Responsibility evidence includes output_mode, copy that exact value "
-        "to its one Goal. Goal Interpretation owns this provider-neutral completion "
-        "modality; Goal Association must not reinterpret, weaken, or relabel it. "
+        "Every new Goal must declare one exact canonical output_mode that represents the work shape for the human outcome. Responsibility kind, execution lane, and provider requirement are Host-derived projections and are not fields in the model schema. GI information/stateful_effect are projected into the existing capability_work Goal representation as described below; that projection does not select a concrete Capability. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
+        "When Responsibility evidence includes output_mode, preserve its human-level "
+        "WHAT while using the canonical Goal projection enforced by the decoder: "
+        "information -> capability_work + information resource; stateful_effect -> "
+        "capability_work without an information resource; every other explicit mode is "
+        "copied exactly. Goal Association must not reinterpret or weaken the WHAT, and "
+        "this projection never chooses a concrete Capability/provider. "
         "Use output_mode=speech for an ordinary authored conversational response, including a greeting, empathy, reassurance, restatement, explanation from supplied context, or acknowledgement of a person's feeling. The need to think or formulate words never makes ordinary conversation capability_work. A person's report of their own state never becomes body_action or capability_work unless the authoritative Responsibility separately asks Chromie to change the world. Preserve speaker, experiencer, actor, and addressee ownership exactly. "
         f"{_EXECUTION_CONTRACT_PROMPT} "
         "The eventual spoken delivery of a capability result is part of that same capability_dependent Goal, never an additional vocal_output Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
@@ -806,7 +811,12 @@ def build_responsibility_coverage_prompt(
         {
             "local_ref": item.local_ref,
             "outcome": item.outcome,
-            "output_mode": item.output_mode,
+            "what_output_mode": item.output_mode,
+            "canonical_goal_output_mode": (
+                "capability_work"
+                if item.output_mode in {"information", "stateful_effect"}
+                else item.output_mode
+            ),
         }
         for item in request.responsibilities
     ]

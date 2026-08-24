@@ -202,8 +202,10 @@ def fast_first_response_truth_prompt(
 
 def fast_first_response_system_prompt() -> str:
     return (
-        "You are Chromie's low-latency Fast Planner authoring exactly one "
-        "immediately realizable Communicative Activity. You own its communicative "
+        "You are Chromie's low-latency Fast Planner deciding whether there is one "
+        "immediately useful Communicative Activity. You own whether to communicate, "
+        "its communicative function, and exact natural wording. Silence is valid when "
+        "no still-needed user-facing semantic delta exists. You own its communicative "
         "function and exact natural wording. Do not select a Capability, resolve "
         "parameters, ask a clarification, claim execution, or invent external "
         "Evidence in this latency phase. This is a method-blind phase: never name "
@@ -218,15 +220,16 @@ def fast_first_response_prompt(
     request: CognitiveWorkRequest,
     *,
     responsibilities: list[CognitiveResponsibilityProposal],
-    needs_work: bool,
 ) -> LayeredPrompt:
     context = request.context if isinstance(request.context, dict) else {}
     language = str(request.language or "auto")[:32]
     role_contract = (
-        "Author one short progress Activity that honestly acknowledges the work "
-        "without giving a result."
-        if needs_work
-        else "Author the complete natural response Activity now."
+        "Choose exactly one of three semantic decisions: (1) activity=null when no "
+        "new user-facing delta is needed now; (2) role=complete_response only when "
+        "the requested conversational content is already supportable from supplied "
+        "trusted context; or (3) role=progress for a useful prospective acknowledgement "
+        "when meaningful work/evidence still appears necessary. Never speak merely "
+        "because a processing phase exists."
     )
     identity = owner_approved_identity_context(context).get("identity") or {}
     personality = owner_approved_personality_context(context)
@@ -249,8 +252,10 @@ def fast_first_response_prompt(
         separators=(",", ":"),
     )
     progress_contract = (
-        "Fast Planner first-response contract: author one useful spoken Main "
-        "Activity and its exact wording. At truth_stage=pre_evidence, no check, "
+        "Fast Planner first-response contract: decide whether one useful spoken Main "
+        "Activity is still needed and, if so, author its exact wording. Returning no "
+        "Activity is correct when equivalent communication is already delivered/pending "
+        "or speaking now adds no useful semantic delta. At truth_stage=pre_evidence, no check, "
         "execution, or fresh Evidence has happened. Say only a present "
         "acknowledgement or prospective intention; never claim or predict a result, "
         "completion, method, instrument, source, sensor, or screen. A progress "
@@ -277,15 +282,10 @@ def fast_first_response_prompt(
         "work, personal state, or external facts."
     )
     responsibility_field_contract = (
-        "The decoder schema deliberately omits Responsibility refs because exactly "
-        "one Responsibility exists. Output no responsibility, ref, role, ID, or "
-        "other field: activity contains only progress_kind and text."
-        if needs_work and len(responsibilities) == 1
-        else (
-            "When the schema exposes source_responsibility_refs, use that exact "
-            "array field with only supplied refs; never invent a nested "
-            "responsibility object."
-        )
+        "The decoder schema omits Responsibility refs when exactly one Responsibility "
+        "exists; trusted runtime restores that mechanical provenance. Otherwise use "
+        "source_responsibility_refs with only supplied refs. Never invent a nested "
+        "Responsibility object."
     )
     rendered = (
         identity_section
@@ -317,12 +317,10 @@ def fast_first_response_prompt(
         )
         + "\n\nAlready delivered or pending interaction summary:\n"
         + bounded_json(context.get("interaction_context") or {}, 700)
-        + (
-            "\n\nFINAL COUNTERFACTUAL CHECK: the exact sentence must remain true if "
-            "no checking has started and no result exists."
-            if needs_work
-            else ""
-        )
+        + "\n\nFINAL TRUTH CHECK: if role=progress, the exact sentence must remain "
+        "true if no checking/execution has started and no result exists. If "
+        "role=complete_response, its content must already be supported by supplied "
+        "trusted context. If neither is useful, return activity=null."
     )
     return LayeredPrompt.promote(
         rendered,

@@ -809,8 +809,6 @@ def _evaluate_goal_interpretation_expectations(
                     "relationship",
                     "target_goal_ids",
                     "resolved_gap_ids",
-                    "completion_requires_work",
-                    "completion_requires_fresh_evidence",
                     "confidence",
                 ):
                     if field in expected_responsibility:
@@ -1233,7 +1231,15 @@ async def evaluate_cognitive_runtime_scenario(
         CognitiveResponsibilityProposal(
             local_ref=f"r{index}",
             outcome=str(item.get("description") or scenario.text),
-            completion_requires_work=True,
+            output_mode=(
+                "information"
+                if str((item.get("metadata") or {}).get("resource_kind") or "") == "information"
+                else (
+                    "body_action"
+                    if str((item.get("metadata") or {}).get("output_mode") or "") == "body_action"
+                    else "stateful_effect"
+                )
+            ),
             confidence=float(
                 (stub.get("goal_association") or {}).get("confidence", 0.9)
             ),
@@ -1246,7 +1252,7 @@ async def evaluate_cognitive_runtime_scenario(
             CognitiveResponsibilityProposal(
                 local_ref="r1",
                 outcome=scenario.text,
-                completion_requires_work=True,
+                output_mode="stateful_effect",
                 confidence=0.9,
             )
         ]

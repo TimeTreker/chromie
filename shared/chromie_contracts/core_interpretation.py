@@ -117,44 +117,23 @@ class CognitiveResponsibilityProposal(BaseModel):
         "nonverbal_vocalization",
         "body_action",
         "media_playback",
-        "capability_work",
+        "information",
+        "stateful_effect",
         "other",
     ] = Field(
         default="unspecified",
         description=(
-            "Provider-neutral completion category for this one outcome, not its "
-            "eventual response transport. Fresh external information is "
-            "capability_work even when a later grounded answer will be spoken; "
-            "requested physical-object acquisition/carrying/handover is body_action, "
-            "not capability_work. speech is an immediate ordinary answer authored "
-            "without fresh acquisition or downstream work. This preserves WHAT kind "
-            "of effect is owed without selecting a Capability, provider, Activity, "
-            "executable argument, or wording."
+            "Provider-neutral WHAT category for this one human outcome. information "
+            "means the person wants Chromie to determine or provide information; "
+            "stateful_effect means the person wants a durable or future state change. "
+            "These categories do not say whether work, fresh evidence, a Capability, "
+            "provider, Activity, executable argument, or later speech is required. "
+            "Requested physical-object acquisition/carrying/handover remains "
+            "body_action because the human-level outcome is an embodied effect."
         ),
     )
     relationship: GoalRelationship = "new"
     target_goal_ids: list[str] = Field(default_factory=list, max_length=8)
-    completion_requires_work: bool = Field(
-        default=False,
-        description=(
-            "Whether satisfying the outcome requires downstream work beyond the "
-            "immediate ordinary conversational response that Fast Planner can author "
-            "from supplied context. Use false for a greeting, empathy, social reply, "
-            "or direct contextual answer; use true for body/media/vocal-performance "
-            "effects, Capability work, fresh evidence, or other work that remains "
-            "after an immediate response."
-        ),
-    )
-    completion_requires_fresh_evidence: bool = Field(
-        default=False,
-        description=(
-            "Whether the human-facing WHAT is to obtain information whose answer "
-            "evidence is absent from trusted context. Runtime execution/observation "
-            "evidence needed later to verify a requested body action, media effect, "
-            "physical handover, or vocal performance is not this flag. Reasoning from "
-            "facts already supplied by the user is not fresh evidence."
-        ),
-    )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
     @field_validator("local_ref", "outcome", mode="before")
@@ -187,40 +166,12 @@ class CognitiveResponsibilityProposal(BaseModel):
         )
 
     @model_validator(mode="after")
-    def validate_evidence_requirement(self) -> "CognitiveResponsibilityProposal":
-        if self.completion_requires_fresh_evidence and not self.completion_requires_work:
-            raise ValueError(
-                "fresh evidence requirement implies completion_requires_work"
-            )
-        if self.output_mode == "speech" and self.completion_requires_work:
-            raise ValueError(
-                "output_mode=speech is an immediate contextual answer and cannot "
-                "require downstream work"
-            )
-        if self.completion_requires_fresh_evidence and self.output_mode in {
-            "styled_speech",
-            "recitation",
-            "singing",
-            "humming",
-            "nonverbal_vocalization",
-            "body_action",
-            "media_playback",
-        }:
-            raise ValueError(
-                f"output_mode={self.output_mode} is the requested observable effect, "
-                "not a fresh-information Responsibility"
-            )
+    def validate_goal_relationship(self) -> "CognitiveResponsibilityProposal":
         if self.relationship == "new" and self.target_goal_ids:
             raise ValueError("relationship=new must not target an existing Goal")
         if self.relationship != "new" and not self.target_goal_ids:
             raise ValueError(
                 f"relationship={self.relationship} requires target_goal_ids"
-            )
-        if self.output_mode not in {"unspecified", "speech", "other"} and not (
-            self.completion_requires_work
-        ):
-            raise ValueError(
-                f"output_mode={self.output_mode} requires completion_requires_work"
             )
         return self
 

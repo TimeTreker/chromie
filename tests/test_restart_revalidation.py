@@ -163,7 +163,6 @@ class RestartRevalidationTests(unittest.TestCase):
                 "local_ref": "resp-walk",
                 "outcome": "Walk forward.",
                 "output_mode": "body_action",
-                "completion_requires_work": True,
                 "confidence": 1.0,
             }
             retained = manager._runtime_revalidation_responsibilities(

@@ -8,12 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .prompt_projection import bounded_json
 from .clients.ollama_client import OllamaClient
 try:
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-
-try:
     from chromie_contracts.reflection import (
+        ReflectionRequest,
         ReflectionAction,
         ReflectionMemoryCandidate,
         ReflectionResolution,
@@ -21,6 +17,7 @@ try:
     from chromie_contracts.situation import CognitiveOpportunity
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.reflection import (
+        ReflectionRequest,
         ReflectionAction,
         ReflectionMemoryCandidate,
         ReflectionResolution,
@@ -73,11 +70,9 @@ class ReflectionResolver:
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
 
-    async def resolve(self, request: CognitiveWorkRequest) -> ReflectionResolution:
+    async def resolve(self, request: ReflectionRequest) -> ReflectionResolution:
         context = request.context if isinstance(request.context, dict) else {}
-        opportunity = CognitiveOpportunity.model_validate(
-            context.get("cognitive_opportunity")
-        )
+        opportunity = request.opportunity
         if opportunity.recommended_cognition != "slow":
             return ReflectionResolution(
                 opportunity_id=opportunity.opportunity_id,
@@ -141,7 +136,7 @@ class ReflectionResolver:
 
     def _prompt(
         self,
-        request: CognitiveWorkRequest,
+        request: ReflectionRequest,
         opportunity: CognitiveOpportunity,
     ) -> str:
         context = request.context if isinstance(request.context, dict) else {}

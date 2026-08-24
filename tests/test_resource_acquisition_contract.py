@@ -1031,8 +1031,6 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         "resource": "a bottle of water",
                         "source": "100 meters ahead",
                     },
-                    "completion_requires_work": True,
-                    "completion_requires_fresh_evidence": False,
                     "confidence": 0.9,
                 }
             ],

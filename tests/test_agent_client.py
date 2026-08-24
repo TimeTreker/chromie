@@ -85,8 +85,6 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
                     CognitiveResponsibilityProposal(
                         local_ref="weather",
                         outcome="check the weather",
-                        completion_requires_work=True,
-                        completion_requires_fresh_evidence=True,
                         confidence=0.95,
                     )
                 ],

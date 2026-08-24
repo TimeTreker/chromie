@@ -120,7 +120,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         capabilities = [item.capability_id for item in turn.agent.selected_capabilities]
         skill_set = set(capabilities)
         requires_activity = any(
-            item.completion_requires_work
+            item.output_mode not in {"speech", "unspecified", "other"}
             for item in turn.goal_interpretation.responsibilities
         )
         speech = " ".join(turn.agent.speech).strip()
@@ -522,7 +522,7 @@ def scenario_candidate_from_episode(
             expect["no_capabilities"] = True
         if "missing_eye_skill" in evaluation.failure_tags:
             if any(
-                item.completion_requires_work
+                item.output_mode not in {"speech", "unspecified", "other"}
                 for item in turn.goal_interpretation.responsibilities
             ):
                 expect["capabilities"] = ["soridormi.blink_eyes"]

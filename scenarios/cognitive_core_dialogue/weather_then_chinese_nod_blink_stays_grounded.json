@@ -32,11 +32,10 @@
                     "location": "北京",
                     "date": "today"
                   },
-                  "completion_requires_work": true,
-                  "completion_requires_fresh_evidence": true,
                   "confidence": 0.96,
                   "relationship": "new",
-                  "target_goal_ids": []
+                  "target_goal_ids": [],
+                  "output_mode": "information"
                 }
               ],
               "unresolved": []
@@ -57,9 +56,8 @@
               "location": "北京",
               "date": "today"
             },
-            "completion_requires_work": true,
-            "completion_requires_fresh_evidence": true,
-            "confidence": 0.96
+            "confidence": 0.96,
+            "output_mode": "information"
           }
         ]
       }
@@ -82,11 +80,10 @@
                     "count": 1,
                     "order": "first"
                   },
-                  "completion_requires_work": true,
-                  "completion_requires_fresh_evidence": false,
                   "confidence": 0.98,
                   "relationship": "new",
-                  "target_goal_ids": []
+                  "target_goal_ids": [],
+                  "output_mode": "body_action"
                 },
                 {
                   "local_ref": "r2",
@@ -95,11 +92,10 @@
                     "count": 2,
                     "order": "then"
                   },
-                  "completion_requires_work": true,
-                  "completion_requires_fresh_evidence": false,
                   "confidence": 0.98,
                   "relationship": "new",
-                  "target_goal_ids": []
+                  "target_goal_ids": [],
+                  "output_mode": "body_action"
                 }
               ],
               "unresolved": []
@@ -120,9 +116,8 @@
               "count": 1,
               "order": "first"
             },
-            "completion_requires_work": true,
-            "completion_requires_fresh_evidence": false,
-            "confidence": 0.98
+            "confidence": 0.98,
+            "output_mode": "body_action"
           },
           {
             "local_ref": "r2",
@@ -131,9 +126,8 @@
               "count": 2,
               "order": "then"
             },
-            "completion_requires_work": true,
-            "completion_requires_fresh_evidence": false,
-            "confidence": 0.98
+            "confidence": 0.98,
+            "output_mode": "body_action"
           }
         ],
         "history_contains": [

@@ -95,6 +95,7 @@ from .situation import (
     SituationProjection,
 )
 from .reflection import (
+    ReflectionRequest,
     ReflectionAction,
     ReflectionMemoryCandidate,
     ReflectionMemoryKind,
@@ -299,6 +300,7 @@ __all__ = [
     "CognitiveOpportunity",
     "CognitiveOpportunityMode",
     "CognitiveOpportunityTrigger",
+    "ReflectionRequest",
     "ReflectionAction",
     "ReflectionMemoryCandidate",
     "ReflectionMemoryKind",

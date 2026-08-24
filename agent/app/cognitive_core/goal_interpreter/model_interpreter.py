@@ -377,35 +377,6 @@ def _canonical_goal_ids_from_context(value: Any) -> set[str]:
     return found
 
 
-def _reject_fresh_evidence_output_mode_contradictions(
-    parsed: dict[str, Any],
-) -> None:
-    """Reject a semantic completion contract the decoder failed to enforce."""
-
-    contradictions: list[str] = []
-    for index, responsibility in enumerate(parsed.get("responsibilities") or []):
-        if not isinstance(responsibility, dict):
-            continue
-        if responsibility.get("completion_requires_fresh_evidence") is not True:
-            continue
-        output_mode = " ".join(
-            str(responsibility.get("output_mode") or "").strip().split()
-        )
-        if not output_mode:
-            # Current decoder schemas require the field. Retained pre-contract
-            # fixtures may omit it and remain subject to Pydantic's legacy default;
-            # this semantic contradiction check concerns an explicit downgrade.
-            continue
-        if output_mode != "capability_work":
-            contradictions.append(
-                f"responsibilities[{index}].output_mode={output_mode!r}"
-            )
-    if contradictions:
-        raise _GoalInterpretationAuthorityViolation(
-            "fresh-evidence Responsibilities cannot be downgraded to an ordinary "
-            "observable channel: " + ", ".join(contradictions)
-        )
-
 
 def _reject_canonical_goal_identity_refs(
     request: GoalInterpretationRequest,
@@ -475,7 +446,7 @@ def _reject_unknown_goal_refs(
 
 
 def _continuity_goal_contracts(context: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Return exact provider-neutral completion facts for retained Goals."""
+    """Return exact provider-neutral WHAT facts for retained Goals."""
 
     contracts: dict[str, dict[str, Any]] = {}
     active = context.get("active_goal_snapshots")
@@ -495,22 +466,17 @@ def _continuity_goal_contracts(context: dict[str, Any]) -> dict[str, dict[str, A
             continue
         metadata = goal.get("metadata") if isinstance(goal.get("metadata"), dict) else {}
         output_mode = " ".join(str(metadata.get("output_mode") or "").split())
-        contract: dict[str, Any] = {}
-        if output_mode:
-            contract["output_mode"] = output_mode
-        if "completion_requires_work" in metadata:
-            contract["completion_requires_work"] = bool(
-                metadata["completion_requires_work"]
+        if output_mode == "capability_work":
+            resource = goal.get("resource_responsibility")
+            resource_payload = resource if isinstance(resource, dict) else {}
+            descriptor = resource_payload.get("resource")
+            descriptor_payload = descriptor if isinstance(descriptor, dict) else {}
+            output_mode = (
+                "information"
+                if descriptor_payload.get("kind") == "information"
+                else "stateful_effect"
             )
-        elif metadata.get("provider_required") is True:
-            # Legacy retained Goals predate explicit GI completion flags. A
-            # provider-required effect still cannot become immediate speech.
-            contract["completion_requires_work"] = True
-        if "completion_requires_fresh_evidence" in metadata:
-            contract["completion_requires_fresh_evidence"] = bool(
-                metadata["completion_requires_fresh_evidence"]
-            )
-        contracts[goal_id] = contract
+        contracts[goal_id] = {"output_mode": output_mode} if output_mode else {}
     return contracts
 
 
@@ -518,13 +484,7 @@ def _reject_continuity_completion_contract_mismatch(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
 ) -> None:
-    """Reject a pure continue/resume DTO that changes the retained effect.
-
-    This is an exact cross-field contract check, not a new semantic decision:
-    the model selected one supplied Goal identity and declared that the person
-    wants to continue or resume it. Such a relationship cannot silently turn
-    retained work into an ordinary immediate speech Responsibility.
-    """
+    """Reject a continue/resume DTO that changes the retained WHAT modality."""
 
     contracts = _continuity_goal_contracts(request.context)
     if not contracts:
@@ -549,21 +509,13 @@ def _reject_continuity_completion_contract_mismatch(
         if len(known_targets) != 1:
             continue
         target_id = known_targets[0]
-        expected = contracts[target_id]
-        for field in (
-            "output_mode",
-            "completion_requires_work",
-            "completion_requires_fresh_evidence",
-        ):
-            if field not in expected:
-                continue
-            actual = item.get(field)
-            if actual != expected[field]:
-                raise _GoalInterpretationAuthorityViolation(
-                    f"responsibilities[{index}] relationship={relationship!r} "
-                    f"changes retained Goal {target_id!r} {field}: "
-                    f"expected={expected[field]!r} actual={actual!r}"
-                )
+        expected = contracts[target_id].get("output_mode")
+        if expected and item.get("output_mode") != expected:
+            raise _GoalInterpretationAuthorityViolation(
+                f"responsibilities[{index}] relationship={relationship!r} "
+                f"changes retained Goal {target_id!r} output_mode: "
+                f"expected={expected!r} actual={item.get('output_mode')!r}"
+            )
 
 
 _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS = (
@@ -762,11 +714,11 @@ def _strip_redundant_conversational_turn_echo_bindings(
     A model may redundantly preserve a short acknowledgement such as ``Yeah.`` in
     ``bindings.user_input`` even though the same single conversational WHAT is
     already carried by ``outcome``.  For one explicit ``output_mode=speech``
-    Responsibility with no downstream work or fresh-evidence requirement, that
-    exact whole-turn scalar is envelope redundancy rather than hidden structure.
+    Responsibility, that exact whole-turn scalar is envelope redundancy rather
+    than hidden structure.
 
-    The rule is intentionally narrow.  Embodied, capability, media, authored-vocal,
-    multi-Responsibility, or work-requiring interpretations retain the fail-closed
+    The rule is intentionally narrow. Embodied, information, stateful, media,
+    authored-vocal, or multi-Responsibility interpretations retain the fail-closed
     whole-turn guard below because an opaque copied turn can conceal coordinated
     independently satisfiable effects.
     """
@@ -778,10 +730,6 @@ def _strip_redundant_conversational_turn_echo_bindings(
     if not isinstance(item, dict):
         return
     if str(item.get("output_mode") or "") != "speech":
-        return
-    if item.get("completion_requires_work") is not False:
-        return
-    if item.get("completion_requires_fresh_evidence") is not False:
         return
     bindings = item.get("bindings")
     if not isinstance(bindings, dict):
@@ -1072,13 +1020,17 @@ def _compact_active_goal_snapshots(
                     "description": description[:240],
                     "object": goal.get("object") if isinstance(goal.get("object"), dict) else {},
                     "constraints": goal.get("constraints") if isinstance(goal.get("constraints"), dict) else {},
-                    "output_mode": metadata.get("output_mode"),
-                    "completion_requires_work": metadata.get(
-                        "completion_requires_work",
-                        True if metadata.get("provider_required") is True else None,
-                    ),
-                    "completion_requires_fresh_evidence": metadata.get(
-                        "completion_requires_fresh_evidence"
+                    "output_mode": (
+                        "information"
+                        if metadata.get("output_mode") == "capability_work"
+                        and isinstance(goal.get("resource_responsibility"), dict)
+                        and isinstance(goal["resource_responsibility"].get("resource"), dict)
+                        and goal["resource_responsibility"]["resource"].get("kind") == "information"
+                        else (
+                            "stateful_effect"
+                            if metadata.get("output_mode") == "capability_work"
+                            else metadata.get("output_mode")
+                        )
                     ),
                 },
                 "open_information_gaps": [
@@ -1291,10 +1243,9 @@ class OllamaGoalInterpreter:
             "a Responsibility to confirm, acknowledge, remember, record, schedule, "
             "monitor, or act on that statement. "
             "A Responsibility that continues or resumes one supplied Goal must preserve "
-            "that Goal's provider-neutral output_mode, completion_requires_work, and "
-            "completion_requires_fresh_evidence contract. Continuation of body action, "
-            "media, information work, or vocal performance never becomes ordinary "
-            "speech merely because the current turn is a short reference. "
+            "that Goal's provider-neutral WHAT output_mode. Continuation of body action, "
+            "media, information, stateful effect, or vocal performance never becomes "
+            "ordinary speech merely because the current turn is a short reference. "
             "Preserve deictic spatial meaning such as here/there, inside/outside, "
             "ahead/behind, and equivalent expressions in any language as an exact "
             "current-turn location or direction binding when it changes the outcome. "
@@ -1313,21 +1264,16 @@ class OllamaGoalInterpreter:
             "does not occur there and is invalid. Preserve every explicit Arabic "
             "numeric token from Latest user input verbatim in an atomic material "
             "binding; never spell it out, translate it, round it, or replace it with "
-            "a default. Before choosing a completion branch, distinguish fresh "
-            "INFORMATION from later EXECUTION EVIDENCE. completion_requires_fresh_evidence "
-            "is true only when the human-facing WHAT is to learn or receive information "
-            "whose answer evidence is absent from trusted Context. If such an external, "
-            "private, runtime-observed, or changing fact is requested but absent, set "
-            "output_mode=capability_work, completion_requires_work=true, and "
-            "completion_requires_fresh_evidence=true. In contrast, when the human asks "
-            "Chromie to cause an observable effect -- including a body action, media "
-            "effect, vocal performance, or acquiring/carrying/handing over a physical "
-            "object -- preserve that effect output_mode, set completion_requires_work=true, "
-            "and keep completion_requires_fresh_evidence=false. Runtime will later need "
-            "execution/observation evidence to prove the effect completed; that evidence "
-            "does not turn the WHAT into information acquisition. The input being a "
-            "question or the result eventually being spoken never makes absent information "
-            "evidence into output_mode=speech. No route, intent, response wording, Activity, Work, "
+            "a default. Classify only the human-facing WHAT. Use output_mode=information "
+            "when the person wants Chromie to determine or provide information, regardless "
+            "of whether the answer is already present in trusted Context or will require "
+            "fresh acquisition later. Use output_mode=stateful_effect when the requested "
+            "WHAT is a durable or future state change such as recording, scheduling, "
+            "changing a setting, or sending later. Preserve body, media, and vocal "
+            "effects in their exact observable modes. Do not decide whether downstream "
+            "work, fresh Evidence, a Capability, or a provider is required; Planner owns "
+            "that judgment from canonical Goal state, trusted Evidence, and available "
+            "Capabilities. No route, intent, response wording, Activity, Work, "
             "Plan, Capability, Tool, provider, executable args, or input-resolution "
             "strategy. Copy only Goal IDs explicitly supplied in Context."
         )
@@ -1360,8 +1306,6 @@ class OllamaGoalInterpreter:
                 "output_mode",
                 "relationship",
                 "target_goal_ids",
-                "completion_requires_work",
-                "completion_requires_fresh_evidence",
                 "confidence",
             ]
             if new_relationship_only:
@@ -1406,8 +1350,18 @@ class OllamaGoalInterpreter:
                         ),
                     },
                     {
-                        "const": "capability_work",
-                        "description": "Fresh information or persistent world-state work.",
+                        "const": "information",
+                        "description": (
+                            "The person wants Chromie to determine or provide information; "
+                            "this does not decide whether fresh acquisition is needed."
+                        ),
+                    },
+                    {
+                        "const": "stateful_effect",
+                        "description": (
+                            "A durable or future state change such as recording, scheduling, "
+                            "changing a setting, or sending later."
+                        ),
                     },
                     {
                         "const": "styled_speech",
@@ -1437,20 +1391,15 @@ class OllamaGoalInterpreter:
                 ]
                 output_mode["oneOf"] = output_mode_variants
                 output_mode["description"] = (
-                    "Provider-neutral completion category for this one atomic outcome, "
-                    "not its eventual response transport. Fresh external information "
-                    "is capability_work even when Chromie will later speak the grounded "
-                    "answer; speech is only an immediate ordinary answer authored from "
-                    "supplied trusted context without fresh acquisition or downstream "
-                    "work. "
-                    "Singing or a song is singing, never styled_speech, speech, "
-                    "nonverbal_vocalization, capability_work, or body_action. "
-                    "nonverbal_vocalization excludes singing, songs, melody, lyrics, "
-                    "and humming. styled_speech means spoken "
-                    "words with requested emotion/style but no melody or song. "
-                    "Blinking/locomotion are body_action; ordinary conversation is "
-                    "speech. No catch-all mode "
-                    "is available: choose the exact source-grounded category."
+                    "Provider-neutral WHAT category for this one atomic outcome. "
+                    "Use information whenever the requested outcome is to determine or "
+                    "provide information, whether or not current trusted Context already "
+                    "contains the answer. Use stateful_effect for durable/future state "
+                    "changes. These categories never decide work, fresh Evidence, a "
+                    "Capability, provider, or response transport. Singing or a song is "
+                    "singing; blinking/locomotion are body_action; ordinary conversational "
+                    "words are speech. No catch-all mode is available: choose the exact "
+                    "source-grounded category."
                 )
             relationship = responsibility.get("properties", {}).get(
                 "relationship"
@@ -1506,96 +1455,10 @@ class OllamaGoalInterpreter:
                         },
                     }
                 )
-            # Ollama's structured decoder accepted an object that violated an
-            # if/then dependency here. Its grammar also treats a nested object
-            # oneOf as the complete object shape rather than intersecting it with
-            # sibling properties, so each disjoint branch must repeat the complete
-            # Responsibility contract. Complete disjoint branches make both an
-            # illegal fresh-evidence + speech tuple and an illegal downstream-work
-            # + speech tuple unrepresentable without dropping semantic fields.
-            base_properties = responsibility.pop("properties")
-            branch_required = responsibility.pop("required")
-            responsibility.pop("additionalProperties", None)
-            fresh_properties = copy.deepcopy(base_properties)
-            fresh_properties["completion_requires_fresh_evidence"] = {
-                "const": True,
-                "description": (
-                    "The human-facing outcome itself is to obtain information whose "
-                    "answer evidence is absent from trusted context. This is not the "
-                    "execution evidence later used to verify an observable effect."
-                ),
-            }
-            fresh_properties["completion_requires_work"] = {
-                "const": True,
-                "description": "Fresh information acquisition remains after interpretation.",
-            }
-            fresh_properties["output_mode"] = {
-                "const": "capability_work",
-                "description": (
-                    "Provider-neutral acquisition of absent information, even when the "
-                    "grounded answer will later be spoken."
-                ),
-            }
-            immediate_speech_properties = copy.deepcopy(base_properties)
-            immediate_speech_properties["completion_requires_fresh_evidence"] = {
-                "const": False
-            }
-            immediate_speech_properties["completion_requires_work"] = {
-                "const": False,
-                "description": "No evidence acquisition or downstream effect remains.",
-            }
-            immediate_speech_properties["output_mode"] = {
-                "const": "speech",
-                "description": (
-                    "Immediate ordinary conversation whose answer does not depend on "
-                    "absent external, private, runtime, observed, or changing evidence."
-                ),
-            }
-            non_fresh_work_properties = copy.deepcopy(base_properties)
-            non_fresh_work_properties["completion_requires_fresh_evidence"] = {
-                "const": False,
-                "description": (
-                    "The requested WHAT is an effect or deliverable rather than absent "
-                    "information. Runtime may still require later execution evidence."
-                ),
-            }
-            non_fresh_work_properties["completion_requires_work"] = {
-                "const": True,
-                "description": (
-                    "An observable effect or deliverable remains to be executed, such "
-                    "as body action, physical-object handover, media, or vocal performance."
-                ),
-            }
-            work_output_mode = copy.deepcopy(base_properties["output_mode"])
-            work_output_mode["oneOf"] = [
-                item
-                for item in work_output_mode.get("oneOf", [])
-                if item.get("const") != "speech"
-            ]
-            non_fresh_work_properties["output_mode"] = work_output_mode
-            responsibility["oneOf"] = [
-                {
-                    "title": "Fresh information acquisition",
-                    "type": "object",
-                    "properties": fresh_properties,
-                    "required": branch_required,
-                    "additionalProperties": False,
-                },
-                {
-                    "title": "Immediate answer with no evidence acquisition",
-                    "type": "object",
-                    "properties": immediate_speech_properties,
-                    "required": branch_required,
-                    "additionalProperties": False,
-                },
-                {
-                    "title": "Requested observable effect or deliverable",
-                    "type": "object",
-                    "properties": non_fresh_work_properties,
-                    "required": branch_required,
-                    "additionalProperties": False,
-                },
-            ]
+            # Keep the decoder surface identical to the WHAT-only Pydantic contract.
+            # Work/evidence readiness is deliberately absent: Planner derives it later
+            # from canonical Goal state, trusted Evidence, and available Capabilities.
+            responsibility["additionalProperties"] = False
         return schema
 
     @staticmethod
@@ -1712,8 +1575,7 @@ class OllamaGoalInterpreter:
                     "route/intent/Capability/Activity/Work/Plan/provider field into another "
                     "implementation hint. Preserve only the human outcome, material semantic "
                     "bindings, supplied Goal relationships, "
-                    "the exact provider-neutral output_mode, "
-                    "work/fresh-evidence requirements, confidence, and genuine "
+                    "the exact provider-neutral output_mode, confidence, and genuine "
                     "semantic uncertainty. Never create/resolve an InformationGap or "
                     "choose input-source/default/clarification policy. A directly named "
                     "entity binding must copy the exact "
@@ -1788,12 +1650,12 @@ class OllamaGoalInterpreter:
                     "authoritative source or supplied typed Context. Never translate, "
                     "transliterate, infer, or copy a transport/runtime identifier into a "
                     "semantic binding. "
-                    "Audit the completion contract as one semantic unit: when correct "
-                    "completion requires fresh external/private/runtime/observed evidence, "
-                    "set completion_requires_fresh_evidence=true, "
-                    "completion_requires_work=true, and output_mode=capability_work. "
-                    "Never label that evidence work as ordinary speech merely because its "
-                    "result will later be spoken. "
+                    "Audit the WHAT modality as one semantic unit: use "
+                    "output_mode=information whenever the person's outcome is to determine "
+                    "or receive information, whether or not current trusted Context already "
+                    "contains the answer. Use stateful_effect for durable/future state "
+                    "changes. Never decide here whether work, fresh Evidence, a Capability, "
+                    "or provider is required. "
                     "Audit declarative context before counting outcomes: an explanation, "
                     "personal situation, or stated future plan is not another "
                     "Responsibility unless the source actually asks Chromie to confirm, "
@@ -1819,20 +1681,11 @@ class OllamaGoalInterpreter:
                 .get("$defs", {})
                 .get("CognitiveResponsibilityProposal", {})
             )
-            branches = (
-                responsibility_schema.get("oneOf", [])
-                if isinstance(responsibility_schema, dict)
-                else []
-            )
-            if exact_surfaces:
-                for branch in branches:
-                    binding_schema = (
-                        branch.get("properties", {}).get("bindings")
-                        if isinstance(branch, dict)
-                        else None
-                    )
-                    if not isinstance(binding_schema, dict):
-                        continue
+            if exact_surfaces and isinstance(responsibility_schema, dict):
+                binding_schema = responsibility_schema.get("properties", {}).get(
+                    "bindings"
+                )
+                if isinstance(binding_schema, dict):
                     binding_schema.setdefault("properties", {})["location"] = {
                         "type": "string",
                         "enum": exact_surfaces,
@@ -1855,14 +1708,7 @@ class OllamaGoalInterpreter:
         complexity after the accepted WHAT handoff.
         """
 
-        if decision.unresolved:
-            return True
-        fresh_evidence_count = sum(
-            1
-            for responsibility in decision.responsibilities
-            if responsibility.completion_requires_fresh_evidence
-        )
-        return fresh_evidence_count > 1
+        return bool(decision.unresolved)
 
     @staticmethod
     def _validate_interpretation_content(
@@ -1872,7 +1718,6 @@ class OllamaGoalInterpreter:
         parsed = _extract_json_object(content)
         _normalize_mechanical_goal_interpretation_dto(parsed)
         _reject_planner_shaped_goal_interpretation(parsed)
-        _reject_fresh_evidence_output_mode_contradictions(parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)
@@ -1895,11 +1740,7 @@ class OllamaGoalInterpreter:
         logger.info(
             "goal_interpretation_deep_escalation sid=%s reason=%s",
             request.sid,
-            (
-                "material_unresolved_responsibility_meaning"
-                if decision.unresolved
-                else "multiple_fresh_evidence_responsibility_claims"
-            ),
+            "material_unresolved_responsibility_meaning",
         )
         try:
             data = await self._chat_logged(

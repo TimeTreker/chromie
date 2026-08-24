@@ -4,6 +4,31 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .situation import CognitiveOpportunity
+
+
+class ReflectionRequest(BaseModel):
+    """Trusted internal request for selective Reflection.
+
+    Reflection is not a person-owed Responsibility. The Host binds one already
+    qualified CognitiveOpportunity plus bounded context and history; the model
+    cannot smuggle user-task authority into this internal cognition request.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sid: str = Field(min_length=1, max_length=200)
+    text: str = Field(default="", max_length=4000)
+    language: str = Field(default="auto", min_length=1, max_length=64)
+    opportunity: CognitiveOpportunity
+    context: dict[str, Any] = Field(default_factory=dict)
+    history: list[dict[str, Any]] = Field(default_factory=list, max_length=32)
+
+    @field_validator("sid", "text", "language", mode="before")
+    @classmethod
+    def normalize_request_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
 
 ReflectionAction = Literal[
     "replan",

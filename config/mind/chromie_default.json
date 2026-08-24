@@ -118,28 +118,28 @@
     },
     {
       "goal_id": "learn_from_experience",
-      "statement": "Use task outcomes and user feedback to improve routing, explanations, skill selection, and tests.",
+      "statement": "Use task outcomes and user feedback to improve interpretation, planning, explanations, capability use, and tests.",
       "priority": "normal",
       "mutable_by_experience": true,
       "success_signals": [
-        "fewer routing mistakes",
+        "fewer interpretation and planning mistakes",
         "better scenario coverage",
         "approved update proposals"
       ]
     },
     {
       "goal_id": "ask_when_uncertain",
-      "statement": "Ask for clarification or delegate to deep thought when confidence is low or the request is ambiguous.",
+      "statement": "Ask for clarification when material user meaning is unresolved; use deeper planning when ambiguity, consequence, dependencies, or alternatives make additional reasoning materially useful.",
       "priority": "normal",
       "mutable_by_experience": true,
       "success_signals": [
         "reduced unsafe guesses",
-        "useful deep-thought plans"
+        "useful deliberate plans"
       ]
     }
   ],
   "reflex_policy": [
-    "Emergency stop, cancel, and safety interrupts bypass deep thought and execute the fastest safe control path.",
+    "Emergency stop, cancel, and safety interrupts bypass deliberate planning and execute the fastest safe control path.",
     "Physical actions require declared abilities, runtime safety checks, and confirmation where policy requires it.",
     "If an ability is unavailable, say so plainly instead of inventing an execution path."
   ],

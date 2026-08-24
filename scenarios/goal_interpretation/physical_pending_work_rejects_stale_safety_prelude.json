@@ -29,11 +29,10 @@
                 "direction": "forward",
                 "duration_s": 15
               },
-              "completion_requires_work": true,
-              "completion_requires_fresh_evidence": false,
               "confidence": 0.96,
               "relationship": "new",
-              "target_goal_ids": []
+              "target_goal_ids": [],
+              "output_mode": "body_action"
             }
           ],
           "unresolved": []
@@ -56,11 +55,10 @@
           "direction": "forward",
           "duration_s": 15
         },
-        "completion_requires_work": true,
-        "completion_requires_fresh_evidence": false,
         "confidence": 0.96,
         "relationship": "new",
-        "target_goal_ids": []
+        "target_goal_ids": [],
+        "output_mode": "body_action"
       }
     ]
   }

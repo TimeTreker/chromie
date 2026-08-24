@@ -374,11 +374,15 @@ FastPlannerImmediateCommunicativeAct = Annotated[
 
 
 class FastPlannerFirstResponseModelOutput(BaseModel):
-    """Minimal model payload for Fast Planner's first-response latency phase."""
+    """Minimal model payload for Fast Planner's first-response latency phase.
+
+    ``activity=None`` is a first-class Planner decision: if no still-needed
+    user-facing semantic delta exists yet, silence is correct.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    activity: FastPlannerImmediateCommunicativeAct
+    activity: FastPlannerImmediateCommunicativeAct | None = None
 
 
 class FastPlannerFirstResponseTruthCertificate(BaseModel):
