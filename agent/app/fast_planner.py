@@ -36,19 +36,14 @@ from .planner_schema import (
 )
 from .planner_context import (
     canonical_goal_grounding,
-    expected_goal_ids,
     fast_capability_payload,
     gateway_speech_act,
-    goal_cancellation_evidence_reentry_goal_ids,
-    planner_goal_execution_requirements,
-    planner_response_goal_ids,
-    result_evidence_reentry_goal_ids,
+    planner_goal_context,
 )
 from .planner_validation import (
     coordinated_action_goal_ids,
-    normalize_detached_parameter_resolutions,
-    normalize_missing_numeric_parameter_provenance,
-    normalize_schema_default_parameter_provenance,
+    normalize_common_planner_output,
+    qualify_planner_capability_payload,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -792,43 +787,16 @@ class FastPlannerResolver:
     async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         plan_id = stable_plan_id(request, "fast")
         context = request.context if isinstance(request.context, dict) else {}
-        expected_goal_ids_for_turn = expected_goal_ids(context)
-        authoritative_goals = canonical_goal_grounding(context)
-        cancellation_reentry_goal_ids = (
-            goal_cancellation_evidence_reentry_goal_ids(context)
+        goal_context = planner_goal_context(context)
+        expected_goal_ids_for_turn = list(goal_context.expected_goal_ids)
+        authoritative_goals = list(goal_context.authoritative_goals)
+        cancellation_reentry_goal_ids = set(
+            goal_context.cancellation_reentry_goal_ids
         )
-        response_goal_ids = sorted(
-            planner_response_goal_ids(authoritative_goals)
-            | cancellation_reentry_goal_ids
-        )
-        response_only, requires_execution = planner_goal_execution_requirements(
-            authoritative_goals
-        )
-        reentry_goal_ids = result_evidence_reentry_goal_ids(context)
-        if cancellation_reentry_goal_ids:
-            capability_goal_ids = {
-                str(goal.get("goal_id") or "").strip()
-                for goal in authoritative_goals
-                if isinstance(goal, dict)
-                and isinstance(goal.get("metadata"), dict)
-                and str(goal["metadata"].get("responsibility_kind") or "").strip()
-                == "capability_dependent"
-            }
-            requires_execution = bool(
-                capability_goal_ids - cancellation_reentry_goal_ids
-            )
-            if cancellation_reentry_goal_ids == set(expected_goal_ids_for_turn):
-                response_only = True
-        if reentry_goal_ids == set(expected_goal_ids_for_turn):
-            # Terminal Evidence satisfies the just-completed provider prerequisite,
-            # but it does not force a response-only callback.  Planner must see the
-            # executable catalog so the new trusted state can legitimately yield a
-            # response, genuinely new follow-up Work, clarification/waiting, or no
-            # new Activity.  The just-completed Activity is rejected separately by
-            # the Host re-entry boundary rather than hidden by this schema.
-            response_only = False
-            requires_execution = False
-            response_goal_ids = list(expected_goal_ids_for_turn)
+        reentry_goal_ids = set(goal_context.result_reentry_goal_ids)
+        response_goal_ids = list(goal_context.response_goal_ids)
+        response_only = goal_context.response_only
+        requires_execution = goal_context.requires_execution
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
         executable = [
             item
@@ -839,10 +807,11 @@ class FastPlannerResolver:
         ]
         if response_only:
             executable = []
-        capability_payload = [
-            fast_capability_payload(item)
-            for item in executable[: self.max_capabilities]
-        ]
+        projected_payload = [fast_capability_payload(item) for item in executable]
+        capability_payload = qualify_planner_capability_payload(
+            projected_payload,
+            authoritative_goals=authoritative_goals,
+        )[: self.max_capabilities]
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         contract_schema = (
             "FastPlannerMultiGoalPlanOutput" if multi_goal_contract else "FastPlannerModelOutput"
@@ -952,9 +921,14 @@ class FastPlannerResolver:
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
-                raw, detached_resolution_repairs = (
-                    normalize_detached_parameter_resolutions(raw)
+                raw, common_repairs = normalize_common_planner_output(
+                    raw,
+                    authoritative_goals=authoritative_goals,
+                    capability_payload=capability_payload,
                 )
+                detached_resolution_repairs = common_repairs[
+                    "detached_parameter_resolutions"
+                ]
                 if detached_resolution_repairs:
                     logger.warning(
                         "fast_planner_detached_parameter_resolutions_removed "
@@ -962,15 +936,7 @@ class FastPlannerResolver:
                         request.sid,
                         bounded_json(detached_resolution_repairs, 2000),
                     )
-                raw, provenance_repairs = (
-                    normalize_schema_default_parameter_provenance(
-                        raw,
-                        authoritative_goals=canonical_goal_grounding(
-                            request.context
-                        ),
-                        capability_payload=capability_payload,
-                    )
-                )
+                provenance_repairs = common_repairs["schema_default_provenance"]
                 if provenance_repairs:
                     logger.info(
                         "fast_planner_schema_default_provenance_normalized "
@@ -978,14 +944,9 @@ class FastPlannerResolver:
                         request.sid,
                         bounded_json(provenance_repairs, 2000),
                     )
-                raw, numeric_provenance_repairs = (
-                    normalize_missing_numeric_parameter_provenance(
-                        raw,
-                        authoritative_goals=canonical_goal_grounding(
-                            request.context
-                        ),
-                    )
-                )
+                numeric_provenance_repairs = common_repairs[
+                    "numeric_parameter_provenance"
+                ]
                 if numeric_provenance_repairs:
                     logger.info(
                         "fast_planner_numeric_provenance_normalized sid=%s repairs=%s",
@@ -1014,7 +975,6 @@ class FastPlannerResolver:
                 except (ValidationError, ValueError) as exc:
                     raise PlannerDTOContractError(str(exc)) from exc
 
-                authoritative_goals = canonical_goal_grounding(request.context)
                 validate_goal_responsibility_outcomes(
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
@@ -1199,10 +1159,9 @@ class FastPlannerResolver:
                 plan,
                 capability_payload=capability_payload,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                authoritative_goals=canonical_goal_grounding(request.context),
+                authoritative_goals=authoritative_goals,
                 evidence_reentry_goal_ids=(
-                    result_evidence_reentry_goal_ids(request.context)
-                    | goal_cancellation_evidence_reentry_goal_ids(request.context)
+                    reentry_goal_ids | cancellation_reentry_goal_ids
                 ),
                 min_confidence=self.min_confidence,
             )
@@ -1271,7 +1230,7 @@ class FastPlannerResolver:
                 metadata["evidence_response_truth_qualification"] = qualification
                 validated = validated.model_copy(update={"metadata": metadata})
             coordinated_goal_ids = coordinated_action_goal_ids(
-                canonical_goal_grounding(request.context)
+                authoritative_goals
             )
             if (
                 coordinated_goal_ids.intersection(validated.goal_ids)
@@ -1283,7 +1242,7 @@ class FastPlannerResolver:
                         self.ollama,
                         request_text=request.text,
                         language=str(request.language or "und"),
-                        authoritative_goals=canonical_goal_grounding(request.context),
+                        authoritative_goals=authoritative_goals,
                         plan=validated,
                         capabilities=capability_payload,
                         num_ctx=self.num_ctx,

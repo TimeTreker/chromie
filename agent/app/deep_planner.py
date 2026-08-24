@@ -38,24 +38,17 @@ from .planner_schema import (
     deep_contract_revision_response_schema,
 )
 from .planner_context import (
-    canonical_goal_grounding,
-    expected_goal_ids,
     deep_capability_payload,
-    goal_cancellation_evidence_reentry_goal_ids,
-    planner_goal_execution_requirements,
+    planner_goal_context,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
-    planner_response_goal_ids,
 )
 from .planner_validation import (
     coordinated_action_goal_ids,
     explicit_numeric_goal_values,
     information_goal_ids_without_declared_provider,
-    normalize_detached_parameter_resolutions,
-    normalize_missing_numeric_parameter_provenance,
-    normalize_schema_default_parameter_provenance,
-    qualify_capability_catalog_for_information_domains,
-    qualify_capability_catalog_for_output_modes,
+    normalize_common_planner_output,
+    qualify_planner_capability_payload,
     requires_safety_revision,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
@@ -160,28 +153,11 @@ class DeepPlannerResolver:
     async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         plan_id = stable_plan_id(request, "deep")
         context = request.context if isinstance(request.context, dict) else {}
-        expected_goal_ids_for_turn = expected_goal_ids(context)
-        authoritative_goals = canonical_goal_grounding(context)
-        cancellation_reentry_goal_ids = (
-            goal_cancellation_evidence_reentry_goal_ids(context)
-        )
-        response_only, requires_execution = planner_goal_execution_requirements(
-            authoritative_goals
-        )
-        if cancellation_reentry_goal_ids:
-            capability_goal_ids = {
-                str(goal.get("goal_id") or "").strip()
-                for goal in authoritative_goals
-                if isinstance(goal, dict)
-                and isinstance(goal.get("metadata"), dict)
-                and str(goal["metadata"].get("responsibility_kind") or "").strip()
-                == "capability_dependent"
-            }
-            requires_execution = bool(
-                capability_goal_ids - cancellation_reentry_goal_ids
-            )
-            if cancellation_reentry_goal_ids == set(expected_goal_ids_for_turn):
-                response_only = True
+        goal_context = planner_goal_context(context)
+        expected_goal_ids_for_turn = list(goal_context.expected_goal_ids)
+        authoritative_goals = list(goal_context.authoritative_goals)
+        response_only = goal_context.response_only
+        requires_execution = goal_context.requires_execution
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
         executable = [
             item
@@ -193,12 +169,8 @@ class DeepPlannerResolver:
         if response_only:
             executable = []
         full_payload = [deep_capability_payload(item) for item in executable]
-        output_mode_qualified_payload = qualify_capability_catalog_for_output_modes(
+        qualified_payload = qualify_planner_capability_payload(
             full_payload,
-            authoritative_goals=authoritative_goals,
-        )
-        qualified_payload = qualify_capability_catalog_for_information_domains(
-            output_mode_qualified_payload,
             authoritative_goals=authoritative_goals,
         )
         payload = qualified_payload[: self.max_capabilities]
@@ -214,7 +186,7 @@ class DeepPlannerResolver:
         )
         if omitted_domain_capability_ids:
             logger.info(
-                "deep_planner_information_domain_catalog_qualified sid=%s omitted=%s",
+                "deep_planner_semantic_catalog_qualified sid=%s omitted=%s",
                 request.sid,
                 omitted_domain_capability_ids,
             )
@@ -245,10 +217,7 @@ class DeepPlannerResolver:
             },
             response_only=response_only,
             requires_execution=requires_execution,
-            response_goal_ids=sorted(
-                planner_response_goal_ids(authoritative_goals)
-                | cancellation_reentry_goal_ids
-            ),
+            response_goal_ids=list(goal_context.response_goal_ids),
             provider_required_vocal_goal_ids=sorted(
                 planner_provider_vocal_goal_ids(authoritative_goals)
             ),
@@ -324,9 +293,14 @@ class DeepPlannerResolver:
                         raw,
                         baseline=mechanical_numeric_baseline,
                     )
-                raw, detached_resolution_repairs = (
-                    normalize_detached_parameter_resolutions(raw)
+                raw, common_repairs = normalize_common_planner_output(
+                    raw,
+                    authoritative_goals=authoritative_goals,
+                    capability_payload=payload,
                 )
+                detached_resolution_repairs = common_repairs[
+                    "detached_parameter_resolutions"
+                ]
                 if detached_resolution_repairs:
                     logger.warning(
                         "deep_planner_detached_parameter_resolutions_removed "
@@ -334,15 +308,7 @@ class DeepPlannerResolver:
                         request.sid,
                         bounded_json(detached_resolution_repairs, 2000),
                     )
-                raw, provenance_repairs = (
-                    normalize_schema_default_parameter_provenance(
-                        raw,
-                        authoritative_goals=canonical_goal_grounding(
-                            request.context
-                        ),
-                        capability_payload=payload,
-                    )
-                )
+                provenance_repairs = common_repairs["schema_default_provenance"]
                 if provenance_repairs:
                     logger.info(
                         "deep_planner_schema_default_provenance_normalized "
@@ -350,14 +316,9 @@ class DeepPlannerResolver:
                         request.sid,
                         bounded_json(provenance_repairs, 2000),
                     )
-                raw, numeric_provenance_repairs = (
-                    normalize_missing_numeric_parameter_provenance(
-                        raw,
-                        authoritative_goals=canonical_goal_grounding(
-                            request.context
-                        ),
-                    )
-                )
+                numeric_provenance_repairs = common_repairs[
+                    "numeric_parameter_provenance"
+                ]
                 if numeric_provenance_repairs:
                     logger.info(
                         "deep_planner_numeric_provenance_normalized sid=%s repairs=%s",
@@ -398,26 +359,26 @@ class DeepPlannerResolver:
 
                 validate_goal_responsibility_outcomes(
                     validated_model_output,
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    authoritative_goals=authoritative_goals,
                     context=request.context,
                 )
                 validate_resource_responsibility_capability_grounding(
                     validated_model_output,
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    authoritative_goals=authoritative_goals,
                     capabilities=payload,
                 )
                 validate_explicit_numeric_parameter_grounding(
                     validated_model_output,
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    authoritative_goals=authoritative_goals,
                 )
                 validate_goal_binding_argument_grounding(
                     validated_model_output,
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    authoritative_goals=authoritative_goals,
                     capabilities=payload,
                 )
                 validate_user_supplied_parameter_provenance(
                     validated_model_output,
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    authoritative_goals=authoritative_goals,
                 )
                 validate_external_response_evidence_boundary(
                     validated_model_output,
@@ -457,7 +418,7 @@ class DeepPlannerResolver:
                 )
                 numeric_obligations = detached_numeric_provenance_obligations(
                     raw,
-                    authoritative_goals=canonical_goal_grounding(request.context),
+                    authoritative_goals=authoritative_goals,
                     error=exc,
                 )
                 if numeric_obligations:
@@ -485,9 +446,7 @@ class DeepPlannerResolver:
                         raw=raw,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                         capability_payload=payload,
-                        authoritative_goals=canonical_goal_grounding(
-                            request.context
-                        ),
+                        authoritative_goals=authoritative_goals,
                     )
                     initial_validation_errors = bounded_json(
                         validation_feedback, 12000
@@ -550,7 +509,8 @@ class DeepPlannerResolver:
                 plan,
                 payload,
                 expected_goal_ids=expected_goal_ids_for_turn,
-                authoritative_goals=canonical_goal_grounding(request.context),
+                authoritative_goals=authoritative_goals,
+                requires_execution=requires_execution,
                 min_confidence=self.min_confidence,
                 min_goal_satisfaction=self.min_goal_satisfaction,
             )
@@ -561,7 +521,7 @@ class DeepPlannerResolver:
             if not errors:
                 coverage_review_metadata: dict[str, Any] = {}
                 coordinated_goal_ids = coordinated_action_goal_ids(
-                    canonical_goal_grounding(request.context)
+                    authoritative_goals
                 )
                 if (
                     coordinated_goal_ids.intersection(plan.goal_ids)
@@ -573,7 +533,7 @@ class DeepPlannerResolver:
                             self.ollama,
                             request_text=request.text,
                             language=str(request.language or "und"),
-                            authoritative_goals=canonical_goal_grounding(request.context),
+                            authoritative_goals=authoritative_goals,
                             plan=plan,
                             capabilities=payload,
                             num_ctx=self.num_ctx,

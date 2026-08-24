@@ -175,7 +175,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "e33ad13522aa37c1e548a32bb40c2a53d82437b176cdb2bddf4eb21d62a7f1ee",
+      "body_sha256": "68fca5578f9cb76aaf1cd98efb68dcb0e4f59be1c195139a3b1466e1431f1eb3",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -1168,11 +1168,11 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._resolve",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve_and_commit_goal_association",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
-      "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Fail closed if canonical Goal state cannot be committed after Goal Association; record the failed commit and never continue planning against uncommitted Goal state.",
       "review_status": "reviewed",
       "body_sha256": "999b78b48326401ec07eb3affa0de11d012371df36960cb639109b3579322b61",
       "failure_signals": [
@@ -1182,7 +1182,7 @@
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "GoalDrivenRuntimeCoordinator._resolve",
-      "ordinal": 2,
+      "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator.cognitive_runtime",
       "contract": "Record Planner InformationGap commit rejection and raise a typed cognitive-stage failure; never ask before the Planner-owned gap is atomically attached to its canonical Goal.",
@@ -1195,7 +1195,7 @@
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "GoalDrivenRuntimeCoordinator._resolve",
-      "ordinal": 3,
+      "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return an observable failed result without authorizing unvalidated work.",

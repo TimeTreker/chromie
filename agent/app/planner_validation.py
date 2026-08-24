@@ -2055,6 +2055,60 @@ def normalize_detached_parameter_resolutions(
     normalized["parameter_resolutions"] = retained
     return normalized, repairs
 
+
+def normalize_common_planner_output(
+    raw: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+    capability_payload: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
+    """Apply only cross-depth mechanical Planner DTO normalizations.
+
+    Fast and Deep use the same CanonicalPlan semantics.  These adapters are
+    therefore one shared mechanism: they may remove detached provenance or add
+    mechanically provable provenance metadata, but never alter Goal meaning,
+    Capability choice, executable arguments, timing, disposition, or wording.
+    """
+
+    normalized, detached_repairs = normalize_detached_parameter_resolutions(raw)
+    normalized, schema_default_repairs = normalize_schema_default_parameter_provenance(
+        normalized,
+        authoritative_goals=authoritative_goals,
+        capability_payload=capability_payload,
+    )
+    normalized, numeric_repairs = normalize_missing_numeric_parameter_provenance(
+        normalized,
+        authoritative_goals=authoritative_goals,
+    )
+    return normalized, {
+        "detached_parameter_resolutions": detached_repairs,
+        "schema_default_provenance": schema_default_repairs,
+        "numeric_parameter_provenance": numeric_repairs,
+    }
+
+
+def qualify_planner_capability_payload(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Apply the same typed semantic applicability filter at either depth.
+
+    Fast may receive a smaller catalog and Deep a wider one, but once entries
+    are projected their applicability comes from the same canonical Goal and
+    Capability metadata rather than pass-specific resolver behavior.
+    """
+
+    output_mode_qualified = qualify_capability_catalog_for_output_modes(
+        capabilities,
+        authoritative_goals=authoritative_goals,
+    )
+    return qualify_capability_catalog_for_information_domains(
+        output_mode_qualified,
+        authoritative_goals=authoritative_goals,
+    )
+
+
 def planner_contract_diagnostics(
     raw: Any,
     *,

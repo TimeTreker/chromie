@@ -128,6 +128,20 @@ def test_fast_deep_and_prompt_depend_on_real_planner_layer_owners() -> None:
     assert deep_planner.validate_planner_model_output is (
         planner_validation.validate_planner_model_output
     )
+    assert fast_planner.planner_goal_context is planner_context.planner_goal_context
+    assert deep_planner.planner_goal_context is planner_context.planner_goal_context
+    assert fast_planner.normalize_common_planner_output is (
+        planner_validation.normalize_common_planner_output
+    )
+    assert deep_planner.normalize_common_planner_output is (
+        planner_validation.normalize_common_planner_output
+    )
+    assert fast_planner.qualify_planner_capability_payload is (
+        planner_validation.qualify_planner_capability_payload
+    )
+    assert deep_planner.qualify_planner_capability_payload is (
+        planner_validation.qualify_planner_capability_payload
+    )
     assert fast_planner.qualify_fast_canonical_plan is (
         planner_fast_validation.qualify_fast_canonical_plan
     )

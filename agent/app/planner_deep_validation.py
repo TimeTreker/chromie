@@ -17,7 +17,6 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import CanonicalPlan
 
 from .capabilities.validator import validate_args_for_schema
-from .planner_context import planner_goal_execution_requirements
 from .planner_model_contract import PlannerDTOContractError
 from .planner_validation import (
     explicit_numeric_goal_values,
@@ -667,6 +666,7 @@ def deep_plan_validation_errors(
     *,
     expected_goal_ids: list[str],
     authoritative_goals: list[dict[str, Any]],
+    requires_execution: bool,
     min_confidence: float,
     min_goal_satisfaction: float,
 ) -> list[dict[str, Any]]:
@@ -680,9 +680,6 @@ def deep_plan_validation_errors(
                 "actual_goal_ids": list(plan.goal_ids),
             }
         )
-    _, requires_execution = planner_goal_execution_requirements(
-        authoritative_goals
-    )
     if (
         requires_execution
         and plan.disposition not in {"clarify", "unavailable", "refused"}

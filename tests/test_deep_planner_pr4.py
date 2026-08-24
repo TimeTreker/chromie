@@ -19,6 +19,7 @@ from agent.app.planner_validation import (
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.tool_result import canonical_value_sha256
 
 
 class SequencedOllama:
@@ -355,6 +356,60 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
 
 
 class DeepPlannerResolverTests(unittest.TestCase):
+    def test_terminal_evidence_reentry_uses_same_goal_shape_as_fast_planner(self):
+        data = {"answer": "trusted current state"}
+        run_request = request("What is the current state?", goal_ids=["goal-info"])
+        goal = run_request.context["goal_association_resolution"]["new_goals"][0]
+        goal["metadata"] = {
+            "responsibility_kind": "capability_dependent",
+            "execution_lane": "capability",
+            "output_mode": "capability_work",
+            "provider_required": True,
+        }
+        run_request.context["result_evidence_reentry"] = {
+            "source_goal_ids": ["goal-info"],
+            "evidence_refs": ["evidence-info"],
+        }
+        run_request.context["trusted_terminal_evidence"] = [
+            {
+                "evidence_id": "evidence-info",
+                "tool_id": "test.current_state",
+                "status": "completed",
+                "data": data,
+                "output_sha256": canonical_value_sha256(data),
+            }
+        ]
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Answer from trusted terminal Evidence.",
+            "response_text": "The current state is available.",
+            "steps": [],
+            "goal_outcomes": {
+                "goal-info": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "The current state is available.",
+                    "step_ids": [],
+                }
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-info"],
+            },
+        }
+        ollama = SequencedOllama([raw])
+
+        plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+
+        self.assertEqual(plan.disposition, "respond")
+        self.assertEqual(plan.response_text, "The current state is available.")
+        schema = ollama.prompts[0][1]["response_format"]
+        self.assertIn("respond", schema["properties"]["disposition"].get("enum", []))
+        self.assertGreater(schema["properties"]["steps"].get("maxItems", 0), 0)
+
     def test_canonical_body_goal_is_planned_from_goal_state(self):
         raw = {
             "disposition": "execute",

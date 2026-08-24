@@ -246,7 +246,13 @@ version. The pending Activity retains whether the question came from GI unresolv
 meaning or a Planner-owned input need; this continuity does not transfer source-policy
 ownership into GI. Planner's deep pass is reserved for complex HOW, dependencies, alternatives,
 or consequential planning—not for asking a question the fast pass already knows it must
-ask.
+ask. Fast and Deep therefore consume the same canonical Goal/Evidence projection before
+their pass-specific cognition begins. Cancellation Evidence, terminal result Evidence,
+Goal response shape, and whether prior execution is still a prerequisite are projected
+once by the shared Planner context owner; the passes may differ in search depth, repair,
+and safety policy, but they may not independently reinterpret those facts. Shared
+Capability applicability and mechanical provenance normalization likewise live in the
+common Planner validation owner rather than in duplicated Fast/Deep resolver logic.
 
 Safe, side-effect-free, schema-valid reads may start without awaiting GA once their
 Capability also explicitly declares parallel safety, needs no confirmation, and is
@@ -809,10 +815,16 @@ stages that have not begun; speech already heard remains delivery evidence.
 ### 8.2 Evidence-bound post-execution speech
 
 After terminal results have been joined and every executable Goal reconciled, the Host
-reactivates Fast Planner with the immutable Goal/Evidence result bundle. Fast Planner,
-not a deterministic or model-backed post-execution composer, owns the human-relevant
-answer/follow-up/silence decision and exact wording. It cannot treat the result as a new
-user turn, reassign it to another Goal, or add execution authority. Before Runtime
+reactivates Planner with the immutable Goal/Evidence result bundle, beginning with the
+Fast depth and delegating to Deep only under the normal cognition-depth policy. The
+shared Planner Goal/Evidence projection marks the completed prerequisite as satisfied
+for both depths without forcing response-only behavior: Planner may answer, author
+genuinely new follow-up Work, clarify, wait, or remain silent. Neither depth may
+independently turn the same terminal Evidence back into a requirement to repeat the
+completed Work. Planner, not a deterministic or model-backed post-execution composer,
+owns the human-relevant answer/follow-up/silence decision and exact wording. It cannot
+treat the result as a new user turn, reassign it to another Goal, or add execution
+authority. Before Runtime
 commits an answer, one bounded same-owner Epistemic Qualification accepts or rejects
 the immutable wording against the exact Goal/Evidence snapshot. It cannot rewrite the
 answer; rejection or unavailability delegates once through the existing Deep-Planner

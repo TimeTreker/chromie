@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass
 import json
 from typing import Any
 
@@ -492,6 +493,74 @@ def goal_cancellation_evidence_reentry_goal_ids(
     if requested_goal_ids and not requested_goal_ids.issubset(evidence_goal_ids):
         return set()
     return requested_goal_ids or evidence_goal_ids
+
+
+@dataclass(frozen=True)
+class PlannerGoalContext:
+    """One immutable Goal/evidence projection shared by Fast and Deep Planner.
+
+    Fast and Deep are cognition depths of one Planner authority.  The semantic
+    meaning of the current Goal set, cancellation Evidence, and terminal-result
+    re-entry therefore must not drift between pass-specific resolver code.
+    """
+
+    expected_goal_ids: tuple[str, ...]
+    authoritative_goals: tuple[dict[str, Any], ...]
+    cancellation_reentry_goal_ids: frozenset[str]
+    result_reentry_goal_ids: frozenset[str]
+    response_goal_ids: tuple[str, ...]
+    response_only: bool
+    requires_execution: bool
+
+
+def planner_goal_context(context: dict[str, Any] | None) -> PlannerGoalContext:
+    """Project canonical Goal/evidence truth once for either Planner depth.
+
+    Result-Evidence re-entry deliberately re-opens the executable catalog rather
+    than forcing a response-only callback: after trusted state changes, the same
+    Planner may answer, plan genuinely new follow-up Work, clarify, wait, or do
+    nothing.  The Host's re-entry guard rejects replay of the completed Work.
+    """
+
+    current = context if isinstance(context, dict) else {}
+    expected = tuple(expected_goal_ids(current))
+    goals = canonical_goal_grounding(current)
+    cancellation_goal_ids = frozenset(
+        goal_cancellation_evidence_reentry_goal_ids(current)
+    )
+    result_goal_ids = frozenset(result_evidence_reentry_goal_ids(current))
+    response_only, requires_execution = planner_goal_execution_requirements(goals)
+    response_goal_ids = set(planner_response_goal_ids(goals)) | set(
+        cancellation_goal_ids
+    )
+
+    if cancellation_goal_ids:
+        capability_goal_ids = {
+            str(goal.get("goal_id") or "").strip()
+            for goal in goals
+            if isinstance(goal, dict)
+            and isinstance(goal.get("metadata"), dict)
+            and str(goal["metadata"].get("responsibility_kind") or "").strip()
+            == "capability_dependent"
+        }
+        requires_execution = bool(capability_goal_ids - set(cancellation_goal_ids))
+        if set(cancellation_goal_ids) == set(expected):
+            response_only = True
+
+    if result_goal_ids and set(result_goal_ids) == set(expected):
+        response_only = False
+        requires_execution = False
+        response_goal_ids = set(expected)
+
+    return PlannerGoalContext(
+        expected_goal_ids=expected,
+        authoritative_goals=tuple(goals),
+        cancellation_reentry_goal_ids=cancellation_goal_ids,
+        result_reentry_goal_ids=result_goal_ids,
+        response_goal_ids=tuple(sorted(response_goal_ids)),
+        response_only=response_only,
+        requires_execution=requires_execution,
+    )
 
 
 def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any]:
