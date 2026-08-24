@@ -425,8 +425,8 @@ def canonical_plan_response_schema(
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
-    provider_required_vocal_goal_ids: list[str] | None = None,
-    provider_required_media_goal_operations: dict[str, str] | None = None,
+    provider_vocal_goal_ids: list[str] | None = None,
+    provider_media_goal_operations: dict[str, str] | None = None,
     unavailable_information_goal_ids: list[str] | None = None,
     single_step_goal_ids: list[str] | None = None,
     required_numeric_goal_values: dict[str, list[int | float]] | None = None,
@@ -529,12 +529,12 @@ def canonical_plan_response_schema(
         and isinstance(disposition, dict)
     ):
         disposition["enum"] = ["unavailable", "refused"]
-    provider_vocal_goal_set = set(provider_required_vocal_goal_ids or []).intersection(
+    provider_vocal_goal_set = set(provider_vocal_goal_ids or []).intersection(
         allowed_goals
     )
     provider_media_goal_operations = {
         goal_id: operation
-        for goal_id, operation in (provider_required_media_goal_operations or {}).items()
+        for goal_id, operation in (provider_media_goal_operations or {}).items()
         if goal_id in allowed_goals and operation in MEDIA_CAPABILITY_IDS
     }
     vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_capabilities
@@ -2429,8 +2429,8 @@ def deep_plan_response_schema(
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
-    provider_required_vocal_goal_ids: list[str] | None = None,
-    provider_required_media_goal_operations: dict[str, str] | None = None,
+    provider_vocal_goal_ids: list[str] | None = None,
+    provider_media_goal_operations: dict[str, str] | None = None,
     unavailable_information_goal_ids: list[str] | None = None,
     single_step_goal_ids: list[str] | None = None,
     required_numeric_goal_values: dict[str, list[int | float]] | None = None,
@@ -2443,8 +2443,8 @@ def deep_plan_response_schema(
         response_only=response_only,
         requires_execution=requires_execution,
         response_goal_ids=response_goal_ids,
-        provider_required_vocal_goal_ids=(provider_required_vocal_goal_ids),
-        provider_required_media_goal_operations=(provider_required_media_goal_operations),
+        provider_vocal_goal_ids=(provider_vocal_goal_ids),
+        provider_media_goal_operations=(provider_media_goal_operations),
         unavailable_information_goal_ids=unavailable_information_goal_ids,
         single_step_goal_ids=single_step_goal_ids,
         required_numeric_goal_values=required_numeric_goal_values,

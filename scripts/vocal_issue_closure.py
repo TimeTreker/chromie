@@ -281,14 +281,8 @@ def _goal_metadata(goal: dict[str, Any]) -> dict[str, Any]:
     return metadata if isinstance(metadata, dict) else {}
 
 
-def _goal_signature(goal: dict[str, Any]) -> tuple[str, str, str, bool]:
-    metadata = _goal_metadata(goal)
-    return (
-        str(metadata.get("responsibility_kind") or ""),
-        str(metadata.get("execution_lane") or ""),
-        str(metadata.get("output_mode") or ""),
-        metadata.get("provider_required") is True,
-    )
+def _goal_output_mode(goal: dict[str, Any]) -> str:
+    return str(_goal_metadata(goal).get("output_mode") or "")
 
 
 def _outcomes_by_goal(plan: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -475,14 +469,12 @@ def validate_closure_summary(
     singing_goals = [
         item
         for item in typed_goals
-        if _goal_signature(item)
-        == ("vocal_output", "vocal", "singing", True)
+        if _goal_output_mode(item) == "singing"
     ]
     body_goals = [
         item
         for item in typed_goals
-        if _goal_signature(item)
-        == ("executable_action", "activity", "body_action", True)
+        if _goal_output_mode(item) == "body_action"
     ]
     if len(singing_goals) != 1:
         errors.append(f"expected exactly one typed singing Goal, got {len(singing_goals)}")

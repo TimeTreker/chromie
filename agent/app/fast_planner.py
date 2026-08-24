@@ -992,6 +992,7 @@ class FastPlannerResolver:
                 validate_external_response_evidence_boundary(
                     validated_model_output,
                     context=request.context,
+                    authoritative_goals=authoritative_goals,
                 )
                 capability_errors = capability_argument_errors(
                     plan,

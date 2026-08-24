@@ -391,7 +391,7 @@ required_capabilities:
 optional_capabilities:
   - chromie.memory.retrieve_verified_tool_result
 applicable_output_modes:
-  - capability_work
+  - information
 applicable_information_domains:
   - weather_forecast
 projections:

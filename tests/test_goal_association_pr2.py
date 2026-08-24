@@ -183,8 +183,10 @@ def coverage_item(
         "required_output_mode": (
             required_output_mode
             if required_output_mode is not None
-            else "capability_work"
-            if required_goal_shape in {"information_resource", "persistent_effect"}
+            else "information"
+            if required_goal_shape == "information_resource"
+            else "stateful_effect"
+            if required_goal_shape == "persistent_effect"
             else "body_action"
             if required_goal_shape == "physical_resource"
             else "none"
@@ -288,14 +290,15 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
 
 
-    def test_host_execution_projection_is_derived_from_output_mode(self):
+    def test_goal_association_preserves_what_without_execution_projection(self):
         item = GoalAssociationModelGoal.model_validate(
-            goal("Check tomorrow's weather.", "capability_work")
+            goal("Check tomorrow's weather.", "information")
         )
 
-        self.assertEqual(item.responsibility_kind, "capability_dependent")
-        self.assertEqual(item.execution_lane, "activity")
-        self.assertTrue(item.provider_required)
+        self.assertEqual(item.output_mode, "information")
+        self.assertFalse(hasattr(item, "responsibility_kind"))
+        self.assertFalse(hasattr(item, "execution_lane"))
+        self.assertFalse(hasattr(item, "provider_required"))
 
     def test_model_cannot_author_host_execution_projection(self):
         with self.assertRaises(ValidationError):
@@ -396,7 +399,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             source_status="provider_resolved",
         )
         parsed = GoalAssociationModelGoal.model_validate(
-            goal("Check Chongqing weather tonight.", "capability_work", resource=information)
+            goal("Check Chongqing weather tonight.", "information", resource=information)
         )
         resource = parsed.resource_responsibility
         self.assertEqual(resource.kind, "information")
@@ -408,7 +411,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             GoalAssociationModelGoal.model_validate(
                 goal(
                     "Check the named source.",
-                    "capability_work",
+                    "information",
                     resource=resource_responsibility(
                         kind="information",
                         description="named-source result",
@@ -430,7 +433,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         payload["source"]["bindings"] = [binding("location", "location", "重庆")]
         with self.assertRaises(ValidationError):
             GoalAssociationModelGoal.model_validate(
-                goal("Check 重庆 weather.", "capability_work", resource=payload)
+                goal("Check 重庆 weather.", "information", resource=payload)
             )
 
     def test_resource_kind_requires_its_semantic_completion_mode(self):
@@ -441,15 +444,15 @@ class GoalExecutionContractTests(unittest.TestCase):
             attributes=[binding("location", "location", "Chongqing")],
             source_status="provider_resolved",
         )
-        with self.assertRaisesRegex(ValueError, "output_mode=capability_work"):
+        with self.assertRaisesRegex(ValueError, "output_mode=information"):
             GoalAssociationModelGoal.model_validate(
                 goal("Check tonight's weather.", "speech", resource=information)
             )
 
         parsed = GoalAssociationModelGoal.model_validate(
-            goal("Check tonight's weather.", "capability_work", resource=information)
+            goal("Check tonight's weather.", "information", resource=information)
         )
-        self.assertEqual(parsed.output_mode, "capability_work")
+        self.assertEqual(parsed.output_mode, "information")
 
     def test_information_resource_requires_typed_query_scope_not_description_only(self):
         information = resource_responsibility(
@@ -460,7 +463,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "query_scope"):
             GoalAssociationModelGoal.model_validate(
-                goal("Check Chongqing weather.", "capability_work", resource=information)
+                goal("Check Chongqing weather.", "information", resource=information)
             )
 
     def test_vocal_goal_cannot_claim_resource_authority(self):
@@ -528,7 +531,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             resolved_references=[],
         )
         self.assertTrue(list(goal_validator.iter_errors(weather)))
-        weather["new_goals"][0]["output_mode"] = "capability_work"
+        weather["new_goals"][0]["output_mode"] = "information"
         self.assertEqual(list(goal_validator.iter_errors(weather)), [])
         weather["new_goals"][0]["bindings"] = [
             binding("location", "location", "Chongqing")
@@ -825,7 +828,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             raw=create_goals(
                 goal(
                     "Check Chongqing weather tonight.",
-                    "capability_work",
+                    "information",
                     resource=resource_responsibility(
                         kind="information",
                         description="Chongqing weather tonight",
@@ -872,11 +875,10 @@ class GoalExecutionContractTests(unittest.TestCase):
             [],
             output_type=GoalSegmentationModelOutput,
         )
-        self.assertIn("deferred reminder", execution_contract)
-        self.assertIn("stateful capability work", execution_contract)
-        self.assertIn("saying the reminder now does not complete", execution_contract)
-        self.assertIn("ordinary typed Goal bindings", execution_contract)
-        self.assertIn("persistent state mutations", execution_contract)
+        self.assertIn("stateful_effect", execution_contract)
+        self.assertIn("durable or future state change", execution_contract)
+        self.assertIn("does not decide whether a Capability", execution_contract)
+        self.assertIn("ordinary typed bindings", execution_contract)
         self.assertIn("local/private/runtime source", execution_contract)
         self.assertIn("source.status=unknown", execution_contract)
 
@@ -1454,7 +1456,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         payload = create_goals(
             goal(
                 "Determine the current local time.",
-                "capability_work",
+                "information",
                 resource=resource_responsibility(
                     kind="information",
                     description="current local time",
@@ -1483,7 +1485,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         payload = create_goals(
             goal(
                 "Determine whether someone is outside.",
-                "capability_work",
+                "information",
                 resource=resource_responsibility(
                     kind="information",
                     information_domain="direct_environment_perception",
@@ -1516,7 +1518,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         candidate = GoalAssociationModelGoal.model_validate(
             goal(
                 "Determine whether someone is outside.",
-                "capability_work",
+                "information",
                 resource=resource_responsibility(
                     kind="information",
                     information_domain="weather_forecast",
@@ -1556,7 +1558,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         initial = create_goals(
             goal(
                 "determine whether it will rain in Chongqing tonight",
-                "capability_work",
+                "information",
                 bindings=[
                     binding("location", "location", "重庆"),
                     binding("time", "day_part", "night"),
@@ -1586,7 +1588,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         corrected = create_goals(
             goal(
                 "determine whether it will rain in Chongqing tonight",
-                "capability_work",
+                "information",
                 resource=resource_responsibility(
                     kind="information",
                     description="重庆今晚降雨情况",
@@ -1778,7 +1780,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         raw = create_goals(
             goal(
                 "Check package status.",
-                "capability_work",
+                "information",
                 bindings=list(resource["query_scope"]),
                 resource=resource,
             )
@@ -1802,7 +1804,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         raw = create_goals(
             goal(
                 "Check package status.",
-                "capability_work",
+                "information",
                 bindings=[binding("carrier", "organization", "ParcelCo")],
                 resource=resource,
             )
@@ -1953,7 +1955,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         raw = create_goals(
             goal(
                 "Report the current local time.",
-                "capability_work",
+                "information",
                 resource=resource_responsibility(
                     kind="information",
                     description="current local time",
@@ -2213,7 +2215,7 @@ class GoalExecutionContractTests(unittest.TestCase):
 
     def test_coverage_contract_has_no_provider_temporal_realization_fields(self):
         schema = ga_schema.coverage_certificate_response_schema(
-            [GoalAssociationModelGoal.model_validate(goal("Check weather.", "capability_work", resource=resource_responsibility(kind="information", description="weather", attributes=[binding("temporal_scope", "temporal_scope", "今晚")], source_status="provider_resolved")))]
+            [GoalAssociationModelGoal.model_validate(goal("Check weather.", "information", resource=resource_responsibility(kind="information", description="weather", attributes=[binding("temporal_scope", "temporal_scope", "今晚")], source_status="provider_resolved")))]
         )
         properties = schema["$defs"]["GoalResponsibilityCoverageItem"]["properties"]
         self.assertNotIn("temporal_dimensions", properties)
@@ -2275,7 +2277,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         initial = create_goals(
             goal(
                 "Confirm whether it rains in Chongqing tonight.",
-                "capability_work",
+                "information",
                 source_responsibility_refs=["weather_1"],
                 resource=resource_responsibility(
                     kind="information",
@@ -2307,7 +2309,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         corrected = create_goals(
             goal(
                 "确认重庆今天晚上是否有大雨。",
-                "capability_work",
+                "information",
                 source_responsibility_refs=["weather_1"],
                 resource=resource_responsibility(
                     kind="information",
@@ -3226,7 +3228,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         result = self._resolve(
             [
                 create_goals(
-                    goal("查询并解释重庆明天的天气。", "capability_work", resource=weather)
+                    goal("查询并解释重庆明天的天气。", "information", resource=weather)
                 ),
                 certificate(
                     coverage_item(
@@ -3272,7 +3274,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                 create_goals(
                     goal(
                         "Check whether it will rain and be cold in Chongqing tonight.",
-                        "capability_work",
+                        "information",
                         resource=weather,
                     )
                 ),
@@ -3294,7 +3296,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
 
         self.assertEqual(len(result.new_goals), 1)
         semantic = result.new_goals[0]
-        self.assertEqual(semantic.metadata["output_mode"], "capability_work")
+        self.assertEqual(semantic.metadata["output_mode"], "information")
         self.assertNotIn("completion_requires_work", semantic.metadata)
         self.assertNotIn("completion_requires_fresh_evidence", semantic.metadata)
         self.assertEqual(
@@ -3393,7 +3395,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         payload = create_goals(
             goal(
                 "Check 重庆 weather.",
-                "capability_work",
+                "information",
                 resource=resource_responsibility(
                     kind="information",
                     description="重庆 weather",

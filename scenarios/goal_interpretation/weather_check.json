@@ -3,7 +3,7 @@
   "id": "weather_check",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "GI preserves the weather outcome and fresh-evidence need without treating a Capability-owned location input as semantic uncertainty.",
+  "description": "GI preserves the weather-information WHAT without treating a Capability-owned location input as semantic uncertainty; evidence acquisition remains Planner/runtime authority.",
   "tags": [
     "tool",
     "normal"

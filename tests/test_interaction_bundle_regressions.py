@@ -38,7 +38,7 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
                     {
                         "source_responsibility_refs": ["r1"],
                         "description": "Perform several independently observable outcomes together.",
-                        "output_mode": "capability_work",
+                        "output_mode": "other",
                     }
                 ],
                 "confidence": 1.0,
@@ -57,7 +57,7 @@ class GoalAndCoverageRegressionTests(unittest.TestCase):
             [
                 {
                     "goal_id": "goal-resource",
-                    "metadata": {"responsibility_kind": "capability_dependent"},
+                    "metadata": {"output_mode": "information"},
                     "resource_responsibility": {
                         "responsibility_type": "acquire_and_deliver_resource",
                         "resource": {

@@ -103,12 +103,7 @@ def vocal_goal(mode: str = "singing") -> dict[str, object]:
         "goal_id": "goal-vocal",
         "description": "Perform the authored vocal content.",
         "source_text": "Sing a short greeting.",
-        "metadata": {
-            "responsibility_kind": "vocal_output",
-            "execution_lane": "vocal",
-            "output_mode": mode,
-            "provider_required": True,
-        },
+        "metadata": {"output_mode": mode},
     }
 
 
@@ -292,7 +287,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             planner_tier="deep",
             expected_goal_ids=["goal-vocal"],
             allowed_capability_ids=[],
-            provider_required_vocal_goal_ids=["goal-vocal"],
+            provider_vocal_goal_ids=["goal-vocal"],
         )
         vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-vocal"]
         self.assertEqual(
@@ -314,7 +309,6 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             **vocal_goal(mode="speech"),
             "metadata": {
                 **vocal_goal(mode="speech")["metadata"],
-                "provider_required": False,
             },
         }
         ordinary_association = GoalAssociationResolution.model_validate(

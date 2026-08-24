@@ -317,10 +317,7 @@ class GoalAssociationResolution(BaseModel):
             projected_metadata = {
                 key: metadata[key]
                 for key in (
-                    "responsibility_kind",
-                    "execution_lane",
                     "output_mode",
-                    "provider_required",
                     "media_operation",
                 )
                 if key in metadata

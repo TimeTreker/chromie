@@ -466,16 +466,6 @@ def _continuity_goal_contracts(context: dict[str, Any]) -> dict[str, dict[str, A
             continue
         metadata = goal.get("metadata") if isinstance(goal.get("metadata"), dict) else {}
         output_mode = " ".join(str(metadata.get("output_mode") or "").split())
-        if output_mode == "capability_work":
-            resource = goal.get("resource_responsibility")
-            resource_payload = resource if isinstance(resource, dict) else {}
-            descriptor = resource_payload.get("resource")
-            descriptor_payload = descriptor if isinstance(descriptor, dict) else {}
-            output_mode = (
-                "information"
-                if descriptor_payload.get("kind") == "information"
-                else "stateful_effect"
-            )
         contracts[goal_id] = {"output_mode": output_mode} if output_mode else {}
     return contracts
 
@@ -1020,18 +1010,7 @@ def _compact_active_goal_snapshots(
                     "description": description[:240],
                     "object": goal.get("object") if isinstance(goal.get("object"), dict) else {},
                     "constraints": goal.get("constraints") if isinstance(goal.get("constraints"), dict) else {},
-                    "output_mode": (
-                        "information"
-                        if metadata.get("output_mode") == "capability_work"
-                        and isinstance(goal.get("resource_responsibility"), dict)
-                        and isinstance(goal["resource_responsibility"].get("resource"), dict)
-                        and goal["resource_responsibility"]["resource"].get("kind") == "information"
-                        else (
-                            "stateful_effect"
-                            if metadata.get("output_mode") == "capability_work"
-                            else metadata.get("output_mode")
-                        )
-                    ),
+                    "output_mode": metadata.get("output_mode"),
                 },
                 "open_information_gaps": [
                     {

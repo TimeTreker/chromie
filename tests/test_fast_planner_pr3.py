@@ -242,7 +242,7 @@ class CompleteResourceCatalog(FakeCatalog):
 
 def _test_what_mode(text: str, *, goal_metadata: dict | None = None) -> str:
     configured = str((goal_metadata or {}).get("output_mode") or "").strip()
-    if configured and configured != "capability_work":
+    if configured:
         return configured
     lowered = str(text or "").casefold()
     if any(token in lowered for token in ("weather", "天气", "下雨", "rain", "temperature", "温度", "check", "determine whether")):
@@ -495,17 +495,12 @@ def retained_weather_followup_fixture() -> tuple[dict, AgentRunRequest]:
 
 class PlannerVocalResponsibilityTests(unittest.TestCase):
     @staticmethod
-    def vocal_goal(*, output_mode: str, provider_required: bool) -> list[dict]:
+    def vocal_goal(*, output_mode: str) -> list[dict]:
         return [
             {
                 "goal_id": "goal-vocal",
                 "description": "Perform the requested vocal output.",
-                "metadata": {
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
-                    "output_mode": output_mode,
-                    "provider_required": provider_required,
-                },
+                "metadata": {"output_mode": output_mode},
             }
         ]
 
@@ -515,7 +510,6 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                 "goal_association_resolution": {
                     "new_goals": self.vocal_goal(
                         output_mode="singing",
-                        provider_required=True,
                     )
                 }
             }
@@ -523,12 +517,7 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
 
         self.assertEqual(
             projection["new_goals"][0]["metadata"],
-            {
-                "responsibility_kind": "vocal_output",
-                "execution_lane": "vocal",
-                "output_mode": "singing",
-                "provider_required": True,
-            },
+            {"output_mode": "singing"},
         )
 
     def test_generic_respond_cannot_close_singing_goal(self):
@@ -559,7 +548,6 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                 output,
                 authoritative_goals=self.vocal_goal(
                     output_mode="singing",
-                    provider_required=True,
                 ),
             )
 
@@ -589,7 +577,6 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
             output,
             authoritative_goals=self.vocal_goal(
                 output_mode="singing",
-                provider_required=True,
             ),
         )
 
@@ -617,7 +604,6 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
             output,
             authoritative_goals=self.vocal_goal(
                 output_mode="singing",
-                provider_required=True,
             ),
         )
         self.assertIn("can't sing", output.response_text)
@@ -646,7 +632,6 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
             output,
             authoritative_goals=self.vocal_goal(
                 output_mode="speech",
-                provider_required=False,
             ),
         )
 
@@ -865,12 +850,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                 authoritative_goals=[
                     {
                         "goal_id": "goal-walk",
-                        "metadata": {
-                            "responsibility_kind": "executable_action",
-                            "execution_lane": "activity",
-                            "output_mode": "physical_action",
-                            "provider_required": True,
-                        },
+                        "metadata": {"output_mode": "body_action"},
                     }
                 ],
             )
@@ -901,16 +881,13 @@ class CanonicalPlanContractTests(unittest.TestCase):
                 {
                     "goal_id": "goal-walk",
                     "metadata": {
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
-                        "output_mode": "physical_action",
-                        "provider_required": True,
+                        "output_mode": "body_action",
                     },
                 }
             ],
         )
 
-    def test_capability_dependent_goal_cannot_be_completed_by_respond_outcome(self):
+    def test_stateful_effect_goal_cannot_be_completed_by_respond_outcome(self):
         raw = {
             "disposition": "respond",
             "coverage": "complete",
@@ -934,21 +911,19 @@ class CanonicalPlanContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ValueError,
-            "capability_dependent goal cannot use disposition=respond",
+            "stateful_effect goal cannot use disposition=respond",
         ):
             validate_goal_responsibility_outcomes(
                 output,
                 authoritative_goals=[
                     {
                         "goal_id": "goal-weather",
-                        "metadata": {
-                            "responsibility_kind": "capability_dependent"
-                        },
+                        "metadata": {"output_mode": "stateful_effect"},
                     }
                 ],
             )
 
-    def test_capability_dependent_goal_can_respond_from_exact_delivered_evidence(self):
+    def test_information_goal_can_respond_from_exact_delivered_evidence(self):
         raw = {
             "disposition": "respond",
             "coverage": "complete",
@@ -975,7 +950,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             authoritative_goals=[
                 {
                     "goal_id": "goal-weather",
-                    "metadata": {"responsibility_kind": "capability_dependent"},
+                    "metadata": {"output_mode": "information"},
                 }
             ],
             context={
@@ -993,7 +968,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             },
         )
 
-    def test_capability_dependent_goal_can_respond_from_exact_terminal_reentry(self):
+    def test_information_goal_can_respond_from_exact_terminal_reentry(self):
         raw = {
             "disposition": "respond",
             "coverage": "complete",
@@ -1027,7 +1002,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             authoritative_goals=[
                 {
                     "goal_id": "goal-weather",
-                    "metadata": {"responsibility_kind": "capability_dependent"},
+                    "metadata": {"output_mode": "information"},
                 }
             ],
             context={
@@ -1069,20 +1044,22 @@ class CanonicalPlanContractTests(unittest.TestCase):
             expected_goal_ids_for_turn=["goal-weather"],
         )
 
+        authoritative_goals = [
+            {
+                "goal_id": "goal-weather",
+                "metadata": {"output_mode": "information"},
+                "resource_responsibility": {
+                    "resource": {"kind": "information"}
+                },
+            }
+        ]
         with self.assertRaisesRegex(
             ValueError,
-            "capability_dependent goal cannot use disposition=respond",
+            "external_read_response_requires_completed_or_verified_evidence",
         ):
-            validate_goal_responsibility_outcomes(
+            validate_external_response_evidence_boundary(
                 output,
-                authoritative_goals=[
-                    {
-                        "goal_id": "goal-weather",
-                        "metadata": {
-                            "responsibility_kind": "capability_dependent"
-                        },
-                    }
-                ],
+                authoritative_goals=authoritative_goals,
                 context={
                     "result_evidence_reentry": {
                         "source_goal_ids": ["goal-weather"],
@@ -1340,7 +1317,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         planner_request = request(
             "今晚重庆会不会下雨？",
             goal_ids=["goal-weather"],
-            goal_metadata={"responsibility_kind": "capability_dependent"},
+            goal_metadata={"output_mode": "information"},
         )
         context = dict(planner_request.context)
         context.update(
@@ -1412,7 +1389,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         planner_request = request(
             "今晚重庆会不会下雨？",
             goal_ids=["goal-weather"],
-            goal_metadata={"responsibility_kind": "capability_dependent"},
+            goal_metadata={"output_mode": "information"},
         )
         context = dict(planner_request.context)
         context.update(
@@ -4104,12 +4081,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         association["new_goals"] = [
             {
                 **association["new_goals"][0],
-                "metadata": {
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
-                    "output_mode": "physical_action",
-                    "provider_required": True,
-                },
+                "metadata": {"output_mode": "body_action"},
             }
         ]
         context["goal_association_resolution"] = association
@@ -4169,7 +4141,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "recipient": {"description": "requester"},
                         "delivery_mode": "physical_handover",
                     },
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 }
             ],
         }
@@ -4227,7 +4199,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "recipient": {"description": "requester"},
                         "delivery_mode": "physical_handover",
                     },
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 }
             ],
         }
@@ -4333,7 +4305,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "delivery_mode": "physical_handover",
                         "metadata": {},
                     },
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 }
             ],
         }
@@ -4482,10 +4454,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "Blink twice.",
                     goal_ids=["goal-blink"],
                     goal_metadata={
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
                         "output_mode": "body_action",
-                        "provider_required": True,
                     },
                 )
             )
@@ -4527,7 +4496,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
             goal_satisfaction=exact_satisfaction(["goal-greet"]),
         )
-        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})))
+        plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", goal_ids=["goal-greet"], goal_metadata={"output_mode": "speech"})))
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.steps, [])
 
@@ -4723,7 +4692,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         ollama = FakeOllama(raw)
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
-                request("Hello.", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
+                request("Hello.", goal_ids=["goal-greet"], goal_metadata={"output_mode": "speech"})
             )
         )
         self.assertEqual(plan.disposition, "respond")
@@ -4984,21 +4953,21 @@ class FastPlannerResolverTests(unittest.TestCase):
                             }
                         }
                     },
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 },
                 {
                     "goal_id": "goal-water",
                     "description": "拿一杯水。",
                     "source_text": run_request.text,
                     "object": {"bindings": {}},
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 },
                 {
                     "goal_id": "goal-return",
                     "description": "返回用户身边。",
                     "source_text": run_request.text,
                     "object": {"bindings": {}},
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 },
             ],
         }
@@ -5436,12 +5405,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         run_request = request(
             "今晚重庆天气怎么样？",
             goal_ids=[goal_id],
-            goal_metadata={
-                "responsibility_kind": "capability_dependent",
-                "execution_lane": "activity",
-                "output_mode": "capability_work",
-                "provider_required": True,
-            },
+            goal_metadata={"output_mode": "information"},
         )
         canonical_goal = run_request.context["goal_association_resolution"][
             "new_goals"
@@ -6149,7 +6113,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 goal_satisfaction=exact_satisfaction(["goal-greet"]),
             )
         )
-        planner_request = request("你好。", goal_ids=["goal-greet"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
+        planner_request = request("你好。", goal_ids=["goal-greet"], goal_metadata={"output_mode": "speech"})
         context = dict(planner_request.context)
         context["history"] = [
             {
@@ -6428,7 +6392,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
-                request("Tell me a short joke.", goal_ids=["goal-joke"], goal_metadata={"responsibility_kind": "vocal_output", "output_mode": "speech", "provider_required": False})
+                request("Tell me a short joke.", goal_ids=["goal-joke"], goal_metadata={"output_mode": "speech"})
             )
         )
 

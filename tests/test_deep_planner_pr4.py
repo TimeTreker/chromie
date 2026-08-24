@@ -361,10 +361,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         run_request = request("What is the current state?", goal_ids=["goal-info"])
         goal = run_request.context["goal_association_resolution"]["new_goals"][0]
         goal["metadata"] = {
-            "responsibility_kind": "capability_dependent",
-            "execution_lane": "capability",
-            "output_mode": "capability_work",
-            "provider_required": True,
+            "output_mode": "information",
         }
         run_request.context["result_evidence_reentry"] = {
             "source_goal_ids": ["goal-info"],
@@ -462,10 +459,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         run_request = request("Blink twice.", goal_ids=["goal-blink"])
         goal = run_request.context["goal_association_resolution"]["new_goals"][0]
         goal["metadata"] = {
-            "responsibility_kind": "executable_action",
-            "execution_lane": "activity",
             "output_mode": "body_action",
-            "provider_required": True,
         }
         coverage_review = {
             "decision": "accept",
@@ -519,12 +513,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal_id": "goal-walk",
                     "description": "Walk forward for fifteen seconds.",
                     "source_text": "Walk forward for fifteen seconds.",
-                    "metadata": {
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
-                        "output_mode": "physical_action",
-                        "provider_required": True,
-                    },
+                    "metadata": {"output_mode": "body_action"},
                 }
             ],
         }
@@ -611,7 +600,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                         "recipient": {"description": "requester"},
                         "delivery_mode": "physical_handover",
                     },
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 }
             ],
         }
@@ -703,7 +692,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                         "recipient": {"description": "requester"},
                         "delivery_mode": "physical_handover",
                     },
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                 }
             ],
         }
@@ -1396,10 +1385,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "description": "Walk forward.",
                     "source_text": "Walk while singing.",
                     "metadata": {
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
                         "output_mode": "body_action",
-                        "provider_required": True,
                     },
                 },
                 {
@@ -1407,10 +1393,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "description": "Sing while walking.",
                     "source_text": "Walk while singing.",
                     "metadata": {
-                        "responsibility_kind": "vocal_output",
-                        "execution_lane": "vocal",
                         "output_mode": "singing",
-                        "provider_required": True,
                     },
                 },
             ],
@@ -1882,30 +1865,21 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal_id": "goal-walk",
                     "description": "Walk forward for 15 seconds.",
                     "metadata": {
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
                         "output_mode": "body_action",
-                        "provider_required": True,
                     },
                 },
                 {
                     "goal_id": "goal-sing",
                     "description": "Sing while walking.",
                     "metadata": {
-                        "responsibility_kind": "vocal_output",
-                        "execution_lane": "vocal",
                         "output_mode": "singing",
-                        "provider_required": True,
                     },
                 },
                 {
                     "goal_id": "goal-blink",
                     "description": "Blink while walking.",
                     "metadata": {
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
                         "output_mode": "body_action",
-                        "provider_required": True,
                     },
                 },
             ],

@@ -283,15 +283,18 @@ Capability contract. When no exact Capability exists, Chromie preserves the unde
 Responsibility and returns an honest unavailable outcome rather than substituting
 weather, generic external information, or another merely adjacent tool.
 
-State mutation and information acquisition remain distinct. A deferred reminder,
-shopping-list edit, stored obligation, later message, device-setting change, or other
-persistent state effect is `capability_work` when it requires a Provider, but it is not
-an information `resource_responsibility` merely because words or data are involved.
-Conversely, ordinary fairness judgments, prioritization, advice, and other immediately
-satisfiable reasoning stay conversational when no fresh external/private/runtime
-evidence is required. Local/private/device/sensor state without a supplied trusted
-sensor or Provider remains epistemically unknown; a generic web or weather source is
-not silently promoted into authority for that state.
+State mutation and information acquisition remain distinct provider-neutral WHAT. A
+deferred reminder, shopping-list edit, stored obligation, later message, device-setting
+change, or other persistent state effect uses `output_mode=stateful_effect`; it is not an
+information `resource_responsibility` merely because words or data are involved. A request
+to determine or provide information uses `output_mode=information`. Goal Association does
+not decide from either mode that a Provider, execution lane, Work item, or fresh Evidence is
+required. Planner derives HOW from canonical Goal meaning, trusted current state/Evidence,
+and the advertised Capability catalog. Typed information-resource Goals still require
+trusted acquisition/retrieval Evidence before a factual response; stable reasoning or
+knowledge that is not represented as an acquisition resource may remain directly answerable.
+Local/private/device/sensor state without a supplied trusted observation or Provider remains
+epistemically unknown; a generic web or weather source is not silently promoted into authority.
 
 Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
 
@@ -1783,15 +1786,14 @@ fields are rejected rather than ignored or merged into canonical state; the
 bounded model may revise one invalid schema result, but the Host never treats
 transport noise as semantic input.
 
-A new Goal has exactly one model-authored execution truth: `output_mode`.
-`responsibility_kind`, `execution_lane`, and `provider_required` are deterministic
-Host projections and therefore do not exist in the model-facing Goal schema.
-There is no reverse mapping from a legacy responsibility/lane tuple back into a
-mode and no default that silently turns an omitted mode into ordinary speech.
-After `output_mode` validates, the Host may materialize those projections in
-canonical Goal metadata for downstream Planner/runtime consumers. This preserves
-one source of semantic truth without forcing downstream stages to repeat the
-same derivation.
+A new Goal preserves exactly one model-authored human-facing modality: `output_mode`
+(plus `media_operation` only for media lifecycle meaning). It is WHAT, not an execution
+truth. `responsibility_kind`, `execution_lane`, and `provider_required` are not Goal fields,
+not Host projections, and not compatibility inputs. Goal Association commits only the
+provider-neutral modality and semantic bindings. Planner later decides whether current
+trusted state already satisfies the Goal or whether Capability-backed Work is needed; the
+selected Capability/Activity then carries its own Runtime execution-lane facts. There is no
+legacy responsibility/lane tuple to reverse-map and no `capability_work` bridge.
 
 Typed entity provenance begins at Goal Interpretation and remains binding at Goal
 Association. A directly named entity is preserved in the user's own surface form
@@ -3479,7 +3481,7 @@ Evolution rules:
 - keep Cognitive Gateway normalization, protective reflex, attention, context, and
   admission distinct from Core semantics;
 - keep Goal Interpretation WHAT-only: Responsibility meaning, material bindings,
-  confidence, fresh-evidence need, and unresolved meaning;
+  confidence, provider-neutral output modality, and unresolved meaning;
 - make `CognitiveWorkRequest` the typed WHAT-to-HOW handoff; do not tunnel semantic
   authority through anonymous context dictionaries;
 - keep Fast Planner as the first HOW owner, including execution-input completeness,

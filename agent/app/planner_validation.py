@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import CanonicalPlan, GoalSatisfactionStatus, PlanParameterResolution
 
 from .planner_context import (
-    _goal_execution_metadata,
+    _goal_output_mode,
     evidence_bound_dialogue,
     goal_association_prompt_projection,
     goal_cancellation_evidence_reentry_goal_ids,
@@ -70,18 +70,13 @@ def validate_goal_responsibility_outcomes(
     provider_vocal_goal_ids = planner_provider_vocal_goal_ids(authoritative_goals)
     provider_media_goal_operations = planner_provider_media_goal_operations(authoritative_goals)
     speaking_goal_ids = response_goal_ids | provider_vocal_goal_ids
-    capability_goal_ids: set[str] = set()
-    for goal in authoritative_goals:
-        if not isinstance(goal, dict):
-            continue
-        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        metadata = goal.get("metadata")
-        if (
-            goal_id
-            and isinstance(metadata, dict)
-            and metadata.get("responsibility_kind") == "capability_dependent"
-        ):
-            capability_goal_ids.add(goal_id)
+    stateful_goal_ids = {
+        goal_id
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
+        and _goal_output_mode(goal) == "stateful_effect"
+    }
     evidence_goal_ids = {
         source_goal_id
         for item in evidence_bound_dialogue(context)
@@ -116,7 +111,7 @@ def validate_goal_responsibility_outcomes(
         if outcome.disposition == "execute":
             expected_mode = next(
                 (
-                    _goal_execution_metadata(goal)[1]
+                    _goal_output_mode(goal)
                     for goal in authoritative_goals
                     if str(goal.get("goal_id") or "").strip() == goal_id
                 ),
@@ -199,7 +194,7 @@ def validate_goal_responsibility_outcomes(
             "Media playback Goals can own only their exact chromie.media.* "
             "Capability step: " + ",".join(invalid_media_steps)
         )
-    for goal_id in sorted(capability_goal_ids):
+    for goal_id in sorted(stateful_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
         responds_without_capability = (
             outcome is not None and outcome.disposition == "respond"
@@ -210,8 +205,8 @@ def validate_goal_responsibility_outcomes(
         )
         if responds_without_capability and goal_id not in evidence_goal_ids:
             raise ValueError(
-                "capability_dependent goal cannot use disposition=respond "
-                "without capability or delivered evidence-bound dialogue: " + goal_id
+                "stateful_effect goal cannot use disposition=respond without "
+                "execution or delivered evidence-bound dialogue: " + goal_id
             )
     # Keep this broad invariant last so narrower responsibility contracts retain
     # their more actionable diagnostics.  It contains every remaining typed
@@ -265,7 +260,8 @@ def qualify_capability_catalog_for_output_modes(
         return list(capabilities)
 
     has_body = "body_action" in output_modes
-    has_information = "capability_work" in output_modes
+    has_information = "information" in output_modes
+    has_stateful = "stateful_effect" in output_modes
     has_media = "media_playback" in output_modes
     has_provider_vocal = bool(
         output_modes.intersection(set(VOCAL_MODES) - {"speech"})
@@ -295,6 +291,15 @@ def qualify_capability_catalog_for_output_modes(
             " ".join(str(item or "").strip().split())
             for item in scope.get("resource_kinds") or []
         }
+        declared_output_modes = {
+            " ".join(str(item or "").strip().split())
+            for item in (
+                scope.get("output_modes")
+                if isinstance(scope.get("output_modes"), list)
+                else [scope.get("output_mode")]
+            )
+            if " ".join(str(item or "").strip().split())
+        }
         is_information = (
             responsibility_type == "acquire_and_deliver_resource"
             and "information" in resource_kinds
@@ -314,6 +319,7 @@ def qualify_capability_catalog_for_output_modes(
             responsibility_type == "acquire_and_deliver_resource"
             and "physical_object" in resource_kinds
         )
+        is_stateful = "stateful_effect" in declared_output_modes
         is_vocal = capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
         is_media = capability_id in set(MEDIA_CAPABILITY_IDS.values())
         if is_vocal:
@@ -326,6 +332,10 @@ def qualify_capability_catalog_for_output_modes(
             continue
         if is_information:
             if has_information:
+                qualified.append(capability)
+            continue
+        if is_stateful:
+            if has_stateful:
                 qualified.append(capability)
             continue
         if is_body:
@@ -839,13 +849,13 @@ def coordinated_action_goal_ids(
 ) -> set[str]:
     """Return model-authored provider Goals requiring semantic coverage audit.
 
-    Goal Association, rather than the Host, declares ``responsibility_kind`` and
-    authors any ``action_list`` binding or sibling Goal split. The Host uses only
-    those typed facts to require an independent model completeness audit; it does
-    not infer actions, parse user wording, or select Capabilities. Auditing every
-    executable-action and capability-dependent Goal prevents a generic movement
-    step from being accepted as object handling and prevents a domain-specific
-    read Capability from being broadened into unrelated external retrieval.
+    Goal Association preserves provider-neutral output modality and authors any
+    ``action_list`` binding or sibling Goal split. The Host uses only those typed
+    WHAT facts to require an independent model completeness audit; it does not infer
+    actions, parse user wording, or select Capabilities. Auditing effectful Goals
+    prevents a generic movement step from being accepted as object handling and
+    prevents a domain-specific read Capability from being broadened into unrelated
+    external retrieval.
     """
 
     goal_ids: set[str] = set()
@@ -860,9 +870,12 @@ def coordinated_action_goal_ids(
         if source_text:
             source_groups.setdefault(source_text, set()).add(goal_id)
         metadata = goal.get("metadata")
-        if isinstance(metadata, dict) and str(
-            metadata.get("responsibility_kind") or ""
-        ).strip() in {"executable_action", "capability_dependent"}:
+        output_mode = (
+            " ".join(str(metadata.get("output_mode") or "").strip().split())
+            if isinstance(metadata, dict)
+            else ""
+        )
+        if output_mode in {"body_action", "media_playback"}:
             goal_ids.add(goal_id)
         resource_responsibility = goal.get("resource_responsibility")
         if isinstance(resource_responsibility, dict) and resource_responsibility:
@@ -1387,6 +1400,7 @@ def validate_external_response_evidence_boundary(
     output: PlannerModelOutput,
     *,
     context: dict[str, Any] | None,
+    authoritative_goals: list[dict[str, Any]] | None = None,
 ) -> None:
     """Reject factual responses for unresolved external-read Goals.
 
@@ -1399,11 +1413,28 @@ def validate_external_response_evidence_boundary(
     """
 
     context = context or {}
+    authoritative_goals = authoritative_goals or []
     snapshots = context.get("active_goal_snapshots")
     if not isinstance(snapshots, list):
         snapshots = []
 
     unresolved_external_goal_ids: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        responsibility = goal.get("resource_responsibility")
+        responsibility = responsibility if isinstance(responsibility, dict) else {}
+        resource = responsibility.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
+        if goal_id and " ".join(str(resource.get("kind") or "").strip().split()) == "information":
+            # A typed information resource represents an acquisition/delivery
+            # responsibility. Planner may choose the provider, reuse exact trusted
+            # evidence, or report inability, but may not fabricate the resource from
+            # model memory. Ordinary stable-knowledge information Goals need not use
+            # this resource shape and remain directly answerable.
+            unresolved_external_goal_ids.add(goal_id)
+
     completed_statuses = {"completed", "done", "success", "succeeded"}
     external_safety_classes = {"safe_read", "read_only", "external_read"}
     for snapshot in snapshots:
@@ -1447,9 +1478,15 @@ def validate_external_response_evidence_boundary(
     elif output.disposition == "respond":
         responding_goal_ids = set(unresolved_external_goal_ids)
 
+    dialogue_goal_ids = {
+        goal_id
+        for item in evidence_bound_dialogue(context)
+        for goal_id in item.get("source_goal_ids") or []
+    }
     unsupported = responding_goal_ids & unresolved_external_goal_ids
     unsupported -= result_evidence_reentry_goal_ids(context)
     unsupported -= goal_cancellation_evidence_reentry_goal_ids(context)
+    unsupported -= dialogue_goal_ids
     if unsupported:
         raise ValueError(
             "external_read_response_requires_completed_or_verified_evidence: "
@@ -1467,11 +1504,6 @@ def validate_external_response_evidence_boundary(
                 for value in item.get("goal_ids") or []
                 if (normalized := " ".join(str(value or "").strip().split()))
             )
-    dialogue_goal_ids = {
-        goal_id
-        for item in evidence_bound_dialogue(context)
-        for goal_id in item.get("source_goal_ids") or []
-    }
     index_only_goal_ids = responding_goal_ids & verified_goal_ids - dialogue_goal_ids
     index_only_goal_ids -= result_evidence_reentry_goal_ids(context)
     index_only_goal_ids -= goal_cancellation_evidence_reentry_goal_ids(context)

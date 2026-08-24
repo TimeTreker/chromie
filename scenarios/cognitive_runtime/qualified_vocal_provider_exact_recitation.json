@@ -24,10 +24,7 @@
           "description": "Recite the authored greeting using a qualified recitation provider.",
           "source_text": "Recite this greeting with the qualified recitation voice: Hello from Chromie.",
           "metadata": {
-            "responsibility_kind": "vocal_output",
-            "execution_lane": "vocal",
-            "output_mode": "recitation",
-            "provider_required": true
+            "output_mode": "recitation"
           }
         }
       ],

@@ -176,7 +176,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "goal_id": "goal-fetch-water",
                     "description": "Bring the user a cup of water.",
-                    "metadata": {"responsibility_kind": "executable_action"},
+                    "metadata": {"output_mode": "body_action"},
                     "object": {
                         "bindings": {
                             "item": {
@@ -192,18 +192,18 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(goal_ids, {"goal-fetch-water"})
 
-    def test_capability_dependent_goal_requires_scope_coverage_audit(self) -> None:
+    def test_plain_information_goal_does_not_imply_execution_scope_audit(self) -> None:
         goal_ids = coordinated_action_goal_ids(
             [
                 {
                     "goal_id": "goal-current-place",
                     "description": "Find a currently open restaurant.",
-                    "metadata": {"responsibility_kind": "capability_dependent"},
+                    "metadata": {"output_mode": "information"},
                 }
             ]
         )
 
-        self.assertEqual(goal_ids, {"goal-current-place"})
+        self.assertEqual(goal_ids, set())
 
     def test_semantic_coverage_rejection_does_not_trigger_safety_revision(self) -> None:
         feedback = [
@@ -485,13 +485,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "goal_satisfaction": satisfaction,
             }
         )
-        with self.assertRaisesRegex(ValueError, "vocal_output goal must use"):
+        with self.assertRaisesRegex(ValueError, "provider-required vocal goal requires exact capability_id"):
             validate_goal_responsibility_outcomes(
                 output,
                 authoritative_goals=[
                     {
                         "goal_id": "goal-song",
-                        "metadata": {"responsibility_kind": "vocal_output"},
+                        "metadata": {"output_mode": "singing"},
                     }
                 ],
             )

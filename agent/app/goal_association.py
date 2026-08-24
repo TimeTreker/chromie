@@ -192,11 +192,7 @@ class GoalAssociationResolver:
             responsibility_count=len(request.responsibilities),
             responsibility_refs=[item.local_ref for item in request.responsibilities],
             responsibility_output_modes={
-                item.local_ref: (
-                    "capability_work"
-                    if item.output_mode in {"information", "stateful_effect"}
-                    else item.output_mode
-                )
+                item.local_ref: item.output_mode
                 for item in request.responsibilities
                 if item.output_mode != "unspecified"
             },
@@ -932,11 +928,11 @@ class GoalAssociationResolver:
                 if (
                     role == "responsibility"
                     and required_output_mode
-                    not in {"none", "body_action", "capability_work"}
+                    not in {"none", "body_action", "information"}
                     and required_goal_shape != "ordinary"
                 ):
                     # Resource completion modes are body_action (physical) or
-                    # capability_work (information). Once the independent auditor
+                    # information. Once the independent auditor
                     # has explicitly selected any vocal/media/other completion
                     # mode, a resource shape is mechanically impossible.
                     item["required_goal_shape"] = "ordinary"
@@ -1055,7 +1051,7 @@ class GoalAssociationResolver:
                                 item.get("role") != "responsibility"
                                 or (
                                     resource is None
-                                    and candidate.output_mode != "capability_work"
+                                    and candidate.output_mode not in {"information", "stateful_effect"}
                                 )
                             ),
                             "information_resource": (
@@ -1068,7 +1064,7 @@ class GoalAssociationResolver:
                             ),
                             "persistent_effect": (
                                 resource is None
-                                and candidate.output_mode == "capability_work"
+                                and candidate.output_mode == "stateful_effect"
                             ),
                         }.get(required_goal_shape, False)
                         if not shape_matches:
@@ -1509,11 +1505,7 @@ class GoalAssociationResolver:
                     supersedes_goal_ids=item.supersedes_goal_ids,
                     metadata={
                         "model_boundary": type(model_output).__name__,
-                        "host_generated_fields": True,
-                        "responsibility_kind": item.responsibility_kind,
-                        "execution_lane": item.execution_lane,
                         "output_mode": item.output_mode,
-                        "provider_required": item.provider_required,
                         "media_operation": item.media_operation,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)

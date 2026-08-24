@@ -204,8 +204,8 @@ class DeepPlannerResolver:
             and str(goal.get("goal_id") or "").strip()
             and not goal.get("resource_responsibility")
             and isinstance(goal.get("metadata"), dict)
-            and str(goal["metadata"].get("responsibility_kind") or "").strip()
-            in {"executable_action", "capability_dependent"}
+            and str(goal["metadata"].get("output_mode") or "").strip()
+            in {"body_action", "media_playback", "stateful_effect"}
         ]
         response_schema = deep_plan_response_schema(
             expected_goal_ids_for_turn,
@@ -216,10 +216,10 @@ class DeepPlannerResolver:
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=list(goal_context.response_goal_ids),
-            provider_required_vocal_goal_ids=sorted(
+            provider_vocal_goal_ids=sorted(
                 planner_provider_vocal_goal_ids(authoritative_goals)
             ),
-            provider_required_media_goal_operations=(
+            provider_media_goal_operations=(
                 planner_provider_media_goal_operations(authoritative_goals)
             ),
             unavailable_information_goal_ids=sorted(
@@ -381,6 +381,7 @@ class DeepPlannerResolver:
                 validate_external_response_evidence_boundary(
                     validated_model_output,
                     context=request.context,
+                    authoritative_goals=authoritative_goals,
                 )
             except Exception as exc:
                 failure = llm_failure_metadata(exc)

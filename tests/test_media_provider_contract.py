@@ -91,10 +91,7 @@ def media_goal(operation: str = "play") -> dict[str, object]:
         "description": f"Apply media operation {operation}.",
         "source_text": "Play a song.",
         "metadata": {
-            "responsibility_kind": "executable_action",
-            "execution_lane": "activity",
             "output_mode": "media_playback",
-            "provider_required": True,
             "media_operation": operation,
         },
     }
@@ -219,8 +216,9 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         )
 
         self.assertEqual(playback.media_operation, "play")
-        self.assertEqual(playback.execution_lane, "activity")
+        self.assertEqual(playback.output_mode, "media_playback")
         self.assertEqual(singing.output_mode, "singing")
+        self.assertFalse(hasattr(playback, "execution_lane"))
         with self.assertRaisesRegex(ValueError, "exact media_operation"):
             GoalAssociationModelGoal(
                 source_responsibility_refs=["playback"],
@@ -272,7 +270,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
             planner_tier="deep",
             expected_goal_ids=["goal-media"],
             allowed_capability_ids=[MEDIA_CAPABILITY_IDS["pause"]],
-            provider_required_media_goal_operations={"goal-media": "play"},
+            provider_media_goal_operations={"goal-media": "play"},
         )
         outcome = unavailable["properties"]["goal_outcomes"]["properties"]["goal-media"]
         self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])

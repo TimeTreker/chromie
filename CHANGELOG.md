@@ -5,6 +5,20 @@ remains available in Git history.
 
 ## Unreleased
 
+### P3 audit continuation
+
+- Removed the remaining Goal-Association execution projection: `information` and
+  `stateful_effect` now survive unchanged from Goal Interpretation into canonical Goals,
+  and Planner is the first owner allowed to decide Capability-backed HOW.
+- Re-grounded Planner capability filtering and direct-speech detection on canonical WHAT
+  instead of deleted Goal execution metadata. Typed information-resource Goals cannot be
+  answered factually without trusted acquisition/retrieval Evidence, while ordinary
+  information may still be answered from already trusted context.
+- Removed legacy `capability_work` translation from Goal continuity/Agent Skills and aligned current architecture/API/execution-lane docs.
+- Returned `VoiceAssistant` to the structural ratchet (`105` methods) by moving fresh
+  capability-state projection into the existing Planner re-entry policy module and
+  collapsing restart revalidation helpers into the one orchestration path.
+
 - Bounded Fast Goal Interpretation to one mechanical DTO repair and one risk-tiered Deep handoff: benign low-confidence chat stays fast, consequential uncertainty escalates, and repeated malformed or contradictory output fails closed.
 - Collapsed physical-object and information fetch/delivery into one canonical
   `AcquireAndDeliverResource` semantic responsibility. `resource.kind` and
@@ -45,10 +59,11 @@ remains available in Git history.
 - Replaced scenario-answer instructions in coordinated-action review with
   general semantic entailment and Capability-contract principles; concrete
   distinctions remain benchmark/regression responsibilities.
-- Reduced Goal Association's live completion contract to the semantic
-  `output_mode` choice (plus media operation when applicable); the Host now
-  materializes `responsibility_kind`, `execution_lane`, and `provider_required`
-  deterministically instead of asking the LLM to copy a valid tuple.
+- Reduced Goal Association's canonical contract to provider-neutral `output_mode`
+  (plus media operation when applicable). The old `capability_work`,
+  `responsibility_kind`, `execution_lane`, and `provider_required` Goal projections
+  are removed rather than materialized by the Host; Planner derives HOW from current
+  Goal meaning, trusted state/Evidence, and the Capability catalog.
 - Removed route-specific hard-coded pre-dispatch failure speech; the bounded
   failure composer now receives the trusted facts and must describe only the
   user-visible missing result/effect without exposing planner/workflow language.

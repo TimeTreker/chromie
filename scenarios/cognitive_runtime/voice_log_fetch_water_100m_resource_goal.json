@@ -72,7 +72,7 @@
             "delivery_mode": "physical_handover"
           },
           "metadata": {
-            "responsibility_kind": "executable_action"
+            "output_mode": "body_action"
           }
         }
       ],

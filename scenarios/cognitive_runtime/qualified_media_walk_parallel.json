@@ -25,10 +25,7 @@
           "description": "Walk forward for five seconds.",
           "source_text": "Walk forward while playing the existing fixture song.",
           "metadata": {
-            "responsibility_kind": "executable_action",
-            "execution_lane": "activity",
             "output_mode": "body_action",
-            "provider_required": true,
             "media_operation": "none"
           }
         },
@@ -37,10 +34,7 @@
           "description": "Play the existing fixture song.",
           "source_text": "Walk forward while playing the existing fixture song.",
           "metadata": {
-            "responsibility_kind": "executable_action",
-            "execution_lane": "activity",
             "output_mode": "media_playback",
-            "provider_required": true,
             "media_operation": "play"
           }
         }

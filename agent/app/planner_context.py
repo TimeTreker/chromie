@@ -85,10 +85,8 @@ def goal_association_prompt_projection(
             {
                 key: copy.deepcopy(metadata[key])
                 for key in (
-                    "responsibility_kind",
-                    "execution_lane",
                     "output_mode",
-                    "provider_required",
+                    "media_operation",
                 )
                 if key in metadata
             }
@@ -264,84 +262,67 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
             )
     return result
 
-def _goal_execution_metadata(goal: dict[str, Any]) -> tuple[str, str, bool]:
+def _goal_output_mode(goal: dict[str, Any]) -> str:
     metadata = goal.get("metadata")
     if not isinstance(metadata, dict):
-        return "", "", False
-    return (
-        str(metadata.get("responsibility_kind") or "").strip(),
-        str(metadata.get("output_mode") or "").strip(),
-        bool(metadata.get("provider_required")),
-    )
+        return ""
+    return str(metadata.get("output_mode") or "").strip()
+
 
 def planner_response_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return direct Vocal Goals completed by ordinary authored speech.
+    """Return Goals whose requested WHAT is ordinary authored speech."""
 
-    Mode-specific vocal performance is deliberately excluded.  It remains in
-    the Vocal lane but requires exact provider evidence and cannot be closed
-    by a generic ``respond`` outcome.
-    """
+    return {
+        goal_id
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
+        and _goal_output_mode(goal) == "speech"
+    }
 
-    result: set[str] = set()
-    for goal in authoritative_goals:
-        if not isinstance(goal, dict):
-            continue
-        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
-        if (
-            goal_id
-            and responsibility_kind == "vocal_output"
-            and output_mode in {"", "speech"}
-            and not provider_required
-        ):
-            result.add(goal_id)
-    return result
 
 def planner_effectful_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return Goals that require provider evidence or an explicit terminal block.
+    """Return WHAT modalities that cannot be completed by ordinary response text.
 
-    Goal Association already owns these typed responsibility declarations.  The
-    validator does not infer an effect from user wording or select a Capability;
-    it only prevents a planner from declaring such a Goal satisfied through an
-    ordinary response while emitting no executable work.
+    This is a Planner-side projection from canonical human-outcome modality, not a
+    Goal-Association execution declaration. Information is deliberately excluded:
+    Planner may answer it from supplied trusted context/evidence or may plan fresh
+    acquisition when the current state requires that.
     """
 
-    result: set[str] = set()
-    for goal in authoritative_goals:
-        if not isinstance(goal, dict):
-            continue
-        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        metadata = goal.get("metadata")
-        if not goal_id or not isinstance(metadata, dict):
-            continue
-        responsibility_kind = str(
-            metadata.get("responsibility_kind") or ""
-        ).strip()
-        if (
-            responsibility_kind in {"executable_action", "capability_dependent"}
-            or bool(metadata.get("provider_required"))
-        ):
-            result.add(goal_id)
-    return result
+    effect_modes = {
+        "styled_speech",
+        "recitation",
+        "singing",
+        "humming",
+        "nonverbal_vocalization",
+        "body_action",
+        "media_playback",
+        "stateful_effect",
+    }
+    return {
+        goal_id
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
+        and _goal_output_mode(goal) in effect_modes
+    }
+
 
 def planner_goal_execution_requirements(
     authoritative_goals: list[dict[str, Any]],
 ) -> tuple[bool, bool]:
-    """Derive Planner execution shape only from canonical Goal semantics.
+    """Derive only decoder shape that follows mechanically from canonical WHAT.
 
-    Goal Interpretation is provider-neutral WHAT evidence and must
-    never grant or suppress executable capability access. Goal Association owns the
-    typed completion contract; planners may tighten their decoder surface from that
-    canonical truth only.
-
-    Returns ``(response_only, requires_execution)``. ``requires_execution`` is the
-    decoder-tightening flag for canonical ``capability_dependent`` work (the semantic
-    successor to the old tool route). Other provider-backed Activity/Vocal Goals retain
-    the normal mixed-response schema and are still enforced by Goal outcome validation.
+    Ordinary speech-only Goals need no Capability surface. A durable/future
+    ``stateful_effect`` cannot be satisfied by saying something now, so its planner
+    schema requires an executable or explicit blocked outcome. Information remains a
+    mixed case: current trusted context may already satisfy it, otherwise Planner may
+    select fresh information Work.
     """
 
     goal_ids = {
@@ -351,64 +332,63 @@ def planner_goal_execution_requirements(
         and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
     }
     response_goal_ids = planner_response_goal_ids(authoritative_goals)
-    capability_work_goal_ids = {
+    stateful_goal_ids = {
         goal_id
         for goal in authoritative_goals
         if isinstance(goal, dict)
         and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
-        and isinstance(goal.get("metadata"), dict)
-        and str(goal["metadata"].get("responsibility_kind") or "").strip()
-        == "capability_dependent"
+        and _goal_output_mode(goal) == "stateful_effect"
     }
     response_only = bool(goal_ids) and goal_ids.issubset(response_goal_ids)
-    requires_execution = bool(capability_work_goal_ids)
+    requires_execution = bool(stateful_goal_ids)
     return response_only, requires_execution
+
 
 def planner_provider_vocal_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
-    """Return Vocal Goals that require mode-specific provider evidence."""
+    """Return requested vocal-performance Goals requiring exact provider evidence."""
 
-    result: set[str] = set()
-    for goal in authoritative_goals:
-        if not isinstance(goal, dict):
-            continue
-        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
-        if (
-            goal_id
-            and responsibility_kind == "vocal_output"
-            and output_mode not in {"", "speech"}
-            and provider_required
-        ):
-            result.add(goal_id)
-    return result
+    provider_vocal_modes = {
+        "styled_speech",
+        "recitation",
+        "singing",
+        "humming",
+        "nonverbal_vocalization",
+    }
+    return {
+        goal_id
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and (goal_id := " ".join(str(goal.get("goal_id") or "").strip().split()))
+        and _goal_output_mode(goal) in provider_vocal_modes
+    }
+
 
 def planner_provider_media_goal_operations(
     authoritative_goals: list[dict[str, Any]],
 ) -> dict[str, str]:
-    """Return exact media lifecycle operations owned by Activity Goals."""
+    """Return exact media lifecycle operations requested by canonical WHAT."""
 
     result: dict[str, str] = {}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        responsibility_kind, output_mode, provider_required = _goal_execution_metadata(goal)
         metadata = goal.get("metadata")
         operation = (
-            str(metadata.get("media_operation") or "").strip() if isinstance(metadata, dict) else ""
+            str(metadata.get("media_operation") or "").strip()
+            if isinstance(metadata, dict)
+            else ""
         )
-        if (
-            goal_id
-            and responsibility_kind == "executable_action"
-            and output_mode == "media_playback"
-            and provider_required
-        ):
+        if goal_id and _goal_output_mode(goal) == "media_playback":
             if operation not in MEDIA_CAPABILITY_IDS:
-                raise ValueError(f"media_playback Goal requires exact media_operation: {goal_id}")
+                raise ValueError(
+                    f"media_playback Goal requires exact media_operation: {goal_id}"
+                )
             result[goal_id] = operation
     return result
+
 
 def result_evidence_reentry_goal_ids(
     context: dict[str, Any] | None,
@@ -535,15 +515,13 @@ def planner_goal_context(context: dict[str, Any] | None) -> PlannerGoalContext:
     )
 
     if cancellation_goal_ids:
-        capability_goal_ids = {
+        stateful_goal_ids = {
             str(goal.get("goal_id") or "").strip()
             for goal in goals
             if isinstance(goal, dict)
-            and isinstance(goal.get("metadata"), dict)
-            and str(goal["metadata"].get("responsibility_kind") or "").strip()
-            == "capability_dependent"
+            and _goal_output_mode(goal) == "stateful_effect"
         }
-        requires_execution = bool(capability_goal_ids - set(cancellation_goal_ids))
+        requires_execution = bool(stateful_goal_ids - set(cancellation_goal_ids))
         if set(cancellation_goal_ids) == set(expected):
             response_only = True
 

@@ -7,7 +7,7 @@ supply when a meaningful runtime transition reactivates the existing Planner.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
 from shared.chromie_contracts.core_interpretation import (
@@ -160,6 +160,50 @@ def provider_state_relevance(
         if normalized_request_id not in request_ids:
             return False, "request_binding_superseded"
     return True, "current"
+
+
+def fresh_capability_state_projection(
+    capability_ids: Sequence[str],
+    *,
+    capability_definition: Callable[[str], Any],
+) -> list[dict[str, Any]]:
+    """Project fresh provider/catalog truth for restored Goal re-entry.
+
+    This is mechanical catalog observation only. It neither chooses a Capability
+    nor decides whether the restored Goal should resume, change, speak, or wait.
+    """
+
+    projection: list[dict[str, Any]] = []
+    for capability_id in dict.fromkeys(
+        str(item).strip() for item in capability_ids if str(item).strip()
+    ):
+        try:
+            definition = capability_definition(capability_id)
+        except ValueError:
+            projection.append(
+                {
+                    "capability_id": capability_id,
+                    "known": False,
+                    "available": False,
+                    "unavailable_reason": "not_in_fresh_registry",
+                }
+            )
+            continue
+        projection.append(
+            {
+                "capability_id": capability_id,
+                "known": True,
+                "available": bool(definition.available),
+                "provider_id": definition.provider_id,
+                "version": definition.version,
+                **(
+                    {"unavailable_reason": definition.unavailable_reason}
+                    if definition.unavailable_reason
+                    else {}
+                ),
+            }
+        )
+    return projection
 
 
 def meaningful_provider_state(

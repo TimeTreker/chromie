@@ -79,7 +79,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                     "success_criteria": [
                         "使用与当前地点和日期匹配的可信天气证据回答。"
                     ],
-                    "output_mode": "capability_work",
+                    "output_mode": "information",
                     "information_domain": "weather_forecast",
                     "resource_kind": "information",
                 }
@@ -200,7 +200,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
             weather.optional_capabilities,
             ("chromie.memory.retrieve_verified_tool_result",),
         )
-        self.assertEqual(weather.applicable_output_modes, ("capability_work",))
+        self.assertEqual(weather.applicable_output_modes, ("information",))
         self.assertEqual(
             weather.applicable_information_domains,
             ("weather_forecast",),

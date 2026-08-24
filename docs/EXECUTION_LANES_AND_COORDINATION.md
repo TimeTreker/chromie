@@ -348,36 +348,32 @@ members are compiled and cancelled as one provider-local physical activity. A
 future cross-provider contract may add prepared states, a shared monotonic start
 barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
 
-## Typed Goal completion contract
+## Typed Goal WHAT contract and execution projection
 
-Validated Goals retain five separate completion facts instead of overloading
-`responsibility_kind`:
+Canonical Goals do not persist execution-lane or provider-requirement metadata. Their
+model-authored modality is the provider-neutral human outcome:
 
 ```text
-responsibility_kind  human completion modality
-execution_lane       vocal | activity | none
-output_mode          speech | styled_speech | recitation | singing | humming
-                     | nonverbal_vocalization | body_action | media_playback
-                     | capability_work | other
-provider_required    exact provider evidence required beyond ordinary speech
-media_operation      play | pause | resume | seek | stop | volume | status | none
+output_mode  speech | styled_speech | recitation | singing | humming
+             | nonverbal_vocalization | body_action | media_playback
+             | information | stateful_effect | other
+media_operation  play | pause | resume | seek | stop | volume | status | none
 ```
 
-The live model schema exposes the semantic completion choice `output_mode` and,
-only when needed for media lifecycle semantics, `media_operation`. The Host
-deterministically materializes `responsibility_kind`, `execution_lane`, and
-`provider_required` from `output_mode`; those redundant system invariants are
-not independent LLM decisions. A bounded legacy mapping keeps retained replay
-and old test DTOs readable without reopening that model-facing state space.
-`output_mode=speech` materializes ordinary Vocal speech delivery without a
-mode-specific provider requirement. Mode-specific vocal outputs materialize
-Vocal output with provider evidence required. `chromie.vocal.perform` is the exact source
-contract for qualified provider execution, but the default catalog remains
-unavailable and advertises no modes. Planner may execute one such Goal only when
-a qualified declaration advertises the authoritative `output_mode`; otherwise
-it must return a per-Goal unavailable, refused, or clarification outcome rather
-than generic `respond`. Activity, body, and media execution remain separate. A
-normal vocal Goal cannot carry `resource_responsibility`.
+`media_operation` is meaningful only for `media_playback`. Goal Association preserves
+these WHAT facts and semantic bindings; it does not decide Capability, Provider, Work,
+execution lane, or fresh-Evidence need. Planner projects the current Goal into HOW using
+trusted state/Evidence and the current Capability catalog. Ordinary `speech` may be a
+direct Communicative Activity. Provider-backed vocal modes require an exact advertised
+`chromie.vocal.perform` mode. `body_action`, `media_playback`, and `stateful_effect` require
+a real effectful Capability or an explicit blocked outcome. `information` may be answered
+from already trusted evidence/context; when represented as an information
+`resource_responsibility`, factual completion requires trusted acquisition/retrieval
+Evidence.
+
+Execution lanes belong to selected Capability/Activity realization and Runtime
+coordination, not to the Goal. This keeps WHAT stable even when a provider changes or a
+future provider makes a formerly complex workflow atomic.
 
 ## One personal voice
 

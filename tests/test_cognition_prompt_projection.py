@@ -21,7 +21,7 @@ class CognitionPromptProjectionTests(unittest.TestCase):
                     source_text="Check the weather.",
                     success_criteria=["Weather is reported."],
                     metadata={
-                        "responsibility_kind": "capability_dependent",
+                        "output_mode": "information",
                         "initial_raw_output": "nested raw output",
                         "diagnostic": {"transcript": "hidden"},
                     },
@@ -41,7 +41,7 @@ class CognitionPromptProjectionTests(unittest.TestCase):
         self.assertNotIn("metadata", projection)
         self.assertEqual(
             projection["new_goals"][0]["metadata"],
-            {"responsibility_kind": "capability_dependent"},
+            {"output_mode": "information"},
         )
         rendered = repr(projection)
         self.assertNotIn("top-level raw output", rendered)

@@ -3698,8 +3698,7 @@ class GoalDrivenRuntimeCoordinator:
             not association.associations
             and bool(association.new_goals)
             and all(
-                str((goal.metadata or {}).get("responsibility_kind") or "") == "vocal_output"
-                and not bool((goal.metadata or {}).get("provider_required"))
+                str((goal.metadata or {}).get("output_mode") or "") == "speech"
                 and bool(str(goal.goal_id or "").strip())
                 for goal in association.new_goals
             )

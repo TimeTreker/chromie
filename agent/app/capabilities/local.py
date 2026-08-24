@@ -134,10 +134,7 @@ def vocal_performance_tool(
                 "parallel_allowed_with_lanes": ["activity"],
             },
             "semantic_scope": {
-                "responsibility_kind": "vocal_output",
-                "execution_lane": "vocal",
                 "output_modes": supported_modes,
-                "provider_required": True,
             },
         },
     )
@@ -243,11 +240,8 @@ def media_playback_tools(
                         ],
                     },
                     "semantic_scope": {
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
-                        "output_mode": "media_playback",
+                        "output_modes": ["media_playback"],
                         "media_operation": operation,
-                        "provider_required": True,
                     },
                 },
             )

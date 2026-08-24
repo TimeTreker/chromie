@@ -24,7 +24,8 @@ AgentSkillApplicableOutputMode = Literal[
     "nonverbal_vocalization",
     "body_action",
     "media_playback",
-    "capability_work",
+    "information",
+    "stateful_effect",
     "other",
 ]
 AgentSkillApplicableInformationDomain = Literal[

@@ -254,10 +254,7 @@ def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
                 description="Respond to the user.",
                 source_text="hello",
                 metadata={
-                    "responsibility_kind": "vocal_output",
-                    "execution_lane": "vocal",
                     "output_mode": "speech",
-                    "provider_required": False,
                 },
             )
         ],
@@ -278,10 +275,7 @@ def body_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
                 description="Blink the eyes.",
                 source_text="blink",
                 metadata={
-                    "responsibility_kind": "executable_action",
-                    "execution_lane": "activity",
-                    "output_mode": "activity",
-                    "provider_required": True,
+                    "output_mode": "body_action",
                 },
             )
         ],
@@ -1099,10 +1093,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     description="Bring the requester a cup of tea.",
                     source_text="Bring me a cup of tea.",
                     metadata={
-                        "responsibility_kind": "capability_dependent",
-                        "execution_lane": "activity",
                         "output_mode": "body_action",
-                        "provider_required": True,
                     },
                 )
             ],
@@ -1357,10 +1348,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     description="Check Chongqing weather today.",
                     source_text="Check Chongqing weather today.",
                     metadata={
-                        "responsibility_kind": "capability_dependent",
-                        "execution_lane": "activity",
-                        "output_mode": "capability_work",
-                        "provider_required": True,
+                        "output_mode": "information",
                     },
                 )
             ],
@@ -2345,10 +2333,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     description="Move toward the unresolved referenced destination.",
                     source_text="move over there",
                     metadata={
-                        "responsibility_kind": "executable_action",
-                        "execution_lane": "activity",
                         "output_mode": "body_action",
-                        "provider_required": True,
                     },
                 )
             ],

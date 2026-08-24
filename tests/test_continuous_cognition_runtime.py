@@ -501,7 +501,7 @@ def test_social_attention_projects_semantic_activities_not_execution_modalities(
                     goal_id="goal-sing",
                     description="sing a short song",
                     source_text="Greet Alice while you walk, then sing a short song.",
-                    metadata={"output_mode": "singing", "provider_required": True},
+                    metadata={"output_mode": "singing"},
                 ),
             ],
         ),

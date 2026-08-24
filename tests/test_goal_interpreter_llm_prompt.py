@@ -689,7 +689,6 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                                 "description": "move forward 10 seconds",
                                 "metadata": {
                                     "output_mode": "body_action",
-                                    "provider_required": True,
                                 },
                             },
                         }
@@ -870,7 +869,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                             "description": "move forward 10 seconds",
                             "metadata": {
                                 "output_mode": "body_action",
-                                "provider_required": True,
                             },
                         },
                     }

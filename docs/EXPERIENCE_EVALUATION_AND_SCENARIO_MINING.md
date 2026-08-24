@@ -98,7 +98,7 @@ Recommended top-level shape:
             "local_ref": "r1",
             "outcome": "Walk forward for 15 seconds quickly.",
             "bindings": {"duration_s": 15, "speed": "quickly"},
-            "completion_requires_work": true
+            "output_mode": "body_action"
           }
         ],
         "unresolved": [],

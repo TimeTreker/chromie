@@ -62,10 +62,7 @@ def passing_summary() -> dict:
                         "goal_id": "goal-walk",
                         "description": "往前走15秒",
                         "metadata": {
-                            "responsibility_kind": "executable_action",
-                            "execution_lane": "activity",
                             "output_mode": "body_action",
-                            "provider_required": True,
                         },
                     },
                     {
@@ -73,20 +70,14 @@ def passing_summary() -> dict:
                         "description": "边走边唱歌",
                         "resource_responsibility": None,
                         "metadata": {
-                            "responsibility_kind": "vocal_output",
-                            "execution_lane": "vocal",
                             "output_mode": "singing",
-                            "provider_required": True,
                         },
                     },
                     {
                         "goal_id": "goal-blink",
                         "description": "同时眨眼睛",
                         "metadata": {
-                            "responsibility_kind": "executable_action",
-                            "execution_lane": "activity",
                             "output_mode": "body_action",
-                            "provider_required": True,
                         },
                     },
                 ]

@@ -14,7 +14,7 @@ optional_capabilities:
   - chromie.weather.lookup
   - chromie.external_information.retrieve
 applicable_output_modes:
-  - capability_work
+  - information
 applicable_information_domains:
   - weather_forecast
   - external_grounded_information

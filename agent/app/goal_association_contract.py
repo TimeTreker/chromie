@@ -34,13 +34,6 @@ InformationResourceDomain = Literal[
     "direct_environment_perception",
     "private_runtime_information",
 ]
-GoalResponsibilityKind = Literal[
-    "executable_action",
-    "vocal_output",
-    "capability_dependent",
-    "other",
-]
-GoalExecutionLane = Literal["vocal", "activity", "none"]
 GoalOutputMode = Literal[
     "speech",
     "styled_speech",
@@ -50,7 +43,8 @@ GoalOutputMode = Literal[
     "nonverbal_vocalization",
     "body_action",
     "media_playback",
-    "capability_work",
+    "information",
+    "stateful_effect",
     "other",
 ]
 GoalMediaOperation = Literal[
@@ -63,71 +57,26 @@ GoalMediaOperation = Literal[
     "volume",
     "status",
 ]
-_OUTPUT_MODE_EXECUTION_CONTRACT: dict[
-    GoalOutputMode,
-    tuple[GoalResponsibilityKind, GoalExecutionLane, bool],
-] = {
-    "speech": ("vocal_output", "vocal", False),
-    "styled_speech": ("vocal_output", "vocal", True),
-    "recitation": ("vocal_output", "vocal", True),
-    "singing": ("vocal_output", "vocal", True),
-    "humming": ("vocal_output", "vocal", True),
-    "nonverbal_vocalization": ("vocal_output", "vocal", True),
-    "body_action": ("executable_action", "activity", True),
-    "media_playback": ("executable_action", "activity", True),
-    "capability_work": ("capability_dependent", "activity", True),
-    "other": ("other", "none", False),
-}
 _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
 )
 _EXECUTION_CONTRACT_PROMPT = (
-    "Classify each Goal by the semantic work that must actually complete the "
-    "human outcome, not by the channel used later to report that outcome. In the "
-    "model-facing Goal JSON, output_mode is the completion discriminant; the Host "
-    "deterministically derives responsibility kind, execution lane, and "
-    "provider requirement from that choice. Those Host-owned projections are not "
-    "fields in the model schema. Use capability_work only when completion depends on "
-    "fresh external, private, or runtime evidence from a registered non-vocal "
-    "Capability. Stable general knowledge, reasoning, creative content, and an "
-    "immediate user-facing reminder or piece of advice that Chromie can author "
-    "and deliver in the current exchange use ordinary speech. A deferred reminder, "
-    "scheduled notification, recorded obligation, or later message to another person "
-    "is stateful capability work: saying the reminder now does not complete that "
-    "future effect. Represent the reminder's recipient, trigger, time, and content "
-    "as ordinary typed Goal bindings; it is not an information acquisition resource "
-    "merely because its eventual notification is spoken. The same rule applies to "
-    "persistent state mutations such as adding/removing list items, recording an "
-    "obligation, changing a setting, or sending a later message: use capability_work "
-    "with ordinary typed bindings and no resource_responsibility unless the human "
-    "outcome is genuinely to acquire and deliver a resource. Embodied effects use "
-    "body_action; lifecycle "
-    "control of existing media uses media_playback; authored vocal performances "
-    "use their exact vocal mode. The fact that a capability result will later be "
-    "spoken does not turn its owned work into speech. If no matching provider is "
-    "available, preserve the evidence-dependent completion mode so downstream "
-    "planning can report the limitation instead of inventing an answer. Never "
-    "replace a requested embodied effect with a speech Goal because the current "
-    "input channel is text, because later acknowledgement is spoken, or because "
-    "of an unsupported assumption that Chromie has no embodied Capability. "
-    "media_operation is meaningful only for media_playback; otherwise omit it or "
-    "leave it as none. A negative instruction that limits what Chromie may say "
-    "while completing another requested outcome is a constraint on that outcome, "
-    "not an independently satisfiable spoken Goal. A manner, mood, persona, or "
-    "social-presentation directive attached to another requested effect is likewise "
-    "an expression constraint on that effect, not an additional spoken Goal. Preserve "
-    "that framing in the effect Goal. Create a separate vocal Goal only when the user "
-    "requests independently observable positive words, information, or a vocal "
-    "performance—not merely because wording or speech could help convey the style. "
-    "Coordination grammar in any language requires one Goal for every independently "
-    "observable requested modality. Preserve coordination in descriptions or bindings, "
-    "but never merge independently satisfiable effects merely because they overlap in "
-    "time or share one sentence. Preserve each effect's own semantic output mode. "
-    "When a concrete requested effect is accompanied by a broad desired social "
-    "impression but no words, information, vocal performance, or second effect "
-    "modality is specified, apply that impression as embodiment-wide expression "
-    "framing to the concrete effect. Do not invent an audible modality from an "
-    "adjective, state directive, conjunction, or imperative grammar."
+    "Preserve the human-facing WHAT category from Goal Interpretation exactly. "
+    "Goal Association may refine semantic bindings, resource structure, references, "
+    "and canonical continuity, but it does not decide whether a Capability, provider, "
+    "execution lane, fresh Evidence, or Work is required. Use information when the "
+    "person wants Chromie to determine or provide information, whether that information "
+    "is already available to reasoning/context or must later be acquired. Use "
+    "stateful_effect for a durable or future state change such as recording, scheduling, "
+    "changing a setting, or sending later. Embodied effects use body_action; lifecycle "
+    "control of media uses media_playback; authored vocal performances use their exact "
+    "vocal mode. Ordinary directly authored conversation uses speech. Capability and "
+    "provider applicability are Planner concerns and must not be encoded into Goal "
+    "output_mode or metadata. A negative instruction that limits another outcome is a "
+    "constraint, not a separate Goal. A manner, mood, persona, or social-presentation "
+    "directive attached to another effect is expression framing, not an extra spoken "
+    "Goal. Coordination grammar still requires one Goal per independently satisfiable "
+    "observable outcome. Never invent an audible modality from style wording alone."
 )
 
 _GOAL_SEGMENTATION_IDENTITY_CONTRACT = (
@@ -564,7 +513,7 @@ GoalAssociationModelResourceResponsibility = Annotated[
 
 
 class GoalAssociationModelGoal(BaseModel):
-    """Minimal model-facing semantic Goal; ``output_mode`` is the sole execution truth."""
+    """Minimal model-facing semantic Goal preserving provider-neutral WHAT."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -572,13 +521,12 @@ class GoalAssociationModelGoal(BaseModel):
     description: str = Field(min_length=1)
     output_mode: GoalOutputMode = Field(
         description=(
-            "Semantic work that completes this Goal, not the later channel used "
-            "to deliver its result. Choose capability_work when fresh external, "
-            "private, or runtime evidence is required; choose speech for directly "
-            "authored ordinary conversation; use exact embodied, media, or vocal "
-            "modes when those effects are the requested outcome. This is the sole "
-            "model-authored execution discriminant; the Host derives responsibility "
-            "kind, execution lane, and provider requirement from it."
+            "Provider-neutral human outcome modality copied from Goal Interpretation. "
+            "information says the person wants information; stateful_effect says the "
+            "person wants a durable or future state change. Neither category asserts "
+            "that a Capability, provider, execution lane, fresh Evidence, or Work is "
+            "required. Use exact embodied, media, or vocal modes only when those are "
+            "the requested observable outcome."
         ),
     )
     media_operation: GoalMediaOperation = Field(
@@ -615,18 +563,6 @@ class GoalAssociationModelGoal(BaseModel):
             }
         )
         return schema
-
-    @property
-    def responsibility_kind(self) -> GoalResponsibilityKind:
-        return _OUTPUT_MODE_EXECUTION_CONTRACT[self.output_mode][0]
-
-    @property
-    def execution_lane(self) -> GoalExecutionLane:
-        return _OUTPUT_MODE_EXECUTION_CONTRACT[self.output_mode][1]
-
-    @property
-    def provider_required(self) -> bool:
-        return _OUTPUT_MODE_EXECUTION_CONTRACT[self.output_mode][2]
 
     @property
     def semantic_bindings(self) -> list[GoalAssociationModelBinding]:
@@ -670,7 +606,7 @@ class GoalAssociationModelGoal(BaseModel):
             required_mode: GoalOutputMode = (
                 "body_action"
                 if self.resource_responsibility.kind == "physical_object"
-                else "capability_work"
+                else "information"
             )
             if self.output_mode != required_mode:
                 raise ValueError(
@@ -843,7 +779,8 @@ class GoalResponsibilityCoverageItem(BaseModel):
         "nonverbal_vocalization",
         "body_action",
         "media_playback",
-        "capability_work",
+        "information",
+        "stateful_effect",
         "other",
     ] = "none"
 

@@ -269,7 +269,7 @@ class ConversationStateTests(unittest.TestCase):
                         "source_text": "今晚会下雨吗？",
                         "source_responsibility_refs": ["r1"],
                         "metadata": {
-                            "output_mode": "capability_work",
+                            "output_mode": "information",
                         },
                     },
                 }

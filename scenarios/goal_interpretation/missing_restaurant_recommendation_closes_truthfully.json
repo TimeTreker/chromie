@@ -3,7 +3,7 @@
   "id": "missing_restaurant_recommendation_closes_truthfully",
   "suite": "goal_interpretation",
   "level": "integration",
-  "description": "GI preserves the nearby restaurant recommendation outcome and fresh-evidence need; sourcing the location and capability availability remain Planner authority.",
+  "description": "GI preserves the nearby restaurant-recommendation WHAT; sourcing the location, evidence, and capability availability remain Planner/runtime authority.",
   "tags": [
     "missing-ability",
     "external-information",

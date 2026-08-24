@@ -289,23 +289,17 @@ continuity before creation: each semantic responsibility may associate with
 existing active goals, become an independent new goal, or produce one natural
 clarification when the reference is ambiguous. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
-are rejected. Every validated new Goal retains five typed completion facts.
-`responsibility_kind` is `executable_action`, `vocal_output`,
-`capability_dependent`, or `other`; `execution_lane` is `vocal`, `activity`,
-or `none`; `output_mode` distinguishes ordinary speech, expressive speech,
-recitation, singing, humming, nonverbal vocalization, body action, media
-playback, capability work, or other; `provider_required` says whether an
-exact registered Capability Provider beyond ordinary authored speech delivery
-must return completion evidence; and `media_operation` is one exact persistent
-playback operation for `media_playback` or `none` otherwise. The live model-facing Goal schema has exactly one execution discriminant:
-`output_mode`, plus `media_operation` only when media lifecycle semantics require
-it. `responsibility_kind`, `execution_lane`, and `provider_required` are not model
-input fields. The Host exposes them only as deterministic projections of the
-validated mode when it materializes canonical Goal metadata. Missing
-`output_mode` and model-authored copies of those Host projections are schema
-violations; there is no reverse inference or legacy execution-tuple compatibility
-path. This keeps one semantic source of truth at the model boundary and makes
-contradictory completion tuples structurally unrepresentable.
+are rejected. Every validated new Goal retains provider-neutral WHAT semantics. `output_mode`
+distinguishes ordinary speech, expressive speech, recitation, singing, humming,
+nonverbal vocalization, body action, media playback, information, stateful effect,
+or other; `media_operation` is one exact persistent playback operation only for
+`media_playback`. The live model-facing and canonical Goal contracts do not contain
+`responsibility_kind`, `execution_lane`, `provider_required`, or `capability_work`.
+Those concepts are not reconstructed by the Host. Planner decides HOW from the
+canonical Goal, current trusted state/Evidence, and the available Capability catalog;
+selected Capability/Activity records carry Runtime execution facts separately. This
+keeps Goal identity stable across provider changes and prevents Goal Association from
+quietly taking back planning authority.
 For a resource responsibility, the live schema likewise has one writable nested
 authority: `resource_responsibility.resource`, `.source`, `.recipient`, and
 `.delivery_mode`. Resource identity, normalized numeric quantity, query-scope

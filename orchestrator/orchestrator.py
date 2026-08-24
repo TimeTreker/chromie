@@ -114,6 +114,7 @@ from orchestrator.runtime.runtime_ready_greeting import (
 from orchestrator.runtime.situation import build_situation_projection
 from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
+    fresh_capability_state_projection,
     planner_reentry_repeats_completed_activity,
     planner_reentry_responsibilities,
     meaningful_provider_state,
@@ -5027,123 +5028,6 @@ class VoiceAssistant:
         )
 
 
-    def _fresh_capability_state_projection(
-        self, capability_ids: list[str]
-    ) -> list[dict[str, Any]]:
-        projection: list[dict[str, Any]] = []
-        for capability_id in dict.fromkeys(
-            str(item).strip() for item in capability_ids if str(item).strip()
-        ):
-            try:
-                definition = self.interaction_runtime.capability_definition(capability_id)
-            except ValueError:
-                projection.append(
-                    {
-                        "capability_id": capability_id,
-                        "known": False,
-                        "available": False,
-                        "unavailable_reason": "not_in_fresh_registry",
-                    }
-                )
-                continue
-            projection.append(
-                {
-                    "capability_id": capability_id,
-                    "known": True,
-                    "available": bool(definition.available),
-                    "provider_id": definition.provider_id,
-                    "version": definition.version,
-                    **(
-                        {"unavailable_reason": definition.unavailable_reason}
-                        if definition.unavailable_reason
-                        else {}
-                    ),
-                }
-            )
-        return projection
-
-    async def _reenter_restored_goal_for_provider_state(
-        self,
-        *,
-        candidate: dict[str, Any],
-        provider_state: list[dict[str, Any]],
-    ) -> bool:
-        goal_id = str(candidate.get("goal_id") or "").strip()
-        user_request = str(candidate.get("source_text") or "").strip()
-        raw_responsibilities = candidate.get("responsibilities")
-        if not goal_id or not user_request or not isinstance(raw_responsibilities, list):
-            return False
-        responsibilities: list[CognitiveResponsibilityProposal] = []
-        try:
-            for item in raw_responsibilities:
-                if isinstance(item, dict):
-                    responsibilities.append(
-                        CognitiveResponsibilityProposal.model_validate(item)
-                    )
-        except (TypeError, ValueError) as exc:
-            self.session_log(
-                None,
-                "restored_goal_revalidation_rejected: goal_id=%s reason=invalid_responsibility_provenance error_type=%s",
-                goal_id,
-                type(exc).__name__,
-            )
-            return False
-        if not responsibilities:
-            self.session_log(
-                None,
-                "restored_goal_revalidation_deferred: goal_id=%s reason=missing_responsibility_provenance",
-                goal_id,
-            )
-            return False
-        restored_marker = str(candidate.get("restored_ms") or "unknown").strip()
-        evidence_ref = f"provider-state:restart:{goal_id}:{restored_marker}"[:220]
-        opportunity = CognitiveOpportunity.create(
-            trigger="provider_state",
-            goal_ids=[goal_id],
-            evidence_refs=[evidence_ref],
-            reason_codes=["restored_goal_fresh_provider_state"],
-            recommended_cognition="fast",
-        )
-        planner_response = await self._planner_state_reentry_response(
-            source_response=None,
-            canonical_plan=None,
-            user_request=user_request,
-            language=str(candidate.get("language") or "auto"),
-            goal_ids=[goal_id],
-            evidence_goal_ids=[goal_id],
-            evidence_refs=[evidence_ref],
-            session_id=None,
-            phase="restored_provider_state_revalidation",
-            context_updates={
-                "trusted_provider_state_event": {
-                    "evidence_ref": evidence_ref,
-                    "source": "restart_provider_revalidation",
-                    "capabilities": provider_state,
-                },
-                "provider_state_reentry": {
-                    "source_goal_ids": [goal_id],
-                    "evidence_refs": [evidence_ref],
-                    "planner_authority": "planner",
-                    "restored_goal": True,
-                },
-                "cognitive_opportunity": opportunity.prompt_projection(),
-            },
-            fast_workflow_stage="fast_planner_restored_provider_state_reentry",
-            deep_workflow_stage="planner_deep_pass_restored_provider_state_reentry",
-            response_source="fast_planner_restored_provider_state_reentry",
-            responsibilities_override=responsibilities,
-        )
-        if planner_response is None:
-            return False
-        completed = self.conversation_state.complete_runtime_revalidation(
-            [goal_id],
-            evidence_ref=evidence_ref,
-        )
-        if goal_id not in completed:
-            return False
-        await self._apply_planner_reentry_response(planner_response, session_id=None)
-        return True
-
     async def _revalidate_restored_goals_from_provider_state(self) -> None:
         candidates = self.conversation_state.runtime_revalidation_candidates()
         if not candidates:
@@ -5169,38 +5053,102 @@ class VoiceAssistant:
                     type(exc).__name__,
                 )
                 return
+
         for candidate in candidates:
+            goal_id = str(candidate.get("goal_id") or "").strip()
+            user_request = str(candidate.get("source_text") or "").strip()
+            raw_responsibilities = candidate.get("responsibilities")
             capability_ids = [
                 str(item).strip()
                 for item in candidate.get("capability_ids") or []
                 if str(item).strip()
             ]
+            if not goal_id or not user_request or not isinstance(raw_responsibilities, list):
+                continue
             if not capability_ids:
                 self.session_log(
                     None,
                     "restored_goal_revalidation_deferred: goal_id=%s reason=no_prior_capability_binding",
-                    candidate.get("goal_id"),
+                    goal_id,
                 )
                 continue
-            provider_state = self._fresh_capability_state_projection(capability_ids)
-            await self._reenter_restored_goal_for_provider_state(
-                candidate=candidate,
-                provider_state=provider_state,
-            )
+            responsibilities: list[CognitiveResponsibilityProposal] = []
+            try:
+                responsibilities = [
+                    CognitiveResponsibilityProposal.model_validate(item)
+                    for item in raw_responsibilities
+                    if isinstance(item, dict)
+                ]
+            except (TypeError, ValueError) as exc:
+                self.session_log(
+                    None,
+                    "restored_goal_revalidation_rejected: goal_id=%s reason=invalid_responsibility_provenance error_type=%s",
+                    goal_id,
+                    type(exc).__name__,
+                )
+                continue
+            if not responsibilities:
+                self.session_log(
+                    None,
+                    "restored_goal_revalidation_deferred: goal_id=%s reason=missing_responsibility_provenance",
+                    goal_id,
+                )
+                continue
 
-    def _schedule_restored_goal_revalidation(self) -> None:
-        if not self.conversation_state.runtime_revalidation_candidates():
-            return
-        task = asyncio.create_task(
-            self._revalidate_restored_goals_from_provider_state(),
-            name="restored-goal-provider-revalidation",
-        )
-        result_tasks = getattr(self, "active_capability_result_tasks", None)
-        if not isinstance(result_tasks, dict):
-            result_tasks = {}
-            self.active_capability_result_tasks = result_tasks
-        result_tasks[task] = "restored-goal-provider-revalidation"
-        task.add_done_callback(self._capability_result_task_done)
+            provider_state = fresh_capability_state_projection(
+                capability_ids,
+                capability_definition=self.interaction_runtime.capability_definition,
+            )
+            restored_marker = str(candidate.get("restored_ms") or "unknown").strip()
+            evidence_ref = f"provider-state:restart:{goal_id}:{restored_marker}"[:220]
+            opportunity = CognitiveOpportunity.create(
+                trigger="provider_state",
+                goal_ids=[goal_id],
+                evidence_refs=[evidence_ref],
+                reason_codes=["restored_goal_fresh_provider_state"],
+                recommended_cognition="fast",
+            )
+            planner_response = await self._planner_state_reentry_response(
+                source_response=None,
+                canonical_plan=None,
+                user_request=user_request,
+                language=str(candidate.get("language") or "auto"),
+                goal_ids=[goal_id],
+                evidence_goal_ids=[goal_id],
+                evidence_refs=[evidence_ref],
+                session_id=None,
+                phase="restored_provider_state_revalidation",
+                context_updates={
+                    "trusted_provider_state_event": {
+                        "evidence_ref": evidence_ref,
+                        "source": "restart_provider_revalidation",
+                        "capabilities": provider_state,
+                    },
+                    "provider_state_reentry": {
+                        "source_goal_ids": [goal_id],
+                        "evidence_refs": [evidence_ref],
+                        "planner_authority": "planner",
+                        "restored_goal": True,
+                    },
+                    "cognitive_opportunity": opportunity.prompt_projection(),
+                },
+                fast_workflow_stage="fast_planner_restored_provider_state_reentry",
+                deep_workflow_stage="planner_deep_pass_restored_provider_state_reentry",
+                response_source="fast_planner_restored_provider_state_reentry",
+                responsibilities_override=responsibilities,
+            )
+            if planner_response is None:
+                continue
+            completed = self.conversation_state.complete_runtime_revalidation(
+                [goal_id],
+                evidence_ref=evidence_ref,
+            )
+            if goal_id not in completed:
+                continue
+            await self._apply_planner_reentry_response(
+                planner_response,
+                session_id=None,
+            )
 
     async def _apply_planner_reentry_response(
         self,
@@ -7069,7 +7017,15 @@ class VoiceAssistant:
                 audio_device_monitor(self)
             )
         await self._announce_runtime_ready()
-        self._schedule_restored_goal_revalidation()
+        if self.conversation_state.runtime_revalidation_candidates():
+            task = asyncio.create_task(
+                self._revalidate_restored_goals_from_provider_state(),
+                name="restored-goal-provider-revalidation",
+            )
+            self.active_capability_result_tasks[task] = (
+                "restored-goal-provider-revalidation"
+            )
+            task.add_done_callback(self._capability_result_task_done)
         input_runtime = input_session_runtime_for(self)
         if self.audio_input_mode == "stdin":
             await input_runtime.injected_audio_stream()

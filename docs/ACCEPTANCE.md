@@ -815,9 +815,9 @@ python scripts/general_ability_acceptance.py \
 ```
 
 The focused scenario must preserve `chromie.vocal.perform`, the exact requested
-mode, source Goal ownership, and `execution_lane=speaking` through Goal
-Association, both Planner tiers, Planner-owned Communicative Activities, and
-Host materialization.
+mode, and source Goal ownership through Goal Association. `execution_lane=speaking`
+first appears only after Planner selects the vocal Capability/Activity realization and
+then remains exact through Host materialization.
 Provider tests must cover declaration evidence, unsupported-mode refusal before
 backend invocation, silent-downgrade rejection, exact request cancellation, and
 the final Trusted Capability Runtime/turn-closure evidence identity. Ordinary

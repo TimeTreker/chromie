@@ -195,7 +195,7 @@ def goal_association_response_schema(
             resources.  Keep semantic selection model-owned while removing
             impossible resource kinds and putting the ordinary ``null`` branch
             first.  ``body_action`` remains free to select a real physical
-            acquisition, and ``capability_work`` remains free to select a real
+            acquisition, and ``information`` remains free to select a real
             information responsibility.
             """
 
@@ -307,8 +307,10 @@ def goal_association_response_schema(
                 return ["information"]
             if output_mode == "body_action":
                 return ["ordinary", "physical_object"]
-            if output_mode == "capability_work":
-                return ["ordinary", "information"]
+            if output_mode == "information":
+                return ["information"]
+            if output_mode == "stateful_effect":
+                return ["ordinary"]
             if output_mode is not None:
                 return ["ordinary"]
             return ["unbounded"]
@@ -525,7 +527,7 @@ def resource_semantic_contract_response_schema(
         clauses = goal_schema.setdefault("allOf", [])
         for resource_kind, output_mode in (
             ("physical_object", "body_action"),
-            ("information", "capability_work"),
+            ("information", "information"),
         ):
             clauses.append(
                 {
@@ -699,7 +701,7 @@ def coverage_certificate_response_schema(
                                     "private_runtime_information",
                                 ]
                             },
-                            "required_output_mode": {"const": "capability_work"},
+                            "required_output_mode": {"const": "information"},
                         }
                     },
                 },
@@ -748,7 +750,7 @@ def coverage_certificate_response_schema(
                     },
                     "then": {
                         "properties": {
-                            "required_output_mode": {"const": "capability_work"}
+                            "required_output_mode": {"const": "information"}
                         }
                     },
                 },
@@ -854,7 +856,7 @@ def coverage_certificate_response_schema(
                     )
                 if resource is not None and resource.kind == "physical_object":
                     return ("physical_resource", "none", candidate.output_mode)
-                if candidate.output_mode == "capability_work":
+                if candidate.output_mode == "stateful_effect":
                     return ("persistent_effect", "none", candidate.output_mode)
                 return ("ordinary", "none", candidate.output_mode)
 

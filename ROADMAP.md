@@ -51,7 +51,7 @@ Reviewed architecture status (each item states its implementation state explicit
 
 1. **GI/Planner input-ownership boundary — implemented and source-guarded.** GI is
    WHAT-only: Responsibility meaning, explicit/contextual semantic bindings, Goal
-   relation, fresh-evidence need, and bounded unresolved meaning. GI has no authority or
+   relation, provider-neutral output modality, and bounded unresolved meaning. GI has no authority or
    DTO fields to create/resolve planning InformationGaps, declare Capability inputs
    missing/blocking, or choose `ask_user`, context, observation/query, or default. Fast
    Planner fast pass owns execution-input completeness, source/default policy, gap provenance, and
