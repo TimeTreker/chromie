@@ -1491,7 +1491,12 @@ Evidence history is not Memory. Evidence answers what happened; Memory is the
 selective retention of meaning worth making available to future cognition.
 Situation answers what matters now; Memory answers what may matter again later.
 The default should be not to promote ordinary transient facts into durable
-Memory.
+Memory. Prompt availability is context-conditioned rather than a recent-N query: the
+existing owner derives bounded lexical/entity cues from the current user turn, open
+Goal/task context, and discourse focus, ranks matching retained Memory ahead of unrelated
+recent entries, then uses recency only as fallback/fill. This deterministic activation is
+not semantic authority, does not rewrite Memory, and does not justify a vector database or
+a second retrieval model by itself.
 
 `Experience` does not currently require a separate first-class store. Important or
 repeated outcomes may produce an experience candidate; selective Reflection may

@@ -17,6 +17,7 @@ from orchestrator.runtime.memory import (
     MemoryPromptBuilder,
     MemoryStore,
     ProtectedDurableMemoryStore,
+    rank_memory_prompt_entries,
 )
 
 if TYPE_CHECKING:
@@ -3405,15 +3406,73 @@ class ConversationStateManager:
             self._recent_tool_evidence.append(entry)
             known_ids.add(evidence_id)
 
+    def _memory_activation_texts(self) -> list[str]:
+        """Project current context into bounded deterministic Memory cues."""
+
+        values: list[str] = []
+        latest_user = self._latest_turn("user")
+        if latest_user:
+            values.append(str(latest_user.get("text") or ""))
+        for context in self._active_task_contexts()[-4:]:
+            values.extend(
+                [
+                    str(context.get("goal") or ""),
+                    str(context.get("last_meaningful_user_turn") or ""),
+                ]
+            )
+            semantic_goal = context.get("semantic_goal")
+            if isinstance(semantic_goal, dict):
+                values.extend(
+                    [
+                        str(semantic_goal.get("description") or ""),
+                        str(semantic_goal.get("object") or ""),
+                    ]
+                )
+        referents = {
+            str(item.get("referent_id") or ""): item
+            for item in self._discourse_referents
+            if isinstance(item, dict)
+        }
+        for referent_id in self.discourse_focus()[-4:]:
+            referent = referents.get(referent_id) or {}
+            values.extend(
+                [
+                    str(referent.get("canonical_value") or ""),
+                    str(referent.get("entity_type") or ""),
+                ]
+            )
+        return [
+            self._compact_text(value, limit=260)
+            for value in values
+            if str(value or "").strip()
+        ][:16]
+
     def session_memory(self) -> dict[str, Any]:
         active_tasks = self._active_pending_tasks()
         active_task_contexts = self._active_task_contexts()
         current_task_context = self._current_task_context()
         latest_user = self._latest_turn("user")
         latest_assistant = self._latest_turn("assistant")
-        extracted_memory = self._memory_prompt_builder.build(self._memory_store)
-        durable_entries = self._durable_memory.prompt_entries(limit=8)
-        combined_entries = [*durable_entries, *extracted_memory["entries"]][-12:]
+        activation_texts = self._memory_activation_texts()
+        extracted_memory = self._memory_prompt_builder.build(
+            self._memory_store,
+            limit=12,
+            activation_texts=activation_texts,
+        )
+        durable_entries = self._durable_memory.prompt_entries(
+            limit=12,
+            activation_texts=activation_texts,
+        )
+        combined_entries = rank_memory_prompt_entries(
+            [*durable_entries, *extracted_memory["entries"]],
+            activation_texts=activation_texts,
+            limit=12,
+        )
+        durable_entries = rank_memory_prompt_entries(
+            durable_entries,
+            activation_texts=activation_texts,
+            limit=8,
+        )
         combined_summary_lines = [
             f"- {entry['text']}" for entry in combined_entries if entry.get("text")
         ]
@@ -3452,6 +3511,10 @@ class ConversationStateManager:
             "memory_summary": (
                 "\n".join(combined_summary_lines) if combined_summary_lines else "None"
             ),
+            "memory_selection": {
+                "policy": "context_relevance_then_recency",
+                "activation_source_count": len(activation_texts),
+            },
             "durable_profile_memory": {
                 "enabled": self.durable_memory_enabled,
                 "entries": durable_entries,

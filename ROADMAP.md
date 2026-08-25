@@ -165,9 +165,11 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    unsafe state enters Deep Planner directly. This is a small derived readiness policy, not a
    numeric priority engine or competing semantic planner. Broader risk/novelty/resource signals
    should be added only when their authority is concrete.
-5. **Activate Memory by current context rather than recency alone.** Reuse existing Memory,
-   Goal, Situation, entity/scope, and provenance owners before considering a new retrieval
-   subsystem.
+5. **Activate Memory by current context rather than recency alone.** **Implemented:** the
+   existing Memory owner deterministically projects bounded cues from the current user turn,
+   open task/Goal context, and discourse focus. Older relevant entries outrank unrelated recent
+   entries; recency remains the fallback/fill policy. No vector database, retrieval LLM, or new
+   Memory authority is introduced.
 6. **Add bounded semantic expectation mismatch and active perception through existing
    owners.** Expected evidence/outcome may reactivate Situation/Planner/Reflection;
    information-seeking gaze/tool/body Work remains ordinary Planner-authored Activity, not a

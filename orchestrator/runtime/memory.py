@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import tempfile
 import time
 from collections import deque
@@ -30,6 +31,105 @@ def _memory_id(scope: str, kind: str, text: str, key: str | None = None) -> str:
     identity = key or text.casefold()
     digest = hashlib.sha1(f"{scope}:{kind}:{identity}".encode("utf-8")).hexdigest()[:12]
     return f"mem_{digest}"
+
+
+def _activation_tokens(values: Iterable[str]) -> set[str]:
+    """Return a bounded lexical cue set for deterministic memory activation.
+
+    This is intentionally not semantic authority. Latin-like text contributes
+    word tokens; CJK text contributes adjacent character pairs so an older
+    memory can be activated by a shared entity phrase without a vector store or
+    a second model call.
+    """
+
+    tokens: set[str] = set()
+    for raw in list(values)[:32]:
+        value = compact_text(str(raw or ""), limit=320).casefold()
+        if not value:
+            continue
+        for token in re.findall(r"[a-z0-9_][a-z0-9_.:-]*", value):
+            if len(token) >= 2:
+                tokens.add(token[:80])
+        cjk = "".join(
+            char
+            for char in value
+            if "\u3400" <= char <= "\u9fff"
+        )
+        for index in range(max(0, len(cjk) - 1)):
+            tokens.add(cjk[index : index + 2])
+        if len(cjk) == 1:
+            tokens.add(cjk)
+        if len(tokens) >= 96:
+            break
+    return set(list(tokens)[:96])
+
+
+def _memory_prompt_activation_score(
+    entry: dict[str, Any],
+    *,
+    activation_tokens: set[str],
+) -> float:
+    if not activation_tokens:
+        return 0.0
+    text_tokens = _activation_tokens(
+        [
+            str(entry.get("kind") or ""),
+            str(entry.get("key") or ""),
+            str(entry.get("text") or ""),
+        ]
+    )
+    overlap = activation_tokens & text_tokens
+    if not overlap:
+        return 0.0
+    key_tokens = _activation_tokens([str(entry.get("key") or "")])
+    key_overlap = activation_tokens & key_tokens
+    confidence = max(0.0, min(1.0, float(entry.get("confidence") or 0.0)))
+    return float(len(overlap)) + (2.0 * len(key_overlap)) + (0.1 * confidence)
+
+
+def rank_memory_prompt_entries(
+    entries: Iterable[dict[str, Any]],
+    *,
+    activation_texts: Iterable[str] | None = None,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """Select bounded Memory by current-context activation, then recency.
+
+    Relevant older entries outrank unrelated recent entries. Recency remains the
+    fallback when no cue matches, and fills unused capacity after relevant hits.
+    Input order is treated as oldest-to-newest.
+    """
+
+    bounded_limit = max(0, int(limit))
+    if bounded_limit == 0:
+        return []
+    items = [dict(item) for item in entries if isinstance(item, dict)]
+    if not items:
+        return []
+    activation_tokens = _activation_tokens(list(activation_texts or []))
+    if not activation_tokens:
+        return items[-bounded_limit:]
+
+    ranked: list[tuple[float, int, dict[str, Any]]] = []
+    unmatched: list[tuple[int, dict[str, Any]]] = []
+    for index, item in enumerate(items):
+        score = _memory_prompt_activation_score(
+            item,
+            activation_tokens=activation_tokens,
+        )
+        if score > 0:
+            ranked.append((score, index, item))
+        else:
+            unmatched.append((index, item))
+    ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    selected = [item for _score, _index, item in ranked[:bounded_limit]]
+    if len(selected) < bounded_limit:
+        selected.extend(
+            item
+            for _index, item in reversed(unmatched)
+            if item not in selected
+        )
+    return selected[:bounded_limit]
 
 
 @dataclass
@@ -159,9 +259,18 @@ class MemoryStore:
         self.prune_expired()
         return [entry.to_dict() for entry in self._entries]
 
-    def prompt_entries(self, *, limit: int = 8) -> list[dict[str, Any]]:
+    def prompt_entries(
+        self,
+        *,
+        limit: int = 8,
+        activation_texts: Iterable[str] | None = None,
+    ) -> list[dict[str, Any]]:
         self.prune_expired()
-        return [entry.to_prompt_dict() for entry in list(self._entries)[-limit:]]
+        return rank_memory_prompt_entries(
+            [entry.to_prompt_dict() for entry in self._entries],
+            activation_texts=activation_texts,
+            limit=limit,
+        )
 
     def summary_lines(self, *, limit: int = 8) -> list[str]:
         return [f"- {entry['text']}" for entry in self.prompt_entries(limit=limit)]
@@ -278,8 +387,20 @@ class ProtectedDurableMemoryStore:
             self.persist()
         return count
 
-    def prompt_entries(self, *, limit: int = 8) -> list[dict[str, Any]]:
-        return self.store.prompt_entries(limit=limit) if self.enabled else []
+    def prompt_entries(
+        self,
+        *,
+        limit: int = 8,
+        activation_texts: Iterable[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        return (
+            self.store.prompt_entries(
+                limit=limit,
+                activation_texts=activation_texts,
+            )
+            if self.enabled
+            else []
+        )
 
     def snapshot(self) -> list[dict[str, Any]]:
         return self.store.snapshot() if self.enabled else []
@@ -315,10 +436,23 @@ class ProtectedDurableMemoryStore:
 
 
 class MemoryPromptBuilder:
-    def build(self, store: MemoryStore, *, limit: int = 8) -> dict[str, Any]:
+    def build(
+        self,
+        store: MemoryStore,
+        *,
+        limit: int = 8,
+        activation_texts: Iterable[str] | None = None,
+    ) -> dict[str, Any]:
+        entries = store.prompt_entries(
+            limit=limit,
+            activation_texts=activation_texts,
+        )
         return {
-            "summary": store.summary(limit=limit),
-            "entries": store.prompt_entries(limit=limit),
+            "summary": (
+                "\n".join(f"- {entry['text']}" for entry in entries if entry.get("text"))
+                or "None"
+            ),
+            "entries": entries,
         }
 
 
