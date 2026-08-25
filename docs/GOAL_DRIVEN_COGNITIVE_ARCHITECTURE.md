@@ -1489,7 +1489,10 @@ A bounded sleeper/checker over already-structured due conditions is Runtime sche
 not ambient cognition: it performs no semantic interpretation or model call until a
 condition is actually due. The Host must not infer timers from free-form Goal text. Do
 not implement a background `while true: think()` loop or a giant numeric priority
-engine.
+engine. Implementation structure follows the same rule: extracting a large orchestration
+subphase is valid only when the helper stays on the existing authority owner, returns typed
+mechanical state, and preserves cancellation/Evidence semantics. File-size reduction alone
+is not authority for another service or manager.
 
 #### 4.14.9 Memory, learning, and recovery
 

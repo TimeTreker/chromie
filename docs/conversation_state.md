@@ -77,18 +77,13 @@ result-free index of exact original arguments and provenance; the capability
 returns data only when the already-resolved Goal bindings match exactly and the
 record is fresh enough. See
 [`DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
-Goal Interpretation can hand complex requests to `deepthinking_agent`, which uses this
-same bounded memory to split tasks, plan, debug, and produce unified robot
-skill tasks without treating memory as authorization.
-Deep-thinking prompts should consume extracted task context, claims, entities,
-constraints, pending questions, and pending-task summaries rather than
-injecting raw conversation transcript turns. The next memory architecture is
-defined in [`MEMORY_EXTRACTION.md`](MEMORY_EXTRACTION.md): raw turns are
-evidence/debug data, while model-facing memory should be compact extracted
-meaning selected by a prompt builder. The first deterministic slice is
-implemented for session/task memory, Goal Interpreter prompt sanitization, direct
-fallback context, ordinary conversation prompts, capability planning/review
-prompts, and deepthinking prompts.
+Goal Interpretation remains WHAT-only and never hands planning to a separate
+separate deep-thinking agent. Fast and Deep Planner passes consume the same bounded
+Goal/Situation/Memory authorities at different cognition depths. Raw turns remain
+evidence/debug context; model-facing Memory is compact retained meaning selected
+by the existing Memory owner. Current prompt selection is context-conditioned so
+older relevant Memory can outrank unrelated recent entries without a retrieval
+agent or vector database. See [`MEMORY_EXTRACTION.md`](MEMORY_EXTRACTION.md).
 
 Each task context should preserve the information that later sessions need:
 
@@ -108,16 +103,13 @@ The same rule applies to ordinary chat history: bounded raw turns may be
 retained for traceability, but they should not become the default memory block
 for future prompts.
 
-When a request routes to `memory`, Goal Interpretation must author a typed
-`MemoryUpdateProposal` containing normalized session content, kind, optional
-key, ephemeral persistence policy, and confidence. `memory_agent` validates and
-applies that exact proposal; it does not infer memory kind or content from raw
-user text, keywords, or regular expressions. A missing proposal produces a
-clarification rather than a Host-authored guess. The Host records the resulting
-`extracted_memory` entry in process-local `session_memory.memory_summary` and
-`session_memory.extracted_memory`; the bounded `user_statement` entry remains
-compatibility evidence derived from the same proposal. Structured updates with
-the same `scope`, `kind`, and `key` replace the prior entry.
+Memory is not a Goal Interpretation route and there is no maintained
+separate memory agent. `ConversationStateManager` records bounded Memory only from
+already-typed owner outputs such as structured extracted-memory metadata, trusted
+Runtime outcomes, Reflection-approved local lessons, and explicitly consent-bound
+profile updates. The Host may validate/store those records but must not infer a
+preference, fact, or durable memory instruction from keywords or raw text. Keyed
+entries with the same `scope`, `kind`, and `key` revise the retained entry.
 
 This is separate from the durable mind and experience layer documented in
 [`chromie_mind.md`](chromie_mind.md). Session memory tracks the current

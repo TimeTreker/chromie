@@ -61,16 +61,17 @@ At this revision the checker reports:
 |---|---:|
 | `VoiceAssistant` methods | 105 |
 | properties | 1 |
-| `__init__` lines | 305 |
-| initialized `self` attributes | 110 |
+| `__init__` lines | 301 |
+| initialized `self` attributes | 108 |
 | direct-LLM compatibility call sites | 0 |
 
 These values are a **non-growth ceiling**, not proof that structural
-simplification is complete. The Planner-re-entry policy extraction removed nine
-private methods from the composition root (`159 -> 150`) and tightened the older
-permissive ceilings (`187/409/139`) to the actual maintained baseline
-(`150/305/110`). Subsequent owner-internal mechanical extractions move TTS text segmentation, Goal-list console projection, observability containment, reflex confirmation-token bookkeeping, and OS-default audio-device lifecycle out of the composition root. Top-level process teardown now lives in stateless `orchestrator/runtime/shutdown_lifecycle.py`: it reuses `InputTurnLifecycle.shutdown_tasks()`, asks the Playback lifecycle to release waiters/duck state, calls the real `PlaybackTransport` output-close owner directly, closes ASR/HTTP/audio resources, and finalizes session traces without interpreting Goal state. Removing `VoiceAssistant.cleanup()` and its cleanup-only `close_output_stream()` compatibility wrapper lowers the method ceiling to `127`. Accelerator sample scheduling, detached observability-task tracking, and trace attachment then move into the existing stateless `observability_recording.py` boundary, lowering the current ceiling to `124` without moving semantic authority. Playback provider/output ownership is then completed by deleting the seven `VoiceAssistant` transport/TTS compatibility delegates (`ensure_output_stream`, `abort_output_stream`, `play_audio`, `enqueue_playback_skip`, `playback_worker`, `play_one_order`, and `synthesize_one`). `PlaybackTransport` calls its own methods directly, retains the existing TTS/playback session trace spans on the true owner, and Host call sites obtain the current transport through the existing Playback lifecycle. This lowers the current ceiling to `117` without moving speech semantics or interruption authority. Input/session ownership is then completed by deleting twelve `VoiceAssistant` compatibility delegates (`mic_callback`, VAD/ASR queue helpers, routed-turn helpers, device/stdin input streams, and idle sweeping). `InputSessionRuntime` calls those operations on itself, Host integration obtains the existing runtime explicitly, and `InputTurnLifecycle` remains the ASR/turn/reflex task-state owner. This lowers the current ceiling to `105` without moving Gateway, turn, reflex, or conversation semantics. A ratchet increase requires an explicit reviewed before/after
-rationale in the same change; ordinary work must hold or lower every ceiling.
+simplification is complete. The composition root has already moved transport, input/session,
+shutdown, observability, confirmation bookkeeping, and other mechanical lifecycle concerns to
+their existing owners. Historical ratchet transitions belong in Git history/CHANGELOG; this
+document records only the current maintained boundary. A ratchet increase requires an explicit
+reviewed before/after rationale in the same change; ordinary work must hold or lower every
+ceiling.
 
 ## Remaining ownership seams
 

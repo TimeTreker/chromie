@@ -146,6 +146,28 @@ class _GoalAssociationStageResult:
     has_goal_replacement: bool
 
 
+@dataclass
+class _FastAdvanceProgress:
+    """Transient early-execution handle visible to cancellation while Fast advance runs."""
+
+    ready_capability_execution: Any | None = None
+    ready_capability_status: str = "not_started"
+
+
+@dataclass(frozen=True)
+class _FastAdvanceStageResult:
+    """Mechanical result of the Fast Planner advance phase and safe early realization."""
+
+    advance: FastPlannerAdvance
+    activity_plan_elapsed_ms: float
+    ready_capability_execution: Any | None
+    ready_capability_status: str
+    communicative_realization_status: str
+    social_attention_opportunity_delta: int
+    ready_communicative_executions: tuple[Any, ...]
+    vocal_activity_ids: tuple[str, ...]
+
+
 class CognitiveAgentClient(Protocol):
     async def resolve_goal_association(
         self, session: Any, **kwargs: Any
@@ -4311,6 +4333,149 @@ class GoalDrivenRuntimeCoordinator:
             )
         return resolution.model_copy(update={"metadata": metadata})
 
+    async def _resolve_fast_activity_plan_stage(
+        self,
+        session: Any,
+        *,
+        work_request: CognitiveWorkRequest,
+        sid: str,
+        turn_id: str,
+        text: str,
+        context: dict[str, Any],
+        history: list[dict[str, Any]],
+        responsibility_proposals: list[Any],
+        committed_fast_activity_ids: set[str],
+        fast_started: float,
+        progress: _FastAdvanceProgress,
+    ) -> _FastAdvanceStageResult:
+        """Run Fast Planner advance and only its already-qualified early realizations.
+
+        This extraction owns no new cognition or state. It is the former nested
+        phase of ``_resolve`` expressed as a typed mechanical stage result so the
+        main transaction remains reconstructable.
+        """
+
+        advance = await self._observe_workflow_stage(
+            sid=sid,
+            stage="fast_planner_advance",
+            input_payload={
+                "user_text": text,
+                "responsibilities": [
+                    item.model_dump(mode="json", exclude_none=True)
+                    for item in responsibility_proposals
+                ],
+                "active_goal_snapshots": context.get("active_goal_snapshots", []),
+                "interaction_context": context.get("interaction_context", {}),
+            },
+            operation=self.agent_client.resolve_fast_advance(
+                session,
+                request=work_request.model_copy(
+                    update={
+                        "sid": turn_id,
+                        "context": context,
+                        "history": history,
+                    }
+                ),
+                timeout_ms=self.policy.fast_planner_timeout_ms,
+            ),
+        )
+        ready_capability_execution: Any | None = progress.ready_capability_execution
+        ready_capability_status = progress.ready_capability_status
+        communicative_realization_status = "not_started"
+        social_attention_opportunity_delta = 0
+        ready_communicative_executions: list[Any] = []
+        vocal_activity_ids: list[str] = []
+
+        if self.policy.mode == "apply":
+            capability_activities = [
+                item
+                for item in advance.activities
+                if isinstance(item, FastPlannerCapabilityActivity)
+            ]
+            if capability_activities:
+                try:
+                    ready_capability_execution = (
+                        await self.adapter.interaction_runtime.start_fast_planner_capability_activities(
+                            capability_activities,
+                            session_id=sid,
+                            turn_id=turn_id,
+                        )
+                    )
+                    ready_capability_status = (
+                        "accepted_before_goal_association"
+                        if ready_capability_execution is not None
+                        else "not_started"
+                    )
+                    progress.ready_capability_execution = ready_capability_execution
+                    progress.ready_capability_status = ready_capability_status
+                except (
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    ValidationError,
+                    RuntimeError,
+                ) as exc:
+                    # Ineligible or invalid Work is not executed early. The
+                    # canonical validation path still evaluates the Activity
+                    # after GA; no semantic fallback is inferred.
+                    ready_capability_status = (
+                        "deferred_to_canonical_validation:" + type(exc).__name__
+                    )
+                    progress.ready_capability_status = ready_capability_status
+
+        communicative_acts = [
+            item for item in advance.activities if item.role != "capability"
+        ]
+        if communicative_acts:
+            communicative_realization_status = "planner_owned"
+        if self.policy.mode == "apply":
+            has_capability = any(
+                item.role == "capability" for item in advance.activities
+            )
+            for activity in advance.activities:
+                if activity.role in {"capability", "clarification"}:
+                    continue
+                if activity.activity_id in committed_fast_activity_ids:
+                    continue
+                # Progress can accompany concurrent Goal work. Mixed complete
+                # answer+Capability wording remains with final Plan coordination.
+                if activity.role == "complete_response" and has_capability:
+                    continue
+                self._queue_social_attention_for_activity(
+                    session,
+                    activity=self._fast_planner_communicative_social_activity(activity),
+                    text=text,
+                    sid=sid,
+                    turn_id=turn_id,
+                    language=work_request.language or "auto",
+                    context=context,
+                    history=history,
+                )
+                if self.adapter.social_attention_mode != "off":
+                    social_attention_opportunity_delta += 1
+                ready_execution = (
+                    await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
+                        activity,
+                        session_id=sid,
+                        turn_id=turn_id,
+                        language=work_request.language or "auto",
+                    )
+                )
+                if activity.role == "complete_response":
+                    ready_communicative_executions.append(ready_execution)
+                vocal_activity_ids.append(activity.activity_id)
+
+        return _FastAdvanceStageResult(
+            advance=advance,
+            activity_plan_elapsed_ms=(time.perf_counter() - fast_started) * 1000.0,
+            ready_capability_execution=ready_capability_execution,
+            ready_capability_status=ready_capability_status,
+            communicative_realization_status=communicative_realization_status,
+            social_attention_opportunity_delta=social_attention_opportunity_delta,
+            ready_communicative_executions=tuple(ready_communicative_executions),
+            vocal_activity_ids=tuple(vocal_activity_ids),
+        )
+
     async def _resolve(
         self,
         session: Any,
@@ -4340,13 +4505,14 @@ class GoalDrivenRuntimeCoordinator:
         fast_planner_path = ""
         deep_planner_invocation_reasons: list[str] = []
         needs_deep_planner = False
-        fast_advance_task: asyncio.Task[FastPlannerAdvance] | None = None
+        fast_advance_task: asyncio.Task[_FastAdvanceStageResult] | None = None
         fast_vocal_activity_ids: list[str] = []
         ready_fast_communicative_executions: list[Any] = []
         fast_communicative_realization_status = "not_started"
         social_attention_opportunity_count = 0
         ready_fast_capability_execution: Any | None = None
         ready_fast_capability_status = "not_started"
+        fast_advance_progress = _FastAdvanceProgress()
         retained_work_reconciliation_status = "not_applicable"
         work_reconciliation_required = False
         work_reconciliation_activity_count = 0
@@ -4435,18 +4601,24 @@ class GoalDrivenRuntimeCoordinator:
             if fast_advance_task is not None and not fast_advance_task.done():
                 fast_advance_task.cancel()
                 await asyncio.gather(fast_advance_task, return_exceptions=True)
+            execution = (
+                ready_fast_capability_execution
+                or fast_advance_progress.ready_capability_execution
+            )
+            execution_status = (
+                ready_fast_capability_status
+                if ready_fast_capability_execution is not None
+                else fast_advance_progress.ready_capability_status
+            )
             if (
-                ready_fast_capability_execution is None
-                or ready_fast_capability_status.startswith(
-                    "completed_before_canonical_dispatch"
-                )
-                or ready_fast_capability_status
-                == "cancelled_by_work_reconciliation"
+                execution is None
+                or execution_status.startswith("completed_before_canonical_dispatch")
+                or execution_status == "cancelled_by_work_reconciliation"
             ):
                 return
             try:
                 await self.adapter.interaction_runtime.runtime.cancel_interaction(
-                    ready_fast_capability_execution.interaction_id
+                    execution.interaction_id
                 )
                 ready_fast_capability_status = "cancelled_before_goal_binding:" + reason
             except Exception as cleanup_exc:
@@ -4546,128 +4718,21 @@ class GoalDrivenRuntimeCoordinator:
                             first_activity.activity_id
                         )
 
-                async def resolve_fast_activity_plan() -> FastPlannerAdvance:
-                    nonlocal ready_fast_capability_execution
-                    nonlocal ready_fast_capability_status
-                    nonlocal fast_communicative_realization_status
-                    nonlocal social_attention_opportunity_count
-                    advance = await self._observe_workflow_stage(
+                fast_advance_task = asyncio.create_task(
+                    self._resolve_fast_activity_plan_stage(
+                        session,
+                        work_request=work_request,
                         sid=sid,
-                        stage="fast_planner_advance",
-                        input_payload={
-                            "user_text": text,
-                            "responsibilities": [
-                                item.model_dump(mode="json", exclude_none=True)
-                                for item in responsibility_proposals
-                            ],
-                            "active_goal_snapshots": context.get(
-                                "active_goal_snapshots", []
-                            ),
-                            "interaction_context": context.get(
-                                "interaction_context", {}
-                            ),
-                        },
-                        operation=self.agent_client.resolve_fast_advance(
-                            session,
-                            request=work_request.model_copy(
-                                update={
-                                    "sid": turn_id,
-                                    "context": context,
-                                    "history": history,
-                                }
-                            ),
-                            timeout_ms=self.policy.fast_planner_timeout_ms,
-                        ),
+                        turn_id=turn_id,
+                        text=text,
+                        context=context,
+                        history=history,
+                        responsibility_proposals=responsibility_proposals,
+                        committed_fast_activity_ids=committed_fast_activity_ids,
+                        fast_started=fast_started,
+                        progress=fast_advance_progress,
                     )
-                    timings["fast_planner_activity_plan"] = (
-                        time.perf_counter() - fast_started
-                    ) * 1000.0
-                    if self.policy.mode == "apply":
-                        capability_activities = [
-                            item
-                            for item in advance.activities
-                            if isinstance(item, FastPlannerCapabilityActivity)
-                        ]
-                        if capability_activities:
-                            try:
-                                ready_fast_capability_execution = (
-                                    await self.adapter.interaction_runtime.start_fast_planner_capability_activities(
-                                        capability_activities,
-                                        session_id=sid,
-                                        turn_id=turn_id,
-                                    )
-                                )
-                                ready_fast_capability_status = (
-                                    "accepted_before_goal_association"
-                                    if ready_fast_capability_execution is not None
-                                    else "not_started"
-                                )
-                            except (
-                                AttributeError,
-                                TypeError,
-                                ValueError,
-                                ValidationError,
-                                RuntimeError,
-                            ) as exc:
-                                # Ineligible or invalid Work is not executed early.
-                                # The canonical validation path still evaluates the
-                                # Activity after GA; no semantic fallback is inferred.
-                                ready_fast_capability_status = (
-                                    "deferred_to_canonical_validation:"
-                                    + type(exc).__name__
-                                )
-                    communicative_acts = [
-                        item
-                        for item in advance.activities
-                        if item.role != "capability"
-                    ]
-                    if communicative_acts:
-                        fast_communicative_realization_status = "planner_owned"
-                    if (
-                        self.policy.mode == "apply"
-                    ):
-                        has_capability = any(
-                            item.role == "capability" for item in advance.activities
-                        )
-                        for activity in advance.activities:
-                            if activity.role in {"capability", "clarification"}:
-                                continue
-                            if activity.activity_id in committed_fast_activity_ids:
-                                continue
-                            # Progress and clarification can accompany concurrent
-                            # Goal work. A standalone complete answer may also start;
-                            # mixed answer+Capability wording stays with final Plan coordination
-                            # coordination to avoid duplicate delivery.
-                            if activity.role == "complete_response" and has_capability:
-                                continue
-                            self._queue_social_attention_for_activity(
-                                session,
-                                activity=self._fast_planner_communicative_social_activity(
-                                    activity,
-                                ),
-                                text=text,
-                                sid=sid,
-                                turn_id=turn_id,
-                                language=language,
-                                context=context,
-                                history=history,
-                            )
-                            if self.adapter.social_attention_mode != "off":
-                                social_attention_opportunity_count += 1
-                            ready_execution = (
-                                await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
-                                    activity,
-                                    session_id=sid,
-                                    turn_id=turn_id,
-                                    language=language,
-                                )
-                            )
-                            if activity.role == "complete_response":
-                                ready_fast_communicative_executions.append(ready_execution)
-                            fast_vocal_activity_ids.append(activity.activity_id)
-                    return advance
-
-                fast_advance_task = asyncio.create_task(resolve_fast_activity_plan())
+                )
                 # Establish the GI fan-out before entering GA's serialized commit
                 # section. A fail-fast GA result must not prevent Fast Planner from
                 # receiving the same authoritative GI result.
@@ -4717,7 +4782,26 @@ class GoalDrivenRuntimeCoordinator:
                         "retryable": False,
                     },
                 )
-            fast_advance = await fast_advance_task
+            fast_advance_stage = await fast_advance_task
+            fast_advance = fast_advance_stage.advance
+            timings["fast_planner_activity_plan"] = (
+                fast_advance_stage.activity_plan_elapsed_ms
+            )
+            ready_fast_capability_execution = (
+                fast_advance_stage.ready_capability_execution
+            )
+            ready_fast_capability_status = fast_advance_stage.ready_capability_status
+            if fast_advance_stage.communicative_realization_status != "not_started":
+                fast_communicative_realization_status = (
+                    fast_advance_stage.communicative_realization_status
+                )
+            social_attention_opportunity_count += (
+                fast_advance_stage.social_attention_opportunity_delta
+            )
+            ready_fast_communicative_executions.extend(
+                fast_advance_stage.ready_communicative_executions
+            )
+            fast_vocal_activity_ids.extend(fast_advance_stage.vocal_activity_ids)
             timings["fast_planner_advance"] = (
                 time.perf_counter() - fast_started
             ) * 1000.0

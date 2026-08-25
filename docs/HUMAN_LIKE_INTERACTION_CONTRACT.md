@@ -151,8 +151,8 @@ Use an architecture or policy fix when any of these are true:
   confirmed meaning.
 - A tool call can be started without validated semantic arguments.
 - A physical route can claim execution without a committed proposal.
-- Deepthinking can replace an exact catalog-backed action proposal with an
-  internal apology.
+- Any downstream cognition can discard an exact catalog-backed action decision
+  and replace it with unrelated wording rather than preserving Planner authority.
 - A review-model failure or schema error is reported as missing user capability.
 - Tests pass while the replayed voice interaction remains unnatural.
 

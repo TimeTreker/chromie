@@ -5,6 +5,18 @@
       "role": "mission_architecture"
     },
     {
+      "path": "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md",
+      "role": "canonical_cognitive_architecture"
+    },
+    {
+      "path": "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md",
+      "role": "human_interaction_contract"
+    },
+    {
+      "path": "docs/ACCEPTANCE.md",
+      "role": "acceptance_contract"
+    },
+    {
       "path": "ROADMAP.md",
       "role": "delivery_order"
     },

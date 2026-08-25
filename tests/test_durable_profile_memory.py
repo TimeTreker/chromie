@@ -47,7 +47,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
             manager.record_interaction_response(
                 "sid-1",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "extracted_memory",
                             "key": "tea_preference",
@@ -62,7 +62,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "confidence": 0.96,
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             self.assertTrue(path.is_file())
@@ -97,7 +97,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 manager.record_interaction_response(
                     "sid",
                     {
-                        "memory_updates": [
+                        "metadata": {"memory_updates": [
                             {
                                 "type": "extracted_memory",
                                 "key": key,
@@ -111,13 +111,13 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                     "retention_days": 30,
                                 },
                             }
-                        ]
+                        ]}
                     },
                 )
             manager.record_interaction_response(
                 "sid",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "durable_memory_forget",
                             "key": "one",
@@ -131,7 +131,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "consent_basis": "explicit_current_turn",
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             self.assertEqual(
@@ -141,7 +141,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
             manager.record_interaction_response(
                 "sid",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "durable_memory_clear",
                             "value": {
@@ -153,7 +153,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "consent_basis": "explicit_current_turn",
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             self.assertEqual(
@@ -171,7 +171,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
             manager.record_interaction_response(
                 "sid",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "extracted_memory",
                             "value": {
@@ -184,13 +184,13 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "retention_days": 30,
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             manager.record_interaction_response(
                 "sid",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "durable_memory_forget",
                             "key": "keep",
@@ -203,7 +203,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "persistence_policy": "durable_with_explicit_consent",
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             self.assertEqual(
@@ -224,7 +224,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
             manager.record_interaction_response(
                 "sid",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "extracted_memory",
                             "value": {
@@ -236,7 +236,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "retention_days": 30,
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             self.assertFalse(path.exists())
@@ -255,7 +255,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
             manager.record_interaction_response(
                 "sid",
                 {
-                    "memory_updates": [
+                    "metadata": {"memory_updates": [
                         {
                             "type": "extracted_memory",
                             "value": {
@@ -267,7 +267,7 @@ class DurableProfileMemoryTests(unittest.TestCase):
                                 "retention_days": 30,
                             },
                         }
-                    ]
+                    ]}
                 },
             )
             self.assertFalse(path.exists())

@@ -177,9 +177,15 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    original expectation beside actual Evidence so the same Planner can revise on mismatch. The
    expectation is never Evidence or Goal-completion truth, and no prediction/perception agent is
    introduced.
-7. **Mechanically simplify the coordinators and stale surfaces.** Split oversized pure
-   orchestration stages without introducing authority, then remove proven-stale docs and
-   compatibility only after live consumers are absent.
+7. **Mechanically simplify the coordinators and stale surfaces.** **Implemented for the
+   audited closure slice:** the Fast-advance subphase is a typed helper on the existing
+   `CognitiveRuntime` owner, reducing the monolithic `_resolve()` transaction without a new
+   service or semantic state owner. Current docs now name Fast/Deep Planner and the native
+   Memory owner instead of retired deepthinking/memory-agent routes; current composition-root
+   metrics are factual; the docs gate rejects those stale positive claims; and the proven-dead
+   top-level `memory_updates` compatibility input is removed in favor of native
+   `InteractionResponse.metadata.memory_updates`. Further decomposition requires another
+   concrete reconstructability/ownership defect, not file size alone.
 8. **Re-run current-revision qualification on the resulting exact tree.** Target evidence
    remains separate from source/test closure and must not be inferred from these patches.
 

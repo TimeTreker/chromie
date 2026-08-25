@@ -105,8 +105,9 @@ whether this independent selection boundary is enabled plus its model and candid
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
-Goal Interpretation uses unlocked `common` entries for the fast compact Qwen prompt as
-`common_ability_catalog`; deepthinking may use the full catalog. Safety-locked
+Fast Planner uses unlocked `common` entries for its bounded low-latency catalog;
+Deep Planner may use the full qualified catalog. Goal Interpretation remains WHAT-only
+and does not gain Capability-selection authority from catalog projection. Safety-locked
 entries remain visible in the full catalog but are excluded from the fast
 common prompt even when an experience overlay requests `common`. The initial
 preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.

@@ -5840,13 +5840,15 @@ class ConversationStateManager:
                     },
                 )
 
-        # Legacy responses exposed memory_updates at the top level. Native
-        # InteractionResponse keeps them in metadata so the shared wire
-        # contract remains narrow. Support both representations.
-        memory_updates = data.get("memory_updates", []) or []
+        # Native InteractionResponse keeps Memory mutations in metadata so the
+        # shared wire contract remains narrow. Historical top-level
+        # ``memory_updates`` is intentionally not a compatibility input.
         metadata = data.get("metadata")
-        if not memory_updates and isinstance(metadata, dict):
-            memory_updates = metadata.get("memory_updates", []) or []
+        memory_updates = (
+            metadata.get("memory_updates", []) or []
+            if isinstance(metadata, dict)
+            else []
+        )
         for update in memory_updates:
             if not isinstance(update, dict):
                 continue

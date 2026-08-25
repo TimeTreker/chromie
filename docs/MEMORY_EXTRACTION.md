@@ -2,26 +2,16 @@
 
 ## Status
 
-First deterministic slice implemented. The host Orchestrator has process-local
-`MemoryEntry`, `MemoryStore`, `MemoryExtractor`, and `MemoryPromptBuilder`
-support. `ConversationStateManager` exposes `memory_summary` and
-`extracted_memory` through `session_memory`, records compact task/context
-memory from structured metadata, and records Trusted Capability Runtime outcomes as
-task outcome memory. Fast Goal Interpreter prompts sanitize raw history/conversation
-fields and use compact session memory instead. Deepthinking prompts consume the
-extracted memory block. Ordinary conversation prompts now use extracted memory
-plus a tiny recent-turn fallback for immediate reference resolution; capability
-planning/review prompts use extracted memory and omit raw history.
-Explicit `memory` routes now carry a typed model-authored
-`MemoryUpdateProposal`. `memory_agent` only validates and applies that proposal,
-emitting refined `extracted_memory` plus a bounded compatibility
-`user_statement` derived from the same content. It never reclassifies raw user
-text with keyword or regex rules; missing proposals clarify and fail closed.
-
-Durable personal memory and experience-fed memory selection remain future work.
-
-This document defines the intended next architecture so code changes can be
-made against a stable contract.
+Implemented. The host Orchestrator has bounded `MemoryEntry`, `MemoryStore`,
+`MemoryExtractor`, and `MemoryPromptBuilder` support. `ConversationStateManager`
+exposes `memory_summary` and `extracted_memory`, records typed task/context and
+trusted Runtime outcome memory, and keeps explicitly consent-bound profile Memory
+in protected owner-local storage. Prompt selection is current-context-conditioned:
+the latest user turn, open Goal/task context, and discourse focus can activate an
+older relevant entry ahead of unrelated recent entries; recency remains fallback.
+No `memory` route, separate memory agent, vector database, or retrieval LLM owns Memory
+semantics. Raw transcript remains bounded interaction evidence rather than the
+default retained-meaning projection.
 
 ## Principle
 
@@ -43,7 +33,7 @@ raw turns and runtime events
 
 The raw transcript may still be kept in bounded host state, logs, episode
 records, and evidence bundles. It should not be injected as the normal prompt
-payload for routing, planning, or deepthinking.
+payload for Goal interpretation, planning, or Reflection.
 
 ## Ownership
 
@@ -148,7 +138,7 @@ Memory Summary:
 - Open concern: avoid raw transcript injection.
 ```
 
-For deepthinking, include richer task memory:
+For Deep Planner, include richer task memory:
 
 ```text
 Extracted Conversation Context:
@@ -212,7 +202,7 @@ Memory is interpretive context, not authority.
    path is covered, with strict JSON output and low temperature.
 5. Implemented first slice: `MemoryPromptBuilder` feeds `session_memory`,
    sanitized Goal Interpreter prompts, direct fallback context, conversation prompts,
-   capability planning/review prompts, and deepthinking prompts.
+   Planner prompts and Reflection context.
 6. Implemented first slice: direct fallback and ordinary conversation prompts
    keep only a tiny recent-turn fallback for immediate reference resolution;
    capability planning and review prompts rely on extracted memory/task context
@@ -220,7 +210,7 @@ Memory is interpretive context, not authority.
 7. Implemented first slice: focused tests cover extracted-memory storage,
    reset and hard-idle expiry, keyed correction updates, explicit typed memory
    updates, trusted outcome memory, Goal Interpreter prompt sanitization,
-   conversation/capability prompt migration, and deepthinking memory visibility.
+   conversation/Planner prompt migration, and Deep Planner Memory visibility.
 8. Implemented: terminal Goal history may feed evidence-grounded local
    `experience`/`calibration` proposals without reopening or rewriting the old Goal.
    Responsibility-control actions remain open-Goal only. The Host materializes those
@@ -239,7 +229,7 @@ Memory is interpretive context, not authority.
 The first implemented slice should prove:
 
 - the next turn receives compact extracted memory for a multi-turn task;
-- raw transcript turns are not injected into deepthinking as the normal path;
+- raw transcript turns are not injected into Deep Planner as the normal path;
 - fast Goal Interpreter receives a small memory summary, not the full chat;
 - a user correction revises the memory summary used by the next turn;
 - runtime-confirmed outcomes can update task memory;

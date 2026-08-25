@@ -526,13 +526,34 @@ class ConversationStateTests(unittest.TestCase):
             "weather lookup",
         )
 
-    def test_agent_result_extracted_memory_update_reaches_session_memory(self) -> None:
+    def test_legacy_top_level_memory_updates_are_not_a_wire_contract(self) -> None:
         manager = ConversationStateManager()
 
         manager.record_interaction_response(
             "s1",
             {
                 "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "note",
+                            "text": "This legacy top-level update must be ignored.",
+                        },
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(manager.session_memory()["memory_summary"], "None")
+
+    def test_agent_result_extracted_memory_update_reaches_session_memory(self) -> None:
+        manager = ConversationStateManager()
+
+        manager.record_interaction_response(
+            "s1",
+            {
+                "metadata": {"memory_updates": [
                     {
                         "type": "extracted_memory",
                         "key": "preference",
@@ -544,7 +565,7 @@ class ConversationStateTests(unittest.TestCase):
                         },
                         "confidence": 0.9,
                     }
-                ]
+                ]}
             },
         )
 
@@ -559,7 +580,7 @@ class ConversationStateTests(unittest.TestCase):
         manager.record_interaction_response(
             "s1",
             {
-                "memory_updates": [
+                "metadata": {"memory_updates": [
                     {
                         "type": "extracted_memory",
                         "value": {
@@ -569,13 +590,13 @@ class ConversationStateTests(unittest.TestCase):
                             "text": "User prefers jasmine tea without sugar.",
                         },
                     }
-                ]
+                ]}
             },
         )
         manager.record_interaction_response(
             "s2",
             {
-                "memory_updates": [
+                "metadata": {"memory_updates": [
                     {
                         "type": "extracted_memory",
                         "value": {
@@ -585,7 +606,7 @@ class ConversationStateTests(unittest.TestCase):
                             "text": "User corrected tea preference to green tea without sugar.",
                         },
                     }
-                ]
+                ]}
             },
         )
 
@@ -604,7 +625,7 @@ class ConversationStateTests(unittest.TestCase):
         manager.record_interaction_response(
             "s1",
             {
-                "memory_updates": [
+                "metadata": {"memory_updates": [
                     {
                         "type": "extracted_memory",
                         "value": {
@@ -613,7 +634,7 @@ class ConversationStateTests(unittest.TestCase):
                             "text": "User wants this only in the current conversation.",
                         },
                     }
-                ]
+                ]}
             },
         )
         manager.last_activity_ms -= 6_000

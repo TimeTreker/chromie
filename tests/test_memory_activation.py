@@ -39,7 +39,7 @@ def test_session_memory_uses_current_user_context_instead_of_recency_alone() -> 
     manager.record_interaction_response(
         "sid-old",
         {
-            "memory_updates": [
+            "metadata": {"memory_updates": [
                 {
                     "type": "extracted_memory",
                     "value": {
@@ -49,14 +49,14 @@ def test_session_memory_uses_current_user_context_instead_of_recency_alone() -> 
                         "text": "The blue cup belongs to the user.",
                     },
                 }
-            ]
+            ]}
         },
     )
     for index in range(12):
         manager.record_interaction_response(
             f"sid-noise-{index}",
             {
-                "memory_updates": [
+                "metadata": {"memory_updates": [
                     {
                         "type": "extracted_memory",
                         "value": {
@@ -66,7 +66,7 @@ def test_session_memory_uses_current_user_context_instead_of_recency_alone() -> 
                             "text": f"Recent unrelated music note {index}.",
                         },
                     }
-                ]
+                ]}
             },
         )
 
