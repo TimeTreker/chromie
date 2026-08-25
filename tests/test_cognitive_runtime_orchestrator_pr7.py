@@ -511,9 +511,16 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             self.assertTrue(handled)
 
         asyncio.run(run())
-        self.assertEqual(len(assistant._launch_interaction_calls), 1)
-        self.assertFalse(
-            assistant._launch_interaction_calls[0][1]["reset_playback"]
+        self.assertEqual(len(assistant._launch_interaction_calls), 0)
+        self.assertEqual(len(assistant.conversation_state.agent_results), 1)
+        recorded_response = assistant.conversation_state.agent_results[0][0][1]
+        self.assertEqual(recorded_response.speech, [])
+        self.assertTrue(
+            recorded_response.metadata["user_visible_fallback_suppressed"]
+        )
+        self.assertEqual(
+            recorded_response.metadata["fallback_suppression_reason"],
+            "planner_communication_already_committed",
         )
 
 

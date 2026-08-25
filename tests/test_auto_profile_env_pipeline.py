@@ -334,6 +334,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "8000")
+        self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "8000")
+        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "2500")
+        self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "9000")
+        self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "9000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "15000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "2500")
@@ -347,6 +352,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
             "AGENT_FAST_PLANNER_TIMEOUT_MS",
+            "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS",
             "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
             "ORCH_FAST_PLANNER_TIMEOUT_MS",
@@ -404,6 +410,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "150000")

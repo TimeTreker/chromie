@@ -2420,18 +2420,44 @@ class VoiceAssistant:
                 ),
                 failure_error=str(resolution.fallback_reason or ""),
             )
+            # A committed Planner-authored communication is already the user's
+            # visible progress for this turn. A later GA/Planner/runtime failure
+            # must remain observable in metadata/evidence, but it must not speak a
+            # second generic "that didn't go through" line over wording that was
+            # already scheduled or played. The failure remains fail-closed for
+            # effects; this suppresses only duplicate/conflicting Host speech.
+            fallback_speech_suppressed = bool(fast_first_scheduled)
+            if fallback_speech_suppressed:
+                safe_response = safe_response.model_copy(
+                    deep=True,
+                    update={
+                        "speech": [],
+                        "metadata": {
+                            **safe_response.metadata,
+                            "user_visible_fallback_suppressed": True,
+                            "fallback_suppression_reason": (
+                                "planner_communication_already_committed"
+                            ),
+                        },
+                    },
+                )
             record_session_workflow_stage(
                 self,
                 session_id,
                 stage="fallback_speech",
                 started_monotonic_ms=fallback_started_ms,
                 finished_monotonic_ms=now_ms(),
-                status="selected",
+                status=(
+                    "suppressed" if fallback_speech_suppressed else "selected"
+                ),
                 input_payload={
                     "cognitive_runtime_status": resolution.status,
                     "failure_stage": resolution.metadata.get("failure_stage"),
                     "fallback_reason": resolution.fallback_reason,
                     "user_text": user_text,
+                    "planner_communication_already_committed": (
+                        fallback_speech_suppressed
+                    ),
                 },
                 output_payload=safe_response,
                 errors=list(resolution.metadata.get("stage_diagnostics") or []),
@@ -2463,20 +2489,22 @@ class VoiceAssistant:
                 ),
             )
             self.conversation_state.record_interaction_response(session_id, safe_response)
-            await self._queue_response_social_attention(
-                safe_response,
-                session_id=session_id,
-            )
+            if not fallback_speech_suppressed:
+                await self._queue_response_social_attention(
+                    safe_response,
+                    session_id=session_id,
+                )
             record_cognitive_runtime_evidence(
                 getattr(self, "cognitive_evidence", None),
                 resolution, session_id=session_id, user_text=user_text,
                 session_log=self.session_log,
             )
-            self._launch_interaction(
-                safe_response,
-                session_id,
-                reset_playback=not fast_first_scheduled,
-            )
+            if not fallback_speech_suppressed:
+                self._launch_interaction(
+                    safe_response,
+                    session_id,
+                    reset_playback=True,
+                )
             return True
 
         response = resolution.interaction_response.model_copy(deep=True)

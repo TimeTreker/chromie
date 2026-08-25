@@ -182,7 +182,9 @@ foreground interruption; that decision and the affected work remain auditable.
 
 For one simple Communicative Act, one natural response is usually enough. If
 fast-first already answered a simple greeting or clarification, the final agent
-must not answer the same act again.
+must not answer the same act again. A later Goal-Association, planning, or runtime
+failure remains visible as failure Evidence/telemetry but must not append a generic
+Host apology over an already committed or delivered Planner Communicative Activity.
 
 Goal Interpretation reads bounded Session Context: recent admitted dialogue,
 active/recent Goals and versions, current Activity/task state, pending
@@ -378,7 +380,10 @@ runtime immediately. A simple greeting may be delivered before Goal Association
 finishes, but GA still commits its canonical conversational Goal and later binds the
 delivered Activity to that Goal. This binding is continuity and completion Evidence;
 it never authorizes a second response. If persistent work also exists, Fast Planner may
-author only prospective progress while requesting Goal Association. These are
+author only prospective progress while requesting Goal Association. The compact
+first-response decoder therefore exposes `complete_response` only when every supplied
+Responsibility is conversational speech WHAT; information and observable/stateful WHAT
+can choose only prospective progress or silence until fresh Evidence/work exists. These are
 model-authored planning decisions, never a Host greeting phrase table, and Goal
 Interpretation does not write the reply. Planner owns
 the Communicative Act and its exact wording; the Host validates and delivers without

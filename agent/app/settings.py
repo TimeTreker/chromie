@@ -338,6 +338,16 @@ class Settings(BaseModel):
     fast_planner_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500")), ge=100, le=120000
     )
+    fast_first_response_timeout_ms: int = Field(
+        default_factory=lambda: int(
+            os.getenv(
+                "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS",
+                os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500"),
+            )
+        ),
+        ge=100,
+        le=120000,
+    )
     fast_planner_num_ctx: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "8192")), ge=2048, le=131072
     )

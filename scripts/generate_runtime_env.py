@@ -71,6 +71,7 @@ COGNITIVE_BUDGET_KEYS = (
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS",
     "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
     "AGENT_FAST_PLANNER_TIMEOUT_MS",
+    "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS",
     "AGENT_DEEP_PLANNER_TIMEOUT_MS",
     "AGENT_SOCIAL_ATTENTION_TIMEOUT_MS",
     "ORCH_AGENT_TIMEOUT_MS",
@@ -619,6 +620,7 @@ def main(argv: list[str] | None = None) -> int:
         f"fast_output={budgets.get('AGENT_FAST_PLANNER_NUM_PREDICT')} "
         f"deep_output={budgets.get('AGENT_DEEP_PLANNER_NUM_PREDICT')} "
         f"margin={budgets.get('AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS')} "
+        f"fast_first={budgets.get('AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS')}ms "
         f"fast={budgets.get('AGENT_FAST_PLANNER_TIMEOUT_MS')}ms "
         f"deep={budgets.get('AGENT_DEEP_PLANNER_TIMEOUT_MS')}ms "
         f"host_deep={budgets.get('ORCH_DEEP_PLANNER_TIMEOUT_MS')}ms "

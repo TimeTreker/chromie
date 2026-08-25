@@ -1875,10 +1875,13 @@ def fast_first_response_response_schema(
 ) -> dict[str, Any]:
     """Expose Fast Planner's 0..1 first-communication decision to decoding.
 
-    The decoder may choose a complete response, a prospective progress act, or
-    silence. Runtime does not pre-classify the Responsibility as "needs work";
-    truth/evidence qualification and the later full Planner phase keep completion
-    claims grounded.
+    The decoder may choose a complete response only when every supplied
+    Responsibility is already conversational speech WHAT. Information,
+    body/media/vocal, and other observable/stateful Responsibilities still need
+    Planner work before they can be completed, so their pre-Evidence first-response
+    schema exposes only prospective progress or silence. This keeps the decoder
+    from treating a text-only progress acknowledgement as a complete response just
+    because the compact DTO intentionally omits the mechanical ``role`` tag.
     """
 
     schema = copy.deepcopy(FastPlannerFirstResponseModelOutput.model_json_schema())
@@ -1889,13 +1892,20 @@ def fast_first_response_response_schema(
         # discriminating role after decoding from the presence/absence of
         # progress_kind, so the LLM does not spend tokens on a mechanical tag.
         activity_schema.clear()
+        activity_choices: list[dict[str, Any]] = [
+            {"$ref": "#/$defs/FastPlannerProgressAct"},
+        ]
+        supplied_responsibilities = list(responsibilities or [])
+        if supplied_responsibilities and all(
+            item.output_mode == "speech" for item in supplied_responsibilities
+        ):
+            activity_choices.append(
+                {"$ref": "#/$defs/FastPlannerCompleteResponseAct"}
+            )
+        activity_choices.append({"type": "null"})
         activity_schema.update(
             {
-                "anyOf": [
-                    {"$ref": "#/$defs/FastPlannerProgressAct"},
-                    {"$ref": "#/$defs/FastPlannerCompleteResponseAct"},
-                    {"type": "null"},
-                ],
+                "anyOf": activity_choices,
                 "default": None,
             }
         )

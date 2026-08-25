@@ -69,6 +69,19 @@ class AgentSettingsTests(unittest.TestCase):
             settings = Settings()
         self.assertEqual(settings.fast_truth_model, "response-model")
 
+    def test_fast_first_response_timeout_is_independent_from_full_fast_planning(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_FAST_PLANNER_TIMEOUT_MS": "8000",
+                "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS": "2500",
+            },
+            clear=False,
+        ):
+            settings = Settings()
+        self.assertEqual(settings.fast_planner_timeout_ms, 8000)
+        self.assertEqual(settings.fast_first_response_timeout_ms, 2500)
+
     def test_goal_interpreter_deep_pass_retains_its_own_model_authority(self) -> None:
         with patch.dict(
             os.environ,

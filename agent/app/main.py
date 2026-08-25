@@ -402,10 +402,11 @@ fast_first_response_client = (
     if settings.use_llm
     and settings.fast_planner_enabled
     and settings.fast_first_response_model == settings.fast_planner_model
+    and settings.fast_first_response_timeout_ms == settings.fast_planner_timeout_ms
     else OllamaClient(
         settings.ollama_url,
         settings.fast_first_response_model,
-        timeout_ms=settings.fast_planner_timeout_ms,
+        timeout_ms=settings.fast_first_response_timeout_ms,
         purpose="fast_planner_first_response",
         service_settings=settings,
     )

@@ -2750,6 +2750,63 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertNotIn("think", str(schema))
 
+    def test_first_response_schema_cannot_complete_information_before_evidence(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "weather",
+                "outcome": "determine whether it will rain in Chongqing this afternoon",
+                "bindings": {"location": "重庆", "time": "下午"},
+                "output_mode": "information",
+                "confidence": 0.99,
+            }
+        )
+
+        schema = planner_schema.fast_first_response_response_schema(
+            ["weather"],
+            responsibilities=[responsibility],
+            language="zh-CN",
+        )
+
+        activity_refs = {
+            item["$ref"]
+            for item in schema["properties"]["activity"]["anyOf"]
+            if "$ref" in item
+        }
+        self.assertEqual(
+            activity_refs,
+            {"#/$defs/FastPlannerProgressAct"},
+        )
+
+    def test_first_response_schema_keeps_completion_for_conversational_speech(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "greeting",
+                "outcome": "reciprocate the user's greeting",
+                "bindings": {},
+                "output_mode": "speech",
+                "confidence": 0.99,
+            }
+        )
+
+        schema = planner_schema.fast_first_response_response_schema(
+            ["greeting"],
+            responsibilities=[responsibility],
+            language="zh-CN",
+        )
+
+        activity_refs = {
+            item["$ref"]
+            for item in schema["properties"]["activity"]["anyOf"]
+            if "$ref" in item
+        }
+        self.assertEqual(
+            activity_refs,
+            {
+                "#/$defs/FastPlannerProgressAct",
+                "#/$defs/FastPlannerCompleteResponseAct",
+            },
+        )
+
     def test_first_response_rejects_reversing_the_humans_feeling(self):
         ollama = ScriptedOllama(
             [

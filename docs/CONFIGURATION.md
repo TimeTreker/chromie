@@ -851,7 +851,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b` for higher-quality continuity-before-creation and independent-goal segmentation. |
-| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `3000`; endpoint model-call timeout. Failure returns a formal `fail_closed` resolution with no Goal or clarification authority. |
+| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `8000` in maintained interactive modes; endpoint model-call timeout. Goal Association runs behind the latency-critical first response and may emit a materially larger structured DTO, so the acknowledgement target is not reused as a cognition kill switch. Failure still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
@@ -879,18 +879,19 @@ semantic DAG is capped at five calls. There is no local relationship synonym,
 phrase mapping, word-form normalization, resource-alignment workflow, or
 certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
-| `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `3500`; host timeout for the advisory endpoint. |
+| `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around the Agent Goal Association watchdog. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
 | `AGENT_FAST_FIRST_RESPONSE_MODEL` | Defaults to the active Agent model; owns the latency-critical first natural Communicative Activity. |
 | `AGENT_FAST_TRUTH_MODEL` | Defaults to `AGENT_FAST_FIRST_RESPONSE_MODEL`; qualifies that model's immutable wording for truth and semantic consistency without authoring a replacement. |
-| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `2500`; Fast Planner model timeout. |
+| `AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS` | `2500` in maintained interactive modes; watchdog for the small latency-critical first-response/truth client. It is deliberately shorter than full Fast planning so the user-facing phase can fail silent without killing larger background cognition. Qualification mode raises it with the other model watchdogs. |
+| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `8000` in maintained interactive modes; full Fast Planner model timeout. The small first-response phase is expected to return much earlier in healthy operation, while complete structured planning is allowed to finish behind that user-visible progress. |
 Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. |
 | `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
-| `ORCH_FAST_PLANNER_TIMEOUT_MS` | `3000`; host timeout for report-only planning. |
+| `ORCH_FAST_PLANNER_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around full Fast planning. |
 | `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
 | `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
