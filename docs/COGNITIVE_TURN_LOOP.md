@@ -17,11 +17,15 @@ evidence remains open and is owned by [STATUS.md](STATUS.md).
 ## Bounded addressedness before Core semantics
 
 The Gateway's focused Attention Review consumes the latest transcript, Host engagement
-evidence, and a bounded recent-dialogue projection. Recent exchange is context, not an
-automatic addressedness grant: a temporary user-authored rule such as "wait until I say
-Chromie" can suppress ambient nearby speech while allowing a later explicitly addressed
-turn. The Attention model makes one judgment only. Invalid/unavailable output fails open
-to ordinary Core cognition; there is no Attention repair or suppression-review chain.
+evidence, and a bounded recent-dialogue projection. That projection contains admitted
+user dialogue plus assistant dialogue; Gateway-suppressed room speech may remain bounded
+input evidence but is not fed back as if Chromie had accepted it into the conversation.
+Recent exchange is context, not an automatic addressedness grant: a temporary
+user-authored rule such as "wait until I say Chromie" can suppress ambient nearby speech
+while allowing a later explicitly addressed turn. The Attention model makes one primary
+judgment. An internally contradictory output receives at most one schema-constrained
+repair; malformed, unavailable, or still-contradictory review fails open to ordinary Core
+cognition. There is no open-ended Attention critic or suppression-review chain.
 
 The executable loop applies `GREETING-GOAL-001`, `PLANNER-AUTHORITY-001`, and `ASYNC-COGNITION-001`; these names refer to Charter invariants, not additional stages.
 

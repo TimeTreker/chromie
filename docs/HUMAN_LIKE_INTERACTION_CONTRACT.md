@@ -1054,6 +1054,7 @@ capability recovery:
 
 | Case | Expected behavior |
 |---|---|
+| `你好。` | Admit as a directed greeting even with inactive engagement; one natural reply. A prior Gateway-suppressed room utterance must not poison the next turn's recent-dialogue addressedness context. |
 | `Hello, how are you.` | One natural greeting answer; no duplicate fast-first plus final greeting loop. |
 | `你能查天信吗？` | Clarify what the user means; do not treat `天信` as `天气`; no weather lookup; no `checking_only` TTS. |
 | `重庆今天天气情况怎么样？` | Typed information Goal; Planner may select `chromie.weather.lookup` when its declared contract matches; short Chinese acknowledgement; grounded weather result later. |

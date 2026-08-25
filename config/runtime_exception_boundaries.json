@@ -168,6 +168,20 @@
       ]
     },
     {
+      "path": "agent/app/cognitive_gateway/attention_review.py",
+      "symbol": "AttentionReviewer.review",
+      "ordinal": 2,
+      "classification": "typed_failure_mapping",
+      "owner": "agent",
+      "contract": "Fail open to Core admission when the single bounded Attention contradiction-repair attempt fails or remains inconsistent; never authorize an effect or fabricate ambient meaning.",
+      "review_status": "reviewed",
+      "body_sha256": "d2b73276490e1c6982ba1076ac92ca12d206a32e1d20ef10c3a43d6cc224450c",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
       "path": "agent/app/deep_planner.py",
       "symbol": "DeepPlannerResolver._resolve",
       "ordinal": 1,

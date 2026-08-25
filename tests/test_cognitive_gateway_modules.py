@@ -237,7 +237,11 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
             {
                 "interaction_engagement": {"active": False, "gate_enabled": True},
                 "history": [
-                    {"role": "user", "text": "Wait until I say Chromie before responding."},
+                    {
+                        "role": "user",
+                        "text": "Wait until I say Chromie before responding.",
+                        "metadata": {"accepted_dialogue_evidence": True},
+                    },
                     {"role": "assistant", "text": "Okay."},
                 ],
             },
@@ -256,6 +260,50 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         self.assertNotIn("intent", payload)
         self.assertNotIn("capability", payload)
         self.assertNotIn("plan", payload)
+
+    def test_attention_recent_dialogue_excludes_gateway_suppressed_user_turns(self) -> None:
+        gateway = CognitiveGateway(clock=self.clock)
+        capture = gateway.capture(
+            "你好。",
+            session_id="turn-after-suppressed-room-speech",
+            conversation_id="conversation-attention",
+            channel="text",
+        )
+        snapshot = gateway.assemble_context(
+            capture,
+            {
+                "interaction_engagement": {"active": False, "gate_enabled": True},
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "你好。",
+                        "metadata": {
+                            "accepted_dialogue_evidence": False,
+                            "source": "cognitive_gateway.attention_review_model",
+                        },
+                    },
+                    {
+                        "role": "user",
+                        "text": "Wait until I say Chromie before responding.",
+                        "metadata": {"accepted_dialogue_evidence": True},
+                    },
+                    {"role": "assistant", "text": "Okay."},
+                ],
+            },
+        )
+
+        request = gateway.attention_request(capture, snapshot)
+
+        self.assertEqual(
+            request.recent_dialogue,
+            [
+                {
+                    "role": "user",
+                    "text": "Wait until I say Chromie before responding.",
+                },
+                {"role": "assistant", "text": "Okay."},
+            ],
+        )
 
     def test_attention_speech_act_is_preserved_in_admitted_envelope(self) -> None:
         gateway = CognitiveGateway(clock=self.clock)

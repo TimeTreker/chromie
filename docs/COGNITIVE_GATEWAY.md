@@ -137,11 +137,16 @@ policy permits suppression.
 
 A direct question, request, greeting, Chromie's name, active-goal continuation,
 unresolved unclear review, malformed model output, or contradiction between
-question form and an ambient label fails open to Core review. The classifier
-must use an explicit ambient speech act with `addressed=false`; a directed or
-unclear act paired with `addressed=false` receives one schema-constrained model
-repair and still fails open if that repair remains inconsistent. Attention
-Review cannot authorize an effect.
+direct-address surface evidence and an ambient label fails open to Core review.
+Bare greetings, terminal question form, and an exact wake-name call are bounded
+contradiction evidence only; they do not infer intent, Goal, Capability, or plan.
+The classifier must use an explicit ambient speech act with `addressed=false`; a
+directed or unclear act paired with `addressed=false`, or an output contradicted
+by that bounded surface evidence, receives one schema-constrained model repair
+and still fails open if the repair remains inconsistent. Gateway-suppressed room
+speech remains bounded input evidence but is excluded from the recent-dialogue
+projection because Chromie did not accept it as part of the conversation.
+Attention Review cannot authorize an effect.
 
 ### 4.4 Context Assembly / 上下文组装
 

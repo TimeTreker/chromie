@@ -35,6 +35,27 @@ SUPPRESSIBLE_INACTIVE_SPEECH_ACTS: set[str] = {
     "narration",
     "reply",
 }
+_BARE_GREETING_SURFACES = frozenset(
+    {
+        "hi",
+        "hello",
+        "hey",
+        "hey there",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "你好",
+        "您好",
+        "嗨",
+        "哈喽",
+        "哈囉",
+        "早上好",
+        "早安",
+        "下午好",
+        "晚上好",
+    }
+)
+_SURFACE_EDGE_PUNCTUATION = " \t\r\n.!?。！？…，,~～"
 
 
 class _AttentionModelOutput(BaseModel):
@@ -92,24 +113,21 @@ class AttentionReviewer:
             "num_ctx": self.num_ctx,
             "num_predict": self.num_predict,
         }
+        active_engagement = engagement.get("active") is True
+        surface_evidence = self._surface_direct_address(request.text)
         try:
             raw = await self.client.generate(
                 self._prompt(request),
                 system=self._system_prompt(),
                 options=options,
                 response_format=self._response_schema(
-                    active_engagement=engagement.get("active") is True
+                    active_engagement=active_engagement
                 ),
                 prompt_family="cognitive_gateway_attention_review.primary",
                 turn_id=request.turn_id,
                 attempt=1,
             )
-            if not isinstance(raw, dict):
-                raise ValueError("attention model did not return a JSON object")
-            result = self._validate_model_output(
-                raw,
-                active_engagement=engagement.get("active") is True,
-            )
+            result = self._parse_model_output(raw)
         except Exception as exc:
             logger.warning(
                 "attention_review_failed turn_id=%s error_type=%s error=%s",
@@ -124,6 +142,68 @@ class AttentionReviewer:
                 reason=f"attention review failed open: {type(exc).__name__}",
             )
 
+        contradiction = self._contradiction_reason(
+            result,
+            active_engagement=active_engagement,
+            surface_evidence=surface_evidence,
+        )
+        result_source = "cognitive_gateway.attention_review_model"
+        if contradiction:
+            try:
+                repaired_raw = await self.client.generate(
+                    self._repair_prompt(
+                        request,
+                        result=result,
+                        contradiction=contradiction,
+                        surface_evidence=surface_evidence,
+                    ),
+                    system=self._system_prompt(),
+                    options=options,
+                    response_format=self._response_schema(
+                        active_engagement=active_engagement
+                    ),
+                    prompt_family="cognitive_gateway_attention_review.repair",
+                    turn_id=request.turn_id,
+                    attempt=2,
+                )
+                repaired = self._parse_model_output(repaired_raw)
+                repaired_contradiction = self._contradiction_reason(
+                    repaired,
+                    active_engagement=active_engagement,
+                    surface_evidence=surface_evidence,
+                )
+                if repaired_contradiction:
+                    raise ValueError(
+                        "attention repair remained contradictory: "
+                        f"{repaired_contradiction}"
+                    )
+                result = repaired
+                result_source = "cognitive_gateway.attention_review_model_repair"
+            except Exception as exc:
+                logger.warning(
+                    "attention_review_repair_failed turn_id=%s contradiction=%s "
+                    "error_type=%s error=%s",
+                    request.turn_id,
+                    contradiction,
+                    type(exc).__name__,
+                    exc,
+                )
+                return self._admit(
+                    request=request,
+                    confidence=0.0,
+                    source="cognitive_gateway.attention_review_fail_open",
+                    reason=(
+                        "attention contradiction failed open after one repair: "
+                        f"{contradiction}"
+                    ),
+                    speech_act=(
+                        surface_evidence[0]
+                        if surface_evidence is not None
+                        and surface_evidence[0] is not None
+                        else "unclear"
+                    ),
+                )
+
         fail_open_reason = self._admission_reason(result)
         if fail_open_reason:
             return AttentionReviewResult(
@@ -133,7 +213,7 @@ class AttentionReviewer:
                 disposition="admit",
                 speech_act=result.speech_act,
                 confidence=result.confidence,
-                source="cognitive_gateway.attention_review_model",
+                source=result_source,
                 reason=f"attention review admitted: {fail_open_reason}",
             )
 
@@ -144,7 +224,7 @@ class AttentionReviewer:
             disposition="suppress",
             speech_act=result.speech_act,
             confidence=result.confidence,
-            source="cognitive_gateway.attention_review_model",
+            source=result_source,
             reason="inactive/restricted turn classified as unaddressed ambient speech",
         )
 
@@ -160,12 +240,35 @@ class AttentionReviewer:
         return ""
 
     @staticmethod
-    def _validate_model_output(
-        raw: dict[str, Any],
+    def _parse_model_output(raw: Any) -> _AttentionModelOutput:
+        if not isinstance(raw, dict):
+            raise ValueError("attention model did not return a JSON object")
+        return _AttentionModelOutput.model_validate(raw)
+
+    @staticmethod
+    def _surface_direct_address(
+        text: str,
+    ) -> tuple[AttentionSpeechAct | None, str] | None:
+        compact = " ".join(str(text or "").strip().split())
+        if not compact:
+            return None
+        casefolded = compact.casefold()
+        bare = casefolded.strip(_SURFACE_EDGE_PUNCTUATION)
+        if bare in _BARE_GREETING_SURFACES:
+            return ("greeting", "bare_greeting")
+        if compact.rstrip().endswith(("?", "？")):
+            return ("question", "question_form")
+        if bare in {"chromie", "@chromie"}:
+            return (None, "wake_name")
+        return None
+
+    @staticmethod
+    def _contradiction_reason(
+        result: _AttentionModelOutput,
         *,
-        active_engagement: bool = False,
-    ) -> _AttentionModelOutput:
-        result = _AttentionModelOutput.model_validate(raw)
+        active_engagement: bool,
+        surface_evidence: tuple[AttentionSpeechAct | None, str] | None,
+    ) -> str:
         directed_acts = set(DIRECTED_SPEECH_ACTS)
         if active_engagement:
             # Within a live exchange, an utterance the model itself classifies
@@ -174,11 +277,39 @@ class AttentionReviewer:
             # narration, dictation, or unclear function.
             directed_acts.add("reply")
         if not result.addressed and result.speech_act in directed_acts:
-            raise ValueError(
-                "addressed=false cannot carry an explicitly directed speech act; "
-                f"got speech_act={result.speech_act}"
-            )
-        return result
+            return f"unaddressed_direct_speech_act:{result.speech_act}"
+        if not result.addressed and result.speech_act == "unclear":
+            return "unaddressed_unclear"
+        if surface_evidence is not None:
+            expected_speech_act, cue = surface_evidence
+            if not result.addressed:
+                return f"surface_direct_address:{cue}"
+            if (
+                expected_speech_act is not None
+                and result.speech_act != expected_speech_act
+            ):
+                return (
+                    f"surface_speech_act:{cue}:expected={expected_speech_act}:"
+                    f"actual={result.speech_act}"
+                )
+        return ""
+
+    @staticmethod
+    def _repair_prompt(
+        request: AttentionReviewRequest,
+        *,
+        result: _AttentionModelOutput,
+        contradiction: str,
+        surface_evidence: tuple[AttentionSpeechAct | None, str] | None,
+    ) -> str:
+        return (
+            f"Primary classification: {result.model_dump(mode='json')}\n"
+            f"Detected contradiction: {contradiction}\n"
+            f"Bounded direct-address surface evidence: {surface_evidence}\n"
+            "Reclassify the same latest transcript once. Do not invent intent, "
+            "route, goal, capability, action, plan, or response.\n"
+            f"{AttentionReviewer._prompt(request)}"
+        )
 
     @staticmethod
     def _admit(
@@ -187,13 +318,14 @@ class AttentionReviewer:
         confidence: float,
         source: str,
         reason: str,
+        speech_act: AttentionSpeechAct = "unclear",
     ) -> AttentionReviewResult:
         return AttentionReviewResult(
             turn_id=request.turn_id,
             session_id=request.session_id,
             context_digest=request.context_digest,
             disposition="admit",
-            speech_act="unclear",
+            speech_act=speech_act,
             confidence=confidence,
             source=source,
             reason=reason,
@@ -253,7 +385,9 @@ class AttentionReviewer:
             "directed to Chromie. Do not infer route, intent, goal, capability, "
             "tool, action, plan, or response. First identify direct-address "
             "evidence: questions, requests, imperatives, greetings, Chromie's "
-            "name, and second-person language are addressed. Questions and "
+            "name, and second-person language are addressed. A bare salutation "
+            "such as '你好', '您好', 'hello', or 'hi' is a greeting and therefore "
+            "addressed. Questions and "
             "requests remain addressed when Chromie's name or the pronoun 'you' "
             "is omitted. In pro-drop languages, including Chinese, a command or "
             "request may omit its second-person subject and still address Chromie. "

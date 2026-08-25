@@ -26,6 +26,18 @@ class AttentionReview:
                     continue
                 role = str(item.get("role") or "").strip().casefold()
                 text = " ".join(str(item.get("text") or "").strip().split())
+                metadata = item.get("metadata")
+                metadata = metadata if isinstance(metadata, dict) else {}
+                # Suppressed room speech remains bounded transport evidence in
+                # Conversation State, but it is not part of the dialogue Chromie
+                # believes it was having with the person. Feeding it back here
+                # poisons addressedness on the next turn (for example, repeated
+                # greetings begin to look like self-directed narration).
+                if (
+                    role == "user"
+                    and metadata.get("accepted_dialogue_evidence") is not True
+                ):
+                    continue
                 if role in {"user", "assistant"} and text:
                     recent_dialogue.append({"role": role, "text": text[:1200]})
         return AttentionReviewRequest(
