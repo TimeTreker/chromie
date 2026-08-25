@@ -155,9 +155,10 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    source:** Situation v3 carries bounded source-grounded interpretations and meaningful
    provider Runtime-state transitions enter as `SituationRevisionObservation` without
    being mislabeled Evidence. Broader scene/body/environment ingress remains future work.
-3. **Close Planner-authored structured time-condition creation.** The consumer/wake path
-   exists; Planner still needs a bounded output contract that can author useful exact
-   Goal/current-Plan-bound conditions. Host must not parse deadline prose into timers.
+3. **Close Planner-authored structured time-condition creation.** **Implemented:** the
+   same Planner can author bounded `time_conditions` for executable Goals; Host materializes
+   stable condition identity and ConversationState binds current Plan plus original
+   Responsibility provenance. Host never parses deadline prose into timers.
 4. **Make readiness genuinely selective.** Derive no-op/local/fast/slow cognition from the
    relation between the change and open Responsibility, current Work, risk, authority, and
    evidence novelty. Do not create a numeric priority engine or competing semantic planner.

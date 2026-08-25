@@ -16,6 +16,7 @@ try:
         PlanCoverage,
         PlanDisposition,
         PlanParameterResolution,
+        PlannedGoalTimeCondition,
         PlanTiming,
     )
 except ImportError:  # pragma: no cover
@@ -28,6 +29,7 @@ except ImportError:  # pragma: no cover
         PlanCoverage,
         PlanDisposition,
         PlanParameterResolution,
+        PlannedGoalTimeCondition,
         PlanTiming,
     )
 
@@ -243,6 +245,23 @@ class PlannerModelGoalOutcome(BaseModel):
             )
         return self
 
+class PlannerModelTimeCondition(BaseModel):
+    """Model-facing time readiness authored by the same Planner that owns HOW."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal_id: str = Field(min_length=1, max_length=160)
+    due_at_ms: int = Field(ge=1)
+    reason_code: str = Field(
+        default="planner_time_condition", min_length=1, max_length=120
+    )
+
+    @field_validator("goal_id", "reason_code", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> str:
+        return normalize_whitespace(value)
+
+
 class PlannerModelOutput(BaseModel):
     """Flat model-facing planner DTO.
 
@@ -264,6 +283,9 @@ class PlannerModelOutput(BaseModel):
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
+    time_conditions: list[PlannerModelTimeCondition] = Field(
+        default_factory=list, max_length=16
+    )
     goal_outcomes: dict[str, PlannerModelGoalOutcome] = Field(default_factory=dict)
     goal_satisfaction: PlannerGoalSatisfaction | None = None
     plan_relation: PlannerPlanRelation = "exact"
@@ -375,7 +397,30 @@ class PlannerModelOutput(BaseModel):
             "mixed",
         }:
             raise ValueError("planner-requested confirmation is valid only for executable plans")
+        if self.time_conditions and self.disposition not in {"execute", "mixed"}:
+            raise ValueError(
+                "time conditions require executable Work that leaves a Goal live until future readiness"
+            )
         if self.goal_outcomes:
+            outcome_goal_ids = set(self.goal_outcomes)
+            foreign_time_goals = {
+                item.goal_id for item in self.time_conditions
+            } - outcome_goal_ids
+            if foreign_time_goals:
+                raise ValueError(
+                    "time conditions reference goals outside goal_outcomes: "
+                    + ",".join(sorted(foreign_time_goals))
+                )
+            nonexecuting_time_goals = {
+                item.goal_id
+                for item in self.time_conditions
+                if self.goal_outcomes[item.goal_id].disposition != "execute"
+            }
+            if nonexecuting_time_goals:
+                raise ValueError(
+                    "time conditions may only bind execute goal outcomes: "
+                    + ",".join(sorted(nonexecuting_time_goals))
+                )
             outcome_dispositions = {item.disposition for item in self.goal_outcomes.values()}
             expected_disposition = (
                 "mixed" if len(outcome_dispositions) > 1 else next(iter(outcome_dispositions))
@@ -474,6 +519,23 @@ def materialize_planner_output(
     out["plan_id"] = plan_id
     out["planner_tier"] = planner_tier
     out["goal_ids"] = list(expected_goal_ids_for_turn)
+    expected_goal_set = set(expected_goal_ids_for_turn)
+    planned_time_conditions: list[dict[str, Any]] = []
+    for index, condition in enumerate(model_output.time_conditions):
+        if condition.goal_id not in expected_goal_set:
+            raise PlannerDTOContractError(
+                "time condition references a non-authoritative Goal ID: "
+                + condition.goal_id
+            )
+        planned_time_conditions.append(
+            PlannedGoalTimeCondition(
+                condition_id=f"{plan_id}:time:{index}",
+                goal_id=condition.goal_id,
+                due_at_ms=condition.due_at_ms,
+                reason_code=condition.reason_code,
+            ).model_dump(mode="python")
+        )
+    out["time_conditions"] = planned_time_conditions
 
     if planner_tier == "fast" and fast_multi_goal_contract:
         metadata = materialize_planner_metadata(model_output)
@@ -520,6 +582,7 @@ def materialize_planner_output(
     out.setdefault("escalation_reason", "")
     out.setdefault("unresolved", [])
     out.setdefault("parameter_resolutions", [])
+    out.setdefault("time_conditions", [])
     out.setdefault("goal_outcomes", [])
     out.setdefault("goal_satisfaction", None)
     out["metadata"] = materialize_planner_metadata(model_output)

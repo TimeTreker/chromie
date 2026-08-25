@@ -41,7 +41,7 @@ try:
     from chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
     from chromie_contracts.reflex import CancellationDispatchReceipt
     from chromie_contracts.reflection import ReflectionResolution
-    from chromie_contracts.plan import PlannerInformationGap
+    from chromie_contracts.plan import CanonicalPlan, PlannerInformationGap
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -67,7 +67,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
     from shared.chromie_contracts.reflex import CancellationDispatchReceipt
     from shared.chromie_contracts.reflection import ReflectionResolution
-    from shared.chromie_contracts.plan import PlannerInformationGap
+    from shared.chromie_contracts.plan import CanonicalPlan, PlannerInformationGap
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
@@ -5174,6 +5174,84 @@ class ConversationStateManager:
             retained.append(self._json_safe(item))
         return retained
 
+    def _record_planner_time_conditions(
+        self,
+        result_metadata: dict[str, Any],
+    ) -> int:
+        """Bind Planner-authored time semantics to current Goal provenance.
+
+        The canonical Plan carries only Planner-owned Goal/time semantics.  This
+        owner adds current Plan identity and original GI Responsibility refs at
+        persistence time; it never derives time from Goal prose.
+        """
+
+        raw_plan = result_metadata.get("canonical_plan")
+        if not isinstance(raw_plan, dict):
+            return 0
+        try:
+            plan = CanonicalPlan.model_validate(raw_plan)
+        except ValidationError:
+            return 0
+        if not plan.time_conditions:
+            return 0
+
+        canonical_fingerprint = str(
+            result_metadata.get("canonical_plan_fingerprint") or ""
+        ).strip()
+        language = self._compact_text(
+            str(result_metadata.get("language") or "auto"), limit=64
+        )
+        for goal_id in plan.goal_ids:
+            context = self._task_context_by_goal_id(goal_id)
+            if context is None or self._goal_responsibility_status(context) != "open":
+                continue
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            responsibilities = self._planner_reentry_responsibilities(
+                result_metadata=result_metadata,
+                goal_id=goal_id,
+            )
+            context["metadata"] = {
+                **metadata,
+                "canonical_plan_id": plan.plan_id,
+                **(
+                    {"canonical_plan_fingerprint": canonical_fingerprint}
+                    if canonical_fingerprint
+                    else {}
+                ),
+                **(
+                    {
+                        "planner_reentry_responsibilities": responsibilities,
+                        "planner_reentry_language": language,
+                    }
+                    if responsibilities
+                    else {}
+                ),
+            }
+            context["updated_ms"] = _now_ms()
+
+        accepted = 0
+        for planned in plan.time_conditions:
+            context = self._task_context_by_goal_id(planned.goal_id)
+            if context is None or self._goal_responsibility_status(context) != "open":
+                continue
+            goal = self._semantic_goal_from_context(context)
+            condition = GoalTimeCondition(
+                condition_id=planned.condition_id,
+                goal_id=planned.goal_id,
+                due_at_ms=planned.due_at_ms,
+                source_plan_id=plan.plan_id,
+                source_responsibility_refs=list(goal.source_responsibility_refs),
+                reason_code=planned.reason_code,
+            )
+            if self.register_goal_time_condition(condition):
+                accepted += 1
+        if accepted:
+            self._persist_task_contexts_if_enabled()
+        return accepted
+
+
     def register_goal_time_condition(
         self,
         condition: GoalTimeCondition | dict[str, Any],
@@ -5469,6 +5547,7 @@ class ConversationStateManager:
                 result_metadata,
                 confirmation_authorized=bool(confirmed_request_ids),
             )
+            self._record_planner_time_conditions(result_metadata)
             goal_outcomes = self._canonical_goal_outcomes(result_metadata)
             self._record_nonexecuting_goal_outcomes(goal_outcomes)
 

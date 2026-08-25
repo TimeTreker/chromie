@@ -1606,7 +1606,11 @@ interpretation tuples and exact authority-owned source references, while source
 payloads remain outside Situation. Meaningful provider Runtime-state transitions
 are the first production trusted ingress and are explicitly not promoted to
 Evidence; broader scene/body/environment adapters remain source-specific future
-work. Remaining detail questions—exact Goal revision provenance, resumable
+work. Structured future readiness is likewise Planner-owned HOW: a canonical Plan may
+carry bounded Goal/time conditions for executable Work, while ConversationState adds
+only Plan identity and immutable Responsibility provenance before durable registration.
+Host may wake a due condition mechanically but may not infer a deadline from Goal prose.
+Remaining detail questions—exact Goal revision provenance, resumable
 cognitive artifacts, durable scoped consent/privacy, and multi-user identity—must
 be solved against these invariants without reopening the whole ontology or
 pre-creating one manager per concept.

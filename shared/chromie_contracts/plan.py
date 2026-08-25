@@ -702,6 +702,30 @@ class GoalSatisfactionAssessment(BaseModel):
         return self
 
 
+class PlannedGoalTimeCondition(BaseModel):
+    """Planner-authored semantic wake condition before Host provenance binding.
+
+    Planner owns *when* an existing Goal should become cognitively ready again.
+    Host adds the canonical Plan ID and original Responsibility provenance only
+    when persisting the condition; it never parses free-form Goal text into time
+    semantics.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    condition_id: str = Field(min_length=1, max_length=200)
+    goal_id: str = Field(min_length=1, max_length=160)
+    due_at_ms: int = Field(ge=1)
+    reason_code: str = Field(
+        default="planner_time_condition", min_length=1, max_length=120
+    )
+
+    @field_validator("condition_id", "goal_id", "reason_code", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> str:
+        return normalize_whitespace(value)
+
+
 class CanonicalPlanStep(CapabilityIdentityModel):
     """One canonical executable Capability step in a Plan."""
 
@@ -888,6 +912,9 @@ class CanonicalPlan(BaseModel):
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
+    time_conditions: list[PlannedGoalTimeCondition] = Field(
+        default_factory=list, max_length=16
+    )
     goal_outcomes: list[GoalPlanOutcome] = Field(default_factory=list)
     goal_satisfaction: GoalSatisfactionAssessment | None = None
     selected_agent_skills: list[PlanAgentSkillProvenance] = Field(default_factory=list)
@@ -1034,6 +1061,21 @@ class CanonicalPlan(BaseModel):
             raise ValueError("executable plans cannot retain blocking parameter resolutions")
 
         goal_id_set = set(self.goal_ids)
+        condition_ids = [item.condition_id for item in self.time_conditions]
+        if len(condition_ids) != len(set(condition_ids)):
+            raise ValueError("time condition IDs must be unique")
+        unknown_time_goals = {
+            item.goal_id for item in self.time_conditions
+        } - goal_id_set
+        if unknown_time_goals:
+            raise ValueError(
+                "time conditions reference unknown Goal IDs: "
+                + ",".join(sorted(unknown_time_goals))
+            )
+        if self.time_conditions and self.disposition not in {"execute", "mixed"}:
+            raise ValueError(
+                "time conditions require executable Work with future Goal readiness"
+            )
         communicative_act_ids = [
             item.activity_id for item in self.communicative_acts
         ]
@@ -1143,6 +1185,16 @@ class CanonicalPlan(BaseModel):
                 )
             if self.planner_tier == "deep" and "escalate" in outcome_dispositions:
                 raise ValueError("deep plans cannot contain escalate goal outcomes")
+            nonexecuting_time_goals = {
+                item.goal_id
+                for item in self.time_conditions
+                if outcome_by_goal[item.goal_id].disposition != "execute"
+            }
+            if nonexecuting_time_goals:
+                raise ValueError(
+                    "time conditions may only bind execute goal outcomes: "
+                    + ",".join(sorted(nonexecuting_time_goals))
+                )
 
             referenced_steps: set[str] = set()
             executable_owners_by_step: dict[str, set[str]] = {}
