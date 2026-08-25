@@ -217,6 +217,30 @@ def test_live_provider_state_enters_situation_without_becoming_evidence() -> Non
     assert opportunity.trigger == "situation_revision"
     assert opportunity.situation_digest == projection.digest
     assert opportunity.evidence_refs == []
+    assert opportunity.recommended_cognition == "slow"
+
+
+def test_waiting_provider_state_is_local_cognition_only() -> None:
+    from orchestrator.runtime.situation import (
+        build_provider_state_situation_observation,
+        derive_situation_revision_opportunity,
+    )
+
+    observation = build_provider_state_situation_observation(
+        context={"active_goal_snapshots": [{"goal_id": "goal-water"}]},
+        turn_id="turn-water",
+        goal_ids=["goal-water"],
+        dispatch_id="dispatch-water",
+        request_id="request-water",
+        capability_id="soridormi.wait",
+        provider_id="soridormi.mcp",
+        sequence=8,
+        provider_state={"status": "waiting", "waiting_for": "door_open"},
+    )
+
+    opportunity = derive_situation_revision_opportunity(observation)
+    assert opportunity is not None
+    assert opportunity.recommended_cognition == "local"
 
 
 def test_situation_digest_opportunity_cannot_reenter_with_different_projection() -> None:

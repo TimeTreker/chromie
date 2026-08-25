@@ -1461,7 +1461,13 @@ not currently justify independent persistent Mind state:
 A relevant state change may produce no cognition, a deterministic/local reaction,
 fast cognition, slow cognition, or overlapping fast progress plus slower
 reasoning. Fast and Slow cognition are different cognitive timescales/resources,
-not mandatory sequential stages.
+not mandatory sequential stages. The first production policy is deliberately small:
+no semantic Situation delta emits no opportunity; benign waiting/recovering/running
+or phase-only Runtime revisions are `local`; ordinary material revisions are `fast`;
+blocked/degraded/failed/unsafe revisions are `slow`. `local` preserves the changed
+Situation without a model call, while `slow` may enter Deep Planner directly instead
+of paying for a mandatory Fast pass. This is a bounded readiness judgment, not a new
+semantic authority or universal numeric priority score.
 
 Open responsibilities wait passively until reality makes new progress possible.
 Provider results, user clarification, timer events, scene/body changes, memory

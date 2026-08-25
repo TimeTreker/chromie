@@ -358,6 +358,38 @@ def build_provider_state_situation_observation(
     )
 
 
+def situation_revision_cognition_mode(
+    observation: SituationRevisionObservation,
+) -> str:
+    """Select cognition depth from the admitted Situation delta, not its trigger name.
+
+    This is a bounded mechanical readiness judgment.  It does not choose Work or
+    interpret user meaning.  No-op is represented by no CognitiveOpportunity;
+    ``local`` means the trusted owner state is worth retaining/logging but does
+    not justify an LLM pass.
+    """
+
+    values = {
+        _normalized(item.value).casefold()
+        for item in observation.projection.interpretations
+        if item.source_refs
+    }
+    relations = {
+        _normalized(item.relation).casefold()
+        for item in observation.projection.interpretations
+    }
+    severe = {"blocked", "degraded", "failed", "error", "unsafe"}
+    if values.intersection(severe):
+        return "slow"
+    if values.intersection({"paused", "needs_attention"}):
+        return "fast"
+    if values.intersection({"waiting", "recovering", "running"}):
+        return "local"
+    if relations and relations.issubset({"runtime.phase", "runtime.member_status"}):
+        return "local"
+    return "fast"
+
+
 def derive_situation_revision_opportunity(
     observation: SituationRevisionObservation,
     *,
@@ -386,7 +418,7 @@ def derive_situation_revision_opportunity(
         goal_ids=list(observation.goal_ids),
         evidence_refs=evidence_refs,
         reason_codes=["trusted_situation_revision"],
-        recommended_cognition="fast",
+        recommended_cognition=situation_revision_cognition_mode(observation),
         situation_digest=observation.projection.digest,
     )
 
@@ -561,4 +593,5 @@ __all__ = [
     "derive_situation_revision_opportunity",
     "drain_due_time_conditions_once",
     "run_time_condition_wake_loop",
+    "situation_revision_cognition_mode",
 ]

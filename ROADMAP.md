@@ -159,9 +159,12 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    same Planner can author bounded `time_conditions` for executable Goals; Host materializes
    stable condition identity and ConversationState binds current Plan plus original
    Responsibility provenance. Host never parses deadline prose into timers.
-4. **Make readiness genuinely selective.** Derive no-op/local/fast/slow cognition from the
-   relation between the change and open Responsibility, current Work, risk, authority, and
-   evidence novelty. Do not create a numeric priority engine or competing semantic planner.
+4. **Make readiness genuinely selective.** **Implemented for bounded Situation re-entry:**
+   unchanged state produces no opportunity; benign waiting/recovering/running or phase-only
+   changes remain local; ordinary material revisions use Fast Planner; blocked/degraded/failed/
+   unsafe state enters Deep Planner directly. This is a small derived readiness policy, not a
+   numeric priority engine or competing semantic planner. Broader risk/novelty/resource signals
+   should be added only when their authority is concrete.
 5. **Activate Memory by current context rather than recency alone.** Reuse existing Memory,
    Goal, Situation, entity/scope, and provenance owners before considering a new retrieval
    subsystem.

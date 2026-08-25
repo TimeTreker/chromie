@@ -346,6 +346,117 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             "time_condition",
         )
 
+    def test_slow_situation_opportunity_enters_deep_planner_without_fast_pass(self) -> None:
+        goal_id = "goal-recover"
+        satisfaction = GoalSatisfactionAssessment(
+            score=1.0,
+            status="exact",
+            satisfied_goal_ids=[goal_id],
+        )
+        replanned = CanonicalPlan(
+            plan_id="recover-deep-response",
+            planner_tier="deep",
+            disposition="respond",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=[goal_id],
+            response_text="I need to revise the approach.",
+            goal_outcomes=[
+                RespondGoalPlanOutcome(
+                    goal_id=goal_id,
+                    disposition="respond",
+                    coverage="complete",
+                    response_text="I need to revise the approach.",
+                    satisfaction=satisfaction,
+                )
+            ],
+            goal_satisfaction=satisfaction,
+        )
+
+        class Client:
+            fast_calls = 0
+            deep_calls = 0
+
+            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+                self.fast_calls += 1
+                raise AssertionError("slow readiness must not spend a Fast Planner pass")
+
+            async def resolve_deep_plan(self, _session, *, request, timeout_ms):
+                self.deep_calls += 1
+                self.request = request
+                return replanned
+
+        class Adapter:
+            async def build_planner_owned_response(self, **_kwargs):
+                return InteractionResponse(
+                    interaction_id="recover-deep",
+                    status="ok",
+                    speech=[InteractionSpeech(text="I need to revise the approach.")],
+                )
+
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.agent_client = Client()
+        assistant.cognitive_runtime_policy = SimpleNamespace(
+            fast_planner_timeout_ms=3000,
+            deep_planner_timeout_ms=6000,
+        )
+        assistant.cognitive_runtime = SimpleNamespace(
+            adapter=Adapter(), interaction_ledger=None
+        )
+        assistant.session_log = lambda *_args, **_kwargs: None
+        assistant.build_context = lambda _sid: {"history": []}
+        assistant._goal_driven_authority_context = (
+            lambda context, **_kwargs: context
+        )
+
+        async def get_session():
+            return object()
+
+        assistant.get_http_session = get_session
+        opportunity = CognitiveOpportunity.create(
+            trigger="situation_revision",
+            goal_ids=[goal_id],
+            reason_codes=["trusted_situation_revision"],
+            recommended_cognition="slow",
+        )
+        responsibility = CognitiveResponsibilityProposal(
+            local_ref="resp-recover",
+            outcome="Continue the responsibility safely after the blockage.",
+            output_mode="stateful_effect",
+            relationship="new",
+            confidence=1.0,
+        )
+
+        response = asyncio.run(
+            assistant._planner_state_reentry_response(
+                source_response=None,
+                canonical_plan=None,
+                user_request="Keep going when you can.",
+                language="en-US",
+                goal_ids=[goal_id],
+                evidence_goal_ids=[],
+                evidence_refs=[],
+                session_id=None,
+                phase="situation_revision_reentry",
+                context_updates={
+                    "cognitive_opportunity": opportunity.prompt_projection(),
+                },
+                fast_workflow_stage="fast_planner_situation_revision_reentry",
+                deep_workflow_stage="planner_deep_pass_situation_revision_reentry",
+                response_source="planner_situation_revision_reentry",
+                responsibilities_override=[responsibility],
+            )
+        )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(assistant.agent_client.fast_calls, 0)
+        self.assertEqual(assistant.agent_client.deep_calls, 1)
+        self.assertEqual(
+            assistant.agent_client.request.context["cognitive_opportunity"][
+                "recommended_cognition"
+            ],
+            "slow",
+        )
 
     def test_aggregate_reentry_exposes_failed_terminal_truth_without_host_wording(self) -> None:
         goal_id = "goal-motion"

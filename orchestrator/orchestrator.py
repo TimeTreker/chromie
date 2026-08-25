@@ -5003,6 +5003,14 @@ class VoiceAssistant:
         response.metadata.setdefault(
             "incremental_cognitive_opportunities", []
         ).append(opportunity.prompt_projection())
+        if opportunity.recommended_cognition == "local":
+            self.session_log(
+                session_id,
+                "provider_state_reentry_local: request_id=%s opportunity_id=%s",
+                event.request_id,
+                opportunity.opportunity_id,
+            )
+            return
         source_ref = situation_observation.source_refs[0]
         bounded_event = {
             "source_ref": source_ref,
@@ -5428,41 +5436,60 @@ class VoiceAssistant:
             "evidence_refs": normalized_evidence_refs,
             "phase": phase,
         }
-        try:
-            replanned = await self.agent_client.resolve_fast_plan(
-                session,
-                request=request,
-                timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+        preferred_mode = (
+            opportunity.recommended_cognition
+            if opportunity is not None
+            else "fast"
+        )
+        if preferred_mode == "local":
+            self.session_log(
+                session_id,
+                "planner_state_reentry_local_only: phase=%s opportunity_id=%s",
+                phase,
+                opportunity_ref,
             )
-        except Exception as exc:
+            return None
+
+        replanned: CanonicalPlan | None = None
+        if preferred_mode != "slow":
+            try:
+                replanned = await self.agent_client.resolve_fast_plan(
+                    session,
+                    request=request,
+                    timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+                )
+            except Exception as exc:
+                record_session_workflow_stage(
+                    self,
+                    session_id,
+                    stage=fast_workflow_stage,
+                    started_monotonic_ms=planner_started_ms,
+                    finished_monotonic_ms=now_ms(),
+                    status="failed",
+                    input_payload=workflow_input,
+                    output_payload=None,
+                    errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
+                    metadata={"wording_owner": "fast_planner"},
+                )
+                raise
             record_session_workflow_stage(
                 self,
                 session_id,
                 stage=fast_workflow_stage,
                 started_monotonic_ms=planner_started_ms,
                 finished_monotonic_ms=now_ms(),
-                status="failed",
+                status="resolved",
                 input_payload=workflow_input,
-                output_payload=None,
-                errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
+                output_payload=replanned,
+                errors=[],
                 metadata={"wording_owner": "fast_planner"},
             )
-            raise
-        record_session_workflow_stage(
-            self,
-            session_id,
-            stage=fast_workflow_stage,
-            started_monotonic_ms=planner_started_ms,
-            finished_monotonic_ms=now_ms(),
-            status="resolved",
-            input_payload=workflow_input,
-            output_payload=replanned,
-            errors=[],
-            metadata={"wording_owner": "fast_planner"},
-        )
-        if set(replanned.goal_ids) != set(normalized_goal_ids):
-            raise ValueError("Planner state re-entry changed the bound Goal set")
-        if replanned.disposition == "escalate":
+            if set(replanned.goal_ids) != set(normalized_goal_ids):
+                raise ValueError("Planner state re-entry changed the bound Goal set")
+
+        if preferred_mode == "slow" or (
+            replanned is not None and replanned.disposition == "escalate"
+        ):
             deep_call = getattr(self.agent_client, "resolve_deep_plan", None)
             if not callable(deep_call):
                 self.session_log(
@@ -5487,12 +5514,17 @@ class VoiceAssistant:
                 input_payload=workflow_input,
                 output_payload=replanned,
                 errors=[],
-                metadata={"planner_pass": "deep"},
+                metadata={
+                    "planner_pass": "deep",
+                    "readiness_mode": preferred_mode,
+                },
             )
             if set(replanned.goal_ids) != set(normalized_goal_ids):
                 raise ValueError(
                     "Deep Planner state re-entry changed the bound Goal set"
                 )
+        if replanned is None:
+            return None
         if (
             source_response is not None
             and repeat_check_evidence
