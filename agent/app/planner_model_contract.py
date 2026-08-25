@@ -17,6 +17,7 @@ try:
         PlanDisposition,
         PlanParameterResolution,
         PlannedGoalTimeCondition,
+        PlanStepPurpose,
         PlanTiming,
     )
 except ImportError:  # pragma: no cover
@@ -30,6 +31,7 @@ except ImportError:  # pragma: no cover
         PlanDisposition,
         PlanParameterResolution,
         PlannedGoalTimeCondition,
+        PlanStepPurpose,
         PlanTiming,
     )
 
@@ -127,7 +129,22 @@ class PlannerModelStep(CapabilityIdentityModel):
     timing: PlanTiming = "sequential"
     source_goal_ids: list[str] = Field(default_factory=list)
     reuse_activity_id: str = ""
+    step_purpose: PlanStepPurpose = "achieve_effect"
+    expected_outcome: str = Field(default="", max_length=600)
     reason_summary: str = ""
+
+    @field_validator("step_id", "reuse_activity_id", "expected_outcome", "reason_summary", mode="before")
+    @classmethod
+    def normalize_step_text(cls, value: Any) -> Any:
+        return normalize_whitespace(value)
+
+    @model_validator(mode="after")
+    def validate_information_acquisition_expectation(self) -> "PlannerModelStep":
+        if self.step_purpose == "acquire_information" and not self.expected_outcome:
+            raise ValueError(
+                "information-acquisition steps require expected_outcome"
+            )
+        return self
 
 class PlannerGoalSatisfaction(GoalSatisfactionAssessment):
     """Prospective adequacy of the proposed plan, not execution progress."""

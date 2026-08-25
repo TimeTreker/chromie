@@ -413,6 +413,7 @@ __all__ = [
     "PlanDisposition",
     "PlanParameterResolution",
     "PlannedGoalTimeCondition",
+    "PlanStepPurpose",
     "PlannerTier",
     "canonical_plan_fingerprint",
     "ToolResultEvidence",
@@ -428,6 +429,7 @@ from .plan import (
     PlanDisposition,
     PlanParameterResolution,
     PlannedGoalTimeCondition,
+    PlanStepPurpose,
     PlannerTier,
     canonical_plan_fingerprint,
 )

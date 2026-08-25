@@ -171,9 +171,12 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    entries; recency remains the fallback/fill policy. No vector database, retrieval LLM, or new
    Memory authority is introduced.
 6. **Add bounded semantic expectation mismatch and active perception through existing
-   owners.** Expected evidence/outcome may reactivate Situation/Planner/Reflection;
-   information-seeking gaze/tool/body Work remains ordinary Planner-authored Activity, not a
-   new agent or prediction engine.
+   owners.** **Implemented at the Planner/Work boundary:** an ordinary step may declare
+   `step_purpose=acquire_information` plus a non-empty prospective `expected_outcome`. Runtime
+   preserves normal Capability safety/provider authority; trusted result re-entry exposes the
+   original expectation beside actual Evidence so the same Planner can revise on mismatch. The
+   expectation is never Evidence or Goal-completion truth, and no prediction/perception agent is
+   introduced.
 7. **Mechanically simplify the coordinators and stale surfaces.** Split oversized pure
    orchestration stages without introducing authority, then remove proven-stale docs and
    compatibility only after live consumers are absent.

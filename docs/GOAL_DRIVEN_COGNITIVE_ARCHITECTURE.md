@@ -1434,8 +1434,14 @@ observation.
 
 When uncertainty can be resolved cheaply by reality, prefer acquiring evidence
 through perception, a provider/tool read, or clarification over spending longer
-LLM inference guessing. Deeper commitment requires stronger evidence,
-authorization, and provenance.
+LLM inference guessing. Planner may express that as ordinary Work with
+`step_purpose=acquire_information` and a bounded `expected_outcome` describing the
+observation that would enable progress. Gaze/body/perception remains an ordinary
+Capability choice and still obeys its normal safety/provider contract. The expected outcome
+is prospective and falsifiable, never Evidence: terminal re-entry presents the retained
+Planner expectation beside fresh trusted Evidence, and the same Planner owns any semantic
+revision when reality disagrees. No prediction engine or Active-Perception agent is needed.
+Deeper commitment requires stronger evidence, authorization, and provenance.
 
 #### 4.14.8 Event-driven cognition without a Mind-level scheduler
 

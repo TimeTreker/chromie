@@ -35,6 +35,7 @@ GoalOutcomeDisposition = Literal[
     "refused",
 ]
 PlanTiming = Literal["sequential", "parallel"]
+PlanStepPurpose = Literal["achieve_effect", "acquire_information"]
 ParameterResolutionStrategy = Literal[
     "user_supplied",
     "schema_default",
@@ -734,10 +735,14 @@ class CanonicalPlanStep(CapabilityIdentityModel):
     timing: PlanTiming = "sequential"
     source_goal_ids: list[str] = Field(default_factory=list)
     reuse_activity_id: str = ""
+    step_purpose: PlanStepPurpose = "achieve_effect"
+    expected_outcome: str = Field(default="", max_length=600)
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("step_id", "reuse_activity_id", "reason_summary", mode="before")
+    @field_validator(
+        "step_id", "reuse_activity_id", "expected_outcome", "reason_summary", mode="before"
+    )
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -751,6 +756,15 @@ class CanonicalPlanStep(CapabilityIdentityModel):
     @classmethod
     def reject_low_level_fields(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def validate_step_expectation(self) -> "CanonicalPlanStep":
+        if self.step_purpose == "acquire_information" and not self.expected_outcome:
+            raise ValueError(
+                "information-acquisition steps require an expected_outcome describing "
+                "the observation needed for progress"
+            )
+        return self
 
 
 class _GoalPlanOutcomeBase(BaseModel):

@@ -5381,6 +5381,21 @@ class VoiceAssistant:
             context["goal_association_resolution"] = association
         if canonical_plan is not None:
             context["canonical_plan_resolution"] = canonical_plan.prompt_projection()
+            planner_reentry_expectations = [
+                {
+                    "step_id": step.step_id,
+                    "source_goal_ids": list(step.source_goal_ids),
+                    "step_purpose": step.step_purpose,
+                    "expected_outcome": step.expected_outcome,
+                }
+                for step in canonical_plan.steps
+                if step.expected_outcome
+                and set(step.source_goal_ids) & set(normalized_goal_ids)
+            ]
+            if planner_reentry_expectations:
+                # Planner-authored prospective expectations are hypotheses to compare
+                # with fresh trusted Evidence, never Host-created Evidence themselves.
+                context["planner_reentry_expectations"] = planner_reentry_expectations
         if isinstance(metadata.get("user_turn_envelope"), dict):
             context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
         if isinstance(metadata.get("goal_interpretation"), dict):
