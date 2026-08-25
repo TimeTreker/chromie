@@ -11,14 +11,19 @@ from shared.chromie_contracts.situation import (
     CognitiveOpportunity,
     GoalTimeCondition,
     SituationConditionRef,
-    SituationEvidenceRef,
+    SituationInterpretation,
     SituationRevisionObservation,
     SituationProjection,
+    SituationSourceRef,
 )
 
 
 def _normalized(value: Any) -> str:
     return " ".join(str(value or "").strip().split())
+
+
+def _bounded(value: Any, *, limit: int) -> str:
+    return _normalized(value)[: max(1, int(limit))]
 
 
 def _unique(values: Iterable[Any], *, limit: int) -> list[str]:
@@ -35,7 +40,7 @@ def _unique(values: Iterable[Any], *, limit: int) -> list[str]:
     return out
 
 
-def _evidence_reference(item: dict[str, Any], index: int) -> SituationEvidenceRef:
+def _evidence_source_reference(item: dict[str, Any], index: int) -> SituationSourceRef:
     for key in (
         "evidence_id",
         "execution_outcome_id",
@@ -59,20 +64,125 @@ def _evidence_reference(item: dict[str, Any], index: int) -> SituationEvidenceRe
         reference_id = f"situation_evidence_{hashlib.sha256(encoded).hexdigest()[:20]}"
 
     source = _normalized(item.get("source") or item.get("owner") or "")
-    if "execution" in source.casefold() or item.get("execution_outcome_id"):
-        kind = "execution_evidence"
-    elif "interaction" in source.casefold() or item.get("event_id"):
-        kind = "interaction_evidence"
-    elif item.get("tool_id") or item.get("tool_call_id") or item.get("request_id"):
-        kind = "tool_evidence"
-    else:
-        kind = "other_evidence"
     owner = source or "orchestrator.conversation_state"
-    return SituationEvidenceRef(
-        kind=kind,
+    return SituationSourceRef(
+        kind="evidence",
         reference_id=reference_id or f"evidence_{index}",
         owner=owner,
     )
+
+
+def _source_refs(
+    values: Iterable[SituationSourceRef],
+    *,
+    limit: int,
+) -> list[SituationSourceRef]:
+    out: list[SituationSourceRef] = []
+    seen: set[str] = set()
+    for item in values:
+        if item.reference_id in seen:
+            continue
+        seen.add(item.reference_id)
+        out.append(item)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _interpretation_id(
+    *,
+    subject_ref: str,
+    relation: str,
+    value: str,
+    source_ref: str,
+) -> str:
+    encoded = json.dumps(
+        {
+            "subject_ref": subject_ref,
+            "relation": relation,
+            "value": value,
+            "source_ref": source_ref,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return f"situation_interpretation_{hashlib.sha256(encoded).hexdigest()[:20]}"
+
+
+def _provider_state_interpretations(
+    *,
+    request_id: str,
+    goal_ids: list[str],
+    source_ref: str,
+    provider_state: dict[str, Any],
+) -> list[SituationInterpretation]:
+    """Project only source-stated provider implications into current Situation.
+
+    This deliberately performs no semantic inference about the Goal.  A provider
+    saying a request is blocked/waiting/degraded can become a current Situation
+    interpretation because that state is directly relevant to active Work; Host
+    does not infer user intent, Goal satisfaction, recovery policy, or next Work.
+    """
+
+    subject_ref = f"capability_request:{_normalized(request_id)}"
+    if len(subject_ref) > 200:
+        subject_ref = (
+            "capability_request:"
+            f"{hashlib.sha256(subject_ref.encode('utf-8')).hexdigest()[:32]}"
+        )
+    interpretations: list[SituationInterpretation] = []
+
+    def add(relation: str, value: Any, *, subject: str = subject_ref) -> None:
+        if len(interpretations) >= 12:
+            return
+        normalized_value = _bounded(value, limit=240)
+        if not normalized_value:
+            return
+        interpretations.append(
+            SituationInterpretation(
+                interpretation_id=_interpretation_id(
+                    subject_ref=subject,
+                    relation=relation,
+                    value=normalized_value,
+                    source_ref=source_ref,
+                ),
+                subject_ref=subject,
+                relation=relation,
+                value=normalized_value,
+                epistemic_status="established",
+                relevance_goal_ids=goal_ids,
+                source_refs=[source_ref],
+            )
+        )
+
+    for key in ("status", "state", "phase", "condition", "waiting_for"):
+        if key in provider_state:
+            add(f"runtime.{key}", provider_state.get(key))
+    for key in ("blocked", "degraded", "paused", "recovering"):
+        if provider_state.get(key) is True:
+            add("runtime.condition", key)
+
+    member_status = provider_state.get("member_status")
+    if isinstance(member_status, dict):
+        for member_id, member_state in member_status.items():
+            member_subject = (
+                f"{subject_ref}:member:{_normalized(member_id)}"
+                if _normalized(member_id)
+                else subject_ref
+            )
+            if len(member_subject) > 200:
+                member_subject = (
+                    f"{subject_ref[:150]}:member:"
+                    f"{hashlib.sha256(member_subject.encode('utf-8')).hexdigest()[:32]}"
+                )
+            add(
+                "runtime.member_status",
+                member_state,
+                subject=member_subject,
+            )
+    return interpretations
 
 
 def build_situation_projection(
@@ -81,12 +191,15 @@ def build_situation_projection(
     turn_id: str,
     focus_goal_ids: Iterable[str] | None = None,
     revision: int = 1,
+    source_refs: Iterable[SituationSourceRef] | None = None,
+    interpretations: Iterable[SituationInterpretation] | None = None,
 ) -> SituationProjection:
     """Reconstruct one bounded live Situation from current authoritative projections.
 
-    This function has no persistence and owns no source facts.  It intentionally
-    emits references/working-set identity only; Goal/Evidence/Memory/provider
-    objects remain authoritative in their existing owners.
+    This function has no persistence and owns no source facts.  Goal/Evidence/
+    Memory/provider objects remain authoritative in their existing owners.  The
+    returned Situation may retain only their bounded references plus current
+    implications explicitly supplied by a trusted ingress.
     """
 
     current = context if isinstance(context, dict) else {}
@@ -128,10 +241,22 @@ def build_situation_projection(
     recent_evidence = current.get("recent_tool_evidence")
     if not isinstance(recent_evidence, list):
         recent_evidence = []
-    evidence_refs = [
-        _evidence_reference(item, index)
+    evidence_sources = [
+        _evidence_source_reference(item, index)
         for index, item in enumerate(recent_evidence[-8:])
         if isinstance(item, dict)
+    ]
+
+    explicit_sources = list(source_refs or [])
+    bounded_sources = _source_refs(
+        [*explicit_sources, *evidence_sources],
+        limit=16,
+    )
+    allowed_source_refs = {item.reference_id for item in bounded_sources}
+    bounded_interpretations = [
+        item
+        for item in list(interpretations or [])[:12]
+        if set(item.source_refs).issubset(allowed_source_refs)
     ]
 
     selected_goals = (
@@ -145,7 +270,91 @@ def build_situation_projection(
         focus_goal_ids=selected_goals,
         discourse_focus_ids=_unique(discourse_focus[-8:], limit=8),
         unresolved_conditions=conditions,
-        evidence_refs=evidence_refs,
+        source_refs=bounded_sources,
+        interpretations=bounded_interpretations,
+    )
+
+
+def build_provider_state_situation_observation(
+    *,
+    context: dict[str, Any] | None,
+    turn_id: str,
+    goal_ids: Iterable[str],
+    dispatch_id: str,
+    request_id: str,
+    capability_id: str,
+    provider_id: str,
+    sequence: int,
+    provider_state: dict[str, Any],
+) -> SituationRevisionObservation:
+    """Admit one bounded live provider-state transition as Situation input.
+
+    Provider progress is independently trusted for its own Runtime state domain but
+    is not Evidence of Goal satisfaction or of external-world facts.  The ingress
+    therefore records it as ``runtime_state`` provenance and creates only direct,
+    revisable interpretations of the source-stated request state.
+    """
+
+    normalized_goals = _unique(goal_ids, limit=8)
+    if not normalized_goals:
+        raise ValueError("provider Situation ingress requires at least one Goal")
+    normalized_request_id = _normalized(request_id)
+    if not normalized_request_id:
+        raise ValueError("provider Situation ingress requires request_id")
+    normalized_dispatch_id = _normalized(dispatch_id)
+    source_ref_id = (
+        f"runtime-state:{normalized_dispatch_id or 'dispatch'}:"
+        f"{normalized_request_id}:{max(1, int(sequence))}"
+    )
+    if len(source_ref_id) > 200:
+        encoded = source_ref_id.encode("utf-8")
+        source_ref_id = (
+            f"runtime-state:{hashlib.sha256(encoded).hexdigest()[:32]}"
+        )
+    source = SituationSourceRef(
+        kind="runtime_state",
+        reference_id=source_ref_id,
+        owner=(
+            _bounded(provider_id, limit=160)
+            or "orchestrator.interaction_runtime"
+        ),
+    )
+    provider_interpretations = _provider_state_interpretations(
+        request_id=normalized_request_id,
+        goal_ids=normalized_goals,
+        source_ref=source_ref_id,
+        provider_state=dict(provider_state),
+    )
+    if not provider_interpretations:
+        raise ValueError("provider Situation ingress requires meaningful state")
+    projection = build_situation_projection(
+        context=context,
+        turn_id=turn_id,
+        focus_goal_ids=normalized_goals,
+        revision=max(1, int(sequence)),
+        source_refs=[source],
+        interpretations=provider_interpretations,
+    )
+    observation_id = (
+        f"situation_observation:{normalized_dispatch_id or 'dispatch'}:"
+        f"{normalized_request_id}:{max(1, int(sequence))}"
+    )
+    if len(observation_id) > 200:
+        encoded = observation_id.encode("utf-8")
+        observation_id = (
+            f"situation_observation:{hashlib.sha256(encoded).hexdigest()[:32]}"
+        )
+    return SituationRevisionObservation(
+        observation_id=observation_id,
+        source_id=(
+            _bounded(provider_id, limit=160)
+            or _bounded(capability_id, limit=160)
+            or "orchestrator.interaction_runtime"
+        ),
+        source_revision=max(1, int(sequence)),
+        goal_ids=normalized_goals,
+        source_refs=[source_ref_id],
+        projection=projection,
     )
 
 
@@ -164,10 +373,18 @@ def derive_situation_revision_opportunity(
     previous = _normalized(previous_situation_digest)
     if previous and previous == observation.projection.digest:
         return None
+    source_by_ref = {
+        item.reference_id: item for item in observation.projection.source_refs
+    }
+    evidence_refs = [
+        source_ref
+        for source_ref in observation.source_refs
+        if source_by_ref[source_ref].kind == "evidence"
+    ]
     return CognitiveOpportunity.create(
         trigger="situation_revision",
         goal_ids=list(observation.goal_ids),
-        evidence_refs=list(observation.evidence_refs),
+        evidence_refs=evidence_refs,
         reason_codes=["trusted_situation_revision"],
         recommended_cognition="fast",
         situation_digest=observation.projection.digest,
@@ -339,6 +556,7 @@ async def run_time_condition_wake_loop(
 
 __all__ = [
     "apply_due_time_condition_opportunity",
+    "build_provider_state_situation_observation",
     "build_situation_projection",
     "derive_situation_revision_opportunity",
     "drain_due_time_conditions_once",

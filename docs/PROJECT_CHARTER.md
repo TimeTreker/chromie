@@ -156,8 +156,10 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
   that re-enters Planner. A trigger is not automatically Evidence: a structured
   Goal/current-Plan-bound clock condition may be a trusted readiness transition with zero
-  Evidence refs, while Situation revision must preserve its admitted source/Evidence
-  provenance. In all cases the callback says only that cognition may now be useful; it
+  Evidence refs, while Situation revision must preserve exact admitted source provenance.
+  A Situation source may be retained Evidence or independently trusted live authority-owned
+  state such as provider Runtime state; live state must not be relabeled as Evidence merely
+  to wake cognition. In all cases the callback says only that cognition may now be useful; it
   never selects a response or Work itself. Planner may produce zero, one, or many desired
   Activity changes.
 - **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at

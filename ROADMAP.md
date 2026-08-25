@@ -146,27 +146,32 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
 
 1. **Close Continuous Mind wake/re-entry mechanics first.** A meaningful non-turn state
    transition must be able to wake the same Planner without fabricating a UserTurn,
-   Responsibility, Evidence, or response. The structured due-time consumer is now
-   production-wired; trusted live Situation ingress and Planner-authored time-condition
-   registration remain implementation work.
+   Responsibility, Evidence, or response. **Implemented:** the structured due-time
+   consumer is production-wired and non-Evidence readiness is admitted explicitly.
 2. **Make Situation a bounded current interpretation, then connect trusted sources.** Keep
    immutable Evidence/provider truth outside Situation; represent only current relevant
    interpretations, uncertainty/contradiction, and provenance needed by cognition. Do not
-   create a world-model database or `SituationManager`.
-3. **Make readiness genuinely selective.** Derive no-op/local/fast/slow cognition from the
+   create a world-model database or `SituationManager`. **Implemented for the first live
+   source:** Situation v3 carries bounded source-grounded interpretations and meaningful
+   provider Runtime-state transitions enter as `SituationRevisionObservation` without
+   being mislabeled Evidence. Broader scene/body/environment ingress remains future work.
+3. **Close Planner-authored structured time-condition creation.** The consumer/wake path
+   exists; Planner still needs a bounded output contract that can author useful exact
+   Goal/current-Plan-bound conditions. Host must not parse deadline prose into timers.
+4. **Make readiness genuinely selective.** Derive no-op/local/fast/slow cognition from the
    relation between the change and open Responsibility, current Work, risk, authority, and
    evidence novelty. Do not create a numeric priority engine or competing semantic planner.
-4. **Activate Memory by current context rather than recency alone.** Reuse existing Memory,
+5. **Activate Memory by current context rather than recency alone.** Reuse existing Memory,
    Goal, Situation, entity/scope, and provenance owners before considering a new retrieval
    subsystem.
-5. **Add bounded semantic expectation mismatch and active perception through existing
+6. **Add bounded semantic expectation mismatch and active perception through existing
    owners.** Expected evidence/outcome may reactivate Situation/Planner/Reflection;
    information-seeking gaze/tool/body Work remains ordinary Planner-authored Activity, not a
    new agent or prediction engine.
-6. **Mechanically simplify the coordinators and stale surfaces.** Split oversized pure
+7. **Mechanically simplify the coordinators and stale surfaces.** Split oversized pure
    orchestration stages without introducing authority, then remove proven-stale docs and
    compatibility only after live consumers are absent.
-7. **Re-run current-revision qualification on the resulting exact tree.** Target evidence
+8. **Re-run current-revision qualification on the resulting exact tree.** Target evidence
    remains separate from source/test closure and must not be inferred from these patches.
 
 The already-settled implementation facts below remain constraints during that closure:

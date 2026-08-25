@@ -1600,11 +1600,16 @@ invalidates assumptions, close/reopen Goals, or make selective deeper cognition
 worthwhile.
 
 This synthesis is now the architecture baseline for the next implementation
-slices. The minimum Situation projection is now implemented as bounded live
-reference state. Remaining detail questions—exact Goal revision provenance,
-resumable cognitive artifacts, durable scoped
-consent/privacy, and multi-user identity—must be solved against these invariants
-without reopening the whole ontology or pre-creating one manager per concept.
+slices. `SituationProjection` v3 is implemented as bounded live current
+interpretation: working-set identity may be accompanied by small revisable
+interpretation tuples and exact authority-owned source references, while source
+payloads remain outside Situation. Meaningful provider Runtime-state transitions
+are the first production trusted ingress and are explicitly not promoted to
+Evidence; broader scene/body/environment adapters remain source-specific future
+work. Remaining detail questions—exact Goal revision provenance, resumable
+cognitive artifacts, durable scoped consent/privacy, and multi-user identity—must
+be solved against these invariants without reopening the whole ontology or
+pre-creating one manager per concept.
 
 #### 4.14.12 Human-like behavior emerges across time
 

@@ -5367,9 +5367,14 @@ class ConversationStateManager:
         self,
         goal_ids: list[str],
         *,
-        evidence_ref: str,
+        source_ref: str,
     ) -> list[str]:
-        """Invalidate stale pre-restart Work only after Planner saw fresh provider truth."""
+        """Invalidate stale pre-restart Work only after fresh provider truth.
+
+        Provider/catalog state is authoritative for its Runtime domain but is not
+        execution/world Evidence. Retain the source reference without promoting it
+        into the Evidence namespace.
+        """
 
         completed: list[str] = []
         now = _now_ms()
@@ -5403,7 +5408,7 @@ class ConversationStateManager:
                 updated["recovery_previous_canonical_plan_fingerprint"] = previous_fingerprint
             if isinstance(previous_capabilities, list) and previous_capabilities:
                 updated["recovery_previous_planned_capabilities"] = self._json_safe(previous_capabilities)
-            updated["runtime_revalidation_evidence_ref"] = str(evidence_ref or "").strip()
+            updated["runtime_revalidation_source_ref"] = str(source_ref or "").strip()
             updated["runtime_revalidated_ms"] = now
             context["metadata"] = updated
             if str(context.get("plan_status") or "") == "revalidation_required":

@@ -112,7 +112,9 @@ from orchestrator.runtime.runtime_ready_greeting import (
     execute_default_runtime_ready_orientation,
 )
 from orchestrator.runtime.situation import (
+    build_provider_state_situation_observation,
     build_situation_projection,
+    derive_situation_revision_opportunity,
     run_time_condition_wake_loop,
 )
 from orchestrator.runtime.planner_reentry import (
@@ -157,7 +159,7 @@ from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
     goal_completion_qualification_summary,
 )
-from shared.chromie_contracts.situation import CognitiveOpportunity
+from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -4979,21 +4981,31 @@ class VoiceAssistant:
                 exc,
             )
             return
-        evidence_ref = (
-            f"provider-state:{event.dispatch_id}:{event.request_id}:{event.sequence}"
-        )
-        opportunity = CognitiveOpportunity.create(
-            trigger="provider_state",
+        situation_observation = build_provider_state_situation_observation(
+            context=self.build_context(session_id),
+            turn_id=str(
+                metadata.get("turn_id")
+                or f"provider-state:{event.dispatch_id}:{event.request_id}"
+            ),
             goal_ids=goal_ids,
-            evidence_refs=[evidence_ref],
-            reason_codes=["meaningful_provider_state_transition"],
-            recommended_cognition="fast",
+            dispatch_id=event.dispatch_id,
+            request_id=event.request_id,
+            capability_id=event.capability_id,
+            provider_id=event.provider_id,
+            sequence=event.sequence,
+            provider_state=provider_state,
         )
+        opportunity = derive_situation_revision_opportunity(
+            situation_observation,
+        )
+        if opportunity is None:
+            return
         response.metadata.setdefault(
             "incremental_cognitive_opportunities", []
         ).append(opportunity.prompt_projection())
+        source_ref = situation_observation.source_refs[0]
         bounded_event = {
-            "evidence_ref": evidence_ref,
+            "source_ref": source_ref,
             "sequence": event.sequence,
             "dispatch_id": event.dispatch_id,
             "request_id": event.request_id,
@@ -5007,22 +5019,28 @@ class VoiceAssistant:
             user_request=user_request,
             language=str(metadata.get("language") or "en-US"),
             goal_ids=goal_ids,
-            evidence_goal_ids=goal_ids,
-            evidence_refs=[evidence_ref],
+            evidence_goal_ids=[],
+            evidence_refs=[],
             session_id=session_id,
-            phase="provider_state_reentry",
+            phase="situation_revision_reentry",
             context_updates={
+                "situation": situation_observation.projection.prompt_projection(),
+                "situation_revision_observation": situation_observation.model_dump(
+                    mode="json"
+                ),
                 "trusted_provider_state_event": bounded_event,
                 "provider_state_reentry": {
                     "source_goal_ids": goal_ids,
-                    "evidence_refs": [evidence_ref],
+                    "situation_source_refs": list(
+                        situation_observation.source_refs
+                    ),
                     "planner_authority": "planner",
                 },
                 "cognitive_opportunity": opportunity.prompt_projection(),
             },
-            fast_workflow_stage="fast_planner_provider_state_reentry",
-            deep_workflow_stage="planner_deep_pass_provider_state_reentry",
-            response_source="fast_planner_provider_state_reentry",
+            fast_workflow_stage="fast_planner_situation_revision_reentry",
+            deep_workflow_stage="planner_deep_pass_situation_revision_reentry",
+            response_source="fast_planner_situation_revision_reentry",
         )
         if planner_response is None:
             return
@@ -5103,11 +5121,11 @@ class VoiceAssistant:
                 capability_definition=self.interaction_runtime.capability_definition,
             )
             restored_marker = str(candidate.get("restored_ms") or "unknown").strip()
-            evidence_ref = f"provider-state:restart:{goal_id}:{restored_marker}"[:220]
+            source_ref = f"runtime-state:restart:{goal_id}:{restored_marker}"[:200]
             opportunity = CognitiveOpportunity.create(
                 trigger="provider_state",
                 goal_ids=[goal_id],
-                evidence_refs=[evidence_ref],
+                evidence_refs=[],
                 reason_codes=["restored_goal_fresh_provider_state"],
                 recommended_cognition="fast",
             )
@@ -5117,19 +5135,19 @@ class VoiceAssistant:
                 user_request=user_request,
                 language=str(candidate.get("language") or "auto"),
                 goal_ids=[goal_id],
-                evidence_goal_ids=[goal_id],
-                evidence_refs=[evidence_ref],
+                evidence_goal_ids=[],
+                evidence_refs=[],
                 session_id=None,
                 phase="restored_provider_state_revalidation",
                 context_updates={
                     "trusted_provider_state_event": {
-                        "evidence_ref": evidence_ref,
+                        "source_ref": source_ref,
                         "source": "restart_provider_revalidation",
                         "capabilities": provider_state,
                     },
                     "provider_state_reentry": {
                         "source_goal_ids": [goal_id],
-                        "evidence_refs": [evidence_ref],
+                        "state_refs": [source_ref],
                         "planner_authority": "planner",
                         "restored_goal": True,
                     },
@@ -5144,7 +5162,7 @@ class VoiceAssistant:
                 continue
             completed = self.conversation_state.complete_runtime_revalidation(
                 [goal_id],
-                evidence_ref=evidence_ref,
+                source_ref=source_ref,
             )
             if goal_id not in completed:
                 continue
@@ -5256,6 +5274,31 @@ class VoiceAssistant:
             except (TypeError, ValueError):
                 opportunity = None
         opportunity_ref = opportunity.opportunity_id if opportunity is not None else ""
+        provided_situation: SituationProjection | None = None
+        raw_situation = context_updates.get("situation")
+        if isinstance(raw_situation, dict):
+            try:
+                provided_situation = SituationProjection.model_validate(raw_situation)
+            except (TypeError, ValueError) as exc:
+                self.session_log(
+                    session_id,
+                    "planner_state_reentry_rejected: reason=invalid_situation "
+                    "error_type=%s error=%s",
+                    type(exc).__name__,
+                    exc,
+                )
+                return None
+        if opportunity is not None and opportunity.situation_digest:
+            if (
+                provided_situation is None
+                or provided_situation.digest != opportunity.situation_digest
+            ):
+                self.session_log(
+                    session_id,
+                    "planner_state_reentry_rejected: "
+                    "reason=situation_opportunity_digest_mismatch",
+                )
+                return None
         if not normalized_evidence_refs and (
             opportunity is None
             or set(opportunity.goal_ids) != set(normalized_goal_ids)
@@ -5334,15 +5377,27 @@ class VoiceAssistant:
             context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
         if isinstance(metadata.get("goal_interpretation"), dict):
             context["core_interpretation"] = dict(metadata["goal_interpretation"])
-        situation = build_situation_projection(
-            context=context,
-            turn_id=str(
-                metadata.get("turn_id")
-                or f"state:{reentry_ref}"
-            ),
-            focus_goal_ids=normalized_goal_ids,
-            revision=1,
-        )
+        if provided_situation is not None:
+            if not set(normalized_goal_ids).issubset(
+                set(provided_situation.focus_goal_ids)
+            ):
+                self.session_log(
+                    session_id,
+                    "planner_state_reentry_rejected: "
+                    "reason=situation_goal_binding_mismatch",
+                )
+                return None
+            situation = provided_situation
+        else:
+            situation = build_situation_projection(
+                context=context,
+                turn_id=str(
+                    metadata.get("turn_id")
+                    or f"state:{reentry_ref}"
+                ),
+                focus_goal_ids=normalized_goal_ids,
+                revision=1,
+            )
         context["situation"] = situation.prompt_projection()
         interaction_ledger = getattr(
             getattr(self, "cognitive_runtime", None),

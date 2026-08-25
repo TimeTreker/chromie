@@ -126,16 +126,36 @@ class _FreshRuntime:
 
 
 class _RestoredState:
+    def __init__(self) -> None:
+        self.completed = []
+
     def runtime_revalidation_candidates(self):
         return [
             {
                 "goal_id": "goal-walk",
+                "source_text": "Walk forward and blink.",
+                "language": "en-US",
+                "responsibilities": [
+                    {
+                        "local_ref": "resp-walk",
+                        "outcome": "Walk forward and blink.",
+                        "bindings": {},
+                        "output_mode": "stateful_effect",
+                        "relationship": "new",
+                        "target_goal_ids": [],
+                        "confidence": 1.0,
+                    }
+                ],
                 "capability_ids": [
                     "soridormi.walk_forward",
                     "soridormi.blink_eyes",
                 ],
             }
         ]
+
+    def complete_runtime_revalidation(self, goal_ids, *, source_ref):
+        self.completed.append((list(goal_ids), source_ref))
+        return list(goal_ids)
 
 
 def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
@@ -149,16 +169,26 @@ def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
     host.session_log = lambda *_args, **_kwargs: None
     captured = []
 
-    async def capture_reentry(*, candidate, provider_state):
-        captured.append((candidate, provider_state))
-        return True
+    async def capture_planner_reentry(**kwargs):
+        captured.append(kwargs)
+        return InteractionResponse(interaction_id="revalidated")
 
-    host._reenter_restored_goal_for_provider_state = capture_reentry
+    async def apply_reentry(_response, *, session_id):
+        assert session_id is None
+        return "applied"
+
+    host._planner_state_reentry_response = capture_planner_reentry
+    host._apply_planner_reentry_response = apply_reentry
     asyncio.run(host._revalidate_restored_goals_from_provider_state())
 
     assert host.interaction_runtime.refresh_calls == 1
     assert len(captured) == 1
-    states = {item["capability_id"]: item for item in captured[0][1]}
+    states = {
+        item["capability_id"]: item
+        for item in captured[0]["context_updates"]["trusted_provider_state_event"][
+            "capabilities"
+        ]
+    }
     assert states["soridormi.walk_forward"]["available"] is True
     assert states["soridormi.blink_eyes"]["available"] is False
     assert (

@@ -206,9 +206,9 @@ class RestartRevalidationTests(unittest.TestCase):
             )
             self.assertEqual(candidates[0]["responsibilities"], [responsibility])
 
-            evidence_ref = "provider-state:restart:goal-walk:1"
+            source_ref = "runtime-state:restart:goal-walk:1"
             completed = restored.complete_runtime_revalidation(
-                ["goal-walk"], evidence_ref=evidence_ref
+                ["goal-walk"], source_ref=source_ref
             )
             self.assertEqual(completed, ["goal-walk"])
             binding = restored.goal_cancellation_bindings(["goal-walk"])[0]
@@ -219,8 +219,8 @@ class RestartRevalidationTests(unittest.TestCase):
             self.assertEqual(restored_context["status"], "planning")
             self.assertEqual(restored_context["plan_status"], "revalidated")
             self.assertEqual(
-                restored_context["metadata"]["runtime_revalidation_evidence_ref"],
-                evidence_ref,
+                restored_context["metadata"]["runtime_revalidation_source_ref"],
+                source_ref,
             )
             self.assertEqual(
                 restored_context["metadata"]["recovery_previous_canonical_plan_id"],
