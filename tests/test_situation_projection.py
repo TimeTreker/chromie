@@ -137,3 +137,76 @@ def test_trusted_situation_revision_emits_only_on_semantic_delta() -> None:
         )
         is None
     )
+
+
+def test_due_time_condition_runtime_cycle_reenters_same_planner_without_evidence() -> None:
+    import asyncio
+
+    from orchestrator.runtime.situation import drain_due_time_conditions_once
+    from shared.chromie_contracts.situation import GoalTimeCondition
+
+    condition = GoalTimeCondition(
+        condition_id="condition-reminder",
+        goal_id="goal-reminder",
+        due_at_ms=2_000,
+        source_plan_id="plan-reminder",
+        source_responsibility_refs=["resp-reminder"],
+    )
+    opportunity = CognitiveOpportunity.create(
+        trigger="time_condition",
+        goal_ids=["goal-reminder"],
+        reason_codes=["planner_time_condition"],
+        recommended_cognition="fast",
+    )
+
+    class State:
+        def due_time_condition_opportunities(self, *, now_ms=None):
+            assert now_ms == 2_000
+            return [
+                {
+                    "condition": condition.model_dump(mode="json"),
+                    "opportunity": opportunity.prompt_projection(),
+                    "source_text": "Remind me later.",
+                    "language": "en-US",
+                    "responsibilities": [
+                        {
+                            "local_ref": "resp-reminder",
+                            "outcome": "Remind the user at the requested time.",
+                            "bindings": {},
+                            "output_mode": "stateful_effect",
+                            "relationship": "new",
+                            "target_goal_ids": [],
+                            "confidence": 1.0,
+                        }
+                    ],
+                }
+            ]
+
+    class Host:
+        def __init__(self) -> None:
+            self.conversation_state = State()
+            self.reentry = None
+            self.applied = None
+
+        def session_log(self, *_args, **_kwargs):
+            return None
+
+        async def _planner_state_reentry_response(self, **kwargs):
+            self.reentry = kwargs
+            return {"planner": "response"}
+
+        async def _apply_planner_reentry_response(self, response, *, session_id):
+            self.applied = (response, session_id)
+            return "planner_reentry_applied"
+
+    host = Host()
+    statuses = asyncio.run(drain_due_time_conditions_once(host, now_ms=2_000))
+
+    assert statuses == ["planner_reentry_applied"]
+    assert host.reentry is not None
+    assert host.reentry["phase"] == "time_condition_reentry"
+    assert host.reentry["goal_ids"] == ["goal-reminder"]
+    assert host.reentry["evidence_goal_ids"] == []
+    assert host.reentry["evidence_refs"] == []
+    assert host.reentry["responsibilities_override"][0].local_ref == "resp-reminder"
+    assert host.applied == ({"planner": "response"}, None)

@@ -165,7 +165,7 @@ class RestartRevalidationTests(unittest.TestCase):
                 "output_mode": "body_action",
                 "confidence": 1.0,
             }
-            retained = manager._runtime_revalidation_responsibilities(
+            retained = manager._planner_reentry_responsibilities(
                 result_metadata={
                     "goal_interpretation": {"responsibilities": [responsibility]}
                 },
@@ -187,8 +187,8 @@ class RestartRevalidationTests(unittest.TestCase):
                             "request_id": "request-walk",
                         }
                     ],
-                    "runtime_revalidation_responsibilities": retained,
-                    "runtime_revalidation_language": "en-US",
+                    "planner_reentry_responsibilities": retained,
+                    "planner_reentry_language": "en-US",
                 }
             )
             self.assertTrue(manager.persist_task_contexts())

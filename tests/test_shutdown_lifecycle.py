@@ -38,6 +38,9 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         assistant.output_abort_tasks = {
             asyncio.create_task(asyncio.Event().wait())
         }
+        assistant.active_cognitive_runtime_tasks = {
+            asyncio.create_task(asyncio.Event().wait()): "detached-state-reentry"
+        }
         assistant.observability_tasks = {
             asyncio.create_task(asyncio.Event().wait())
         }
@@ -66,6 +69,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
             assistant.active_reflex_task,
             *assistant.concurrent_protective_reflex_tasks,
             *assistant.output_abort_tasks,
+            *assistant.active_cognitive_runtime_tasks,
             *assistant.observability_tasks,
             assistant.session_idle_sweeper_task,
             assistant.audio_device_monitor_task,

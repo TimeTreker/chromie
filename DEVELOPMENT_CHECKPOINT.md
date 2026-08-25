@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 
-Status: current resume point; audit remediation in progress
-Updated: 2026-08-24
+Status: current resume point; owner-approved Continuous Mind runtime closure in progress
+Updated: 2026-08-25
 Remote baseline: `47dbfbcc22eb8d008af1b31d414d17d64b080c4f` (`Restore cognitive authority boundaries`)
 Archive baseline: user-supplied `chromie_20260825.zip`, verified against the same current source shape.
 
@@ -135,4 +135,16 @@ The final five source/audit topics are now closed without adding speculative cog
 14. Static-analysis maintenance widens incrementally rather than by declaration: `scripts/run_mypy.py` is now covered by both the Ruff and Mypy ratchets while the `VoiceAssistant` structural ceiling remains unchanged.
 15. Physical-robot evidence remains optional for `current_revision_qualification`, while the supervised physical-pilot path remains fail-closed: exact Chromie revision, source-clean/provider-bound evidence, safe state before/after, and a named safety operator are required before the claim can be attached.
 
-After Patch 3, the audit no longer calls for another broad source-architecture rewrite. The next main activity is current-revision target qualification on the exact committed tree; observed qualification failures, rather than speculative architecture work, should drive any subsequent patch.
+Patch 3 closed the then-known semantic-authority audit line. The 2026-08-25 full project audit subsequently found a narrower but real mismatch: canonical Continuous Mind design already described Situation/time-driven re-entry, while production wiring existed mainly for user turns, Runtime/Provider outcomes, and provider-state changes. The owner explicitly approved closing those verified implementation gaps in architecture-to-detail order before the next full current-revision qualification. This supersedes the earlier Phase-6-only scheduling sentence without reopening the settled WHAT/HOW authority architecture.
+
+## Continuous Mind runtime closure — Patch 4 / first architecture slice
+
+This patch closes the **wake/re-entry substrate** before adding richer Situation or Memory behavior:
+
+1. Structured due `GoalTimeCondition` records are now consumed by a production mechanical wall-clock wake loop. The loop does no semantic interpretation and invokes no model until an already-structured condition becomes due.
+2. Due-time wake re-enters the same Planner from exact retained Goal/current-Plan/original Responsibility provenance. It does not fabricate a UserTurn, Responsibility, response, or Capability decision.
+3. Generic Planner state re-entry no longer assumes every meaningful trigger is Evidence. A due clock condition can carry zero Evidence refs and therefore cannot mark Planner speech as `post_evidence`; Evidence-bearing Runtime/Situation paths keep their existing truth semantics.
+4. The long-lived mechanical wake task reuses the existing detached Runtime-state task lifecycle and is explicitly cancelled during shutdown rather than creating another Mind manager or Host state owner.
+5. Status/architecture/acceptance prose now distinguishes implementation from qualification. Trusted live `SituationRevisionObservation` ingress and Planner-authored time-condition registration remain **implementation work**, not target-evidence gaps.
+
+The binding next order is: (a) make Situation a bounded current interpretation and connect real trusted Situation changes, (b) close Planner-authored structured time-condition creation, (c) make CognitiveOpportunity readiness selective, (d) context-condition Memory activation, (e) add bounded semantic expectation mismatch/active perception through existing owners, (f) mechanically simplify oversized coordinators and stale surfaces, then (g) run full current-revision qualification. Do not create new semantic managers for these concepts unless a concrete irreducible authority/lifecycle is proven.

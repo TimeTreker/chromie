@@ -272,7 +272,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
             reset_playback=False,
             mark_session_done=False,
         )
-        tasks = list(assistant.active_capability_result_tasks)
+        tasks = list(assistant.active_cognitive_runtime_tasks)
         self.assertEqual(len(tasks), 1)
         return await tasks[0]
 

@@ -3818,8 +3818,8 @@ class ConversationStateManager:
         turn_id: str = "",
         canonical_plan_id: str = "",
         canonical_plan_fingerprint: str = "",
-        runtime_revalidation_responsibilities: list[dict[str, Any]] | None = None,
-        runtime_revalidation_language: str = "",
+        planner_reentry_responsibilities: list[dict[str, Any]] | None = None,
+        planner_reentry_language: str = "",
     ) -> None:
         """Track execution lifecycle for one semantic goal only.
 
@@ -3847,16 +3847,16 @@ class ConversationStateManager:
             ).strip(),
             **(
                 {
-                    "runtime_revalidation_responsibilities": [
+                    "planner_reentry_responsibilities": [
                         self._json_safe(item)
-                        for item in runtime_revalidation_responsibilities
+                        for item in planner_reentry_responsibilities
                         if isinstance(item, dict)
                     ],
-                    "runtime_revalidation_language": self._compact_text(
-                        runtime_revalidation_language or "auto", limit=64
+                    "planner_reentry_language": self._compact_text(
+                        planner_reentry_language or "auto", limit=64
                     ),
                 }
-                if runtime_revalidation_responsibilities
+                if planner_reentry_responsibilities
                 else {}
             ),
         }
@@ -5129,17 +5129,19 @@ class ConversationStateManager:
         }
         self._persist_task_contexts_if_enabled()
 
-    def _runtime_revalidation_responsibilities(
+    def _planner_reentry_responsibilities(
         self,
         *,
         result_metadata: dict[str, Any] | None,
         goal_id: str,
     ) -> list[dict[str, Any]]:
-        """Retain exact GI provenance needed to replan an open Goal after restart.
+        """Retain exact GI provenance for later state-driven Planner re-entry.
 
-        This is not a second Responsibility authority.  The canonical Goal remains
-        the durable owed outcome; these immutable source records only let Planner
-        recover the original WHAT without fabricating a new UserTurn.
+        This is not a second Responsibility authority. The canonical Goal remains
+        the owed outcome; these immutable source records let a later trusted Runtime,
+        Situation, or time transition reactivate the same Planner without fabricating
+        a new UserTurn or reconstructing WHAT from Goal prose. Restart revalidation is
+        one consumer of the same bounded provenance.
         """
 
         if not isinstance(result_metadata, dict):
@@ -5274,9 +5276,16 @@ class ConversationStateManager:
                             or ""
                         ).strip(),
                         "language": str(
-                            metadata.get("runtime_revalidation_language") or "auto"
+                            metadata.get("planner_reentry_language") or "auto"
                         ).strip()
                         or "auto",
+                        "responsibilities": [
+                            self._json_safe(item)
+                            for item in (
+                                metadata.get("planner_reentry_responsibilities") or []
+                            )
+                            if isinstance(item, dict)
+                        ],
                     }
                 )
             if len(keep) != len(raw_conditions):
@@ -5334,7 +5343,7 @@ class ConversationStateManager:
                     and str(item.get("capability_id") or "").strip()
                 )
             )
-            responsibilities = metadata.get("runtime_revalidation_responsibilities")
+            responsibilities = metadata.get("planner_reentry_responsibilities")
             if not isinstance(responsibilities, list):
                 responsibilities = []
             candidates.append(
@@ -5342,7 +5351,7 @@ class ConversationStateManager:
                     "goal_id": goal_id,
                     "task_id": str(context.get("task_id") or ""),
                     "source_text": str(semantic_goal.get("source_text") or context.get("last_meaningful_user_turn") or "").strip(),
-                    "language": str(metadata.get("runtime_revalidation_language") or "auto").strip() or "auto",
+                    "language": str(metadata.get("planner_reentry_language") or "auto").strip() or "auto",
                     "capability_ids": capability_ids,
                     "responsibilities": [
                         self._json_safe(item)
@@ -5440,9 +5449,9 @@ class ConversationStateManager:
         canonical_plan_id = ""
         canonical_plan_fingerprint = ""
         goal_outcomes: dict[str, dict[str, Any]] = {}
-        runtime_revalidation_language = "auto"
+        planner_reentry_language = "auto"
         if isinstance(result_metadata, dict):
-            runtime_revalidation_language = str(result_metadata.get("language") or "auto")
+            planner_reentry_language = str(result_metadata.get("language") or "auto")
             self._record_tool_evidence(result_metadata)
             turn_id = str(result_metadata.get("turn_id") or "").strip()
             canonical_plan_id = str(
@@ -5550,13 +5559,13 @@ class ConversationStateManager:
                     turn_id=turn_id,
                     canonical_plan_id=canonical_plan_id,
                     canonical_plan_fingerprint=canonical_plan_fingerprint,
-                    runtime_revalidation_responsibilities=(
-                        self._runtime_revalidation_responsibilities(
+                    planner_reentry_responsibilities=(
+                        self._planner_reentry_responsibilities(
                             result_metadata=result_metadata,
                             goal_id=goal_id,
                         )
                     ),
-                    runtime_revalidation_language=runtime_revalidation_language,
+                    planner_reentry_language=planner_reentry_language,
                 )
 
         actions = data.get("actions", []) or data.get("capabilities", []) or []
@@ -5651,13 +5660,13 @@ class ConversationStateManager:
                     turn_id=turn_id,
                     canonical_plan_id=canonical_plan_id,
                     canonical_plan_fingerprint=canonical_plan_fingerprint,
-                    runtime_revalidation_responsibilities=(
-                        self._runtime_revalidation_responsibilities(
+                    planner_reentry_responsibilities=(
+                        self._planner_reentry_responsibilities(
                             result_metadata=result_metadata,
                             goal_id=goal_id,
                         )
                     ),
-                    runtime_revalidation_language=runtime_revalidation_language,
+                    planner_reentry_language=planner_reentry_language,
                 )
 
             if unscoped:

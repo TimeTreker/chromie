@@ -312,7 +312,7 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
     assistant.active_interaction_task = None
     assistant.active_interaction_id = None
     assistant.active_interaction_tasks = {}
-    assistant.active_capability_result_tasks = {}
+    assistant.active_cognitive_runtime_tasks = {}
     assistant.cognitive_turn_closure = None
     assistant.session_log = lambda *_args, **_kwargs: None
     assistant.maybe_session_done = lambda _sid: None
@@ -383,8 +383,8 @@ async def test_foreground_dispatch_finishes_while_provider_work_remains_running(
     assert foreground.done()
     observation = await coordinator.runtime.execution_observation()
     assert "interaction-detached-reentry" in observation.open_interaction_ids
-    assert len(assistant.active_capability_result_tasks) == 1
-    result_task = next(iter(assistant.active_capability_result_tasks))
+    assert len(assistant.active_cognitive_runtime_tasks) == 1
+    result_task = next(iter(assistant.active_cognitive_runtime_tasks))
     assert not result_task.done()
 
     provider.release_first.set()
@@ -444,7 +444,7 @@ async def test_current_interaction_runtime_ownership_survives_foreground_cleanup
 
     provider.release_first.set()
     provider.release_second.set()
-    result_task = next(iter(assistant.active_capability_result_tasks))
+    result_task = next(iter(assistant.active_cognitive_runtime_tasks))
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
 
 
@@ -483,7 +483,7 @@ async def test_late_result_from_superseded_plan_keeps_evidence_but_cannot_speak(
     assistant.conversation_state.plan_fingerprint = "f" * 64
     provider.release_first.set()
     for _ in range(100):
-        prepared = next(iter(assistant.active_capability_result_tasks), None)
+        prepared = next(iter(assistant.active_cognitive_runtime_tasks), None)
         if prepared is not None and response.metadata.get("suppressed_terminal_reentry"):
             break
         await asyncio.sleep(0.01)
@@ -492,7 +492,7 @@ async def test_late_result_from_superseded_plan_keeps_evidence_but_cannot_speak(
     assert assistant.agent_client.requests == []
 
     provider.release_second.set()
-    result_task = next(iter(assistant.active_capability_result_tasks))
+    result_task = next(iter(assistant.active_cognitive_runtime_tasks))
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
 
 
@@ -537,7 +537,7 @@ async def test_late_result_after_goal_cancellation_cannot_reenter_speech():
     assert assistant.agent_client.requests == []
 
     provider.release_second.set()
-    result_task = next(iter(assistant.active_capability_result_tasks))
+    result_task = next(iter(assistant.active_cognitive_runtime_tasks))
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
 
 class _FollowUpProvider:
@@ -675,5 +675,5 @@ async def test_terminal_evidence_can_start_follow_up_work_while_sibling_is_runni
     assistant.conversation_state.goal_status["goal-first"] = "cancelled"
     provider.release_second.set()
     follow_up.release.set()
-    for task in list(assistant.active_capability_result_tasks):
+    for task in list(assistant.active_cognitive_runtime_tasks):
         await asyncio.wait_for(asyncio.shield(task), timeout=1.0)

@@ -1251,7 +1251,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.interaction_runtime = _Runtime()
         assistant.playback_generation = 0
-        assistant.active_capability_result_tasks = {}
+        assistant.active_cognitive_runtime_tasks = {}
         assistant._consume_detached_non_cognitive_dispatch = MethodType(
             consume_non_cognitive, assistant
         )
@@ -1261,12 +1261,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             response, session_id, confirmed_request_ids=None,
             reset_playback=False, mark_session_done=True,
         )
-        await asyncio.gather(*list(assistant.active_capability_result_tasks))
+        await asyncio.gather(*list(assistant.active_cognitive_runtime_tasks))
         await assistant._dispatch_detached_interaction(
             response, session_id, confirmed_request_ids=None,
             reset_playback=True, mark_session_done=True,
         )
-        await asyncio.gather(*list(assistant.active_capability_result_tasks))
+        await asyncio.gather(*list(assistant.active_cognitive_runtime_tasks))
 
         self.assertEqual(reset_calls, 1)
         self.assertEqual(done_calls, 2)
@@ -1312,7 +1312,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         assistant.interaction_runtime = _Runtime()
         assistant.playback_generation = 0
-        assistant.active_capability_result_tasks = {}
+        assistant.active_cognitive_runtime_tasks = {}
         assistant.reset_playback_ordering = MethodType(
             lambda self: asyncio.sleep(0), assistant
         )
@@ -1335,7 +1335,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(assistant.sessions.state[session_id]["llm_done"])
         release_delivery.set()
-        await asyncio.gather(*list(assistant.active_capability_result_tasks))
+        await asyncio.gather(*list(assistant.active_cognitive_runtime_tasks))
         self.assertTrue(assistant.sessions.state[session_id]["llm_done"])
 
     async def test_nonterminal_interaction_does_not_mark_session_done(self) -> None:
@@ -1385,7 +1385,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.interaction_runtime = _Runtime()
         assistant.playback_generation = 0
-        assistant.active_capability_result_tasks = {}
+        assistant.active_cognitive_runtime_tasks = {}
         assistant._consume_detached_non_cognitive_dispatch = MethodType(
             consume_non_cognitive, assistant
         )
@@ -1399,7 +1399,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             reset_playback=False,
             mark_session_done=False,
         )
-        await asyncio.gather(*list(assistant.active_capability_result_tasks))
+        await asyncio.gather(*list(assistant.active_cognitive_runtime_tasks))
 
         self.assertEqual(done_calls, 0)
         self.assertFalse(assistant.sessions.state[session_id]["llm_done"])

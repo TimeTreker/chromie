@@ -1784,6 +1784,19 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/situation.py",
+      "symbol": "drain_due_time_conditions_once",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator.runtime",
+      "contract": "Contain one due structured time-condition re-entry failure, emit a visible diagnostic, and continue independent due conditions without authorizing unvalidated Planner output.",
+      "review_status": "reviewed",
+      "body_sha256": "b8beecd8397b71d5ffb38cf8c487719cada0aa10ed24972479b236abfd92d417",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
       "path": "orchestrator/vad.py",
       "symbol": "<module>",
       "ordinal": 1,

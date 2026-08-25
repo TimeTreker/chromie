@@ -2071,6 +2071,19 @@ class TimeConditionContinuousCognitionTests(unittest.TestCase):
         context["metadata"] = {
             **context.get("metadata", {}),
             "canonical_plan_id": "plan-reminder",
+            "planner_reentry_language": "en-US",
+            "planner_reentry_responsibilities": [
+                {
+                    "schema_version": 1,
+                    "local_ref": "resp-reminder",
+                    "outcome": "Remind the user at the requested time.",
+                    "bindings": {},
+                    "output_mode": "stateful_effect",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                }
+            ],
         }
         return manager
 
@@ -2098,6 +2111,11 @@ class TimeConditionContinuousCognitionTests(unittest.TestCase):
             self.assertEqual(due[0]["condition"]["condition_id"], "condition-reminder")
             self.assertEqual(due[0]["opportunity"]["trigger"], "time_condition")
             self.assertEqual(due[0]["opportunity"]["goal_ids"], ["goal-reminder"])
+            self.assertEqual(due[0]["language"], "en-US")
+            self.assertEqual(
+                due[0]["responsibilities"][0]["local_ref"],
+                "resp-reminder",
+            )
             self.assertIsNone(manager.next_time_condition_due_ms())
             self.assertEqual(manager.due_time_condition_opportunities(now_ms=3_000), [])
             self.assertTrue(store.exists())

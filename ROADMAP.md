@@ -140,8 +140,36 @@ currently explanatory/process/derived/policy concepts unless a concrete future
 case proves an independent lifecycle or authority that existing owners cannot
 represent.
 
-The next work is **detail validation and incremental implementation against this
-baseline**, not another broad concept-expansion phase:
+The next work is **bounded architecture closure followed by detail validation against this
+baseline**, not another broad concept-expansion phase. The owner-approved order from the
+2026-08-25 full audit is binding until new source evidence disproves it:
+
+1. **Close Continuous Mind wake/re-entry mechanics first.** A meaningful non-turn state
+   transition must be able to wake the same Planner without fabricating a UserTurn,
+   Responsibility, Evidence, or response. The structured due-time consumer is now
+   production-wired; trusted live Situation ingress and Planner-authored time-condition
+   registration remain implementation work.
+2. **Make Situation a bounded current interpretation, then connect trusted sources.** Keep
+   immutable Evidence/provider truth outside Situation; represent only current relevant
+   interpretations, uncertainty/contradiction, and provenance needed by cognition. Do not
+   create a world-model database or `SituationManager`.
+3. **Make readiness genuinely selective.** Derive no-op/local/fast/slow cognition from the
+   relation between the change and open Responsibility, current Work, risk, authority, and
+   evidence novelty. Do not create a numeric priority engine or competing semantic planner.
+4. **Activate Memory by current context rather than recency alone.** Reuse existing Memory,
+   Goal, Situation, entity/scope, and provenance owners before considering a new retrieval
+   subsystem.
+5. **Add bounded semantic expectation mismatch and active perception through existing
+   owners.** Expected evidence/outcome may reactivate Situation/Planner/Reflection;
+   information-seeking gaze/tool/body Work remains ordinary Planner-authored Activity, not a
+   new agent or prediction engine.
+6. **Mechanically simplify the coordinators and stale surfaces.** Split oversized pure
+   orchestration stages without introducing authority, then remove proven-stale docs and
+   compatibility only after live consumers are absent.
+7. **Re-run current-revision qualification on the resulting exact tree.** Target evidence
+   remains separate from source/test closure and must not be inferred from these patches.
+
+The already-settled implementation facts below remain constraints during that closure:
 
 1. **Goal/Work truth separation is implemented.** `SemanticGoal` now owns the
    small Responsibility lifecycle while `ActiveGoalSnapshot.work_status` exposes
@@ -188,13 +216,14 @@ baseline**, not another broad concept-expansion phase:
 
 ### Incremental implementation rhythm for human-like behavior
 
-This sequence does not reorder the binding current execution order. It begins only
-after the current-revision evidence line and the already-queued structural
-simplification permit later semantic work. Here, `rhythm` means delivery cadence only;
-it is not architecture vocabulary, a runtime mode, a persistent state, or another
-manager. Each item should be one focused Issue/patch with an originating episode, the
-earliest wrong boundary, a General Ability regression, canonical gates, and the highest
-safe evidence profile available.
+This sequence is subordinate to the owner-approved Continuous Mind closure order above.
+The previous scheduling assumption that target qualification must precede any further semantic
+implementation is superseded by the 2026-08-25 audit: verified production wiring gaps must be
+closed before those behaviors can honestly be qualified. `Rhythm` still means delivery cadence
+only; it is not architecture vocabulary, a runtime mode, a persistent state, or another manager.
+Each item should remain one focused patch with an originating episode, the earliest wrong
+boundary, a General Ability regression, canonical gates, and the highest safe evidence profile
+available.
 
 1. **Make simple interaction promptly useful.** Meet the approved Fast-Planner and
    audible-start budgets by removing avoidable model reloads, duplicate generations,

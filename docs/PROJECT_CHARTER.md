@@ -154,8 +154,12 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
 - **ASYNC-COGNITION-001** — Trusted asynchronous Runtime events report what happened;
   Host-bound Evidence records what is true; Responsibility/Goal records what is still
   owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
-  that re-enters Planner. The callback never selects a response itself. Planner may
-  produce zero, one, or many desired Activity changes.
+  that re-enters Planner. A trigger is not automatically Evidence: a structured
+  Goal/current-Plan-bound clock condition may be a trusted readiness transition with zero
+  Evidence refs, while Situation revision must preserve its admitted source/Evidence
+  provenance. In all cases the callback says only that cognition may now be useful; it
+  never selects a response or Work itself. Planner may produce zero, one, or many desired
+  Activity changes.
 - **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at
   most 2.0 seconds from validated GI handoff to the first valid Planner Communicative
   Activity commitment and at most 3.0 seconds from that commitment to playback start.

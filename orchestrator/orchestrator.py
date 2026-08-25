@@ -111,7 +111,10 @@ from orchestrator.runtime.runtime_ready_greeting import (
     RuntimeReadyGreetingPolicy,
     execute_default_runtime_ready_orientation,
 )
-from orchestrator.runtime.situation import build_situation_projection
+from orchestrator.runtime.situation import (
+    build_situation_projection,
+    run_time_condition_wake_loop,
+)
 from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
     fresh_capability_state_projection,
@@ -309,7 +312,7 @@ class VoiceAssistant:
         self.active_interaction_tasks: dict[asyncio.Task, str] = {}
         # Detached provider work is not an active foreground interaction task.
         # These tasks consume Runtime lifecycle/Evidence after submit() returned.
-        self.active_capability_result_tasks: dict[asyncio.Task, str] = {}
+        self.active_cognitive_runtime_tasks: dict[asyncio.Task, str] = {}
         self.observability_tasks: set[asyncio.Task] = set()
         self.is_playing_audio = False
 
@@ -5245,7 +5248,30 @@ class VoiceAssistant:
                 str(item).strip() for item in evidence_refs if str(item).strip()
             )
         )
-        if not normalized_goal_ids or not normalized_evidence_refs:
+        opportunity_projection = context_updates.get("cognitive_opportunity")
+        opportunity: CognitiveOpportunity | None = None
+        if isinstance(opportunity_projection, dict):
+            try:
+                opportunity = CognitiveOpportunity.model_validate(opportunity_projection)
+            except (TypeError, ValueError):
+                opportunity = None
+        opportunity_ref = opportunity.opportunity_id if opportunity is not None else ""
+        if not normalized_evidence_refs and (
+            opportunity is None
+            or set(opportunity.goal_ids) != set(normalized_goal_ids)
+        ):
+            self.session_log(
+                session_id,
+                "planner_state_reentry_rejected: "
+                "reason=missing_or_mismatched_non_evidence_opportunity",
+            )
+            return None
+        reentry_ref = (
+            normalized_evidence_refs[0]
+            if normalized_evidence_refs
+            else opportunity_ref
+        )
+        if not normalized_goal_ids or not reentry_ref:
             return None
         metadata = (
             source_response.metadata
@@ -5312,7 +5338,7 @@ class VoiceAssistant:
             context=context,
             turn_id=str(
                 metadata.get("turn_id")
-                or f"state:{normalized_evidence_refs[0]}"
+                or f"state:{reentry_ref}"
             ),
             focus_goal_ids=normalized_goal_ids,
             revision=1,
@@ -5331,7 +5357,7 @@ class VoiceAssistant:
             ).model_dump(mode="json")
 
         request = CognitiveWorkRequest(
-            sid=f"{sid}:state:{normalized_evidence_refs[0]}"[:160],
+            sid=f"{sid}:state:{reentry_ref}"[:160],
             text=user_request,
             language=language,
             responsibilities=responsibilities,
@@ -5435,6 +5461,7 @@ class VoiceAssistant:
             {
                 "planner_state_reentry": True,
                 "planner_state_reentry_phase": phase,
+                "planner_state_reentry_ref": reentry_ref,
                 "planner_state_reentry_evidence_refs": normalized_evidence_refs,
                 **(
                     {"goal_association": association}
@@ -5496,12 +5523,12 @@ class VoiceAssistant:
                 }
             )
             speech_goal_ids = existing_source_goal_ids or set(normalized_goal_ids)
-            if (
+            if normalized_evidence_refs and (
                 not speech.metadata.get("truth_stage")
                 and (not evidence_goal_set or speech_goal_ids & evidence_goal_set)
             ):
                 speech.metadata["truth_stage"] = "post_evidence"
-            if (
+            if normalized_evidence_refs and (
                 not speech.metadata.get("evidence_refs")
                 and (not evidence_goal_set or speech_goal_ids & evidence_goal_set)
             ):
@@ -5809,17 +5836,17 @@ class VoiceAssistant:
                 f"{receipt.dispatch_id if receipt is not None else 'immediate'}"
             ),
         )
-        result_tasks = getattr(self, "active_capability_result_tasks", None)
+        result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
         if not isinstance(result_tasks, dict):
             result_tasks = {}
-            self.active_capability_result_tasks = result_tasks
+            self.active_cognitive_runtime_tasks = result_tasks
         result_tasks[result_task] = dispatch.source_response.interaction_id
-        result_task.add_done_callback(self._capability_result_task_done)
+        result_task.add_done_callback(self._cognitive_runtime_task_done)
 
         return receipt
 
-    def _capability_result_task_done(self, task: asyncio.Task) -> None:
-        result_tasks = getattr(self, "active_capability_result_tasks", None)
+    def _cognitive_runtime_task_done(self, task: asyncio.Task) -> None:
+        result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
         if isinstance(result_tasks, dict):
             result_tasks.pop(task, None)
         if task.cancelled():
@@ -5827,7 +5854,7 @@ class VoiceAssistant:
         error = task.exception()
         if error is not None:
             logger.error(
-                "Detached capability result task failed: %s",
+                "Detached cognitive runtime task failed: %s",
                 error,
                 exc_info=error,
             )
@@ -7017,15 +7044,23 @@ class VoiceAssistant:
                 audio_device_monitor(self)
             )
         await self._announce_runtime_ready()
+        time_condition_task = asyncio.create_task(
+            run_time_condition_wake_loop(self),
+            name="time-condition-cognition-wake",
+        )
+        self.active_cognitive_runtime_tasks[time_condition_task] = (
+            "time-condition-cognition-wake"
+        )
+        time_condition_task.add_done_callback(self._cognitive_runtime_task_done)
         if self.conversation_state.runtime_revalidation_candidates():
             task = asyncio.create_task(
                 self._revalidate_restored_goals_from_provider_state(),
                 name="restored-goal-provider-revalidation",
             )
-            self.active_capability_result_tasks[task] = (
+            self.active_cognitive_runtime_tasks[task] = (
                 "restored-goal-provider-revalidation"
             )
-            task.add_done_callback(self._capability_result_task_done)
+            task.add_done_callback(self._cognitive_runtime_task_done)
         input_runtime = input_session_runtime_for(self)
         if self.audio_input_mode == "stdin":
             await input_runtime.injected_audio_stream()

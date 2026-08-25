@@ -5,6 +5,7 @@ import unittest
 from types import SimpleNamespace
 
 from orchestrator.orchestrator import VoiceAssistant
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
     ExecutionOutcomeBundle,
@@ -18,6 +19,7 @@ from shared.chromie_contracts.plan import (
     RespondGoalPlanOutcome,
     canonical_plan_fingerprint,
 )
+from shared.chromie_contracts.situation import CognitiveOpportunity
 from shared.chromie_contracts.tool_result import (
     ToolResultEvidence,
     canonical_value_sha256,
@@ -231,6 +233,118 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertIsNotNone(duplicate)
         assert duplicate is not None
         self.assertEqual(duplicate.speech, [])
+
+
+    def test_non_evidence_time_opportunity_can_reenter_without_false_post_evidence_truth(self) -> None:
+        goal_id = "goal-reminder"
+        satisfaction = GoalSatisfactionAssessment(
+            score=1.0,
+            status="exact",
+            satisfied_goal_ids=[goal_id],
+        )
+        replanned = CanonicalPlan(
+            plan_id="reminder-due-response",
+            planner_tier="fast",
+            disposition="respond",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=[goal_id],
+            response_text="It is time.",
+            goal_outcomes=[
+                RespondGoalPlanOutcome(
+                    goal_id=goal_id,
+                    disposition="respond",
+                    coverage="complete",
+                    response_text="It is time.",
+                    satisfaction=satisfaction,
+                )
+            ],
+            goal_satisfaction=satisfaction,
+        )
+
+        class Client:
+            request = None
+
+            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+                self.request = request
+                return replanned
+
+        class Adapter:
+            async def build_planner_owned_response(self, **_kwargs):
+                return InteractionResponse(
+                    interaction_id="reminder-due",
+                    status="ok",
+                    speech=[InteractionSpeech(text="It is time.")],
+                )
+
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.agent_client = Client()
+        assistant.cognitive_runtime_policy = SimpleNamespace(
+            fast_planner_timeout_ms=3000,
+            deep_planner_timeout_ms=6000,
+        )
+        assistant.cognitive_runtime = SimpleNamespace(
+            adapter=Adapter(), interaction_ledger=None
+        )
+        assistant.session_log = lambda *_args, **_kwargs: None
+        assistant.build_context = lambda _sid: {"history": []}
+        assistant._goal_driven_authority_context = (
+            lambda context, **_kwargs: context
+        )
+
+        async def get_session():
+            return object()
+
+        assistant.get_http_session = get_session
+        opportunity = CognitiveOpportunity.create(
+            trigger="time_condition",
+            goal_ids=[goal_id],
+            reason_codes=["planner_time_condition"],
+            recommended_cognition="fast",
+        )
+        responsibility = CognitiveResponsibilityProposal(
+            local_ref="resp-reminder",
+            outcome="Remind the user at the requested time.",
+            output_mode="stateful_effect",
+            relationship="new",
+            confidence=1.0,
+        )
+
+        response = asyncio.run(
+            assistant._planner_state_reentry_response(
+                source_response=None,
+                canonical_plan=None,
+                user_request="Remind me later.",
+                language="en-US",
+                goal_ids=[goal_id],
+                evidence_goal_ids=[],
+                evidence_refs=[],
+                session_id=None,
+                phase="time_condition_reentry",
+                context_updates={
+                    "cognitive_opportunity": opportunity.prompt_projection(),
+                    "time_condition": {"condition_id": "condition-reminder"},
+                },
+                fast_workflow_stage="fast_planner_time_condition_reentry",
+                deep_workflow_stage="planner_deep_pass_time_condition_reentry",
+                response_source="fast_planner_time_condition_reentry",
+                responsibilities_override=[responsibility],
+            )
+        )
+
+        self.assertIsNotNone(response)
+        assert response is not None
+        self.assertEqual(
+            response.metadata["planner_state_reentry_ref"],
+            opportunity.opportunity_id,
+        )
+        self.assertEqual(response.metadata["evidence_refs"], [])
+        self.assertNotIn("truth_stage", response.speech[0].metadata)
+        self.assertNotIn("evidence_refs", response.speech[0].metadata)
+        self.assertEqual(
+            assistant.agent_client.request.context["cognitive_opportunity"]["trigger"],
+            "time_condition",
+        )
 
 
     def test_aggregate_reentry_exposes_failed_terminal_truth_without_host_wording(self) -> None:

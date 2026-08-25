@@ -85,6 +85,13 @@ async def shutdown_voice_assistant(
     if output_abort_tasks:
         await asyncio.gather(*output_abort_tasks, return_exceptions=True)
 
+    detached_state_tasks = list(
+        getattr(host, "active_cognitive_runtime_tasks", {}).keys()
+    )
+    _cancel_tasks(detached_state_tasks)
+    if detached_state_tasks:
+        await asyncio.gather(*detached_state_tasks, return_exceptions=True)
+
     sweeper = getattr(host, "session_idle_sweeper_task", None)
     if sweeper is not None and not sweeper.done():
         sweeper.cancel()

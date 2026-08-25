@@ -1465,8 +1465,19 @@ not mandatory sequential stages.
 
 Open responsibilities wait passively until reality makes new progress possible.
 Provider results, user clarification, timer events, scene/body changes, memory
-retrieval, or other relevant Evidence may reactivate cognition. Do not implement
-a background `while true: think()` loop or a giant numeric priority engine.
+retrieval, or other relevant state changes may reactivate cognition. Not every
+reactivation trigger is itself Evidence. A structured wall-clock condition may be a
+trusted mechanical readiness transition with zero `evidence_refs`, but it must remain
+bound to the exact Goal/current Plan and retained original Responsibility provenance.
+Situation revisions likewise preserve the provenance of their admitted trusted
+observation/Evidence instead of manufacturing new truth in Host. In every case the
+trigger says only that cognition may be useful now; it never chooses response or Work.
+
+A bounded sleeper/checker over already-structured due conditions is Runtime scheduling,
+not ambient cognition: it performs no semantic interpretation or model call until a
+condition is actually due. The Host must not infer timers from free-form Goal text. Do
+not implement a background `while true: think()` loop or a giant numeric priority
+engine.
 
 #### 4.14.9 Memory, learning, and recovery
 
