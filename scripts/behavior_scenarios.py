@@ -1652,7 +1652,7 @@ async def evaluate_cognitive_turn_loop_scenario(
         )
 
     async def launch_detached_result_task() -> asyncio.Task[CapabilityRuntimeResult]:
-        before = set(getattr(assistant, "active_capability_result_tasks", {}))
+        before = set(getattr(assistant, "active_cognitive_runtime_tasks", {}))
         await assistant._dispatch_detached_interaction(
             response,
             session_id,
@@ -1660,7 +1660,7 @@ async def evaluate_cognitive_turn_loop_scenario(
             reset_playback=False,
             mark_session_done=False,
         )
-        current = getattr(assistant, "active_capability_result_tasks", {})
+        current = getattr(assistant, "active_cognitive_runtime_tasks", {})
         created = [task for task in current if task not in before]
         if len(created) != 1:
             raise AssertionError(

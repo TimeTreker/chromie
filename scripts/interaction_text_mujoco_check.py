@@ -32,6 +32,13 @@ if str(ROOT) not in sys.path:
 from orchestrator.runtime.evidence_identity import (
     load_runtime_evidence_identity,
 )
+from orchestrator.runtime.playback_transport import (
+    transport_for as playback_transport_for,
+)
+from orchestrator.runtime.observability_recording import (
+    record_cognitive_runtime_evidence,
+)
+from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "text-mujoco"
 DEFAULT_TEXT = (
     "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, "
@@ -475,6 +482,23 @@ def _apply_soridormi_skill_timeout(response: Any, timeout_s: float | None) -> An
         for skill in response.capabilities
     ]
     return response.model_copy(deep=True, update={"capabilities": capabilities})
+
+
+def _planner_communication_already_scheduled(resolution: Any) -> bool:
+    """Preserve output ordering after an apply-mode Planner speech commit.
+
+    The production Host uses the same cognitive-resolution evidence to avoid
+    resetting playback when Fast Planner has already handed a Communicative
+    Activity to the Host. The live diagnostic must not discard that queued
+    speech or leave its session accounting unterminated before dispatching the
+    canonical response.
+    """
+
+    metadata = getattr(resolution, "metadata", None)
+    return bool(
+        isinstance(metadata, dict)
+        and metadata.get("fast_vocal_activity_ids")
+    )
 
 
 def _configure_environment(args: argparse.Namespace, evidence_dir: Path) -> None:
@@ -1033,8 +1057,12 @@ async def run_check(
                     **cognitive_resolution.metadata,
                     "host_commit_status": "prepared_and_goal_state_committed",
                 }
-            assistant._record_cognitive_runtime_evidence(
-                cognitive_resolution, session_id=sid, user_text=args.text
+            record_cognitive_runtime_evidence(
+                assistant.cognitive_evidence,
+                cognitive_resolution,
+                session_id=sid,
+                user_text=args.text,
+                session_log=assistant.session_log,
             )
         else:
             errors.append(
@@ -1133,17 +1161,19 @@ async def run_check(
                 confirmed_request_ids=confirmed,
             )
             before_result_tasks = set(
-                getattr(assistant, "active_capability_result_tasks", {})
+                getattr(assistant, "active_cognitive_runtime_tasks", {})
             )
             await assistant._dispatch_detached_interaction(
                 response,
                 sid,
                 confirmed_request_ids=confirmed,
-                reset_playback=True,
+                reset_playback=not _planner_communication_already_scheduled(
+                    cognitive_resolution
+                ),
                 mark_session_done=True,
             )
             current_result_tasks = getattr(
-                assistant, "active_capability_result_tasks", {}
+                assistant, "active_cognitive_runtime_tasks", {}
             )
             created_result_tasks = [
                 task
@@ -1320,7 +1350,12 @@ async def run_check(
         return summary
     finally:
         if owns_assistant:
-            await assistant.cleanup()
+            await shutdown_voice_assistant(
+                assistant,
+                close_output_stream=(
+                    playback_transport_for(assistant).close_output_stream
+                ),
+            )
 
 
 async def run_check_sequence(
@@ -1358,7 +1393,10 @@ async def run_check_sequence(
             if not summary.get("ok"):
                 break
     finally:
-        await assistant.cleanup()
+        await shutdown_voice_assistant(
+            assistant,
+            close_output_stream=playback_transport_for(assistant).close_output_stream,
+        )
     return summaries
 
 

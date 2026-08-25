@@ -44,6 +44,7 @@ class AttentionReview:
             turn_id=capture.turn_id,
             session_id=capture.session_id,
             context_digest=snapshot.digest,
+            channel=capture.channel,
             text=capture.normalized_text,
             language=capture.language or "auto",
             engagement=(engagement if isinstance(engagement, dict) else {}),

@@ -35,6 +35,7 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self,
         text: str,
         *,
+        channel: str = "voice",
         active: bool = False,
         evidence: str | None = None,
         recent_dialogue: list[dict[str, str]] | None = None,
@@ -44,6 +45,7 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
             turn_id="turn-1",
             session_id="turn-1",
             context_digest="1" * 64,
+            channel=channel,
             text=text,
             language="en-US",
             engagement={
@@ -53,6 +55,21 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
             },
             recent_dialogue=list(recent_dialogue or []),
         )
+
+    async def test_explicit_text_transport_admits_without_room_speech_review(self) -> None:
+        client = _Client(
+            {"addressed": False, "speech_act": "narration", "confidence": 0.99}
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(
+            self.request("我有点累。", channel="text")
+        )
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.source, "cognitive_gateway.explicit_text_transport")
+        self.assertEqual(result.confidence, 1.0)
+        self.assertEqual(client.calls, 0)
 
 
     async def test_disabled_gate_admits_without_fabricating_review_confidence(self) -> None:

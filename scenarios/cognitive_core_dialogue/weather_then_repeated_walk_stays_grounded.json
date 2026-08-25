@@ -89,13 +89,31 @@
               ],
               "unresolved": []
             }
+          },
+          {
+            "stage": "goal_interpretation_responsibility_coverage",
+            "decision": {
+              "responsibility_items": [
+                {
+                  "source_excerpt": "walk forward for 15 seconds quickly",
+                  "role": "responsibility",
+                  "coverage": "covered",
+                  "independently_satisfiable": true,
+                  "responsibility_refs": ["r1"],
+                  "required_output_mode": "body_action"
+                }
+              ],
+              "supporting_items": [],
+              "reason_summary": "The first walking request has one owner."
+            }
           }
         ]
       },
       "expect": {
-        "llm_calls": 1,
+        "llm_calls": 2,
         "llm_stages": [
-          "goal_interpretation"
+          "goal_interpretation",
+          "goal_interpretation_responsibility_coverage"
         ],
         "responsibilities": [
           {
@@ -142,13 +160,31 @@
               ],
               "unresolved": []
             }
+          },
+          {
+            "stage": "goal_interpretation_responsibility_coverage",
+            "decision": {
+              "responsibility_items": [
+                {
+                  "source_excerpt": "walk forward for 15 seconds quickly",
+                  "role": "responsibility",
+                  "coverage": "covered",
+                  "independently_satisfiable": true,
+                  "responsibility_refs": ["r1"],
+                  "required_output_mode": "body_action"
+                }
+              ],
+              "supporting_items": [],
+              "reason_summary": "The repeated walking request has one owner."
+            }
           }
         ]
       },
       "expect": {
-        "llm_calls": 1,
+        "llm_calls": 2,
         "llm_stages": [
-          "goal_interpretation"
+          "goal_interpretation",
+          "goal_interpretation_responsibility_coverage"
         ],
         "responsibilities": [
           {

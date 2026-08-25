@@ -100,13 +100,39 @@
               ],
               "unresolved": []
             }
+          },
+          {
+            "stage": "goal_interpretation_responsibility_coverage",
+            "decision": {
+              "responsibility_items": [
+                {
+                  "source_excerpt": "点点头",
+                  "role": "responsibility",
+                  "coverage": "covered",
+                  "independently_satisfiable": true,
+                  "responsibility_refs": ["r1"],
+                  "required_output_mode": "body_action"
+                },
+                {
+                  "source_excerpt": "眨两下眼睛",
+                  "role": "responsibility",
+                  "coverage": "covered",
+                  "independently_satisfiable": true,
+                  "responsibility_refs": ["r2"],
+                  "required_output_mode": "body_action"
+                }
+              ],
+              "supporting_items": [],
+              "reason_summary": "The nod and blink are independently observable."
+            }
           }
         ]
       },
       "expect": {
-        "llm_calls": 1,
+        "llm_calls": 2,
         "llm_stages": [
-          "goal_interpretation"
+          "goal_interpretation",
+          "goal_interpretation_responsibility_coverage"
         ],
         "responsibilities": [
           {

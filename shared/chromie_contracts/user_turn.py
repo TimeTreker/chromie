@@ -112,6 +112,7 @@ class AttentionReviewRequest(BaseModel):
     turn_id: str = Field(min_length=1, max_length=160)
     session_id: str = Field(min_length=1, max_length=160)
     context_digest: str = Field(min_length=64, max_length=64)
+    channel: UserTurnChannel
     text: str = Field(max_length=65536)
     language: str = Field(default="auto", min_length=1, max_length=64)
     engagement: dict[str, Any] = Field(default_factory=dict)

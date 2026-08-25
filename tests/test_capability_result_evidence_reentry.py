@@ -5,7 +5,10 @@ import unittest
 from types import SimpleNamespace
 
 from orchestrator.orchestrator import VoiceAssistant
-from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    PlannerReentryScope,
+)
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
     ExecutionOutcomeBundle,
@@ -15,6 +18,7 @@ from shared.chromie_contracts.interaction import InteractionResponse, Interactio
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     CanonicalPlanStep,
+    ExecuteGoalPlanOutcome,
     GoalSatisfactionAssessment,
     RespondGoalPlanOutcome,
     canonical_plan_fingerprint,
@@ -172,6 +176,14 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                             "output_mode": "information",
                             "relationship": "new",
                             "confidence": 1.0,
+                        },
+                        {
+                            "local_ref": "blink-result",
+                            "outcome": "Blink twice.",
+                            "bindings": {"count": 2},
+                            "output_mode": "body_action",
+                            "relationship": "new",
+                            "confidence": 1.0,
                         }
                     ]
                 },
@@ -181,6 +193,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                         {
                             "goal_id": goal_id,
                             "source_responsibility_refs": ["weather-result"],
+                        },
+                        {
+                            "goal_id": "goal-excluded-blink",
+                            "source_responsibility_refs": ["blink-result"],
                         }
                     ],
                 },
@@ -205,8 +221,31 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertEqual(response.speech[0].metadata["truth_stage"], "post_evidence")
         self.assertEqual(response.speech[0].metadata["evidence_refs"], ["weather-result"])
         request = assistant.agent_client.request
+        self.assertEqual(request.planner_reentry_scope.goal_ids, (goal_id,))
+        self.assertEqual(
+            request.planner_reentry_scope.trigger,
+            "post_execution",
+        )
+        self.assertEqual(
+            request.planner_reentry_scope.source_plan_id,
+            original.plan_id,
+        )
         self.assertEqual(request.context["result_evidence_reentry"]["source_goal_ids"], [goal_id])
         self.assertEqual(request.context["trusted_terminal_evidence"][0]["evidence_id"], "weather-result")
+        self.assertEqual(
+            [
+                item["local_ref"]
+                for item in request.context["core_interpretation"]["responsibilities"]
+            ],
+            ["weather-result"],
+        )
+        self.assertEqual(
+            [
+                item["goal_id"]
+                for item in request.context["goal_association_resolution"]["new_goals"]
+            ],
+            [goal_id],
+        )
 
         assistant._turn_speech_events = {
             "session": [
@@ -548,6 +587,149 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertEqual(truth["aggregate_status"], "failed")
         self.assertEqual(truth["goal_outcomes"][0]["status"], "failed")
         self.assertNotIn("speech", truth)
+
+    def test_aggregate_reentry_excludes_already_consumed_sibling_evidence_and_goal(self) -> None:
+        first_goal = "goal-walk"
+        second_goal = "goal-blink"
+        original = CanonicalPlan(
+            plan_id="compound-plan",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=0.98,
+            goal_ids=[first_goal, second_goal],
+            steps=[
+                CanonicalPlanStep(
+                    step_id="walk",
+                    capability_id="soridormi.walk_forward",
+                    args={"duration_s": 1},
+                    source_goal_ids=[first_goal],
+                ),
+                CanonicalPlanStep(
+                    step_id="blink",
+                    capability_id="soridormi.blink_eyes",
+                    args={"count": 2},
+                    source_goal_ids=[second_goal],
+                ),
+            ],
+            goal_outcomes=[
+                ExecuteGoalPlanOutcome(
+                    goal_id=first_goal,
+                    disposition="execute",
+                    coverage="complete",
+                    step_ids=["walk"],
+                ),
+                ExecuteGoalPlanOutcome(
+                    goal_id=second_goal,
+                    disposition="execute",
+                    coverage="complete",
+                    step_ids=["blink"],
+                ),
+            ],
+            goal_satisfaction=GoalSatisfactionAssessment(
+                score=1.0,
+                status="exact",
+                satisfied_goal_ids=[first_goal, second_goal],
+            ),
+        )
+        evidence_rows = [
+            ExecutionEvidence(
+                evidence_id="walk-failed",
+                request_id="request-walk",
+                step_id="walk",
+                capability_id="soridormi.walk_forward",
+                source_goal_ids=[first_goal],
+                status="failed",
+                reported_status="failed",
+                reason_code="provider_failed",
+            ),
+            ExecutionEvidence(
+                evidence_id="blink-failed",
+                request_id="request-blink",
+                step_id="blink",
+                capability_id="soridormi.blink_eyes",
+                source_goal_ids=[second_goal],
+                status="failed",
+                reported_status="failed",
+                reason_code="provider_failed",
+            ),
+        ]
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-compound",
+            turn_id="turn-compound",
+            interaction_id="interaction-compound",
+            canonical_plan_id=original.plan_id,
+            canonical_plan_fingerprint=canonical_plan_fingerprint(original),
+            canonical_goal_ids=[first_goal, second_goal],
+            aggregate_status="failed",
+            evidence=evidence_rows,
+            goal_outcomes=[
+                GoalExecutionOutcome(
+                    goal_id=first_goal,
+                    status="failed",
+                    step_ids=["walk"],
+                    evidence_ids=["walk-failed"],
+                    unresolved_step_ids=["walk"],
+                    reason_codes=["provider_failed"],
+                ),
+                GoalExecutionOutcome(
+                    goal_id=second_goal,
+                    status="failed",
+                    step_ids=["blink"],
+                    evidence_ids=["blink-failed"],
+                    unresolved_step_ids=["blink"],
+                    reason_codes=["provider_failed"],
+                ),
+            ],
+        )
+        source = InteractionResponse(
+            interaction_id="interaction-compound",
+            status="ok",
+            metadata={
+                "language": "en-US",
+                "incremental_planner_reentry_evidence_ids": ["walk-failed"],
+                "user_turn_envelope": {
+                    "normalized_input": {
+                        "text": "Walk, then blink twice.",
+                        "language": "en-US",
+                    }
+                },
+            },
+        )
+        captured: dict[str, object] = {}
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.session_log = lambda *_args, **_kwargs: None
+
+        async def capture(**kwargs):
+            captured.update(kwargs)
+            return InteractionResponse(interaction_id="planner-result", status="ok")
+
+        assistant._planner_state_reentry_response = capture
+        response = asyncio.run(
+            assistant._plan_evidence_bound_capability_result_response(
+                source_response=source,
+                bundle=bundle,
+                plan=original,
+                session_id="session",
+            )
+        )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(captured["goal_ids"], [second_goal])
+        self.assertEqual(captured["evidence_refs"], ["blink-failed"])
+        context = captured["context_updates"]
+        self.assertEqual(
+            [item["evidence_id"] for item in context["trusted_execution_outcome"]["evidence"]],
+            ["blink-failed"],
+        )
+        self.assertEqual(
+            [item["goal_id"] for item in context["trusted_execution_outcome"]["goal_outcomes"]],
+            [second_goal],
+        )
+        self.assertEqual(
+            [item["evidence_id"] for item in context["execution_outcome_bundle"]["evidence"]],
+            ["blink-failed"],
+        )
 
     def test_host_reentry_fails_closed_without_originating_responsibility(self) -> None:
         goal_id = "goal-weather"

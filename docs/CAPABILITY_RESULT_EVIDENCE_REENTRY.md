@@ -78,8 +78,12 @@ than Evidence. `ExecutionEvidence`/`ToolResultEvidence` is admitted only after t
 Host validates the immutable execution join.
 
 The Planner endpoint receives Host-bound terminal Evidence together with the existing
-canonical Goal set and current bounded state. Re-entry may not widen the supplied Goal
-set. It must reuse the originating Goal-Interpretation `responsibilities[]` and the
+exact affected canonical Goal subset and current bounded state. Re-entry may not widen
+the supplied Goal set. Before invocation the Host mechanically removes excluded sibling
+Responsibilities, Goal-Association rows, source-Plan steps/outcomes, and already-consumed
+terminal Evidence from the prompt projection; the original user text remains context,
+not authority to narrate an excluded sibling effect. Re-entry must reuse the originating
+Goal-Interpretation `responsibilities[]` and the
 Goal-Association `source_responsibility_refs` that bind those Responsibilities to the
 affected Goals. If that immutable Responsibility provenance is missing, malformed, or
 ambiguous, the Host retains the terminal Evidence but does not fabricate a callback
@@ -116,7 +120,9 @@ apply. An internal opportunity is never user confirmation.
   event.
 - Once Planner has consumed one terminal Evidence item, aggregate closure must not run a
   second semantic response/planning pass over the same Evidence merely because sibling
-  Work later completes. A later failure or new terminal result is a new transition with
-  its own Evidence/opportunity.
+  Work later completes. If aggregate closure still has unconsumed Evidence, its Planner
+  scope and execution-truth projection contain only those unconsumed items and their
+  Goals. A later failure or new terminal result is a new transition with its own
+  Evidence/opportunity.
 - Re-entry failure produces no speculative incremental speech. Retained terminal truth
   remains available for diagnostics and a later authorized state transition.

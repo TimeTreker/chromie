@@ -26,7 +26,11 @@ from .capabilities.validator import validate_args_for_schema
 from .planner_context import first_response_phase_decided, planner_goal_execution_requirements
 from .planner_grounding import semantic_numeric_values
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
-from .planner_validation import parallel_plan_contract_errors, planner_contract_diagnostics
+from .planner_validation import (
+    parallel_activity_contract_errors,
+    parallel_plan_contract_errors,
+    planner_contract_diagnostics,
+)
 from .prompt_projection import bounded_json
 
 
@@ -47,12 +51,17 @@ class AuthoritativeGroundingValidationError(ValueError):
     """Fast output contradicts or bypasses immutable Goal grounding."""
 
 
+class FastAdvanceMechanicalSchedulingError(PlannerDTOContractError):
+    """A timing label is mechanically unusable without changing its meaning."""
+
+
 def planner_validation_error_items(
     exc: Exception,
     *,
     raw: Any,
     planner_tier: PlannerTier,
     expected_goal_ids_for_turn: list[str],
+    include_canonical_plan_diagnostics: bool = True,
 ) -> list[dict[str, Any]]:
     if isinstance(exc, CapabilityArgumentValidationError):
         feedback = [dict(item) for item in exc.feedback]
@@ -60,13 +69,14 @@ def planner_validation_error_items(
         feedback = list(exc.errors(include_url=False))
     else:
         feedback = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
-    feedback.extend(
-        planner_contract_diagnostics(
-            raw,
-            planner_tier=planner_tier,
-            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+    if include_canonical_plan_diagnostics:
+        feedback.extend(
+            planner_contract_diagnostics(
+                raw,
+                planner_tier=planner_tier,
+                expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+            )
         )
-    )
     unique: list[dict[str, Any]] = []
     seen: set[tuple[str, tuple[Any, ...]]] = set()
     for item in feedback:
@@ -88,6 +98,7 @@ def planner_validation_error_json(
     planner_tier: PlannerTier,
     expected_goal_ids_for_turn: list[str],
     limit: int = 10000,
+    include_canonical_plan_diagnostics: bool = True,
 ) -> str:
     from .prompt_projection import bounded_json
 
@@ -97,6 +108,9 @@ def planner_validation_error_json(
             raw=raw,
             planner_tier=planner_tier,
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+            include_canonical_plan_diagnostics=(
+                include_canonical_plan_diagnostics
+            ),
         ),
         limit,
     )
@@ -360,9 +374,119 @@ def validate_fast_advance_output(
     capability_activities = [
         item for item in output.activities if item.role == "capability"
     ]
+    terminal_activities = [
+        item
+        for item in output.activities
+        if item.role in {"capability", "complete_response"}
+    ]
+    parallel_batch: list[Any] = []
+    for activity in capability_activities:
+        if activity.timing == "parallel":
+            parallel_batch.append(activity)
+            continue
+        if len(parallel_batch) == 1 and len(capability_activities) > 1:
+            raise FastAdvanceMechanicalSchedulingError(
+                "Fast Planner parallel timing must form a contiguous group of at "
+                "least two Capability Activities; singleton="
+                + parallel_batch[0].activity_id
+            )
+        parallel_batch = []
+    if len(parallel_batch) == 1 and len(capability_activities) > 1:
+        raise FastAdvanceMechanicalSchedulingError(
+            "Fast Planner parallel timing must form a contiguous group of at "
+            "least two Capability Activities; singleton="
+            + parallel_batch[0].activity_id
+        )
+    parallel_errors = parallel_activity_contract_errors(
+        capability_activities,
+        capabilities,
+    )
+    if parallel_errors:
+        raise FastAdvanceMechanicalSchedulingError(
+            "Fast Planner parallel timing conflicts with the authoritative "
+            "Capability scheduling contract: "
+            + json.dumps(
+                parallel_errors,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+    activity_indexes_by_ref: dict[str, list[int]] = {
+        ref: [] for ref in responsibility_refs
+    }
+    terminal_by_ref: dict[str, list[Any]] = {
+        ref: [] for ref in responsibility_refs
+    }
+    for activity_index, activity in enumerate(terminal_activities):
+        for source_ref in activity.source_responsibility_refs:
+            if source_ref not in activity_indexes_by_ref:
+                continue
+            activity_indexes_by_ref[source_ref].append(activity_index)
+            terminal_by_ref[source_ref].append(activity)
+
+    def sibling_refs(value: Any) -> list[str]:
+        values = value if isinstance(value, list) else [value]
+        return [
+            str(item).strip()
+            for item in values
+            if str(item).strip() in by_ref
+        ]
+
+    for source_ref, source in by_ref.items():
+        for relation_name in ("before", "precedes"):
+            for target_ref in sibling_refs(source.bindings.get(relation_name)):
+                if not activity_indexes_by_ref[source_ref] or not activity_indexes_by_ref[target_ref]:
+                    continue
+                if max(activity_indexes_by_ref[source_ref]) >= min(
+                    activity_indexes_by_ref[target_ref]
+                ) or any(
+                    activity.timing != "sequential"
+                    for activity in terminal_by_ref[source_ref] + terminal_by_ref[target_ref]
+                ):
+                    raise FastAdvanceMechanicalSchedulingError(
+                        "Fast Planner timing contradicts typed Responsibility order: "
+                        f"{source_ref} must precede {target_ref}"
+                    )
+        for relation_name in ("after", "follows"):
+            for target_ref in sibling_refs(source.bindings.get(relation_name)):
+                if not activity_indexes_by_ref[source_ref] or not activity_indexes_by_ref[target_ref]:
+                    continue
+                if min(activity_indexes_by_ref[source_ref]) <= max(
+                    activity_indexes_by_ref[target_ref]
+                ) or any(
+                    activity.timing != "sequential"
+                    for activity in terminal_by_ref[source_ref] + terminal_by_ref[target_ref]
+                ):
+                    raise FastAdvanceMechanicalSchedulingError(
+                        "Fast Planner timing contradicts typed Responsibility order: "
+                        f"{source_ref} must follow {target_ref}"
+                    )
+        for target_ref in sibling_refs(source.bindings.get("parallel_with")):
+            if not terminal_by_ref[source_ref] or not terminal_by_ref[target_ref]:
+                continue
+            if any(
+                activity.timing != "parallel"
+                for activity in terminal_by_ref[source_ref] + terminal_by_ref[target_ref]
+            ):
+                raise FastAdvanceMechanicalSchedulingError(
+                    "Fast Planner timing contradicts typed Responsibility concurrency: "
+                    f"{source_ref} must run parallel with {target_ref}"
+                )
     complete_response_activities = [
         item for item in output.activities if item.role == "complete_response"
     ]
+    for activity in complete_response_activities:
+        for source_ref in activity.source_responsibility_refs:
+            source = by_ref.get(source_ref)
+            if source is not None and source.output_mode != "speech":
+                raise PlannerDTOContractError(
+                    "complete_response Activity may satisfy only an ordinary "
+                    "speech Responsibility; observable, informational, vocal, "
+                    "media, and stateful outcomes require their own terminal "
+                    f"Activity; source_ref={source_ref} "
+                    f"output_mode={source.output_mode}"
+                )
     numeric_args_by_ref: dict[str, set[Decimal]] = {
         ref: set() for ref in responsibility_refs
     }
@@ -484,6 +608,13 @@ def validate_fast_advance_output(
             )
         for source_ref in activity.source_responsibility_refs:
             source = by_ref[source_ref]
+            if source.output_mode == "speech":
+                raise PlannerDTOContractError(
+                    "ordinary speech Responsibility requires a Planner-authored "
+                    "complete_response Activity, not a Capability Activity; "
+                    f"source_ref={source_ref} actual_capability="
+                    f"{activity.capability_id}"
+                )
             if source.output_mode not in set(VOCAL_MODES) - {"speech"}:
                 continue
             if (

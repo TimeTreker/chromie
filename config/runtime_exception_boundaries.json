@@ -232,7 +232,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "1d7c1cba8474a5d51b7b50e03adddc5f55001d09bd75bd05ec931c17276c85ae",
+      "body_sha256": "508bdd5364cbf61f03f5e7d5ab4f46da47280c66034c0fa03ee537651e29f8b7",
       "failure_signals": [
         "continue",
         "diagnostic",
@@ -289,7 +289,7 @@
       "owner": "agent.fast_planner",
       "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
       "review_status": "reviewed",
-      "body_sha256": "d4e42855b699f20a478747054d497588595a2a542676c9187383c2c32755d2bb",
+      "body_sha256": "1d936a1fe35ee040071a2d4cc3fdd4a42e37ee8e938e27a1346b23150e780b67",
       "failure_signals": [
         "continue",
         "return",

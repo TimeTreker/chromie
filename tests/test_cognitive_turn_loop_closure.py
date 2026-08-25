@@ -352,6 +352,26 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
                 metadata={
                     "source": "test_planner_evidence_reentry",
                     "phase": phase,
+                    # Match the production re-entry projection closely enough to
+                    # prove that delivered result speech cannot replace the
+                    # original execution binding before aggregate reconciliation.
+                    "turn_id": "turn-reentry",
+                    "canonical_plan_id": "plan-reentry-response",
+                    "canonical_plan_fingerprint": "e" * 64,
+                    "canonical_plan": {
+                        "plan_id": "plan-reentry-response",
+                        "disposition": "respond",
+                        "goal_ids": goal_ids,
+                        "goal_outcomes": [
+                            {
+                                "goal_id": goal_id,
+                                "disposition": "respond",
+                                "coverage": "complete",
+                                "step_ids": [],
+                            }
+                            for goal_id in goal_ids
+                        ],
+                    },
                 },
             )
 
@@ -563,6 +583,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(execution.status, "failed")
         self.assertEqual(len(runtime.calls), 2)
+        self.assertEqual(runtime.session_ids, [session_id, session_id])
         final_response = runtime.calls[1]
         self.assertEqual(final_response.capabilities, [])
         self.assertEqual(
@@ -580,6 +601,14 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         }
         self.assertEqual(contexts["goal-first"]["status"], "done")
         self.assertEqual(contexts["goal-second"]["status"], "failed")
+        self.assertEqual(
+            contexts["goal-first"]["metadata"]["interaction_id"],
+            response.interaction_id,
+        )
+        self.assertEqual(
+            contexts["goal-second"]["metadata"]["interaction_id"],
+            response.interaction_id,
+        )
         self.assertEqual(
             contexts["goal-second"]["metadata"]["execution_outcome_status"],
             "not_run",

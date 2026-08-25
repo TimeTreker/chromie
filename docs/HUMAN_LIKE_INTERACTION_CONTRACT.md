@@ -197,6 +197,22 @@ first-response phase; after that commitment, remaining Fast planning and Goal
 Association consume it concurrently. Deep Goal Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
+Before an effectful or multi-Responsibility GI result is accepted, an independent
+source-based coverage certificate must account for the authoritative turn and prove
+one candidate owner per independently satisfiable outcome. Trusted code validates
+the certificate's source-token references, mechanically materializes their exact
+contiguous source spans, and validates candidate references, cardinality, and
+output-mode agreement; the independent audit does not receive the candidate
+`output_mode` it is checking and cannot retype or silently correct user spelling.
+For an ordered or parallel supporting constraint the certificate also lists the
+participating candidate refs. Trusted code verifies that the candidate actually
+encodes material order as `before`/`after` sibling-Responsibility references or
+requested concurrency as `parallel_with` sibling references. These
+typed semantic relations let Planner author timing and let the Host reject a
+contradiction without interpreting the user's words. Trusted code never uses
+conjunction/action phrase rules to invent missing WHAT. One
+failed certificate may cause one fresh source resegmentation and final certificate;
+there is no recursive semantic repair.
 
 Fast Planner is the first stage that compares understood Responsibility with concrete
 Plan, Agent-Skill, Capability, safety, and provider contracts. It therefore owns
@@ -224,6 +240,10 @@ GA preserve the person's human temporal scope rather than converting it into pro
 arguments. Planner receives that source-grounded scope together with the immutable
 original turn and realizes provider-local temporal arguments only after selecting a
 Capability whose current contract explicitly declares that realization boundary.
+Planner owns those transformed argument values. When their provenance is uniquely
+derivable from the immutable Goal binding, selected Capability realization contract,
+and model-authored step ownership, the Host projects the duplicate parameter-resolution
+record without changing any plan-semantic field; ambiguity still fails normal validation.
 
 Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
 serving multiple Goals appears in each applicable view under the same stable request
@@ -274,6 +294,12 @@ the Goal remains open. Routine runtime churn does not wake cognition, and passiv
 does not close the Responsibility. Continuous Mind means state-driven re-entry until all
 owned Responsibilities are satisfied, cancelled, refused, or superseded—not an unlimited
 background LLM loop.
+
+Each re-entry carries an immutable typed scope containing the exact trigger, affected
+Goal IDs, Evidence refs or opportunity identity, and source Plan identity when present.
+The Planner sees and may return exactly those affected Goals. Unrelated or already-closed
+sibling Goals may remain in durable history but are not projected into the transaction;
+scope/Goal/Evidence/Plan mismatch fails closed instead of being repaired by the model.
 
 ## Human-like cognition is selective, not perfectionist
 

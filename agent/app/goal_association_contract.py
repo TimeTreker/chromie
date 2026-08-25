@@ -67,8 +67,10 @@ _EXECUTION_CONTRACT_PROMPT = (
     "execution lane, fresh Evidence, or Work is required. Use information when the "
     "person wants Chromie to determine or provide information, whether that information "
     "is already available to reasoning/context or must later be acquired. Use "
-    "stateful_effect for a durable or future state change such as recording, scheduling, "
-    "changing a setting, or sending later. Embodied effects use body_action; lifecycle "
+    "stateful_effect only for a durable or future state change outside embodiment, such as "
+    "recording, scheduling, changing a setting, or sending later. Locomotion, posture, "
+    "gaze, gesture, physical manipulation, carrying, and handover use body_action even "
+    "when they change location or another lasting physical state; lifecycle "
     "control of media uses media_playback; authored vocal performances use their exact "
     "vocal mode. Ordinary directly authored conversation uses speech. Capability and "
     "provider applicability are Planner concerns and must not be encoded into Goal "
@@ -476,7 +478,14 @@ class GoalAssociationModelPhysicalResourceResponsibility(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["physical_object"]
+    kind: Literal["physical_object"] = Field(
+        description=(
+            "Select only when the responsibility is to acquire a distinct concrete "
+            "object independent of Chromie's body and physically hand it to a "
+            "recipient. Never select for Chromie's own locomotion, posture, gaze, "
+            "gesture, turning, or other body motion."
+        ),
+    )
     description: str = Field(
         min_length=1,
         description=(
@@ -523,7 +532,9 @@ class GoalAssociationModelGoal(BaseModel):
         description=(
             "Provider-neutral human outcome modality copied from Goal Interpretation. "
             "information says the person wants information; stateful_effect says the "
-            "person wants a durable or future state change. Neither category asserts "
+            "person wants a durable or future state change outside embodiment. Physical "
+            "motion, posture, gaze, gesture, manipulation, carrying, and handover are "
+            "body_action even when their physical result lasts. Neither category asserts "
             "that a Capability, provider, execution lane, fresh Evidence, or Work is "
             "required. Use exact embodied, media, or vocal modes only when those are "
             "the requested observable outcome."
@@ -542,7 +553,26 @@ class GoalAssociationModelGoal(BaseModel):
     )
     related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     supersedes_goal_ids: list[str] = Field(default_factory=list, max_length=8)
-    resource_responsibility: GoalAssociationModelResourceResponsibility | None = None
+    resource_kind: Literal["none", "physical_object", "information"] = Field(
+        default="none",
+        description=(
+            "Explicit discriminator for the requested resource outcome. Use none for "
+            "ordinary conversation and Chromie's own locomotion, posture, gaze, "
+            "gesture, turning, or body motion; physical_object only when acquiring a "
+            "distinct concrete object and handing it to a recipient is the outcome; "
+            "information only when determining or providing information is the outcome."
+        ),
+    )
+    resource_responsibility: GoalAssociationModelResourceResponsibility | None = Field(
+        default=None,
+        description=(
+            "Use null for ordinary conversation, vocal/media effects, and Chromie's "
+            "own locomotion, posture, gaze, gesture, turning, or other body motion. "
+            "Use a physical_object only when acquiring a distinct concrete object "
+            "independent of Chromie's body and handing it to a recipient is itself "
+            "the requested outcome. Use information only for an information outcome."
+        ),
+    )
 
     @classmethod
     def __get_pydantic_json_schema__(
@@ -602,6 +632,16 @@ class GoalAssociationModelGoal(BaseModel):
             raise ValueError("media_playback requires one exact media_operation")
         if self.output_mode != "media_playback" and self.media_operation != "none":
             raise ValueError("media_operation is valid only for output_mode=media_playback")
+        actual_resource_kind = (
+            self.resource_responsibility.kind
+            if self.resource_responsibility is not None
+            else "none"
+        )
+        if self.resource_kind != actual_resource_kind:
+            raise ValueError(
+                "resource_kind must exactly discriminate resource_responsibility: "
+                f"declared={self.resource_kind!r} actual={actual_resource_kind!r}"
+            )
         if self.resource_responsibility is not None:
             required_mode: GoalOutputMode = (
                 "body_action"

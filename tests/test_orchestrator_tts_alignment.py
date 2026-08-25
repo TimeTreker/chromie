@@ -1415,8 +1415,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 self,
                 sid: str | None,
                 response: InteractionResponse,
+                *,
+                bind_planned_execution: bool = True,
             ) -> None:
-                del sid
+                del sid, bind_planned_execution
                 recorded.append(response)
 
         assistant.conversation_state = _ConversationState()

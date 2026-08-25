@@ -69,6 +69,7 @@ has no route/intent compatibility projection and does not select executable capa
 microphone -> host VAD -> ASR -> Cognitive Gateway
   -> matched stop/cancel: interrupt current work and retain the envelope/outcome
   -> local suppression: record the envelope and start no ordinary cognition
+  -> explicit text: transport-addressed admission -> admitted UserTurnEnvelope
   -> otherwise: attention review -> admitted UserTurnEnvelope
   -> Goal Interpretation: contextual Responsibility + Goal relation + bounded unresolved meaning
   -> same GI result, concurrent fan-out
@@ -148,6 +149,7 @@ semantic path.
 `orchestrator/runtime/planner_reentry.py` owns the pure mechanical policy used when
 terminal Runtime Evidence may reactivate Planner. It checks the exact current
 Goal/Plan/request binding, reuses only the originating GI Responsibility provenance,
+constructs an immutable typed scope for the exact affected Goal/Evidence/Plan set,
 rejects repetition of the completed Activity, and removes exact already-delivered speech
 deltas. It does not decide whether Evidence is interesting, reinterpret a Goal, author a
 response, or execute Work. Missing Responsibility provenance retains the Evidence but

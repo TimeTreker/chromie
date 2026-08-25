@@ -59,15 +59,33 @@
             "The intended destination is not identified."
           ]
         }
+      },
+      {
+        "stage": "goal_interpretation_responsibility_coverage",
+        "decision": {
+          "responsibility_items": [
+            {
+              "source_excerpt": "move over there a little",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r1"],
+              "required_output_mode": "body_action"
+            }
+          ],
+          "supporting_items": [],
+          "reason_summary": "One unresolved movement outcome is preserved."
+        }
       }
     ]
   },
   "expect": {
     "confidence": 0.78,
-    "llm_calls": 2,
+    "llm_calls": 3,
     "llm_stages": [
       "goal_interpretation",
-      "goal_interpretation_deep"
+      "goal_interpretation_deep",
+      "goal_interpretation_responsibility_coverage"
     ],
     "unresolved": [
       "The intended destination is not identified."

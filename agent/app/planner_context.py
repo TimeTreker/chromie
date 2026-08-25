@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import ValidationError
 
 try:
+    from chromie_contracts.core_interpretation import PlannerReentryScope
     from chromie_contracts.control import GoalCancellationEvidence
     from chromie_contracts.goal import GoalAssociationResolution
     from chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
@@ -15,6 +16,7 @@ try:
     from chromie_contracts.tool_result import ToolResultEvidence
     from chromie_contracts.plan import FastPlannerFirstResponse
 except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.control import GoalCancellationEvidence
     from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
@@ -24,6 +26,8 @@ except ImportError:  # pragma: no cover
 
 def goal_association_prompt_projection(
     context: dict[str, Any] | None,
+    *,
+    goal_ids: tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, Any]:
     """Return the closed Goal Association projection permitted in prompts.
 
@@ -144,6 +148,50 @@ def goal_association_prompt_projection(
         for item in raw.get("resolved_references") or []
         if isinstance(item, dict)
     ]
+    if goal_ids is not None:
+        allowed = {
+            " ".join(str(goal_id or "").strip().split())
+            for goal_id in goal_ids
+            if " ".join(str(goal_id or "").strip().split())
+        }
+        scoped_associations: list[dict[str, Any]] = []
+        for item in projection["associations"]:
+            target_goal_ids = [
+                goal_id
+                for value in item.get("target_goal_ids") or []
+                if (goal_id := " ".join(str(value or "").strip().split()))
+                in allowed
+            ]
+            goal_update = item.get("goal_update")
+            update_goal_id = (
+                " ".join(str(goal_update.get("goal_id") or "").strip().split())
+                if isinstance(goal_update, dict)
+                else ""
+            )
+            if not target_goal_ids and update_goal_id not in allowed:
+                continue
+            scoped = copy.deepcopy(item)
+            scoped["target_goal_ids"] = target_goal_ids
+            if update_goal_id and update_goal_id not in allowed:
+                scoped.pop("goal_update", None)
+            scoped_associations.append(scoped)
+        projection["associations"] = scoped_associations
+        projection["new_goals"] = [
+            item
+            for item in projection["new_goals"]
+            if " ".join(str(item.get("goal_id") or "").strip().split())
+            in allowed
+        ]
+        projection["referent_updates"] = [
+            item
+            for item in projection["referent_updates"]
+            if isinstance(item.get("referent"), dict)
+            and allowed.intersection(
+                " ".join(str(value or "").strip().split())
+                for value in item["referent"].get("source_goal_ids") or []
+            )
+        ]
+        projection["resolved_references"] = []
     serialized = json.dumps(
         projection,
         ensure_ascii=False,
@@ -493,7 +541,11 @@ class PlannerGoalContext:
     requires_execution: bool
 
 
-def planner_goal_context(context: dict[str, Any] | None) -> PlannerGoalContext:
+def planner_goal_context(
+    context: dict[str, Any] | None,
+    *,
+    reentry_scope: PlannerReentryScope | None = None,
+) -> PlannerGoalContext:
     """Project canonical Goal/evidence truth once for either Planner depth.
 
     Result-Evidence re-entry deliberately re-opens the executable catalog rather
@@ -503,12 +555,56 @@ def planner_goal_context(context: dict[str, Any] | None) -> PlannerGoalContext:
     """
 
     current = context if isinstance(context, dict) else {}
-    expected = tuple(expected_goal_ids(current))
-    goals = canonical_goal_grounding(current)
+    full_expected = tuple(expected_goal_ids(current))
+    full_goals = canonical_goal_grounding(current)
     cancellation_goal_ids = frozenset(
         goal_cancellation_evidence_reentry_goal_ids(current)
     )
     result_goal_ids = frozenset(result_evidence_reentry_goal_ids(current))
+    if reentry_scope is not None:
+        expected = tuple(reentry_scope.goal_ids)
+        unknown = set(expected) - set(full_expected)
+        if unknown:
+            raise ValueError(
+                "Planner re-entry scope references Goals absent from Goal Association: "
+                + ",".join(sorted(unknown))
+            )
+        goals_by_id = {
+            " ".join(str(goal.get("goal_id") or "").strip().split()): goal
+            for goal in full_goals
+            if isinstance(goal, dict)
+        }
+        missing_grounding = set(expected) - set(goals_by_id)
+        if missing_grounding:
+            raise ValueError(
+                "Planner re-entry scope lacks canonical Goal grounding: "
+                + ",".join(sorted(missing_grounding))
+            )
+        goals = [goals_by_id[goal_id] for goal_id in expected]
+        scope_ids = frozenset(expected)
+        if reentry_scope.trigger in {
+            "capability_result_reentry",
+            "post_execution",
+        }:
+            if result_goal_ids != scope_ids:
+                raise ValueError(
+                    "Planner result-Evidence re-entry context does not match typed scope"
+                )
+            result_goal_ids = scope_ids
+            cancellation_goal_ids = frozenset()
+        elif reentry_scope.trigger == "goal_cancellation_reentry":
+            if cancellation_goal_ids != scope_ids:
+                raise ValueError(
+                    "Planner cancellation re-entry context does not match typed scope"
+                )
+            cancellation_goal_ids = scope_ids
+            result_goal_ids = frozenset()
+        else:
+            cancellation_goal_ids = frozenset()
+            result_goal_ids = frozenset()
+    else:
+        expected = full_expected
+        goals = full_goals
     response_only, requires_execution = planner_goal_execution_requirements(goals)
     response_goal_ids = set(planner_response_goal_ids(goals)) | set(
         cancellation_goal_ids

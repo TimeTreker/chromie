@@ -145,6 +145,7 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
     CoreInterpretationResult,
+    PlannerReentryScope,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
@@ -153,10 +154,11 @@ from shared.chromie_contracts.interaction import (
     CapabilityResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.plan import CanonicalPlan, canonical_plan_fingerprint
 from shared.chromie_contracts.reflection import ReflectionRequest
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
+    aggregate_execution_status,
     goal_completion_qualification_summary,
 )
 from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
@@ -4030,9 +4032,19 @@ class VoiceAssistant:
             session_id=session_id,
         )
         try:
+            delivery_session_id = session_id
+            if detached_delivery and isinstance(
+                response.metadata.get("deferred_outcome_delivery"), dict
+            ):
+                # A response intentionally held behind a newer turn is no longer
+                # ordered inside its original playback session. Current-session
+                # re-entry must retain its sid so TTS ordering can accept it;
+                # dropping every detached delivery to sid=None makes valid
+                # evidence-bound speech stale immediately.
+                delivery_session_id = None
             dispatch = await self.interaction_runtime.submit_response(
                 response,
-                session_id=None if detached_delivery else session_id,
+                session_id=delivery_session_id,
             )
             execution = await self.interaction_runtime.wait_dispatch(dispatch)
         except asyncio.CancelledError:
@@ -4141,9 +4153,14 @@ class VoiceAssistant:
             },
         )
         try:
+            # This helper is used only for Planner re-entry after Runtime
+            # Evidence exists. Retain the delivered assistant turn, but do not
+            # reinterpret that communicative delta as replacement executable
+            # Work: the source interaction's outcome still owns reconciliation.
             self.conversation_state.record_interaction_response(
                 session_id,
                 delivered_response,
+                bind_planned_execution=False,
             )
         except Exception as exc:
             self.session_log(
@@ -5394,6 +5411,34 @@ class VoiceAssistant:
             )
             return None
 
+        # Re-entry is an exact Goal subset, not the originating turn replayed with
+        # a hint. Remove excluded sibling semantic material before Planner sees the
+        # state so a per-result response cannot narrate another Goal's effect.
+        scoped_goal_set = set(normalized_goal_ids)
+        scoped_responsibility_refs = {
+            item.local_ref for item in responsibilities
+        }
+        if isinstance(association, dict):
+            association = {
+                **association,
+                "associations": [
+                    dict(item)
+                    for item in association.get("associations") or []
+                    if isinstance(item, dict)
+                    and scoped_goal_set.intersection(
+                        str(value).strip()
+                        for value in item.get("target_goal_ids") or []
+                        if str(value).strip()
+                    )
+                ],
+                "new_goals": [
+                    dict(item)
+                    for item in association.get("new_goals") or []
+                    if isinstance(item, dict)
+                    and str(item.get("goal_id") or "").strip() in scoped_goal_set
+                ],
+            }
+
         sid = str(
             session_id
             or (canonical_plan.plan_id if canonical_plan is not None else "")
@@ -5408,7 +5453,43 @@ class VoiceAssistant:
         if isinstance(association, dict):
             context["goal_association_resolution"] = association
         if canonical_plan is not None:
-            context["canonical_plan_resolution"] = canonical_plan.prompt_projection()
+            plan_projection = canonical_plan.prompt_projection()
+            selected_step_ids = {
+                step.step_id
+                for step in canonical_plan.steps
+                if scoped_goal_set.intersection(step.source_goal_ids)
+            }
+            plan_projection.update(
+                {
+                    "goal_ids": normalized_goal_ids,
+                    "response_text": "",
+                    "steps": [
+                        item
+                        for item in plan_projection.get("steps") or []
+                        if isinstance(item, dict)
+                        and str(item.get("step_id") or "") in selected_step_ids
+                    ],
+                    "goal_outcomes": [
+                        item
+                        for item in plan_projection.get("goal_outcomes") or []
+                        if isinstance(item, dict)
+                        and str(item.get("goal_id") or "") in scoped_goal_set
+                    ],
+                    "parameter_resolutions": [
+                        item
+                        for item in plan_projection.get("parameter_resolutions") or []
+                        if isinstance(item, dict)
+                        and str(item.get("step_id") or "") in selected_step_ids
+                    ],
+                    "time_conditions": [
+                        item
+                        for item in plan_projection.get("time_conditions") or []
+                        if isinstance(item, dict)
+                        and str(item.get("goal_id") or "") in scoped_goal_set
+                    ],
+                }
+            )
+            context["canonical_plan_resolution"] = plan_projection
             planner_reentry_expectations = [
                 {
                     "step_id": step.step_id,
@@ -5427,7 +5508,15 @@ class VoiceAssistant:
         if isinstance(metadata.get("user_turn_envelope"), dict):
             context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
         if isinstance(metadata.get("goal_interpretation"), dict):
-            context["core_interpretation"] = dict(metadata["goal_interpretation"])
+            source_interpretation = dict(metadata["goal_interpretation"])
+            source_interpretation["responsibilities"] = [
+                item
+                for item in source_interpretation.get("responsibilities") or []
+                if isinstance(item, dict)
+                and str(item.get("local_ref") or "")
+                in scoped_responsibility_refs
+            ]
+            context["core_interpretation"] = source_interpretation
         if provided_situation is not None:
             if not set(normalized_goal_ids).issubset(
                 set(provided_situation.focus_goal_ids)
@@ -5462,12 +5551,27 @@ class VoiceAssistant:
                 turn_id=str(metadata.get("turn_id") or ""),
             ).model_dump(mode="json")
 
+        source_plan_id = canonical_plan.plan_id if canonical_plan is not None else ""
+        source_plan_fingerprint = (
+            canonical_plan_fingerprint(canonical_plan)
+            if canonical_plan is not None
+            else ""
+        )
+        reentry_scope = PlannerReentryScope(
+            trigger=phase,
+            goal_ids=normalized_goal_ids,
+            evidence_refs=normalized_evidence_refs,
+            opportunity_id=opportunity_ref,
+            source_plan_id=source_plan_id,
+            source_plan_fingerprint=source_plan_fingerprint,
+        )
         request = CognitiveWorkRequest(
             sid=f"{sid}:state:{reentry_ref}"[:160],
             text=user_request,
             language=language,
             responsibilities=responsibilities,
             interpretation_confidence=1.0,
+            planner_reentry_scope=reentry_scope,
             context=context,
             history=list(context.get("history") or []),
         )
@@ -5730,6 +5834,7 @@ class VoiceAssistant:
             if str(item).strip()
         }
         evidence: list[ToolResultEvidence] = []
+        selected_execution_evidence: list[ExecutionEvidence] = []
         for item in bundle.evidence:
             if not reflection_reentry and item.evidence_id in delivered_incremental_evidence:
                 continue
@@ -5752,6 +5857,7 @@ class VoiceAssistant:
                     output_sha256=canonical_value_sha256(observation_data),
                 )
             )
+            selected_execution_evidence.append(item)
         if not evidence:
             return None
 
@@ -5762,15 +5868,55 @@ class VoiceAssistant:
         )
         if not user_request:
             return None
-        goal_ids = list(plan.executable_goal_ids())
+        plan_goal_ids = set(plan.executable_goal_ids())
+        goal_ids = list(
+            dict.fromkeys(
+                goal_id
+                for item in selected_execution_evidence
+                for goal_id in item.source_goal_ids
+                if goal_id in plan_goal_ids
+            )
+        )
+        if not goal_ids:
+            return None
         try:
             evidence_refs = [item.evidence_id for item in evidence]
+            selected_evidence_ids = set(evidence_refs)
+            selected_goal_ids = set(goal_ids)
+            projected_bundle = bundle.model_dump(mode="json", exclude_none=True)
+            projected_bundle["canonical_goal_ids"] = goal_ids
+            projected_bundle["non_execution_goal_ids"] = []
+            projected_bundle["evidence"] = [
+                item
+                for item in projected_bundle.get("evidence") or []
+                if isinstance(item, dict)
+                and str(item.get("evidence_id") or "") in selected_evidence_ids
+            ]
+            projected_bundle["goal_outcomes"] = [
+                item
+                for item in projected_bundle.get("goal_outcomes") or []
+                if isinstance(item, dict)
+                and str(item.get("goal_id") or "") in selected_goal_ids
+            ]
+            projected_bundle["aggregate_status"] = aggregate_execution_status(
+                [item.status for item in selected_execution_evidence]
+            )
+            projected_truth = planner_execution_outcome_truth(bundle)
+            projected_truth["aggregate_status"] = projected_bundle["aggregate_status"]
+            projected_truth["goal_outcomes"] = [
+                item
+                for item in projected_truth.get("goal_outcomes") or []
+                if str(item.get("goal_id") or "") in selected_goal_ids
+            ]
+            projected_truth["evidence"] = [
+                item
+                for item in projected_truth.get("evidence") or []
+                if str(item.get("evidence_id") or "") in selected_evidence_ids
+            ]
             extra_context = {
-                "execution_outcome_bundle": bundle.model_dump(
-                    mode="json", exclude_none=True
-                ),
-                "trusted_execution_outcome": planner_execution_outcome_truth(bundle),
-                "aggregate_status": bundle.aggregate_status,
+                "execution_outcome_bundle": projected_bundle,
+                "trusted_execution_outcome": projected_truth,
+                "aggregate_status": projected_bundle["aggregate_status"],
                 "goal_statuses": [
                     {
                         "goal_id": item.goal_id,
@@ -5780,6 +5926,7 @@ class VoiceAssistant:
                         ),
                     }
                     for item in bundle.goal_outcomes
+                    if item.goal_id in selected_goal_ids
                 ],
             }
             return await self._planner_state_reentry_response(

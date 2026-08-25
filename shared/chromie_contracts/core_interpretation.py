@@ -104,7 +104,10 @@ class CognitiveResponsibilityProposal(BaseModel):
         default_factory=dict,
         description=(
             "Material user-semantic facts from the authoritative turn or bounded "
-            "semantic context only; never runtime/session identifiers or HOW fields."
+            "semantic context only; never runtime/session identifiers or HOW fields. "
+            "Cross-Responsibility order uses before/after with exact sibling local_ref "
+            "values; requested concurrency uses parallel_with with exact sibling "
+            "local_ref values."
         ),
     )
     output_mode: Literal[
@@ -125,7 +128,10 @@ class CognitiveResponsibilityProposal(BaseModel):
         description=(
             "Provider-neutral WHAT category for this one human outcome. information "
             "means the person wants Chromie to determine or provide information; "
-            "stateful_effect means the person wants a durable or future state change. "
+            "stateful_effect means the person wants a durable or future state change "
+            "outside embodiment. Physical locomotion, posture, gaze, gesture, manipulation, "
+            "carrying, and handover are body_action even when they change location or "
+            "another lasting physical state. "
             "These categories do not say whether work, fresh evidence, a Capability, "
             "provider, Activity, executable argument, or later speech is required. "
             "Requested physical-object acquisition/carrying/handover remains "
@@ -235,6 +241,85 @@ class CoreInterpretationResult(BaseModel):
         return self
 
 
+class PlannerReentryScope(BaseModel):
+    """Immutable state-transition scope for one same-Planner re-entry.
+
+    This is readiness/provenance, not another semantic owner.  It prevents a
+    full conversation Goal projection from silently widening the exact Goal set
+    affected by terminal Evidence, cancellation, Situation, time, or provider
+    revalidation.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    trigger: Literal[
+        "capability_result_reentry",
+        "post_execution",
+        "goal_cancellation_reentry",
+        "situation_revision_reentry",
+        "time_condition_reentry",
+        "restored_provider_state_revalidation",
+    ]
+    goal_ids: tuple[str, ...] = Field(min_length=1, max_length=16)
+    evidence_refs: tuple[str, ...] = Field(default_factory=tuple, max_length=32)
+    opportunity_id: str = Field(default="", max_length=200)
+    source_plan_id: str = Field(default="", max_length=200)
+    source_plan_fingerprint: str = Field(default="", max_length=128)
+
+    @field_validator(
+        "goal_ids",
+        "evidence_refs",
+        mode="before",
+    )
+    @classmethod
+    def normalize_ids(cls, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("Planner re-entry identity fields must be arrays")
+        return tuple(
+            dict.fromkeys(
+                text
+                for item in value
+                if (text := normalize_turn_text(str(item or "")))
+            )
+        )
+
+    @field_validator(
+        "opportunity_id",
+        "source_plan_id",
+        "source_plan_fingerprint",
+        mode="before",
+    )
+    @classmethod
+    def normalize_scalar_ids(cls, value: Any) -> str:
+        return normalize_turn_text(str(value or ""))
+
+    @model_validator(mode="after")
+    def validate_trigger_evidence(self) -> "PlannerReentryScope":
+        evidence_triggers = {
+            "capability_result_reentry",
+            "post_execution",
+            "goal_cancellation_reentry",
+        }
+        if self.trigger in evidence_triggers and not self.evidence_refs:
+            raise ValueError(
+                f"Planner re-entry trigger={self.trigger} requires evidence_refs"
+            )
+        if self.trigger not in evidence_triggers and not self.opportunity_id:
+            raise ValueError(
+                f"Planner re-entry trigger={self.trigger} requires opportunity_id"
+            )
+        if bool(self.source_plan_id) != bool(self.source_plan_fingerprint):
+            raise ValueError(
+                "source_plan_id and source_plan_fingerprint must be supplied together"
+            )
+        return self
+
+
 class CognitiveWorkRequest(BaseModel):
     """Typed WHAT→HOW handoff used by maintained cognitive work endpoints.
 
@@ -252,6 +337,7 @@ class CognitiveWorkRequest(BaseModel):
     responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
     interpretation_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     interpretation_unresolved: list[str] = Field(default_factory=list, max_length=12)
+    planner_reentry_scope: PlannerReentryScope | None = None
     context: dict[str, Any] = Field(default_factory=dict)
     history: list[dict[str, Any]] = Field(default_factory=list)
 

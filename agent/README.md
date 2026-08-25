@@ -11,7 +11,10 @@ The service is **not** a second orchestration runtime. The retired `AgentRuntime
 `/agents`, independent response-authoring stage, and Tool Result Interpreter
 surfaces have been removed. One Planner authority owns Communicative Activities; its
 fast/deep passes receive bounded Responsibility/Goal/Work/Evidence state on initial and
-event-driven re-entry. The Host Orchestrator owns turn coordination
+event-driven re-entry. Re-entry includes one immutable exact affected-Goal scope;
+unrelated siblings are not projected back into the Planner transaction. Planner owns
+Capability/argument/step semantics, while the shared validation kernel projects only
+uniquely derivable duplicate parameter provenance. The Host Orchestrator owns turn coordination
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
 provider behind the Capability boundary.
 

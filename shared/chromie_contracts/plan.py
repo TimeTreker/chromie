@@ -723,7 +723,7 @@ class PlannedGoalTimeCondition(BaseModel):
 
     @field_validator("condition_id", "goal_id", "reason_code", mode="before")
     @classmethod
-    def normalize_text(cls, value: Any) -> str:
+    def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
 
 

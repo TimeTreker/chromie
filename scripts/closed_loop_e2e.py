@@ -44,6 +44,12 @@ if str(ROOT) not in sys.path:
 
 from orchestrator.clients.asr_client import ASRClient  # noqa: E402
 from orchestrator.clients.tts_client import TTSClient  # noqa: E402
+from orchestrator.runtime.playback_transport import (  # noqa: E402
+    transport_for as playback_transport_for,
+)
+from orchestrator.runtime.shutdown_lifecycle import (  # noqa: E402
+    shutdown_voice_assistant,
+)
 from scripts.acceptance_audio import (  # noqa: E402
     AudioFixture,
     HostSpeakerPlayer,
@@ -1132,7 +1138,10 @@ async def run_workflow_case(
         metrics = transcript_metrics(case.language, delivered_text, "")
         semantic = expected_term_result(case, delivered_text)
     finally:
-        await assistant.cleanup()
+        await shutdown_voice_assistant(
+            assistant,
+            close_output_stream=playback_transport_for(assistant).close_output_stream,
+        )
     result = {
         "id": case.case_id,
         "language": case.language,

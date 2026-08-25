@@ -26,6 +26,45 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 
+def _normalized_binding_name(value: Any) -> str:
+    return "_".join(
+        str(value).strip().casefold().replace("-", "_").split()
+    )
+
+
+def _canonical_source_binding_value(name: Any, value: Any) -> str:
+    normalized_name = _normalized_binding_name(name)
+    normalized_value = " ".join(str(value).strip().casefold().split())
+    if normalized_name == "speed":
+        return {
+            "slowly": "slow",
+            "quickly": "quick",
+        }.get(normalized_value, normalized_value)
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return normalized_value
+
+
+def _ordinary_source_binding_pairs(
+    request: CognitiveWorkRequest,
+) -> dict[str, set[tuple[str, str]]]:
+    return {
+        responsibility.local_ref: {
+            (
+                _normalized_binding_name(name),
+                _canonical_source_binding_value(name, value),
+            )
+            for name, value in responsibility.bindings.items()
+            if isinstance(value, (str, int, float, bool))
+            and _normalized_binding_name(name)
+            not in {"action", "activity", "effect", "outcome"}
+        }
+        for responsibility in request.responsibilities
+    }
+
+
 class _CoverageSourceExcerptViolation(ValueError):
     """Coverage audit cited text outside the authoritative user turn."""
 
@@ -392,17 +431,18 @@ def drop_ungrounded_resource_query_locations(
     return normalized, dropped
 
 
-def normalize_grounded_generic_location_types(
+def normalize_grounded_binding_types(
     raw: dict[str, Any],
     *,
     request: CognitiveWorkRequest,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Canonicalize only a source-grounded location with a generic DTO type.
+    """Canonicalize only source-grounded spatial/temporal DTO type labels.
 
     The model already owns the semantic field name and exact value. This adapter
-    changes neither; it replaces only the mechanically non-semantic ``string``/
-    ``text``/``entity`` type label after the value is proven by the authoritative
-    turn, GI bindings, or an admitted resolved reference.
+    changes neither; this replaces only a mechanically non-canonical type/name
+    pair after the value is proven by the authoritative turn, GI bindings, or an
+    admitted resolved reference. Provider-facing temporal realization remains a
+    Planner responsibility.
     """
 
     normalized = copy.deepcopy(raw)
@@ -419,6 +459,7 @@ def normalize_grounded_generic_location_types(
         if isinstance(item, dict)
         and str(item.get("resolved_value") or "").strip()
     )
+    ordinary_pairs_by_ref = _ordinary_source_binding_pairs(request)
     generic_types = {"entity", "string", "text"}
     repaired: list[dict[str, Any]] = []
     goals = normalized.get("new_goals")
@@ -427,6 +468,15 @@ def normalize_grounded_generic_location_types(
     for goal_index, goal in enumerate(goals):
         if not isinstance(goal, dict):
             continue
+        goal_source_refs = {
+            str(source_ref)
+            for source_ref in goal.get("source_responsibility_refs") or []
+        }
+        expected_ordinary_pairs = {
+            pair
+            for source_ref in goal_source_refs
+            for pair in ordinary_pairs_by_ref.get(source_ref, set())
+        }
         surfaces: list[tuple[str, Any]] = [("bindings", goal.get("bindings"))]
         resource = goal.get("resource_responsibility")
         if isinstance(resource, dict):
@@ -463,14 +513,104 @@ def normalize_grounded_generic_location_types(
                 value = " ".join(
                     str(binding.get("value") or "").strip().split()
                 ).casefold()
+                grounded = bool(
+                    value
+                    and (
+                        value in authoritative_turn
+                        or value in grounded_values
+                    )
+                )
+                source_pair_grounded = (
+                    name,
+                    value,
+                ) in expected_ordinary_pairs
+                if surface_name == "bindings" and source_pair_grounded:
+                    canonical_type: str | None = None
+                    if name == "direction" and entity_type in {
+                        "spatial_direction",
+                        *generic_types,
+                    }:
+                        canonical_type = "direction"
+                    elif name in {"duration", "duration_seconds"} and entity_type in {
+                        "integer",
+                        "number",
+                        "temporal_scope",
+                        "time_duration",
+                        *generic_types,
+                    }:
+                        canonical_type = "duration"
+                    elif name == "speed" and entity_type in {
+                        "manner",
+                        *generic_types,
+                    }:
+                        canonical_type = "speed"
+                    elif name in {
+                        "amount",
+                        "count",
+                        "item_count",
+                        "quantity",
+                        "quantity_binding",
+                        "resource_count",
+                        "resource_quantity",
+                    } and entity_type in {"integer", "number", *generic_types}:
+                        canonical_type = name
+                    if canonical_type is not None:
+                        binding["entity_type"] = canonical_type
+                        repaired.append(
+                            {
+                                "path": (
+                                    f"new_goals[{goal_index}].{surface_name}"
+                                    f"[{binding_index}].entity_type"
+                                ),
+                                "from": entity_type,
+                                "to": canonical_type,
+                                "value_unchanged": True,
+                                "source_pair_grounded": True,
+                            }
+                        )
+                        continue
+                if (
+                    surface_name == "resource.query_scope"
+                    and name in {"date", "time", "temporal_scope"}
+                    and entity_type in {"date", "period", "time"}
+                    and grounded
+                ):
+                    binding["entity_type"] = "temporal_scope"
+                    repaired.append(
+                        {
+                            "path": (
+                                f"new_goals[{goal_index}].{surface_name}"
+                                f"[{binding_index}].entity_type"
+                            ),
+                            "from": entity_type,
+                            "to": "temporal_scope",
+                            "value_unchanged": True,
+                        }
+                    )
+                    continue
+                if (
+                    name == "location_relative"
+                    and entity_type == "location_relative"
+                    and grounded
+                ):
+                    binding["name"] = "location"
+                    binding["entity_type"] = "relative_location"
+                    repaired.append(
+                        {
+                            "path": (
+                                f"new_goals[{goal_index}].{surface_name}"
+                                f"[{binding_index}]"
+                            ),
+                            "from": "location_relative/location_relative",
+                            "to": "location/relative_location",
+                            "value_unchanged": True,
+                        }
+                    )
+                    continue
                 if (
                     name != "location"
                     or entity_type not in generic_types
-                    or not value
-                    or (
-                        value not in authoritative_turn
-                        and value not in grounded_values
-                    )
+                    or not grounded
                 ):
                     continue
                 binding["entity_type"] = "place"
@@ -548,6 +688,7 @@ def binding_semantic_contract_conflicts(
     categories = {
         "distance": {"distance"},
         "direction": {"direction"},
+        "duration": {"duration", "duration_seconds"},
         "quantity": {
             "amount",
             "count",
@@ -557,6 +698,7 @@ def binding_semantic_contract_conflicts(
             "resource_count",
             "resource_quantity",
         },
+        "speed": {"speed"},
     }
     category_by_token = {
         token: category
@@ -731,7 +873,7 @@ def source_grounded_binding_coverage_conflicts(
     for responsibility in request.responsibilities:
         expected_by_ref[responsibility.local_ref] = {
             (
-                "_".join(str(name).strip().casefold().replace("-", "_").split()),
+                _normalized_binding_name(name),
                 value,
             )
             for name, raw_value in responsibility.bindings.items()
@@ -750,28 +892,28 @@ def source_grounded_binding_coverage_conflicts(
         if not expected_pairs:
             continue
         resource = goal.resource_responsibility
-        canonicalized_binding_names: set[str] = set()
         if resource is None:
-            actual = {
-                " ".join(binding.value.strip().casefold().split())
-                for binding in goal.semantic_bindings
+            ordinary_expected_pairs = {
+                (name, _canonical_source_binding_value(name, value))
+                for name, value in expected_pairs
             }
-            canonicalized_binding_names = {
-                "_".join(
-                    binding.name.strip().casefold().replace("-", "_").split()
+            actual_pairs = {
+                (
+                    _normalized_binding_name(binding.name),
+                    " ".join(binding.value.strip().casefold().split()),
                 )
                 for binding in goal.semantic_bindings
-                if binding.entity_type.casefold() == "speed"
             }
             normalized_description = " ".join(
                 goal.description.strip().casefold().split()
             )
-            actual.update(
-                value
-                for name, value in expected_pairs
+            actual_pairs.update(
+                (name, value)
+                for name, value in ordinary_expected_pairs
                 if name in {"action", "activity", "effect", "outcome"}
                 and value in normalized_description
             )
+            missing_pairs = ordinary_expected_pairs - actual_pairs
         elif resource.kind == "information":
             actual = {
                 " ".join(binding.value.strip().casefold().split())
@@ -783,6 +925,9 @@ def source_grounded_binding_coverage_conflicts(
             actual.update(scalar_values(resource.recipient.description))
             if resource.source.status == "known":
                 actual.update(scalar_values(resource.source.source_name))
+            missing_pairs = {
+                pair for pair in expected_pairs if pair[1] not in actual
+            }
         else:
             actual = {
                 " ".join(binding.value.strip().casefold().split())
@@ -826,12 +971,10 @@ def source_grounded_binding_coverage_conflicts(
                 if name in {"recipient", "delivery_recipient"}
                 and value in scalar_values(resource.recipient.description)
             )
-        for _, missing in sorted(
-            pair
-            for pair in expected_pairs
-            if pair[1] not in actual
-            and pair[0] not in canonicalized_binding_names
-        ):
+            missing_pairs = {
+                pair for pair in expected_pairs if pair[1] not in actual
+            }
+        for _, missing in sorted(missing_pairs):
             conflicts.append(
                 f"new_goals[{goal_index}] source_refs="
                 f"{','.join(goal.source_responsibility_refs)} missing={missing!r}"

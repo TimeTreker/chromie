@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from .clients.ollama_client import OllamaGenerationError, llm_failure_metadata
-from .planner_context import expected_goal_ids
+from .planner_context import planner_goal_context
 from . import planner_fast_validation as _planner_fast_validation
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -20,6 +20,18 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
 
 logger = logging.getLogger("chromie.agent.planner_fallback")
+
+
+def _request_goal_ids(request: CognitiveWorkRequest) -> list[str]:
+    """Return the exact Planner scope, including typed state re-entry bounds."""
+
+    context = request.context if isinstance(request.context, dict) else {}
+    return list(
+        planner_goal_context(
+            context,
+            reentry_scope=request.planner_reentry_scope,
+        ).expected_goal_ids
+    )
 
 
 def materialize_fast_advance_fail_safe(
@@ -131,7 +143,6 @@ def materialize_fast_escalation(
                 **llm_failure_metadata(error),
             }
         )
-    context = request.context if isinstance(request.context, dict) else {}
     retained_progress = " ".join(str(response_text or "").strip().split())
     if retained_progress:
         detail["retained_progress_response_text"] = {
@@ -144,7 +155,7 @@ def materialize_fast_escalation(
         disposition="escalate",
         coverage="uncertain",
         confidence=0.0,
-        goal_ids=expected_goal_ids(context),
+        goal_ids=_request_goal_ids(request),
         goal_summary=request.text,
         response_text=retained_progress,
         steps=[],
@@ -190,7 +201,6 @@ def materialize_deep_unavailable(
                 **llm_failure_metadata(error),
             }
         )
-    context = request.context if isinstance(request.context, dict) else {}
     return CanonicalPlan(
         plan_id=plan_id,
         planner_tier="deep",
@@ -198,7 +208,7 @@ def materialize_deep_unavailable(
         coverage="uncertain",
         confidence=0.0,
         goal_summary=request.text,
-        goal_ids=expected_goal_ids(context),
+        goal_ids=_request_goal_ids(request),
         response_text="",
         steps=[],
         unresolved=list(unresolved or []),
@@ -235,7 +245,6 @@ def materialize_deep_clarify(
                 **llm_failure_metadata(error),
             }
         )
-    context = request.context if isinstance(request.context, dict) else {}
     return CanonicalPlan(
         plan_id=plan_id,
         planner_tier="deep",
@@ -243,7 +252,7 @@ def materialize_deep_clarify(
         coverage="uncertain",
         confidence=0.0,
         goal_summary=request.text,
-        goal_ids=expected_goal_ids(context),
+        goal_ids=_request_goal_ids(request),
         response_text="",
         steps=[],
         unresolved=list(unresolved or []),

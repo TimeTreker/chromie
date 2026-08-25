@@ -43,7 +43,11 @@ except ImportError:  # pragma: no cover - repository development path
 
 from ...prompt_projection import bounded_json
 from .errors import InterpretationUnavailableError
-from .schema import GoalInterpretationDecision, GoalInterpretationRequest
+from .schema import (
+    GoalInterpretationCoverageCertificate,
+    GoalInterpretationDecision,
+    GoalInterpretationRequest,
+)
 
 
 logger = logging.getLogger("chromie.agent.goal_interpreter.llm")
@@ -301,6 +305,137 @@ def _short_exact_surface_substrings(text: str) -> list[str]:
         for end in range(start + 1, len(surface) + 1)
     }
     return sorted(values, key=lambda value: (len(value), value))
+
+
+def _coverage_source_tokens(text: str) -> list[dict[str, Any]]:
+    """Expose bounded exact source units without asking a model to retype them.
+
+    Latin/digit runs stay readable as words, CJK characters remain independently
+    citable, and punctuation is retained. Whitespace is recovered from the source
+    slice between the first and last cited token; no semantic tokenization occurs.
+    """
+
+    source = " ".join(str(text or "").strip().split())
+    tokens: list[dict[str, Any]] = []
+    index = 0
+
+    def is_cjk(char: str) -> bool:
+        codepoint = ord(char)
+        return (
+            0x3400 <= codepoint <= 0x4DBF
+            or 0x4E00 <= codepoint <= 0x9FFF
+            or 0xF900 <= codepoint <= 0xFAFF
+        )
+
+    while index < len(source):
+        if source[index].isspace():
+            index += 1
+            continue
+        start = index
+        char = source[index]
+        if is_cjk(char):
+            index += 1
+        elif char.isalnum() or char == "_":
+            index += 1
+            while index < len(source):
+                candidate = source[index]
+                if is_cjk(candidate) or not (
+                    candidate.isalnum() or candidate in {"_", "'", "’"}
+                ):
+                    break
+                index += 1
+        else:
+            index += 1
+        tokens.append(
+            {
+                "ref": f"t{len(tokens)}",
+                "surface": source[start:index],
+                "start": start,
+                "end": index,
+            }
+        )
+    return tokens
+
+
+def _materialize_coverage_source_excerpts(
+    request: GoalInterpretationRequest,
+    raw: dict[str, Any],
+) -> dict[str, Any]:
+    """Derive exact audit excerpts from contiguous model-cited source tokens."""
+
+    source = " ".join(str(request.text or "").strip().split())
+    tokens = _coverage_source_tokens(source)
+    by_ref = {str(item["ref"]): item for item in tokens}
+    index_by_ref = {str(item["ref"]): index for index, item in enumerate(tokens)}
+    for collection_name in ("responsibility_items", "supporting_items"):
+        items = raw.get(collection_name)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            # Source-excerpt input remains accepted by direct unit tests and old
+            # retained evidence, but the live response schema below never exposes
+            # this free-form field to the model.
+            if isinstance(item.get("source_excerpt"), str):
+                continue
+            start_ref = str(item.pop("source_start_token_ref", "") or "").strip()
+            end_ref = str(item.pop("source_end_token_ref", "") or "").strip()
+            if not start_ref or not end_ref:
+                # Compatibility for retained iteration-5 evidence and direct tests;
+                # the live schema no longer exposes variable-length token lists.
+                refs = item.pop("source_token_refs", None)
+                if not isinstance(refs, list) or not refs:
+                    raise _GoalInterpretationSemanticStructureViolation(
+                        "Responsibility coverage must cite a source token span"
+                    )
+                start_ref = str(refs[0]).strip()
+                end_ref = str(refs[-1]).strip()
+            if start_ref not in by_ref or end_ref not in by_ref:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Responsibility coverage cited unknown source token refs"
+                )
+            if index_by_ref[start_ref] > index_by_ref[end_ref]:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Responsibility coverage source token span is reversed"
+                )
+            first = by_ref[start_ref]
+            last = by_ref[end_ref]
+            item["source_excerpt"] = source[int(first["start"]):int(last["end"])]
+    responsibility_items = raw.get("responsibility_items")
+    responsibility_items = (
+        responsibility_items if isinstance(responsibility_items, list) else []
+    )
+    for index, item in enumerate(responsibility_items):
+        if isinstance(item, dict) and not str(item.get("audit_ref") or "").strip():
+            item["audit_ref"] = f"a{index + 1}"
+    supporting_items = raw.get("supporting_items")
+    for item in supporting_items if isinstance(supporting_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        relation_kind = str(item.get("relation_kind") or "none")
+        if relation_kind == "none":
+            item.setdefault("related_audit_refs", [])
+            continue
+        if isinstance(item.get("related_audit_refs"), list):
+            continue
+        candidate_refs = item.get("responsibility_refs")
+        candidate_refs = candidate_refs if isinstance(candidate_refs, list) else []
+        item["related_audit_refs"] = list(
+            dict.fromkeys(
+                str(responsibility_item.get("audit_ref") or "").strip()
+                for candidate_ref in candidate_refs
+                for responsibility_item in responsibility_items
+                if isinstance(responsibility_item, dict)
+                and str(candidate_ref).strip()
+                in {
+                    str(value).strip()
+                    for value in responsibility_item.get("responsibility_refs") or []
+                }
+                and str(responsibility_item.get("audit_ref") or "").strip()
+            )
+        )
+    return raw
 
 
 def _reject_dropped_explicit_numeric_bindings(
@@ -810,6 +945,21 @@ def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
         "simultaneously",
         "together",
     }
+    sibling_relation_names = {
+        "after",
+        "before",
+        "follows",
+        "parallel_with",
+        "precedes",
+    }
+    simultaneous_relation_names = {
+        "alongside",
+        "concurrent_with",
+        "parallel_with",
+        "simultaneity",
+        "simultaneous_with",
+        "with",
+    }
     for responsibility_index, item in enumerate(responsibilities):
         if not isinstance(item, dict):
             continue
@@ -833,8 +983,8 @@ def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
                 "coordinat" in normalized_name
                 or "combin" in normalized_name
                 or "simultan" in normalized_name
-                or normalized_name
-                in {"alongside", "concurrent_with", "parallel_with", "with"}
+                or normalized_name in sibling_relation_names
+                or normalized_name in simultaneous_relation_names
                 or (
                     normalized_name == "mode"
                     and normalized_scalar_values.issubset(relation_tokens)
@@ -858,6 +1008,17 @@ def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
                 len(local_refs) > 1
                 and normalized_scalar_values
                 and normalized_scalar_values.issubset(relation_tokens)
+            ):
+                continue
+            # A boolean attached to an explicitly relation-shaped field is only
+            # structural coordination evidence.  Once sibling Responsibilities
+            # already expose the independently observable effects, true/false
+            # cannot conceal another action phrase and is safe to retain as a
+            # human-semantic timing constraint.
+            if (
+                len(local_refs) > 1
+                and normalized_name in simultaneous_relation_names
+                and isinstance(value, bool)
             ):
                 continue
             raise _GoalInterpretationSemanticStructureViolation(
@@ -1247,8 +1408,10 @@ class OllamaGoalInterpreter:
             "when the person wants Chromie to determine or provide information, regardless "
             "of whether the answer is already present in trusted Context or will require "
             "fresh acquisition later. Use output_mode=stateful_effect when the requested "
-            "WHAT is a durable or future state change such as recording, scheduling, "
-            "changing a setting, or sending later. Preserve body, media, and vocal "
+            "WHAT is a durable or future state change outside embodiment, such as recording, "
+            "scheduling, changing a setting, or sending later. Locomotion, posture, "
+            "gaze, gesture, physical manipulation, carrying, and handover remain "
+            "body_action even when they change location or physical state. Preserve body, media, and vocal "
             "effects in their exact observable modes. Do not decide whether downstream "
             "work, fresh Evidence, a Capability, or a provider is required; Planner owns "
             "that judgment from canonical Goal state, trusted Evidence, and available "
@@ -1338,8 +1501,11 @@ class OllamaGoalInterpreter:
                     {
                         "const": "stateful_effect",
                         "description": (
-                            "A durable or future state change such as recording, scheduling, "
-                            "changing a setting, or sending later."
+                            "A durable or future state change outside embodiment, such as "
+                            "recording, scheduling, changing a setting, or sending later. "
+                            "Never use this for locomotion, posture, gaze, gesture, "
+                            "physical manipulation, carrying, or handover; those are "
+                            "body_action even when their physical result lasts."
                         ),
                     },
                     {
@@ -1373,8 +1539,10 @@ class OllamaGoalInterpreter:
                     "Provider-neutral WHAT category for this one atomic outcome. "
                     "Use information whenever the requested outcome is to determine or "
                     "provide information, whether or not current trusted Context already "
-                    "contains the answer. Use stateful_effect for durable/future state "
-                    "changes. These categories never decide work, fresh Evidence, a "
+                    "contains the answer. Use stateful_effect only for durable/future "
+                    "state changes outside embodiment; every physical motion, posture, gaze, "
+                    "gesture, manipulation, carrying, or handover is body_action. These "
+                    "categories never decide work, fresh Evidence, a "
                     "Capability, provider, or response transport. Singing or a song is "
                     "singing; blinking/locomotion are body_action; ordinary conversational "
                     "words are speech. No catch-all mode is available: choose the exact "
@@ -1588,6 +1756,7 @@ class OllamaGoalInterpreter:
         request: GoalInterpretationRequest,
         *,
         constrain_location_provenance: bool = False,
+        atomic_coverage_certificate: GoalInterpretationCoverageCertificate | None = None,
     ) -> dict[str, Any]:
         """Build one source-based Deep GI escalation with unchanged authority.
 
@@ -1603,6 +1772,86 @@ class OllamaGoalInterpreter:
         # output budget in provider thinking and return no DTO, so keep that
         # transport mode disabled just like every other maintained JSON boundary.
         payload["think"] = False
+        independent_audit_items = [
+            item
+            for item in (
+                atomic_coverage_certificate.responsibility_items
+                if atomic_coverage_certificate is not None
+                else []
+            )
+            if item.role == "responsibility"
+            and item.independently_satisfiable
+            and item.coverage in {"covered", "clarification_required"}
+        ]
+        supporting_audit_items = [
+            item
+            for item in (
+                atomic_coverage_certificate.supporting_items
+                if atomic_coverage_certificate is not None
+                else []
+            )
+            if item.coverage in {"covered", "clarification_required"}
+        ]
+        deep_audit_refs = [
+            str(item.audit_ref or f"a{index + 1}").strip()
+            for index, item in enumerate(independent_audit_items)
+        ]
+        audit_payloads = [
+            {
+                **item.model_dump(mode="json"),
+                "audit_ref": deep_audit_refs[index],
+            }
+            for index, item in enumerate(independent_audit_items)
+        ]
+        audit_refs_by_candidate: dict[str, list[str]] = {}
+        for audit_ref, item in zip(deep_audit_refs, independent_audit_items):
+            for candidate_ref in item.responsibility_refs:
+                audit_refs_by_candidate.setdefault(candidate_ref, []).append(audit_ref)
+        supporting_payloads: list[dict[str, Any]] = []
+        related_audit_refs_by_index: list[list[str]] = []
+        for item in supporting_audit_items:
+            related_audit_refs = list(item.related_audit_refs)
+            if item.relation_kind != "none" and not related_audit_refs:
+                related_audit_refs = list(
+                    dict.fromkeys(
+                        audit_ref
+                        for candidate_ref in item.responsibility_refs
+                        for audit_ref in audit_refs_by_candidate.get(candidate_ref, [])
+                    )
+                )
+            related_audit_refs_by_index.append(related_audit_refs)
+            supporting_payloads.append(
+                {
+                    **item.model_dump(mode="json"),
+                    "related_audit_refs": related_audit_refs,
+                }
+            )
+        atomic_audit_contract = (
+            "\n\nAn independent source-based atomic coverage audit has already "
+            "identified the following independently satisfiable source outcomes. "
+            "This is Goal Interpretation evidence, not a candidate plan and not a "
+            "Capability hint. Emit exactly one sibling Responsibility per listed "
+            "item, preserving its exact source span and required output mode. Do "
+            "not merge two listed items into one outcome or binding.\n"
+            + _bounded_json(
+                audit_payloads,
+                max_chars=5000,
+            )
+            + "\nThe same audit identified these non-outcome source constraints and "
+            "context fragments. Preserve material ordering and concurrency in the "
+            "fresh sibling Responsibilities: use before/after sibling-local-ref "
+            "bindings for order and parallel_with sibling-local-ref bindings for "
+            "requested concurrency. Other modifiers remain attached only to the "
+            "outcome they constrain. Use each positive item's audit_ref as the exact "
+            "fresh Responsibility local_ref; it is turn-local audit identity, not a "
+            "Goal identity.\n"
+            + _bounded_json(
+                supporting_payloads,
+                max_chars=3000,
+            )
+            if independent_audit_items
+            else ""
+        )
         payload["messages"] = [
             {
                 "role": "system",
@@ -1632,14 +1881,24 @@ class OllamaGoalInterpreter:
                     "Audit the WHAT modality as one semantic unit: use "
                     "output_mode=information whenever the person's outcome is to determine "
                     "or receive information, whether or not current trusted Context already "
-                    "contains the answer. Use stateful_effect for durable/future state "
-                    "changes. Never decide here whether work, fresh Evidence, a Capability, "
+                    "contains the answer. Use stateful_effect only for durable/future "
+                    "state changes outside embodiment. Locomotion, posture, gaze, gesture, "
+                    "physical manipulation, carrying, and handover are body_action even "
+                    "when their result changes physical state. Never decide here whether "
+                    "work, fresh Evidence, a Capability, "
                     "or provider is required. "
                     "Audit declarative context before counting outcomes: an explanation, "
                     "personal situation, or stated future plan is not another "
                     "Responsibility unless the source actually asks Chromie to confirm, "
                     "acknowledge, remember, record, schedule, monitor, or act on it. "
+                    "Preserve negation as negation. A cessation or prohibition that "
+                    "targets supplied active work may relate to that exact Goal, but "
+                    "never becomes a new positive embodiment or an invented opposite "
+                    "posture. A clause that only excludes replay of already-terminal "
+                    "recent work is constraint/context when independent current outcomes "
+                    "remain; use supplied lifecycle evidence rather than phrase matching. "
                     "Return one final JSON object only."
+                    + atomic_audit_contract
                 ),
             },
             {
@@ -1650,9 +1909,97 @@ class OllamaGoalInterpreter:
                     "No prior interpretation DTO is supplied or authoritative. First count "
                     "the source's independently observable effects; the final number of "
                     "responsibilities must equal that count."
+                    + atomic_audit_contract
                 ),
             },
         ]
+        if independent_audit_items:
+            responsibilities_schema = payload.get("format", {}).get(
+                "properties", {}
+            ).get("responsibilities")
+            if isinstance(responsibilities_schema, dict):
+                responsibilities_schema["minItems"] = len(independent_audit_items)
+                responsibilities_schema["maxItems"] = len(independent_audit_items)
+                responsibilities_schema["description"] = (
+                    "Emit exactly one atomic Responsibility for each independent "
+                    "source-audit item supplied in the prompt."
+                )
+            # The independent model-authored audit supplies exact source outcome
+            # modality and typed relations. Project those claims into the one
+            # permitted fresh source interpretation's decoder schema. Host code
+            # neither discovers source semantics nor mutates the returned DTO.
+            responsibility_model = payload.get("format", {}).get(
+                "$defs", {}
+            ).get("CognitiveResponsibilityProposal")
+            if (
+                len(deep_audit_refs) == len(set(deep_audit_refs))
+                and isinstance(responsibility_model, dict)
+            ):
+                local_ref_schema = responsibility_model.get("properties", {}).get(
+                    "local_ref"
+                )
+                if isinstance(local_ref_schema, dict):
+                    local_ref_schema["enum"] = list(deep_audit_refs)
+                required_bindings_by_ref: dict[str, dict[str, Any]] = {}
+                for relation, refs in zip(
+                    supporting_audit_items,
+                    related_audit_refs_by_index,
+                ):
+                    if (
+                        relation.relation_kind == "ordered"
+                        and len(refs) >= 2
+                        and set(refs).issubset(set(deep_audit_refs))
+                    ):
+                        for earlier_ref, later_ref in zip(refs, refs[1:]):
+                            required_bindings_by_ref.setdefault(later_ref, {})[
+                                "after"
+                            ] = earlier_ref
+                    elif (
+                        relation.relation_kind == "parallel"
+                        and len(refs) >= 2
+                        and set(refs).issubset(set(deep_audit_refs))
+                    ):
+                        for source_ref in refs:
+                            required_bindings_by_ref.setdefault(source_ref, {})[
+                                "parallel_with"
+                            ] = [ref for ref in refs if ref != source_ref]
+                relation_constraints = responsibility_model.setdefault("allOf", [])
+                required_modes_by_ref = {
+                    audit_ref: item.required_output_mode
+                    for audit_ref, item in zip(
+                        deep_audit_refs,
+                        independent_audit_items,
+                    )
+                }
+                for source_ref in deep_audit_refs:
+                    required_bindings = required_bindings_by_ref.get(source_ref, {})
+                    then_properties: dict[str, Any] = {
+                        "output_mode": {
+                            "const": required_modes_by_ref[source_ref]
+                        }
+                    }
+                    if required_bindings:
+                        then_properties["bindings"] = {
+                            "type": "object",
+                            "properties": {
+                                name: {"const": value}
+                                for name, value in required_bindings.items()
+                            },
+                            "required": list(required_bindings),
+                        }
+                    relation_constraints.append(
+                        {
+                            "if": {
+                                "properties": {
+                                    "local_ref": {"const": source_ref}
+                                },
+                                "required": ["local_ref"],
+                            },
+                            "then": {
+                                "properties": then_properties
+                            },
+                        }
+                    )
         if constrain_location_provenance:
             exact_surfaces = _short_exact_surface_substrings(request.text)
             responsibility_schema = (
@@ -1674,6 +2021,459 @@ class OllamaGoalInterpreter:
                         ),
                     }
         return payload
+
+    @staticmethod
+    def _responsibility_coverage_required(
+        decision: GoalInterpretationDecision,
+    ) -> bool:
+        """Use independent source coverage where material effect loss matters.
+
+        The trigger follows already model-authored WHAT categories; Host code
+        does not parse conjunctions or discover actions in the user's words.
+        """
+
+        effect_modes = {
+            "styled_speech",
+            "recitation",
+            "singing",
+            "humming",
+            "nonverbal_vocalization",
+            "body_action",
+            "media_playback",
+            "stateful_effect",
+            "other",
+        }
+        return len(decision.responsibilities) > 1 or any(
+            item.output_mode in effect_modes for item in decision.responsibilities
+        )
+
+    def build_responsibility_coverage_payload(
+        self,
+        request: GoalInterpretationRequest,
+        decision: GoalInterpretationDecision,
+    ) -> dict[str, Any]:
+        """Build one independent, source-based atomic Responsibility audit."""
+
+        candidate_refs = [item.local_ref for item in decision.responsibilities]
+        schema = GoalInterpretationCoverageCertificate.model_json_schema()
+        schema["additionalProperties"] = False
+        schema["required"] = [
+            "responsibility_items",
+            "supporting_items",
+            "reason_summary",
+        ]
+        for item_schema_name in (
+            "GoalInterpretationResponsibilityCoverageItem",
+            "GoalInterpretationSupportingCoverageItem",
+        ):
+            item_schema = schema.get("$defs", {}).get(item_schema_name)
+            if not isinstance(item_schema, dict):
+                continue
+            item_schema["required"] = [
+                "source_start_token_ref",
+                "source_end_token_ref",
+                "role",
+                "coverage",
+                "independently_satisfiable",
+                "responsibility_refs",
+                "required_output_mode",
+                *(
+                    ["relation_kind", "related_audit_refs"]
+                    if item_schema_name
+                    == "GoalInterpretationSupportingCoverageItem"
+                    else ["audit_ref"]
+                ),
+            ]
+            source_tokens = _coverage_source_tokens(request.text)
+            properties = item_schema.setdefault("properties", {})
+            properties.pop("source_excerpt", None)
+            properties.pop("source_token_refs", None)
+            token_ref_schema = {
+                "type": "string",
+                "enum": [str(item["ref"]) for item in source_tokens],
+            }
+            properties["source_start_token_ref"] = {
+                **token_ref_schema,
+                "description": "First inclusive token of one exact source span.",
+            }
+            properties["source_end_token_ref"] = {
+                **token_ref_schema,
+                "description": (
+                    "Last inclusive token of the same exact source span; it must "
+                    "not precede source_start_token_ref."
+                ),
+            }
+            audit_refs = [f"a{index}" for index in range(1, 13)]
+            if item_schema_name == "GoalInterpretationResponsibilityCoverageItem":
+                properties["audit_ref"] = {
+                    "type": "string",
+                    "enum": audit_refs,
+                    "description": (
+                        "Unique identity for this positive source item. Use a1, a2, "
+                        "and so on in source order."
+                    ),
+                }
+            else:
+                properties["related_audit_refs"] = {
+                    "type": "array",
+                    "maxItems": 12,
+                    "uniqueItems": True,
+                    "items": {"type": "string", "enum": audit_refs},
+                    "description": (
+                        "For ordered/parallel relations, cite the related positive "
+                        "audit_ref values; otherwise return an empty array."
+                    ),
+                }
+            refs = item_schema.get("properties", {}).get("responsibility_refs")
+            if isinstance(refs, dict):
+                refs["items"] = {
+                    "type": "string",
+                    "enum": candidate_refs,
+                }
+                refs["uniqueItems"] = True
+        candidates = [
+            {
+                "local_ref": item.local_ref,
+                "outcome": item.outcome,
+                "bindings": item.bindings,
+            }
+            for item in decision.responsibilities
+        ]
+        payload: dict[str, Any] = {
+            "model": self.deep_model,
+            "stream": False,
+            "think": False,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Chromie's independent atomic Responsibility coverage "
+                        "auditor inside Goal Interpretation. Read the authoritative user "
+                        "turn from scratch. Candidate prose is not source evidence. Cite "
+                        "each source fragment only with source_start_token_ref and "
+                        "source_end_token_ref from the supplied source-token table. "
+                        "Trusted code derives the exact excerpt; never retype, translate, "
+                        "or correct source spelling. A positive "
+                        "observable outcome is role=responsibility. Duration, count, "
+                        "distance, direction, ordering, timing, manner, style, prohibition, "
+                        "and other modifiers are role=constraint on an outcome, not another "
+                        "Responsibility. Put every role=responsibility item only in "
+                        "responsibility_items. Put every role=constraint, context, or "
+                        "framing item only in supporting_items; those items must use "
+                        "independently_satisfiable=false and required_output_mode=none "
+                        "because they never inherit an outcome mode. Context and politeness "
+                        "framing own no candidate. "
+                        "Coordination grammar never demotes a positive effect to a constraint: "
+                        "when a person can judge two effects completed independently, emit "
+                        "two independently_satisfiable responsibility_items even when the "
+                        "candidate merged them. Every independently satisfiable item must "
+                        "map to exactly one candidate local_ref when a candidate attempts "
+                        "that outcome. If one invalid candidate merged multiple outcomes, "
+                        "cite that same candidate on each item so trusted validation can "
+                        "reject the overmerge. Use coverage=missing when no candidate "
+                        "attempts an outcome, representation_mismatch when a candidate has "
+                        "the wrong atomic shape or output mode, and clarification_required "
+                        "only for genuine unresolved human meaning. For a responsibility, "
+                        "required_output_mode is the exact provider-neutral WHAT mode, "
+                        "never a Capability or lane: singing or a song is singing; ordinary "
+                        "conversational wording is speech; locomotion, gaze, blink, gesture, "
+                        "and posture are body_action. "
+                        "Assign positive source items unique audit_ref values a1, a2, and "
+                        "so on in source order. This is audit identity only, never a Goal ID. "
+                        "Ordering and concurrency words are material supporting constraints, "
+                        "not disposable grammar. Put an ordered relation such as before, "
+                        "after, then, next, followed by, or its equivalent in any language in "
+                        "supporting_items. Put a simultaneous relation such as while, together, "
+                        "simultaneously, at the same time, or its equivalent in any language in "
+                        "supporting_items. Set relation_kind=ordered and list its candidate "
+                        "responsibility_refs in source order for an ordered relation. Set "
+                        "relation_kind=parallel and list the complete concurrent candidate "
+                        "set for a simultaneous relation. For either typed relation, also "
+                        "list the corresponding positive-item audit_ref values in "
+                        "related_audit_refs; other supporting fragments use "
+                        "relation_kind=none and related_audit_refs=[]. The relation source "
+                        "span must be cited even when "
+                        "the candidate omitted it. A comma, punctuation, a plain conjunction "
+                        "such as and/or, or list enumeration alone does not state order or "
+                        "concurrency; use relation_kind=none unless the source semantically "
+                        "states before/after/then/next or simultaneous overlap. "
+                        "Do not plan, select Capabilities, add Goals, or repair candidates. "
+                        "Return JSON only."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "FINAL AUTHORITATIVE USER TURN:\n"
+                        f"{request.text}\n\n"
+                        "AUTHORITATIVE SOURCE TOKENS (cite refs; surfaces are evidence):\n"
+                        f"{_bounded_json(_coverage_source_tokens(request.text), max_chars=5000)}\n\n"
+                        "Candidate Responsibility DTOs (claims to audit, not source):\n"
+                        f"{_bounded_json(candidates, max_chars=5000)}\n\n"
+                        "Account for every material source fragment exactly once and "
+                        "return the coverage certificate."
+                    ),
+                },
+            ],
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": self.num_ctx,
+                "num_predict": min(self.num_predict, 768),
+            },
+            "format": schema,
+        }
+        reason_summary = payload["format"].get("properties", {}).get(
+            "reason_summary"
+        )
+        if isinstance(reason_summary, dict):
+            reason_summary["maxLength"] = 280
+            reason_summary["description"] = (
+                "One short sentence naming only the coverage decision; do not quote "
+                "or translate source text."
+            )
+        if self.keep_alive:
+            payload["keep_alive"] = self.keep_alive
+        return payload
+
+    @staticmethod
+    def _validate_responsibility_coverage_content(
+        request: GoalInterpretationRequest,
+        decision: GoalInterpretationDecision,
+        content: str,
+    ) -> tuple[GoalInterpretationCoverageCertificate, list[str]]:
+        raw = _extract_json_object(content)
+        _materialize_coverage_source_excerpts(request, raw)
+        certificate = GoalInterpretationCoverageCertificate.model_validate(raw)
+        by_ref = {item.local_ref: item for item in decision.responsibilities}
+        normalized_turn = " ".join(request.text.strip().split())
+        problems: list[str] = []
+        independent_owner_counts: dict[str, int] = {}
+        positively_owned: set[str] = set()
+        audit_items_by_ref: dict[str, Any] = {}
+        for index, item in enumerate(certificate.responsibility_items):
+            audit_ref = str(item.audit_ref or f"a{index + 1}").strip()
+            if not audit_ref or audit_ref in audit_items_by_ref:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Responsibility coverage audit_ref values must be unique"
+                )
+            audit_items_by_ref[audit_ref] = item
+        for item in certificate.responsibility_items + certificate.supporting_items:
+            if item.source_excerpt not in normalized_turn:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Responsibility coverage cited text outside the authoritative turn: "
+                    f"{item.source_excerpt!r}"
+                )
+            unknown_refs = set(item.responsibility_refs) - set(by_ref)
+            if unknown_refs:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Responsibility coverage cited unknown candidate refs: "
+                    + ",".join(sorted(unknown_refs))
+                )
+            if item.role in {"responsibility", "constraint"} and item.coverage not in {
+                "covered",
+                "clarification_required",
+            }:
+                problems.append(
+                    f"{item.coverage}:{item.role}:{item.source_excerpt}"
+                )
+            if item.role != "responsibility" or item.coverage not in {
+                "covered",
+                "clarification_required",
+            }:
+                continue
+            if item.independently_satisfiable and len(item.responsibility_refs) != 1:
+                problems.append(
+                    "independent_responsibility_requires_one_owner:"
+                    + item.source_excerpt
+                )
+            for candidate_ref in item.responsibility_refs:
+                positively_owned.add(candidate_ref)
+                if item.independently_satisfiable:
+                    independent_owner_counts[candidate_ref] = (
+                        independent_owner_counts.get(candidate_ref, 0) + 1
+                    )
+                if (
+                    item.required_output_mode != "none"
+                    and by_ref[candidate_ref].output_mode
+                    != item.required_output_mode
+                ):
+                    problems.append(
+                        "output_mode_mismatch:"
+                        f"{candidate_ref}:{item.required_output_mode}:"
+                        f"{by_ref[candidate_ref].output_mode}"
+                    )
+        for item in certificate.supporting_items:
+            if item.relation_kind == "none":
+                continue
+            unknown_audit_refs = set(item.related_audit_refs) - set(
+                audit_items_by_ref
+            )
+            if unknown_audit_refs:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Responsibility coverage relation cited unknown audit refs: "
+                    + ",".join(sorted(unknown_audit_refs))
+                )
+            related_items = [
+                audit_items_by_ref[audit_ref]
+                for audit_ref in item.related_audit_refs
+            ]
+            refs = [
+                related.responsibility_refs[0]
+                for related in related_items
+                if len(related.responsibility_refs) == 1
+            ]
+            if len(item.related_audit_refs) < 2 or len(refs) < 2:
+                problems.append(
+                    f"{item.relation_kind}_relation_requires_two_candidate_refs:"
+                    + item.source_excerpt
+                )
+                continue
+            expected_relation_candidate_refs = list(dict.fromkeys(refs))
+            if set(item.responsibility_refs) != set(
+                expected_relation_candidate_refs
+            ):
+                problems.append(
+                    "relation_candidate_ownership_mismatch:"
+                    + item.source_excerpt
+                )
+            refs = expected_relation_candidate_refs
+            if len(refs) < 2:
+                problems.append(
+                    f"{item.relation_kind}_relation_collapsed_candidate_owners:"
+                    + item.source_excerpt
+                )
+                continue
+
+            def sibling_refs(candidate_ref: str, relation_name: str) -> set[str]:
+                raw_value = by_ref[candidate_ref].bindings.get(relation_name)
+                values = raw_value if isinstance(raw_value, list) else [raw_value]
+                return {
+                    str(value).strip()
+                    for value in values
+                    if str(value or "").strip() in by_ref
+                }
+
+            if item.relation_kind == "ordered":
+                for earlier_ref, later_ref in zip(refs, refs[1:]):
+                    if (
+                        later_ref
+                        not in sibling_refs(earlier_ref, "before")
+                        and earlier_ref
+                        not in sibling_refs(later_ref, "after")
+                    ):
+                        problems.append(
+                            "ordered_relation_not_preserved:"
+                            f"{earlier_ref}:{later_ref}:{item.source_excerpt}"
+                        )
+            elif item.relation_kind == "parallel":
+                for left_index, left_ref in enumerate(refs):
+                    for right_ref in refs[left_index + 1 :]:
+                        if (
+                            right_ref
+                            not in sibling_refs(left_ref, "parallel_with")
+                            and left_ref
+                            not in sibling_refs(right_ref, "parallel_with")
+                        ):
+                            problems.append(
+                                "parallel_relation_not_preserved:"
+                                f"{left_ref}:{right_ref}:{item.source_excerpt}"
+                            )
+        problems.extend(
+            f"overmerged_independent_responsibilities:{candidate_ref}"
+            for candidate_ref, count in sorted(independent_owner_counts.items())
+            if count > 1
+        )
+        problems.extend(
+            f"unjustified_responsibility:{candidate_ref}"
+            for candidate_ref in sorted(set(by_ref) - positively_owned)
+        )
+        return certificate, problems
+
+    async def _ensure_atomic_responsibility_coverage(
+        self,
+        request: GoalInterpretationRequest,
+        decision: GoalInterpretationDecision,
+        *,
+        allow_resegmentation: bool = True,
+    ) -> GoalInterpretationDecision:
+        if not self._responsibility_coverage_required(decision):
+            return decision
+
+        problems: list[str]
+        coverage_certificate: GoalInterpretationCoverageCertificate | None = None
+        try:
+            audit = await self._chat_logged(
+                self.build_responsibility_coverage_payload(request, decision),
+                stage="goal_interpretation_responsibility_coverage",
+                request=request,
+            )
+            coverage_certificate, problems = self._validate_responsibility_coverage_content(
+                request,
+                decision,
+                str(audit.get("message", {}).get("content") or ""),
+            )
+        except (
+            httpx.HTTPError,
+            ValueError,
+            TypeError,
+            OllamaGenerationError,
+        ) as exc:
+            problems = [f"coverage_contract_invalid:{type(exc).__name__}:{exc}"]
+        if not problems:
+            return decision
+
+        if not allow_resegmentation:
+            raise InterpretationUnavailableError(
+                "invalid_goal_interpretation_after_atomic_coverage_audit: "
+                + ";".join(problems)
+            )
+
+        logger.warning(
+            "Goal Interpretation atomic coverage rejected sid=%s problems=%s; "
+            "performing one fresh source-based resegmentation",
+            request.sid,
+            problems,
+        )
+        try:
+            deep = await self._chat_logged(
+                self.build_deep_interpretation_payload(
+                    request,
+                    atomic_coverage_certificate=coverage_certificate,
+                ),
+                stage="goal_interpretation_deep",
+                request=request,
+            )
+            reconsidered = self._validate_interpretation_content(
+                request,
+                str(deep.get("message", {}).get("content") or ""),
+            )
+            final_audit = await self._chat_logged(
+                self.build_responsibility_coverage_payload(request, reconsidered),
+                stage="goal_interpretation_responsibility_coverage_final",
+                request=request,
+            )
+            _, final_problems = self._validate_responsibility_coverage_content(
+                request,
+                reconsidered,
+                str(final_audit.get("message", {}).get("content") or ""),
+            )
+            if final_problems:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "fresh Goal Interpretation failed final atomic coverage: "
+                    + ";".join(final_problems)
+                )
+            return reconsidered
+        except (
+            httpx.HTTPError,
+            ValueError,
+            TypeError,
+            OllamaGenerationError,
+        ) as exc:
+            raise InterpretationUnavailableError(
+                "invalid_goal_interpretation_after_atomic_coverage_resegmentation: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
 
     @staticmethod
     def _requires_deep_semantic_interpretation(
@@ -1713,9 +2513,15 @@ class OllamaGoalInterpreter:
         self,
         request: GoalInterpretationRequest,
         decision: GoalInterpretationDecision,
+        *,
+        allow_coverage_resegmentation: bool = True,
     ) -> GoalInterpretationDecision:
         if not self._requires_deep_semantic_interpretation(decision):
-            return decision
+            return await self._ensure_atomic_responsibility_coverage(
+                request,
+                decision,
+                allow_resegmentation=allow_coverage_resegmentation,
+            )
         logger.info(
             "goal_interpretation_deep_escalation sid=%s reason=%s",
             request.sid,
@@ -1727,9 +2533,14 @@ class OllamaGoalInterpreter:
                 stage="goal_interpretation_deep",
                 request=request,
             )
-            return self._validate_interpretation_content(
+            decision = self._validate_interpretation_content(
                 request,
                 str(data.get("message", {}).get("content") or ""),
+            )
+            return await self._ensure_atomic_responsibility_coverage(
+                request,
+                decision,
+                allow_resegmentation=False,
             )
         except Exception as exc:
             raise InterpretationUnavailableError(
@@ -1768,9 +2579,14 @@ class OllamaGoalInterpreter:
                     stage="goal_interpretation_deep",
                     request=request,
                 )
-                return self._validate_interpretation_content(
+                decision = self._validate_interpretation_content(
                     request,
                     str(deep.get("message", {}).get("content") or ""),
+                )
+                return await self._ensure_atomic_responsibility_coverage(
+                    request,
+                    decision,
+                    allow_resegmentation=False,
                 )
             except Exception as deep_exc:
                 raise InterpretationUnavailableError(
@@ -1797,7 +2613,11 @@ class OllamaGoalInterpreter:
                     request,
                     str(deep.get("message", {}).get("content") or ""),
                 )
-                return await self._accept_or_deepen_interpretation(request, decision)
+                return await self._accept_or_deepen_interpretation(
+                    request,
+                    decision,
+                    allow_coverage_resegmentation=False,
+                )
             except Exception as deep_exc:
                 raise InterpretationUnavailableError(
                     "invalid_deep_goal_interpretation_after_authority_violation: "

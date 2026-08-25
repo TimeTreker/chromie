@@ -16,6 +16,7 @@ from scripts.interaction_text_mujoco_check import (
     _apply_soridormi_skill_timeout,
     _configure_environment,
     _endpoint_source_revision,
+    _planner_communication_already_scheduled,
     build_parser,
     build_debug_summary,
     collect_run_provenance,
@@ -35,6 +36,18 @@ from shared.chromie_contracts.reflex import ReflexFilter
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):
+
+    def test_live_dispatch_preserves_prior_fast_planner_communication(self) -> None:
+        self.assertTrue(
+            _planner_communication_already_scheduled(
+                SimpleNamespace(metadata={"fast_vocal_activity_ids": ["progress-1"]})
+            )
+        )
+        self.assertFalse(
+            _planner_communication_already_scheduled(
+                SimpleNamespace(metadata={"fast_vocal_activity_ids": []})
+            )
+        )
 
     def test_initial_reflex_uses_production_dispatch_and_retains_scope(self) -> None:
         outcome = ReflexFilter().evaluate("停止音乐。")

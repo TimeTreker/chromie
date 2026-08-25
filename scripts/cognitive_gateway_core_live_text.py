@@ -27,6 +27,12 @@ if str(ROOT) not in sys.path:
 from orchestrator.runtime.evidence_identity import (  # noqa: E402
     load_runtime_evidence_identity,
 )
+from orchestrator.runtime.playback_transport import (  # noqa: E402
+    transport_for as playback_transport_for,
+)
+from orchestrator.runtime.shutdown_lifecycle import (  # noqa: E402
+    shutdown_voice_assistant,
+)
 from scripts.interaction_text_mujoco_check import (  # noqa: E402
     required_speech_delivery_errors,
 )
@@ -166,7 +172,10 @@ async def _run_scenario(
                 }
             )
     finally:
-        await assistant.cleanup()
+        await shutdown_voice_assistant(
+            assistant,
+            close_output_stream=playback_transport_for(assistant).close_output_stream,
+        )
 
     scenario_dir = output_dir / "scenarios" / scenario_id
     result = {

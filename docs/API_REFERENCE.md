@@ -148,12 +148,15 @@ The maintained Goal-driven planning endpoints (`/fast-first-response`, `/fast-ad
 `/fast-plan`, `/deep-plan`, and `/reflection`) accept a typed
 `CognitiveWorkRequest`: `sid`, original `text`, optional `language`, first-class
 `responsibilities`, interpretation confidence/unresolved meaning, bounded `context`, and
-`history`. They do not accept a Goal-Interpreter `route_decision`.
+`history`. Re-entry requests additionally carry an immutable `planner_reentry_scope`;
+ordinary initial requests omit it. They do not accept a Goal-Interpreter `route_decision`.
 
 The maintained Cognitive Core interpretation result contains first-class
 `responsibilities` as provider-neutral Goal-Interpretation evidence: a local reference,
-human outcome, material semantic bindings, whether more work is required, and whether
-fresh evidence is required. Responsibility evidence is the authoritative WHAT handoff
+human outcome, material semantic bindings, Goal relationship, and exact output mode.
+Effectful or multi-Responsibility results cross a separate source-based atomic-coverage
+certificate before acceptance; that transient proof does not become another Goal or
+planning owner. Responsibility evidence is the authoritative WHAT handoff
 for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
 Capability IDs, executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
@@ -219,7 +222,7 @@ it does not call a second wording model or rewrite the act. A pre-evidence act
 cannot cite Evidence or claim a result, while a post-evidence act must cite exact
 Host-admitted Evidence.
 
-On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and may answer or author genuinely new follow-up Work. Any post-Evidence wording still receives the same bounded same-owner
+On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Any post-Evidence wording still receives the same bounded same-owner
 accept/reject Epistemic Qualification before delivery. The certificate
 has no wording or planning fields. Rejection or checker unavailability returns a
 semantic escalation for the existing Deep Planner (or fails closed); the Host never

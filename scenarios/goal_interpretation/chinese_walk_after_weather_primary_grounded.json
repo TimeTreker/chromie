@@ -39,14 +39,32 @@
           ],
           "unresolved": []
         }
+      },
+      {
+        "stage": "goal_interpretation_responsibility_coverage",
+        "decision": {
+          "responsibility_items": [
+            {
+              "source_excerpt": "往前跑个十来秒，速度点",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r1"],
+              "required_output_mode": "body_action"
+            }
+          ],
+          "supporting_items": [],
+          "reason_summary": "The movement and its modifiers have one owner."
+        }
       }
     ]
   },
   "expect": {
     "confidence": 0.97,
-    "llm_calls": 1,
+    "llm_calls": 2,
     "llm_stages": [
-      "goal_interpretation"
+      "goal_interpretation",
+      "goal_interpretation_responsibility_coverage"
     ],
     "unresolved": [],
     "responsibilities": [

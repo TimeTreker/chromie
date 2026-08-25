@@ -16,6 +16,68 @@ from .goal_association_contract import (
 )
 
 
+def _decoder_binding_value(name: Any, value: Any) -> str:
+    """Project an already-typed GI value into the Goal binding vocabulary."""
+
+    normalized_name = "_".join(
+        str(name).strip().casefold().replace("-", "_").split()
+    )
+    normalized_value = " ".join(str(value).strip().casefold().split())
+    if normalized_name == "speed":
+        canonical_speed = {
+            "slowly": "slow",
+            "quickly": "quick",
+        }.get(normalized_value)
+        if canonical_speed is not None:
+            return canonical_speed
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)
+
+
+def _prune_unreferenced_definitions(schema: dict[str, Any]) -> dict[str, Any]:
+    """Remove decoder definitions unreachable from the active schema graph."""
+
+    result = copy.deepcopy(schema)
+    definitions = result.get("$defs")
+    if not isinstance(definitions, dict):
+        return result
+
+    def referenced_definitions(node: Any) -> set[str]:
+        references: set[str] = set()
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            prefix = "#/$defs/"
+            if isinstance(ref, str) and ref.startswith(prefix):
+                references.add(ref[len(prefix) :].split("/", 1)[0])
+            for key, value in node.items():
+                if key != "$defs":
+                    references.update(referenced_definitions(value))
+        elif isinstance(node, list):
+            for value in node:
+                references.update(referenced_definitions(value))
+        return references
+
+    reachable = referenced_definitions(
+        {key: value for key, value in result.items() if key != "$defs"}
+    )
+    pending = list(reachable)
+    while pending:
+        name = pending.pop()
+        nested = referenced_definitions(definitions.get(name))
+        for referenced_name in nested - reachable:
+            reachable.add(referenced_name)
+            pending.append(referenced_name)
+    result["$defs"] = {
+        name: definition
+        for name, definition in definitions.items()
+        if name in reachable
+    }
+    return result
+
+
 def goal_association_response_schema(
     output_type: (
         type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
@@ -147,6 +209,11 @@ def goal_association_response_schema(
                 constrain(value)
 
     constrain(schema)
+    # Apply the canonical binding clauses before copying the binding schema into
+    # Responsibility-specific oneOf branches.  Applying them only to ``$defs``
+    # after those copies are built leaves the active constrained-decoder branch
+    # without the same name/type invariant enforced by runtime validation.
+    schema = binding_semantic_contract_response_schema(schema)
     goal_schema = schema.get("$defs", {}).get("GoalAssociationModelGoal")
     if isinstance(goal_schema, dict) and responsibility_refs:
         # Every writable Goal-semantic surface must be explicit in the
@@ -156,12 +223,13 @@ def goal_association_response_schema(
         goal_required = list(
             dict.fromkeys(
                 [
-                    *(goal_schema.get("required") or []),
                     "source_responsibility_refs",
-                    "description",
                     "output_mode",
+                    "resource_kind",
+                    "description",
                     "bindings",
                     "resource_responsibility",
+                    *(goal_schema.get("required") or []),
                 ]
             )
         )
@@ -201,10 +269,29 @@ def goal_association_response_schema(
 
             properties = copy.deepcopy(branch_goal_properties)
             output_mode = responsibility_output_modes.get(source_ref)
+            properties["resource_kind"] = {
+                "const": (
+                    "none" if resource_variant == "ordinary" else resource_variant
+                ),
+                "description": (
+                    "Choose the semantic resource shape before authoring its payload. "
+                    "none means the outcome is not resource acquisition or delivery."
+                ),
+            }
             if resource_variant == "ordinary":
-                properties["resource_responsibility"] = {"type": "null"}
+                properties["resource_responsibility"] = {
+                    "type": "null",
+                    "description": (
+                        "The requested outcome is not acquisition-and-delivery of a "
+                        "resource. Select this null branch for Chromie's own locomotion, "
+                        "posture, gaze, gesture, turning, or other body motion."
+                    ),
+                }
                 expected_bindings = [
-                    (" ".join(str(name).strip().split()), str(value))
+                    (
+                        " ".join(str(name).strip().split()),
+                        _decoder_binding_value(name, value),
+                    )
                     for name, value in responsibility_bindings.get(
                         source_ref, {}
                     ).items()
@@ -271,7 +358,13 @@ def goal_association_response_schema(
                     "$ref": (
                         "#/$defs/"
                         "GoalAssociationModelPhysicalResourceResponsibility"
-                    )
+                    ),
+                    "description": (
+                        "Select only when acquiring a distinct concrete object "
+                        "independent of Chromie's body and physically handing it to a "
+                        "recipient is the requested outcome. Never select for Chromie's "
+                        "own locomotion, posture, gaze, gesture, turning, or body motion."
+                    ),
                 }
                 properties["bindings"] = {
                     **copy.deepcopy(properties.get("bindings") or {}),
@@ -289,12 +382,40 @@ def goal_association_response_schema(
                     "maxItems": 0,
                 }
 
+            if resource_variant == "unbounded":
+                properties["resource_kind"] = copy.deepcopy(
+                    branch_goal_properties.get("resource_kind") or {}
+                )
+
             properties["source_responsibility_refs"] = {
                 "const": [source_ref]
             }
             if output_mode is not None:
                 properties["output_mode"] = {"const": output_mode}
-            return properties
+            # JSON property order is observable to the constrained decoder.  Put
+            # the explicit semantic discriminator before either payload branch so
+            # the model chooses resource shape before the easier empty-bindings
+            # production can select a physical-resource branch on its behalf.
+            discriminator_first = (
+                "source_responsibility_refs",
+                "output_mode",
+                "resource_kind",
+                "description",
+                "bindings",
+                "resource_responsibility",
+            )
+            return {
+                **{
+                    name: properties[name]
+                    for name in discriminator_first
+                    if name in properties
+                },
+                **{
+                    name: value
+                    for name, value in properties.items()
+                    if name not in discriminator_first
+                },
+            }
 
         def resource_variants(source_ref: str) -> list[str]:
             output_mode = responsibility_output_modes.get(source_ref)
@@ -448,11 +569,24 @@ def goal_association_response_schema(
     schema["required"] = list(dict.fromkeys([*ordered_required, *required]))
     schema.pop("oneOf", None)
     schema.pop("anyOf", None)
-    return resource_semantic_contract_response_schema(
-        binding_semantic_contract_response_schema(
-            schema
-        )
+    schema = resource_semantic_contract_response_schema(schema)
+    # The complete oneOf branches above duplicate the Pydantic parent Goal
+    # surface so constrained decoders can generate branch-local required fields.
+    # Keeping the same properties on the parent makes the decoder compile two
+    # equivalent object surfaces and keeps definitions for impossible resource
+    # variants alive.  Retain exactly one complete surface per branch.
+    compact_goal_schema = schema.get("$defs", {}).get(
+        "GoalAssociationModelGoal"
     )
+    if isinstance(compact_goal_schema, dict) and compact_goal_schema.get("oneOf"):
+        compact_goal_schema.pop("properties", None)
+        compact_goal_schema.pop("required", None)
+        compact_goal_schema.pop("additionalProperties", None)
+        for branch in compact_goal_schema["oneOf"]:
+            if isinstance(branch, dict):
+                branch["type"] = "object"
+                branch["additionalProperties"] = False
+    return _prune_unreferenced_definitions(schema)
 
 
 def binding_semantic_contract_response_schema(
@@ -469,6 +603,7 @@ def binding_semantic_contract_response_schema(
     categories = {
         "distance": ["distance"],
         "direction": ["direction"],
+        "duration": ["duration", "duration_seconds"],
         "quantity": [
             "amount",
             "count",
@@ -478,6 +613,7 @@ def binding_semantic_contract_response_schema(
             "resource_count",
             "resource_quantity",
         ],
+        "speed": ["speed"],
     }
     clauses = binding_schema.setdefault("allOf", [])
     for names in categories.values():

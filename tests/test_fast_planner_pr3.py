@@ -70,8 +70,8 @@ class ScriptedOllama:
 class FakeCatalog:
     def __init__(self):
         self.items = [
-            CatalogCapability(capability_id="soridormi.blink_eyes", agent_id="capability_agent", description="Blink eyes", input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]}, effects=["physical_motion"], available=True, interaction_executable=True, prompt_tier="common"),
-            CatalogCapability(capability_id="soridormi.walk_forward", agent_id="capability_agent", description="Walk forward", input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]}, effects=["physical_motion"], available=True, interaction_executable=True, prompt_tier="common"),
+            CatalogCapability(capability_id="soridormi.blink_eyes", agent_id="capability_agent", description="Blink eyes", input_schema={"type":"object","properties":{"count":{"type":"integer","minimum":1,"maximum":10}},"required":["count"]}, effects=["physical_motion"], available=True, interaction_executable=True, prompt_tier="common", can_run_parallel=True, parallel_metadata_declared=True, exclusive_group="body.face", resource_claims=["body.face"]),
+            CatalogCapability(capability_id="soridormi.walk_forward", agent_id="capability_agent", description="Walk forward", input_schema={"type":"object","properties":{"duration_s":{"type":"number","minimum":0.1}},"required":["duration_s"]}, effects=["physical_motion"], available=True, interaction_executable=True, prompt_tier="common", can_run_parallel=True, parallel_metadata_declared=True, exclusive_group="body.primary_motion", resource_claims=["body.primary_motion"]),
             CatalogCapability(
                 capability_id="soridormi.walk_velocity",
                 agent_id="capability_agent",
@@ -90,12 +90,34 @@ class FakeCatalog:
                 available=True,
                 interaction_executable=True,
                 prompt_tier="common",
+                can_run_parallel=True,
+                parallel_metadata_declared=True,
+                exclusive_group="body.primary_motion",
+                resource_claims=["body.primary_motion"],
             ),
             CatalogCapability(capability_id="chromie.speak", agent_id="capability_agent", description="Speak text", input_schema={"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}, available=True, interaction_executable=True, prompt_tier="common"),
         ]
 
     async def prompt_entries(self, **kwargs):
         return self.items
+
+
+class MissingParallelMetadataCatalog(FakeCatalog):
+    def __init__(self):
+        super().__init__()
+        self.items = [
+            item.model_copy(
+                update={
+                    "can_run_parallel": None,
+                    "parallel_metadata_declared": False,
+                    "exclusive_group": None,
+                    "resource_claims": [],
+                }
+            )
+            if item.capability_id.startswith("soridormi.")
+            else item
+            for item in self.items
+        ]
 
 
 class WeatherCatalog(FakeCatalog):
@@ -1335,6 +1357,20 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "output_sha256": canonical_value_sha256(data),
                     }
                 ],
+                "trusted_execution_outcome": {
+                    "aggregate_status": "completed",
+                    "goal_outcomes": [
+                        {
+                            "goal_id": "goal-weather",
+                            "status": "completed",
+                            "evidence_ids": ["evidence-weather"],
+                            "completion_qualification": {
+                                "required": False,
+                                "established": True,
+                            },
+                        }
+                    ],
+                },
             }
         )
         planner_request = planner_request.model_copy(update={"context": context})
@@ -1357,6 +1393,11 @@ class FastPlannerResolverTests(unittest.TestCase):
             ollama.prompts[1][1]["prompt_family"],
             "fast_planner.evidence_response.truth_check",
         )
+        truth_prompt = str(ollama.prompts[1][0])
+        self.assertIn("Trusted execution outcome JSON", truth_prompt)
+        self.assertIn('"goal_id":"goal-weather"', truth_prompt)
+        self.assertIn("completion qualification", truth_prompt)
+        self.assertEqual(ollama.prompts[1][1]["options"]["num_predict"], 128)
         self.assertEqual(
             plan.metadata["evidence_response_truth_qualification"],
             {"decision": "accept"},
@@ -1483,7 +1524,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(result.activity.truth_stage, "pre_evidence")
         prompt, kwargs = ollama.prompts[0]
         rendered = prompt.render() if hasattr(prompt, "render") else str(prompt)
+        self.assertEqual(kwargs["options"]["num_predict"], 128)
         self.assertIn("Required response language: zh-CN", rendered)
+        self.assertIn("never emit a role field", rendered)
+        self.assertNotIn("role=progress", rendered)
+        self.assertNotIn("role=complete_response", rendered)
         schema = kwargs["response_format"]
         progress = schema["$defs"]["FastPlannerProgressAct"]
         self.assertEqual(
@@ -1507,7 +1552,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             progress["properties"]["text"]["pattern"],
             r"^[^?？]*$",
         )
-        self.assertEqual(kwargs["options"]["num_predict"], 192)
+        self.assertEqual(kwargs["options"]["num_predict"], 128)
         self.assertEqual(kwargs["options"]["num_ctx"], 6144)
         _, truth_kwargs = ollama.prompts[1]
         self.assertEqual(
@@ -3349,7 +3394,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             prompt,
         )
 
-    def test_fresh_external_evidence_schema_excludes_only_completion(self):
+    def test_fresh_external_evidence_schema_excludes_completion(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
                 "local_ref": "weather",
@@ -3383,7 +3428,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             activity_refs,
             {
-                "#/$defs/FastPlannerCompleteResponseAct",
                 "#/$defs/FastPlannerProgressAct",
                 "#/$defs/FastPlannerClarificationAct",
                 "#/$defs/FastPlannerCapabilityActivity",
@@ -3395,7 +3439,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["chromie.weather.lookup"],
         )
         encoded_capability_schema = json.dumps(capability_schema, sort_keys=True)
-        self.assertNotIn('"period"', encoded_capability_schema)
+        self.assertIn('"period"', encoded_capability_schema)
         self.assertNotIn('"reason_summary"', encoded_capability_schema)
         self.assertNotIn('"allOf"', encoded_capability_schema)
         self.assertIn('"args"', encoded_capability_schema)
@@ -3432,11 +3476,372 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             activity_refs,
             {
-                "#/$defs/FastPlannerCompleteResponseAct",
                 "#/$defs/FastPlannerProgressAct",
                 "#/$defs/FastPlannerClarificationAct",
                 "#/$defs/FastPlannerCapabilityActivity",
             },
+        )
+
+    def test_capability_schema_excludes_ordinary_speech_responsibility_refs(self):
+        responsibilities = [
+            CognitiveResponsibilityProposal.model_validate(
+                {
+                    "local_ref": "blink",
+                    "outcome": "Blink twice",
+                    "bindings": {"count": 2},
+                    "output_mode": "body_action",
+                    "confidence": 0.98,
+                }
+            ),
+            CognitiveResponsibilityProposal.model_validate(
+                {
+                    "local_ref": "joke",
+                    "outcome": "Tell a short joke",
+                    "bindings": {"length": "short"},
+                    "output_mode": "speech",
+                    "confidence": 0.98,
+                }
+            ),
+        ]
+
+        schema = planner_schema.fast_advance_response_schema(
+            ["blink", "joke"],
+            responsibilities=responsibilities,
+        )
+
+        capability_refs = schema["$defs"]["FastPlannerCapabilityActivity"][
+            "properties"
+        ]["source_responsibility_refs"]["items"]["enum"]
+        response_refs = schema["$defs"]["FastPlannerCompleteResponseAct"][
+            "properties"
+        ]["source_responsibility_refs"]["items"]["enum"]
+        self.assertEqual(capability_refs, ["blink"])
+        self.assertEqual(response_refs, ["joke"])
+
+    def test_body_action_schema_is_discriminator_first_and_excludes_completion(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "walk",
+                "outcome": "Walk forward for ten seconds",
+                "bindings": {"direction": "forward", "duration": "10 seconds"},
+                "output_mode": "body_action",
+                "confidence": 0.98,
+            }
+        )
+
+        schema = planner_schema.fast_advance_response_schema(
+            ["walk"],
+            responsibilities=[responsibility],
+        )
+
+        activity_refs = [
+            item["$ref"]
+            for item in schema["properties"]["activities"]["items"]["oneOf"]
+        ]
+        self.assertEqual(
+            activity_refs,
+            [
+                "#/$defs/FastPlannerCapabilityActivity",
+                "#/$defs/FastPlannerClarificationAct",
+                "#/$defs/FastPlannerProgressAct",
+            ],
+        )
+        for contract_name in (
+            "FastPlannerCapabilityActivity",
+            "FastPlannerClarificationAct",
+            "FastPlannerProgressAct",
+        ):
+            self.assertEqual(
+                next(iter(schema["$defs"][contract_name]["properties"])),
+                "role",
+            )
+
+    def test_primary_capability_schema_requires_catalog_shaped_args(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "walk",
+                "outcome": "Walk forward for ten seconds",
+                "bindings": {"direction": "forward", "duration": 10},
+                "output_mode": "body_action",
+                "confidence": 0.98,
+            }
+        )
+        schema = planner_schema.fast_advance_response_schema(
+            ["walk"],
+            responsibilities=[responsibility],
+            capabilities=[
+                {
+                    "capability_id": "soridormi.walk_forward",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "duration_s": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "default": 2.0,
+                            }
+                        },
+                        "additionalProperties": False,
+                    },
+                }
+            ],
+        )
+
+        capability = schema["$defs"]["FastPlannerCapabilityActivity"]
+        self.assertIn("args", capability["required"])
+        self.assertEqual(len(capability["oneOf"]), 1)
+        branch = capability["oneOf"][0]
+        self.assertEqual(
+            branch["properties"]["capability_id"]["enum"],
+            ["soridormi.walk_forward"],
+        )
+        self.assertIn("duration_s", branch["properties"]["args"]["properties"])
+
+    def test_execute_revision_cannot_invent_progress_not_selected_initially(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "walk",
+                "outcome": "Walk forward",
+                "bindings": {"direction": "forward"},
+                "output_mode": "body_action",
+                "confidence": 0.98,
+            }
+        )
+        base = planner_schema.fast_advance_response_schema(
+            ["walk"],
+            responsibilities=[responsibility],
+        )
+
+        revision = planner_schema.fast_advance_revision_response_schema(
+            base,
+            {
+                "disposition": "execute",
+                "activities": [
+                    {
+                        "activity_id": "wrong-terminal",
+                        "role": "complete_response",
+                        "text": "I will walk forward.",
+                        "source_responsibility_refs": ["walk"],
+                    }
+                ],
+            },
+            committed_communicative=False,
+            capabilities=[],
+            responsibilities=[responsibility],
+        )
+
+        self.assertEqual(
+            revision["properties"]["activities"]["items"]["oneOf"],
+            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
+        )
+
+    def test_complete_response_cannot_terminally_cover_body_action(self):
+        invalid = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["walk"],
+            "activities": [
+                {
+                    "activity_id": "wrong-spoken-terminal",
+                    "role": "complete_response",
+                    "text": "I will walk forward now.",
+                    "source_responsibility_refs": ["walk"],
+                }
+            ],
+            "continuations": [],
+            "confidence": 0.98,
+            "unresolved": [],
+            "reason_summary": "The response covers the body action.",
+        }
+        request = _work_request(
+            sid="turn-body-spoken-terminal",
+            text="Walk forward.",
+            responsibilities=[
+                {
+                    "local_ref": "walk",
+                    "outcome": "Walk forward",
+                    "bindings": {"direction": "forward"},
+                    "output_mode": "body_action",
+                    "confidence": 0.98,
+                }
+            ],
+        )
+
+        result = asyncio.run(
+            FastPlannerResolver(FakeOllama(invalid), FakeCatalog()).resolve_advance(
+                request
+            )
+        )
+
+        self.assertEqual(result.disposition, "unavailable")
+        self.assertEqual(result.activities, [])
+        self.assertIn("ordinary speech Responsibility", result.metadata["error"])
+
+    def test_malformed_execute_revision_requires_capability_activities(self):
+        initial = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["r1", "r2"],
+            "activities": [
+                {
+                    "activity_id": "cap_walk_forward_001",
+                    "role": "capability",
+                    "args": {"duration_s": 10},
+                    "source_responsibility_refs": ["r1"],
+                },
+                {
+                    "activity_id": "cap_blink_eyes_001",
+                    "role": "capability",
+                    "args": {"count": 1},
+                    "source_responsibility_refs": ["r2"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Use matching body capabilities.",
+        }
+        repaired = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["r1", "r2"],
+            "activities": [
+                {
+                    "activity_id": "walk",
+                    "role": "capability",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 10},
+                    "source_responsibility_refs": ["r1"],
+                },
+                {
+                    "activity_id": "blink",
+                    "role": "capability",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 1},
+                    "source_responsibility_refs": ["r2"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Use matching body capabilities.",
+        }
+        request = _work_request(
+            sid="turn-live-workdag-revision",
+            text="Walk forward for 10 seconds and blink once.",
+            responsibilities=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "Walk forward for 10 seconds",
+                    "bindings": {"direction": "forward", "duration_s": 10},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "Blink once",
+                    "bindings": {"action": "blink", "count": 1},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+            ],
+        )
+        ollama = ScriptedOllama([initial, repaired])
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(request)
+        )
+
+        self.assertEqual(result.disposition, "execute")
+        self.assertEqual([item.role for item in result.activities], ["capability"] * 2)
+        revision_schema = ollama.prompts[1][1]["response_format"]
+        self.assertEqual(
+            revision_schema["properties"]["activities"]["items"]["oneOf"],
+            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
+        )
+        revision_prompt = str(ollama.prompts[1][0])
+        self.assertNotIn("requires at least one step", revision_prompt)
+        self.assertNotIn("requires goal_satisfaction", revision_prompt)
+        self.assertNotIn("requires an explicit goal_outcomes", revision_prompt)
+
+    def test_failed_first_response_does_not_suppress_advance_response(self):
+        ollama = FakeOllama(
+            {
+                "disposition": "mixed",
+                "coverage": "complete",
+                "covered_responsibility_refs": ["blink", "joke"],
+                "activities": [
+                    {
+                        "activity_id": "blink-twice",
+                        "role": "capability",
+                        "capability_id": "soridormi.blink_eyes",
+                        "args": {"count": 2},
+                        "timing": "sequential",
+                        "source_responsibility_refs": ["blink"],
+                    },
+                    {
+                        "activity_id": "tell-joke",
+                        "role": "complete_response",
+                        "text": "Why did the robot nap? It needed to recharge.",
+                        "source_responsibility_refs": ["joke"],
+                    },
+                ],
+                "continuations": [],
+                "confidence": 0.98,
+                "unresolved": [],
+                "reason_summary": "Blink and deliver the requested joke.",
+            }
+        )
+        run_request = _work_request(
+            sid="turn-failed-first-response",
+            text="Blink twice and tell me a short joke.",
+            responsibilities=[
+                {
+                    "local_ref": "blink",
+                    "outcome": "Blink twice",
+                    "bindings": {"count": 2},
+                    "output_mode": "body_action",
+                    "confidence": 0.98,
+                },
+                {
+                    "local_ref": "joke",
+                    "outcome": "Tell a short joke",
+                    "bindings": {"length": "short"},
+                    "output_mode": "speech",
+                    "confidence": 0.98,
+                },
+            ],
+            context={
+                "fast_planner_first_response": {
+                    "turn_id": "turn-failed-first-response",
+                    "activity": None,
+                    "metadata": {
+                        "semantic_authority": "deterministic_fail_safe",
+                        "failure_class": "output_truncated",
+                    },
+                }
+            },
+        )
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual(advance.disposition, "mixed")
+        self.assertEqual(
+            [activity.role for activity in advance.activities],
+            ["capability", "complete_response"],
+        )
+        activity_refs = {
+            item["$ref"]
+            for item in ollama.prompts[0][1]["response_format"]["properties"]
+            ["activities"]["items"]["oneOf"]
+        }
+        self.assertIn("#/$defs/FastPlannerCompleteResponseAct", activity_refs)
+        self.assertNotIn("#/$defs/FastPlannerProgressAct", activity_refs)
+        self.assertIn(
+            "first-response phase failed closed",
+            str(ollama.prompts[0][0]),
         )
 
     def test_committed_body_progress_is_not_advertised_again_in_advance_schema(self):
@@ -3561,6 +3966,199 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
         self.assertNotIn("contract_revision_attempted", advance.metadata)
         self.assertIn("clarification", advance.metadata["error"])
+
+    def test_singleton_parallel_capability_group_gets_one_dto_revision(self):
+        initial = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["walk", "blink"],
+            "activities": [
+                {
+                    "activity_id": "walk-step",
+                    "role": "capability",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["walk"],
+                },
+                {
+                    "activity_id": "blink-step",
+                    "role": "capability",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_responsibility_refs": ["blink"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Perform both ordered actions.",
+        }
+        revised = copy.deepcopy(initial)
+        revised["activities"][0]["timing"] = "sequential"
+        run_request = _work_request(
+            sid="turn-singleton-parallel-revision",
+            text="Walk for one second, then blink twice.",
+            responsibilities=[
+                {
+                    "local_ref": "walk",
+                    "outcome": "walk for one second",
+                    "bindings": {"duration_s": 1.0},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "blink",
+                    "outcome": "blink twice",
+                    "bindings": {"count": 2},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+            ],
+        )
+        ollama = ScriptedOllama([initial, revised])
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual([item.timing for item in advance.activities], ["sequential", "sequential"])
+        self.assertTrue(advance.metadata["contract_revision_attempted"])
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "fast_planner.advance.revision",
+        )
+        self.assertIn("singleton", str(ollama.prompts[1][0]))
+
+    def test_parallel_resource_conflict_gets_one_dto_revision(self):
+        initial = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["walk", "velocity"],
+            "activities": [
+                {
+                    "activity_id": "walk-step",
+                    "role": "capability",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["walk"],
+                },
+                {
+                    "activity_id": "velocity-step",
+                    "role": "capability",
+                    "capability_id": "soridormi.walk_velocity",
+                    "args": {"vx_mps": 0.2, "duration_s": 2.0},
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["velocity"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Perform the two motions.",
+        }
+        revised = copy.deepcopy(initial)
+        for activity in revised["activities"]:
+            activity["timing"] = "sequential"
+        run_request = _work_request(
+            sid="turn-parallel-resource-revision",
+            text="Walk, then use velocity control.",
+            responsibilities=[
+                {
+                    "local_ref": "walk",
+                    "outcome": "walk for one second",
+                    "bindings": {"duration_s": 1.0, "before": "velocity"},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "velocity",
+                    "outcome": "move at velocity for two seconds",
+                    "bindings": {"vx_mps": 0.2, "duration_s": 2.0},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+            ],
+        )
+        ollama = ScriptedOllama([initial, revised])
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual(
+            [item.timing for item in advance.activities],
+            ["sequential", "sequential"],
+        )
+        self.assertTrue(advance.metadata["contract_revision_attempted"])
+        self.assertIn("parallel_resource_claim_conflict", str(ollama.prompts[1][0]))
+
+    def test_typed_responsibility_order_rejects_compatible_parallel_timing(self):
+        initial = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["walk", "blink"],
+            "activities": [
+                {
+                    "activity_id": "walk-step",
+                    "role": "capability",
+                    "capability_id": "soridormi.walk_forward",
+                    "args": {"duration_s": 1.0},
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["walk"],
+                },
+                {
+                    "activity_id": "blink-step",
+                    "role": "capability",
+                    "capability_id": "soridormi.blink_eyes",
+                    "args": {"count": 2},
+                    "timing": "parallel",
+                    "source_responsibility_refs": ["blink"],
+                },
+            ],
+            "continuations": [],
+            "confidence": 0.95,
+            "unresolved": [],
+            "reason_summary": "Perform both actions.",
+        }
+        revised = copy.deepcopy(initial)
+        for activity in revised["activities"]:
+            activity["timing"] = "sequential"
+        run_request = _work_request(
+            sid="turn-typed-order-revision",
+            text="Walk for one second, then blink twice.",
+            responsibilities=[
+                {
+                    "local_ref": "walk",
+                    "outcome": "walk for one second",
+                    "bindings": {"duration_s": 1.0, "before": "blink"},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "blink",
+                    "outcome": "blink twice",
+                    "bindings": {"count": 2, "after": "walk"},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                },
+            ],
+        )
+        ollama = ScriptedOllama([initial, revised])
+
+        advance = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_advance(run_request)
+        )
+
+        self.assertEqual(
+            [item.timing for item in advance.activities],
+            ["sequential", "sequential"],
+        )
+        self.assertTrue(advance.metadata["contract_revision_attempted"])
+        self.assertIn("must precede", str(ollama.prompts[1][0]))
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -5106,7 +5704,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         plan = asyncio.run(
-            FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(
+            FastPlannerResolver(
+                FakeOllama(raw), MissingParallelMetadataCatalog()
+            ).resolve(
                 request(
                     "Walk for 15 seconds while blinking.",
                     goal_ids=goal_ids,
@@ -5267,7 +5867,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("one short sentence each", ollama.prompts[0][0])
 
-    def test_explicit_numeric_grounding_mismatch_receives_one_dto_repair(self):
+    def test_explicit_numeric_grounding_mismatch_requires_deeper_semantic_plan(self):
         invalid = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -5312,26 +5912,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 }
             ],
         )
-        repaired = {
-            **invalid,
-            "steps": [
-                execute_step(
-                    "walk",
-                    "soridormi.walk_forward",
-                    {"duration_s": 2.0},
-                    ["goal-walk"],
-                    "Walk forward.",
-                ),
-                invalid["steps"][1],
-            ],
-            "parameter_resolutions": [
-                {
-                    **invalid["parameter_resolutions"][0],
-                    "value": "2.0",
-                }
-            ],
-        }
-        ollama = ScriptedOllama([invalid, repaired])
+        ollama = ScriptedOllama([invalid])
         run_request = request(
             "Walk forward for 2 seconds, then blink.",
             goal_ids=["goal-walk", "goal-blink"],
@@ -5344,10 +5925,14 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
         )
 
-        self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(plan.steps[0].args["duration_s"], 2.0)
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(plan.metadata["contract_repair_attempted"])
+        self.assertEqual(
+            plan.metadata["validation_feedback"][0]["type"],
+            "authoritative_grounding_mismatch",
+        )
 
     def test_weather_temporal_binding_omission_receives_one_dto_repair(self):
         goal_id = "goal-weather"
@@ -5522,6 +6107,153 @@ class FastPlannerResolverTests(unittest.TestCase):
             "did not realize authoritative semantic scope",
             str(ollama.prompts[1][0]),
         )
+        repair_system = str(ollama.prompts[1][1])
+        self.assertIn(
+            "trusted code projects only uniquely derivable duplicate provenance",
+            repair_system,
+        )
+        self.assertIn("Do not relabel a transformed value", repair_system)
+        repair_prompt = str(ollama.prompts[1][0])
+        self.assertIn(
+            "trusted code projects semantic_realization provenance",
+            repair_prompt,
+        )
+
+    def test_declared_semantic_realization_provenance_is_host_projected(self):
+        goal_id = "goal-weather"
+        raw = multi_goal_plan(
+            disposition="execute",
+            coverage="complete",
+            goal_summary="Check Chongqing weather tonight.",
+            steps=[
+                execute_step(
+                    "weather",
+                    "chromie.weather.lookup",
+                    {
+                        "location": "重庆",
+                        "date": "today",
+                        "period": "night",
+                        "units": "metric",
+                    },
+                    [goal_id],
+                    "Retrieve the requested weather.",
+                )
+            ],
+            goal_outcomes={
+                goal_id: execute_outcome(
+                    goal_id, ["weather"], "The lookup covers the Goal."
+                )
+            },
+            goal_satisfaction=exact_satisfaction([goal_id]),
+            parameter_resolutions=[],
+        )
+        catalog = FakeCatalog()
+        catalog.items.append(
+            CatalogCapability(
+                capability_id="chromie.weather.lookup",
+                agent_id="chromie.weather",
+                description="Retrieve current or short-range weather.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string"},
+                        "date": {"type": "string", "enum": ["today", "tomorrow"]},
+                        "period": {"type": "string", "enum": ["day", "night"]},
+                        "units": {"type": "string", "enum": ["metric", "auto"]},
+                    },
+                    "required": ["location"],
+                    "additionalProperties": False,
+                },
+                available=True,
+                interaction_executable=True,
+                prompt_tier="common",
+                hints={
+                    "semantic_scope": {
+                        "responsibility_type": "acquire_and_deliver_resource",
+                        "resource_kinds": ["information"],
+                        "delivery_modes": ["spoken_explanation"],
+                    },
+                    "argument_realization": {
+                        "temporal_scope": {
+                            "source_entity_type": "temporal_scope",
+                            "planner_owned": True,
+                            "arguments": ["date", "period"],
+                            "minimum_arguments": 1,
+                        }
+                    },
+                    "resource_contract": {
+                        "plan_requires": [],
+                        "plan_provides": ["resource_acquired"],
+                        "final_delivery_owner": "planner_communicative_activity",
+                    },
+                },
+            )
+        )
+        run_request = request(
+            "今晚重庆天气怎么样？",
+            goal_ids=[goal_id],
+            goal_metadata={"output_mode": "information"},
+        )
+        canonical_goal = run_request.context["goal_association_resolution"][
+            "new_goals"
+        ][0]
+        canonical_goal.update(
+            {
+                "description": "Report Chongqing weather tonight.",
+                "resource_responsibility": {
+                    "schema_version": 1,
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource": {
+                        "kind": "information",
+                        "description": "Chongqing weather tonight",
+                        "quantity": "",
+                        "attributes": {
+                            "location": {
+                                "name": "location",
+                                "entity_type": "city",
+                                "value": "重庆",
+                                "confidence": 1.0,
+                            },
+                            "temporal_scope": {
+                                "name": "temporal_scope",
+                                "entity_type": "temporal_scope",
+                                "value": "今晚",
+                                "confidence": 1.0,
+                            },
+                        },
+                    },
+                    "source": {"status": "provider_resolved", "description": "", "bindings": {}},
+                    "recipient": {"description": "requester"},
+                    "delivery_mode": "spoken_explanation",
+                    "metadata": {},
+                },
+            }
+        )
+        ollama = ScriptedOllama(
+            [
+                raw,
+                {
+                    "decision": "accept",
+                    "confidence": 1.0,
+                    "uncovered_requirements": [],
+                    "reason": "The declared realization preserves the temporal scope.",
+                },
+            ]
+        )
+
+        plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
+
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(len(ollama.prompts), 2)
+        by_parameter = {item.parameter: item for item in plan.parameter_resolutions}
+        self.assertEqual(by_parameter["date"].strategy, "semantic_realization")
+        self.assertEqual(by_parameter["period"].strategy, "semantic_realization")
+        self.assertEqual(by_parameter["date"].source_goal_ids, [goal_id])
+        self.assertTrue(
+            plan.metadata["parameter_provenance_normalization"][
+                "semantic_plan_unchanged"
+            ]
+        )
 
     def test_numeric_grounding_accepts_stable_source_goal_provenance(self):
         raw = multi_goal_plan(
@@ -5612,7 +6344,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps[0].args, {"duration_s": 2.0})
         self.assertEqual(len(ollama.prompts), 1)
         self.assertTrue(
-            plan.metadata["numeric_provenance_normalization"][
+            plan.metadata["parameter_provenance_normalization"][
                 "semantic_plan_unchanged"
             ]
         )
@@ -5963,9 +6695,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         ] = "Walk forward for 2 seconds."
 
         plan = asyncio.run(
-            FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(
-                run_request
-            )
+            FastPlannerResolver(
+                FakeOllama(raw), MissingParallelMetadataCatalog()
+            ).resolve(run_request)
         )
 
         self.assertEqual(plan.disposition, "escalate")

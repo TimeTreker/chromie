@@ -32,6 +32,7 @@ from .core_interpretation import (
     CognitiveWorkRequest,
     CoreInterpretationResult,
     CoreInterpretationUnavailable,
+    PlannerReentryScope,
 )
 from .action import ActionCommand, ActionResult
 from .interaction import (

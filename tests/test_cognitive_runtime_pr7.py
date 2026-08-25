@@ -588,6 +588,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             result.terminal_plan.steps[0].metadata["retained_work_reused"]
         )
         self.assertEqual(result.interaction_response.capabilities, [])
+        self.assertEqual(
+            result.interaction_response.metadata["goal_interpretation"]
+            ["responsibilities"][0]["local_ref"],
+            "weather",
+        )
 
     def test_completed_goal_continuation_uses_fast_advance_without_work_replanning(self):
         association = GoalAssociationResolution(

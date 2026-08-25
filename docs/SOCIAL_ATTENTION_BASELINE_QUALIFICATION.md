@@ -39,8 +39,8 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 
 ### Default model topology
 
-The RTX 5090 hardware profile declares `qwen3:4b` for Goal Interpretation, Fast
-Planning, terminal Evidence re-entry, and Social Attention; Goal Association
+The RTX 5090 hardware profile declares `qwen3.5:9b` for Goal Interpretation,
+Fast Planning, terminal Evidence re-entry, and Social Attention; Goal Association
 and Deep Planning use `gemma4:12b`. It explicitly opts out of CosyVoice compact cognition and keeps
 two Ollama models resident. Other profiles may retain the one-model compact
 topology when their committed profile leaves that setting enabled. Qualification

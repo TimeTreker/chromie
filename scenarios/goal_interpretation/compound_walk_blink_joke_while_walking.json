@@ -71,15 +71,49 @@
           ],
           "unresolved": []
         }
+      },
+      {
+        "stage": "goal_interpretation_responsibility_coverage",
+        "decision": {
+          "responsibility_items": [
+            {
+              "source_excerpt": "walk forward for 20 seconds",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r1"],
+              "required_output_mode": "body_action"
+            },
+            {
+              "source_excerpt": "blink your little eyes 6 times",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r2"],
+              "required_output_mode": "body_action"
+            },
+            {
+              "source_excerpt": "tell me a joke when you are walking",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r3"],
+              "required_output_mode": "speech"
+            }
+          ],
+          "supporting_items": [],
+          "reason_summary": "All three independently observable outcomes have distinct owners."
+        }
       }
     ]
   },
   "expect": {
     "confidence": 0.87,
-    "llm_calls": 2,
+    "llm_calls": 3,
     "llm_stages": [
       "goal_interpretation",
-      "goal_interpretation_deep"
+      "goal_interpretation_deep",
+      "goal_interpretation_responsibility_coverage"
     ],
     "unresolved": [],
     "responsibilities": [

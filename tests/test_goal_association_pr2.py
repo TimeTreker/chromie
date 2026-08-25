@@ -138,6 +138,7 @@ def goal(
         "description": description,
         "output_mode": output_mode,
         "bindings": list(bindings or []),
+        "resource_kind": resource.get("kind", "none") if resource else "none",
         "resource_responsibility": resource,
         **extra,
     }
@@ -559,9 +560,12 @@ class GoalExecutionContractTests(unittest.TestCase):
         for branch in bounded_goal_schema["$defs"]["GoalAssociationModelGoal"][
             "oneOf"
         ]:
+            self.assertEqual(branch["type"], "object")
+            self.assertFalse(branch["additionalProperties"])
             self.assertIn("description", branch["required"])
             self.assertIn("output_mode", branch["required"])
             self.assertIn("bindings", branch["required"])
+            self.assertIn("resource_kind", branch["required"])
             self.assertIn("resource_responsibility", branch["required"])
             self.assertIn("description", branch["properties"])
             self.assertIn("bindings", branch["properties"])
@@ -577,12 +581,20 @@ class GoalExecutionContractTests(unittest.TestCase):
         ]
         self.assertEqual(len(body_branches), 2)
         self.assertEqual(
-            body_branches[0]["properties"]["resource_responsibility"],
-            {"type": "null"},
+            body_branches[0]["properties"]["resource_kind"]["const"],
+            "none",
+        )
+        self.assertEqual(
+            body_branches[0]["properties"]["resource_responsibility"]["type"],
+            "null",
         )
         self.assertEqual(
             body_branches[1]["properties"]["resource_responsibility"]["$ref"],
             "#/$defs/GoalAssociationModelPhysicalResourceResponsibility",
+        )
+        self.assertEqual(
+            body_branches[1]["properties"]["resource_kind"]["const"],
+            "physical_object",
         )
         self.assertEqual(
             body_branches[1]["properties"]["bindings"]["maxItems"],
@@ -596,8 +608,12 @@ class GoalExecutionContractTests(unittest.TestCase):
         ]
         self.assertEqual(len(vocal_branches), 1)
         self.assertEqual(
-            vocal_branches[0]["properties"]["resource_responsibility"],
-            {"type": "null"},
+            vocal_branches[0]["properties"]["resource_responsibility"]["type"],
+            "null",
+        )
+        self.assertNotIn(
+            "GoalAssociationModelInformationResourceResponsibility",
+            bounded_goal_schema["$defs"],
         )
         fresh_evidence_schema = ga_schema.goal_association_response_schema(
             GoalSegmentationModelOutput,
@@ -685,6 +701,44 @@ class GoalExecutionContractTests(unittest.TestCase):
             resolved_references=[],
         )
         self.assertTrue(list(goal_validator.iter_errors(typed_physical_attribute)))
+
+        constrained_goal_schema = bounded_goal_schema["$defs"][
+            "GoalAssociationModelGoal"
+        ]
+        body_action_branches = [
+            branch
+            for branch in constrained_goal_schema["oneOf"]
+            if branch["properties"]["output_mode"].get("const") == "body_action"
+        ]
+        ordinary_body_branch = next(
+            branch
+            for branch in body_action_branches
+            if branch["properties"]["resource_responsibility"].get("type")
+            == "null"
+        )
+        ordinary_property_order = list(ordinary_body_branch["properties"])
+        self.assertLess(
+            ordinary_property_order.index("resource_kind"),
+            ordinary_property_order.index("bindings"),
+        )
+        physical_body_branch = next(
+            branch
+            for branch in body_action_branches
+            if "$ref"
+            in branch["properties"]["resource_responsibility"]
+        )
+        self.assertIn(
+            "locomotion",
+            ordinary_body_branch["properties"]["resource_responsibility"][
+                "description"
+            ],
+        )
+        self.assertIn(
+            "distinct concrete object",
+            physical_body_branch["properties"]["resource_responsibility"][
+                "description"
+            ],
+        )
 
         coverage_schema = ga_schema.coverage_certificate_response_schema(
             [
@@ -1391,6 +1445,41 @@ class GoalExecutionContractTests(unittest.TestCase):
             ["new_goals[0].bindings[0]=distance/measurement"],
         )
 
+    def test_ordinary_binding_pair_cannot_relabel_duration_as_distance(self):
+        req = request("你往前走 10 秒。").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "往前走 10 秒",
+                        "bindings": {"direction": "往前", "duration": "10 秒"},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    }
+                )
+            }
+        )
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "往前走 10 秒",
+                    "body_action",
+                    bindings=[
+                        binding("direction", "direction", "往前"),
+                        binding("distance", "distance", "10 秒"),
+                    ],
+                )
+            )
+        )
+
+        self.assertEqual(
+            ga_validation.source_grounded_binding_coverage_conflicts(
+                output,
+                request=req,
+            ),
+            ["new_goals[0] source_refs=r1 missing='10 秒'"],
+        )
+
     def test_physical_resource_source_rejects_body_action_parameters(self):
         output = GoalSegmentationModelOutput.model_validate(
             create_goals(
@@ -1496,7 +1585,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         normalized, repairs = (
-            ga_validation.normalize_grounded_generic_location_types(
+            ga_validation.normalize_grounded_binding_types(
                 payload,
                 request=request("你觉得外面有人吗？"),
             )
@@ -1509,6 +1598,129 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(location["value"], "外面")
         self.assertEqual(repairs[0]["from"], "string")
         self.assertTrue(repairs[0]["value_unchanged"])
+
+    def test_grounded_relative_location_pair_is_mechanically_canonicalized(self):
+        payload = create_goals(
+            goal(
+                "Bring the milk from ahead of you.",
+                "body_action",
+                resource=resource_responsibility(
+                    description="bottle of milk",
+                    source_status="known",
+                    source_bindings=[
+                        binding(
+                            "location_relative",
+                            "location_relative",
+                            "ahead of you",
+                        )
+                    ],
+                ),
+            )
+        )
+
+        normalized, repairs = (
+            ga_validation.normalize_grounded_binding_types(
+                payload,
+                request=request("Bring the milk from ahead of you."),
+            )
+        )
+
+        location = normalized["new_goals"][0]["resource_responsibility"][
+            "source"
+        ]["acquisition_bindings"][0]
+        self.assertEqual(location["name"], "location")
+        self.assertEqual(location["entity_type"], "relative_location")
+        self.assertEqual(location["value"], "ahead of you")
+        self.assertEqual(
+            repairs[0]["from"], "location_relative/location_relative"
+        )
+        self.assertTrue(repairs[0]["value_unchanged"])
+
+    def test_grounded_information_time_type_remains_human_temporal_scope(self):
+        payload = create_goals(
+            goal(
+                "查询今天北京是否下雨",
+                "information",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="weather_forecast",
+                    description="查询今天北京是否下雨",
+                    attributes=[
+                        binding("location", "location", "北京"),
+                        binding("time", "time", "今天"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+
+        normalized, repairs = ga_validation.normalize_grounded_binding_types(
+            payload,
+            request=request("今天北京下雨了没有？"),
+        )
+
+        time_binding = normalized["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ][1]
+        self.assertEqual(time_binding["name"], "time")
+        self.assertEqual(time_binding["entity_type"], "temporal_scope")
+        self.assertEqual(time_binding["value"], "今天")
+        self.assertEqual(repairs[-1]["from"], "time")
+        self.assertEqual(repairs[-1]["to"], "temporal_scope")
+        self.assertTrue(repairs[-1]["value_unchanged"])
+
+    def test_grounded_ordinary_binding_type_aliases_are_mechanically_normalized(self):
+        req = request("往前走 10 秒，同时眨一下眼睛。").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "往前走 10 秒",
+                        "bindings": {"direction": "往前", "duration": "10 秒"},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "眨一下眼睛",
+                        "bindings": {"action": "眨眼", "count": "1 次"},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    },
+                )
+            }
+        )
+        payload = create_goals(
+            goal(
+                "往前走 10 秒",
+                "body_action",
+                bindings=[
+                    binding("direction", "string", "往前"),
+                    binding("duration", "temporal_scope", "10 秒"),
+                ],
+            ),
+            goal(
+                "眨一下眼睛",
+                "body_action",
+                bindings=[binding("count", "integer", "1 次")],
+                source_responsibility_refs=["r2"],
+            ),
+        )
+
+        normalized, repairs = ga_validation.normalize_grounded_binding_types(
+            payload,
+            request=req,
+        )
+
+        first_bindings = normalized["new_goals"][0]["bindings"]
+        second_binding = normalized["new_goals"][1]["bindings"][0]
+        self.assertEqual(
+            [item["entity_type"] for item in first_bindings],
+            ["direction", "duration"],
+        )
+        self.assertEqual(second_binding["entity_type"], "count")
+        self.assertEqual(len(repairs), 3)
+        self.assertTrue(all(item["source_pair_grounded"] for item in repairs))
 
 
 
@@ -2764,6 +2976,116 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             bindings["items"]["oneOf"][0]["properties"]["value"],
             {"const": "10 秒"},
         )
+        duration_binding = bindings["items"]["oneOf"][0]
+        self.assertFalse(
+            list(
+                Draft202012Validator(duration_binding).iter_errors(
+                    binding("duration", "duration", "10 秒")
+                )
+            )
+        )
+        self.assertTrue(
+            list(
+                Draft202012Validator(duration_binding).iter_errors(
+                    binding("duration", "temporal_scope", "10 秒")
+                )
+            )
+        )
+
+        speed_schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "body_action"},
+            responsibility_bindings={"r1": {"speed": "quickly"}},
+        )
+        speed_branch = speed_schema["$defs"]["GoalAssociationModelGoal"][
+            "oneOf"
+        ][0]
+        speed_binding = speed_branch["properties"]["bindings"]["items"][
+            "oneOf"
+        ][0]
+        self.assertEqual(
+            speed_binding["properties"]["value"],
+            {"const": "quick"},
+        )
+        self.assertFalse(
+            list(
+                Draft202012Validator(speed_binding).iter_errors(
+                    binding("speed", "speed", "quick")
+                )
+            )
+        )
+        self.assertTrue(
+            list(
+                Draft202012Validator(speed_binding).iter_errors(
+                    binding("speed", "manner", "quick")
+                )
+            )
+        )
+
+        count_schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "body_action"},
+            responsibility_bindings={"r1": {"count": "1 次"}},
+        )
+        count_binding = count_schema["$defs"]["GoalAssociationModelGoal"][
+            "oneOf"
+        ][0]["properties"]["bindings"]["items"]["oneOf"][0]
+        self.assertTrue(
+            list(
+                Draft202012Validator(count_binding).iter_errors(
+                    binding("count", "integer", "1 次")
+                )
+            )
+        )
+
+    def test_numeric_gi_binding_reaches_the_decoder_as_grounded_text(self):
+        req = request("你往前走 10 秒。").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "往前走 10 秒",
+                        "bindings": {"direction": "前", "duration_seconds": 10},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    }
+                )
+            }
+        )
+        candidate = create_goals(
+            goal(
+                "往前走 10 秒",
+                "body_action",
+                bindings=[
+                    binding("direction", "direction", "前"),
+                    binding("duration_seconds", "duration", "10"),
+                ],
+            )
+        )
+        ollama = ScriptedOllama(
+            [candidate, certificate(coverage_item("往前走 10 秒", 0))]
+        )
+
+        result = self._resolve(ollama, req)
+
+        self.assertEqual(result.resolution_status, "resolved")
+        response_schema = ollama.prompts[0][1]["response_format"]
+        ordinary_branch = response_schema["$defs"][
+            "GoalAssociationModelGoal"
+        ]["oneOf"][0]
+        required_values = {
+            item["contains"]["properties"]["value"]["const"]
+            for item in ordinary_branch["properties"]["bindings"]["allOf"]
+        }
+        self.assertEqual(required_values, {"前", "10"})
 
     def test_invalid_contract_repair_fails_closed_without_third_call(self):
         invalid = create_goals(goal("Blink twice.", "invalid_mode"))

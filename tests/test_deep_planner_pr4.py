@@ -851,6 +851,20 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("Do not use for static observation.", catalog_section)
         self.assertNotIn("duplicated", catalog_section)
 
+    def test_layered_deep_prompt_renders_capability_catalog_exactly_once(self):
+        layered = planner_prompt.deep_layered_prompt(
+            request("Walk briefly."),
+            [item.model_dump(mode="json") for item in FullCatalog().items],
+            feedback=[],
+            response_schema={},
+            expected_goal_ids=["goal-action"],
+        )
+
+        self.assertEqual(
+            layered.render().count("Executable capability catalog JSON:\n"),
+            1,
+        )
+
     def test_clear_goal_without_matching_capability_is_unavailable_not_clarify(self):
         planner_request = request(
             "Find a restaurant that is open now near People's Square."
@@ -1630,7 +1644,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(plan.steps), 1)
         self.assertFalse(plan.metadata["contract_repair_succeeded"])
         self.assertEqual(plan.steps[0].args, {"duration_s": 2.0})
-        normalization = plan.metadata["numeric_provenance_normalization"]
+        normalization = plan.metadata["parameter_provenance_normalization"]
         self.assertTrue(normalization["semantic_plan_unchanged"])
         self.assertEqual(normalization["repairs"][0]["step_id"], "walk")
 

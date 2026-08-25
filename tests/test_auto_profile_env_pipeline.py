@@ -213,10 +213,10 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3:4b-instruct-2507-q4_K_M")
-        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "qwen3:4b-instruct-2507-q4_K_M")
-        self.assertEqual(values["AGENT_FAST_TRUTH_MODEL"], "qwen3:4b-instruct-2507-q4_K_M")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3:4b-instruct-2507-q4_K_M")
+        self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3.5:9b")
+        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_FAST_TRUTH_MODEL"], "gemma4:12b")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3.5:9b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
@@ -247,7 +247,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(manifest["mode_file"], "env/modes/speech.env")
         self.assertEqual(
             manifest["active_ollama_models"],
-            ["qwen3:4b-instruct-2507-q4_K_M", "gemma4:12b"],
+            ["qwen3.5:9b", "gemma4:12b"],
         )
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
@@ -408,15 +408,20 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_COGNITIVE_BUDGET_PROFILE"], "qualification")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_SKILL_SELECTION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_CTX"], "40960")
+        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "900000")
-        self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "20000")
+        self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_TIMEOUT_MS"], "240000")
         self.assertEqual(values["ORCH_AGENT_TIMEOUT_MS"], "300000")
         self.assertEqual(
@@ -428,8 +433,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "900000",
         )
         self.assertEqual(
+            manifest["cognitive_budgets"]["AGENT_DEEP_PLANNER_NUM_CTX"],
+            "40960",
+        )
+        self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"],
-            "20000",
+            "120000",
         )
 
     def test_generated_runtime_env_has_one_assignment_per_key(self) -> None:

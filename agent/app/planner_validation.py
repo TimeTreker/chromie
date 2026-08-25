@@ -904,11 +904,11 @@ def coordinated_action_goal_ids(
             goal_ids.update(grouped_ids)
     return goal_ids
 
-def parallel_plan_contract_errors(
-    plan: CanonicalPlan,
+def parallel_activity_contract_errors(
+    activities: list[Any],
     capabilities: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Validate declared capability/resource evidence for parallel Plan steps.
+    """Validate declared capability/resource evidence for parallel Activities.
 
     This validator never chooses timing. It only rejects model-authored parallel
     timing when the supplied provider catalog does not affirm that timing or
@@ -921,10 +921,14 @@ def parallel_plan_contract_errors(
         for item in capabilities
         if str(item.get("capability_id") or "").strip()
     }
-    parallel_steps = [step for step in plan.steps if step.timing == "parallel"]
+    parallel_steps = [step for step in activities if step.timing == "parallel"]
     errors: list[dict[str, Any]] = []
     usable: list[tuple[Any, dict[str, Any]]] = []
     for step in parallel_steps:
+        step_id = str(
+            getattr(step, "step_id", "")
+            or getattr(step, "activity_id", "")
+        )
         capability = by_id.get(step.capability_id)
         if capability is None:
             continue
@@ -935,7 +939,7 @@ def parallel_plan_contract_errors(
             errors.append(
                 {
                     "type": "parallel_capability_not_declared_safe",
-                    "step_id": step.step_id,
+                    "step_id": step_id,
                     "capability_id": step.capability_id,
                     "parallel_step_count": len(parallel_steps),
                     "parallel_metadata_declared": capability.get("parallel_metadata_declared"),
@@ -946,17 +950,25 @@ def parallel_plan_contract_errors(
         usable.append((step, capability))
 
     for index, (left_step, left) in enumerate(usable):
+        left_step_id = str(
+            getattr(left_step, "step_id", "")
+            or getattr(left_step, "activity_id", "")
+        )
         left_group = str(left.get("exclusive_group") or "").strip()
         left_resources = {
             str(item).strip() for item in left.get("resource_claims") or [] if str(item).strip()
         }
         for right_step, right in usable[index + 1 :]:
+            right_step_id = str(
+                getattr(right_step, "step_id", "")
+                or getattr(right_step, "activity_id", "")
+            )
             right_group = str(right.get("exclusive_group") or "").strip()
             if left_group and left_group == right_group:
                 errors.append(
                     {
                         "type": "parallel_exclusive_group_conflict",
-                        "step_ids": [left_step.step_id, right_step.step_id],
+                        "step_ids": [left_step_id, right_step_id],
                         "exclusive_group": left_group,
                     }
                 )
@@ -970,11 +982,20 @@ def parallel_plan_contract_errors(
                 errors.append(
                     {
                         "type": "parallel_resource_claim_conflict",
-                        "step_ids": [left_step.step_id, right_step.step_id],
+                        "step_ids": [left_step_id, right_step_id],
                         "resource_claims": conflicts,
                     }
                 )
     return errors
+
+
+def parallel_plan_contract_errors(
+    plan: CanonicalPlan,
+    capabilities: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Validate parallel mechanics on an already materialized Canonical Plan."""
+
+    return parallel_activity_contract_errors(list(plan.steps), capabilities)
 
 def retained_evidence_response_review_required(
     context: dict[str, Any] | None,
@@ -1891,6 +1912,225 @@ def normalize_missing_numeric_parameter_provenance(
     target.extend(copy.deepcopy(repairs))
     return normalized, repairs
 
+
+def normalize_mechanically_derivable_parameter_provenance(
+    raw: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+    capability_payload: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Project provenance whose semantics are already fixed elsewhere.
+
+    The model continues to own the Capability, executable argument values, and
+    step-to-Goal ownership.  Trusted code owns only the duplicate provenance
+    record when one top-level argument has exactly one mechanically provable
+    source: either an exact non-resource Goal binding or a Capability-declared
+    semantic realization of one typed Goal binding.  No plan-semantic field is
+    changed, and ambiguous candidates are left for normal validation.
+    """
+
+    normalized = copy.deepcopy(raw)
+    steps = normalized.get("steps")
+    if not isinstance(steps, list):
+        return normalized, []
+    resolutions = normalized.get("parameter_resolutions")
+    if resolutions is None:
+        resolutions = []
+        normalized["parameter_resolutions"] = resolutions
+    elif not isinstance(resolutions, list):
+        return normalized, []
+
+    goals_by_id = {
+        " ".join(str(goal.get("goal_id") or "").strip().split()): goal
+        for goal in authoritative_goals
+        if isinstance(goal, dict)
+        and " ".join(str(goal.get("goal_id") or "").strip().split())
+    }
+    capabilities_by_id = {
+        " ".join(str(item.get("capability_id") or "").strip().split()): item
+        for item in capability_payload
+        if isinstance(item, dict)
+        and " ".join(str(item.get("capability_id") or "").strip().split())
+    }
+    existing_by_key: dict[tuple[str, str], list[int]] = {}
+    for index, resolution in enumerate(resolutions):
+        if not isinstance(resolution, dict):
+            continue
+        key = (
+            " ".join(str(resolution.get("step_id") or "").strip().split()),
+            " ".join(str(resolution.get("parameter") or "").strip().split()),
+        )
+        if all(key):
+            existing_by_key.setdefault(key, []).append(index)
+
+    candidates: dict[
+        tuple[str, str],
+        list[tuple[str, str, str]],
+    ] = {}
+    step_arguments: dict[tuple[str, str], Any] = {}
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        step_id = " ".join(str(step.get("step_id") or "").strip().split())
+        capability_id = " ".join(
+            str(step.get("capability_id") or "").strip().split()
+        )
+        args = step.get("args")
+        if not step_id or not isinstance(args, dict):
+            continue
+        owned_goal_ids = [
+            goal_id
+            for value in step.get("source_goal_ids") or []
+            if (goal_id := " ".join(str(value or "").strip().split()))
+            in goals_by_id
+        ]
+        for parameter, argument in args.items():
+            key = (step_id, str(parameter))
+            step_arguments[key] = argument
+            for goal_id in owned_goal_ids:
+                goal = goals_by_id[goal_id]
+                # Resource DTOs are already passed as structured top-level
+                # arguments and intentionally do not create provenance rows for
+                # each nested field. Their transformed typed scopes are handled
+                # below only through a declared argument_realization contract.
+                if isinstance(goal.get("resource_responsibility"), dict) and goal.get(
+                    "resource_responsibility"
+                ):
+                    continue
+                for binding_name, binding in _goal_binding_map(goal).items():
+                    if _material_values_equal(
+                        argument,
+                        binding.get("value"),
+                        list_compatible=(
+                            binding.get("entity_type") in _LIST_ENTITY_TYPES
+                            or isinstance(argument, list)
+                        ),
+                    ):
+                        candidates.setdefault(key, []).append(
+                            ("user_supplied", goal_id, str(binding_name))
+                        )
+
+        capability = capabilities_by_id.get(capability_id) or {}
+        for goal_id in owned_goal_ids:
+            bindings = _goal_binding_map(goals_by_id[goal_id])
+            for binding_name, binding in bindings.items():
+                entity_type = _normalized_entity_type(binding.get("entity_type"))
+                realization = _argument_realization_contract(capability, entity_type)
+                if realization is None:
+                    continue
+                for parameter in realization.get("arguments") or []:
+                    parameter = str(parameter)
+                    if parameter not in args:
+                        continue
+                    argument = args[parameter]
+                    if _material_values_equal(
+                        argument,
+                        binding.get("value"),
+                        list_compatible=(
+                            entity_type in _LIST_ENTITY_TYPES
+                            or isinstance(argument, list)
+                        ),
+                    ):
+                        # Exact values are direct provenance, not a semantic
+                        # transformation, and are handled by the candidate pass.
+                        continue
+                    candidates.setdefault((step_id, parameter), []).append(
+                        ("semantic_realization", goal_id, str(binding_name))
+                    )
+
+    repairs: list[dict[str, Any]] = []
+    for key, raw_candidates in candidates.items():
+        unique_candidates = list(dict.fromkeys(raw_candidates))
+        strategies = {item[0] for item in unique_candidates}
+        goal_ids = list(dict.fromkeys(item[1] for item in unique_candidates))
+        binding_names = {item[2] for item in unique_candidates}
+        if (
+            len(strategies) != 1
+            or len(goal_ids) != 1
+            or len(binding_names) != 1
+        ):
+            continue
+        existing_indexes = existing_by_key.get(key, [])
+        if len(existing_indexes) > 1:
+            continue
+        strategy = next(iter(strategies))
+        goal_id = goal_ids[0]
+        value = step_arguments[key]
+        expected = {
+            "step_id": key[0],
+            "parameter": key[1],
+            "strategy": strategy,
+            "value": copy.deepcopy(value),
+            "confidence": 1.0,
+            "blocking": False,
+            "rationale": (
+                "Mechanically projected from one exact owned Goal binding."
+                if strategy == "user_supplied"
+                else "Mechanically projected from the selected Capability's "
+                "declared argument realization contract."
+            ),
+            "source_goal_ids": [goal_id],
+        }
+        before: dict[str, Any] | None = None
+        if existing_indexes:
+            index = existing_indexes[0]
+            existing = resolutions[index]
+            if not isinstance(existing, dict) or existing.get("blocking") is True:
+                continue
+            mechanically_owned_fields = {
+                name: expected[name]
+                for name in (
+                    "step_id",
+                    "parameter",
+                    "strategy",
+                    "value",
+                    "blocking",
+                    "source_goal_ids",
+                )
+            }
+            if all(
+                existing.get(name) == expected_value
+                for name, expected_value in mechanically_owned_fields.items()
+            ):
+                continue
+            before = copy.deepcopy(existing)
+            replacement = dict(existing)
+            replacement.update(mechanically_owned_fields)
+            replacement["confidence"] = 1.0
+            replacement["rationale"] = expected["rationale"]
+            resolutions[index] = replacement
+        else:
+            resolutions.append(expected)
+        repairs.append(
+            {
+                "normalization": "mechanically_derived_parameter_provenance",
+                "step_id": key[0],
+                "parameter": key[1],
+                "strategy": strategy,
+                "source_goal_ids": [goal_id],
+                "source_binding_names": sorted(binding_names),
+                "previous_resolution": before,
+                "semantic_plan_unchanged": True,
+            }
+        )
+
+    # Retain the migration adapter for older non-resource Goals whose explicit
+    # numeric value exists only in canonical description/success text. It is the
+    # same exact, unique duplicate-provenance projection and never edits args.
+    normalized, numeric_repairs = normalize_missing_numeric_parameter_provenance(
+        normalized,
+        authoritative_goals=authoritative_goals,
+    )
+    repairs.extend(
+        {
+            "normalization": "legacy_exact_numeric_parameter_provenance",
+            **repair,
+            "semantic_plan_unchanged": True,
+        }
+        for repair in numeric_repairs
+    )
+    return normalized, repairs
+
 def normalize_schema_default_parameter_provenance(
     raw: dict[str, Any],
     *,
@@ -2108,14 +2348,17 @@ def normalize_common_planner_output(
         authoritative_goals=authoritative_goals,
         capability_payload=capability_payload,
     )
-    normalized, numeric_repairs = normalize_missing_numeric_parameter_provenance(
-        normalized,
-        authoritative_goals=authoritative_goals,
+    normalized, parameter_provenance_repairs = (
+        normalize_mechanically_derivable_parameter_provenance(
+            normalized,
+            authoritative_goals=authoritative_goals,
+            capability_payload=capability_payload,
+        )
     )
     return normalized, {
         "detached_parameter_resolutions": detached_repairs,
         "schema_default_provenance": schema_default_repairs,
-        "numeric_parameter_provenance": numeric_repairs,
+        "parameter_provenance": parameter_provenance_repairs,
     }
 
 

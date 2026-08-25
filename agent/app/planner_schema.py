@@ -1118,74 +1118,11 @@ def canonical_plan_response_schema(
                 ]
             }
         )
-    numeric_obligations = {
-        goal_id: list(dict.fromkeys(values))
-        for goal_id, values in (required_numeric_goal_values or {}).items()
-        if goal_id in allowed_goals and values
-    }
-    parameter_resolution_schema = properties.get("parameter_resolutions")
-    if isinstance(parameter_resolution_schema, dict) and numeric_obligations:
-        parameter_resolution_schema["description"] = (
-            "When the named Goal outcome disposition is execute, include one "
-            "nonblocking user_supplied resolution for every listed numeric value; "
-            "the model still owns the exact step and argument mapping. Obligations: "
-            + json.dumps(
-                numeric_obligations,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
-        for goal_id, values in numeric_obligations.items():
-            for value in values:
-                schema.setdefault("allOf", []).append(
-                    {
-                        "if": {
-                            "properties": {
-                                "goal_outcomes": {
-                                    "properties": {
-                                        goal_id: {
-                                            "properties": {
-                                                "disposition": {"const": "execute"}
-                                            },
-                                            "required": ["disposition"],
-                                        }
-                                    },
-                                    "required": [goal_id],
-                                }
-                            },
-                            "required": ["goal_outcomes"],
-                        },
-                        "then": {
-                            "properties": {
-                                "parameter_resolutions": {
-                                    "contains": {
-                                        "type": "object",
-                                        "properties": {
-                                            "strategy": {
-                                                "const": "user_supplied"
-                                            },
-                                            "value": {"const": value},
-                                            "source_goal_ids": {
-                                                "contains": {"const": goal_id},
-                                                "minContains": 1,
-                                            },
-                                            "blocking": {"const": False},
-                                        },
-                                        "required": [
-                                            "strategy",
-                                            "value",
-                                            "source_goal_ids",
-                                            "blocking",
-                                        ],
-                                    },
-                                    "minContains": 1,
-                                }
-                            },
-                            "required": ["parameter_resolutions"],
-                        },
-                    }
-                )
+    # ``required_numeric_goal_values`` remains accepted for API compatibility,
+    # but duplicate provenance is projected after the model authors the exact
+    # Capability argument and Goal ownership. Requiring the model to restate the
+    # same value in this decoder schema created a second, failure-prone authority.
+    del required_numeric_goal_values
     _constrain_terminal_unresolved(schema)
     return schema
 
@@ -2042,7 +1979,18 @@ def fast_advance_revision_response_schema(
     allowed_contracts = allowed_contracts_by_disposition.get(disposition_value)
     if allowed_contracts is None:
         return schema
-    if disposition_value == "execute" and not committed_communicative:
+    initial_activities = initial_raw.get("activities")
+    initial_selected_progress = any(
+        isinstance(item, dict) and item.get("role") == "progress"
+        for item in (
+            initial_activities if isinstance(initial_activities, list) else []
+        )
+    )
+    if (
+        disposition_value == "execute"
+        and not committed_communicative
+        and initial_selected_progress
+    ):
         allowed_contracts.append("FastPlannerProgressAct")
 
     narrowed = copy.deepcopy(schema)
@@ -2172,6 +2120,7 @@ def fast_advance_response_schema(
     interpretation_unresolved: list[str] | None = None,
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
+    suppress_new_progress: bool = False,
 ) -> dict[str, Any]:
     """Constrain Fast Activities to authoritative WHAT and the live catalog.
 
@@ -2237,6 +2186,13 @@ def fast_advance_response_schema(
     if isinstance(reason_summary, dict):
         reason_summary["maxLength"] = 100
     refs = list(dict.fromkeys(responsibility_refs))
+    responsibility_items = list(responsibilities or [])
+    ordinary_speech_refs = {
+        item.local_ref
+        for item in responsibility_items
+        if item.output_mode == "speech"
+    }
+    capability_refs = [ref for ref in refs if ref not in ordinary_speech_refs]
     covered = schema.get("properties", {}).get(
         "covered_responsibility_refs"
     )
@@ -2330,12 +2286,72 @@ def fast_advance_response_schema(
         contract = definitions.get(contract_name)
         if not isinstance(contract, dict):
             continue
-        source_refs = contract.get("properties", {}).get(
+        contract_properties = contract.get("properties", {})
+        source_refs = contract_properties.get(
             "source_responsibility_refs"
         )
         if isinstance(source_refs, dict):
-            source_refs["items"] = {"type": "string", "enum": refs}
+            allowed_refs = (
+                capability_refs
+                if contract_name == "FastPlannerCapabilityActivity"
+                else (
+                    [ref for ref in refs if ref in ordinary_speech_refs]
+                    if (
+                        contract_name == "FastPlannerCompleteResponseAct"
+                        and responsibility_items
+                    )
+                    else refs
+                )
+            )
+            source_refs["items"] = {"type": "string", "enum": allowed_refs}
             source_refs["uniqueItems"] = True
+        role = contract_properties.get("role")
+        if isinstance(role, dict):
+            # Put the discriminating semantic choice before the branch payload.
+            # Otherwise constrained decoding can commit to the first, easiest
+            # union branch before it reaches ``role`` and coerce intended
+            # Capability Activities into Communicative Acts.
+            contract["properties"] = {
+                "role": role,
+                **{
+                    name: value
+                    for name, value in contract_properties.items()
+                    if name != "role"
+                },
+            }
+    activity_items = (
+        activities_schema.get("items")
+        if isinstance(activities_schema, dict)
+        else None
+    )
+    if isinstance(activity_items, dict) and responsibility_items:
+        allowed_activity_contracts = [
+            "FastPlannerCapabilityActivity",
+            "FastPlannerClarificationAct",
+        ]
+        if not (
+            committed_communicative
+            or suppress_new_communicative
+            or suppress_new_progress
+        ):
+            allowed_activity_contracts.append("FastPlannerProgressAct")
+        if ordinary_speech_refs and not (
+            committed_communicative or suppress_new_communicative
+        ):
+            allowed_activity_contracts.insert(1, "FastPlannerCompleteResponseAct")
+        activity_items["oneOf"] = [
+            {"$ref": f"#/$defs/{contract_name}"}
+            for contract_name in allowed_activity_contracts
+        ]
+        discriminator = activity_items.get("discriminator")
+        if isinstance(discriminator, dict):
+            mapping = discriminator.get("mapping")
+            if isinstance(mapping, dict):
+                discriminator["mapping"] = {
+                    role_name: ref
+                    for role_name, ref in mapping.items()
+                    if ref.rsplit("/", 1)[-1] in allowed_activity_contracts
+                }
     capability_contract = definitions.get("FastPlannerCapabilityActivity")
     progress_contract = definitions.get("FastPlannerProgressAct")
     if isinstance(progress_contract, dict):
@@ -2367,14 +2383,36 @@ def fast_advance_response_schema(
                 str(item["capability_id"])
                 for item in allowed_capabilities
             ]
-        # The compact prompt projection already carries every allowed
-        # argument contract. Decoder-time duplication of every full schema
-        # inflated the first-response context. Host validation below remains
-        # the sole acceptance boundary for the Planner-authored args.
         capability_contract.pop("allOf", None)
         capability_properties = capability_contract.get("properties")
         if isinstance(capability_properties, dict):
             capability_properties.pop("reason_summary", None)
+            capability_required = list(capability_contract.get("required", []))
+            if "args" not in capability_required:
+                capability_required.append("args")
+            capability_contract["required"] = capability_required
+            branches: list[dict[str, Any]] = []
+            for capability in allowed_capabilities:
+                capability_id_value = str(capability.get("capability_id") or "")
+                input_schema = capability.get("input_schema")
+                if not capability_id_value or not isinstance(input_schema, dict):
+                    continue
+                branch_properties = copy.deepcopy(capability_properties)
+                branch_properties["capability_id"] = {
+                    "type": "string",
+                    "enum": [capability_id_value],
+                }
+                branch_properties["args"] = copy.deepcopy(input_schema)
+                branches.append(
+                    {
+                        "type": "object",
+                        "properties": branch_properties,
+                        "required": capability_required,
+                        "additionalProperties": False,
+                    }
+                )
+            if branches:
+                capability_contract["oneOf"] = branches
     return schema
 
 def fast_repair_response_schema(

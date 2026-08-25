@@ -93,7 +93,7 @@ from .goal_association_validation import (
     coverage_verdict,
     drop_ungrounded_resource_query_locations,
     non_verbatim_explicit_location_bindings,
-    normalize_grounded_generic_location_types,
+    normalize_grounded_binding_types,
     normalize_optional_referent_updates,
     normalize_optional_resource_quantity,
     normalize_resource_binding_branches,
@@ -205,7 +205,7 @@ class GoalAssociationResolver:
                 item.local_ref: {
                     str(name): value
                     for name, value in item.bindings.items()
-                    if isinstance(value, str)
+                    if isinstance(value, (str, int, float, bool))
                 }
                 for item in request.responsibilities
             },
@@ -280,7 +280,7 @@ class GoalAssociationResolver:
                 request=request,
             )
             ungrounded_resource_location_recovery.extend(recovered)
-            normalized, recovered = normalize_grounded_generic_location_types(
+            normalized, recovered = normalize_grounded_binding_types(
                 normalized,
                 request=request,
             )

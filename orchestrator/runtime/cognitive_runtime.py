@@ -4226,11 +4226,27 @@ class GoalDrivenRuntimeCoordinator:
         ) -> CognitiveRuntimeResolution:
             if core_interpretation is None:
                 return resolution
+            interpretation_payload = core_interpretation.model_dump(mode="json")
             metadata = dict(resolution.metadata)
-            metadata["core_interpretation"] = core_interpretation.model_dump(
-                mode="json"
+            metadata["core_interpretation"] = interpretation_payload
+            interaction = resolution.interaction_response
+            if interaction is not None:
+                interaction_metadata = dict(interaction.metadata)
+                # The InteractionResponse is the immutable source correlation
+                # retained through asynchronous Runtime completion. Re-entry
+                # policy consumes this exact GI provenance; without it, a valid
+                # terminal result cannot be mapped back to its Responsibility
+                # and must fail closed as missing_responsibility_provenance.
+                interaction_metadata["goal_interpretation"] = interpretation_payload
+                interaction = interaction.model_copy(
+                    update={"metadata": interaction_metadata}
+                )
+            return resolution.model_copy(
+                update={
+                    "metadata": metadata,
+                    "interaction_response": interaction,
+                }
             )
-            return resolution.model_copy(update={"metadata": metadata})
 
         def queue_resolution_social_attention(
             resolution: CognitiveRuntimeResolution,

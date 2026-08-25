@@ -817,20 +817,33 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 30. **Semantic decomposition must prove responsibility coverage.** The model owns
    the semantic judgment about which user outcomes are independent Goals; Host
    code must not recover that meaning with phrase rules or action dictionaries.
-   For effectful or otherwise high-risk multi-responsibility segmentation, the
-   trusted Goal boundary may require a separate model-owned coverage audit over
-   the authoritative user turn. That audit explicitly accounts for positive
-   responsibilities, constraints, context, and conversational framing and maps
-   every covered positive responsibility to a zero-based Goal candidate. Coverage
-   items also make typed claims about temporal dimensions and required Goal shape;
-   the Host compares only those model-authored claims with candidate DTO types. The
-   Host checks mechanical invariants: every accepted Goal has positive
-   responsibility ownership, missing or clarification-required meaning cannot
-   be declared covered, and two independently satisfiable outcomes cannot share
-   one Goal. Provider availability never erases a requested responsibility. A
-   rejected audit permits one fresh model-owned resegmentation followed by one
-   recheck; repeated incompleteness fails closed rather than committing partial
-   canonical Goal truth.
+   Before an effectful, multi-Responsibility, or otherwise consequential GI result
+   becomes accepted WHAT, a separate source-based model invocation audits the
+   authoritative turn independently of the candidate prose. It cites bounded
+   source-token refs that trusted code materializes into exact contiguous source
+   spans, rather than retyping or correcting the person's wording, and classifies
+   those spans as positive Responsibilities, constraints, context, or framing;
+   maps each positive Responsibility to candidate `local_ref` identity; and declares
+   the required provider-neutral output mode. Goal Association may independently
+   verify the resulting canonical Goal transaction, but it must not be the first
+   boundary capable of noticing that GI already collapsed or invented WHAT. The
+   Host checks only mechanical invariants over model-authored claims: source-token
+   provenance, valid candidate references, positive ownership, output-mode
+   agreement, typed order/concurrency preservation, and one owner for each
+   independently satisfiable outcome. It never
+   discovers actions from words or reserves action-like binding keys. Provider
+   availability never erases a requested Responsibility. The audit receives the
+   candidate refs, outcomes, and material bindings but not the candidate's claimed
+   `output_mode`; required modality must be an independent source judgment rather
+   than an echo of the value under review. Material cross-Responsibility order is
+   retained in `before`/`after` sibling-`local_ref` bindings, and requested
+   concurrency in `parallel_with` sibling-`local_ref` bindings. These are WHAT
+   relations, not Runtime scheduling permission; Planner still owns timing and the
+   Host only rejects timing that contradicts the typed relation or provider resource
+   contract. A rejected audit permits
+   at most one fresh source-based GI resegmentation followed by one final audit;
+   if a deeper source pass has already occurred, rejection fails closed rather than
+   starting a second semantic pass or committing partial WHAT.
 31. **One model-authored semantic fact must have one model-facing source of truth.**
    When other execution fields are deterministic projections of one semantic
    decision, they do not belong beside that decision as writable model inputs.
@@ -841,6 +854,17 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    copies of those Host projections are schema defects, not invitations for
    compatibility inference. Do not accept a reverse mapping that can silently
    manufacture or downgrade semantic intent.
+
+   The same rule applies to parameter provenance. Planner owns Capability choice,
+   exact executable argument values, semantic realization, and step-to-Goal
+   ownership. When an already-authored argument has exactly one source in an
+   immutable non-resource Goal binding, or a selected Capability explicitly
+   declares how one typed Goal binding is realized into that argument, the duplicate
+   `PlanParameterResolution` is a Host projection rather than a second model-writable
+   semantic fact. Trusted code may add or correct only that provenance record; it
+   may not change Capability, argument, step, timing, outcome, or wording. Ambiguous
+   provenance remains unprojected and must pass ordinary Planner validation or fail
+   closed.
 
 32. **The best-known technical architecture is the default target.** Chromie
    should pursue the technically strongest architecture we can justify from current
@@ -982,7 +1006,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    deterministically attaches it to the exact Goal(s) through the original request
    identity. A meaningful transition may create a bounded `CognitiveOpportunity` that
    re-enters the same Planner with Goal, Responsibility, Situation, actual Work, and
-   Evidence. Planner alone decides whether the human-relevant next Main Activity is
+   Evidence. Every such invocation carries one immutable typed re-entry scope: exact
+   trigger, affected Goal IDs, Evidence refs or `CognitiveOpportunity` identity, and
+   originating Plan identity/fingerprint when a Plan exists. The Planner projection,
+   decoder contract, and final Goal-set validator use exactly that affected Goal set;
+   unrelated or already-closed sibling Goals may remain in durable history but cannot
+   silently re-enter this planning transaction. A mismatch between the typed scope,
+   Goal Association, Evidence/cancellation binding, or source Plan fails closed.
+   Planner alone decides whether the human-relevant next Main Activity is
    an answer, follow-up Work, revision, clarification, waiting, silence, or no new
    Activity; complex HOW may use the Planner deep pass. Neither Host nor a separate Tool Result Interpreter may
    infer Goal ownership from result contents or author result meaning. Before a

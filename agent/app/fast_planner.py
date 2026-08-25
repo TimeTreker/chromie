@@ -35,7 +35,6 @@ from .planner_schema import (
     fast_repair_response_schema,
 )
 from .planner_context import (
-    canonical_goal_grounding,
     fast_capability_payload,
     gateway_speech_act,
     planner_goal_context,
@@ -55,6 +54,7 @@ from .planner_validation import (
 from .planner_fast_validation import (
     AuthoritativeGroundingValidationError,
     CapabilityArgumentValidationError,
+    FastAdvanceMechanicalSchedulingError,
     capability_argument_errors,
     planner_validation_error_json,
     qualify_fast_canonical_plan,
@@ -232,7 +232,11 @@ class FastPlannerResolver:
                     # latency-critical response phase bounded rather than inheriting
                     # a deliberate role's context window.
                     "num_ctx": self.first_response_num_ctx,
-                    "num_predict": min(self.num_predict, 192),
+                    # This DTO fits well below 128 tokens. Retained Gemma/Qwen live
+                    # evidence showed that a 512-token allowance let an already-
+                    # complete JSON object repeat until output_truncated; 128 made
+                    # both decoders stop normally without narrowing the schema.
+                    "num_predict": min(self.num_predict, 128),
                 },
                 response_format=response_schema,
                 prompt_family="fast_planner.first_response",
@@ -451,6 +455,10 @@ class FastPlannerResolver:
 
         schema = fast_truth_certificate_response_schema()
         context = request.context if isinstance(request.context, dict) else {}
+        goal_context = planner_goal_context(
+            context,
+            reentry_scope=request.planner_reentry_scope,
+        )
         contract = (
             "Fast Planner post-Evidence Epistemic Qualification contract: inspect every "
             "candidate response string against only the admitted trusted terminal "
@@ -463,6 +471,18 @@ class FastPlannerResolver:
             "admitted Evidence. Reject unsupported duration, "
             "severity, advice, reassurance, or facts from another period. Do not "
             "rewrite the response, choose a Capability, or add an explanation. "
+            "The typed re-entry scope is exact: reject claims about a sibling Goal "
+            "outside that scope. A completed Evidence record supports only the "
+            "source-Plan step bound to its scoped Goal; use that immutable source "
+            "Plan to verify the requested arguments rather than demanding that the "
+            "provider repeat Planner-owned arguments in its terminal payload. The "
+            "scope excludes every sibling Goal not listed there: reject any wording "
+            "that names, imitates, counts, or claims an effect from an excluded sibling, "
+            "even when the originating user turn or broader history mentions it. The "
+            "trusted execution outcome is the mechanical authority for completion "
+            "status and completion qualification; accept an exact scoped completion "
+            "claim when that outcome marks the Goal completed with required "
+            "qualification established and its Evidence IDs match. "
             "Classify whether the response has an unsupported material claim or a "
             "semantic-perspective contradiction, then return only decision=accept "
             "when neither is present. Otherwise return decision=reject."
@@ -489,9 +509,22 @@ class FastPlannerResolver:
             )
             + "\n\nAdmitted trusted terminal Evidence JSON:\n"
             + bounded_json(context.get("trusted_terminal_evidence") or [], 6000)
+            + "\n\nImmutable typed Planner re-entry scope JSON:\n"
+            + bounded_json(
+                (
+                    request.planner_reentry_scope.model_dump(mode="json")
+                    if request.planner_reentry_scope is not None
+                    else {}
+                ),
+                2400,
+            )
+            + "\n\nAuthoritative source Plan JSON (semantic step/argument/Goal binding):\n"
+            + bounded_json(context.get("canonical_plan_resolution") or {}, 5000)
+            + "\n\nTrusted execution outcome JSON (mechanical completion and qualification):\n"
+            + bounded_json(context.get("trusted_execution_outcome") or {}, 5000)
             + "\n\nAuthoritative canonical Goal JSON:\n"
-            + bounded_json(canonical_goal_grounding(context), 3000)
-            + "\n\nCurrent user turn (scope only):\n"
+            + bounded_json(list(goal_context.authoritative_goals), 3000)
+            + "\n\nCurrent user turn (context only; typed scope above is authoritative):\n"
             + str(request.original_user_text or "")[:700]
         )
         raw = await self.truth_ollama.generate(
@@ -505,7 +538,7 @@ class FastPlannerResolver:
                 "temperature": 0,
                 "top_p": 0.9,
                 "num_ctx": self.truth_num_ctx,
-                "num_predict": min(self.num_predict, 64),
+                "num_predict": min(self.num_predict, 128),
             },
             response_format=schema,
             prompt_family="fast_planner.evidence_response.truth_check",
@@ -527,6 +560,7 @@ class FastPlannerResolver:
         committed_communicative_activities: list[Any] = []
         first_response_decided = False
         raw_first_response = context.get("fast_planner_first_response")
+        first_response_attempted = isinstance(raw_first_response, dict)
         if isinstance(raw_first_response, dict):
             try:
                 first_response = FastPlannerFirstResponse.model_validate(
@@ -535,7 +569,18 @@ class FastPlannerResolver:
             except ValidationError:
                 first_response = None
             if first_response is not None:
-                first_response_decided = True
+                # A fail-safe is evidence that this bounded model call did not
+                # make a valid communication decision. Treating it as intentional
+                # silence removes complete-response Activities from Advance and
+                # can make an ordinary speech Responsibility impossible to
+                # satisfy. A model-authored silence or truth rejection remains a
+                # real bounded decision and must still suppress replacement
+                # progress chatter.
+                first_response_decided = (
+                    first_response.activity is not None
+                    or first_response.metadata.get("semantic_authority")
+                    != "deterministic_fail_safe"
+                )
                 if first_response.activity is not None:
                     committed_communicative_activities.append(first_response.activity)
 
@@ -594,6 +639,11 @@ class FastPlannerResolver:
                 first_response_decided
                 and not committed_communicative_activities
             ),
+            # A failed bounded response call is not a semantic silence
+            # decision, so ordinary speech may still be completed here. It is
+            # nevertheless an attempted prospective-speech phase and Advance
+            # must not bypass its fail-closed result with unqualified progress.
+            suppress_new_progress=first_response_attempted,
         )
         options = {
             "temperature": 0,
@@ -626,6 +676,7 @@ class FastPlannerResolver:
                             committed_communicative_activities
                         ),
                         first_response_decided=first_response_decided,
+                        first_response_attempted=first_response_attempted,
                         validation_errors=previous_errors,
                     ),
                     system=fast_advance_system_prompt(),
@@ -705,7 +756,11 @@ class FastPlannerResolver:
             except Exception as exc:
                 if attempt < self.max_contract_repairs and isinstance(
                     exc,
-                    (ValidationError, json.JSONDecodeError),
+                    (
+                        ValidationError,
+                        FastAdvanceMechanicalSchedulingError,
+                        json.JSONDecodeError,
+                    ),
                 ):
                     revision_source = last_raw
                     previous_errors = planner_validation_error_json(
@@ -713,6 +768,11 @@ class FastPlannerResolver:
                         raw=last_raw,
                         planner_tier="fast",
                         expected_goal_ids_for_turn=responsibility_refs,
+                        # Advance validates an Activity DTO over GI
+                        # Responsibility refs, not a CanonicalPlan over Goal IDs.
+                        # Canonical-plan diagnostics here ask for unrelated
+                        # steps/outcomes and corrupt the one mechanical repair.
+                        include_canonical_plan_diagnostics=False,
                     )
                     continue
                 return materialize_fast_advance_fail_safe(
@@ -766,7 +826,10 @@ class FastPlannerResolver:
     async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         plan_id = stable_plan_id(request, "fast")
         context = request.context if isinstance(request.context, dict) else {}
-        goal_context = planner_goal_context(context)
+        goal_context = planner_goal_context(
+            context,
+            reentry_scope=request.planner_reentry_scope,
+        )
         expected_goal_ids_for_turn = list(goal_context.expected_goal_ids)
         authoritative_goals = list(goal_context.authoritative_goals)
         cancellation_reentry_goal_ids = set(
@@ -864,7 +927,7 @@ class FastPlannerResolver:
         contract_repair_attempted = False
         for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
-            numeric_provenance_repairs: list[dict[str, Any]] = []
+            parameter_provenance_repairs: list[dict[str, Any]] = []
             try:
                 active_response_schema = (
                     fast_repair_response_schema(
@@ -923,14 +986,14 @@ class FastPlannerResolver:
                         request.sid,
                         bounded_json(provenance_repairs, 2000),
                     )
-                numeric_provenance_repairs = common_repairs[
-                    "numeric_parameter_provenance"
+                parameter_provenance_repairs = common_repairs[
+                    "parameter_provenance"
                 ]
-                if numeric_provenance_repairs:
+                if parameter_provenance_repairs:
                     logger.info(
-                        "fast_planner_numeric_provenance_normalized sid=%s repairs=%s",
+                        "fast_planner_parameter_provenance_normalized sid=%s repairs=%s",
                         request.sid,
-                        bounded_json(numeric_provenance_repairs, 2000),
+                        bounded_json(parameter_provenance_repairs, 2000),
                     )
                 try:
                     validated_model_output = validate_planner_model_output(
@@ -969,12 +1032,15 @@ class FastPlannerResolver:
                         validated_model_output,
                         authoritative_goals=authoritative_goals,
                     )
+                except PlannerDTOContractError:
+                    raise
                 except ValueError as exc:
-                    # A missing or internally inconsistent provenance record is
-                    # a mechanically malformed Planner DTO. One same-stage repair
-                    # may add or correct that record without changing Goal meaning,
-                    # Capability selection, or executable arguments.
-                    raise PlannerDTOContractError(str(exc)) from exc
+                    # A structurally invalid provenance row raises
+                    # PlannerDTOContractError inside the validator. A ValueError
+                    # here instead means the selected executable arguments do not
+                    # preserve authoritative Goal values. Fixing that requires a
+                    # fresh semantic Plan, never a same-stage DTO edit.
+                    raise AuthoritativeGroundingValidationError(str(exc)) from exc
                 try:
                     validate_goal_binding_argument_grounding(
                         validated_model_output,
@@ -1114,6 +1180,7 @@ class FastPlannerResolver:
                     path_classification=(
                         "semantic_escalation"
                         if semantic_validation_failure
+                        or authoritative_grounding_failure
                         else "contract_failure"
                     ),
                     metadata={
@@ -1129,6 +1196,13 @@ class FastPlannerResolver:
                         "validation_feedback": (
                             exc.feedback
                             if isinstance(exc, CapabilityArgumentValidationError)
+                            else [
+                                {
+                                    "type": "authoritative_grounding_mismatch",
+                                    "message": str(exc)[:600],
+                                }
+                            ]
+                            if authoritative_grounding_failure
                             else []
                         ),
                         **integrity_metadata,
@@ -1289,11 +1363,11 @@ class FastPlannerResolver:
                 )
                 validated = validated.model_copy(update={"metadata": metadata})
                 logger.info("fast_planner_contract_repair_done sid=%s status=success", request.sid)
-            if numeric_provenance_repairs:
+            if parameter_provenance_repairs:
                 metadata = dict(validated.metadata)
-                metadata["numeric_provenance_normalization"] = {
-                    "strategy": "copy_exact_owned_step_argument",
-                    "repairs": numeric_provenance_repairs,
+                metadata["parameter_provenance_normalization"] = {
+                    "strategy": "project_mechanically_derivable_provenance",
+                    "repairs": parameter_provenance_repairs,
                     "semantic_plan_unchanged": True,
                 }
                 validated = validated.model_copy(update={"metadata": metadata})

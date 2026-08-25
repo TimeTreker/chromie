@@ -256,6 +256,7 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                 {"role": "assistant", "text": "Okay."},
             ],
         )
+        self.assertEqual(payload["channel"], "text")
         self.assertNotIn("route", payload)
         self.assertNotIn("intent", payload)
         self.assertNotIn("capability", payload)

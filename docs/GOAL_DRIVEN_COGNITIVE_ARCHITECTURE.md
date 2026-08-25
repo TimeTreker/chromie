@@ -270,7 +270,11 @@ An ephemeral coverage certificate is evidence about candidate Goal semantics, no
 another mutable Goal model. It may be retained immutably in traces, but its only
 control authority is to accept the candidate, permit one fresh source-based
 interpretation, or fail closed. It may not mutate Goals or enter its own repair
-workflow.
+workflow. Its source provenance is a model-cited contiguous token-ref span that
+trusted code materializes from the authoritative turn; the model does not author a
+second textual copy. Typed ordered/parallel supporting items also identify their
+candidate Responsibility participants so trusted code can verify the corresponding
+`before`/`after` or `parallel_with` bindings without interpreting coordination words.
 
 ### Capability grounding requires semantic entailment
 

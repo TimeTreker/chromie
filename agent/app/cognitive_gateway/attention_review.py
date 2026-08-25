@@ -95,6 +95,20 @@ class AttentionReviewer:
                 reason="attention gate is disabled; addressedness was not reviewed",
             )
 
+        # Text submitted through Chromie's explicit text transport is directed to
+        # Chromie by transport construction. The addressedness model exists to
+        # separate nearby room speech from microphone input; applying that same
+        # ambiguity to an explicit text submission can suppress a direct social
+        # statement or command before Core sees it. This establishes only
+        # admission, never semantic intent, routing, Goals, or Activities.
+        if request.channel == "text":
+            return self._admit(
+                request=request,
+                confidence=1.0,
+                source="cognitive_gateway.explicit_text_transport",
+                reason="explicit text transport is addressed to Chromie",
+            )
+
         # Active work is context for addressedness, not proof that the latest
         # transcript carries a new directed meaning. Always review it. Otherwise an
         # ASR fragment such as "The." can inherit an unrelated active Goal and be
@@ -432,6 +446,7 @@ class AttentionReviewer:
         return (
             f"Host engagement evidence: {request.engagement}\n"
             f"Recent bounded dialogue: {request.recent_dialogue}\n"
+            f"Input channel: {request.channel}\n"
             f"Language hint: {request.language}\n"
             f"Latest transcript: {request.text}"
         )

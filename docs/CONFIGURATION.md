@@ -151,7 +151,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0`. RTX 4090 Laptop uses `qwen3:8b` for Goal Interpretation/Deep Planning, `gemma4:e4b` for Agent/Goal Association, and `qwen3:4b` for Fast roles; RTX 5090 retains its `gemma4:12b` quality stages. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0`. RTX 4090 Laptop uses `qwen3:8b` for Goal Interpretation/Deep Planning, `gemma4:e4b` for Agent/Goal Association, and `qwen3:4b` for Fast roles. RTX 5090 uses `qwen3.5:9b` for Goal Interpretation, full Fast planning, Social Attention, and skill selection; it uses the already-resident `gemma4:12b` for Goal Association, Deep Planning, the bounded first Communicative Activity, and its immutable truth certificate. The latter role split is retained model evidence: under the same structured prompts Qwen repeated output at the 512-token boundary and over-rejected completion truth, while Gemma stopped within the bounded DTO and distinguished supported from unsupported claims. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -263,7 +263,7 @@ Capabilities, or delegate HOW.
 | `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
 | `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
 | `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; warm the Goal Interpreter model during Agent startup. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget. Warm failure is logged and does not create a fallback semantic authority. |
+| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget. Explicit qualification mode raises it to `120000`. Warm failure is logged and does not create a fallback semantic authority. |
 | `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; opt-in raw model-output diagnostics. |
 | `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; opt-in bounded prompt diagnostics. |
@@ -408,7 +408,7 @@ retained. See
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
 | `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
 | `AGENT_SKILL_SELECTION_MODEL` | Ollama model used by the responsible Agent-role selection boundary; default `qwen3:4b`. |
-| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. |
+| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
 | `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, and Deep Planner; default `1`. |
@@ -429,7 +429,7 @@ retained. See
 | `AGENT_EXTERNAL_INFORMATION_ENABLED` | Enable the provider-neutral read-only external-information adapter; default `0`. |
 | `AGENT_EXTERNAL_INFORMATION_URL` | Exact HTTP endpoint for grounded evidence retrieval. The provider performs web/source access and ranking; it must return the `chromie.external_information.retrieve` result schema. Blank means unavailable. |
 | `AGENT_EXTERNAL_INFORMATION_TOKEN` | Optional bearer token for the configured external-information endpoint. It is provider authentication, not model context or user-visible evidence. |
-| `AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS` | Timeout for one external-information provider request; default `15000`. |
+| `AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS` | Timeout for one external-information provider request; default `15000`. Explicit qualification mode raises it to `120000`. |
 
 `chromie.weather.lookup` keeps its required `location` argument equal to the
 canonical Goal binding. It also accepts optional `location_context` fields
@@ -457,7 +457,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
+| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration and `150000` in explicit qualification mode. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
 | `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout. Hardware profiles do not own it; explicit operator/validation modes may override it when collecting qualification evidence. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
@@ -850,7 +850,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b` for higher-quality continuity-before-creation and independent-goal segmentation. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because it produced the correct independent responsibility/constraint audit under the retained Chinese locomotion request. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `8000` in maintained interactive modes; endpoint model-call timeout. Goal Association runs behind the latency-critical first response and may emit a materially larger structured DTO, so the acknowledgement target is not reused as a cognition kill switch. Failure still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -885,6 +885,7 @@ certificate-repair fallback.
 | `AGENT_FAST_FIRST_RESPONSE_MODEL` | Defaults to the active Agent model; owns the latency-critical first natural Communicative Activity. |
 | `AGENT_FAST_TRUTH_MODEL` | Defaults to `AGENT_FAST_FIRST_RESPONSE_MODEL`; qualifies that model's immutable wording for truth and semantic consistency without authoring a replacement. |
 | `AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS` | `2500` in maintained interactive modes; watchdog for the small latency-critical first-response/truth client. It is deliberately shorter than full Fast planning so the user-facing phase can fail silent without killing larger background cognition. Qualification mode raises it with the other model watchdogs. |
+| Fast first-response output budget | Fixed at a maximum of `128` generated tokens inside Fast Planner. The complete bounded DTO fits inside that budget; retained Gemma/Qwen evidence showed that a `512` allowance could turn a complete early JSON object into repeated output ending at `output_truncated`. This is deliberately not another environment variable. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `8000` in maintained interactive modes; full Fast Planner model timeout. The small first-response phase is expected to return much earlier in healthy operation, while complete structured planning is allowed to finish behind that user-visible progress. |
 Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. |
@@ -896,7 +897,7 @@ Fast/Deep depth is selected from material uncertainty, complexity, consequence, 
 | `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
-| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. |
+| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. Explicit qualification mode uses `40960` so the retained full-catalog post-Evidence prompt plus the 4096-token structured-output reserve fits without changing the maintained interactive profile. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |

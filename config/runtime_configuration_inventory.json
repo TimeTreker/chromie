@@ -292,6 +292,7 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
+        "env/modes/qualification.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env"
@@ -392,7 +393,8 @@
       "owners": [
         ".env.common",
         "agent/app/settings.py",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "env/modes/qualification.env"
       ]
     },
     {
@@ -431,6 +433,20 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env"
       ]
     },
     {
@@ -738,7 +754,8 @@
       "owners": [
         ".env.common",
         "agent/app/settings.py",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "env/modes/qualification.env"
       ]
     },
     {
@@ -950,7 +967,8 @@
       "owners": [
         ".env.common",
         "agent/app/settings.py",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "env/modes/qualification.env"
       ]
     },
     {
@@ -2194,7 +2212,8 @@
       "category": "profile_constant",
       "key": "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
       "owners": [
-        ".env.common"
+        ".env.common",
+        "env/modes/qualification.env"
       ]
     },
     {
@@ -4012,10 +4031,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 130,
       "public_choice": 9,
-      "service_internal": 207
+      "service_internal": 208
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 383
+    "total_keys": 384
   }
 }

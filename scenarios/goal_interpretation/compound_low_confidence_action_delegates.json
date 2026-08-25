@@ -43,13 +43,14 @@
               "confidence": 0.31,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "speech"
             },
             {
               "local_ref": "r3",
-              "outcome": "blink while walking",
+              "outcome": "blink six times while walking",
               "bindings": {
-                "concurrency": "while walking"
+                "concurrency": "while walking",
+                "count": 6
               },
               "confidence": 0.7,
               "relationship": "new",
@@ -59,14 +60,48 @@
           ],
           "unresolved": []
         }
+      },
+      {
+        "stage": "goal_interpretation_responsibility_coverage",
+        "decision": {
+          "responsibility_items": [
+            {
+              "source_excerpt": "walk forward for 20 seconds",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r1"],
+              "required_output_mode": "body_action"
+            },
+            {
+              "source_excerpt": "blink six times",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r3"],
+              "required_output_mode": "body_action"
+            },
+            {
+              "source_excerpt": "tell me a joke while walking",
+              "role": "responsibility",
+              "coverage": "covered",
+              "independently_satisfiable": true,
+              "responsibility_refs": ["r2"],
+              "required_output_mode": "speech"
+            }
+          ],
+          "supporting_items": [],
+          "reason_summary": "All three requested effects have distinct owners."
+        }
       }
     ]
   },
   "expect": {
     "confidence": 0.31,
-    "llm_calls": 1,
+    "llm_calls": 2,
     "llm_stages": [
-      "goal_interpretation"
+      "goal_interpretation",
+      "goal_interpretation_responsibility_coverage"
     ],
     "unresolved": [],
     "responsibilities": [
@@ -80,7 +115,7 @@
         "confidence": 0.72,
         "relationship": "new",
         "target_goal_ids": [],
-        "output_mode": "body_action"
+        "output_mode": "speech"
       },
       {
         "local_ref": "r2",
@@ -95,9 +130,10 @@
       },
       {
         "local_ref": "r3",
-        "outcome": "blink while walking",
+        "outcome": "blink six times while walking",
         "bindings": {
-          "concurrency": "while walking"
+          "concurrency": "while walking",
+          "count": 6
         },
         "confidence": 0.7,
         "relationship": "new",

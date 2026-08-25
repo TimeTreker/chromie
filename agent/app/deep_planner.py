@@ -151,7 +151,10 @@ class DeepPlannerResolver:
     async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         plan_id = stable_plan_id(request, "deep")
         context = request.context if isinstance(request.context, dict) else {}
-        goal_context = planner_goal_context(context)
+        goal_context = planner_goal_context(
+            context,
+            reentry_scope=request.planner_reentry_scope,
+        )
         expected_goal_ids_for_turn = list(goal_context.expected_goal_ids)
         authoritative_goals = list(goal_context.authoritative_goals)
         response_only = goal_context.response_only
@@ -256,7 +259,7 @@ class DeepPlannerResolver:
         for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
             mixed_accounting_repairs: list[dict[str, Any]] = []
-            numeric_provenance_repairs: list[dict[str, Any]] = []
+            parameter_provenance_repairs: list[dict[str, Any]] = []
             try:
                 active_response_schema = deep_contract_revision_response_schema(
                     response_schema,
@@ -314,14 +317,14 @@ class DeepPlannerResolver:
                         request.sid,
                         bounded_json(provenance_repairs, 2000),
                     )
-                numeric_provenance_repairs = common_repairs[
-                    "numeric_parameter_provenance"
+                parameter_provenance_repairs = common_repairs[
+                    "parameter_provenance"
                 ]
-                if numeric_provenance_repairs:
+                if parameter_provenance_repairs:
                     logger.info(
-                        "deep_planner_numeric_provenance_normalized sid=%s repairs=%s",
+                        "deep_planner_parameter_provenance_normalized sid=%s repairs=%s",
                         request.sid,
-                        bounded_json(numeric_provenance_repairs, 2000),
+                        bounded_json(parameter_provenance_repairs, 2000),
                     )
                 raw, mixed_accounting_repairs = (
                     normalize_mixed_goal_outcome_accounting(
@@ -608,10 +611,10 @@ class DeepPlannerResolver:
                     }
                 )
                 metadata.update(coverage_review_metadata)
-                if numeric_provenance_repairs:
-                    metadata["numeric_provenance_normalization"] = {
-                        "strategy": "copy_exact_owned_step_argument",
-                        "repairs": numeric_provenance_repairs,
+                if parameter_provenance_repairs:
+                    metadata["parameter_provenance_normalization"] = {
+                        "strategy": "project_mechanically_derivable_provenance",
+                        "repairs": parameter_provenance_repairs,
                         "semantic_plan_unchanged": True,
                     }
                 if mixed_accounting_repairs:

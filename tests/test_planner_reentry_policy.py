@@ -7,6 +7,15 @@ from orchestrator.runtime.planner_reentry import (
     suppress_already_delivered_speech,
     terminal_evidence_relevance,
 )
+from agent.app.planner_context import (
+    goal_association_prompt_projection,
+    planner_goal_context,
+)
+from agent.app.planner_fallback import materialize_fast_escalation
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveWorkRequest,
+    PlannerReentryScope,
+)
 from shared.chromie_contracts.execution_outcome import ExecutionEvidence
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
@@ -92,6 +101,114 @@ def _current_binding() -> list[dict[str, object]]:
             "request_ids": ["request-a"],
         }
     ]
+
+
+def test_typed_reentry_scope_bounds_full_association_to_affected_goals() -> None:
+    context = {
+        "goal_association_resolution": {
+            "new_goals": [
+                {"goal_id": "goal-walk", "metadata": {"output_mode": "body_action"}},
+                {"goal_id": "goal-sing", "metadata": {"output_mode": "singing"}},
+                {"goal_id": "goal-blink", "metadata": {"output_mode": "body_action"}},
+            ]
+        },
+        "result_evidence_reentry": {
+            "source_goal_ids": ["goal-walk", "goal-blink"],
+            "evidence_refs": ["evidence-walk", "evidence-blink"],
+        },
+        "trusted_terminal_evidence": [
+            {
+                "evidence_id": "evidence-walk",
+                "tool_id": "soridormi.walk_forward",
+                "status": "completed",
+                "data": {},
+                "output_sha256": canonical_value_sha256({}),
+            },
+            {
+                "evidence_id": "evidence-blink",
+                "tool_id": "soridormi.blink_eyes",
+                "status": "completed",
+                "data": {},
+                "output_sha256": canonical_value_sha256({}),
+            },
+        ],
+    }
+    scope = PlannerReentryScope(
+        trigger="capability_result_reentry",
+        goal_ids=["goal-walk", "goal-blink"],
+        evidence_refs=["evidence-walk", "evidence-blink"],
+        source_plan_id="plan-original",
+        source_plan_fingerprint="f" * 64,
+    )
+
+    projected = planner_goal_context(context, reentry_scope=scope)
+
+    assert projected.expected_goal_ids == ("goal-walk", "goal-blink")
+    assert [item["goal_id"] for item in projected.authoritative_goals] == [
+        "goal-walk",
+        "goal-blink",
+    ]
+    association_projection = goal_association_prompt_projection(
+        context,
+        goal_ids=scope.goal_ids,
+    )
+    assert [
+        item["goal_id"] for item in association_projection["new_goals"]
+    ] == ["goal-walk", "goal-blink"]
+
+
+def test_fast_fail_safe_cannot_widen_typed_reentry_scope() -> None:
+    context = {
+        "goal_association_resolution": {
+            "new_goals": [
+                {"goal_id": "goal-walk", "metadata": {"output_mode": "body_action"}},
+                {"goal_id": "goal-blink", "metadata": {"output_mode": "body_action"}},
+            ]
+        },
+        "result_evidence_reentry": {
+            "source_goal_ids": ["goal-blink"],
+            "evidence_refs": ["evidence-blink"],
+        },
+        "trusted_terminal_evidence": [
+            {
+                "evidence_id": "evidence-blink",
+                "tool_id": "soridormi.blink_eyes",
+                "status": "completed",
+                "data": {},
+                "output_sha256": canonical_value_sha256({}),
+            }
+        ],
+    }
+    scope = PlannerReentryScope(
+        trigger="capability_result_reentry",
+        goal_ids=["goal-blink"],
+        evidence_refs=["evidence-blink"],
+        source_plan_id="plan-original",
+        source_plan_fingerprint="f" * 64,
+    )
+    request = CognitiveWorkRequest(
+        sid="scope-fail-safe",
+        text="Walk and blink.",
+        responsibilities=[
+            {
+                "local_ref": "blink",
+                "outcome": "blink once",
+                "output_mode": "body_action",
+                "confidence": 1.0,
+            }
+        ],
+        interpretation_confidence=1.0,
+        planner_reentry_scope=scope,
+        context=context,
+    )
+
+    fallback = materialize_fast_escalation(
+        "plan-fallback",
+        request,
+        "truth_qualification_rejected",
+    )
+
+    assert fallback.goal_ids == ["goal-blink"]
 
 
 def test_terminal_evidence_relevance_accepts_exact_current_binding() -> None:
