@@ -1907,7 +1907,9 @@ serialization fragments inside binding values are DTO corruption, not semantic f
 Conversational grounding follows the same rule: a vocative does not become a second effect;
 a repeat request binds the exact most recently accepted assistant utterance; and a standalone
 low-information symbol without resolving context retains unresolved intended meaning rather
-than being treated as an echo request or nearby body action.
+than being treated as an echo request or nearby body action. A question about whether a
+person, object, or event is currently present in the surroundings remains observed
+information even when phrased conversationally as what Chromie thinks.
 
 A semantic interpretation failure is retained as `interpretation_unavailable`; it must not
 be rounded into capability inability, execution failure, an empty result, or a user-facing
