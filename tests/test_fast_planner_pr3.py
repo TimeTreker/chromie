@@ -3063,6 +3063,28 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertNotIn("think", str(schema))
 
+    def test_repeat_first_response_is_exactly_bound_to_delivered_utterance(self):
+        responsibility = CognitiveResponsibilityProposal.model_validate(
+            {
+                "local_ref": "repeat",
+                "outcome": "repeat Chromie's most recent accepted utterance",
+                "bindings": {"prior_assistant_utterance": "你好！"},
+                "output_mode": "speech",
+                "confidence": 1.0,
+            }
+        )
+
+        schema = planner_schema.fast_first_response_response_schema(
+            ["repeat"],
+            responsibilities=[responsibility],
+            language="zh-CN",
+        )
+
+        text_contract = schema["$defs"]["FastPlannerCompleteResponseAct"][
+            "properties"
+        ]["text"]
+        self.assertEqual(text_contract["const"], "你好！")
+
     def test_unresolved_meaning_keeps_first_response_silent_until_clarification(self):
         ollama = ScriptedOllama([])
         run_request = _work_request(

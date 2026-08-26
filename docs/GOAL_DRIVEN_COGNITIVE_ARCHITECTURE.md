@@ -2339,6 +2339,12 @@ It may:
 - propose a low-consequence bounded default in canonical planning;
 - escalate.
 
+When GI binds `prior_assistant_utterance` for an exact repeat request, the
+Fast first-response decoder constrains the complete response to that immutable
+already-delivered text. This is dialogue provenance projection, not new
+Host-authored wording; prefixes, the current question, and planner prose cannot
+replace what the user asked Chromie to repeat.
+
 It must report coverage:
 
 ```text

@@ -1989,6 +1989,25 @@ def fast_first_response_response_schema(
             text_contract["maxLength"] = (
                 32 if str(language).casefold().startswith("zh") else 72
             )
+            if contract_name == "FastPlannerCompleteResponseAct":
+                prior_utterances = {
+                    str(item.bindings.get("prior_assistant_utterance") or "")
+                    for item in (responsibilities or [])
+                    if str(
+                        item.bindings.get("prior_assistant_utterance") or ""
+                    )
+                }
+                if len(prior_utterances) == 1:
+                    # The user asked for an exact repeat of already accepted
+                    # delivered speech. Projecting that immutable dialogue
+                    # value is not Host-authored wording; it prevents the model
+                    # from substituting the current question or adding a prefix.
+                    prior_utterance = next(iter(prior_utterances))
+                    text_contract["const"] = prior_utterance
+                    text_contract["maxLength"] = max(
+                        int(text_contract["maxLength"]),
+                        len(prior_utterance),
+                    )
             if contract_name == "FastPlannerProgressAct":
                 semantic_contract = [
                     {
