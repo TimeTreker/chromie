@@ -1391,6 +1391,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             GoalInterpretationRequest(text="Look at me, then blink twice."),
             atomic_coverage_certificate=certificate,
             constrain_speed_provenance=True,
+            constrained_binding_names=["duration"],
         )
         responsibility_model = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
@@ -1424,6 +1425,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             binding_contract["properties"]["speed_mode"]["const"],
             "__forbidden_noncanonical_speed_binding__",
         )
+        self.assertFalse(binding_contract["additionalProperties"])
+        Draft202012Validator(binding_contract).validate({"duration": "twice"})
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(binding_contract).validate(
+                {"speed_mode_value": "none"}
+            )
 
     def test_system_prompt_names_what_only_boundary(self) -> None:
         prompt = self._interpreter().load_system_prompt()

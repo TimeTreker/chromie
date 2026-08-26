@@ -1310,6 +1310,49 @@ def _reject_unprovenanced_location_bindings(
         )
 
 
+def _is_noncanonical_speed_binding_name(raw_name: str) -> bool:
+    normalized_name = str(raw_name).strip().casefold()
+    if normalized_name == "speed":
+        return False
+    name_tokens = set(
+        re.sub(
+            r"(?<=[a-z0-9])(?=[A-Z])|[^A-Za-z0-9]+",
+            " ",
+            str(raw_name),
+        )
+        .casefold()
+        .split()
+    )
+    speed_dimension_tokens = {"speed", "pace", "velocity"}
+    speed_alias_qualifiers = {"level", "mode", "setting", "value"}
+    return bool(
+        name_tokens & speed_dimension_tokens
+        and name_tokens - speed_dimension_tokens <= speed_alias_qualifiers
+    )
+
+
+def _goal_interpretation_binding_names(parsed: dict[str, Any]) -> list[str]:
+    """Return validated candidate DTO field names without retaining its values."""
+
+    names: list[str] = []
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return names
+    for item in responsibilities:
+        bindings = item.get("bindings") if isinstance(item, dict) else None
+        if not isinstance(bindings, dict):
+            continue
+        for raw_name in bindings:
+            name = str(raw_name).strip()
+            if (
+                name
+                and name not in names
+                and not _is_noncanonical_speed_binding_name(name)
+            ):
+                names.append(name)
+    return names
+
+
 def _reject_unprovenanced_speed_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -1341,27 +1384,11 @@ def _reject_unprovenanced_speed_bindings(
         bindings = item.get("bindings")
         if not isinstance(bindings, dict):
             continue
-        speed_dimension_tokens = {"speed", "pace", "velocity"}
-        speed_alias_qualifiers = {"level", "mode", "setting", "value"}
-        speed_aliases: list[str] = []
-        for raw_name in bindings:
-            normalized_name = str(raw_name).strip().casefold()
-            if normalized_name == "speed":
-                continue
-            name_tokens = set(
-                re.sub(
-                    r"(?<=[a-z0-9])(?=[A-Z])|[^A-Za-z0-9]+",
-                    " ",
-                    str(raw_name),
-                )
-                .casefold()
-                .split()
-            )
-            if (
-                name_tokens & speed_dimension_tokens
-                and name_tokens - speed_dimension_tokens <= speed_alias_qualifiers
-            ):
-                speed_aliases.append(str(raw_name))
+        speed_aliases = [
+            str(raw_name)
+            for raw_name in bindings
+            if _is_noncanonical_speed_binding_name(str(raw_name))
+        ]
         if speed_aliases:
             raise _GoalInterpretationSpeedProvenanceViolation(
                 "Goal Interpretation speed meaning must use the canonical "
@@ -2512,6 +2539,7 @@ class OllamaGoalInterpreter:
         *,
         constrain_location_provenance: bool = False,
         constrain_speed_provenance: bool = False,
+        constrained_binding_names: list[str] | None = None,
         atomic_coverage_certificate: GoalInterpretationCoverageCertificate | None = None,
         source_structure_violation: str = "",
     ) -> dict[str, Any]:
@@ -2827,6 +2855,28 @@ class OllamaGoalInterpreter:
                             ),
                         }
                     if constrain_speed_provenance:
+                        recovery_binding_names = {
+                            "after",
+                            "before",
+                            "count",
+                            "item_count",
+                            "location",
+                            "parallel_with",
+                            "repetition_count",
+                            "speed",
+                            *(constrained_binding_names or []),
+                        }
+                        for name in sorted(recovery_binding_names):
+                            if not _is_noncanonical_speed_binding_name(name):
+                                binding_properties.setdefault(name, {})
+                        if constrained_binding_names is not None:
+                            binding_schema["additionalProperties"] = False
+                            binding_schema["description"] = (
+                                "During source-based recovery, reuse only mechanically "
+                                "validated candidate dimensions or the existing canonical "
+                                "location, speed, count, and sibling-coordination fields. "
+                                "Omit a dimension when the source does not support it."
+                            )
                         binding_properties["speed"] = {
                             "anyOf": [
                                 {"type": "string", "enum": exact_surfaces},
@@ -3586,6 +3636,13 @@ class OllamaGoalInterpreter:
                     request,
                     atomic_coverage_certificate=coverage_certificate,
                     constrain_speed_provenance=True,
+                    constrained_binding_names=list(
+                        dict.fromkeys(
+                            name
+                            for responsibility in decision.responsibilities
+                            for name in responsibility.bindings
+                        )
+                    ),
                 ),
                 stage="goal_interpretation_deep",
                 request=request,
@@ -3803,6 +3860,9 @@ class OllamaGoalInterpreter:
                     self.build_deep_interpretation_payload(
                         request,
                         constrain_speed_provenance=True,
+                        constrained_binding_names=_goal_interpretation_binding_names(
+                            _extract_json_object(content)
+                        ),
                         source_structure_violation=str(exc),
                     ),
                     stage="goal_interpretation_deep",
