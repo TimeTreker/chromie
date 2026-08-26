@@ -1452,10 +1452,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             Draft202012Validator(binding_contract).validate({"speed": "blink"})
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(binding_contract).validate({"speed_mode": "none"})
-        self.assertEqual(
-            binding_contract["properties"]["speed_mode"]["const"],
-            "__forbidden_noncanonical_speed_binding__",
-        )
+        self.assertNotIn("speed_mode", binding_contract["properties"])
         self.assertFalse(binding_contract["additionalProperties"])
         Draft202012Validator(binding_contract).validate({"duration": "twice"})
         with self.assertRaises(JsonSchemaValidationError):
