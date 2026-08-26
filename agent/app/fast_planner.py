@@ -66,7 +66,10 @@ from .planner_fallback import (
     materialize_fast_advance_fail_safe,
     materialize_fast_escalation,
 )
-from .planner_audit import review_coordinated_action_plan_coverage
+from .planner_audit import (
+    qualify_evidence_response_truth,
+    review_coordinated_action_plan_coverage,
+)
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
 except ImportError:  # pragma: no cover - repository development path
@@ -147,6 +150,7 @@ class FastPlannerResolver:
         truth_num_ctx: int | None = None,
         num_ctx: int = 8192,
         num_predict: int = 2048,
+        cognitive_budget_profile: str = "interactive",
         max_capabilities: int = 24,
         max_contract_repairs: int = 1,
     ) -> None:
@@ -184,6 +188,9 @@ class FastPlannerResolver:
         self.catalog = catalog
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
+        self.cognitive_budget_profile = (
+            str(cognitive_budget_profile or "interactive").strip() or "interactive"
+        )
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
         self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
 
@@ -204,6 +211,21 @@ class FastPlannerResolver:
             for item in request.responsibilities
         ]
         responsibility_refs = [item.local_ref for item in responsibilities]
+        if request.interpretation_unresolved:
+            # GI owns WHAT and has explicitly retained an unresolved meaning.  A
+            # prospective first response would falsely imply that one meaning was
+            # selected before the same Planner has authored its typed clarification.
+            return FastPlannerFirstResponse(
+                turn_id=str(request.sid or "turn-fast-first-response"),
+                activity=None,
+                metadata={
+                    "semantic_authority": "fast_planner_unresolved_meaning_contract",
+                    "phase": "first_communicative_activity",
+                    "decision": "silence",
+                    "execution_authority": "none",
+                    "unresolved_meaning_count": len(request.interpretation_unresolved),
+                },
+            )
         response_schema = fast_first_response_response_schema(
             responsibility_refs,
             responsibilities=responsibilities,
@@ -229,12 +251,26 @@ class FastPlannerResolver:
                     # former 128-token ceiling before Ollama closed the JSON object.
                     # Keep this below the historical 512-token repetition failure
                     # while allowing one complete bounded response.
-                    "num_predict": min(self.num_predict, 256),
+                    "num_predict": min(
+                        self.num_predict,
+                        4096
+                        if self.cognitive_budget_profile == "qualification"
+                        else 256,
+                    ),
                     "stop": [
                         "✅",
                         "\n\nNote:",
                         "\n\nExplanation:",
                         "\n\nFinal truth check:",
+                        # Gemma 4 can close the schema-valid object and then loop
+                        # over Markdown-fenced copies until num_predict is exhausted.
+                        # Stop at the mechanical suffix while retaining the first
+                        # complete JSON object; this does not salvage a truncated
+                        # response or alter any semantic field.
+                        "_```json",
+                        "}```json",
+                        "\n```json",
+                        "```",
                     ],
                 },
                 response_format=response_schema,
@@ -320,6 +356,12 @@ class FastPlannerResolver:
                 # Keep the same immutable Activity acceptance surface, but let
                 # trusted contract evidence close the qualification locally.
                 truth_certificate = FastPlannerFirstResponseTruthCertificate(
+                    has_unverified_result_or_completion_claim=False,
+                    has_ungrounded_method_or_world_claim=False,
+                    has_semantic_perspective_contradiction=False,
+                    has_epistemic_strength_contradiction=False,
+                    has_execution_status_contradiction=False,
+                    has_out_of_scope_goal_claim=False,
                     decision="accept"
                 )
                 qualification_metadata = {
@@ -434,7 +476,12 @@ class FastPlannerResolver:
                 "temperature": 0,
                 "top_p": 0.9,
                 "num_ctx": self.truth_num_ctx,
-                "num_predict": min(self.num_predict, 128),
+                "num_predict": min(
+                    self.num_predict,
+                    256
+                    if self.cognitive_budget_profile == "qualification"
+                    else 128,
+                ),
             },
             response_format=schema,
             prompt_family="fast_planner.first_response.truth_check",
@@ -451,107 +498,18 @@ class FastPlannerResolver:
         plan: CanonicalPlan,
     ) -> FastPlannerFirstResponseTruthCertificate:
         """Accept or reject immutable post-Evidence wording without repairing it."""
-
-        schema = fast_truth_certificate_response_schema()
-        context = request.context if isinstance(request.context, dict) else {}
-        goal_context = planner_goal_context(
-            context,
-            reentry_scope=request.planner_reentry_scope,
-        )
-        contract = (
-            "Fast Planner post-Evidence Epistemic Qualification contract: inspect every "
-            "candidate response string against only the admitted trusted terminal "
-            "Evidence and authoritative Goal scope. Return decision=accept only when "
-            "every material claim preserves the Evidence values, scope, and epistemic "
-            "strength. Preserve uncertainty and qualification exactly: probabilistic, "
-            "forecast, estimated, bounded, partial, conditional, or otherwise qualified "
-            "Evidence must remain qualified. Reject wording that strengthens probability, "
-            "confidence, causal implication, temporal scope, or certainty beyond the "
-            "admitted Evidence. Reject unsupported duration, "
-            "severity, advice, reassurance, or facts from another period. Do not "
-            "rewrite the response, choose a Capability, or add an explanation. "
-            "The typed re-entry scope is exact: reject claims about a sibling Goal "
-            "outside that scope. A completed Evidence record supports only the "
-            "source-Plan step bound to its scoped Goal; use that immutable source "
-            "Plan to verify the requested arguments rather than demanding that the "
-            "provider repeat Planner-owned arguments in its terminal payload. The "
-            "scope excludes every sibling Goal not listed there: reject any wording "
-            "that names, imitates, counts, or claims an effect from an excluded sibling, "
-            "even when the originating user turn or broader history mentions it. The "
-            "dedicated has_out_of_scope_goal_claim flag must be true for that case; "
-            "compare the candidate clause-by-clause with the authoritative scoped Goal "
-            "description and its one source-Plan step. It must be false only when every "
-            "claimed effect belongs to that scoped Goal. The "
-            "trusted execution outcome is the mechanical authority for completion "
-            "status and completion qualification; accept an exact scoped completion "
-            "claim when that outcome marks the Goal completed with required "
-            "qualification established and its Evidence IDs match. "
-            "Classify whether the response has an unsupported material claim or a "
-            "semantic-perspective contradiction, and out-of-scope Goal claim, then "
-            "return only decision=accept when none is present. Otherwise return "
-            "decision=reject."
-        )
-        candidate = {
-            "response_text": plan.response_text,
-            "goal_outcome_response_texts": [
-                {
-                    "goal_id": outcome.goal_id,
-                    "response_text": outcome.response_text,
-                }
-                for outcome in plan.goal_outcomes
-                if getattr(outcome, "response_text", "")
-            ],
-        }
-        rendered = (
-            contract
-            + "\n\nImmutable candidate response JSON:\n"
-            + json.dumps(
-                candidate,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-            + "\n\nAdmitted trusted terminal Evidence JSON:\n"
-            + bounded_json(context.get("trusted_terminal_evidence") or [], 6000)
-            + "\n\nImmutable typed Planner re-entry scope JSON:\n"
-            + bounded_json(
-                (
-                    request.planner_reentry_scope.model_dump(mode="json")
-                    if request.planner_reentry_scope is not None
-                    else {}
-                ),
-                2400,
-            )
-            + "\n\nAuthoritative source Plan JSON (semantic step/argument/Goal binding):\n"
-            + bounded_json(context.get("canonical_plan_resolution") or {}, 5000)
-            + "\n\nTrusted execution outcome JSON (mechanical completion and qualification):\n"
-            + bounded_json(context.get("trusted_execution_outcome") or {}, 5000)
-            + "\n\nAuthoritative canonical Goal JSON:\n"
-            + bounded_json(list(goal_context.authoritative_goals), 3000)
-            + "\n\nCurrent user turn (context only; typed scope above is authoritative):\n"
-            + str(request.original_user_text or "")[:700]
-        )
-        raw = await self.truth_ollama.generate(
-            LayeredPrompt.promote(rendered, operating_contract=(contract,)),
-            system=(
-                "You are the same Fast Planner's bounded post-Evidence Epistemic "
-                "Qualification, not a response author. Accept or reject the immutable "
-                "candidate. Set has_out_of_scope_goal_claim explicitly by comparing "
-                "each claimed effect with the exact scoped Goal. Never repair, replace, "
-                "or expand it."
+        return await qualify_evidence_response_truth(
+            self.truth_ollama,
+            request=request,
+            plan=plan,
+            num_ctx=self.truth_num_ctx,
+            num_predict=(
+                256
+                if self.cognitive_budget_profile == "qualification"
+                else 128
             ),
-            options={
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.truth_num_ctx,
-                "num_predict": min(self.num_predict, 128),
-            },
-            response_format=schema,
             prompt_family="fast_planner.evidence_response.truth_check",
-            turn_id=request.sid,
-            attempt=1,
         )
-        return FastPlannerFirstResponseTruthCertificate.model_validate(raw)
 
 
 

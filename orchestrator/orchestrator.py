@@ -120,11 +120,13 @@ from orchestrator.runtime.situation import (
 from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
     fresh_capability_state_projection,
+    incremental_execution_outcome_truth,
     planner_reentry_repeats_completed_activity,
     planner_reentry_responsibilities,
     meaningful_provider_state,
     provider_state_relevance,
     suppress_already_delivered_speech,
+    suppress_redundant_completed_body_followup,
     terminal_evidence_relevance,
 )
 from orchestrator.runtime.tts_text import (
@@ -4930,6 +4932,21 @@ class VoiceAssistant:
             "terminal_status": evidence.status,
             "cognitive_opportunity": opportunity.prompt_projection(),
         }
+        try:
+            execution_truth = incremental_execution_outcome_truth(
+                evidence=evidence,
+                plan=canonical_plan,
+            )
+        except ValueError as exc:
+            self.session_log(
+                session_id,
+                "incremental_evidence_reentry_rejected: request_id=%s "
+                "error_type=%s error=%s",
+                evidence.request_id,
+                type(exc).__name__,
+                exc,
+            )
+            return None
         return await self._planner_state_reentry_response(
             source_response=source_response,
             canonical_plan=canonical_plan,
@@ -4942,6 +4959,7 @@ class VoiceAssistant:
             phase="capability_result_reentry",
             context_updates={
                 "trusted_terminal_evidence": [bounded_evidence.model_dump(mode="json")],
+                "trusted_execution_outcome": execution_truth,
                 "result_evidence_refs": evidence_refs,
                 "result_evidence_reentry": {
                     "phase": "capability_result_reentry",
@@ -5514,8 +5532,19 @@ class VoiceAssistant:
                 # Planner-authored prospective expectations are hypotheses to compare
                 # with fresh trusted Evidence, never Host-created Evidence themselves.
                 context["planner_reentry_expectations"] = planner_reentry_expectations
-        if isinstance(metadata.get("user_turn_envelope"), dict):
-            context["user_turn_envelope"] = dict(metadata["user_turn_envelope"])
+        # A state re-entry is an exact Goal-subset transaction. The originating
+        # immutable UserTurnEnvelope can contain excluded sibling semantics, so it
+        # remains retained on the source response but is not projected into this
+        # Planner request. Use only the already-authoritative GI Responsibility
+        # outcomes as the scoped planning text; canonical Goal and Plan projections
+        # below retain the exact bindings and execution correlation.
+        scoped_request_text = "\n".join(
+            dict.fromkeys(
+                item.outcome.strip()
+                for item in responsibilities
+                if item.outcome.strip()
+            )
+        )
         if isinstance(metadata.get("goal_interpretation"), dict):
             source_interpretation = dict(metadata["goal_interpretation"])
             source_interpretation["responsibilities"] = [
@@ -5576,7 +5605,7 @@ class VoiceAssistant:
         )
         request = CognitiveWorkRequest(
             sid=f"{sid}:state:{reentry_ref}"[:160],
-            text=user_request,
+            text=scoped_request_text,
             language=language,
             responsibilities=responsibilities,
             interpretation_confidence=1.0,
@@ -5742,6 +5771,30 @@ class VoiceAssistant:
                 "phase=%s count=%s",
                 phase,
                 suppressed_speech_count,
+            )
+        body_followup_suppressed_count = 0
+        if (
+            source_response is not None
+            and canonical_plan is not None
+            and repeat_check_evidence
+        ):
+            response, body_followup_suppressed_count = (
+                suppress_redundant_completed_body_followup(
+                    response,
+                    source_response=source_response,
+                    source_plan=canonical_plan,
+                    reentry_goal_ids=normalized_goal_ids,
+                    evidence=repeat_check_evidence,
+                    delivered_events=self._delivered_turn_speech_events(sid),
+                )
+            )
+        if body_followup_suppressed_count:
+            self.session_log(
+                session_id,
+                "planner_state_reentry_redundant_body_followup_suppressed: "
+                "phase=%s count=%s",
+                phase,
+                body_followup_suppressed_count,
             )
         evidence_goal_set = set(normalized_evidence_goal_ids)
         for speech in response.speech:

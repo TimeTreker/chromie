@@ -5,6 +5,7 @@ import unittest
 from types import SimpleNamespace
 
 from orchestrator.orchestrator import VoiceAssistant
+from orchestrator.runtime.planner_reentry import incremental_execution_outcome_truth
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
 )
@@ -72,6 +73,62 @@ async def _planner_evidence_reentry(
 
 
 class PlannerEvidenceReentryContractTests(unittest.TestCase):
+    def test_incremental_truth_marks_one_completed_step_of_multi_step_goal_partial(self) -> None:
+        goal_id = "goal-compound"
+        plan = CanonicalPlan(
+            plan_id="compound",
+            planner_tier="fast",
+            disposition="execute",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=[goal_id],
+            steps=[
+                CanonicalPlanStep(
+                    step_id="first",
+                    capability_id="chromie.test.first",
+                    args={},
+                    source_goal_ids=[goal_id],
+                ),
+                CanonicalPlanStep(
+                    step_id="second",
+                    capability_id="chromie.test.second",
+                    args={},
+                    source_goal_ids=[goal_id],
+                ),
+            ],
+            goal_outcomes=[
+                ExecuteGoalPlanOutcome(
+                    goal_id=goal_id,
+                    disposition="execute",
+                    coverage="complete",
+                    step_ids=["first", "second"],
+                )
+            ],
+            goal_satisfaction=GoalSatisfactionAssessment(
+                score=1.0,
+                status="exact",
+                satisfied_goal_ids=[goal_id],
+            ),
+        )
+        truth = incremental_execution_outcome_truth(
+            evidence=ExecutionEvidence(
+                evidence_id="first-result",
+                request_id="first-request",
+                step_id="first",
+                capability_id="chromie.test.first",
+                source_goal_ids=[goal_id],
+                status="completed",
+                reported_status="completed",
+            ),
+            plan=plan,
+        )
+
+        self.assertEqual(truth["aggregate_status"], "partial")
+        self.assertEqual(truth["goal_outcomes"][0]["status"], "partial")
+        self.assertEqual(
+            truth["goal_outcomes"][0]["unresolved_step_ids"], ["second"]
+        )
+
     def test_terminal_evidence_is_digest_bound(self) -> None:
         data = {"location": "重庆", "rain_probability": 10}
         evidence = ToolResultEvidence(

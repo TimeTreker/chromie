@@ -1346,7 +1346,14 @@ class CanonicalPlanRuntimeAdapter:
             and set(plan.executable_goal_ids()) == set(plan.goal_ids)
             and not confirmation_required
         )
-        if pure_silent_execution:
+        fail_closed_planner_silence = (
+            not text
+            and not plan.steps
+            and plan.disposition
+            in {"clarify", "unavailable", "refused"}
+            and plan.metadata.get("execution_allowed") is False
+        )
+        if pure_silent_execution or fail_closed_planner_silence:
             fingerprint = canonical_plan_fingerprint(plan)
             planner_response = PlannerResponseProjection(
                 projection_id=f"planner_owned_{fingerprint[:20]}",
@@ -1358,11 +1365,14 @@ class CanonicalPlanRuntimeAdapter:
                 confidence=plan.confidence,
                 rationale=(
                     "Planner selected complete execution without a communicative act."
+                    if pure_silent_execution
+                    else "Planner failed closed with no authorized communicative act."
                 ),
                 metadata={
                     "authority": "planner",
                     "resolver": "planner_owned_communication",
                     "task_plan_immutable": True,
+                    "fail_closed_planner_silence": fail_closed_planner_silence,
                 },
             )
             return await self.build_response(
@@ -3039,7 +3049,84 @@ class GoalDrivenRuntimeCoordinator:
             goal_ids=goal_ids,
             turn_id=self._context_turn_id(context, sid),
         )
-        return projection.model_dump(mode="json")
+        payload = projection.model_dump(mode="json")
+
+        # The append-only ledger is session-scoped, while ordinary dialogue
+        # continuity spans several session/turn IDs inside one Conversation.
+        # ConversationState already retains exact Fast communicative text only
+        # after Capability Runtime reports delivery completed. Project those
+        # owner-labelled prior-turn facts into the existing ``already_spoken``
+        # surface so Planner can answer contextual questions from what the user
+        # actually heard. Never project generic agent_result history: authored or
+        # scheduled text is not delivery evidence.
+        prior_delivered: list[dict[str, Any]] = []
+        for turn in list(context.get("history") or [])[-16:]:
+            if not isinstance(turn, dict) or turn.get("role") != "assistant":
+                continue
+            metadata = turn.get("metadata")
+            if not isinstance(metadata, dict) or metadata.get("source") != (
+                "fast_planner_communicative_delivery"
+            ):
+                continue
+            text = " ".join(str(turn.get("text") or "").strip().split())
+            if not text:
+                continue
+            turn_id = " ".join(
+                str(metadata.get("turn_id") or turn.get("sid") or "").strip().split()
+            )
+            activity_id = " ".join(
+                str(metadata.get("fast_activity_id") or "").strip().split()
+            )
+            identity = hashlib.sha256(
+                json.dumps(
+                    [turn_id, activity_id, text],
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()[:24]
+            prior_delivered.append(
+                {
+                    "event_id": f"conversation_speech_{identity}",
+                    "turn_id": turn_id,
+                    "owner": "playback_delivery",
+                    "domain": "vocal",
+                    "event_type": "speech_playback_started",
+                    "state": "playback_completed",
+                    "goal_ids": [],
+                    "subject_id": activity_id or f"speech_{identity}",
+                    "speech_act": str(metadata.get("speech_act") or ""),
+                    "text": text,
+                    "evidence_refs": [],
+                    "metadata": {
+                        "delivery_role": str(
+                            metadata.get("delivery_role") or ""
+                        ),
+                        "source": "fast_planner_communicative_delivery",
+                    },
+                }
+            )
+
+        retained_spoken = list(payload.get("already_spoken") or [])
+        retained_keys = {
+            (
+                str(item.get("turn_id") or ""),
+                str(item.get("subject_id") or ""),
+                str(item.get("text") or ""),
+            )
+            for item in retained_spoken
+            if isinstance(item, dict)
+        }
+        for item in prior_delivered:
+            key = (
+                str(item["turn_id"]),
+                str(item["subject_id"]),
+                str(item["text"]),
+            )
+            if key not in retained_keys:
+                retained_spoken.append(item)
+                retained_keys.add(key)
+        payload["already_spoken"] = retained_spoken[-16:]
+        return payload
 
 
     @staticmethod
@@ -3127,6 +3214,37 @@ class GoalDrivenRuntimeCoordinator:
                     seen.add(gap.gap_id)
                     target.append(gap)
         return by_goal
+
+    @classmethod
+    def _fast_advance_requires_canonical_resource_revision(
+        cls,
+        *,
+        advance: FastPlannerAdvance,
+        association: GoalAssociationResolution,
+    ) -> bool:
+        """Require Planner to bind provisional Work to GA's resource contract.
+
+        Fast Advance sees provider-neutral GI Responsibilities before Goal
+        Association has authored canonical resource shape and information-domain
+        bindings. A Capability Activity for such a newly canonicalized Goal cannot
+        become terminal merely by joining its Responsibility ref to a Goal ID:
+        the same Fast Planner must reconsider HOW against that resource contract
+        and the qualified catalog. Host still chooses no Capability or semantics.
+        """
+
+        capability_refs = {
+            responsibility_ref
+            for activity in advance.activities
+            if isinstance(activity, FastPlannerCapabilityActivity)
+            for responsibility_ref in activity.source_responsibility_refs
+        }
+        if not capability_refs:
+            return False
+        return any(
+            goal.resource_responsibility is not None
+            and capability_refs.intersection(goal.source_responsibility_refs)
+            for goal in association.new_goals
+        )
 
     @classmethod
     def _canonical_plan_from_fast_advance(
@@ -4895,6 +5013,13 @@ class GoalDrivenRuntimeCoordinator:
                 # the provisional Activities or InformationGaps still apply.
                 canonical_fast_revision_reason = (
                     "goal_association_update_reconciliation"
+                )
+            elif self._fast_advance_requires_canonical_resource_revision(
+                advance=fast_advance,
+                association=association,
+            ):
+                canonical_fast_revision_reason = (
+                    "goal_association_resource_grounding"
                 )
             if canonical_fast_revision_reason:
                 planning_context["canonical_fast_revision_reason"] = (

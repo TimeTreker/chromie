@@ -540,7 +540,16 @@ def normalize_grounded_binding_types(
                     source_name = next(iter(source_names_for_value))
                     canonical_type = (
                         "temporal_scope"
-                        if source_name in {"date", "time", "temporal_scope"}
+                    if source_name
+                    in {
+                        "date",
+                        "period",
+                        "time",
+                        "time_period",
+                        "time_scope",
+                        "temporal_period",
+                        "temporal_scope",
+                    }
                         else source_name
                     )
                     binding["name"] = source_name
@@ -605,8 +614,25 @@ def normalize_grounded_binding_types(
                         continue
                 if (
                     surface_name == "resource.query_scope"
-                    and name in {"date", "time", "temporal_scope"}
-                    and entity_type in {"date", "period", "time"}
+                    and name
+                    in {
+                        "date",
+                        "period",
+                        "time",
+                        "time_period",
+                        "time_scope",
+                        "temporal_period",
+                        "temporal_scope",
+                    }
+                    and entity_type
+                    in {
+                        "date",
+                        "period",
+                        "time",
+                        "time_period",
+                        "time_scope",
+                        "temporal_period",
+                    }
                     and grounded
                 ):
                     binding["entity_type"] = "temporal_scope"

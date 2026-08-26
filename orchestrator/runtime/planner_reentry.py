@@ -14,6 +14,7 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
 )
 from shared.chromie_contracts.execution_outcome import ExecutionEvidence
+from shared.chromie_contracts.execution_outcome import aggregate_execution_status
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.tool_result import ToolResultEvidence
@@ -45,6 +46,119 @@ def execution_outcome_user_text(
         if text:
             return text
     return str(getattr(plan, "goal_summary", "") or "").strip()
+
+
+def incremental_execution_outcome_truth(
+    *,
+    evidence: ExecutionEvidence,
+    plan: CanonicalPlan,
+) -> dict[str, Any]:
+    """Project current execution truth for one terminal Evidence re-entry.
+
+    Incremental re-entry occurs before the complete outcome bundle exists.  The
+    Host can nevertheless project the exact terminal step, the still-unresolved
+    sibling steps of each scoped Goal, and the already-mechanical completion
+    qualification.  This supplies facts only; Planner remains the sole owner of
+    user-visible wording and any next Work.
+    """
+
+    plan_steps = {step.step_id: step for step in plan.steps}
+    source_step = plan_steps.get(evidence.step_id)
+    if source_step is None:
+        raise ValueError("incremental Evidence step is absent from source Plan")
+    if not set(evidence.source_goal_ids).issubset(source_step.source_goal_ids):
+        raise ValueError("incremental Evidence Goal binding differs from source Plan")
+
+    required = evidence.metadata.get("completion_qualification_required") is True
+    qualification = evidence.completion_qualification
+    qualification_summary = {
+        "required": required,
+        "established": bool(required)
+        and qualification is not None
+        and qualification.status == "established",
+        "qualifications": (
+            [
+                {
+                    "evidence_id": evidence.evidence_id,
+                    "status": (
+                        qualification.status
+                        if qualification is not None
+                        else "unknown"
+                    ),
+                    "claim": (
+                        qualification.claim if qualification is not None else ""
+                    ),
+                    "reason_codes": (
+                        list(qualification.reason_codes)
+                        if qualification is not None
+                        else [
+                            str(
+                                evidence.metadata.get(
+                                    "completion_evidence_gate_reason"
+                                )
+                                or "completion_qualification_missing"
+                            )
+                        ]
+                    ),
+                }
+            ]
+            if required
+            else []
+        ),
+    }
+
+    goal_outcomes: list[dict[str, Any]] = []
+    for goal_id in evidence.source_goal_ids:
+        step_ids = [
+            step.step_id for step in plan.steps if goal_id in step.source_goal_ids
+        ]
+        if evidence.step_id not in step_ids:
+            raise ValueError(
+                "incremental Evidence references a Goal not bound to its source step"
+            )
+        unresolved_step_ids = [
+            step_id for step_id in step_ids if step_id != evidence.step_id
+        ]
+        statuses = [evidence.status, *("not_run" for _ in unresolved_step_ids)]
+        goal_outcomes.append(
+            {
+                "goal_id": goal_id,
+                "status": aggregate_execution_status(statuses),
+                "reason_codes": (
+                    [str(evidence.reason_code)] if evidence.reason_code else []
+                ),
+                "evidence_ids": [evidence.evidence_id],
+                "completed_step_ids": (
+                    [evidence.step_id] if evidence.status == "completed" else []
+                ),
+                "unresolved_step_ids": unresolved_step_ids,
+                "completion_qualification": qualification_summary,
+            }
+        )
+
+    observation = evidence.observation
+    return {
+        "outcome_id": f"incremental:{evidence.evidence_id}",
+        "aggregate_status": aggregate_execution_status(
+            [item["status"] for item in goal_outcomes]
+        ),
+        "goal_outcomes": goal_outcomes,
+        "evidence": [
+            {
+                "evidence_id": evidence.evidence_id,
+                "capability_id": evidence.capability_id,
+                "source_goal_ids": list(evidence.source_goal_ids),
+                "status": evidence.status,
+                "reason_code": str(evidence.reason_code or ""),
+                "observation_status": (
+                    observation.status if observation is not None else "none"
+                ),
+                "provider_retryability": dict(
+                    evidence.metadata.get("provider_retryability") or {}
+                ),
+            }
+        ],
+    }
 
 
 def terminal_evidence_relevance(
@@ -390,3 +504,82 @@ def suppress_already_delivered_speech(
     if suppressed_count <= 0:
         return response, 0
     return response.model_copy(update={"speech": retained_speech}), suppressed_count
+
+
+def suppress_redundant_completed_body_followup(
+    response: InteractionResponse,
+    *,
+    source_response: InteractionResponse,
+    source_plan: CanonicalPlan,
+    reentry_goal_ids: Sequence[str],
+    evidence: Sequence[ToolResultEvidence],
+    delivered_events: Iterable[Mapping[str, Any]],
+) -> tuple[InteractionResponse, int]:
+    """Suppress a second narration after a mixed turn already spoke its answer.
+
+    This is delivery accounting, not semantic generation. It applies only when
+    every scoped terminal result succeeded, every scoped canonical Goal is a
+    ``body_action``, the source Plan also contained a distinct conversational
+    response Goal, and speech for that sibling response was actually delivered in
+    the same turn. Failures, information results, body-only turns, and undelivered
+    sibling speech remain eligible for normal Planner-owned re-entry wording.
+    """
+
+    if not response.speech or not evidence or any(
+        item.status != "completed" for item in evidence
+    ):
+        return response, 0
+    scoped_goal_ids = {
+        _normalized_text(value) for value in reentry_goal_ids if _normalized_text(value)
+    }
+    if not scoped_goal_ids:
+        return response, 0
+    execute_goal_ids = {
+        item.goal_id
+        for item in source_plan.goal_outcomes
+        if item.disposition == "execute"
+    }
+    sibling_response_goal_ids = {
+        item.goal_id
+        for item in source_plan.goal_outcomes
+        if item.disposition == "respond" and item.goal_id not in scoped_goal_ids
+    }
+    if not scoped_goal_ids.issubset(execute_goal_ids) or not sibling_response_goal_ids:
+        return response, 0
+
+    metadata = (
+        source_response.metadata
+        if isinstance(source_response.metadata, dict)
+        else {}
+    )
+    association = metadata.get("goal_association")
+    new_goals = (
+        association.get("new_goals") if isinstance(association, dict) else []
+    )
+    output_mode_by_goal = {
+        _normalized_text(item.get("goal_id")): _normalized_text(
+            (item.get("metadata") or {}).get("output_mode")
+            if isinstance(item.get("metadata"), dict)
+            else ""
+        )
+        for item in new_goals if isinstance(item, dict)
+    }
+    if any(
+        output_mode_by_goal.get(goal_id) != "body_action"
+        for goal_id in scoped_goal_ids
+    ):
+        return response, 0
+
+    delivered_sibling_response = any(
+        sibling_response_goal_ids.intersection(
+            _normalized_text(value)
+            for value in event.get("source_goal_ids") or []
+            if _normalized_text(value)
+        )
+        for event in delivered_events
+        if isinstance(event, Mapping)
+    )
+    if not delivered_sibling_response:
+        return response, 0
+    suppressed_count = len(response.speech)
+    return response.model_copy(update={"speech": []}), suppressed_count

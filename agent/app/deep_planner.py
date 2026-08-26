@@ -72,7 +72,10 @@ from .planner_fallback import (
     materialize_deep_clarify,
     materialize_deep_unavailable,
 )
-from .planner_audit import review_coordinated_action_plan_coverage
+from .planner_audit import (
+    qualify_evidence_response_truth,
+    review_coordinated_action_plan_coverage,
+)
 
 try:
     from chromie_contracts.plan import CanonicalPlan
@@ -104,6 +107,8 @@ class DeepPlannerResolver:
         ollama: OllamaClient,
         catalog: CapabilityCatalog,
         *,
+        truth_ollama: OllamaClient | None = None,
+        truth_num_ctx: int | None = None,
         num_ctx: int = 8192,
         num_predict: int = 1024,
         max_capabilities: int = 96,
@@ -111,6 +116,11 @@ class DeepPlannerResolver:
         min_goal_satisfaction: float = 0.75,
     ) -> None:
         self.ollama = ollama
+        self.truth_ollama = truth_ollama or ollama
+        self.truth_num_ctx = max(
+            2048,
+            int(truth_num_ctx if truth_num_ctx is not None else num_ctx),
+        )
         self.catalog = catalog
         self.num_ctx = max(4096, int(num_ctx))
         self.num_predict = max(256, int(num_predict))
@@ -532,6 +542,72 @@ class DeepPlannerResolver:
             ]
             if not errors:
                 coverage_review_metadata: dict[str, Any] = {}
+                if (
+                    goal_context.result_reentry_goal_ids
+                    and plan.disposition == "respond"
+                    and plan.response_text
+                ):
+                    try:
+                        evidence_truth = await qualify_evidence_response_truth(
+                            self.truth_ollama,
+                            request=request,
+                            plan=plan,
+                            num_ctx=self.truth_num_ctx,
+                            num_predict=min(self.num_predict, 256),
+                            prompt_family=(
+                                "deep_planner.evidence_response.truth_check"
+                            ),
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "deep_planner_evidence_response_truth_unavailable "
+                            "sid=%s error_type=%s error=%s",
+                            request.sid,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        return materialize_deep_clarify(
+                            plan_id,
+                            request,
+                            "deep_planner_evidence_response_truth_unavailable",
+                            unresolved=[
+                                "Post-Evidence wording could not be truth-qualified."
+                            ],
+                            error=exc,
+                            attempts=attempt + 1,
+                            metadata={"execution_allowed": False},
+                            max_contract_repairs=self.max_contract_repairs,
+                        )
+                    evidence_truth_metadata = evidence_truth.model_dump(
+                        mode="json",
+                        exclude_none=True,
+                        exclude_defaults=True,
+                    )
+                    if evidence_truth.decision != "accept":
+                        logger.warning(
+                            "deep_planner_evidence_response_truth_rejected sid=%s",
+                            request.sid,
+                        )
+                        return materialize_deep_clarify(
+                            plan_id,
+                            request,
+                            "deep_planner_evidence_response_truth_rejected",
+                            unresolved=[
+                                "Post-Evidence wording contradicted trusted terminal "
+                                "Evidence or execution outcome."
+                            ],
+                            attempts=attempt + 1,
+                            metadata={
+                                "evidence_response_truth_qualification": (
+                                    evidence_truth_metadata
+                                ),
+                                "execution_allowed": False,
+                            },
+                            max_contract_repairs=self.max_contract_repairs,
+                        )
+                    coverage_review_metadata[
+                        "evidence_response_truth_qualification"
+                    ] = evidence_truth_metadata
                 coordinated_goal_ids = coordinated_action_goal_ids(
                     authoritative_goals
                 )

@@ -445,6 +445,110 @@ def walk_definition() -> CapabilityDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
+    def test_resource_goal_requires_canonical_fast_revision_after_advance(self):
+        advance = FastPlannerAdvance(
+            turn_id="turn-perception",
+            disposition="execute",
+            coverage="complete",
+            covered_responsibility_refs=["r1"],
+            activities=[
+                {
+                    "role": "capability",
+                    "activity_id": "look-outside",
+                    "capability_id": "soridormi.look_direction",
+                    "args": {"head_yaw_rad": -0.6, "duration_s": 2.0},
+                    "source_responsibility_refs": ["r1"],
+                }
+            ],
+            confidence=0.95,
+        )
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-perception",
+            new_goals=[
+                SemanticGoal.model_validate(
+                    {
+                        "goal_id": "goal-perception",
+                        "source_responsibility_refs": ["r1"],
+                        "description": "Determine whether anyone is outside.",
+                        "source_text": "Is anyone outside?",
+                        "resource_responsibility": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource": {
+                                "kind": "information",
+                                "description": "whether anyone is outside",
+                                "attributes": {
+                                    "information_domain": {
+                                        "name": "information_domain",
+                                        "entity_type": "information_domain",
+                                        "value": "direct_environment_perception",
+                                    }
+                                },
+                            },
+                            "source": {"status": "unknown"},
+                            "recipient": {"description": "requester"},
+                            "delivery_mode": "spoken_explanation",
+                        },
+                        "metadata": {"output_mode": "information"},
+                    }
+                )
+            ],
+            confidence=0.95,
+        )
+
+        self.assertTrue(
+            GoalDrivenRuntimeCoordinator._fast_advance_requires_canonical_resource_revision(
+                advance=advance,
+                association=association,
+            )
+        )
+
+    def test_interaction_context_includes_only_confirmed_prior_turn_speech(self):
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=object(),
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            interaction_ledger=InteractionLedger(),
+        )
+        context = coordinator._interaction_context(
+            sid="current-turn",
+            context={
+                "history": [
+                    {
+                        "role": "assistant",
+                        "sid": "prior-turn",
+                        "text": "你好呀！",
+                        "metadata": {
+                            "source": "fast_planner_communicative_delivery",
+                            "turn_id": "prior-turn",
+                            "fast_activity_id": "greeting-response",
+                            "delivery_role": "complete_response",
+                            "speech_act": "greeting",
+                        },
+                    },
+                    {
+                        "role": "assistant",
+                        "sid": "undelivered-turn",
+                        "text": "This was only authored.",
+                        "metadata": {"source": "agent_result"},
+                    },
+                ]
+            },
+        )
+
+        self.assertEqual(
+            [item["text"] for item in context["already_spoken"]],
+            ["你好呀！"],
+        )
+        self.assertEqual(
+            context["already_spoken"][0]["owner"],
+            "playback_delivery",
+        )
+        self.assertEqual(
+            context["already_spoken"][0]["metadata"]["source"],
+            "fast_planner_communicative_delivery",
+        )
+
     @staticmethod
     def _retained_weather_snapshot(*, location: str = "重庆") -> dict:
         return {
@@ -3068,6 +3172,69 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     plan=plan,
                     session_id="sid-blink-confirmation",
                     language="zh-CN",
+                    context={},
+                )
+            )
+
+    def test_explicit_fail_closed_advisory_is_silent_and_non_executable(self):
+        plan = CanonicalPlan(
+            plan_id="plan-truth-rejected-silent",
+            planner_tier="deep",
+            disposition="clarify",
+            coverage="uncertain",
+            confidence=0.0,
+            goal_ids=["goal-weather"],
+            goal_summary="Check whether it will rain.",
+            response_text="",
+            steps=[],
+            unresolved=["Post-Evidence wording failed truth qualification."],
+            metadata={
+                "authority": "advisory",
+                "status": "clarify",
+                "reason": "deep_planner_evidence_response_truth_rejected",
+                "execution_allowed": False,
+            },
+        )
+        adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([weather_definition()]))
+
+        response = asyncio.run(
+            adapter.build_planner_owned_response(
+                plan=plan,
+                session_id="sid-truth-rejected-silent",
+                language="en-US",
+                context={},
+            )
+        )
+
+        self.assertEqual(response.speech, [])
+        self.assertEqual(response.capabilities, [])
+        self.assertEqual(
+            response.metadata["operational_speech_authority"],
+            "not_applicable",
+        )
+
+    def test_unmarked_missing_planner_text_remains_a_contract_error(self):
+        plan = CanonicalPlan(
+            plan_id="plan-clarify-missing-text",
+            planner_tier="deep",
+            disposition="clarify",
+            coverage="uncertain",
+            confidence=0.0,
+            goal_ids=["goal-weather"],
+            unresolved=["location"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Planner-owned communicative response requires exact text",
+        ):
+            asyncio.run(
+                CanonicalPlanRuntimeAdapter(
+                    FakeRuntime([weather_definition()])
+                ).build_planner_owned_response(
+                    plan=plan,
+                    session_id="sid-missing-text",
+                    language="en-US",
                     context={},
                 )
             )

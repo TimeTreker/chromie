@@ -16,6 +16,7 @@ from .cognitive_identity import (
 from .goal_progress_communication import goal_progress_communication_prompt
 from .prompt_projection import bounded_json
 from .planner_context import (
+    canonical_goal_grounding,
     evidence_bound_dialogue,
     goal_association_prompt_projection,
     planner_goal_context,
@@ -43,8 +44,11 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "the value and units are unambiguous and the value is within the "
     "catalog schema, copy it exactly; never silently replace it with "
     "a schema default or describe it only in prose. Select a capability "
-    "whose argument schema can represent the supplied value. Catalog "
-    "defaults are only for parameters the user did not supply. If the "
+    "whose argument schema can represent the supplied value. Catalog enum labels "
+    "never preserve an explicit quantitative pace merely because an "
+    "enum sounds qualitatively similar; when the Goal supplies a numeric pace or "
+    "velocity, select a qualified numeric argument and put that exact value there. "
+    "Catalog defaults are only for parameters the user did not supply. If the "
     "units, argument mapping, or validity are uncertain, clarify or "
     "escalate according to the planner tier instead of claiming exact "
     "coverage. A material adjustment must use a non-exact plan_relation, "
@@ -83,12 +87,13 @@ def first_response_target_goal_grounding(
     result: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in [
+        *canonical_goal_grounding(context),
         *(context.get("active_goal_snapshots") or []),
         *(context.get("recent_goal_snapshots") or []),
     ]:
         if not isinstance(item, dict):
             continue
-        goal = item.get("goal") if isinstance(item.get("goal"), dict) else {}
+        goal = item.get("goal") if isinstance(item.get("goal"), dict) else item
         goal_id = " ".join(
             str(item.get("goal_id") or goal.get("goal_id") or "").split()
         )
@@ -111,11 +116,16 @@ def first_response_target_goal_grounding(
 def fast_first_response_truth_system_prompt() -> str:
     return (
         "Classify one immutable Fast Planner sentence; do not rewrite it. Return "
-        "only the four audit fields required by the JSON schema. Set each violation "
-        "flag explicitly, then accept only when all three are false. Before action or Evidence, a "
+        "only the audit fields required by the JSON schema. Set each violation "
+        "flag explicitly, then accept only when all are false. Before action or Evidence, a "
         "present acknowledgement or future intention is supported, while an "
         "already-started/completed action, result, invented method, or invented fact is "
-        "not. For pre_evidence information checks, distinguish grammar explicitly: "
+        "not. A generic prospective statement that Chromie will check is method-neutral, "
+        "but saying she will go somewhere, look in a direction, use a device/sensor, or "
+        "otherwise naming how she will check is a concrete method claim. Before Work is "
+        "selected, that method must be present in authoritative Responsibility/context; "
+        "otherwise set has_ungrounded_method_or_world_claim=true. For pre_evidence "
+        "information checks, distinguish grammar explicitly: "
         "an equivalent of 'I'll check' or '我来查一下' is prospective; an equivalent "
         "of 'I checked', '我查过/我查了一下', followed by an answer assertion is past "
         "acquisition plus a result and must set "
@@ -170,7 +180,7 @@ def fast_first_response_truth_prompt(
         "the human to supply or reconfirm information without an InformationGap "
         "also reverses responsibility. For context_grounded text, reject invented "
         "facts; for post_evidence text, require cited Evidence. Set each of the "
-        "three audit flags explicitly. A missing continue/resume relationship in "
+        "audit flags explicitly. A missing continue/resume relationship in "
         "wording for relationship=continue is a semantic-perspective contradiction. "
         "Accept when none applies; otherwise reject. Never supply replacement wording."
     )
@@ -311,6 +321,11 @@ def fast_first_response_prompt(
         + "\nUse that language naturally in activity.text; zh/zh-CN requires "
         "natural Chinese.\n\n"
         + decision_contract
+        + " When a direct conversational Responsibility can be answered in the same "
+        "terminal mixed Plan as a small bounded effect, prefer activity=null: the "
+        "substantive response is the useful speech and a preliminary promise would be "
+        "duplicative. Emit progress only when meaningful downstream work remains before "
+        "the requested answer can be delivered."
         + " Use one brief conversational sentence. Progress states the prospective "
         "check, action, or work instead of repeating the question; omit a second "
         "clause explaining what the check will reveal. For an effectful command, "
@@ -405,8 +420,17 @@ def fast_plan_prompt(
         "contains mechanical terminal/qualification truth only; provider_retryability "
         "is a bounded provider-declared execution fact, not Host permission or a retry "
         "recommendation. Interpret these facts yourself, never expose internal reason-code "
-        "or workflow vocabulary, and never turn a completed-but-unqualified claim into "
-        "verified completion. The typed Planner re-entry scope and FINAL CANONICAL "
+        "or workflow vocabulary. Before authoring response_text, read each scoped "
+        "trusted_execution_outcome.goal_outcomes item. If status=completed and required "
+        "completion_qualification is established, describe that exact source-Plan effect "
+        "as completed or remain status-neutral; never describe it as future, starting, or "
+        "ongoing. Exact completed step arguments remain grounded by the immutable source "
+        "Plan even when the provider payload does not repeat them. If status=completed but "
+        "required completion qualification is not established, do not claim completed, "
+        "ongoing, or future execution; remain silent unless a natural status-neutral "
+        "qualification materially helps. If status is failed, cancelled, or timed_out, "
+        "state only that actual outcome or remain status-neutral and never promise the old "
+        "Work. The typed Planner re-entry scope and FINAL CANONICAL "
         "GOALS are exact; do not claim completion of sibling effects found only in "
         "the original turn or source_text. The original user turn and source Plan "
         "are historical provenance, not a fresh command. A completed source-Plan "
@@ -447,6 +471,14 @@ def fast_plan_prompt(
         )
     )
     semantic_scope_contract = "For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility while treating the current capability catalog as the dynamic decomposition boundary. Fast Planner may terminally execute the Goal only when one exact registered Capability is a complete one-step cover. A provider's resource_contract.plan_requires/plan_provides declares public composition state; provider-internal stages remain private unless exposed as capabilities. If the catalog has only partial resource capabilities that could form a multi-step chain, escalate to Deep Planner rather than inventing hidden provider stages or claiming a partial primitive is complete. The Goal is provider-neutral: choose from the catalog by declared semantic scope and resource contract, never from capability-name conventions or a hardcoded provider rule. When resource_responsibility.source.status=unknown and the selected complete capability cannot resolve the source itself, return a specific context request and zero executable steps. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. Capability domains are not interchangeable merely because several capabilities share a read/effect class. Eligibility requires the selected Capability's declared information_domain and semantic scope to cover the exact Goal; never substitute the nearest read-only Capability from another domain. When the selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Those complete structured arguments are already grounded by the Goal contract; do not emit parameter_resolutions for their nested fields or invent a top-level quantity/distance argument that the Capability does not accept. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material tool argument that directly represents one canonical binding must preserve that binding exactly; never reinterpret an original pronoun or replace a binding with older memory. When a Capability declares argument_realization, use the original user turn plus the canonical human-semantic binding to realize only the declared provider arguments. The model owns that HOW transformation and the exact step values; trusted code projects semantic_realization provenance only from the selected Capability's declared contract, step ownership, and those immutable values. Do not add a conflicting provenance row or relabel a transformed value as user_supplied/schema_default. This is Planner-owned HOW and must never rewrite the Goal. Preserve every canonical-goal qualifier, including temporal scope, comparison period, answer shape, ordering, and concurrency; never use a Capability default to silently narrow an explicit human scope. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; in particular, a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech whose exact wording you own. A user-requested spoken response or performance may still be simultaneous with an Activity-lane step. Preserve that relation without inventing a chromie.speak plan step: keep the spoken Goal as a respond outcome, set each participating Activity step to timing=parallel only when its provider declares safe parallel execution, and leave cross-lane scheduling to trusted Runtime. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, escalate or propose an explicit safe adjustment rather than silently serializing the request. Never silently narrow a goal to fit a capability or its enum defaults. If the goal falls outside a capability's supported scope, escalate for clarification, another capability, or an honest unavailable result with zero steps. "
+    semantic_scope_contract += (
+        "Response text is audible language, never a stage direction or a substitute "
+        "execution channel. In mixed speech with body or tool work, a respond outcome "
+        "may author only the requested vocal content for its own Goal; it must not "
+        "narrate, role-play, or claim another executable Goal's action. Keep that "
+        "effect exclusively in its Capability step until trusted post-Evidence "
+        "re-entry may describe completion. "
+    )
     current_turn_communication_contract = (
         "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
         "Retained Goals, delivered evidence-bound dialogue, and verified memory "
@@ -540,6 +572,8 @@ def fast_plan_prompt(
             "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. Return JSON only.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
             f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
+            f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
+            f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
             f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}\n\n"
             "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
             f"{validation_errors or '[]'}\n"
@@ -592,6 +626,7 @@ def fast_plan_prompt(
         "Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
         f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
         f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
+        f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
         f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}\n\n"
         "FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON:\n"
         f"{validation_errors or '[]'}\n"
@@ -1024,7 +1059,17 @@ def deep_plan_prompt(
         "semantic authority; the original utterance, source_text, and source Plan "
         "are historical provenance for correlation. Never narrate, satisfy, or list "
         "an excluded sibling Goal. A source-Plan step reported completed is prior "
-        "Work and must not be copied into this output's steps array. When trusted "
+        "Work and must not be copied into this output's steps array. Before authoring "
+        "response_text, read each scoped trusted_execution_outcome.goal_outcomes item. "
+        "When status=completed and required completion_qualification is established, "
+        "describe that exact source-Plan effect as completed or remain status-neutral; "
+        "never describe it as future, starting, or ongoing. Exact completed arguments "
+        "remain grounded by the immutable source Plan even when the provider payload "
+        "does not repeat them. When status=completed but required completion qualification "
+        "is not established, do not claim completed, ongoing, or future execution; remain "
+        "silent unless a natural status-neutral qualification materially helps. When "
+        "status is failed, cancelled, or timed_out, state only that actual outcome or "
+        "remain status-neutral and never promise the old Work. When trusted "
         "Evidence completes every scoped Goal and a completion response is still "
         "useful, author respond outcomes with exact Evidence-grounded wording, zero "
         "steps, exact satisfaction, and no sibling unmet requirements. Author new "
@@ -1109,6 +1154,12 @@ def deep_plan_prompt(
         f"{IDENTITY_SEMANTIC_CONTRACT}"
         f"{PERSONALITY_SEMANTIC_CONTRACT}"
         f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
+        "Response text is audible language, never a stage direction or a substitute "
+        "execution channel. In mixed speech with body or tool work, a respond outcome "
+        "may author only the requested vocal content for its own Goal; it must not "
+        "narrate, role-play, or claim another executable Goal's action. Keep that "
+        "effect exclusively in its Capability step until trusted post-Evidence "
+        "re-entry may describe completion. "
         "Use the full catalog, preserve all independent responsibilities, constraints, conditions, ordering, concurrency, temporal scope, comparison period, and requested answer shape. Never silently rewrite simultaneous independent actions as before/after actions. An explicit ordered relation must remain sequential. Capability parallel-safety is permission to honor user-requested concurrency, never evidence that concurrency was requested. Every executable step must explicitly include timing; omission is invalid because it would erase the model's ordering or concurrency decision. When the user requests compatible actions to happen together, assign timing=parallel only when each selected capability explicitly declares parallel_metadata_declared=true and can_run_parallel=true and their exclusive/resource claims are compatible. Never invent an unstated feature of a capability in a reason or outcome; a physical action cannot satisfy a conversational or spoken-performance Goal unless its supplied semantics explicitly say so. Use a respond outcome for speech you author exactly as a Communicative Activity. Never satisfy a prohibition, negation, or hold-state constraint by invoking the positive action it forbids; if the catalog has no capability whose semantic scope actually enforces that negative state, clarify or report it unavailable. If safe parallel execution is unavailable or uncertain, clarify or propose an explicit safe adjustment rather than silently serializing the request. For a Goal with resource_responsibility, keep the entire acquire-and-deliver outcome as one semantic responsibility and use the current capability catalog as the dynamic decomposition boundary. Prefer one exact capability when its declared resource_contract.plan_provides covers the complete required resource state. If no one capability covers the Goal, compose multiple advertised capabilities whose matching semantic scopes and ordered plan_requires/plan_provides form a valid chain covering the required outcome. Never invent provider-internal navigation, perception, grasp, search, retry, carrying, or handover stages that are not separately advertised capabilities. Provider-local decomposition stays inside the selected capability. The Goal is provider-neutral: choose the smallest reliable complete capability set from current declared semantics, never from capability names or a hardcoded provider rule. When source.status=unknown, the selected chain must include a capability that can resolve it internally or otherwise avoid requiring an unresolved source state; do not invent a source. Capability semantic_scope and resource_contract metadata are authoritative applicability evidence. When a selected Capability accepts resource, source, or recipient objects, copy each accepted object exactly from the canonical resource_responsibility, including nested quantity, source bindings, and recipient fields. Do not emit parameter_resolutions for nested fields of those complete structured arguments or invent top-level fields absent from the Capability schema. Never silently narrow a canonical goal to fit a capability or its enum defaults. If a goal is outside every available capability scope, clarify or report unavailable with zero steps. Resolve low-consequence "
         "parameters semantically when justified; otherwise return a specific natural clarification. Clarification is only for ambiguous user meaning or missing material information that the user can supply and whose answer can enable a matching catalog capability. When the Goal is already clear but no exact available capability covers the required outcome, return unavailable rather than asking for preferences, refinements, or details that cannot create the missing provider. Author exact natural response_text for every clarify, unavailable, or refused result; unresolved diagnostics alone are not speech. Capability domains are not interchangeable merely because several capabilities share a read/effect class. Eligibility requires the selected Capability's declared information_domain and semantic scope to cover the exact Goal; never substitute the nearest read-only Capability from another domain. Canonical Goal typed semantics are authoritative: non-resource Goals use object.bindings, while resource Goals use resource_responsibility directly with no persisted flat compatibility copy. Every material step argument that directly represents one canonical binding must preserve that binding exactly; do not replace it with older memory or re-resolve the original reference. When a Capability declares argument_realization, Deep Planner owns the semantic transformation from the original user turn plus canonical human-semantic binding into only those declared provider arguments. Trusted code may project only the duplicate semantic_realization provenance from that declared contract, immutable step ownership, and exact argument value; it never authors or changes the transformation. This transformation is HOW and never rewrites the canonical Goal or silently narrows its scope. For chromie.memory.retrieve_verified_tool_result, all resolved material Goal bindings belong inside the single material_args object. Nested material fields are not missing direct step arguments, so do not emit separate parameter_resolutions for them. If a resolution for that nested object is useful, its parameter must be material_args and its value must equal the complete step.args.material_args object. When independent goals have different terminal needs, use disposition=mixed, coverage=complete, and goal_outcomes so executable goals can proceed while only affected goals wait for clarification. Scope every blocking parameter resolution with source_goal_ids. Exact, safe-adjusted, or alternative executable plans "
         "must use coverage=complete and disposition=execute or mixed as appropriate. Every executable step must include source_goal_ids identifying exactly the goals it serves. Use plan_relation=exact for an exact plan. A safe_adjustment or material alternative must use the corresponding plan_relation, be described in response_text, set user_confirmation_required=true, and require "
@@ -1137,6 +1188,8 @@ def deep_plan_prompt(
         "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
         f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
         f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{bounded_json(grounding, 5000)}\n\n"
+        f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
+        f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
         "FINAL PROVIDER-REQUIRED VOCAL GOALS WITH NO EXACT AVAILABLE "
         "VOCAL PROVIDER JSON (each must have a zero-step unavailable/refused "
         "outcome and truthful limitation wording; never promise, attempt, "

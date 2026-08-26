@@ -247,6 +247,7 @@ def _capability_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _fast_progress_activities(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return Fast Planner communicative Activities, including direct answers."""
     cognitive = summary.get("cognitive_runtime")
     if not isinstance(cognitive, dict):
         return []
@@ -264,7 +265,7 @@ def _fast_progress_activities(summary: dict[str, Any]) -> list[dict[str, Any]]:
         item
         for item in advance.get("activities") or []
         if isinstance(item, dict)
-        and item.get("role") == "progress"
+        and item.get("role") in {"progress", "complete_response"}
         and str(item.get("speech_act") or "").strip()
     ]
 
@@ -624,14 +625,14 @@ def validate_live_text_result(
                 )
             )
     internal_diagnostics: list[str] = []
-    fast_progress = _fast_progress_activities(summary)
-    if case.forbid_fast_communicative_act and fast_progress:
+    fast_communication = _fast_progress_activities(summary)
+    if case.forbid_fast_communicative_act and fast_communication:
         errors.append("Planner emitted forbidden pre-effect Communicative Activity")
     if case.require_fast_communicative_act:
-        if fast_progress:
+        if fast_communication:
             speech_acts = {
                 str(item.get("speech_act") or "").strip()
-                for item in fast_progress
+                for item in fast_communication
             }
             if (
                 case.expected_fast_communicative_speech_acts

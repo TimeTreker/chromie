@@ -216,6 +216,20 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "agent",
+      "contract": "Fail closed when the bounded post-Evidence truth model or certificate is unavailable; never emit or execute unqualified Deep Planner wording.",
+      "review_status": "reviewed",
+      "body_sha256": "082e8285456ab9fe3df40defd887ee869c6e8d4cff9930b018934664b0b4cfd3",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "agent/app/deep_planner.py",
+      "symbol": "DeepPlannerResolver._resolve",
+      "ordinal": 3,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
       "body_sha256": "e50a0174e0bb51697e19b27408e499c4c218b0e318f646e2e2f72de0dd4469ec",

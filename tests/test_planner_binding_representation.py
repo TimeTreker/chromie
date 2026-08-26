@@ -176,6 +176,12 @@ def _weather_capability_with_temporal_realization() -> dict:
 
 
 class PlannerBindingRepresentationTests(unittest.TestCase):
+    def test_numeric_prompt_requires_quantitative_pace_argument(self):
+        self.assertIn(
+            "enum labels never preserve an explicit quantitative pace",
+            EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+        )
+
     def test_decoder_projects_exact_same_name_speed_binding(self):
         base = canonical_plan_response_schema(
             planner_tier="deep",
@@ -517,6 +523,153 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
         message = str(raised.exception)
         self.assertIn("value=0.2", message)
         self.assertIn("value=10", message)
+
+    def test_numeric_grounding_distinguishes_missing_work_argument_from_provenance(self):
+        goal_id = "goal-walk"
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Walk at 0.2 for 10 seconds.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "walk",
+                        "capability_id": "soridormi.walk_velocity",
+                        "args": {"duration_s": 10.0},
+                        "timing": "sequential",
+                        "source_goal_ids": [goal_id],
+                        "reason_summary": "Execute the requested bounded walk.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [
+                    {
+                        "step_id": "walk",
+                        "parameter": "duration_s",
+                        "strategy": "user_supplied",
+                        "value": 10.0,
+                        "source_goal_ids": [goal_id],
+                    }
+                ],
+                "goal_outcomes": {
+                    goal_id: {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["walk"],
+                        "satisfaction": _satisfaction(goal_id),
+                        "rationale": "The walk capability covers the request.",
+                    }
+                },
+                "goal_satisfaction": _satisfaction(goal_id),
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "explicit numeric Goal value is absent from every executable step argument",
+        ):
+            validate_explicit_numeric_parameter_grounding(
+                output,
+                authoritative_goals=[
+                    {
+                        "goal_id": goal_id,
+                        "description": "Walk at 0.2 speed for 10 seconds.",
+                        "success_criteria": [],
+                    }
+                ],
+            )
+
+    def test_exact_structured_resource_numeric_scope_needs_no_flat_resolution(self):
+        goal_id = "goal-milk"
+        resource = {
+            "kind": "physical_object",
+            "description": "bottle of milk",
+            "quantity": "1",
+            "attributes": {},
+        }
+        source = {
+            "status": "known",
+            "description": "ahead of you about 50 meters",
+            "bindings": {
+                "location": {
+                    "name": "location",
+                    "entity_type": "relative_location",
+                    "value": "ahead of you about 50 meters",
+                    "confidence": 1.0,
+                }
+            },
+        }
+        recipient = {"description": "requester", "referent_id": None}
+        output = PlannerModelOutput.model_validate(
+            {
+                "disposition": "execute",
+                "coverage": "complete",
+                "confidence": 1.0,
+                "goal_summary": "Bring the milk.",
+                "response_text": "",
+                "steps": [
+                    {
+                        "step_id": "fetch",
+                        "capability_id": "soridormi.acquire_and_deliver_resource",
+                        "args": {
+                            "resource": resource,
+                            "source": source,
+                            "recipient": recipient,
+                        },
+                        "timing": "sequential",
+                        "source_goal_ids": [goal_id],
+                        "reason_summary": "Acquire and deliver the resource.",
+                    }
+                ],
+                "escalation_reason": "",
+                "unresolved": [],
+                "parameter_resolutions": [],
+                "goal_outcomes": {
+                    goal_id: {
+                        "disposition": "execute",
+                        "coverage": "complete",
+                        "response_text": "",
+                        "unresolved": [],
+                        "step_ids": ["fetch"],
+                        "satisfaction": _satisfaction(goal_id),
+                        "rationale": "The exact resource contract is executable.",
+                    }
+                },
+                "goal_satisfaction": _satisfaction(goal_id),
+                "plan_relation": "exact",
+                "user_confirmation_required": False,
+            }
+        )
+
+        validate_explicit_numeric_parameter_grounding(
+            output,
+            authoritative_goals=[
+                {
+                    "goal_id": goal_id,
+                    "description": (
+                        "bring a bottle of milk from ahead of you about 50 meters"
+                    ),
+                    "source_text": (
+                        "there is a bottle of milk ahead of you about 50 meters, "
+                        "please bring it to me"
+                    ),
+                    "success_criteria": [],
+                    "resource_responsibility": {
+                        "resource": resource,
+                        "source": source,
+                        "recipient": recipient,
+                        "delivery_mode": "physical_handover",
+                    },
+                }
+            ],
+        )
 
     def test_numeric_user_supplied_resolution_rejects_false_goal_provenance(self):
         goal_id = "goal-walk"

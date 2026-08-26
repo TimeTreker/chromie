@@ -75,7 +75,14 @@ class PlannerResponseProjection(BaseModel):
             and bool(plan.steps)
             and set(plan.executable_goal_ids()) == set(plan.goal_ids)
         )
-        if not stages and not execution_only_speech_optional:
+        fail_closed_speech_optional = (
+            not stages
+            and not plan.steps
+            and plan.disposition in {"clarify", "unavailable", "refused"}
+            and plan.metadata.get("execution_allowed") is False
+        )
+        speech_optional = execution_only_speech_optional or fail_closed_speech_optional
+        if not stages and not speech_optional:
             raise ValueError("terminal canonical plans require at least one spoken response stage")
 
         known_goals = set(plan.goal_ids)
@@ -91,7 +98,7 @@ class PlannerResponseProjection(BaseModel):
         if (
             known_goals
             and covered_goals != known_goals
-            and not execution_only_speech_optional
+            and not speech_optional
         ):
             missing = sorted(known_goals - covered_goals)
             raise ValueError(
@@ -221,7 +228,7 @@ class PlannerResponseProjection(BaseModel):
                     "mixed plans require waiting-for-user clarification for goals: "
                     + ",".join(missing)
                 )
-        elif plan.disposition == "clarify":
+        elif plan.disposition == "clarify" and not fail_closed_speech_optional:
             clarification_stages = [
                 stage
                 for stage in stages

@@ -5,6 +5,7 @@ from orchestrator.runtime.planner_reentry import (
     planner_reentry_repeats_completed_activity,
     planner_reentry_responsibilities,
     suppress_already_delivered_speech,
+    suppress_redundant_completed_body_followup,
     terminal_evidence_relevance,
 )
 from agent.app.planner_context import (
@@ -337,6 +338,135 @@ def test_duplicate_speech_suppression_preserves_only_new_delta() -> None:
 
     assert count == 1
     assert [item.text for item in filtered.speech] == ["New result."]
+
+
+def test_completed_body_followup_is_suppressed_after_delivered_sibling_response() -> None:
+    source = _response()
+    source.metadata["goal_association"]["new_goals"] = [
+        {
+            "goal_id": "goal-a",
+            "source_responsibility_refs": ["responsibility-a"],
+            "metadata": {"output_mode": "body_action"},
+        },
+        {
+            "goal_id": "goal-b",
+            "source_responsibility_refs": ["responsibility-b"],
+            "metadata": {"output_mode": "speech"},
+        },
+    ]
+    plan = CanonicalPlan(
+        plan_id="mixed-body-and-speech",
+        planner_tier="fast",
+        disposition="mixed",
+        coverage="complete",
+        confidence=1.0,
+        goal_ids=["goal-a", "goal-b"],
+        steps=[
+            {
+                "step_id": "blink",
+                "capability_id": "soridormi.blink_eyes",
+                "args": {"count": 2},
+                "source_goal_ids": ["goal-a"],
+            }
+        ],
+        goal_outcomes=[
+            {
+                "goal_id": "goal-a",
+                "disposition": "execute",
+                "coverage": "complete",
+                "step_ids": ["blink"],
+            },
+            {
+                "goal_id": "goal-b",
+                "disposition": "respond",
+                "coverage": "complete",
+                "response_text": "A joke.",
+            },
+        ],
+    )
+    followup = InteractionResponse(
+        interaction_id="body-followup",
+        speech=[{"id": "body-done", "text": "I blinked twice."}],
+    )
+    evidence = ToolResultEvidence(
+        evidence_id="blink-result",
+        tool_id="soridormi.blink_eyes",
+        status="completed",
+        data={},
+        output_sha256=canonical_value_sha256({}),
+    )
+
+    filtered, count = suppress_redundant_completed_body_followup(
+        followup,
+        source_response=source,
+        source_plan=plan,
+        reentry_goal_ids=["goal-a"],
+        evidence=[evidence],
+        delivered_events=[{"source_goal_ids": ["goal-b"], "text": "A joke."}],
+    )
+
+    assert count == 1
+    assert filtered.speech == []
+
+
+def test_completed_information_result_is_not_suppressed_by_sibling_response() -> None:
+    source = _response()
+    source.metadata["goal_association"]["new_goals"][0]["metadata"] = {
+        "output_mode": "information"
+    }
+    plan = CanonicalPlan(
+        plan_id="mixed-information-and-speech",
+        planner_tier="fast",
+        disposition="mixed",
+        coverage="complete",
+        confidence=1.0,
+        goal_ids=["goal-a", "goal-b"],
+        steps=[
+            {
+                "step_id": "lookup",
+                "capability_id": "chromie.test.lookup",
+                "args": {},
+                "source_goal_ids": ["goal-a"],
+            }
+        ],
+        goal_outcomes=[
+            {
+                "goal_id": "goal-a",
+                "disposition": "execute",
+                "coverage": "complete",
+                "step_ids": ["lookup"],
+            },
+            {
+                "goal_id": "goal-b",
+                "disposition": "respond",
+                "coverage": "complete",
+                "response_text": "Meanwhile.",
+            },
+        ],
+    )
+    followup = InteractionResponse(
+        interaction_id="information-followup",
+        speech=[{"id": "result", "text": "The result is ready."}],
+    )
+    evidence = ToolResultEvidence(
+        evidence_id="lookup-result",
+        tool_id="chromie.test.lookup",
+        status="completed",
+        data={"value": 1},
+        output_sha256=canonical_value_sha256({"value": 1}),
+    )
+
+    filtered, count = suppress_redundant_completed_body_followup(
+        followup,
+        source_response=source,
+        source_plan=plan,
+        reentry_goal_ids=["goal-a"],
+        evidence=[evidence],
+        delivered_events=[{"source_goal_ids": ["goal-b"]}],
+    )
+
+    assert count == 0
+    assert [item.text for item in filtered.speech] == ["The result is ready."]
 
 
 def test_execution_outcome_user_text_prefers_admitted_turn() -> None:

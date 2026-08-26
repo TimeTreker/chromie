@@ -270,6 +270,82 @@ def goal_association_response_schema(
             else {}
         )
 
+        def expected_source_bindings(source_ref: str) -> list[tuple[str, str]]:
+            return [
+                (
+                    " ".join(str(name).strip().split()),
+                    _decoder_binding_value(name, value),
+                )
+                for name, value in responsibility_bindings.get(
+                    source_ref, {}
+                ).items()
+                if " ".join(str(name).strip().split())
+                and "_".join(
+                    str(name).strip().casefold().replace("-", "_").split()
+                )
+                not in {"action", "activity", "effect", "outcome"}
+            ]
+
+        def exact_binding_array_schema(
+            base: dict[str, Any],
+            expected_bindings: list[tuple[str, str]],
+            *,
+            entity_type_by_name: dict[str, str] | None = None,
+        ) -> dict[str, Any]:
+            constrained = copy.deepcopy(base)
+            constrained["minItems"] = len(expected_bindings)
+            constrained["maxItems"] = len(expected_bindings)
+            binding_item_template = copy.deepcopy(
+                schema.get("$defs", {}).get("GoalAssociationModelBinding") or {}
+            )
+            binding_branches: list[dict[str, Any]] = []
+            for name, value in expected_bindings:
+                binding_branch = copy.deepcopy(binding_item_template)
+                binding_properties = binding_branch.setdefault("properties", {})
+                binding_properties["name"] = {"const": name}
+                binding_properties["value"] = {"const": value}
+                normalized_name = "_".join(
+                    name.strip().casefold().replace("-", "_").split()
+                )
+                canonical_entity_type = {
+                    "after": "sequence_ref",
+                    "before": "sequence_ref",
+                    "parallel_with": "sequence_ref",
+                    **(entity_type_by_name or {}),
+                }.get(normalized_name)
+                if canonical_entity_type is not None:
+                    binding_properties["entity_type"] = {
+                        "const": canonical_entity_type
+                    }
+                binding_branch["required"] = list(
+                    dict.fromkeys(
+                        [
+                            *(binding_branch.get("required") or []),
+                            "name",
+                            "value",
+                            "entity_type",
+                            "confidence",
+                        ]
+                    )
+                )
+                binding_branches.append(binding_branch)
+            constrained["items"] = {"oneOf": binding_branches}
+            constrained["allOf"] = [
+                {
+                    "contains": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"const": name},
+                            "value": {"const": value},
+                        },
+                        "required": ["name", "value"],
+                    },
+                    "minContains": 1,
+                }
+                for name, value in expected_bindings
+            ]
+            return constrained
+
         def branch_properties(
             source_ref: str,
             *,
@@ -310,96 +386,98 @@ def goal_association_response_schema(
                         "posture, gaze, gesture, turning, or other body motion."
                     ),
                 }
-                expected_bindings = [
-                    (
-                        " ".join(str(name).strip().split()),
-                        _decoder_binding_value(name, value),
-                    )
-                    for name, value in responsibility_bindings.get(
-                        source_ref, {}
-                    ).items()
-                    if " ".join(str(name).strip().split())
-                    and "_".join(
-                        str(name)
-                        .strip()
-                        .casefold()
-                        .replace("-", "_")
-                        .split()
-                    )
-                    not in {"action", "activity", "effect", "outcome"}
-                ]
+                expected_bindings = expected_source_bindings(source_ref)
                 if expected_bindings:
-                    bindings_schema = copy.deepcopy(
-                        properties.get("bindings") or {}
+                    properties["bindings"] = exact_binding_array_schema(
+                        properties.get("bindings") or {},
+                        expected_bindings,
                     )
-                    bindings_schema["minItems"] = len(expected_bindings)
-                    bindings_schema["maxItems"] = len(expected_bindings)
-                    binding_item_template = copy.deepcopy(
+            elif resource_variant == "physical_object":
+                physical_schema = copy.deepcopy(
+                    schema.get("$defs", {}).get(
+                        "GoalAssociationModelPhysicalResourceResponsibility"
+                    )
+                    or {}
+                )
+                physical_schema["description"] = (
+                    "Select only when acquiring a distinct concrete object independent "
+                    "of Chromie's body and physically handing it to a recipient is the "
+                    "requested outcome. Never select for Chromie's own locomotion, "
+                    "posture, gaze, gesture, turning, or body motion."
+                )
+                spatial_names = {
+                    "location",
+                    "relative_location",
+                    "distance",
+                    "direction",
+                    "route",
+                }
+                expected_spatial_bindings = [
+                    (name, value)
+                    for name, value in expected_source_bindings(source_ref)
+                    if "_".join(
+                        name.strip().casefold().replace("-", "_").split()
+                    )
+                    in spatial_names
+                ]
+                physical_properties = physical_schema.get("properties")
+                if expected_spatial_bindings and isinstance(
+                    physical_properties, dict
+                ):
+                    source_schema = copy.deepcopy(
                         schema.get("$defs", {}).get(
-                            "GoalAssociationModelBinding"
+                            "GoalAssociationModelPhysicalSource"
                         )
                         or {}
                     )
-                    binding_branches: list[dict[str, Any]] = []
-                    for name, value in expected_bindings:
-                        binding_branch = copy.deepcopy(binding_item_template)
-                        binding_properties = binding_branch.setdefault(
-                            "properties", {}
+                    source_properties = source_schema.get("properties")
+                    if isinstance(source_properties, dict):
+                        source_properties["status"] = {"const": "known"}
+                        source_properties["acquisition_bindings"] = (
+                            exact_binding_array_schema(
+                                source_properties.get("acquisition_bindings") or {},
+                                expected_spatial_bindings,
+                                entity_type_by_name={
+                                    "location": "relative_location",
+                                    "relative_location": "relative_location",
+                                    "distance": "distance",
+                                    "direction": "direction",
+                                    "route": "route",
+                                },
+                            )
                         )
-                        binding_properties["name"] = {"const": name}
-                        binding_properties["value"] = {"const": value}
-                        binding_branch["required"] = list(
+                        source_schema["required"] = list(
                             dict.fromkeys(
                                 [
-                                    *(binding_branch.get("required") or []),
-                                    "name",
-                                    "value",
-                                    "entity_type",
-                                    "confidence",
+                                    *(source_schema.get("required") or []),
+                                    "status",
+                                    "acquisition_bindings",
                                 ]
                             )
                         )
-                        binding_branches.append(binding_branch)
-                    bindings_schema["items"] = {"oneOf": binding_branches}
-                    bindings_schema["allOf"] = [
-                        {
-                            "contains": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"const": name},
-                                    "value": {"const": value},
-                                },
-                                "required": ["name", "value"],
-                            },
-                            "minContains": 1,
-                        }
-                        for name, value in expected_bindings
-                    ]
-                    properties["bindings"] = bindings_schema
-            elif resource_variant == "physical_object":
-                properties["resource_responsibility"] = {
-                    "$ref": (
-                        "#/$defs/"
-                        "GoalAssociationModelPhysicalResourceResponsibility"
-                    ),
-                    "description": (
-                        "Select only when acquiring a distinct concrete object "
-                        "independent of Chromie's body and physically handing it to a "
-                        "recipient is the requested outcome. Never select for Chromie's "
-                        "own locomotion, posture, gaze, gesture, turning, or body motion."
-                    ),
-                }
+                        physical_properties["source"] = source_schema
+                properties["resource_responsibility"] = physical_schema
                 properties["bindings"] = {
                     **copy.deepcopy(properties.get("bindings") or {}),
                     "maxItems": 0,
                 }
             elif resource_variant == "information":
-                properties["resource_responsibility"] = {
-                    "$ref": (
-                        "#/$defs/"
+                information_schema = copy.deepcopy(
+                    schema.get("$defs", {}).get(
                         "GoalAssociationModelInformationResourceResponsibility"
                     )
-                }
+                    or {}
+                )
+                expected_bindings = expected_source_bindings(source_ref)
+                information_properties = information_schema.get("properties")
+                if expected_bindings and isinstance(information_properties, dict):
+                    information_properties["query_scope"] = (
+                        exact_binding_array_schema(
+                            information_properties.get("query_scope") or {},
+                            expected_bindings,
+                        )
+                    )
+                properties["resource_responsibility"] = information_schema
                 properties["bindings"] = {
                     **copy.deepcopy(properties.get("bindings") or {}),
                     "maxItems": 0,

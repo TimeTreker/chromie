@@ -92,9 +92,13 @@ Responsibility and does not invoke Planner for that transition.
 The mechanical policy for this boundary lives in
 `orchestrator/runtime/planner_reentry.py`. It validates current Goal/Plan/request
 correlation, selects only supplied Responsibility provenance, rejects exact repetition
-of the terminal Activity, and suppresses already-delivered exact speech deltas. These are
-pure Host checks over supplied truth; the module does not interpret Goal meaning, author
-speech, invoke Planner, or mutate Runtime.
+of the terminal Activity, projects the current per-Goal execution status (including
+unresolved sibling steps) from exact Plan/Evidence bindings, and suppresses
+already-delivered exact speech deltas. These are pure Host checks over supplied truth;
+the module does not interpret Goal meaning, author speech, invoke Planner, or mutate
+Runtime. Both incremental and aggregate result re-entry supply this bounded
+`trusted_execution_outcome`; the historical source Plan proves requested semantics and
+arguments but never substitutes for current execution status.
 
 A Planner step that exactly repeats the Capability/arguments/Goal ownership of the
 terminal request that just completed is rejected; reactivation is not permission to
@@ -105,6 +109,35 @@ Evidence. Pre-evidence acknowledgements cite no terminal Evidence and cannot cla
 result. If Planner authors new Capability Work, ordinary Capability schemas,
 authorization, confirmation, safety, privacy, resource and concurrency contracts still
 apply. An internal opportunity is never user confirmation.
+
+The re-entry tries Fast Planner first and may use the existing HOW escalation to Deep
+Planner. The terminal response candidate from either tier is accepted only after the
+same Planner-owned immutable truth qualification checks Evidence scope, epistemic
+strength, and execution status. In particular, a probability strictly between 0% and
+100% cannot support categorical “will” or “will not” wording. Qualification rejection
+does not authorize Host rewriting and fails closed with no speculative speech. An exact
+past-tense claim for the scoped source-Plan effect is execution-consistent only when the
+trusted outcome marks that Goal complete and any required completion qualification is
+established; source-Plan `execute` disposition alone is never current-status evidence.
+The qualification DTO is internally closed: `accept` requires every violation flag to
+be false, while `reject` requires at least one specific violation flag to be true. The
+six required model-authored flags are the semantic judgments; trusted code mechanically
+projects the required `decision` field from that complete vector when a provider emits
+the opposite redundant enum. It never supplies a missing flag or makes a truth judgment.
+This
+prevents an ungrounded generic rejection from masquerading as a completed audit without
+granting the Host authority to interpret or rewrite Planner language. Every flag and the
+decision are required in model output; Python defaults may not silently complete a
+partial certificate. The provider-facing decoder grammar is deliberately a flat object
+with those seven required fields; the decision/flag consistency rule and redundant
+aggregate projection are enforced by the authoritative typed DTO after decoding. This
+avoids provider-specific composition-branch
+decoding that can omit required sibling fields without weakening or locally repairing the
+certificate. The auditor receives only the source step/argument/Goal projection,
+not historical Plan disposition, selected skills, or other planning state. Execution
+status means whether Chromie/provider performed that source step; tense inside an
+Evidence-owned world proposition (for example whether forecast rain will happen) is
+audited against Evidence and epistemic strength, not against lookup completion.
 
 ## Failure behavior
 
@@ -118,6 +151,13 @@ apply. An internal opportunity is never user confirmation.
 - Planner output that widens Goals or repeats the just-completed Activity is rejected.
 - Confirmation-requiring new Work is not auto-confirmed by an asynchronous internal
   event.
+- When one originating interaction owns multiple Capability requests, Runtime publishes
+  and correlates every terminal event immediately. Each terminal sibling may create an
+  exact scoped Planner re-entry, but that transaction receives only its bound GI
+  Responsibilities, Goals, source-Plan steps, and Evidence; the retained originating
+  UserTurnEnvelope is not replayed because it can contain excluded sibling semantics.
+  This preserves incremental follow-up Work without granting authority to narrate a
+  still-running sibling.
 - Once Planner has consumed one terminal Evidence item, aggregate closure must not run a
   second semantic response/planning pass over the same Evidence merely because sibling
   Work later completes. If aggregate closure still has unconsumed Evidence, its Planner

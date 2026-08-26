@@ -1820,13 +1820,23 @@ def fast_truth_certificate_response_schema() -> dict[str, Any]:
     schema = copy.deepcopy(
         FastPlannerFirstResponseTruthCertificate.model_json_schema()
     )
-    schema["required"] = [
+    audit_fields = [
         "has_unverified_result_or_completion_claim",
         "has_ungrounded_method_or_world_claim",
         "has_semantic_perspective_contradiction",
+        "has_epistemic_strength_contradiction",
+        "has_execution_status_contradiction",
         "has_out_of_scope_goal_claim",
-        "decision",
     ]
+    schema["required"] = [*audit_fields, "decision"]
+    # Keep the provider-facing grammar flat. Ollama's constrained decoder accepts
+    # JSON-Schema composition keywords here but, with the previous oneOf/anyOf
+    # coupling, repeatedly emitted only the single flag that selected a branch.
+    # The DTO consequently failed closed because the other required fields were
+    # absent. Required-field completeness stays in this decoder schema, while the
+    # decision is mechanically projected from the complete model-authored flag
+    # vector by the typed DTO after decoding. Missing fields are never defaulted
+    # or inferred locally, and trusted code makes no truth judgment of its own.
     return schema
 
 def fast_first_response_response_schema(
@@ -1854,16 +1864,19 @@ def fast_first_response_response_schema(
         # discriminating role after decoding from the presence/absence of
         # progress_kind, so the LLM does not spend tokens on a mechanical tag.
         activity_schema.clear()
-        activity_choices: list[dict[str, Any]] = [
-            {"$ref": "#/$defs/FastPlannerProgressAct"},
-        ]
         supplied_responsibilities = list(responsibilities or [])
-        if supplied_responsibilities and all(
+        direct_conversation = supplied_responsibilities and all(
             item.output_mode == "speech" for item in supplied_responsibilities
-        ):
-            activity_choices.append(
-                {"$ref": "#/$defs/FastPlannerCompleteResponseAct"}
-            )
+        )
+        activity_choices: list[dict[str, Any]] = [
+            {
+                "$ref": (
+                    "#/$defs/FastPlannerCompleteResponseAct"
+                    if direct_conversation
+                    else "#/$defs/FastPlannerProgressAct"
+                )
+            },
+        ]
         activity_choices.append({"type": "null"})
         activity_schema.update(
             {
@@ -2492,6 +2505,63 @@ def fast_repair_response_schema(
         "Bounded contract repair: this is the sole aggregate consistent "
         "with the initial model-authored per-goal dispositions."
     )
+    narrowed_outcomes = narrowed.get("properties", {}).get("goal_outcomes")
+    outcome_properties = (
+        narrowed_outcomes.get("properties")
+        if isinstance(narrowed_outcomes, dict)
+        else None
+    )
+    if isinstance(outcome_properties, dict):
+        for goal_id, initial_disposition in zip(expected, dispositions, strict=True):
+            goal_schema = outcome_properties.get(goal_id)
+            if not isinstance(goal_schema, dict):
+                continue
+            # Retain the shared outcome contract while freezing the
+            # model-authored semantic disposition. A DTO repair may correct
+            # redundant fields but cannot change escalate into execute. An
+            # escalated outcome also has mechanically empty response/step
+            # surfaces: otherwise the repair grammar permits the exact nested
+            # contradiction that caused the original contract rejection.
+            goal_properties = goal_schema.setdefault("properties", {})
+            goal_properties["disposition"] = {
+                "type": "string",
+                "enum": [initial_disposition],
+                "description": (
+                    "Bounded DTO repair: preserve the initial model-authored "
+                    "per-Goal semantic disposition exactly."
+                ),
+            }
+            if initial_disposition == "escalate":
+                goal_properties["response_text"] = {
+                    "type": "string",
+                    "maxLength": 0,
+                }
+                goal_properties["step_ids"] = {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 0,
+                }
+                goal_schema["required"] = list(
+                    dict.fromkeys(
+                        [
+                            *(goal_schema.get("required") or []),
+                            "disposition",
+                            "response_text",
+                            "step_ids",
+                        ]
+                    )
+                )
+    if aggregate == "escalate":
+        properties = narrowed.get("properties", {})
+        coverage = properties.get("coverage")
+        if isinstance(coverage, dict):
+            coverage["enum"] = ["partial"]
+        steps = properties.get("steps")
+        if isinstance(steps, dict):
+            steps["maxItems"] = 0
+        response_text = properties.get("response_text")
+        if isinstance(response_text, dict):
+            response_text["maxLength"] = 0
     return narrowed
 
 def deep_plan_response_schema(

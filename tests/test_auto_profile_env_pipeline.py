@@ -411,10 +411,14 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_SKILL_SELECTION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_WEATHER_TIMEOUT_S"], "120")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "32768")
+        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_CTX"], "40960")
         self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
@@ -567,6 +571,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         for fragment in (
             "CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?",
             "CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?",
+            "CHROMIE_COGNITIVE_BUDGET_PROFILE: ${CHROMIE_COGNITIVE_BUDGET_PROFILE:-interactive}",
             "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
             "AGENT_FAST_FIRST_RESPONSE_MODEL: ${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}",
             "AGENT_FAST_TRUTH_MODEL: ${AGENT_FAST_TRUTH_MODEL:-${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}}",

@@ -422,6 +422,22 @@ class GoalAssociationResolver:
                                 output_type=output_type,
                                 problems=problems,
                                 preserve_unresolved_meaning=clarification_required,
+                                authoritative_coverage_items=(
+                                    [
+                                        {
+                                            "source_excerpt": item.source_excerpt,
+                                            "role": item.role,
+                                            "required_goal_shape": item.required_goal_shape,
+                                            "required_information_domain": (
+                                                item.required_information_domain
+                                            ),
+                                            "required_output_mode": item.required_output_mode,
+                                        }
+                                        for item in certificate.responsibility_items
+                                    ]
+                                    if certificate is not None
+                                    else []
+                                ),
                             ),
                             system=semantic_review_system_prompt(
                                 output_type,
@@ -475,6 +491,43 @@ class GoalAssociationResolver:
                         coverage_metadata["certificate"] = (
                             final_certificate.model_dump(mode="json")
                         )
+                        if certificate is not None:
+                            initial_classifications = {
+                                " ".join(
+                                    item.source_excerpt.strip().casefold().split()
+                                ): (
+                                    item.role,
+                                    item.required_goal_shape,
+                                    item.required_information_domain,
+                                    item.required_output_mode,
+                                )
+                                for item in certificate.responsibility_items
+                            }
+                            final_classifications = {
+                                " ".join(
+                                    item.source_excerpt.strip().casefold().split()
+                                ): (
+                                    item.role,
+                                    item.required_goal_shape,
+                                    item.required_information_domain,
+                                    item.required_output_mode,
+                                )
+                                for item in final_certificate.responsibility_items
+                            }
+                            classification_drift = {
+                                excerpt: {
+                                    "initial": list(classification),
+                                    "final": list(final_classifications.get(excerpt, ())),
+                                }
+                                for excerpt, classification in initial_classifications.items()
+                                if final_classifications.get(excerpt) != classification
+                            }
+                            if classification_drift:
+                                raise ValueError(
+                                    "fresh Goal interpretation changed the independent "
+                                    "auditor's source classification: "
+                                    + self._bounded_json(classification_drift, 1800)
+                                )
                         if final_verdict != "accept":
                             raise ValueError(
                                 "fresh Goal interpretation failed final responsibility "

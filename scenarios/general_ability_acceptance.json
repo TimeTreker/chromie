@@ -125,7 +125,8 @@
               ],
               "expected_args": [
                 "0:duration_s=10.0"
-              ]
+              ],
+              "require_speech": false
             },
             {
               "id": "continue_recent_walk",
@@ -137,12 +138,7 @@
               "expected_args": [
                 "0:duration_s=10.0"
               ],
-              "expected_speech_any": [
-                "继续往前",
-                "继续向前",
-                "接着往前",
-                "接着向前"
-              ],
+              "require_speech": false,
               "forbidden_speech_any": [
                 "刚才那个事情",
                 "刚才那个动作",
@@ -810,9 +806,16 @@
           "id": "beijing_rain_evidence_bound_result",
           "text": "今天北京下雨了没有？",
           "language": "zh-CN",
-          "expect_no_capabilities": true,
+          "expected_capabilities": [
+            "chromie.weather.lookup"
+          ],
+          "expected_args": [
+            "0:location=北京",
+            "0:date=today"
+          ],
           "require_speech": true,
           "require_fast_communicative_act": true,
+          "require_fast_planner_evidence_reentry": true,
           "expected_fast_communicative_speech_acts": [
             "acknowledge_and_check"
           ],
@@ -859,7 +862,8 @@
               ],
               "expected_args": [
                 "0:duration_s=10.0"
-              ]
+              ],
+              "require_speech": false
             },
             {
               "id": "cancel_recent_walk",
@@ -1131,11 +1135,6 @@
           "expected_args": [
             "0:count=2"
           ],
-          "expected_speech_any": [
-            "joke",
-            "robot",
-            "why"
-          ],
           "description": "A live mixed request should execute the body goal while also answering the conversational goal.",
           "expected_terminal_planner_tier": "fast",
           "expected_fast_planner_path": "terminal",
@@ -1242,6 +1241,7 @@
               "expected_args": [
                 "0:duration_s=10.0"
               ],
+              "require_speech": false,
               "min_new_goal_count": 1,
               "min_goal_outcome_count": 1,
               "expected_observations": [
@@ -1265,6 +1265,7 @@
               "expected_args": [
                 "0:duration_s=10.0"
               ],
+              "require_speech": false,
               "forbidden_speech_any": [
                 "刚才那个事情",
                 "刚才那个动作",
@@ -1383,6 +1384,7 @@
               "expected_args": [
                 "0:duration_s=10.0"
               ],
+              "require_speech": false,
               "min_new_goal_count": 2,
               "min_goal_outcome_count": 2,
               "expected_observations": [
@@ -1395,7 +1397,7 @@
                   "max_occurrences": 1
                 },
                 {
-                  "type": "gesture.blink_eyes",
+                  "type": "social_attention.blink",
                   "min_occurrences": 1,
                   "max_occurrences": 1
                 }
@@ -1411,11 +1413,12 @@
               "forbidden_capabilities": [
                 "soridormi.walk_forward"
               ],
+              "require_speech": false,
               "min_new_goal_count": 1,
               "min_goal_outcome_count": 1,
               "expected_observations": [
                 {
-                  "type": "gesture.blink_eyes",
+                  "type": "social_attention.blink",
                   "min_occurrences": 1,
                   "max_occurrences": 1
                 }

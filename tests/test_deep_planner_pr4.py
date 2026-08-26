@@ -460,12 +460,42 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "satisfied_goal_ids": ["goal-info"],
             },
         }
-        ollama = SequencedOllama([raw])
+        ollama = SequencedOllama(
+            [
+                raw,
+                {
+                    "has_unverified_result_or_completion_claim": False,
+                    "has_ungrounded_method_or_world_claim": False,
+                    "has_semantic_perspective_contradiction": False,
+                    "has_epistemic_strength_contradiction": False,
+                    "has_execution_status_contradiction": False,
+                    "has_out_of_scope_goal_claim": False,
+                    "decision": "accept",
+                },
+            ]
+        )
 
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.response_text, "The current state is available.")
+        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(
+            ollama.prompts[1][1]["prompt_family"],
+            "deep_planner.evidence_response.truth_check",
+        )
+        self.assertEqual(
+            plan.metadata["evidence_response_truth_qualification"],
+            {
+                "has_unverified_result_or_completion_claim": False,
+                "has_ungrounded_method_or_world_claim": False,
+                "has_semantic_perspective_contradiction": False,
+                "has_epistemic_strength_contradiction": False,
+                "has_execution_status_contradiction": False,
+                "has_out_of_scope_goal_claim": False,
+                "decision": "accept",
+            },
+        )
         prompt = str(ollama.prompts[0][0])
         self.assertIn(
             "trusted terminal-Evidence Planner re-entry, not a new user turn",
@@ -475,9 +505,94 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "A source-Plan step reported completed is prior Work",
             prompt,
         )
+        self.assertIn("FINAL TRUSTED EXECUTION OUTCOME JSON", prompt)
+        self.assertIn(
+            "describe that exact source-Plan effect as completed",
+            prompt,
+        )
         schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("respond", schema["properties"]["disposition"].get("enum", []))
         self.assertGreater(schema["properties"]["steps"].get("maxItems", 0), 0)
+
+    def test_terminal_evidence_reentry_deep_response_fails_closed_when_truth_rejected(self):
+        data = {"aggregate_status": "completed"}
+        run_request = request("Walk forward.", goal_ids=["goal-walk"])
+        goal = run_request.context["goal_association_resolution"]["new_goals"][0]
+        goal["metadata"] = {"output_mode": "body_action"}
+        run_request.context["result_evidence_reentry"] = {
+            "source_goal_ids": ["goal-walk"],
+            "evidence_refs": ["evidence-walk"],
+        }
+        run_request.context["trusted_terminal_evidence"] = [
+            {
+                "evidence_id": "evidence-walk",
+                "tool_id": "soridormi.walk_forward",
+                "status": "completed",
+                "data": data,
+                "output_sha256": canonical_value_sha256(data),
+            }
+        ]
+        run_request.context["trusted_execution_outcome"] = {
+            "aggregate_status": "completed",
+            "goal_outcomes": [
+                {
+                    "goal_id": "goal-walk",
+                    "status": "completed",
+                    "evidence_ids": ["evidence-walk"],
+                }
+            ],
+        }
+        raw = {
+            "disposition": "respond",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Report completed work.",
+            "response_text": "I will walk forward now.",
+            "steps": [],
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "I will walk forward now.",
+                    "step_ids": [],
+                }
+            },
+            "goal_satisfaction": {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-walk"],
+            },
+        }
+        ollama = SequencedOllama(
+            [
+                raw,
+                {
+                    "has_unverified_result_or_completion_claim": False,
+                    "has_ungrounded_method_or_world_claim": False,
+                    "has_semantic_perspective_contradiction": False,
+                    "has_epistemic_strength_contradiction": False,
+                    "has_execution_status_contradiction": True,
+                    "has_out_of_scope_goal_claim": False,
+                    "decision": "reject",
+                },
+            ]
+        )
+
+        plan = asyncio.run(
+            DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request)
+        )
+
+        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.response_text, "")
+        self.assertEqual(
+            plan.metadata["reason"],
+            "deep_planner_evidence_response_truth_rejected",
+        )
+        self.assertTrue(
+            plan.metadata["evidence_response_truth_qualification"][
+                "has_execution_status_contradiction"
+            ]
+        )
 
     def test_canonical_body_goal_is_planned_from_goal_state(self):
         raw = {
@@ -838,6 +953,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertIn("soridormi.walk_forward", catalog_section)
         self.assertIn("duration_s", catalog_section)
         self.assertIn("additionalProperties", catalog_section)
+        self.assertIn(
+            "Response text is audible language, never a stage direction",
+            prompt,
+        )
+        self.assertIn(
+            "must not narrate, role-play, or claim another executable Goal's action",
+            prompt,
+        )
         self.assertLess(
             catalog_section.index("soridormi.walk_forward"),
             catalog_section.index("rare.capability_0"),
@@ -1431,6 +1554,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(review.decision, "accept")
+        self.assertEqual(ollama.prompts[0][1]["options"]["num_predict"], 4096)
         prompt = ollama.prompts[0][0]
         self.assertIn('"plan_relation":"safe_adjustment"', prompt)
         self.assertIn('"user_confirmation_required":true', prompt)

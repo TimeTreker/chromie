@@ -1627,14 +1627,14 @@ def validate_explicit_numeric_parameter_grounding(
     """Verify numeric user-supplied arguments against immutable goal text.
 
     The planner remains the semantic authority for mapping a user value to a
-    skill parameter.  This check only enforces provenance after that judgment:
-    a value labelled ``user_supplied`` must agree with its executable step and
-    identify an authoritative source Goal containing that value, and every
-    numeric literal in an executable goal must be accounted for.  It therefore
-    catches silent default substitution without introducing phrase-to-action
-    or parameter-name rules.  Stable Goal IDs carry provenance; requiring the
-    model to copy a second free-text citation adds no evidence and is not part
-    of this contract.
+    skill parameter.  This check enforces preservation and provenance after that
+    judgment: every numeric literal in an executable Goal must occur in an owned
+    executable argument, and a value labelled ``user_supplied`` must agree with
+    that argument and identify an authoritative source Goal containing it.  It
+    therefore catches both omission and silent default substitution without
+    introducing phrase-to-action or parameter-name rules. Stable Goal IDs carry
+    provenance; requiring the model to copy a second free-text citation adds no
+    evidence and is not part of this contract.
     """
 
     if output.disposition not in {"execute", "mixed"}:
@@ -1708,6 +1708,7 @@ def validate_explicit_numeric_parameter_grounding(
 
     steps = {step.step_id: step for step in output.steps}
     structured_numeric_grounding: dict[str, set[Decimal]] = {}
+    owned_step_numeric_values: dict[str, set[Decimal]] = {}
 
     def nested_numbers(value: Any) -> set[Decimal]:
         if isinstance(value, dict):
@@ -1729,6 +1730,9 @@ def validate_explicit_numeric_parameter_grounding(
 
     for step in output.steps:
         for goal_id in step.source_goal_ids:
+            owned_step_numeric_values.setdefault(goal_id, set()).update(
+                nested_numbers(step.args)
+            )
             expected_arguments = resource_arguments_by_goal.get(goal_id, {})
             for parameter, expected in expected_arguments.items():
                 actual = step.args.get(parameter)
@@ -1816,6 +1820,22 @@ def validate_explicit_numeric_parameter_grounding(
             ) and literal not in structured_numeric_grounding.get(goal_id, set()):
                 missing_numeric_grounding.append((goal_id, literal))
     if missing_numeric_grounding:
+        absent_from_work = [
+            (goal_id, literal)
+            for goal_id, literal in missing_numeric_grounding
+            if literal not in owned_step_numeric_values.get(goal_id, set())
+        ]
+        if absent_from_work:
+            missing = "; ".join(
+                f"goal_id={goal_id!r}, value={literal}"
+                for goal_id, literal in absent_from_work
+            )
+            raise ValueError(
+                "explicit numeric Goal value is absent from every executable "
+                "step argument owned by that Goal; author the exact value in the "
+                "semantically corresponding Capability argument or return a "
+                f"truthful non-executing outcome: {missing}"
+            )
         missing = "; ".join(
             f"goal_id={goal_id!r}, value={literal}"
             for goal_id, literal in missing_numeric_grounding

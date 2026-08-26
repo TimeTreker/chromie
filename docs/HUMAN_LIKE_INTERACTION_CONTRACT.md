@@ -407,9 +407,11 @@ finishes, but GA still commits its canonical conversational Goal and later binds
 delivered Activity to that Goal. This binding is continuity and completion Evidence;
 it never authorizes a second response. If persistent work also exists, Fast Planner may
 author only prospective progress while requesting Goal Association. The compact
-first-response decoder therefore exposes `complete_response` only when every supplied
-Responsibility is conversational speech WHAT; information and observable/stateful WHAT
-can choose only prospective progress or silence until fresh Evidence/work exists. These are
+first-response decoder therefore exposes `complete_response` or silence when every supplied
+Responsibility is conversational speech WHAT; it does not mislabel an already-authored
+conversational answer as progress and then authorize the same answer again. Information
+and observable/stateful WHAT can choose only prospective progress or silence until fresh
+Evidence/work exists. These are
 model-authored planning decisions, never a Host greeting phrase table, and Goal
 Interpretation does not write the reply. Planner owns
 the Communicative Act and its exact wording; the Host validates and delivers without
@@ -656,6 +658,10 @@ Interaction Context remains the authority for whether any speech was actually he
 is still pending. A Planner `CommunicativeAct.activity_id` is the semantic speech
 identity for that turn. Requeueing the same Activity under a new playback generation
 or order creates a new **delivery attempt**, not a new user-facing speech event. Runtime
+projects prior-turn assistant text into `already_spoken` only from the existing
+delivery-completed conversation record; generic authored or scheduled response history
+does not become heard-speech evidence. This lets later Planner turns reason from exact
+delivered wording without treating a proposal as something the person heard.
 may suppress/resume transport only by exact Activity identity and retained delivery
 evidence; wording similarity is never a de-duplication authority. A delivered or
 already-scheduled Activity must not be spoken again merely because GA reconciliation,
@@ -807,9 +813,18 @@ barrier. Before Runtime commits a post-Evidence answer, the same Fast Planner pe
 one bounded accept/reject Epistemic Qualification over the immutable wording and exact
 Goal/Evidence snapshot. The qualifier cannot rewrite or replace the answer. Rejection
 or qualifier failure uses the existing single Deep-Planner escalation or fails closed;
-there is no later wording owner or semantic repair chain. In particular, a forecast
+there is no later wording owner or semantic repair chain. The six required audit flags
+are the model-owned semantic judgment; the required decision is their redundant closed
+aggregate and trusted code may only project that aggregate after all six exact boolean
+flags are present. When the resulting advisory Plan explicitly sets
+`execution_allowed=false` and authorizes neither Work nor Communicative Activity, the
+Host consumes it as a silent handled result rather than inventing speech, throwing a
+presentation error, or reopening the same Evidence for another semantic attempt. In
+particular, a forecast
 probability below 100% must remain a probability/possibility rather than becoming a
-claim of certainty.
+claim of certainty. The certificate records epistemic-strength contradiction separately
+from world-grounding, execution-status, perspective, and Goal-scope contradictions so a
+generic false flag cannot conceal a probability-to-certainty upgrade.
 
 Natural:
 

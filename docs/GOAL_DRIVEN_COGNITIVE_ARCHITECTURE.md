@@ -321,14 +321,19 @@ Communicative Activity violates trusted truth or provenance, reject it or use an
 already contract-defined deterministic fail-safe; do not repair semantics
 through a composer or reviewer chain.
 
-### Terminal Capability Evidence re-enters Fast Planner
+### Terminal Capability Evidence re-enters Planner through Fast first
 
 Trusted Runtime publishes a correlated terminal event. The Host validates the
 immutable request/result join and schema, binds bounded Evidence only to the
 request's exact canonical Goal IDs, updates Goal/task state, and reactivates
-Fast Planner. Fast Planner selects relevant facts and decides answer, follow-up
-Work, clarification, retry Plan, or silence. It may not widen the supplied Goal
-set or duplicate the completed execution.
+Fast Planner first. Planner selects relevant facts and decides answer, follow-up
+Work, clarification, retry Plan, or silence. Fast may make the terminal decision
+or escalate genuinely complex HOW to Deep under the existing Planner contract; the
+terminal response from either tier receives the same bounded Planner-owned
+post-Evidence Epistemic Qualification. Escalation cannot bypass evidence scope,
+probability strength, or execution-status truth. The qualification only accepts or
+rejects immutable model-authored wording and cannot rewrite it. Planner may not widen
+the supplied Goal set or duplicate the completed execution.
 
 Result content, place names, provider fields, recency, or text similarity never
 infer Goal ownership. Missing or stale request/Goal provenance fails closed. A
@@ -862,6 +867,11 @@ clarification authority separate from Fast Planner. After that commitment, the s
 Planner continues the remaining Activity decision and Goal Association begins
 concurrently from the unchanged GI result. Both branches retain the immutable admitted
 UserTurn as source evidence alongside the structured Responsibility projection. The
+decoder exposes a direct complete response (or silence) for an all-conversational speech
+Responsibility set, and prospective progress (or silence) for work/evidence-bearing
+Responsibility sets. A complete conversational answer cannot be typed as progress and
+reissued by the terminal response phase.
+The
 continued Planner returns a typed `FastPlannerAdvance` that mechanically retains the committed act and completes the
 first real Activity Plan:
 exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
@@ -1844,7 +1854,9 @@ Association. A directly named entity is preserved in the user's own surface form
 rather than translated, transliterated, or provider-canonicalized inside WHAT.
 For locations, Goal Interpretation rejects a model-authored spelling that has
 neither a current-turn surface nor bounded semantic-context provenance; the one
-existing same-stage DTO repair may regenerate from the authoritative turn. When
+canonical semantic binding name is `location`, so renaming that dimension cannot
+bypass the same provenance contract. The one existing same-stage DTO repair may
+regenerate from the authoritative turn. When
 Goal Association declares a new directly named location binding without a
 supplied referent, its value must likewise remain a contiguous verbatim span of
 the authoritative current user turn in the user's language. An ungrounded value
@@ -2188,6 +2200,14 @@ closed. This creates containment without transferring semantic authority to the
 Host and directly prevents a compound request such as walking, singing, and
 blinking from silently becoming only one observable responsibility.
 
+The GI atomic audit receives each candidate's `output_mode` as a candidate claim, not
+as source evidence, so it can detect a single DTO that merged independently observable
+effects with different WHAT modes. When the audit maps every source outcome bijectively
+to an already-correct candidate and only its typed order/concurrency relation or mode is
+missing, Host may project those exact audit-owned fields onto the same candidates and
+revalidate the certificate. It does not regenerate or infer semantics. Non-bijective,
+missing, or over-merged coverage still takes the one source-based resegmentation path.
+
 The audit is an authority-ephemeral proof certificate, not a second mutable Goal
 model. It may be retained immutably in traces and reviewed evidence, but its only
 control effects are `accept`, `reconsider_once`, and `fail_closed`. Model output
@@ -2282,6 +2302,20 @@ Fast Planner may use:
 - common capabilities;
 - essential provider and safety state.
 
+A pre-Association Fast Capability Activity is not terminal merely because Host can
+join its Responsibility reference to a newly created canonical resource Goal. The
+same Fast Planner performs the existing canonical revision after Goal Association so
+the resource shape, information domain, and qualified Capability semantics participate
+in HOW selection. Host performs only the typed join and revision trigger; it does not
+choose or substitute a Capability.
+
+The independent atomic-coverage audit cites authoritative source tokens. When a
+candidate Responsibility's model-owned outcome is one unique token-aligned verbatim
+slice of that same source, trusted validation uses that exact slice instead of a
+decoder span that swallowed an adjacent sibling predicate. This is a provenance
+normalization only: it cannot change ownership, coverage, output mode, relation, or
+split an overmerged candidate, which therefore still fails closed.
+
 It may:
 
 - complete a simple conversational Responsibility with a speaking Activity;
@@ -2367,7 +2401,10 @@ person's intended outcome, scope, or referent belongs to Deep Goal Interpretatio
 before planning; Deep Planner cannot reinterpret it. A Responsibility that is already
 completely and safely resolved by Fast does not enter Deep in parallel for reassurance.
 Deep Planner receives the original Goal truth, the Fast planning-escalation evidence,
-and the full planning boundary.
+and the full planning boundary. When Deep becomes the terminal response author for a
+post-Evidence re-entry, its immutable response is subject to the same bounded
+Planner-owned truth qualification as a terminal Fast response; a rejection fails
+closed rather than falling through to Host wording.
 It may regenerate once only when its structured DTO is mechanically malformed;
 semantic grounding, coverage, confidence/satisfaction, capability, or safety
 rejection is terminal and fails closed. Model confidence alone neither grants a direct/Fast
@@ -2963,9 +3000,13 @@ Planner-authored speech timed `after_capabilities` is not dispatched before term
 Evidence on detached execution paths. Before terminal Evidence exists it is only prospective
 wording and therefore cannot own a completion claim. Terminal Evidence re-enters the same
 Planner, which may author a new trustworthy communicative delta, new Work, or silence. When
-an early sibling result is already delivered, later Planner context carries that delivered
-Evidence so equivalent speech is not repeated; when every completed fact has already been
-delivered, aggregate closure still records whole-scope terminal truth without forcing speech. A newer overlapping turn suppresses early result speech rather than allowing
+an originating interaction contains multiple Capability requests, each per-request Runtime
+event can re-enter Planner immediately, but its transaction contains only that result's
+bound GI Responsibilities, Goals, source-Plan steps, and Evidence. The retained original
+whole-turn envelope is not replayed into a subset transaction, so one result cannot narrate
+a sibling that is still running. When
+every completed fact has already been delivered, aggregate closure still records whole-scope
+terminal truth without forcing speech. A newer overlapping turn suppresses early result speech rather than allowing
 an old result to interrupt it. Runtime open-interaction ownership remains visible to scoped
 cancellation even after the foreground interaction task has been cleaned up. Late-result re-entry
 then applies a stricter Host-owned relevance gate: every source Goal must still have open
@@ -3145,7 +3186,9 @@ Before Runtime commits a post-Evidence answer, one bounded same-owner Epistemic
 Qualification accepts or rejects its immutable wording. It cannot rewrite or replace
 the answer. Rejection or qualification unavailability uses the existing single
 Deep-Planner escalation or fails closed; it does not introduce a final composer,
-reviewer chain, or semantic retry. A probability below 100% remains uncertain.
+reviewer chain, or semantic retry. A probability below 100% remains uncertain, and the
+typed qualification certificate must report epistemic-strength contradiction explicitly
+rather than folding it into a generic world-claim flag.
 
 The host validates that:
 

@@ -344,7 +344,7 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
 
 
 @pytest.mark.asyncio
-async def test_foreground_dispatch_finishes_while_provider_work_remains_running():
+async def test_multi_capability_result_reentry_projects_only_terminal_sibling_scope():
     spoken: list[str] = []
 
     async def schedule_speech(args: dict[str, Any]) -> dict[str, Any]:
@@ -388,29 +388,35 @@ async def test_foreground_dispatch_finishes_while_provider_work_remains_running(
     assert not result_task.done()
 
     provider.release_first.set()
-    for _ in range(100):
-        if spoken:
-            break
-        await asyncio.sleep(0.01)
+    await asyncio.sleep(0.05)
 
     assert spoken == ["first result"]
     assert "Both reads succeeded." not in spoken
     assert not provider.release_second.is_set()
     assert len(assistant.agent_client.requests) == 1
-    planner_request = assistant.agent_client.requests[0]
-    assert planner_request.context["incremental_terminal_evidence"] is True
-    assert planner_request.context["terminal_request_id"] == "request-first"
-    assert planner_request.context["result_evidence_reentry"]["source_goal_ids"] == [
+    first_request = assistant.agent_client.requests[0]
+    assert first_request.text == "Obtain the first requested result."
+    assert first_request.original_user_text == first_request.text
+    assert "user_turn_envelope" not in first_request.context
+    assert first_request.context["result_evidence_reentry"]["source_goal_ids"] == [
         "goal-first"
     ]
-    assert response.metadata.get("incremental_cognitive_opportunities") is None
+    first_truth = first_request.context["trusted_execution_outcome"]
+    assert first_truth["aggregate_status"] == "completed"
+    assert first_truth["goal_outcomes"][0]["goal_id"] == "goal-first"
+    assert first_truth["goal_outcomes"][0]["status"] == "completed"
+    assert first_truth["goal_outcomes"][0]["evidence_ids"]
+    assert [item.outcome for item in first_request.responsibilities] == [
+        "Obtain the first requested result."
+    ]
 
-    # The detached coordinator uses the prepared response for re-entry metadata;
-    # result arrival is internal state, never a fabricated user turn.
+    # Each exact sibling result remains an immediate cognitive opportunity, while
+    # its Planner transaction cannot see the other sibling's source semantics.
     provider.release_second.set()
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
     assert result_task.done()
     assert "Both reads succeeded." not in spoken
+    assert len(assistant.agent_client.requests) == 2
 
 
 @pytest.mark.asyncio

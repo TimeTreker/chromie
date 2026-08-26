@@ -156,6 +156,12 @@ class _GoalInterpretationSemanticStructureViolation(
     """The DTO shape is valid but does not preserve atomic source meaning."""
 
 
+class _GoalInterpretationLocationProvenanceViolation(
+    _GoalInterpretationAuthorityViolation
+):
+    """A location field crossed GI's exact source/context provenance boundary."""
+
+
 def _without_goal_interpretation_authority(value: Any) -> Any:
     """Strip downstream authority and retired route classifications from context."""
 
@@ -251,6 +257,50 @@ def _normalize_mechanical_goal_interpretation_dto(
         ):
             parsed["confidence"] = min(float(value) for value in confidence_values)
     return parsed
+
+
+def _strip_bound_values_from_unresolved(parsed: dict[str, Any]) -> None:
+    """Remove exact DTO self-contradictions without interpreting user meaning.
+
+    A scalar value cannot simultaneously be a resolved binding and unresolved
+    meaning in the same model-owned decision.  Removing only byte-equivalent
+    normalized duplicates is a mechanical projection of that closed contract;
+    every other unresolved item remains untouched.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    unresolved = parsed.get("unresolved")
+    if not isinstance(responsibilities, list) or not isinstance(unresolved, list):
+        return
+
+    def scalar_texts(value: Any) -> set[str]:
+        if isinstance(value, str):
+            normalized = " ".join(value.strip().casefold().split())
+            return {normalized} if normalized else set()
+        if isinstance(value, dict):
+            return {
+                text
+                for nested in value.values()
+                for text in scalar_texts(nested)
+            }
+        if isinstance(value, (list, tuple)):
+            return {
+                text for nested in value for text in scalar_texts(nested)
+            }
+        return set()
+
+    bound_values = {
+        text
+        for item in responsibilities
+        if isinstance(item, dict)
+        for text in scalar_texts(item.get("bindings") or {})
+    }
+    parsed["unresolved"] = [
+        item
+        for item in unresolved
+        if " ".join(str(item or "").strip().casefold().split())
+        not in bound_values
+    ]
 
 
 def _strip_redundant_outcome_echo_bindings(parsed: dict[str, Any]) -> None:
@@ -499,6 +549,8 @@ def _coverage_source_tokens(text: str) -> list[dict[str, Any]]:
 def _materialize_coverage_source_excerpts(
     request: GoalInterpretationRequest,
     raw: dict[str, Any],
+    *,
+    decision: GoalInterpretationDecision | None = None,
 ) -> dict[str, Any]:
     """Derive exact audit excerpts from contiguous model-cited source tokens."""
 
@@ -506,6 +558,48 @@ def _materialize_coverage_source_excerpts(
     tokens = _coverage_source_tokens(source)
     by_ref = {str(item["ref"]): item for item in tokens}
     index_by_ref = {str(item["ref"]): index for index, item in enumerate(tokens)}
+    exact_candidate_spans: dict[str, tuple[int, int]] = {}
+    if decision is not None:
+        folded_source = source.casefold()
+        for responsibility in decision.responsibilities:
+            candidate = " ".join(responsibility.outcome.strip().split())
+            if not candidate:
+                continue
+            folded_candidate = candidate.casefold()
+            starts: list[int] = []
+            offset = 0
+            while True:
+                found = folded_source.find(folded_candidate, offset)
+                if found < 0:
+                    break
+                starts.append(found)
+                offset = found + 1
+            if len(starts) != 1:
+                continue
+            start_char = starts[0]
+            end_char = start_char + len(candidate)
+            matching_tokens = [
+                (start_index, end_index)
+                for start_index, first in enumerate(tokens)
+                for end_index, last in enumerate(tokens[start_index:], start_index)
+                if int(first["start"]) == start_char
+                and int(last["end"]) == end_char
+            ]
+            if len(matching_tokens) == 1:
+                exact_candidate_spans[responsibility.local_ref] = matching_tokens[0]
+    candidate_audit_owner_counts: dict[str, int] = {}
+    for item in raw.get("responsibility_items") or []:
+        if not isinstance(item, dict):
+            continue
+        candidate_refs = item.get("responsibility_refs")
+        if not isinstance(candidate_refs, list):
+            continue
+        for candidate_ref in {
+            str(value).strip() for value in candidate_refs if str(value).strip()
+        }:
+            candidate_audit_owner_counts[candidate_ref] = (
+                candidate_audit_owner_counts.get(candidate_ref, 0) + 1
+            )
     responsibility_span_items: list[tuple[dict[str, Any], int, int]] = []
     for collection_name in ("responsibility_items", "supporting_items"):
         items = raw.get(collection_name)
@@ -541,6 +635,27 @@ def _materialize_coverage_source_excerpts(
                 # endpoints recovers the same unique source span without inventing,
                 # translating, or reclassifying any semantic material.
                 start_ref, end_ref = end_ref, start_ref
+            if collection_name == "responsibility_items":
+                candidate_refs = item.get("responsibility_refs")
+                if isinstance(candidate_refs, list) and len(candidate_refs) == 1:
+                    candidate_ref = str(candidate_refs[0]).strip()
+                    exact_span = (
+                        exact_candidate_spans.get(candidate_ref)
+                        if candidate_audit_owner_counts.get(candidate_ref) == 1
+                        else None
+                    )
+                    if exact_span is not None:
+                        # The candidate's model-owned outcome is itself one unique,
+                        # token-aligned verbatim source slice. Prefer that exact
+                        # provenance over a decoder citation that swallowed a
+                        # sibling predicate. This changes neither candidate owner,
+                        # coverage, modality, nor relation. When several independent
+                        # audit items cite one overmerged candidate, keep their
+                        # model-cited disjoint source spans: replacing every item with
+                        # the candidate's whole span would erase the very evidence
+                        # needed for source-grounded resegmentation.
+                        start_ref = str(tokens[exact_span[0]]["ref"])
+                        end_ref = str(tokens[exact_span[1]]["ref"])
             first = by_ref[start_ref]
             last = by_ref[end_ref]
             item["source_excerpt"] = source[int(first["start"]):int(last["end"])]
@@ -552,6 +667,35 @@ def _materialize_coverage_source_excerpts(
         responsibility_span_items,
         key=lambda value: (value[1], value[2]),
     )
+    # A coverage decoder occasionally includes the coordination token in both
+    # adjacent positive spans (for example ``Nod twice, then`` and ``then blink
+    # once``).  When both spans retain a non-empty exclusive source region, the
+    # overlap has one mechanically unique source-order normalization: keep the
+    # later span and end the earlier span immediately before it.  Containment or
+    # identical spans remain invalid because trimming those would require a
+    # semantic judgment about whether the model invented a second outcome.
+    normalized_span_items: list[tuple[dict[str, Any], int, int]] = []
+    for item, start, end in ordered_span_items:
+        if normalized_span_items:
+            previous_item, previous_start, previous_end = normalized_span_items[-1]
+            if start <= previous_end:
+                if previous_start < start and previous_end < end:
+                    previous_end = start - 1
+                    normalized_span_items[-1] = (
+                        previous_item,
+                        previous_start,
+                        previous_end,
+                    )
+                else:
+                    raise _GoalInterpretationSemanticStructureViolation(
+                        "Independent Responsibility coverage source spans must not overlap"
+                    )
+        normalized_span_items.append((item, start, end))
+    ordered_span_items = normalized_span_items
+    for item, start, end in ordered_span_items:
+        first = tokens[start]
+        last = tokens[end]
+        item["source_excerpt"] = source[int(first["start"]):int(last["end"])]
     for index, (_, left_start, left_end) in enumerate(ordered_span_items):
         for _, right_start, right_end in ordered_span_items[index + 1 :]:
             if max(left_start, right_start) <= min(left_end, right_end):
@@ -613,23 +757,59 @@ def _materialize_coverage_source_excerpts(
         related_audit_refs = item.get("related_audit_refs")
         if not isinstance(related_audit_refs, list):
             item["related_audit_refs"] = []
-        if relation_kind != "none" and not item["related_audit_refs"]:
-            candidate_refs = item.get("responsibility_refs")
-            candidate_refs = candidate_refs if isinstance(candidate_refs, list) else []
-            item["related_audit_refs"] = list(
-                dict.fromkeys(
-                    str(responsibility_item.get("audit_ref") or "").strip()
-                    for candidate_ref in candidate_refs
-                    for responsibility_item in responsibility_items
-                    if isinstance(responsibility_item, dict)
-                    and str(candidate_ref).strip()
-                    in {
-                        str(value).strip()
-                        for value in responsibility_item.get("responsibility_refs") or []
-                    }
-                    and str(responsibility_item.get("audit_ref") or "").strip()
+        candidate_refs = item.get("responsibility_refs")
+        candidate_refs = candidate_refs if isinstance(candidate_refs, list) else []
+        candidate_audit_refs: set[str] = set()
+        for candidate_ref in candidate_refs:
+            matching_audit_refs = {
+                str(responsibility_item.get("audit_ref") or "").strip()
+                for responsibility_item in responsibility_items
+                if isinstance(responsibility_item, dict)
+                and str(candidate_ref).strip()
+                in {
+                    str(value).strip()
+                    for value in responsibility_item.get("responsibility_refs") or []
+                }
+                and str(responsibility_item.get("audit_ref") or "").strip()
+            }
+            if len(matching_audit_refs) == 1:
+                candidate_audit_refs.update(matching_audit_refs)
+        if relation_kind != "none":
+            # Both fields are typed references emitted by the same audit.  Some
+            # constrained decoders put the earlier endpoint in candidate-owner
+            # form and only the later endpoint in related_audit_refs.  Merge the
+            # two explicit endpoint sets in authoritative source order; no
+            # relation or endpoint is inferred from natural language here.
+            cited_audit_refs = set(item["related_audit_refs"]) | candidate_audit_refs
+            item["related_audit_refs"] = [
+                str(responsibility_item.get("audit_ref") or "").strip()
+                for responsibility_item in responsibility_items
+                if str(responsibility_item.get("audit_ref") or "").strip()
+                in cited_audit_refs
+            ]
+        if (
+            str(item.get("role") or "") == "constraint"
+            and str(item.get("coverage") or "") != "covered"
+            and not item["related_audit_refs"]
+        ):
+            support_excerpt = str(item.get("source_excerpt") or "")
+            overlapping_audit_refs = [
+                str(responsibility_item.get("audit_ref") or "").strip()
+                for responsibility_item in responsibility_items
+                if support_excerpt
+                and (
+                    support_excerpt
+                    in str(responsibility_item.get("source_excerpt") or "")
+                    or str(responsibility_item.get("source_excerpt") or "")
+                    in support_excerpt
                 )
-            )
+            ]
+            if len(overlapping_audit_refs) == 1:
+                # An uncovered supporting copy of exactly one positive span has
+                # one mechanically unique positive audit owner.  Attaching that
+                # already-emitted owner makes the DTO valid without changing its
+                # coverage judgment or choosing a new semantic relation.
+                item["related_audit_refs"] = overlapping_audit_refs
         if relation_kind != "none" and len(item["related_audit_refs"]) < 2:
             # ordered/parallel are relations among independently observable
             # outcomes. A model label attached to only one audited outcome is
@@ -707,6 +887,71 @@ def _project_audited_atomic_contract(
         bindings.update(bindings_by_ref[local_ref])
         responsibility["bindings"] = bindings
         responsibility["output_mode"] = modes_by_ref[local_ref]
+    return GoalInterpretationDecision.model_validate(payload)
+
+
+def _project_audited_contract_onto_covered_candidates(
+    decision: GoalInterpretationDecision,
+    certificate: GoalInterpretationCoverageCertificate,
+) -> GoalInterpretationDecision | None:
+    """Project a bijective audit onto existing candidates without reinterpreting.
+
+    When the independent audit already maps every atomic source outcome to one
+    unique existing candidate, a missing typed relation or corrected output mode
+    does not require a fresh semantic generation. The model-owned audit supplies
+    those exact types; Host only copies its references into the corresponding
+    candidate DTO. A non-bijective audit still requires source resegmentation.
+    """
+
+    candidate_refs = {item.local_ref for item in decision.responsibilities}
+    audit_to_candidate: dict[str, str] = {}
+    candidate_owners: set[str] = set()
+    for item in certificate.responsibility_items:
+        if (
+            not item.independently_satisfiable
+            or len(item.responsibility_refs) != 1
+            or not item.audit_ref
+        ):
+            return None
+        candidate_ref = item.responsibility_refs[0]
+        if candidate_ref not in candidate_refs or candidate_ref in candidate_owners:
+            return None
+        audit_to_candidate[item.audit_ref] = candidate_ref
+        candidate_owners.add(candidate_ref)
+    if candidate_owners != candidate_refs:
+        return None
+
+    payload = decision.model_dump(mode="python")
+    by_ref = {
+        str(item.get("local_ref") or ""): item
+        for item in payload.get("responsibilities") or []
+        if isinstance(item, dict)
+    }
+    for item in certificate.responsibility_items:
+        by_ref[audit_to_candidate[item.audit_ref]]["output_mode"] = (
+            item.required_output_mode
+        )
+    for item in by_ref.values():
+        bindings = dict(item.get("bindings") or {})
+        for field in ("before", "after", "parallel_with"):
+            bindings.pop(field, None)
+        item["bindings"] = bindings
+    for relation in certificate.supporting_items:
+        refs = [
+            audit_to_candidate[audit_ref]
+            for audit_ref in relation.related_audit_refs
+            if audit_ref in audit_to_candidate
+        ]
+        if relation.relation_kind == "ordered" and len(refs) >= 2:
+            for earlier_ref, later_ref in zip(refs, refs[1:], strict=False):
+                by_ref[later_ref]["bindings"]["after"] = earlier_ref
+        elif relation.relation_kind == "parallel" and len(refs) >= 2:
+            for candidate_ref in refs:
+                by_ref[candidate_ref]["bindings"]["parallel_with"] = [
+                    sibling_ref
+                    for sibling_ref in refs
+                    if sibling_ref != candidate_ref
+                ]
     return GoalInterpretationDecision.model_validate(payload)
 
 
@@ -1005,6 +1250,43 @@ def _reject_unprovenanced_location_bindings(
         bindings = item.get("bindings")
         if not isinstance(bindings, dict):
             continue
+        location_alias_qualifiers = {
+            "area",
+            "place",
+            "scope",
+            "spatial",
+            "target",
+        }
+        location_aliases: list[str] = []
+        for raw_name in bindings:
+            normalized_name = str(raw_name).casefold()
+            if normalized_name == "location":
+                continue
+            name_tokens = {
+                token
+                for token in re.sub(
+                    r"(?<=[a-z0-9])(?=[A-Z])|[^A-Za-z0-9]+",
+                    " ",
+                    str(raw_name),
+                ).casefold().split()
+            }
+            # Reject names that merely rename the location dimension.  A
+            # compound key that also names another independently typed semantic
+            # dimension (for example location_direction) is not a location
+            # alias; its own grounding is handled by the ordinary binding
+            # contract instead of being misclassified here.
+            if (
+                "location" in name_tokens
+                and name_tokens - {"location"} <= location_alias_qualifiers
+            ):
+                location_aliases.append(str(raw_name))
+        if location_aliases:
+            raise _GoalInterpretationAuthorityViolation(
+                "Goal Interpretation location meaning must use the canonical "
+                f"bindings.location field; noncanonical location binding name(s) "
+                f"at responsibilities[{index}]: {location_aliases!r}. Regenerate "
+                "from the authoritative turn without renaming the typed dimension."
+            )
         raw_location = bindings.get("location")
         if not isinstance(raw_location, str):
             continue
@@ -1014,7 +1296,7 @@ def _reject_unprovenanced_location_bindings(
         folded = location.casefold()
         if folded in current_turn or folded in contextual_values:
             continue
-        raise _GoalInterpretationAuthorityViolation(
+        raise _GoalInterpretationLocationProvenanceViolation(
             "Goal Interpretation location binding has no authoritative surface "
             f"provenance: responsibilities[{index}].bindings.location={location!r}. "
             "A directly named location must copy the exact current-turn user-language "
@@ -1696,6 +1978,13 @@ class OllamaGoalInterpreter:
             "Preserve deictic spatial meaning such as here/there, inside/outside, "
             "ahead/behind, and equivalent expressions in any language as an exact "
             "current-turn location or direction binding when it changes the outcome. "
+            "Any place or spatial-location meaning uses the one canonical binding name "
+            "location; never rename that dimension to location_scope, target_location, "
+            "place_location, or another alias. "
+            "Use speed only when the person explicitly supplied pace or velocity meaning. "
+            "Do not invent a normal/default speed, and never store a duration phrase, "
+            "repetition word, action verb, or direction under speed; keep those in their "
+            "own semantic dimensions. "
             "Return responsibilities, confidence, and unresolved semantic uncertainty. "
             "For directly named entities, preserve "
             "the exact current-turn user-language surface in bindings; never translate or "
@@ -1727,7 +2016,14 @@ class OllamaGoalInterpreter:
             "scheduling, changing a setting, or sending later. Locomotion, posture, "
             "gaze, gesture, physical manipulation, carrying, and handover remain "
             "body_action even when they change location or physical state. Preserve body, media, and vocal "
-            "effects in their exact observable modes. Do not decide whether downstream "
+            "effects in their exact observable modes. Perform one final modality and "
+            "atomicity audit across languages: grammatical fusion, shared aspect, or a "
+            "while/during relation never merges independently observable locomotion and "
+            "vocal performance into one outcome. Emit each independently judgeable effect "
+            "as its own Responsibility and preserve their parallel relation. A request to "
+            "acquire, carry, bring, fetch, retrieve, or hand over a physical object is one "
+            "physical-delivery body_action Responsibility, never ordinary speech merely "
+            "because the recipient is addressed in conversation. Do not decide whether downstream "
             "work, fresh Evidence, a Capability, or a provider is required; Planner owns "
             "that judgment from canonical Goal state, trusted Evidence, and available "
             "Capabilities. No route, intent, response wording, Activity, Work, "
@@ -2070,7 +2366,9 @@ class OllamaGoalInterpreter:
                     "entity binding must copy the exact "
                     "current-turn surface; never translate or transliterate it. Provider timezone "
                     "or clock-range choices for an already-preserved relative time are not semantic "
-                    "uncertainty. The request-envelope language tag and the whole Latest "
+                    "uncertainty. Any place or spatial-location meaning must use the canonical "
+                    "binding name location; never rename the dimension to a location alias. "
+                    "The request-envelope language tag and the whole Latest "
                     "user input are not semantic bindings. Decompose each independently "
                     "observable requested effect into a sibling Responsibility and bind "
                     "only its atomic material facts."
@@ -2124,7 +2422,6 @@ class OllamaGoalInterpreter:
             )
             if item.role == "responsibility"
             and item.independently_satisfiable
-            and item.coverage in {"covered", "clarification_required"}
         ]
         supporting_audit_items = [
             item
@@ -2133,7 +2430,6 @@ class OllamaGoalInterpreter:
                 if atomic_coverage_certificate is not None
                 else []
             )
-            if item.coverage in {"covered", "clarification_required"}
         ]
         deep_audit_refs = [
             str(item.audit_ref or f"a{index + 1}").strip()
@@ -2234,6 +2530,11 @@ class OllamaGoalInterpreter:
                     "authoritative source or supplied typed Context. Never translate, "
                     "transliterate, infer, or copy a transport/runtime identifier into a "
                     "semantic binding. "
+                    "Keep binding dimensions exact: duration is elapsed time, while speed "
+                    "is only an explicitly requested pace or velocity. Never invent a "
+                    "normal/default speed, and never place a duration phrase, repetition "
+                    "word, action verb, or direction under speed. Omit speed when the "
+                    "person supplied no pace or velocity meaning. "
                     "Audit the WHAT modality as one semantic unit: use output_mode=speech "
                     "for ordinary conversation whose answer is already entailed by supplied "
                     "bounded semantic context and needs only authored wording. Use "
@@ -2270,7 +2571,9 @@ class OllamaGoalInterpreter:
                     + "\n\nPerform one fresh Deep interpretation from the source above. "
                     "No prior interpretation DTO is supplied or authoritative. First count "
                     "the source's independently observable effects; the final number of "
-                    "responsibilities must equal that count."
+                    "responsibilities must equal that count. Before returning, verify that "
+                    "every speed binding is backed by explicit pace or velocity meaning; "
+                    "duration, count, action, and direction are never speed."
                     + atomic_audit_contract
                     + structure_feedback
                 ),
@@ -2385,6 +2688,24 @@ class OllamaGoalInterpreter:
                         "description": (
                             "If location is present, copy one exact contiguous source "
                             "surface; never translate or transliterate it."
+                        ),
+                    }
+                    binding_schema["propertyNames"] = {
+                        "anyOf": [
+                            {"const": "location"},
+                            {
+                                "not": {
+                                    "pattern": (
+                                        r"(?:^|[_\-\s])"
+                                        r"[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]"
+                                        r"(?:$|[_\-\s])"
+                                    )
+                                }
+                            },
+                        ],
+                        "description": (
+                            "Location meaning has exactly one canonical binding name: "
+                            "location. Other semantic dimensions remain writable."
                         ),
                     }
         return payload
@@ -2523,6 +2844,7 @@ class OllamaGoalInterpreter:
                 "local_ref": item.local_ref,
                 "outcome": item.outcome,
                 "bindings": item.bindings,
+                "output_mode": item.output_mode,
             }
             for item in decision.responsibilities
         ]
@@ -2590,6 +2912,14 @@ class OllamaGoalInterpreter:
                         "independently_satisfiable=false and required_output_mode=none "
                         "because they never inherit an outcome mode. Context and politeness "
                         "framing own no candidate. "
+                        "A negative clause is not automatically a second positive body "
+                        "outcome. Use supplied retained-Goal lifecycle evidence: a request "
+                        "to cancel or pause currently active work remains an independently "
+                        "owed relationship outcome, but wording that only prohibits replay "
+                        "of already-terminal work is supporting constraint/context on the "
+                        "still-positive current outcomes. Never classify an already-true "
+                        "idle/no-replay state as new positive embodiment merely because an "
+                        "action verb appears under negation. "
                         "Coordination grammar never demotes a positive effect to a constraint: "
                         "when a person can judge two effects completed independently, emit "
                         "two independently_satisfiable responsibility_items even when the "
@@ -2619,7 +2949,12 @@ class OllamaGoalInterpreter:
                         "own cited source span; never swap, rotate, or copy modes between "
                         "adjacent coordinated outcomes. A run/walk span is body_action "
                         "and a sing/song span is singing, including when they overlap in "
-                        "time. "
+                        "time. Grammatical fusion, shared aspect, or a while/during relation "
+                        "never makes those separately observable effects one predicate. A "
+                        "request to acquire, carry, bring, fetch, retrieve, or hand over a "
+                        "physical object is one physical-delivery body_action Responsibility, "
+                        "not speech; acquisition, carrying, and handover are stages of that "
+                        "one human outcome rather than separate Responsibilities. "
                         "Assign positive source items unique audit_ref values a1, a2, and "
                         "so on in source order. This is audit identity only, never a Goal ID. "
                         "Positive Responsibility source spans must be disjoint: cite only "
@@ -2666,6 +3001,19 @@ class OllamaGoalInterpreter:
                         "Candidate Responsibility DTOs (claims to audit, not source):\n"
                         f"{_bounded_json(candidates, max_chars=5000)}\n\n"
                         f"{retained_atomic_contract}\n\n"
+                        "Final atomicity check: inspect each candidate outcome, its "
+                        "bindings, and output_mode for multiple independently observable "
+                        "effects. If one candidate combines effects with different WHAT "
+                        "modes, emit one responsibility item per effect and cite that same "
+                        "candidate ref on each item so the overmerge is rejected. Do not "
+                        "call such a multimodal combination one outcome.\n\n"
+                        "MODALITY COUNT IS AUTHORITATIVE: count the observable effects "
+                        "again immediately before JSON. If one source predicate requests "
+                        "both an embodied effect and a vocal performance, emit two positive "
+                        "responsibility_items with their own exact modes even when the "
+                        "candidate used one outcome, one broad mode, or stored the second "
+                        "effect in a binding. The number of responsibility_items must equal "
+                        "that final effect count.\n\n"
                         "Cite only coherent positive-outcome and material-constraint spans; "
                         "do not inventory the source-token table. Return the coverage "
                         "certificate."
@@ -2741,7 +3089,11 @@ class OllamaGoalInterpreter:
         content: str,
     ) -> tuple[GoalInterpretationCoverageCertificate, list[str]]:
         raw = _extract_json_object(content)
-        _materialize_coverage_source_excerpts(request, raw)
+        _materialize_coverage_source_excerpts(
+            request,
+            raw,
+            decision=decision,
+        )
         certificate = GoalInterpretationCoverageCertificate.model_validate(raw)
         by_ref = {item.local_ref: item for item in decision.responsibilities}
         normalized_turn = " ".join(request.text.strip().split())
@@ -2931,7 +3283,10 @@ class OllamaGoalInterpreter:
                 decision,
                 str(audit.get("message", {}).get("content") or ""),
             )
-        except _GoalInterpretationSemanticStructureViolation as exc:
+        except (
+            _GoalInterpretationSemanticStructureViolation,
+            ValidationError,
+        ) as exc:
             try:
                 repaired_audit = await self._chat_logged(
                     self.build_responsibility_coverage_repair_payload(
@@ -3003,6 +3358,23 @@ class OllamaGoalInterpreter:
         ):
             return decision
 
+        if coverage_certificate is not None:
+            projected = _project_audited_contract_onto_covered_candidates(
+                decision,
+                coverage_certificate,
+            )
+            if projected is not None:
+                _, projected_problems = self._validate_responsibility_coverage_content(
+                    request,
+                    projected,
+                    json.dumps(
+                        coverage_certificate.model_dump(mode="json"),
+                        ensure_ascii=False,
+                    ),
+                )
+                if not projected_problems:
+                    return projected
+
         if not allow_resegmentation:
             raise InterpretationUnavailableError(
                 "invalid_goal_interpretation_after_atomic_coverage_audit: "
@@ -3015,6 +3387,15 @@ class OllamaGoalInterpreter:
             request.sid,
             problems,
         )
+        if coverage_certificate is None:
+            # A malformed auxiliary audit has no authority to trigger a fresh
+            # semantic interpretation.  Retrying the source without the typed
+            # certificate only moves the failure downstream and reports the
+            # misleading "missing certificate" symptom.
+            raise InterpretationUnavailableError(
+                "invalid_goal_interpretation_after_atomic_coverage_audit: "
+                + ";".join(problems)
+            )
         try:
             deep = await self._chat_logged(
                 self.build_deep_interpretation_payload(
@@ -3034,10 +3415,6 @@ class OllamaGoalInterpreter:
                     reconsidered,
                     coverage_certificate,
                 )
-            if coverage_certificate is None:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "atomic resegmentation requires its authoritative source certificate"
-                )
             # The independent certificate is the semantic authority that caused
             # resegmentation.  Validate the projected result against that same
             # certificate; asking a second model audit here allowed a fresh,
@@ -3046,8 +3423,22 @@ class OllamaGoalInterpreter:
             # deterministic contract validation rather than new interpretation.
             projected_certificate = coverage_certificate.model_dump(mode="json")
             for item in projected_certificate["responsibility_items"]:
+                # ``coverage`` describes the rejected pre-resegmentation
+                # candidate set. The fresh decoder is schema-bound to emit one
+                # candidate per retained audit ref, and the projection above
+                # fixes that candidate's mode and typed relations. Keeping the
+                # old ``missing`` value while assigning its new owner creates a
+                # self-contradictory DTO, so record the mechanically established
+                # ownership before final validation.
+                item["coverage"] = "covered"
                 item["responsibility_refs"] = [item["audit_ref"]]
             for item in projected_certificate["supporting_items"]:
+                # The source audit also owns constraint attachment.  Its DTO now
+                # requires every uncovered constraint to cite the positive audit
+                # owner(s), while the fresh decoder is constrained to use those
+                # audit refs and receives the same modifier/relationship contract.
+                # Record the resulting ownership without interpreting source text.
+                item["coverage"] = "covered"
                 item["responsibility_refs"] = list(
                     item.get("related_audit_refs") or []
                 )
@@ -3096,6 +3487,7 @@ class OllamaGoalInterpreter:
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
         _normalize_mechanical_goal_interpretation_dto(parsed)
+        _strip_bound_values_from_unresolved(parsed)
         _reject_planner_shaped_goal_interpretation(parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
         _reject_unknown_goal_refs(request, parsed)
@@ -3139,10 +3531,28 @@ class OllamaGoalInterpreter:
                 stage="goal_interpretation_deep",
                 request=request,
             )
-            decision = self._validate_interpretation_content(
-                request,
-                str(data.get("message", {}).get("content") or ""),
-            )
+            try:
+                decision = self._validate_interpretation_content(
+                    request,
+                    str(data.get("message", {}).get("content") or ""),
+                )
+            except _GoalInterpretationLocationProvenanceViolation:
+                # Deep GI already owns the semantic delegation. A translated or
+                # otherwise unprovenanced location is a mechanically invalid DTO,
+                # so use the one permitted same-stage repair with an exact-source
+                # decoder constraint. No semantic state has been accepted yet.
+                repaired = await self._chat_logged(
+                    self.build_deep_interpretation_payload(
+                        request,
+                        constrain_location_provenance=True,
+                    ),
+                    stage="goal_interpretation_deep_contract_repair",
+                    request=request,
+                )
+                decision = self._validate_interpretation_content(
+                    request,
+                    str(repaired.get("message", {}).get("content") or ""),
+                )
             return await self._ensure_atomic_responsibility_coverage(
                 request,
                 decision,

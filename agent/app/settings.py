@@ -18,6 +18,12 @@ except ImportError:  # pragma: no cover
 
 
 class Settings(BaseModel):
+    cognitive_budget_profile: str = Field(
+        default_factory=lambda: os.getenv(
+            "CHROMIE_COGNITIVE_BUDGET_PROFILE", "interactive"
+        ).strip()
+        or "interactive"
+    )
     host: str = Field(default_factory=lambda: os.getenv("AGENT_HOST", "0.0.0.0"))
     port: int = Field(default_factory=lambda: int(os.getenv("AGENT_PORT", "8092")))
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL") or os.getenv("OLLAMA_URL") or "http://chromie-llm:11434")

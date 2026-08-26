@@ -84,6 +84,53 @@ def test_planner_schema_and_validation_have_distinct_mechanical_owners() -> None
     )
 
 
+def test_fast_repair_schema_preserves_initial_escalation_semantics() -> None:
+    goal_id = "goal_weather"
+    base = planner_schema.fast_multi_goal_response_schema(
+        expected_goal_ids=[goal_id],
+        allowed_capability_ids=["chromie.weather.lookup"],
+        capability_input_schemas={
+            "chromie.weather.lookup": {
+                "type": "object",
+                "properties": {"location": {"type": "string"}},
+                "required": ["location"],
+                "additionalProperties": False,
+            }
+        },
+        requires_execution=True,
+    )
+    repaired = planner_schema.fast_repair_response_schema(
+        base,
+        {
+            "disposition": "escalate",
+            "goal_outcomes": {
+                goal_id: {
+                    "disposition": "escalate",
+                }
+            },
+        },
+        expected_goal_ids_for_turn=[goal_id],
+    )
+
+    properties = repaired["properties"]
+    assert properties["disposition"]["enum"] == ["escalate"]
+    assert properties["coverage"]["enum"] == ["partial"]
+    assert properties["steps"]["maxItems"] == 0
+    assert properties["response_text"]["maxLength"] == 0
+    goal_schema = properties["goal_outcomes"]["properties"][goal_id]
+    frozen = goal_schema["properties"]
+    assert frozen["disposition"]["enum"] == [
+        "escalate"
+    ]
+    assert frozen["response_text"]["maxLength"] == 0
+    assert frozen["step_ids"]["maxItems"] == 0
+    assert {
+        "disposition",
+        "response_text",
+        "step_ids",
+    }.issubset(goal_schema["required"])
+
+
 def test_planner_audit_is_planner_owned_bounded_audit_not_runtime_authority() -> None:
     namespace = vars(planner_audit)
     for forbidden in (
@@ -94,6 +141,9 @@ def test_planner_audit_is_planner_owned_bounded_audit_not_runtime_authority() ->
     ):
         assert forbidden not in namespace
     assert planner_audit.review_coordinated_action_plan_coverage.__module__ == (
+        "agent.app.planner_audit"
+    )
+    assert planner_audit.qualify_evidence_response_truth.__module__ == (
         "agent.app.planner_audit"
     )
 

@@ -129,6 +129,11 @@ logger = logging.getLogger("chromie.agent")
 def _fast_truth_context_window(
     service_settings: Settings,
 ) -> int:
+    if service_settings.cognitive_budget_profile == "qualification":
+        # Qualification measures semantic plausibility before latency tuning.  Its
+        # retained post-Evidence projection is not the compact interactive prompt,
+        # so do not apply the dedicated-runner 6144-token latency ceiling here.
+        return service_settings.fast_planner_num_ctx
     model = service_settings.fast_truth_model
     if model == service_settings.fast_planner_model:
         # Reuse the already-resident Fast runner exactly when the roles genuinely
@@ -155,6 +160,8 @@ def _fast_first_response_context_window(
     service_settings: Settings,
     interpreter_settings: GoalInterpreterSettings,
 ) -> int:
+    if service_settings.cognitive_budget_profile == "qualification":
+        return service_settings.fast_planner_num_ctx
     # Prefer exact reuse of the Fast or GI runner. A dedicated response model is
     # intentionally bounded; it must not inherit a large context merely because
     # the same weights are also assigned to a deliberative role.
@@ -447,6 +454,7 @@ fast_planner_resolver = (
         ),
         num_ctx=settings.fast_planner_num_ctx,
         num_predict=settings.fast_planner_num_predict,
+        cognitive_budget_profile=settings.cognitive_budget_profile,
         max_capabilities=settings.fast_planner_max_capabilities,
     )
     if fast_planner_client is not None
@@ -466,6 +474,8 @@ deep_planner_client = (
 deep_planner_resolver = (
     DeepPlannerResolver(
         deep_planner_client, capability_catalog,
+        truth_ollama=fast_truth_client,
+        truth_num_ctx=_fast_truth_context_window(settings),
         num_ctx=settings.deep_planner_num_ctx,
         num_predict=settings.deep_planner_num_predict,
         max_capabilities=settings.deep_planner_max_capabilities,

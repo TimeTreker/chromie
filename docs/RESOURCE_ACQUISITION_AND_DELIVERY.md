@@ -168,6 +168,10 @@ spatial/acquisition facts only in `source.acquisition_bindings`. The Host then
 materializes one canonical `resource_responsibility`; it does not persist a second
 flat `SemanticGoal.object.bindings` copy. Generic Planner checks may derive a
 transient flat view from the canonical object, but that view is never written back.
+A separately supplied distance and direction remain separate typed bindings. When
+Goal Interpretation instead owns one composite relative-location value that already
+contains an approximate distance, Goal Association preserves that complete value in
+one location binding; it must not split or normalize the authoritative semantic value.
 A Goal description is a
 human-readable summary: it may be checked for material contradiction but never
 supplies, overrides, or repairs a typed resource fact. Generic Goal bindings and

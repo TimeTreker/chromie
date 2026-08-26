@@ -68,6 +68,22 @@ class ScriptedOllama:
         return value
 
 
+def _truth_certificate(
+    decision: str = "accept", **violations: bool
+) -> dict[str, object]:
+    certificate: dict[str, object] = {
+        "has_unverified_result_or_completion_claim": False,
+        "has_ungrounded_method_or_world_claim": False,
+        "has_semantic_perspective_contradiction": False,
+        "has_epistemic_strength_contradiction": False,
+        "has_execution_status_contradiction": False,
+        "has_out_of_scope_goal_claim": False,
+        "decision": decision,
+    }
+    certificate.update(violations)
+    return certificate
+
+
 class FakeCatalog:
     def __init__(self):
         self.items = [
@@ -1592,7 +1608,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         planner_request = planner_request.model_copy(update={"context": context})
 
-        ollama = ScriptedOllama([raw, {"decision": "accept"}])
+        ollama = ScriptedOllama([raw, _truth_certificate()])
         plan = asyncio.run(
             FastPlannerResolver(ollama, WeatherCatalog()).resolve(planner_request)
         )
@@ -1604,6 +1620,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         planning_prompt = str(ollama.prompts[0][0])
         self.assertIn(
             "original user turn and source Plan are historical provenance",
+            planning_prompt,
+        )
+        self.assertIn("FINAL TRUSTED EXECUTION OUTCOME JSON", planning_prompt)
+        self.assertIn(
+            "describe that exact source-Plan effect as completed",
             planning_prompt,
         )
         self.assertNotIn(
@@ -1622,12 +1643,19 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         truth_prompt = str(ollama.prompts[1][0])
         self.assertIn("Trusted execution outcome JSON", truth_prompt)
+        self.assertIn("Critical claim-type boundary", truth_prompt)
+        self.assertIn("Minimal authoritative source-Plan projection", truth_prompt)
+        self.assertNotIn("selected_agent_skills", truth_prompt)
         self.assertIn('"goal_id":"goal-weather"', truth_prompt)
+        self.assertIn(
+            "Do not set that flag when the candidate makes no probability",
+            truth_prompt,
+        )
         self.assertIn("completion qualification", truth_prompt)
         self.assertEqual(ollama.prompts[1][1]["options"]["num_predict"], 128)
         self.assertEqual(
             plan.metadata["evidence_response_truth_qualification"],
-            {"decision": "accept"},
+            _truth_certificate(),
         )
 
     def test_terminal_evidence_wording_that_upgrades_probability_is_rejected(self):
@@ -1681,11 +1709,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         ollama = ScriptedOllama(
             [
                 raw,
-                {
-                    "has_unverified_result_or_completion_claim": True,
-                    "has_ungrounded_method_or_world_claim": False,
-                    "decision": "reject",
-                },
+                _truth_certificate(
+                    "reject", has_unverified_result_or_completion_claim=True
+                ),
             ]
         )
 
@@ -1701,10 +1727,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.response_text, "")
         self.assertEqual(
             plan.metadata["evidence_response_truth_qualification"],
-            {
-                "has_unverified_result_or_completion_claim": True,
-                "decision": "reject",
-            },
+            _truth_certificate(
+                "reject", has_unverified_result_or_completion_claim=True
+            ),
         )
 
     def test_first_response_is_planner_authored_in_a_small_language_bound_contract(self):
@@ -1716,9 +1741,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "progress_kind": "check_information",
                     },
                 },
-                {
-                    "decision": "accept",
-                },
+                _truth_certificate(),
             ]
         )
         request = _work_request(
@@ -1839,7 +1862,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "trusted_gateway_greeting_contract",
         )
         self.assertEqual(
-            result.metadata["truth_qualification"], {"decision": "accept"}
+            result.metadata["truth_qualification"], _truth_certificate()
         )
 
     def test_first_response_receives_resolved_target_goal_meaning_for_continuation(self):
@@ -1945,7 +1968,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         planning_ollama = ScriptedOllama(
             [
-                {"decision": "accept"},
+                _truth_certificate(),
                 {
                     "disposition": "execute",
                     "coverage": "complete",
@@ -2035,7 +2058,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "progress_kind": "perform_action",
                     }
                 },
-                {"decision": "accept"},
+                _truth_certificate(),
             ]
         )
         request = _work_request(
@@ -2079,7 +2102,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 }
             ]
         )
-        truth_ollama = ScriptedOllama([{"decision": "accept"}])
+        truth_ollama = ScriptedOllama([_truth_certificate()])
         request = _work_request(
             sid="turn-specialized-fast-truth",
             text="刚才那个事情继续。",
@@ -2129,11 +2152,9 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "source_responsibility_refs": ["weather"],
                     }
                 },
-                {
-                    "has_unverified_result_or_completion_claim": True,
-                    "has_ungrounded_method_or_world_claim": False,
-                    "decision": "reject",
-                },
+                _truth_certificate(
+                    "reject", has_unverified_result_or_completion_claim=True
+                ),
             ]
         )
         request = _work_request(
@@ -2168,10 +2189,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(
             result.metadata["truth_qualification"],
-            {
-                "has_unverified_result_or_completion_claim": True,
-                "decision": "reject",
-            },
+            _truth_certificate(
+                "reject", has_unverified_result_or_completion_claim=True
+            ),
         )
         truth_prompt = str(ollama.prompts[1][0])
         self.assertIn("immutable activity.text", truth_prompt)
@@ -2180,7 +2200,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             truth_prompt,
         )
         self.assertIn(
-            "Set each of the three audit flags explicitly",
+            "Set each of the audit flags explicitly",
             truth_prompt,
         )
         author_prompt = str(ollama.prompts[0][0])
@@ -2956,6 +2976,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("assigns Chromie's owed action to the human", prompt)
         self.assertIn("unrequested joint-participation wording", prompt)
         self.assertIn("look outside or use direct perception", prompt)
+        self.assertIn("concrete method claim", planner_prompt.fast_first_response_truth_system_prompt())
         self.assertIn(
             "in a human command addressed to Chromie, Chromie is the commanded actor",
             planner_prompt.fast_first_response_truth_system_prompt(),
@@ -2977,6 +2998,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("An imperative addressed to Chromie makes Chromie the actor", author_prompt)
         self.assertIn("Chromie's first-person intention", author_prompt)
         self.assertIn("invitation, accompaniment, or joint activity", author_prompt)
+        self.assertIn("preliminary promise would be duplicative", author_prompt)
         self.assertIn("prospective intention", prompt)
         self.assertIn("I checked", prompt)
         self.assertIn("我查过/我查了一下", prompt)
@@ -2993,11 +3015,9 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "text": activity.text,
                     }
                 },
-                {
-                    "has_unverified_result_or_completion_claim": False,
-                    "has_ungrounded_method_or_world_claim": True,
-                    "decision": "reject",
-                },
+                _truth_certificate(
+                    "reject", has_ungrounded_method_or_world_claim=True
+                ),
             ]
         )
         result = asyncio.run(
@@ -3018,11 +3038,15 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "has_unverified_result_or_completion_claim",
                 "has_ungrounded_method_or_world_claim",
                 "has_semantic_perspective_contradiction",
+                "has_epistemic_strength_contradiction",
+                "has_execution_status_contradiction",
                 "has_out_of_scope_goal_claim",
                 "decision",
             ],
         )
         self.assertIn("has_semantic_perspective_contradiction", truth_schema["properties"])
+        self.assertIn("has_execution_status_contradiction", truth_schema["properties"])
+        self.assertIn("has_epistemic_strength_contradiction", truth_schema["properties"])
         self.assertIn("has_out_of_scope_goal_claim", truth_schema["properties"])
         self.assertIn("has_out_of_scope_goal_claim", truth_schema["required"])
 
@@ -3038,6 +3062,72 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["acknowledge_work", "check_information", "perform_action"],
         )
         self.assertNotIn("think", str(schema))
+
+    def test_unresolved_meaning_keeps_first_response_silent_until_clarification(self):
+        ollama = ScriptedOllama([])
+        run_request = _work_request(
+            sid="turn-ambiguous-name",
+            text="帮我找天信",
+            language="zh-CN",
+            responsibilities=[
+                {
+                    "local_ref": "ambiguous-target",
+                    "outcome": "resolve what 天信 refers to before choosing work",
+                    "bindings": {},
+                    "confidence": 0.55,
+                }
+            ],
+        ).model_copy(update={"interpretation_unresolved": ["天信指代不明确"]})
+
+        result = asyncio.run(
+            FastPlannerResolver(ollama, FakeCatalog()).resolve_first_response(
+                run_request
+            )
+        )
+
+        self.assertIsNone(result.activity)
+        self.assertEqual(ollama.prompts, [])
+        self.assertEqual(
+            result.metadata["semantic_authority"],
+            "fast_planner_unresolved_meaning_contract",
+        )
+        self.assertEqual(result.metadata["unresolved_meaning_count"], 1)
+
+    def test_qualification_first_response_uses_non_truncating_output_budget(self):
+        ollama = ScriptedOllama(
+            [
+                {"activity": None},
+            ]
+        )
+        run_request = _work_request(
+            sid="turn-qualification-output-budget",
+            text="Please walk and blink.",
+            language="en-US",
+            responsibilities=[
+                {
+                    "local_ref": "walk",
+                    "outcome": "walk forward",
+                    "bindings": {},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                }
+            ],
+        )
+
+        asyncio.run(
+            FastPlannerResolver(
+                ollama,
+                FakeCatalog(),
+                num_predict=4096,
+                cognitive_budget_profile="qualification",
+            ).resolve_first_response(run_request)
+        )
+
+        self.assertEqual(ollama.prompts[0][1]["options"]["num_predict"], 4096)
+        self.assertIn("_```json", ollama.prompts[0][1]["options"]["stop"])
+        self.assertIn("}```json", ollama.prompts[0][1]["options"]["stop"])
+        self.assertIn("\n```json", ollama.prompts[0][1]["options"]["stop"])
+        self.assertIn("```", ollama.prompts[0][1]["options"]["stop"])
 
     def test_first_response_schema_cannot_complete_information_before_evidence(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
@@ -3090,10 +3180,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         }
         self.assertEqual(
             activity_refs,
-            {
-                "#/$defs/FastPlannerProgressAct",
-                "#/$defs/FastPlannerCompleteResponseAct",
-            },
+            {"#/$defs/FastPlannerCompleteResponseAct"},
         )
 
     def test_first_response_rejects_reversing_the_humans_feeling(self):
@@ -3108,12 +3195,9 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "source_responsibility_refs": ["tired"],
                     }
                 },
-                {
-                    "has_unverified_result_or_completion_claim": False,
-                    "has_ungrounded_method_or_world_claim": False,
-                    "has_semantic_perspective_contradiction": True,
-                    "decision": "reject",
-                },
+                _truth_certificate(
+                    "reject", has_semantic_perspective_contradiction=True
+                ),
             ]
         )
         run_request = _work_request(
@@ -3139,10 +3223,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIsNone(result.activity)
         self.assertEqual(
             result.metadata["truth_qualification"],
-            {
-                "has_semantic_perspective_contradiction": True,
-                "decision": "reject",
-            },
+            _truth_certificate(
+                "reject", has_semantic_perspective_contradiction=True
+            ),
         )
         self.assertIn(
             "human's first person never becomes Chromie's first person",
@@ -6107,6 +6190,10 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
         )
         self.assertIn("one short sentence each", ollama.prompts[0][0])
+        self.assertIn(
+            "Response text is audible language, never a stage direction",
+            ollama.prompts[0][0],
+        )
 
     def test_explicit_numeric_grounding_mismatch_requires_deeper_semantic_plan(self):
         invalid = multi_goal_plan(

@@ -396,11 +396,71 @@ class FastPlannerFirstResponseTruthCertificate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    has_unverified_result_or_completion_claim: bool = False
-    has_ungrounded_method_or_world_claim: bool = False
-    has_semantic_perspective_contradiction: bool = False
-    has_out_of_scope_goal_claim: bool = False
+    has_unverified_result_or_completion_claim: bool = Field(
+        description=(
+            "True only when the candidate claims a result or completion that the "
+            "admitted Evidence and completion qualification do not establish."
+        ),
+    )
+    has_ungrounded_method_or_world_claim: bool = Field(
+        description=(
+            "True only for a candidate claim about an ungrounded method, source, "
+            "instrument, sensor, world fact, or provider behavior."
+        ),
+    )
+    has_semantic_perspective_contradiction: bool = Field(
+        description=(
+            "True only when the candidate changes who said, felt, perceived, or "
+            "performed the scoped meaning."
+        ),
+    )
+    has_epistemic_strength_contradiction: bool = Field(
+        description=(
+            "True only when the candidate strengthens or weakens an Evidence-owned "
+            "probability, estimate, forecast, qualification, confidence, causal "
+            "implication, or temporal scope. Ordinary exact completion wording for "
+            "a qualified completed step is not an epistemic-strength claim."
+        ),
+    )
+    has_execution_status_contradiction: bool = Field(
+        description=(
+            "True only when the candidate's completed, ongoing, future, failed, "
+            "cancelled, or timed-out execution state conflicts with the trusted "
+            "execution outcome."
+        ),
+    )
+    has_out_of_scope_goal_claim: bool = Field(
+        description=(
+            "True only when the candidate claims an effect belonging to a Goal "
+            "outside the immutable typed re-entry scope."
+        ),
+    )
     decision: Literal["accept", "reject"]
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_redundant_decision(cls, value: Any) -> Any:
+        """Project complete model-authored flags onto their redundant decision."""
+
+        if not isinstance(value, dict):
+            return value
+        audit_fields = (
+            "has_unverified_result_or_completion_claim",
+            "has_ungrounded_method_or_world_claim",
+            "has_semantic_perspective_contradiction",
+            "has_epistemic_strength_contradiction",
+            "has_execution_status_contradiction",
+            "has_out_of_scope_goal_claim",
+        )
+        flags = [value.get(field_name) for field_name in audit_fields]
+        if (
+            value.get("decision") in {"accept", "reject"}
+            and all(type(flag) is bool for flag in flags)
+        ):
+            normalized = dict(value)
+            normalized["decision"] = "reject" if any(flags) else "accept"
+            return normalized
+        return value
 
     @model_validator(mode="after")
     def decision_matches_claim_audit(self) -> "FastPlannerFirstResponseTruthCertificate":
@@ -408,12 +468,14 @@ class FastPlannerFirstResponseTruthCertificate(BaseModel):
             self.has_unverified_result_or_completion_claim
             or self.has_ungrounded_method_or_world_claim
             or self.has_semantic_perspective_contradiction
+            or self.has_epistemic_strength_contradiction
+            or self.has_execution_status_contradiction
             or self.has_out_of_scope_goal_claim
         )
         if self.decision == "accept" and has_violation:
             raise ValueError("accept requires every truth-audit flag to be false")
-        # Decoder contracts require all audit flags explicitly. Defaults retain
-        # backward-compatible parsing for historical evidence only.
+        if self.decision == "reject" and not has_violation:
+            raise ValueError("reject requires at least one truth-audit flag to be true")
         return self
 
 

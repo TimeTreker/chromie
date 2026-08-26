@@ -4,12 +4,213 @@ import json
 from typing import Any
 
 try:
-    from chromie_contracts.plan import CanonicalPlan
+    from chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerFirstResponseTruthCertificate,
+    )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerFirstResponseTruthCertificate,
+    )
 
+from .clients.ollama_client import LayeredPrompt
+from .planner_context import planner_goal_context
 from .planner_model_contract import PlannerCommunicationReview, PlannerCoverageReview
-from .planner_schema import planner_communication_review_response_schema, planner_coverage_review_response_schema
+from .planner_schema import (
+    fast_truth_certificate_response_schema,
+    planner_communication_review_response_schema,
+    planner_coverage_review_response_schema,
+)
+from .prompt_projection import bounded_json
+
+
+async def qualify_evidence_response_truth(
+    client: Any,
+    *,
+    request: Any,
+    plan: CanonicalPlan,
+    num_ctx: int,
+    num_predict: int,
+    prompt_family: str,
+) -> FastPlannerFirstResponseTruthCertificate:
+    """Accept or reject terminal Planner wording against immutable Evidence.
+
+    This audit is shared by Fast and Deep Planner because escalation must not
+    create a path around the post-Evidence truth contract. It never rewrites a
+    response or authorizes execution.
+    """
+
+    context = request.context if isinstance(request.context, dict) else {}
+    goal_context = planner_goal_context(
+        context,
+        reentry_scope=request.planner_reentry_scope,
+    )
+    contract = (
+        "Planner post-Evidence Epistemic Qualification contract: inspect every "
+        "candidate response string against only the admitted trusted terminal "
+        "Evidence and authoritative Goal scope. Return decision=accept only when "
+        "every material claim preserves the Evidence values, scope, and epistemic "
+        "strength. Apply the audit fields to their distinct claim classes instead "
+        "of using one flag as a generic rejection reason. First determine the "
+        "candidate's execution-state claim for each scoped Goal: completed, ongoing, "
+        "future, failed/cancelled/timed-out, or status-neutral. Compare that claim "
+        "only with trusted_execution_outcome. Next determine whether completion "
+        "qualification is required and established. When a scoped source-Plan step "
+        "is completed and its required qualification is established, exact completion "
+        "wording for that step is supported; do not mark it as an epistemic-strength "
+        "contradiction merely because the provider payload does not repeat the "
+        "Planner-owned count, duration, direction, or other immutable step arguments. "
+        "When completion qualification is required but not established, a completion "
+        "claim is unverified even if the provider returned completed; status-neutral "
+        "wording may still be valid. Preserve uncertainty and qualification exactly: probabilistic, "
+        "forecast, estimated, bounded, partial, conditional, or otherwise qualified "
+        "Evidence must remain qualified. For every numeric probability p where "
+        "0 < p < 100 percent, categorical wording that the event will happen or "
+        "will not happen is an epistemic-strength contradiction, even when another "
+        "Evidence field has a categorical condition label. Reject wording that "
+        "strengthens probability, confidence, causal implication, temporal scope, "
+        "or certainty beyond the admitted Evidence, and set "
+        "has_epistemic_strength_contradiction=true for that exact defect. "
+        "Do not set that flag when the candidate makes no probability, forecast, "
+        "estimate, confidence, causal, qualification, or temporal-scope claim. "
+        "Reject unsupported duration, severity, advice, reassurance, or facts from another "
+        "period. Do not rewrite the response, choose a Capability, or add an "
+        "explanation. The typed re-entry scope is exact: reject claims about a "
+        "sibling Goal outside that scope. A completed Evidence record supports only "
+        "the source-Plan step bound to its scoped Goal; use that immutable source "
+        "Plan to verify the requested arguments rather than demanding that the "
+        "provider repeat Planner-owned arguments in its terminal payload. The source "
+        "Plan is historical requested-Work truth only: its disposition and executable "
+        "steps never state the current execution status and must not determine tense. "
+        "Only the trusted execution outcome is authoritative for current execution "
+        "status. The scope "
+        "excludes every sibling Goal not listed there: reject any wording that names, "
+        "imitates, counts, or claims an effect from an excluded sibling, even when "
+        "the originating user turn or broader history mentions it. The dedicated "
+        "has_out_of_scope_goal_claim flag must be true for that case; compare the "
+        "candidate clause-by-clause with the authoritative scoped Goal description "
+        "and its one source-Plan step. It must be false only when every claimed effect "
+        "belongs to that scoped Goal. The trusted execution outcome is the mechanical "
+        "authority for completion status and completion qualification; accept an "
+        "exact scoped completion claim when that outcome marks the Goal completed, "
+        "its Evidence IDs match, and required qualification is established (or no "
+        "completion qualification is required). In that condition, an exact "
+        "past-tense statement that Chromie performed the scoped source-Plan effect is "
+        "consistent and has_execution_status_contradiction must be false. Audit "
+        "execution tense against that same outcome. When it says the scoped Goal is "
+        "completed, wording that says Chromie will perform, is starting, or is still "
+        "performing that completed effect contradicts execution state; set "
+        "has_execution_status_contradiction=true. When it says the scoped Goal failed, "
+        "cancelled, timed out, or otherwise did not complete, wording that commands, "
+        "promises, or implies successful completion contradicts execution state. A "
+        "completed outcome may be described as completed, or the response may state "
+        "only the observed result. Classify whether the response has an unsupported "
+        "material claim or a semantic-perspective contradiction, execution-status "
+        "contradiction, or out-of-scope Goal claim, then return only decision=accept "
+        "when none is present. Otherwise return decision=reject. A rejection must "
+        "identify at least one exact violation flag; never reject with every flag false."
+    )
+    candidate = {
+        "response_text": plan.response_text,
+        "goal_outcome_response_texts": [
+            {
+                "goal_id": outcome.goal_id,
+                "response_text": outcome.response_text,
+            }
+            for outcome in plan.goal_outcomes
+            if getattr(outcome, "response_text", "")
+        ],
+    }
+    source_plan = context.get("canonical_plan_resolution") or {}
+    source_plan_projection = {
+        "plan_id": source_plan.get("plan_id"),
+        "steps": [
+            {
+                "step_id": step.get("step_id"),
+                "capability_id": step.get("capability_id"),
+                "args": step.get("args") or {},
+                "expected_outcome": step.get("expected_outcome") or "",
+                "source_goal_ids": step.get("source_goal_ids") or [],
+            }
+            for step in source_plan.get("steps") or []
+            if isinstance(step, dict)
+        ],
+    }
+    claim_boundary = (
+        "Execution-status claims are only claims about whether Chromie or a "
+        "provider performed the requested source-Plan step. Tense inside the "
+        "Evidence-owned world proposition is not execution status. In particular, "
+        "an information answer about whether rain will happen, what a forecast "
+        "predicts, or what time it is is status-neutral with respect to completion "
+        "of the lookup step. Audit that proposition only against Evidence and "
+        "epistemic strength. Conversely, wording that Chromie walked, blinked, "
+        "looked up, or finished does claim execution status. Do not compare a "
+        "future weather/event proposition with the completed lookup status. Return "
+        "all six boolean fields and decision explicitly; omission is an invalid "
+        "certificate."
+    )
+    rendered = (
+        contract
+        + "\n\nCritical claim-type boundary:\n"
+        + claim_boundary
+        + "\n\nImmutable candidate response JSON:\n"
+        + json.dumps(
+            candidate,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n\nAdmitted trusted terminal Evidence JSON:\n"
+        + bounded_json(context.get("trusted_terminal_evidence") or [], 6000)
+        + "\n\nImmutable typed Planner re-entry scope JSON:\n"
+        + bounded_json(
+            (
+                request.planner_reentry_scope.model_dump(mode="json")
+                if request.planner_reentry_scope is not None
+                else {}
+            ),
+            2400,
+        )
+        + "\n\nMinimal authoritative source-Plan projection "
+        "(requested step/argument/Goal binding only; it carries no current "
+        "execution status):\n"
+        + bounded_json(source_plan_projection, 2600)
+        + "\n\nTrusted execution outcome JSON (mechanical completion and qualification):\n"
+        + bounded_json(context.get("trusted_execution_outcome") or {}, 5000)
+        + "\n\nAuthoritative canonical Goal JSON:\n"
+        + bounded_json(list(goal_context.authoritative_goals), 3000)
+        + "\n\nCurrent user turn (context only; typed scope above is authoritative):\n"
+        + str(request.original_user_text or "")[:700]
+    )
+    raw = await client.generate(
+        LayeredPrompt.promote(rendered, operating_contract=(contract,)),
+        system=(
+            "You are the current Planner's bounded post-Evidence Epistemic "
+            "Qualification, not a response author. Accept or reject the immutable "
+            "candidate. Set has_out_of_scope_goal_claim explicitly by comparing each "
+            "claimed effect with the exact scoped Goal. Never repair, replace, or "
+            "expand it. Set has_execution_status_contradiction explicitly by comparing "
+            "candidate tense with the trusted execution outcome. Set "
+            "has_epistemic_strength_contradiction explicitly by comparing every "
+            "probability, estimate, forecast, or qualification with Evidence; leave "
+            "that flag false when no such claim exists. Reject only with at least one "
+            "specific true violation flag. An Evidence-world proposition such as "
+            "whether rain will happen is not a claim about whether the lookup step "
+            "executed. Return all six booleans and decision explicitly."
+        ),
+        options={
+            "temperature": 0,
+            "top_p": 0.9,
+            "num_ctx": max(2048, int(num_ctx)),
+            "num_predict": max(64, min(int(num_predict), 256)),
+        },
+        response_format=fast_truth_certificate_response_schema(),
+        prompt_family=prompt_family,
+        turn_id=request.sid,
+        attempt=1,
+    )
+    return FastPlannerFirstResponseTruthCertificate.model_validate(raw)
 
 async def review_retained_evidence_response(
     client: Any,
@@ -315,7 +516,10 @@ async def review_coordinated_action_plan_coverage(
             "temperature": 0,
             "top_p": 0.8,
             "num_ctx": max(4096, int(num_ctx)),
-            "num_predict": 384,
+            # The bounded DTO permits twelve findings plus a rationale.  Leave
+            # enough output budget to finish that contract instead of turning a
+            # semantic rejection into truncated JSON.
+            "num_predict": 4096,
         },
         response_format=planner_coverage_review_response_schema(),
     )

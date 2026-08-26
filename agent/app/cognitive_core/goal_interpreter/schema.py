@@ -256,6 +256,18 @@ class GoalInterpretationSupportingCoverageItem(
                 )
         if self.relation_kind != "none" and self.role != "constraint":
             raise ValueError("typed coordination relations must be constraints")
+        if self.relation_kind != "none" and len(self.related_audit_refs) < 2:
+            raise ValueError(
+                "typed coordination relations require at least two positive audit refs"
+            )
+        if (
+            self.role == "constraint"
+            and self.coverage != "covered"
+            and not self.related_audit_refs
+        ):
+            raise ValueError(
+                "an uncovered constraint must cite its positive audit owner"
+            )
         return self
 
 

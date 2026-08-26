@@ -588,8 +588,10 @@ class GoalExecutionContractTests(unittest.TestCase):
             "null",
         )
         self.assertEqual(
-            body_branches[1]["properties"]["resource_responsibility"]["$ref"],
-            "#/$defs/GoalAssociationModelPhysicalResourceResponsibility",
+            body_branches[1]["properties"]["resource_responsibility"]["properties"][
+                "kind"
+            ]["const"],
+            "physical_object",
         )
         self.assertEqual(
             body_branches[1]["properties"]["resource_kind"]["const"],
@@ -630,8 +632,8 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             fresh_evidence_branches[0]["properties"][
                 "resource_responsibility"
-            ]["$ref"],
-            "#/$defs/GoalAssociationModelInformationResourceResponsibility",
+            ]["properties"]["kind"]["const"],
+            "information",
         )
         two_body_actions = create_goals(
             goal("Run forward for 15 seconds.", "body_action"),
@@ -723,8 +725,11 @@ class GoalExecutionContractTests(unittest.TestCase):
         physical_body_branch = next(
             branch
             for branch in body_action_branches
-            if "$ref"
-            in branch["properties"]["resource_responsibility"]
+            if branch["properties"]["resource_responsibility"]
+            .get("properties", {})
+            .get("kind", {})
+            .get("const")
+            == "physical_object"
         )
         self.assertIn(
             "locomotion",
@@ -880,6 +885,10 @@ class GoalExecutionContractTests(unittest.TestCase):
             "For weather, a resolved place belongs in a binding named location",
             interpretation_prompt,
         )
+        self.assertIn(
+            "never decompose one GI-owned composite binding",
+            interpretation_prompt,
+        )
 
         coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
             request=req,
@@ -911,6 +920,10 @@ class GoalExecutionContractTests(unittest.TestCase):
             "resource_responsibility.query_scope",
             coverage_prompt,
         )
+        self.assertIn(
+            "keep that complete value byte-for-byte in one acquisition binding",
+            coverage_prompt,
+        )
         coverage_system = ga_prompt.responsibility_coverage_system_prompt()
         self.assertIn("source-grounded human scope", coverage_system)
         self.assertIn("do not require date/period fields", coverage_prompt)
@@ -924,6 +937,10 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("Reference grounding is part of responsibility coverage", coverage_prompt)
         self.assertIn("silently invents a generic object", coverage_prompt)
         self.assertIn("multiple scene candidates remain plausible", coverage_prompt)
+        self.assertIn(
+            "if the reason says a candidate preserves or validly represents a fragment",
+            coverage_prompt,
+        )
 
         execution_contract = ga_prompt.build_prompt(
             request(
@@ -1278,6 +1295,53 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             ga_validation.source_grounded_binding_coverage_conflicts(
                 grounded_source,
+                request=req,
+            ),
+            [],
+        )
+
+    def test_physical_resource_preserves_one_composite_gi_location_binding(self):
+        location = "ahead of you about 50 meters"
+        req = request(
+            f"there is a bottle of milk {location}, please bring it to me",
+            language="en-US",
+            responsibility_outcomes=["bring a bottle of milk to me"],
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "bring a bottle of milk to me",
+                        "bindings": {
+                            "location": location,
+                            "object": "bottle of milk",
+                        },
+                        "output_mode": "body_action",
+                        "confidence": 0.98,
+                    }
+                )
+            }
+        )
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "bring a bottle of milk to me",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="bottle of milk",
+                        source_status="known",
+                        source_description=location,
+                        source_bindings=[
+                            binding("location", "relative_location", location),
+                        ],
+                    ),
+                )
+            )
+        )
+
+        self.assertEqual(
+            ga_validation.source_grounded_binding_coverage_conflicts(
+                output,
                 request=req,
             ),
             [],
@@ -1696,6 +1760,72 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(time_binding["entity_type"], "temporal_scope")
         self.assertEqual(time_binding["value"], "今天")
         self.assertEqual(repairs[-1]["from"], "time")
+        self.assertEqual(repairs[-1]["to"], "temporal_scope")
+        self.assertTrue(repairs[-1]["value_unchanged"])
+
+    def test_grounded_information_time_period_alias_remains_human_temporal_scope(self):
+        payload = create_goals(
+            goal(
+                "查询今天白天重庆的天气",
+                "information",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="weather_forecast",
+                    description="查询今天白天重庆的天气",
+                    attributes=[
+                        binding("location", "place", "重庆"),
+                        binding("time", "time_period", "今天白天"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+
+        normalized, repairs = ga_validation.normalize_grounded_binding_types(
+            payload,
+            request=request("今天白天重庆天气怎么样？"),
+        )
+
+        time_binding = normalized["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ][1]
+        self.assertEqual(time_binding["name"], "time")
+        self.assertEqual(time_binding["entity_type"], "temporal_scope")
+        self.assertEqual(time_binding["value"], "今天白天")
+        self.assertEqual(repairs[-1]["from"], "time_period")
+        self.assertEqual(repairs[-1]["to"], "temporal_scope")
+        self.assertTrue(repairs[-1]["value_unchanged"])
+
+    def test_grounded_information_time_scope_alias_remains_human_temporal_scope(self):
+        payload = create_goals(
+            goal(
+                "查询今天上午重庆是否下雨",
+                "information",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="weather_forecast",
+                    description="查询今天上午重庆是否下雨",
+                    attributes=[
+                        binding("location", "place", "重庆"),
+                        binding("time_scope", "time_scope", "今天上午"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+
+        normalized, repairs = ga_validation.normalize_grounded_binding_types(
+            payload,
+            request=request("哎，今天上午重庆会不会下雨？"),
+        )
+
+        time_binding = normalized["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ][1]
+        self.assertEqual(time_binding["name"], "time_scope")
+        self.assertEqual(time_binding["entity_type"], "temporal_scope")
+        self.assertEqual(time_binding["value"], "今天上午")
+        self.assertEqual(repairs[-1]["from"], "time_scope")
         self.assertEqual(repairs[-1]["to"], "temporal_scope")
         self.assertTrue(repairs[-1]["value_unchanged"])
 
@@ -3130,6 +3260,61 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             )
         )
 
+    def test_response_schema_requires_all_source_grounded_information_scope(self):
+        schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "information"},
+            responsibility_information_refs={"r1"},
+            responsibility_bindings={
+                "r1": {"event": "下雨", "location": "北京", "time": "今天"}
+            },
+        )
+
+        branch = schema["$defs"]["GoalAssociationModelGoal"]["oneOf"][0]
+        information = branch["properties"]["resource_responsibility"]
+        scope = information["properties"]["query_scope"]
+        self.assertEqual(scope["minItems"], 3)
+        self.assertEqual(scope["maxItems"], 3)
+        required_pairs = {
+            (
+                clause["contains"]["properties"]["name"]["const"],
+                clause["contains"]["properties"]["value"]["const"],
+            )
+            for clause in scope["allOf"]
+        }
+        self.assertEqual(
+            required_pairs,
+            {("event", "下雨"), ("location", "北京"), ("time", "今天")},
+        )
+        validator = Draft202012Validator(schema)
+        complete = create_goals(
+            goal(
+                "查询今天北京是否下雨",
+                "information",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="查询今天北京是否下雨",
+                    attributes=[
+                        binding("event", "event", "下雨"),
+                        binding("location", "place", "北京"),
+                        binding("time", "temporal_scope", "今天"),
+                    ],
+                    source_status="provider_resolved",
+                ),
+            )
+        )
+        complete.update(referent_updates=[], resolved_references=[])
+        self.assertEqual(list(validator.iter_errors(complete)), [])
+        incomplete = copy.deepcopy(complete)
+        incomplete["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ].pop(0)
+        self.assertTrue(list(validator.iter_errors(incomplete)))
+
     def test_numeric_gi_binding_reaches_the_decoder_as_grounded_text(self):
         req = request("你往前走 10 秒。").model_copy(
             update={
@@ -3527,6 +3712,69 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             {"distance", "direction", "quantity"},
         )
         self.assertNotIn("resource_grounding_projection", semantic.metadata)
+
+    def test_fresh_audit_cannot_downgrade_initial_physical_resource_shape(self):
+        req = request(
+            "Bring me the milk from ahead.",
+            language="en-US",
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "bring the milk to me",
+                        "bindings": {
+                            "object": "milk",
+                            "location": "ahead",
+                        },
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    }
+                )
+            }
+        )
+        ordinary = create_goals(
+            goal(
+                "Bring the milk from ahead.",
+                "body_action",
+                bindings=[
+                    binding("object", "physical_object", "milk"),
+                    binding("location", "relative_location", "ahead"),
+                ],
+            )
+        )
+        initial_certificate = certificate(
+            coverage_item(
+                "Bring me the milk from ahead",
+                0,
+                required_goal_shape="physical_resource",
+            )
+        )
+        downgraded_final_certificate = certificate(
+            coverage_item(
+                "Bring me the milk from ahead",
+                0,
+                required_goal_shape="ordinary",
+                required_output_mode="body_action",
+            )
+        )
+        ollama = ScriptedOllama(
+            [
+                ordinary,
+                initial_certificate,
+                ordinary,
+                downgraded_final_certificate,
+            ]
+        )
+
+        result = asyncio.run(GoalAssociationResolver(ollama).resolve(req))
+
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(result.new_goals, [])
+        self.assertIn(
+            "initial independent auditor's positive source classifications",
+            str(ollama.prompts[2][0]),
+        )
 
     def test_user_water_probe_preserves_one_resource_goal_and_source_constraint(self):
         resource = resource_responsibility(

@@ -32,6 +32,7 @@ MODEL_PLAN_KEYS = (
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_FAST_FIRST_RESPONSE_MODEL",
+    "AGENT_FAST_TRUTH_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
     "AGENT_SOCIAL_ATTENTION_MODEL",
 )
@@ -41,7 +42,6 @@ MODEL_PLAN_KEYS = (
 # ${VAR} and later hand that string to Ollama as a model name.
 MODEL_ASSIGNMENT_KEYS = (
     *MODEL_PLAN_KEYS,
-    "AGENT_FAST_TRUTH_MODEL",
     "AGENT_TASK_CONTINUITY_MODEL",
     "AGENT_SKILL_SELECTION_MODEL",
     "TTS_COSYVOICE_OLLAMA_MODEL",
@@ -444,6 +444,7 @@ def active_models(values: Mapping[str, str]) -> list[str]:
     if enabled(values.get("AGENT_FAST_PLANNER_ENABLED"), default=True):
         append(values.get("AGENT_FAST_PLANNER_MODEL"))
         append(values.get("AGENT_FAST_FIRST_RESPONSE_MODEL"))
+        append(values.get("AGENT_FAST_TRUTH_MODEL"))
     if enabled(values.get("AGENT_DEEP_PLANNER_ENABLED"), default=True):
         append(values.get("AGENT_DEEP_PLANNER_MODEL"))
     if values.get("AGENT_SOCIAL_ATTENTION_MODE", "off") != "off":
