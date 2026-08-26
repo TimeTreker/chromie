@@ -899,7 +899,7 @@ Fast/Deep depth is selected from material uncertainty, complexity, consequence, 
 | `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
-| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. Explicit qualification mode uses `40960` so the retained full-catalog post-Evidence prompt plus the 4096-token structured-output reserve fits without changing the maintained interactive profile. |
+| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. Qualification mode and the architecture-validation overlay use `40960` so the retained full-catalog post-Evidence prompt plus the 4096-token structured-output reserve fits without changing the maintained interactive profile. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
