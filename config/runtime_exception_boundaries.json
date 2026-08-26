@@ -117,11 +117,24 @@
     {
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Fail closed when one source-based Deep Goal Interpretation cannot restore atomic compound-responsibility structure; never accept the lossy preliminary meaning.",
+      "contract": "Fail closed when the independent atomic audit cannot safely recover a candidate whose provisional coordination binding contained free-form effect wording; never accept or execute the malformed relation.",
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
       "ordinal": 2,
+      "body_sha256": "5aa3bf30ed74742029bbe1b51379b249ae8b341464a11f9766a64dc398e3e05f",
+      "failure_signals": [
+        "raise"
+      ]
+    },
+    {
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Fail closed when one source-based Deep Goal Interpretation cannot restore atomic compound-responsibility structure; never accept the lossy preliminary meaning.",
+      "review_status": "reviewed",
+      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
+      "symbol": "OllamaGoalInterpreter.interpret_goal",
+      "ordinal": 3,
       "body_sha256": "9b8b03863002c11b7604dcd38e5c1109a5c7de8cb0cb59fe85c6fe89d0be5a82",
       "failure_signals": [
         "raise"
@@ -134,7 +147,7 @@
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 3,
+      "ordinal": 4,
       "body_sha256": "064662502353418459fe11753a482e6dd6af5e9bb05f6325e7a8e95ec704e684",
       "failure_signals": [
         "raise"
@@ -147,7 +160,7 @@
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 4,
+      "ordinal": 5,
       "body_sha256": "26fdefcac95c3cebfc18d38a28f735638bf203cbdfa90483ac8dbf29dfe15f77",
       "failure_signals": [
         "raise"

@@ -1953,6 +1953,7 @@
       "key": "OLLAMA_FLASH_ATTENTION",
       "owners": [
         "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
       ]
     },
@@ -1986,6 +1987,7 @@
       "key": "OLLAMA_KV_CACHE_TYPE",
       "owners": [
         "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
       ]
     },

@@ -44,6 +44,8 @@ def stream_fixture_target(connection: Connection) -> None:
         if payload.get("text") == "worker-error":
             connection.send({"type": "error", "message": "fixture failure"})
             continue
+        if payload.get("text") == "duplicate-ready":
+            connection.send({"type": "ready", "fixture": "delayed"})
         if payload.get("text") == "audio-then-stall":
             connection.send(
                 {"type": "audio", "pcm": b"\x01\x00" * 80, "sample_rate": 8000}
@@ -173,6 +175,27 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                 )
             ]
             self.assertEqual([event["type"] for event in events], ["audio", "complete"])
+        finally:
+            await worker.stop()
+
+    async def test_streaming_worker_discards_delayed_startup_control_event(self) -> None:
+        worker = StreamingProcessWorker(
+            stream_fixture_target,
+            name="candidate-test-delayed-ready-worker",
+            startup_timeout_s=5.0,
+        )
+        await worker.start()
+        try:
+            events = [
+                event
+                async for event in worker.stream(
+                    {"type": "synthesize", "text": "duplicate-ready"}
+                )
+            ]
+            self.assertEqual(
+                [event["type"] for event in events],
+                ["audio", "complete"],
+            )
         finally:
             await worker.stop()
 

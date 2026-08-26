@@ -162,4 +162,10 @@ def build_interaction_runtime(
                 metadata=metadata,
             )
         ),
+        # Runtime owns the outer request timeout. It must not preempt the
+        # Host-owned playback-start barrier during a cold provider restart.
+        speech_timeout_ms=max(
+            30000,
+            int(settings.playback.playback_start_timeout_ms) + 5000,
+        ),
     )

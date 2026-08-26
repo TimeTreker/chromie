@@ -885,8 +885,32 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(execution.status, "failed")
-        self.assertEqual(execution.results[0].reason_code, "playback_not_started")
+        self.assertEqual(
+            [
+                (result.request_id, result.status, result.reason_code)
+                for result in execution.results
+            ],
+            [
+                (
+                    execution.results[0].request_id,
+                    "failed",
+                    "playback_not_started",
+                ),
+                (
+                    "nod-after-cue",
+                    "cancelled",
+                    "blocked_by_failed_predecessor",
+                ),
+            ],
+        )
         self.assertEqual(body.calls, [])
+
+    def test_local_speech_timeout_can_cover_host_playback_barrier(self) -> None:
+        self.assertEqual(
+            local_speech_definition(timeout_ms=125000).timeout_ms,
+            125000,
+        )
+        self.assertEqual(local_speech_definition(timeout_ms=1000).timeout_ms, 30000)
 
     async def test_started_playback_barrier_releases_following_body_effect(self) -> None:
         events: list[str] = []
@@ -2604,7 +2628,12 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     "required-pre-action",
                     "cancelled",
                     "cancelled_output_only",
-                )
+                ),
+                (
+                    "motion-after-speech",
+                    "cancelled",
+                    "blocked_by_failed_predecessor",
+                ),
             ],
         )
         self.assertEqual(body_provider.calls, [])

@@ -145,7 +145,10 @@ class CapabilityDefinition(CapabilityIdentityModel):
     interruptible: bool = True
     can_run_parallel: bool = True
     exclusive_group: str | None = None
-    timeout_ms: int = Field(default=30000, ge=1, le=120000)
+    # Internal providers may need a bounded cleanup/ownership envelope beyond
+    # the model-facing request ceiling. In particular, local speech must outlive
+    # the configured playback-start barrier so Runtime cannot orphan synthesis.
+    timeout_ms: int = Field(default=30000, ge=1, le=300000)
     idempotent: bool = False
     durable_runtime_eligible: bool = False
     requires_safety_monitor: bool = False
@@ -875,6 +878,7 @@ class CapabilityRuntime:
     ) -> CapabilityRuntimeResult:
         results: list[CapabilityResult] = []
         traces: list[CapabilityTrace] = []
+        blocked_by: CapabilityResult | None = None
         try:
             await start_gate.wait()
             try:
@@ -900,17 +904,20 @@ class CapabilityRuntime:
                                 results=results,
                                 traces=traces,
                             )
-                        if any(
-                            self._failure_blocks_following_requests(
+                        blocking_batch_results = [
+                            result
+                            for (item, item_definition), result in zip(
+                                parallel_items, batch_results, strict=True
+                            )
+                            if self._failure_blocks_following_requests(
                                 interaction_id,
                                 item,
                                 item_definition,
                                 result,
                             )
-                            for (item, item_definition), result in zip(
-                                parallel_items, batch_results, strict=True
-                            )
-                        ):
+                        ]
+                        if blocking_batch_results:
+                            blocked_by = blocking_batch_results[0]
                             break
                     result, trace = await self._run_one(
                         interaction_id,
@@ -933,6 +940,7 @@ class CapabilityRuntime:
                         definition,
                         result,
                     ):
+                        blocked_by = result
                         break
                 if pending_parallel:
                     batch_results, batch_traces = await self._run_parallel(
@@ -948,6 +956,32 @@ class CapabilityRuntime:
                             status="cancelled",
                             results=results,
                             traces=traces,
+                        )
+                if blocked_by is not None:
+                    completed_request_ids = {item.request_id for item in results}
+                    for request, definition in validated:
+                        if request.request_id in completed_request_ids:
+                            continue
+                        result, trace = self._cancelled_pair(
+                            interaction_id,
+                            request,
+                            definition,
+                            reason_code="blocked_by_failed_predecessor",
+                            message=(
+                                "accepted request was not started because predecessor "
+                                f"request {blocked_by.request_id!r} failed its runtime barrier"
+                            ),
+                        )
+                        results.append(result)
+                        traces.append(trace)
+                        await self._publish_request_event(
+                            dispatch_id=self._dispatch_id_for_interaction(interaction_id),
+                            interaction_id=interaction_id,
+                            request=request,
+                            definition=definition,
+                            event_type="cancelled",
+                            message=result.message or None,
+                            result=result,
                         )
             except asyncio.CancelledError:
                 await asyncio.shield(self.cancel_interaction(interaction_id))
@@ -3144,7 +3178,7 @@ class MockCapabilityProvider:
         self.cancelled_request_ids.append(request.request_id)
 
 
-def local_speech_definition() -> CapabilityDefinition:
+def local_speech_definition(*, timeout_ms: int | None = None) -> CapabilityDefinition:
     return CapabilityDefinition(
         capability_id="chromie.speak",
         version="1.0.0",
@@ -3162,7 +3196,7 @@ def local_speech_definition() -> CapabilityDefinition:
             "required": ["text"],
             "additionalProperties": False,
         },
-        timeout_ms=30000,
+        timeout_ms=max(30000, int(timeout_ms or 30000)),
         interruptible=True,
         can_run_parallel=True,
         exclusive_group="chromie.voice",

@@ -48,6 +48,7 @@ class PlannerCoverageReview(BaseModel):
 
     decision: Literal["accept", "reject"]
     confidence: float = Field(ge=0.0, le=1.0)
+    semantic_mismatch_found: bool = False
     uncovered_requirements: list[str] = Field(default_factory=list, max_length=12)
     reason: str = Field(min_length=1, max_length=1000)
 
@@ -64,6 +65,8 @@ class PlannerCoverageReview(BaseModel):
 
     @model_validator(mode="after")
     def validate_decision(self) -> "PlannerCoverageReview":
+        if self.decision == "accept" and self.semantic_mismatch_found:
+            raise ValueError("accepted coverage cannot report a semantic mismatch")
         if self.decision == "accept" and self.uncovered_requirements:
             raise ValueError("accepted coverage cannot list uncovered requirements")
         if self.decision == "reject" and not self.uncovered_requirements:

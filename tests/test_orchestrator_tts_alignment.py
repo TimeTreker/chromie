@@ -1999,6 +1999,84 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
+    async def test_provider_error_before_pcm_uses_bounded_websocket_retry(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.sessions = SessionTracker(enabled=True)
+        session_id = assistant.sessions.create()
+        assistant.playback_generation = 0
+        assistant.playback_start_waiters = {}
+        assistant.active_synthesis_tasks = set()
+        assistant.playback_queue = asyncio.Queue()
+        assistant.playback_task = None
+        assistant.pending_audio = {}
+        assistant.next_playback_order = 0
+        assistant.synthesis_semaphore = asyncio.Semaphore(1)
+        assistant.tts_url = "ws://tts"
+        assistant.speaker_id = "default"
+        assistant.tts_ws_retries = 2
+        assistant.tts_ws_retry_delay_ms = 0
+        assistant.default_tts_rate = 24000
+        assistant.output_rate = 24000
+        assistant.save_audio_enabled = False
+
+        attempts = 0
+
+        class _RetryTtsWebSocket:
+            def __init__(self, attempt: int) -> None:
+                self._messages: list[str | bytes] = (
+                    [json.dumps({"type": "error", "message": "stale worker"})]
+                    if attempt == 1
+                    else [
+                        json.dumps({"type": "start", "sample_rate": 24000}),
+                        b"\x01\x00" * 240,
+                        json.dumps({"type": "end"}),
+                    ]
+                )
+
+            async def send(self, payload: str) -> None:
+                del payload
+
+            def __aiter__(self) -> "_RetryTtsWebSocket":
+                return self
+
+            async def __anext__(self) -> str | bytes:
+                if not self._messages:
+                    raise StopAsyncIteration
+                return self._messages.pop(0)
+
+        class _FakeConnect:
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                nonlocal attempts
+                del args, kwargs
+                attempts += 1
+                self.ws = _RetryTtsWebSocket(attempts)
+
+            async def __aenter__(self) -> _RetryTtsWebSocket:
+                return self.ws
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc: BaseException | None,
+                tb: object | None,
+            ) -> None:
+                del exc_type, exc, tb
+
+        original_connect = getattr(playback_transport_module.websockets, "connect", None)
+        playback_transport_module.websockets.connect = _FakeConnect  # type: ignore[attr-defined]
+        try:
+            await playback_transport_for(assistant).synthesize_one(
+                "Retry this sentence.", 0, session_id, 0
+            )
+        finally:
+            if original_connect is None:
+                delattr(playback_transport_module.websockets, "connect")
+            else:
+                playback_transport_module.websockets.connect = original_connect
+
+        self.assertEqual(attempts, 2)
+        self.assertEqual(assistant.playback_queue.qsize(), 1)
+
     async def test_tts_splitter_groups_tiny_fragments_without_swallowing_long_chunk(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.tts_text_chunking_enabled = True

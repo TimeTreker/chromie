@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from orchestrator.orchestrator import VoiceAssistant
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
-    PlannerReentryScope,
 )
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
@@ -193,10 +192,12 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                         {
                             "goal_id": goal_id,
                             "source_responsibility_refs": ["weather-result"],
+                            "source_text": "Check the weather and blink twice.",
                         },
                         {
                             "goal_id": "goal-excluded-blink",
                             "source_responsibility_refs": ["blink-result"],
+                            "source_text": "Check the weather and blink twice.",
                         }
                     ],
                 },
@@ -245,6 +246,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 for item in request.context["goal_association_resolution"]["new_goals"]
             ],
             [goal_id],
+        )
+        self.assertNotIn(
+            "source_text",
+            request.context["goal_association_resolution"]["new_goals"][0],
         )
 
         assistant._turn_speech_events = {

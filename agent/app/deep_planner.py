@@ -260,6 +260,7 @@ class DeepPlannerResolver:
             raw: Any = None
             mixed_accounting_repairs: list[dict[str, Any]] = []
             parameter_provenance_repairs: list[dict[str, Any]] = []
+            terminal_response_repairs: list[dict[str, Any]] = []
             try:
                 active_response_schema = deep_contract_revision_response_schema(
                     response_schema,
@@ -299,6 +300,16 @@ class DeepPlannerResolver:
                     authoritative_goals=authoritative_goals,
                     capability_payload=payload,
                 )
+                terminal_response_repairs = common_repairs[
+                    "terminal_response_goal_outcome_accounting"
+                ]
+                if terminal_response_repairs:
+                    logger.info(
+                        "deep_planner_terminal_response_accounting_normalized "
+                        "sid=%s repairs=%s",
+                        request.sid,
+                        bounded_json(terminal_response_repairs, 2000),
+                    )
                 detached_resolution_repairs = common_repairs[
                     "detached_parameter_resolutions"
                 ]
@@ -368,14 +379,14 @@ class DeepPlannerResolver:
                     authoritative_goals=authoritative_goals,
                     capabilities=payload,
                 )
-                validate_explicit_numeric_parameter_grounding(
-                    validated_model_output,
-                    authoritative_goals=authoritative_goals,
-                )
                 validate_goal_binding_argument_grounding(
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
                     capabilities=payload,
+                )
+                validate_explicit_numeric_parameter_grounding(
+                    validated_model_output,
+                    authoritative_goals=authoritative_goals,
                 )
                 validate_user_supplied_parameter_provenance(
                     validated_model_output,
@@ -616,6 +627,12 @@ class DeepPlannerResolver:
                         "strategy": "project_mechanically_derivable_provenance",
                         "repairs": parameter_provenance_repairs,
                         "semantic_plan_unchanged": True,
+                    }
+                if terminal_response_repairs:
+                    metadata["terminal_response_accounting_normalization"] = {
+                        "strategy": "project_exact_per_goal_responses",
+                        "repairs": terminal_response_repairs,
+                        "semantic_outcomes_unchanged": True,
                     }
                 if mixed_accounting_repairs:
                     metadata["mixed_goal_accounting_recovery"] = {

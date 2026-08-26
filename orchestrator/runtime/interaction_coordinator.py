@@ -168,9 +168,10 @@ class InteractionRuntimeCoordinator:
         communicative_goal_completion_recorder: (
             CommunicativeGoalCompletionRecorder | None
         ) = None,
+        speech_timeout_ms: int | None = None,
     ) -> None:
         self.registry = CapabilityRegistry()
-        self.registry.register(local_speech_definition())
+        self.registry.register(local_speech_definition(timeout_ms=speech_timeout_ms))
         self.registry.register(session_interrupt_definition())
         self.registry.register(work_dag_capability_definition())
         self.runtime = CapabilityRuntime(

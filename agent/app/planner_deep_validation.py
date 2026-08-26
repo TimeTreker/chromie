@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 """Deep-Planner-specific deterministic repair, safety, and diagnostic mechanics.
 
 This is an implementation layer of the single Planner authority, not another Planner.
 """
+
+from __future__ import annotations
 
 import copy
 import json
@@ -89,10 +89,11 @@ def normalize_mixed_goal_outcome_accounting(
 
     Per-Goal outcomes are the semantic authority. When they cover every
     canonical Goal, contain at least two terminal dispositions, and explicitly
-    leave some Goals non-executing, top-level ``coverage`` means accounting
-    coverage and is therefore mechanically ``complete``. A step that no execute
-    outcome references is contradictory DTO residue and cannot be executed; it
-    is removed without changing any Goal outcome or inventing replacement work.
+    leave some Goals non-executing, top-level aggregate disposition, coverage,
+    satisfaction, and limitation speech are redundant projections of those
+    outcomes. A step that no execute outcome references is contradictory DTO
+    residue and cannot be executed; it is removed without changing any Goal
+    outcome or inventing replacement work or wording.
     """
 
     normalized = copy.deepcopy(raw)
@@ -130,6 +131,33 @@ def normalize_mixed_goal_outcome_accounting(
             }
         )
         normalized["coverage"] = "complete"
+
+    terminal_limitation_texts = list(
+        dict.fromkeys(
+            " ".join(str(outcome.get("response_text") or "").strip().split())
+            for goal_id in expected_goal_ids
+            if isinstance((outcome := outcomes.get(goal_id)), dict)
+            and outcome.get("disposition") in {"unavailable", "refused"}
+            and " ".join(
+                str(outcome.get("response_text") or "").strip().split()
+            )
+        )
+    )
+    if terminal_limitation_texts:
+        aggregate_response_text = " ".join(terminal_limitation_texts)
+        if normalized.get("response_text") != aggregate_response_text:
+            repairs.append(
+                {
+                    "path": "response_text",
+                    "from": normalized.get("response_text"),
+                    "to": aggregate_response_text,
+                    "basis": (
+                        "terminal non-effect per-Goal wording is the explicit "
+                        "aggregate limitation authority"
+                    ),
+                }
+            )
+            normalized["response_text"] = aggregate_response_text
 
     for goal_id, outcome in outcomes.items():
         if not isinstance(outcome, dict):
@@ -302,6 +330,28 @@ def normalize_mixed_goal_outcome_accounting(
                 "path": f"steps[{index}]",
                 "step_id": step_id,
                 "reason": "not_referenced_by_any_execute_outcome",
+            }
+        )
+    surviving_parallel = [
+        (index, step)
+        for index, step in enumerate(retained)
+        if isinstance(step, dict) and step.get("timing") == "parallel"
+    ]
+    if len(surviving_parallel) == 1:
+        retained_index, step = surviving_parallel[0]
+        repaired_step = dict(step)
+        repaired_step["timing"] = "sequential"
+        retained[retained_index] = repaired_step
+        repairs.append(
+            {
+                "path": f"steps[{retained_index}].timing",
+                "step_id": str(step.get("step_id") or ""),
+                "from": "parallel",
+                "to": "sequential",
+                "basis": (
+                    "terminal non-effect accounting left no executable "
+                    "parallel peer"
+                ),
             }
         )
     normalized["steps"] = retained

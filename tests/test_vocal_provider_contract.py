@@ -409,8 +409,13 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         result = await submit_and_wait_terminal(runtime, response)
 
         self.assertEqual(result.status, "failed")
-        self.assertEqual(len(result.results), 1)
+        self.assertEqual(len(result.results), 2)
         self.assertEqual(result.results[0].reason_code, "personal_voice_not_released")
+        self.assertEqual(
+            result.results[1].reason_code,
+            "blocked_by_failed_predecessor",
+        )
+        self.assertEqual(result.results[1].request_id, "recite-after-speech")
         self.assertEqual(self.calls, [])
 
     async def test_coordinator_registers_qualified_peer_without_replacing_speech(self) -> None:

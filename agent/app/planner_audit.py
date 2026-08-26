@@ -281,6 +281,12 @@ async def review_coordinated_action_plan_coverage(
             "executable_capabilities": selected_capabilities,
             "output_contract": {
                 "decision": "accept or reject",
+                "semantic_mismatch_found": (
+                    "Set true when any selected Capability's declared effect does not "
+                    "entail the Goal effect it claims, including an approximate, "
+                    "symbolic, personality-based, or merely natural-looking substitute. "
+                    "A true value requires decision=reject."
+                ),
                 "accept": (
                     "Only when every effect claim is semantically supported and every "
                     "other Goal has truthful explicit terminal non-effect accounting; "

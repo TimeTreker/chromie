@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Deterministic Planner validation shared by Fast and Deep passes.
 
 This module owns cross-pass contract, grounding, provenance, and integrity mechanics only.
 Pass-specific qualification/repair mechanics live in planner_fast_validation and
 planner_deep_validation; neither layer owns model invocation or Planner semantics.
 """
+
+from __future__ import annotations
 
 import copy
 from decimal import Decimal, InvalidOperation
@@ -402,6 +402,68 @@ def qualify_capability_catalog_for_information_domains(
         if domain and domain not in required_domains:
             continue
         qualified.append(capability)
+    return qualified
+
+
+def qualify_capability_catalog_for_typed_binding_values(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove capabilities whose declared typed argument contradicts a Goal value.
+
+    This does not select a Capability or translate user meaning. A provider or
+    same-name argument declaration makes the applicability claim; the canonical
+    Goal supplies the value. If that declared schema cannot represent any required
+    value of its type, exposing the Capability would invite an impossible exact
+    plan (for example a qualitative speed enum for a numeric speed Goal).
+    """
+
+    required_by_type: dict[str, list[Any]] = {}
+    required_by_name: dict[str, list[Any]] = {}
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        for name, binding in _goal_binding_map(goal).items():
+            entity_type = _normalized_entity_type(binding.get("entity_type"))
+            value = binding.get("value")
+            if entity_type:
+                required_by_type.setdefault(entity_type, []).append(value)
+            required_by_name.setdefault(str(name), []).append(value)
+
+    qualified: list[dict[str, Any]] = []
+    for capability in capabilities:
+        if not isinstance(capability, dict):
+            continue
+        input_schema = capability.get("input_schema")
+        properties = (
+            input_schema.get("properties")
+            if isinstance(input_schema, dict)
+            else None
+        )
+        if not isinstance(properties, dict):
+            qualified.append(capability)
+            continue
+        contradicted = False
+        for argument_name, argument_schema in properties.items():
+            if not isinstance(argument_schema, dict):
+                continue
+            entity_type = _normalized_entity_type(
+                argument_schema.get("x-chromie-entity-type")
+            )
+            values = (
+                required_by_type.get(entity_type, [])
+                if entity_type
+                else required_by_name.get(str(argument_name), [])
+            )
+            if values and not any(
+                _argument_schema_accepts_canonical_binding(argument_schema, value)
+                for value in values
+            ):
+                contradicted = True
+                break
+        if not contradicted:
+            qualified.append(capability)
     return qualified
 
 def information_goal_ids_without_declared_provider(
@@ -1292,6 +1354,29 @@ def validate_goal_binding_argument_grounding(
                         for declared in fixed_values
                     )
                 ):
+                    continue
+                goal_information_domains = {
+                    str(candidate.get("value") or "").strip().casefold()
+                    for candidate in bindings_by_goal[goal_id].values()
+                    if candidate.get("entity_type") == "information_domain"
+                }
+                capability_domain = str(
+                    semantic_scope.get("domain") or ""
+                ).strip().casefold()
+                if (
+                    binding["entity_type"] in fixed_entity_types
+                    and capability_domain
+                    and goal_information_domains == {capability_domain}
+                    and any(
+                        str(value or "").strip().casefold() == "now"
+                        for value in fixed_values
+                    )
+                ):
+                    # Goal Association, rather than this validator, owns the
+                    # multilingual semantic judgment that the request is for the
+                    # current local clock. The Capability's typed domain and fixed
+                    # `now` scope then cover the source-language temporal surface
+                    # without a phrase table or a fabricated executable argument.
                     continue
                 raise PlannerDTOContractError(
                     "information capability step omits authoritative temporal scope: "
@@ -2328,6 +2413,185 @@ def normalize_detached_parameter_resolutions(
     return normalized, repairs
 
 
+def normalize_terminal_response_goal_outcome_accounting(
+    raw: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Project an exact all-response Goal map into redundant aggregate fields.
+
+    Result-evidence re-entry asks Planner to author completion wording for a
+    scoped set of already-completed Goals. Small models reliably author the
+    individual outcomes but can retain aggregate fields or steps from the
+    historical source Plan. Once every authoritative Goal has an explicit,
+    exact ``respond`` outcome with no step reference, those outcomes are the
+    semantic authority. This normalization copies only their already-authored
+    wording and satisfaction into the aggregate and removes no semantic choice.
+    """
+
+    normalized = copy.deepcopy(raw)
+    expected_goal_ids = [
+        str(goal.get("goal_id") or "").strip()
+        for goal in authoritative_goals
+        if isinstance(goal, dict) and str(goal.get("goal_id") or "").strip()
+    ]
+    outcomes = normalized.get("goal_outcomes")
+    if (
+        not expected_goal_ids
+        or not isinstance(outcomes, dict)
+        or set(outcomes) != set(expected_goal_ids)
+    ):
+        return normalized, []
+
+    ordered_outcomes: list[dict[str, Any]] = []
+    for goal_id in expected_goal_ids:
+        outcome = outcomes.get(goal_id)
+        if not isinstance(outcome, dict):
+            return normalized, []
+        satisfaction = outcome.get("satisfaction")
+        score = satisfaction.get("score") if isinstance(satisfaction, dict) else None
+        response_text = " ".join(
+            str(outcome.get("response_text") or "").strip().split()
+        )
+        if (
+            outcome.get("disposition") != "respond"
+            or outcome.get("coverage") != "complete"
+            or not response_text
+            or list(outcome.get("step_ids") or [])
+            or list(outcome.get("unresolved") or [])
+            or not isinstance(satisfaction, dict)
+            or satisfaction.get("status") != "exact"
+            or isinstance(score, bool)
+            or not isinstance(score, (int, float))
+            or float(score) < 0.95
+            or set(satisfaction.get("satisfied_goal_ids") or []) != {goal_id}
+            or list(satisfaction.get("unmet_goal_ids") or [])
+            or list(satisfaction.get("unmet_requirements") or [])
+        ):
+            return normalized, []
+        ordered_outcomes.append(outcome)
+
+    repairs: list[dict[str, Any]] = []
+    aggregate_response_text = " ".join(
+        dict.fromkeys(
+            " ".join(str(outcome["response_text"]).strip().split())
+            for outcome in ordered_outcomes
+        )
+    )
+    projections: dict[str, Any] = {
+        "disposition": "respond",
+        "coverage": "complete",
+        "response_text": aggregate_response_text,
+        "steps": [],
+        "parameter_resolutions": [],
+        "unresolved": [],
+    }
+    for field_name, value in projections.items():
+        if normalized.get(field_name) == value:
+            continue
+        repairs.append(
+            {
+                "path": field_name,
+                "from": normalized.get(field_name),
+                "to": value,
+                "basis": "complete exact per-Goal respond outcomes",
+            }
+        )
+        normalized[field_name] = value
+
+    existing_satisfaction = normalized.get("goal_satisfaction")
+    rationale = " ".join(
+        dict.fromkeys(
+            " ".join(
+                str(outcome.get("rationale") or "").strip().split()
+            )
+            for outcome in ordered_outcomes
+            if " ".join(
+                str(outcome.get("rationale") or "").strip().split()
+            )
+        )
+    )
+    if not rationale:
+        rationale = "All scoped Goals have exact Planner-authored responses."
+    aggregate_satisfaction = {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": expected_goal_ids,
+        "unmet_goal_ids": [],
+        "unmet_requirements": [],
+        "rationale": rationale,
+    }
+    if existing_satisfaction != aggregate_satisfaction:
+        repairs.append(
+            {
+                "path": "goal_satisfaction",
+                "from": existing_satisfaction,
+                "to": aggregate_satisfaction,
+                "basis": "deterministic aggregate of exact per-Goal responses",
+            }
+        )
+        normalized["goal_satisfaction"] = aggregate_satisfaction
+    return normalized, repairs
+
+
+def normalize_nonexecuting_plan_mechanics(
+    raw: dict[str, Any],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Remove executable mechanics from a unanimous non-executing outcome.
+
+    These fields are redundant DTO mechanics, not semantic decisions.  Once the
+    aggregate and every authoritative per-Goal outcome already agree on the same
+    non-executing disposition, confirmation, steps, timing, and parameter
+    resolution cannot be meaningful and must retain their canonical empty form.
+    """
+
+    normalized = copy.deepcopy(raw)
+    disposition = str(normalized.get("disposition") or "")
+    if disposition not in {"clarify", "escalate", "refused", "unavailable"}:
+        return normalized, []
+    expected_goal_ids = {
+        str(goal.get("goal_id") or "").strip()
+        for goal in authoritative_goals
+        if isinstance(goal, dict) and str(goal.get("goal_id") or "").strip()
+    }
+    outcomes = normalized.get("goal_outcomes")
+    if (
+        not expected_goal_ids
+        or not isinstance(outcomes, dict)
+        or set(outcomes) != expected_goal_ids
+        or any(
+            not isinstance(outcome, dict)
+            or str(outcome.get("disposition") or "") != disposition
+            for outcome in outcomes.values()
+        )
+    ):
+        return normalized, []
+
+    repairs: list[dict[str, Any]] = []
+    canonical_fields: dict[str, Any] = {
+        "plan_relation": "exact",
+        "user_confirmation_required": False,
+        "steps": [],
+        "parameter_resolutions": [],
+        "time_conditions": [],
+    }
+    for field_name, value in canonical_fields.items():
+        if normalized.get(field_name) == value:
+            continue
+        repairs.append(
+            {
+                "path": field_name,
+                "from": normalized.get(field_name),
+                "to": value,
+                "basis": f"unanimous non-executing {disposition} outcome",
+            }
+        )
+        normalized[field_name] = value
+    return normalized, repairs
+
+
 def normalize_common_planner_output(
     raw: dict[str, Any],
     *,
@@ -2337,12 +2601,29 @@ def normalize_common_planner_output(
     """Apply only cross-depth mechanical Planner DTO normalizations.
 
     Fast and Deep use the same CanonicalPlan semantics.  These adapters are
-    therefore one shared mechanism: they may remove detached provenance or add
-    mechanically provable provenance metadata, but never alter Goal meaning,
-    Capability choice, executable arguments, timing, disposition, or wording.
+    therefore one shared mechanism. They may project redundant aggregate fields
+    from a complete, internally exact per-Goal response map, remove detached
+    provenance, or add mechanically provable provenance metadata. They never
+    choose a Goal outcome, Capability, executable argument, timing, or wording.
     """
 
-    normalized, detached_repairs = normalize_detached_parameter_resolutions(raw)
+    normalized, capability_argument_type_repairs = (
+        normalize_mechanical_capability_argument_types(
+            raw,
+            capability_payload=capability_payload,
+        )
+    )
+    normalized, terminal_response_repairs = (
+        normalize_terminal_response_goal_outcome_accounting(
+            normalized,
+            authoritative_goals=authoritative_goals,
+        )
+    )
+    normalized, nonexecuting_repairs = normalize_nonexecuting_plan_mechanics(
+        normalized,
+        authoritative_goals=authoritative_goals,
+    )
+    normalized, detached_repairs = normalize_detached_parameter_resolutions(normalized)
     normalized, schema_default_repairs = normalize_schema_default_parameter_provenance(
         normalized,
         authoritative_goals=authoritative_goals,
@@ -2356,10 +2637,91 @@ def normalize_common_planner_output(
         )
     )
     return normalized, {
+        "capability_argument_types": capability_argument_type_repairs,
+        "terminal_response_goal_outcome_accounting": terminal_response_repairs,
+        "nonexecuting_plan_mechanics": nonexecuting_repairs,
         "detached_parameter_resolutions": detached_repairs,
         "schema_default_provenance": schema_default_repairs,
         "parameter_provenance": parameter_provenance_repairs,
     }
+
+
+def normalize_mechanical_capability_argument_types(
+    raw: dict[str, Any],
+    *,
+    capability_payload: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Convert exact JSON numeric strings to the Capability's numeric type.
+
+    Canonical Goal bindings intentionally preserve source surfaces such as
+    ``"0.2"``.  When Planner copies that exact scalar into an argument whose
+    registered schema says number/integer, changing only the JSON container type
+    is a mechanically isomorphic DTO normalization.  This adapter never clamps,
+    rounds, chooses defaults, or edits an out-of-range value.
+    """
+
+    normalized = copy.deepcopy(raw)
+    by_id = {
+        str(item.get("capability_id") or ""): item
+        for item in capability_payload
+        if isinstance(item, dict) and str(item.get("capability_id") or "")
+    }
+    repairs: list[dict[str, Any]] = []
+    steps = normalized.get("steps")
+    if not isinstance(steps, list):
+        return normalized, repairs
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        capability_id = str(step.get("capability_id") or "")
+        capability = by_id.get(capability_id)
+        args = step.get("args")
+        if not isinstance(capability, dict) or not isinstance(args, dict):
+            continue
+        input_schema = capability.get("input_schema")
+        properties = (
+            input_schema.get("properties")
+            if isinstance(input_schema, dict)
+            else None
+        )
+        if not isinstance(properties, dict):
+            continue
+        for name, value in list(args.items()):
+            argument_schema = properties.get(name)
+            if (
+                not isinstance(argument_schema, dict)
+                or argument_schema.get("type") not in {"integer", "number"}
+                or not isinstance(value, str)
+            ):
+                continue
+            lexical = value.strip()
+            if not re.fullmatch(r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)", lexical):
+                continue
+            try:
+                decimal_value = Decimal(lexical)
+            except InvalidOperation:
+                continue
+            if not decimal_value.is_finite():
+                continue
+            target_type = str(argument_schema["type"])
+            if target_type == "integer":
+                if decimal_value != decimal_value.to_integral_value():
+                    continue
+                normalized_value: int | float = int(decimal_value)
+            else:
+                normalized_value = float(decimal_value)
+            args[name] = normalized_value
+            repairs.append(
+                {
+                    "step_id": str(step.get("step_id") or ""),
+                    "capability_id": capability_id,
+                    "argument": str(name),
+                    "from_type": "string",
+                    "to_type": target_type,
+                    "value": lexical,
+                }
+            )
+    return normalized, repairs
 
 
 def qualify_planner_capability_payload(
@@ -2378,8 +2740,12 @@ def qualify_planner_capability_payload(
         capabilities,
         authoritative_goals=authoritative_goals,
     )
-    return qualify_capability_catalog_for_information_domains(
+    domain_qualified = qualify_capability_catalog_for_information_domains(
         output_mode_qualified,
+        authoritative_goals=authoritative_goals,
+    )
+    return qualify_capability_catalog_for_typed_binding_values(
+        domain_qualified,
         authoritative_goals=authoritative_goals,
     )
 
@@ -2538,10 +2904,10 @@ def planner_contract_diagnostics(
     multi_goal_fast = planner_tier == "fast" and len(expected_goal_set) > 1
     fast_escalation = planner_tier == "fast" and disposition == "escalate"
 
-    if multi_goal_fast and "goal_outcomes" not in raw:
+    if (multi_goal_fast or fast_escalation) and "goal_outcomes" not in raw:
         add(
             ["goal_outcomes"],
-            "multi-goal fast planner output requires an explicit goal_outcomes object",
+            "fast multi-goal or escalation output requires an explicit goal_outcomes object",
             value=None,
             error_type="missing",
         )
@@ -2552,36 +2918,24 @@ def planner_contract_diagnostics(
                 "fast semantic escalation requires partial or uncertain coverage",
                 value=coverage,
             )
-        if multi_goal_fast:
-            satisfaction = raw.get("goal_satisfaction")
-            if not isinstance(satisfaction, dict):
-                add(
-                    ["goal_satisfaction"],
-                    "multi-goal fast escalation requires model-authored goal_satisfaction",
-                    value=satisfaction,
-                )
-            elif satisfaction.get("status") == "exact":
-                add(
-                    ["goal_satisfaction", "status"],
-                    "fast semantic escalation cannot claim exact goal satisfaction",
-                    value=satisfaction.get("status"),
-                )
-        else:
-            if isinstance(outcomes, dict) and outcomes:
-                add(
-                    ["goal_outcomes"],
-                    "single-goal fast semantic escalation requires goal_outcomes={}",
-                    value=outcomes,
-                )
-            if raw.get("goal_satisfaction") is not None:
-                add(
-                    ["goal_satisfaction"],
-                    "single-goal fast semantic escalation requires goal_satisfaction=null",
-                    value=raw.get("goal_satisfaction"),
-                )
+        satisfaction = raw.get("goal_satisfaction")
+        if not isinstance(satisfaction, dict):
+            add(
+                ["goal_satisfaction"],
+                "fast escalation requires model-authored goal_satisfaction",
+                value=satisfaction,
+            )
+        elif satisfaction.get("status") == "exact":
+            add(
+                ["goal_satisfaction", "status"],
+                "fast semantic escalation cannot claim exact goal satisfaction",
+                value=satisfaction.get("status"),
+            )
     if isinstance(outcomes, dict):
         outcome_goal_set = set(outcomes)
         require_complete_outcome_map = not fast_escalation or multi_goal_fast
+        if fast_escalation:
+            require_complete_outcome_map = True
         if require_complete_outcome_map and outcome_goal_set != expected_goal_set:
             add(
                 ["goal_outcomes"],
@@ -2958,18 +3312,17 @@ def validate_planner_model_output(
                 "multi-goal fast planner output requires explicit fields: "
                 + ",".join(missing_envelope_fields)
             )
-    if planner_tier == "fast" and len(expected_goal_id_set) > 1 and not goal_outcomes_were_supplied:
-        raise ValueError("multi-goal fast planner output requires an explicit goal_outcomes object")
+    if (
+        planner_tier == "fast"
+        and (len(expected_goal_id_set) > 1 or output.disposition == "escalate")
+        and not goal_outcomes_were_supplied
+    ):
+        raise ValueError(
+            "fast multi-goal or escalation output requires an explicit goal_outcomes object"
+        )
     if planner_tier == "fast" and output.disposition == "escalate":
         if output.coverage not in {"partial", "uncertain"}:
             raise ValueError("fast semantic escalation requires partial or uncertain coverage")
-        if len(expected_goal_id_set) <= 1:
-            if output.goal_outcomes:
-                raise ValueError("single-goal fast semantic escalation requires goal_outcomes={}")
-            if output.goal_satisfaction is not None:
-                raise ValueError(
-                    "single-goal fast semantic escalation requires goal_satisfaction=null"
-                )
     if (
         len(expected_goal_id_set) > 1
         and output.disposition in {"execute", "respond", "mixed"}
@@ -2981,7 +3334,7 @@ def validate_planner_model_output(
         )
     if (
         goal_outcomes_were_supplied
-        and len(expected_goal_id_set) > 1
+        and (len(expected_goal_id_set) > 1 or output.disposition == "escalate")
         and outcome_goal_ids != expected_goal_id_set
     ):
         raise ValueError(
@@ -3019,7 +3372,7 @@ def validate_planner_model_output(
                 raise ValueError("fast semantic escalation must not carry steps")
             if output.goal_satisfaction is None:
                 raise ValueError(
-                    "multi-goal fast semantic escalation requires model-authored goal_satisfaction"
+                    "fast semantic escalation requires model-authored goal_satisfaction"
                 )
             if output.goal_satisfaction.status == "exact":
                 raise ValueError("fast semantic escalation cannot claim exact goal satisfaction")
@@ -3031,9 +3384,11 @@ def validate_planner_model_output(
         }:
             raise ValueError("fast mixed output requires at least one execute and one respond goal")
     for goal_id, outcome in output.goal_outcomes.items():
-        if planner_tier == "fast" and len(expected_goal_id_set) > 1:
+        if planner_tier == "fast" and (
+            len(expected_goal_id_set) > 1 or output.disposition == "escalate"
+        ):
             if outcome.satisfaction is None:
-                raise ValueError("multi-goal fast outcomes require model-authored satisfaction")
+                raise ValueError("fast outcomes require model-authored satisfaction")
         referenced_goal_ids = {
             *(outcome.satisfaction.satisfied_goal_ids if outcome.satisfaction else []),
             *(outcome.satisfaction.unmet_goal_ids if outcome.satisfaction else []),

@@ -83,10 +83,6 @@ except ImportError:  # pragma: no cover
 
 try:
     from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-    from chromie_contracts.interaction import (
-        VOCAL_MODES,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-    )
     from chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
@@ -97,10 +93,6 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-    from shared.chromie_contracts.interaction import (
-        VOCAL_MODES,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-    )
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
@@ -232,11 +224,18 @@ class FastPlannerResolver:
                     # latency-critical response phase bounded rather than inheriting
                     # a deliberate role's context window.
                     "num_ctx": self.first_response_num_ctx,
-                    # This DTO fits well below 128 tokens. Retained Gemma/Qwen live
-                    # evidence showed that a 512-token allowance let an already-
-                    # complete JSON object repeat until output_truncated; 128 made
-                    # both decoders stop normally without narrowing the schema.
-                    "num_predict": min(self.num_predict, 128),
+                    # The schema is compact, but retained qualification evidence
+                    # includes a valid multi-goal first response that reached the
+                    # former 128-token ceiling before Ollama closed the JSON object.
+                    # Keep this below the historical 512-token repetition failure
+                    # while allowing one complete bounded response.
+                    "num_predict": min(self.num_predict, 256),
+                    "stop": [
+                        "✅",
+                        "\n\nNote:",
+                        "\n\nExplanation:",
+                        "\n\nFinal truth check:",
+                    ],
                 },
                 response_format=response_schema,
                 prompt_family="fast_planner.first_response",
@@ -479,13 +478,18 @@ class FastPlannerResolver:
             "scope excludes every sibling Goal not listed there: reject any wording "
             "that names, imitates, counts, or claims an effect from an excluded sibling, "
             "even when the originating user turn or broader history mentions it. The "
+            "dedicated has_out_of_scope_goal_claim flag must be true for that case; "
+            "compare the candidate clause-by-clause with the authoritative scoped Goal "
+            "description and its one source-Plan step. It must be false only when every "
+            "claimed effect belongs to that scoped Goal. The "
             "trusted execution outcome is the mechanical authority for completion "
             "status and completion qualification; accept an exact scoped completion "
             "claim when that outcome marks the Goal completed with required "
             "qualification established and its Evidence IDs match. "
             "Classify whether the response has an unsupported material claim or a "
-            "semantic-perspective contradiction, then return only decision=accept "
-            "when neither is present. Otherwise return decision=reject."
+            "semantic-perspective contradiction, and out-of-scope Goal claim, then "
+            "return only decision=accept when none is present. Otherwise return "
+            "decision=reject."
         )
         candidate = {
             "response_text": plan.response_text,
@@ -532,7 +536,9 @@ class FastPlannerResolver:
             system=(
                 "You are the same Fast Planner's bounded post-Evidence Epistemic "
                 "Qualification, not a response author. Accept or reject the immutable "
-                "candidate. Never repair, replace, or expand it."
+                "candidate. Set has_out_of_scope_goal_claim explicitly by comparing "
+                "each claimed effect with the exact scoped Goal. Never repair, replace, "
+                "or expand it."
             ),
             options={
                 "temperature": 0,
@@ -919,7 +925,15 @@ class FastPlannerResolver:
             "temperature": 0,
             "top_p": 0.9,
             "num_ctx": self.num_ctx,
-            "num_predict": self.num_predict,
+            # Terminal-result plans are bounded state deltas, not full original
+            # plan replays.  Their smaller output reservation keeps the complete
+            # scoped prompt inside the configured context window without dropping
+            # provenance or silently reducing input context.
+            "num_predict": (
+                min(self.num_predict, 2048)
+                if reentry_goal_ids
+                else self.num_predict
+            ),
         }
         previous_raw: Any = None
         initial_raw_output: Any = None
@@ -928,6 +942,7 @@ class FastPlannerResolver:
         for attempt in range(self.max_contract_repairs + 1):
             raw: Any = None
             parameter_provenance_repairs: list[dict[str, Any]] = []
+            terminal_response_repairs: list[dict[str, Any]] = []
             try:
                 active_response_schema = (
                     fast_repair_response_schema(
@@ -968,6 +983,16 @@ class FastPlannerResolver:
                     authoritative_goals=authoritative_goals,
                     capability_payload=capability_payload,
                 )
+                terminal_response_repairs = common_repairs[
+                    "terminal_response_goal_outcome_accounting"
+                ]
+                if terminal_response_repairs:
+                    logger.info(
+                        "fast_planner_terminal_response_accounting_normalized "
+                        "sid=%s repairs=%s",
+                        request.sid,
+                        bounded_json(terminal_response_repairs, 2000),
+                    )
                 detached_resolution_repairs = common_repairs[
                     "detached_parameter_resolutions"
                 ]
@@ -1028,6 +1053,16 @@ class FastPlannerResolver:
                     capabilities=capability_payload,
                 )
                 try:
+                    validate_goal_binding_argument_grounding(
+                        validated_model_output,
+                        authoritative_goals=authoritative_goals,
+                        capabilities=capability_payload,
+                    )
+                except PlannerDTOContractError:
+                    raise
+                except ValueError as exc:
+                    raise AuthoritativeGroundingValidationError(str(exc)) from exc
+                try:
                     validate_explicit_numeric_parameter_grounding(
                         validated_model_output,
                         authoritative_goals=authoritative_goals,
@@ -1035,18 +1070,12 @@ class FastPlannerResolver:
                 except PlannerDTOContractError:
                     raise
                 except ValueError as exc:
-                    # A structurally invalid provenance row raises
-                    # PlannerDTOContractError inside the validator. A ValueError
-                    # here instead means the selected executable arguments do not
-                    # preserve authoritative Goal values. Fixing that requires a
-                    # fresh semantic Plan, never a same-stage DTO edit.
+                    # Run after typed Capability grounding so an omitted declared
+                    # realization is diagnosed as the bounded mechanical DTO defect
+                    # it is. A remaining numeric mismatch is semantic and must still
+                    # fail closed instead of being edited in place.
                     raise AuthoritativeGroundingValidationError(str(exc)) from exc
                 try:
-                    validate_goal_binding_argument_grounding(
-                        validated_model_output,
-                        authoritative_goals=authoritative_goals,
-                        capabilities=capability_payload,
-                    )
                     validate_user_supplied_parameter_provenance(
                         validated_model_output,
                         authoritative_goals=authoritative_goals,
@@ -1369,6 +1398,14 @@ class FastPlannerResolver:
                     "strategy": "project_mechanically_derivable_provenance",
                     "repairs": parameter_provenance_repairs,
                     "semantic_plan_unchanged": True,
+                }
+                validated = validated.model_copy(update={"metadata": metadata})
+            if terminal_response_repairs:
+                metadata = dict(validated.metadata)
+                metadata["terminal_response_accounting_normalization"] = {
+                    "strategy": "project_exact_per_goal_responses",
+                    "repairs": terminal_response_repairs,
+                    "semantic_outcomes_unchanged": True,
                 }
                 validated = validated.model_copy(update={"metadata": metadata})
             return validated

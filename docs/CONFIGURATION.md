@@ -151,7 +151,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` only as a fallback for explicitly constrained profiles. The maintained RTX 4090 Laptop and RTX 5090 profiles set `0`. RTX 4090 Laptop uses `qwen3:8b` for Goal Interpretation/Deep Planning, `gemma4:e4b` for Agent/Goal Association, and `qwen3:4b` for Fast roles. RTX 5090 uses `qwen3.5:9b` for Goal Interpretation, full Fast planning, Social Attention, and skill selection; it uses the already-resident `gemma4:12b` for Goal Association, Deep Planning, the bounded first Communicative Activity, and its immutable truth certificate. The latter role split is retained model evidence: under the same structured prompts Qwen repeated output at the 512-token boundary and over-rejected completion truth, while Gemma stopped within the bounded DTO and distinguished supported from unsupported claims. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `1` and uses one 32K `qwen3:4b-instruct-2507-q4_K_M` runner for every cognitive role; Flash Attention and a q8 KV cache leave enough VRAM for overlapping CosyVoice synthesis. The maintained RTX 5090 profile sets `0` and uses its declared Qwen/Gemma role split. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -159,10 +159,9 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `chromie_mixed` is the catalog default; `speaker_id=default` routes `zh` and
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
-The maintained RTX 5090 and RTX 4090 Laptop profiles both opt out: RTX 5090 keeps
-`qwen3:4b` plus `gemma4:12b` resident when memory permits, while RTX 4090 Laptop
-uses `qwen3:4b`, `qwen3:8b`, and sparse `gemma4:e4b` in their declared roles but
-limits Ollama to one resident 32768-token runner at a time.
+The RTX 4090 Laptop profile uses that compact policy with one 32768-token Qwen
+runner and quantized KV cache. The RTX 5090 profile opts out and keeps its
+declared Qwen/Gemma role split resident when memory permits.
 Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
 only `chromie-llm` to clear stale runners left by an earlier launch. Select a
 fallback explicitly with
@@ -472,7 +471,7 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_FIRST_CHUNK_CHARS` | Preferred first complete-speech chunk size; common and code default `16` so short complete openers such as `I'm doing well.`, `Not tired.`, or `Too fast.` can be synthesized before longer follow-up sections. Set `0` to use `ORCH_TTS_CHUNK_CHARS` for every chunk. |
 | `ORCH_TTS_CHUNK_CHARS` | Preferred upper size for complete-speech chunks; common and code default `120`. Complete speech is split on sentence and substantial clause boundaries first; tiny fragments may be grouped, and length splitting is only a fallback for text longer than `TTS_MAX_TEXT_CHARS`. |
 | `ORCH_TTS_MIN_CHUNK_CHARS` | Small-fragment aggregation threshold for complete-speech chunks; common and code default `20`. |
-| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Hard Host wait for response speech that carries a playback-start delivery/effect barrier. Maintained interactive modes and the code/common fallback use `3500`; explicit qualification mode uses `20000`. Failure prevents dependent body effects, marks the speech request failed, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
+| `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Hard Host wait for response speech that carries a playback-start delivery/effect barrier. Maintained interactive modes and the code/common fallback use `3500`; explicit qualification mode uses `20000`. The Capability Runtime speech envelope is derived to outlive this wait by a bounded cleanup margin. Failure prevents dependent body effects, marks the speech request failed, terminalizes every accepted dependent request as blocked-before-start, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
 | `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
 | `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation path, but maintained profiles do not require or schedule that speech. |
@@ -885,7 +884,7 @@ certificate-repair fallback.
 | `AGENT_FAST_FIRST_RESPONSE_MODEL` | Defaults to the active Agent model; owns the latency-critical first natural Communicative Activity. |
 | `AGENT_FAST_TRUTH_MODEL` | Defaults to `AGENT_FAST_FIRST_RESPONSE_MODEL`; qualifies that model's immutable wording for truth and semantic consistency without authoring a replacement. |
 | `AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS` | `2500` in maintained interactive modes; watchdog for the small latency-critical first-response/truth client. It is deliberately shorter than full Fast planning so the user-facing phase can fail silent without killing larger background cognition. Qualification mode raises it with the other model watchdogs. |
-| Fast first-response output budget | Fixed at a maximum of `128` generated tokens inside Fast Planner. The complete bounded DTO fits inside that budget; retained Gemma/Qwen evidence showed that a `512` allowance could turn a complete early JSON object into repeated output ending at `output_truncated`. This is deliberately not another environment variable. |
+| Fast first-response output budget | Fixed at a maximum of `256` generated tokens inside Fast Planner. A retained qualification run showed the multi-goal DTO reaching the former `128`-token ceiling before its JSON object closed, while earlier Gemma/Qwen evidence showed that a `512` allowance could turn a complete early object into repeated output ending at `output_truncated`. The bounded middle value closes the reproduced truncation without adding another environment variable. Truth-certificate calls remain capped at `128`. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `8000` in maintained interactive modes; full Fast Planner model timeout. The small first-response phase is expected to return much earlier in healthy operation, while complete structured planning is allowed to finish behind that user-visible progress. |
 Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. |

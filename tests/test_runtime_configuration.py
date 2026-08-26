@@ -218,8 +218,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=1", profile)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", profile)
-        self.assertNotIn("OLLAMA_FLASH_ATTENTION", profile)
-        self.assertNotIn("OLLAMA_KV_CACHE_TYPE", profile)
+        self.assertIn("OLLAMA_FLASH_ATTENTION=1", profile)
+        self.assertIn("OLLAMA_KV_CACHE_TYPE=q8_0", profile)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", profile)
 
         rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(

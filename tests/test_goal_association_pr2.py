@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from agent.app import goal_association_contract as ga_contract
 from agent.app import goal_association_schema as ga_schema
 from agent.app import goal_association_validation as ga_validation
 from agent.app import goal_association_prompt as ga_prompt
@@ -768,6 +767,12 @@ class GoalExecutionContractTests(unittest.TestCase):
             ],
             "body_action",
         )
+        self.assertIs(
+            covered_responsibility_branch["properties"][
+                "independently_satisfiable"
+            ]["const"],
+            True,
+        )
         supporting_items_schema = coverage_schema["properties"]["supporting_items"]
         self.assertNotIn(
             "temporal_dimensions",
@@ -852,7 +857,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertNotIn("边跑的唱歌", excerpt_contract["enum"])
 
     def test_resource_and_coverage_prompts_share_information_ownership(self):
-        resolver = GoalAssociationResolver(FakeOllama({}))
         req = request(
             "I am in chongqing now, please help me check whether it will rain "
             "tonight and whether it it cold",
@@ -1541,6 +1545,32 @@ class GoalExecutionContractTests(unittest.TestCase):
             [],
         )
 
+    def test_verbatim_geographic_query_scope_is_valid_location_provenance(self):
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "河南省内乡县今天的天气怎么样？",
+                    "information",
+                    resource=resource_responsibility(
+                        kind="information",
+                        information_domain="weather_forecast",
+                        description="河南省内乡县今天的天气怎么样？",
+                        attributes=[
+                            binding("location", "geographic", "河南省内乡县"),
+                        ],
+                    ),
+                )
+            )
+        )
+
+        self.assertEqual(
+            ga_validation.non_verbatim_explicit_location_bindings(
+                output,
+                request=request("河南省内乡县今天的天气怎么样？"),
+            ),
+            [],
+        )
+
     def test_location_name_cannot_hide_non_location_query_semantics(self):
         payload = create_goals(
             goal(
@@ -1969,7 +1999,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("Removing an unjustified sibling Goal never permits dropping", prompt)
 
     def test_coverage_prompt_distinguishes_preferences_state_changes_and_information(self):
-        resolver = GoalAssociationResolver(FakeOllama({}))
         prompt = ga_prompt.build_responsibility_coverage_prompt(
             request=request("I want noodles, my sister wants rice; help us choose one.", language="en-US"),
             raw=create_goals(goal("Choose lunch fairly.", "speech")),
@@ -2209,8 +2238,48 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual([item["name"] for item in query_scope], ["time"])
         self.assertEqual(dropped[0]["value"], "current location")
 
+    def test_unique_gi_time_value_repairs_corrupted_query_location_label(self):
+        raw = create_goals(
+            goal(
+                "Report the current local time.",
+                "information",
+                resource=resource_responsibility(
+                    kind="information",
+                    description="current local time",
+                    attributes=[binding("location", "unknown", "现在")],
+                    source_status="unknown",
+                ),
+            )
+        )
+        req = request("帮我看看现在几点。", language="zh-CN")
+        req = req.model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "现在是几点",
+                        "bindings": {"time": "现在"},
+                        "output_mode": "information",
+                        "confidence": 0.99,
+                    }
+                )
+            }
+        )
+
+        normalized, repaired = ga_validation.normalize_grounded_binding_types(
+            raw,
+            request=req,
+        )
+
+        query_scope = normalized["new_goals"][0]["resource_responsibility"][
+            "query_scope"
+        ]
+        self.assertEqual(query_scope[0]["name"], "time")
+        self.assertEqual(query_scope[0]["entity_type"], "temporal_scope")
+        self.assertEqual(query_scope[0]["value"], "现在")
+        self.assertTrue(repaired[0]["source_pair_grounded"])
+
     def test_goal_association_prompt_uses_gateway_original_user_wording(self):
-        resolver = GoalAssociationResolver(FakeOllama({}))
         req = request("今晚，重庆热不热？")
         context = dict(req.context)
         context["user_turn_envelope"] = {
@@ -2229,7 +2298,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
     def test_goal_prompts_distinguish_body_action_from_physical_resource(self):
-        resolver = GoalAssociationResolver(FakeOllama({}))
         req = request(
             "Run forward for 15 seconds while singing.",
             language="en-US",
@@ -2288,7 +2356,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
     def test_no_candidate_segmentation_prompt_fits_qualified_8k_preflight(self):
-        resolver = GoalAssociationResolver(FakeOllama({}))
         req = request("你往前走 10 秒。")
 
         layered = ga_prompt.layered_prompt(
@@ -2949,6 +3016,23 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             ],
         )
 
+    def test_response_schema_keeps_unsupplied_recipient_pronoun_out_of_referent_id(self):
+        schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "body_action"},
+            responsibility_bindings={
+                "r1": {"location": "ahead of you", "distance": "50 meters"}
+            },
+        )
+
+        recipient = schema["$defs"]["GoalAssociationModelResourceRecipient"]
+        self.assertEqual(recipient["properties"]["referent_id"], {"type": "null"})
+        self.assertNotIn("referent_id", recipient.get("required", []))
+
     def test_response_schema_requires_source_grounded_ordinary_bindings(self):
         schema = ga_schema.goal_association_response_schema(
             GoalSegmentationModelOutput,
@@ -3394,7 +3478,9 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
 
 class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
-    def _resolve(self, payloads, req: AgentRunRequest) -> GoalAssociationResolution:
+    def _resolve(
+        self, payloads, req: CognitiveWorkRequest
+    ) -> GoalAssociationResolution:
         return asyncio.run(
             GoalAssociationResolver(ScriptedOllama(payloads)).resolve(req)
         )

@@ -206,6 +206,140 @@ class OutcomeObservationTests(unittest.TestCase):
 
         self.assertEqual(collect_llm_integrity_violations(summary), [])
 
+    def test_completed_detached_tts_is_observed_from_host_workflow(self) -> None:
+        summary = {"interaction_response": {"capabilities": [], "speech": []}}
+        summary["session_state"] = {
+            "workflow_events": [
+                {
+                    "event": "tts_schedule",
+                    "elapsed_ms": 1200.0,
+                    "message": "tts_schedule: order=0 chars=16 text='I blinked twice!'",
+                },
+                {
+                    "event": "playback_end",
+                    "elapsed_ms": 2400.0,
+                    "message": "playback_end: order=0 played_tts=1",
+                },
+            ]
+        }
+
+        self.assertEqual(
+            collect_observations(summary),
+            [
+                {
+                    "sequence": 0,
+                    "type": "speech.output",
+                    "domain": "speech",
+                    "status": "completed",
+                    "interaction_role": "task_response",
+                    "text": "I blinked twice!",
+                    "metadata": {
+                        "source": "session_tts_playback",
+                        "tts_order": 0,
+                        "workflow_event_index": 0,
+                        "elapsed_ms": 1200.0,
+                    },
+                    "planned_sequence": 0,
+                }
+            ],
+        )
+
+    def test_tts_chunks_count_as_one_model_authored_speech_activity(self) -> None:
+        summary = self._summary()
+        summary["interaction_response"]["capabilities"] = []
+        summary["interaction_response"]["speech"][0]["text"] = (
+            "Why don't scientists trust atoms? Because they make up everything!"
+        )
+        summary["execution"]["results"] = []
+        summary["session_state"] = {
+            "workflow_events": [
+                {
+                    "event": "tts_schedule",
+                    "elapsed_ms": 1000.0,
+                    "message": (
+                        "tts_schedule: order=0 "
+                        'text="Why don\'t scientists trust atoms?"'
+                    ),
+                },
+                {
+                    "event": "tts_schedule",
+                    "elapsed_ms": 1001.0,
+                    "message": (
+                        "tts_schedule: order=1 "
+                        "text='Because they make up everything!'"
+                    ),
+                },
+                {
+                    "event": "playback_end",
+                    "message": "playback_end: order=0 played_tts=1",
+                },
+                {
+                    "event": "playback_end",
+                    "message": "playback_end: order=1 played_tts=2",
+                },
+            ]
+        }
+
+        observations = collect_observations(summary)
+
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0]["type"], "speech.output")
+        self.assertEqual(observations[0]["status"], "completed")
+        self.assertEqual(
+            observations[0]["text"],
+            "Why don't scientists trust atoms? Because they make up everything!",
+        )
+
+    def test_delivered_speech_before_capability_receipt_keeps_actual_chronology(self) -> None:
+        summary = self._summary()
+        summary["interaction_response"]["capabilities"] = [
+            {
+                "request_id": "req-weather",
+                "capability_id": "chromie.weather.lookup",
+                "args": {"location": "重庆"},
+                "metadata": {"source_goal_ids": ["goal-weather"]},
+            }
+        ]
+        summary["interaction_response"]["speech"] = []
+        summary["execution"]["results"] = [
+            {"request_id": "req-weather", "status": "completed"}
+        ]
+        summary["timings_ms"] = {"agent_ms": 74000.0}
+        summary["session_state"] = {
+            "workflow_events": [
+                {
+                    "event": "tts_schedule",
+                    "elapsed_ms": 5300.0,
+                    "message": "tts_schedule: order=0 text='I checked: rain is certain.'",
+                },
+                {
+                    "event": "playback_end",
+                    "elapsed_ms": 10500.0,
+                    "message": "playback_end: order=0 played_tts=1",
+                },
+            ]
+        }
+
+        observations = collect_observations(summary)
+
+        self.assertEqual(
+            [item["type"] for item in observations],
+            ["speech.output", "capability.chromie.weather.lookup"],
+        )
+
+    def test_scheduled_but_unplayed_tts_is_not_observed(self) -> None:
+        summary = {"interaction_response": {"capabilities": [], "speech": []}}
+        summary["session_state"] = {
+            "workflow_events": [
+                {
+                    "event": "tts_schedule",
+                    "message": "tts_schedule: order=0 text='not delivered'",
+                }
+            ]
+        }
+
+        self.assertEqual(collect_observations(summary), [])
+
 
 if __name__ == "__main__":
     unittest.main()

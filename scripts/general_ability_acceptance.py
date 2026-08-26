@@ -206,6 +206,28 @@ def _speech_text(summary: dict[str, Any]) -> str:
         text = str(activity.get("text") or "").strip()
         if text and text not in texts:
             texts.append(text)
+
+    # Detached terminal-Evidence re-entry may deliver completion speech after
+    # the initial interaction response. User-outcome observation collection has
+    # already correlated those lines to completed playback in this exact turn;
+    # include that retained delivery evidence in speech-content assertions.
+    user_outcome = summary.get("user_outcome")
+    observations = (
+        user_outcome.get("observations")
+        if isinstance(user_outcome, dict)
+        else None
+    )
+    if isinstance(observations, list):
+        for observation in observations:
+            if (
+                not isinstance(observation, dict)
+                or observation.get("type") != "speech.output"
+                or observation.get("status") != "completed"
+            ):
+                continue
+            text = str(observation.get("text") or "").strip()
+            if text and text not in texts:
+                texts.append(text)
     return "\n".join(texts)
 
 

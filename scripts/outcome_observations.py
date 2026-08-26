@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,63 @@ _HARD_LLM_EVENTS = {
     "llm_prompt_truncated",
     "llm_stream_incomplete",
 }
+
+_TTS_ORDER_RE = re.compile(r"\border=(\d+)\b")
+_TTS_TEXT_RE = re.compile(r"\btext=(.+)$")
+
+
+def _completed_tts_playback(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return exact speech which the retained Host workflow says was played.
+
+    Detached result re-entry can schedule speech after the initial interaction
+    response has already been materialized.  The session workflow is the Host's
+    delivery authority for that speech; reconstructing it here keeps the
+    acceptance oracle from treating audible completion wording as absent.
+    """
+
+    session = summary.get("session_state")
+    if not isinstance(session, dict):
+        return []
+    events = [
+        item
+        for item in session.get("workflow_events") or []
+        if isinstance(item, dict)
+    ]
+    completed_orders: set[int] = set()
+    for item in events:
+        if item.get("event") != "playback_end":
+            continue
+        match = _TTS_ORDER_RE.search(str(item.get("message") or ""))
+        if match:
+            completed_orders.add(int(match.group(1)))
+
+    delivered: list[dict[str, Any]] = []
+    for event_index, item in enumerate(events):
+        if item.get("event") != "tts_schedule":
+            continue
+        message = str(item.get("message") or "")
+        order_match = _TTS_ORDER_RE.search(message)
+        text_match = _TTS_TEXT_RE.search(message)
+        if not order_match or not text_match:
+            continue
+        order = int(order_match.group(1))
+        if order not in completed_orders:
+            continue
+        try:
+            text = ast.literal_eval(text_match.group(1).strip())
+        except (SyntaxError, ValueError):
+            continue
+        if not isinstance(text, str) or not text.strip():
+            continue
+        delivered.append(
+            {
+                "order": order,
+                "event_index": event_index,
+                "elapsed_ms": item.get("elapsed_ms"),
+                "text": text.strip(),
+            }
+        )
+    return delivered
 
 
 @lru_cache(maxsize=4)
@@ -84,6 +143,12 @@ def collect_observations(
         for index, item in enumerate(execution_results)
     }
     fallback_order = len(execution_order)
+    timings = summary.get("timings_ms")
+    timings = timings if isinstance(timings, dict) else {}
+    try:
+        capability_receipt_lower_bound_ms = float(timings.get("agent_ms"))
+    except (TypeError, ValueError):
+        capability_receipt_lower_bound_ms = None
 
     observations: list[dict[str, Any]] = []
     for planned_sequence, skill in enumerate(response.get("capabilities") or []):
@@ -125,9 +190,20 @@ def collect_observations(
                 "args": observed_args,
                 "request_id": skill.get("request_id"),
                 "planned_sequence": planned_sequence,
+                **(
+                    {
+                        "_chronology_elapsed_ms": capability_receipt_lower_bound_ms
+                        + execution_order.get(request_id, planned_sequence) * 0.001
+                    }
+                    if receipt is not None
+                    and capability_receipt_lower_bound_ms is not None
+                    else {}
+                ),
             }
         )
 
+    delivered_tts = _completed_tts_playback(summary)
+    matched_delivery_indices: set[int] = set()
     capability_count = len(response.get("capabilities") or [])
     for planned_sequence, speech in enumerate(response.get("speech") or []):
         if not isinstance(speech, dict):
@@ -137,6 +213,23 @@ def collect_observations(
             continue
         metadata = speech.get("metadata") if isinstance(speech.get("metadata"), dict) else {}
         speech_id = str(speech.get("id") or "")
+        normalized_text = " ".join(text.split()).casefold()
+        matching_deliveries = [
+            (index, item)
+            for index, item in enumerate(delivered_tts)
+            if index not in matched_delivery_indices
+            and " ".join(str(item.get("text") or "").split()).casefold()
+            in normalized_text
+        ]
+        matched_delivery_indices.update(index for index, _item in matching_deliveries)
+        delivery_elapsed_ms = next(
+            (
+                item.get("elapsed_ms")
+                for _index, item in matching_deliveries
+                if item.get("elapsed_ms") is not None
+            ),
+            None,
+        )
         observations.append(
             {
                 "sequence": execution_order.get(
@@ -146,22 +239,62 @@ def collect_observations(
                 "type": "speech.output",
                 "domain": "speech",
                 "status": "completed"
-                if str(speech.get("id") or "") in execution_by_request
+                if matching_deliveries
+                or str(speech.get("id") or "") in execution_by_request
                 or not execution_by_request
                 else "planned",
                 "interaction_role": "task_response",
                 "text": text,
                 "metadata": metadata,
                 "planned_sequence": planned_sequence,
+                **(
+                    {"_chronology_elapsed_ms": delivery_elapsed_ms}
+                    if delivery_elapsed_ms is not None
+                    else {}
+                ),
             }
         )
 
-    observations.sort(
-        key=lambda item: (
-            int(item.get("sequence", 0)),
-            str(item.get("type") or ""),
+    for playback_index, playback in enumerate(delivered_tts):
+        if playback_index in matched_delivery_indices:
+            continue
+        observations.append(
+            {
+                "sequence": fallback_order + capability_count + playback["order"],
+                "type": "speech.output",
+                "domain": "speech",
+                "status": "completed",
+                "interaction_role": "task_response",
+                "text": playback["text"],
+                "metadata": {
+                    "source": "session_tts_playback",
+                    "tts_order": playback["order"],
+                    "workflow_event_index": playback["event_index"],
+                    "elapsed_ms": playback["elapsed_ms"],
+                },
+                "planned_sequence": playback["order"],
+                "_chronology_elapsed_ms": playback["elapsed_ms"],
+            }
         )
-    )
+
+    if any(item.get("_chronology_elapsed_ms") is not None for item in observations):
+        observations.sort(
+            key=lambda item: (
+                0 if item.get("_chronology_elapsed_ms") is not None else 1,
+                float(item.get("_chronology_elapsed_ms") or 0.0),
+                int(item.get("sequence", 0)),
+                str(item.get("type") or ""),
+            )
+        )
+    else:
+        observations.sort(
+            key=lambda item: (
+                int(item.get("sequence", 0)),
+                str(item.get("type") or ""),
+            )
+        )
+    for item in observations:
+        item.pop("_chronology_elapsed_ms", None)
     return observations
 
 

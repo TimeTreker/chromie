@@ -127,10 +127,68 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         self.assertEqual(normalized, raw)
         self.assertEqual(repairs, [])
 
+    def test_mixed_cleanup_canonicalizes_parallel_step_left_without_peer(self):
+        raw = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "step_ids": ["walk"],
+                },
+                "goal-sing": {
+                    "disposition": "unavailable",
+                    "response_text": "Singing is unavailable.",
+                    "step_ids": [],
+                },
+                "goal-blink": {
+                    "disposition": "execute",
+                    "step_ids": ["blink"],
+                },
+            },
+            "steps": [
+                {"step_id": "walk", "timing": "sequential"},
+                {"step_id": "blink", "timing": "parallel"},
+                {"step_id": "fake-sing", "timing": "parallel"},
+            ],
+        }
+
+        normalized, repairs = (
+            planner_deep_validation.normalize_mixed_goal_outcome_accounting(
+                raw,
+                expected_goal_ids=["goal-walk", "goal-sing", "goal-blink"],
+            )
+        )
+
+        self.assertEqual(
+            normalized["steps"],
+            [
+                {
+                    "step_id": "walk",
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-walk"],
+                },
+                {
+                    "step_id": "blink",
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-blink"],
+                },
+            ],
+        )
+        self.assertTrue(
+            any(
+                item.get("path") == "steps[1].timing"
+                and item.get("basis")
+                == "terminal non-effect accounting left no executable parallel peer"
+                for item in repairs
+            )
+        )
+
     def test_explicit_per_goal_outcomes_repair_redundant_aggregate_fields(self):
         raw = {
             "disposition": "execute",
             "coverage": "partial",
+            "response_text": "I will sing while walking.",
             "goal_outcomes": {
                 "goal-walk": {
                     "disposition": "execute",
@@ -145,6 +203,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
                 },
                 "goal-sing": {
                     "disposition": "unavailable",
+                    "response_text": "I can walk, but singing is unavailable.",
                     "step_ids": [],
                     "satisfaction": {
                         "score": 0.0,
@@ -187,6 +246,10 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
 
         self.assertEqual(normalized["disposition"], "mixed")
         self.assertEqual(normalized["coverage"], "complete")
+        self.assertEqual(
+            normalized["response_text"],
+            "I can walk, but singing is unavailable.",
+        )
         self.assertEqual(
             normalized["goal_outcomes"]["goal-walk"]["satisfaction"][
                 "unmet_goal_ids"
@@ -403,6 +466,15 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.response_text, "The current state is available.")
+        prompt = str(ollama.prompts[0][0])
+        self.assertIn(
+            "trusted terminal-Evidence Planner re-entry, not a new user turn",
+            prompt,
+        )
+        self.assertIn(
+            "A source-Plan step reported completed is prior Work",
+            prompt,
+        )
         schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("respond", schema["properties"]["disposition"].get("enum", []))
         self.assertGreater(schema["properties"]["steps"].get("maxItems", 0), 0)
@@ -1766,25 +1838,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             },
             "goal_satisfaction": {"score": 1.0, "status": "substantial"},
         }
-        repaired = {
-            **invalid,
-            "disposition": "execute",
-            "goal_outcomes": {
-                "goal-walk": {
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["walk"],
-                    "satisfaction": {"score": 1.0, "status": "exact"},
-                },
-                "goal-blink": {
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["blink"],
-                    "satisfaction": {"score": 1.0, "status": "exact"},
-                },
-            },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
-        }
         ollama = SequencedOllama([invalid])
 
         plan = asyncio.run(
@@ -1964,14 +2017,15 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
-        exact = lambda goal_id: {
-            "score": 1.0,
-            "status": "exact",
-            "satisfied_goal_ids": [goal_id],
-            "unmet_goal_ids": [],
-            "unmet_requirements": [],
-            "rationale": "The owned step prospectively satisfies this goal.",
-        }
+        def exact(goal_id):
+            return {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": [goal_id],
+                "unmet_goal_ids": [],
+                "unmet_requirements": [],
+                "rationale": "The owned step prospectively satisfies this goal.",
+            }
         repaired = {
             **invalid,
             "confidence": 1.0,
@@ -2541,11 +2595,12 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "satisfied_goal_ids": goal_ids,
             },
         }
-        outcome_satisfaction = lambda goal_id: {
-            "score": 1.0,
-            "status": "exact",
-            "satisfied_goal_ids": [goal_id],
-        }
+        def outcome_satisfaction(goal_id):
+            return {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": [goal_id],
+            }
         repaired = {
             "disposition": "mixed",
             "coverage": "complete",
@@ -2594,11 +2649,12 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_live_blink_and_joke_nested_metadata_repairs_to_minimal_keyed_outcomes(self):
         goal_ids = ["goal-joke", "goal-blink"]
-        satisfaction = lambda goal_id: {
-            "score": 1.0,
-            "status": "exact",
-            "satisfied_goal_ids": [goal_id],
-        }
+        def satisfaction(goal_id):
+            return {
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": [goal_id],
+            }
         invalid = {
             "disposition": "mixed",
             "coverage": "complete",
@@ -2973,16 +3029,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 }
             },
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
-        }
-        revised = {
-            **invalid,
-            "goal_outcomes": {
-                "goal-blink": {
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["blink"],
-                }
-            },
         }
         ollama = SequencedOllama([invalid])
 

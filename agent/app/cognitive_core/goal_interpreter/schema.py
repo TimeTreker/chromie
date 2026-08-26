@@ -217,8 +217,9 @@ class GoalInterpretationSupportingCoverageItem(
         default_factory=list,
         max_length=12,
         description=(
-            "For ordered/parallel constraints, exact audit_ref values of the "
-            "positive source outcomes in source order or concurrent membership."
+            "Exact audit_ref values of the positive source outcomes this constraint "
+            "modifies. Ordered relations preserve source order; parallel relations "
+            "list concurrent membership; ordinary modifiers cite their exact owner."
         ),
     )
 
@@ -255,8 +256,6 @@ class GoalInterpretationSupportingCoverageItem(
                 )
         if self.relation_kind != "none" and self.role != "constraint":
             raise ValueError("typed coordination relations must be constraints")
-        if self.relation_kind == "none" and self.related_audit_refs:
-            raise ValueError("non-relation supporting items cannot cite audit refs")
         return self
 
 

@@ -687,10 +687,18 @@ class PlaybackTransport:
                                 host.session_log(session_id, "tts_error: order=%s attempt=%s/%s tts_ms=%.1f error=%s", order, attempt, max_attempts, now_ms() - tts_start_ms, data.get("message"))
                                 if stream is not None:
                                     await stream.finish("tts_error")
-                                else:
-                                    await self.enqueue_playback_skip(generation, order, session_id, "tts_error")
-                                host.maybe_session_done(session_id)
-                                return
+                                    host.maybe_session_done(session_id)
+                                    return
+                                # A provider can invalidate a stale warm worker
+                                # before emitting any PCM.  That response is a
+                                # retryable transport failure: the next bounded
+                                # WebSocket attempt reaches the freshly started
+                                # worker.  Returning here used to bypass the
+                                # already-declared retry budget and permanently
+                                # skip otherwise recoverable speech.
+                                raise RuntimeError(
+                                    str(data.get("message") or "TTS provider error")
+                                )
                             if msg_type == "end":
                                 provider_metadata = data.get("provider")
                                 if not isinstance(provider_metadata, dict):

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 from itertools import product
-import json
 from typing import Any
 
 try:
@@ -28,7 +27,6 @@ except ImportError:  # pragma: no cover
         FastPlannerFirstResponseTruthCertificate,
     )
 
-from .planner_context import expected_goal_ids
 from .prompt_projection import bounded_json
 from .planner_grounding import (
     _argument_schema_accepts_canonical_binding,
@@ -379,6 +377,7 @@ def planner_coverage_review_response_schema() -> dict[str, Any]:
     schema["required"] = [
         "decision",
         "confidence",
+        "semantic_mismatch_found",
         "uncovered_requirements",
         "reason",
     ]
@@ -388,6 +387,7 @@ def planner_coverage_review_response_schema() -> dict[str, Any]:
                 {
                     "properties": {
                         "decision": {"type": "string", "enum": ["accept"]},
+                        "semantic_mismatch_found": {"type": "boolean", "const": False},
                         "uncovered_requirements": {
                             "type": "array",
                             "maxItems": 0,
@@ -556,6 +556,30 @@ def canonical_plan_response_schema(
             | unavailable_information_goal_set
         )
     ]
+    known_unavailable_goal_set = (
+        unavailable_provider_vocal_goal_set
+        | unavailable_provider_media_goal_set
+        | unavailable_information_goal_set
+    )
+    if (
+        requires_execution
+        and executable_source_goal_ids
+        and known_unavailable_goal_set
+        and isinstance(disposition, dict)
+    ):
+        # A request can contain independently executable work alongside a Goal
+        # whose typed provider contract is deterministically unavailable.  The
+        # complete aggregate result is then ``mixed`` even when no Goal is a
+        # conversational-response Goal.  Keep that valid result representable
+        # at the decoder boundary; the per-Goal schemas and semantic validator
+        # still decide which remaining Goals are actually executable.
+        disposition["enum"] = [
+            "execute",
+            "mixed",
+            "clarify",
+            "unavailable",
+            "refused",
+        ]
 
     if unavailable_provider_vocal_goal_set:
         planner_response_text = properties.get("response_text")
@@ -1800,6 +1824,7 @@ def fast_truth_certificate_response_schema() -> dict[str, Any]:
         "has_unverified_result_or_completion_claim",
         "has_ungrounded_method_or_world_claim",
         "has_semantic_perspective_contradiction",
+        "has_out_of_scope_goal_claim",
         "decision",
     ]
     return schema

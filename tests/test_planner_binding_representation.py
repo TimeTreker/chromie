@@ -14,6 +14,7 @@ from agent.app.planner_schema import (
 from agent.app.planner_validation import (
     normalize_detached_parameter_resolutions,
     normalize_schema_default_parameter_provenance,
+    qualify_capability_catalog_for_typed_binding_values,
     validate_explicit_numeric_parameter_grounding,
     validate_goal_binding_argument_grounding,
     validate_user_supplied_parameter_provenance,
@@ -750,6 +751,38 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             ],
         )
 
+    def test_local_clock_fixed_now_scope_accepts_source_language_temporal_value(self):
+        goal = _information_weather_goal()
+        goal["resource_responsibility"]["resource"]["attributes"] = {
+            "information_domain": {
+                "entity_type": "information_domain",
+                "value": "local_clock",
+            },
+            "time": {"entity_type": "temporal_scope", "value": "现在"},
+        }
+        output = _weather_output()
+        output.steps[0].capability_id = "chromie.clock.local"
+        output.steps[0].args = {}
+
+        validate_goal_binding_argument_grounding(
+            output,
+            authoritative_goals=[goal],
+            capabilities=[
+                {
+                    "capability_id": "chromie.clock.local",
+                    "hints": {
+                        "semantic_scope": {
+                            "domain": "local_clock",
+                            "fixed_temporal_scope": {
+                                "entity_types": ["time", "temporal_scope"],
+                                "values": ["now"],
+                            },
+                        }
+                    },
+                }
+            ],
+        )
+
     def test_typed_list_binding_accepts_chinese_list_separators(self):
         goal = _weather_goal()
         goal["object"]["bindings"]["aspects"]["value"] = (
@@ -758,6 +791,82 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
         validate_goal_binding_argument_grounding(
             _weather_output(),
             authoritative_goals=[goal],
+        )
+
+    def test_typed_capability_argument_rejects_omitted_numeric_speed(self):
+        goal = _weather_goal()
+        goal["object"]["bindings"] = {
+            "speed": {"entity_type": "speed", "value": "0.2"}
+        }
+        output = _weather_output(extra_args={"duration_s": 10.0})
+        output.steps[0].capability_id = "soridormi.walk_velocity"
+
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "omitted authoritative typed Goal binding",
+        ):
+            validate_goal_binding_argument_grounding(
+                output,
+                authoritative_goals=[goal],
+                capabilities=[
+                    {
+                        "capability_id": "soridormi.walk_velocity",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {
+                                "vx_mps": {
+                                    "type": "number",
+                                    "x-chromie-entity-type": "speed",
+                                },
+                                "duration_s": {"type": "number"},
+                            },
+                        },
+                    }
+                ],
+            )
+
+    def test_numeric_speed_omits_qualitative_capability_but_keeps_numeric_one(self):
+        goal = _weather_goal()
+        goal["object"]["bindings"] = {
+            "speed": {"entity_type": "speed", "value": "0.2"}
+        }
+        capabilities = [
+            {
+                "capability_id": "soridormi.walk_forward",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "speed": {
+                            "type": "string",
+                            "enum": ["slow", "normal", "quick"],
+                        }
+                    },
+                },
+            },
+            {
+                "capability_id": "soridormi.walk_velocity",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {
+                            "type": "number",
+                            "minimum": -0.03,
+                            "maximum": 0.25,
+                            "x-chromie-entity-type": "speed",
+                        }
+                    },
+                },
+            },
+        ]
+
+        qualified = qualify_capability_catalog_for_typed_binding_values(
+            capabilities,
+            authoritative_goals=[goal],
+        )
+
+        self.assertEqual(
+            [item["capability_id"] for item in qualified],
+            ["soridormi.walk_velocity"],
         )
 
     def test_typed_list_binding_still_rejects_different_items(self):

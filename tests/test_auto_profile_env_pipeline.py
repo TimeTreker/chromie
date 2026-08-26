@@ -312,8 +312,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", values)
-        self.assertNotIn("OLLAMA_FLASH_ATTENTION", values)
-        self.assertNotIn("OLLAMA_KV_CACHE_TYPE", values)
+        self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
+        self.assertEqual(values["OLLAMA_KV_CACHE_TYPE"], "q8_0")
         self.assertEqual(
             manifest["active_ollama_models"],
             [single_model],

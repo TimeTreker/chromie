@@ -16,12 +16,9 @@ from .cognitive_identity import (
 from .goal_progress_communication import goal_progress_communication_prompt
 from .prompt_projection import bounded_json
 from .planner_context import (
-    canonical_goal_grounding,
     evidence_bound_dialogue,
-    expected_goal_ids,
     goal_association_prompt_projection,
     planner_goal_context,
-    planner_goal_execution_requirements,
     planner_provider_vocal_goal_ids,
     situation_prompt_projection,
 )
@@ -118,13 +115,20 @@ def fast_first_response_truth_system_prompt() -> str:
         "flag explicitly, then accept only when all three are false. Before action or Evidence, a "
         "present acknowledgement or future intention is supported, while an "
         "already-started/completed action, result, invented method, or invented fact is "
-        "not. An onset or progressive predicate saying execution starts, has "
+        "not. For pre_evidence information checks, distinguish grammar explicitly: "
+        "an equivalent of 'I'll check' or '我来查一下' is prospective; an equivalent "
+        "of 'I checked', '我查过/我查了一下', followed by an answer assertion is past "
+        "acquisition plus a result and must set "
+        "has_unverified_result_or_completion_claim=true. An onset or progressive predicate saying execution starts, has "
         "started, or is underway is an already-started claim even when an immediacy "
         "marker appears before it. Resolve grammatical roles: in a human command addressed to Chromie, "
         "Chromie is the commanded actor. Chromie's first-person subject is the "
         "correct actor; the user's second-person command does not make that reply "
         "a perspective contradiction. A reply telling the human to do Chromie's "
-        "action does. Never choose a Capability or change Goal meaning."
+        "action does. Wording that says Chromie will accompany the human, act together "
+        "with them, or otherwise makes the human a co-participant is also a perspective "
+        "contradiction unless the Responsibility explicitly requests joint participation. "
+        "Never choose a Capability or change Goal meaning."
     )
 
 
@@ -140,7 +144,10 @@ def fast_first_response_truth_prompt(
         "a present acknowledgement or prospective intention is valid; future-oriented "
         "grammar may announce intended checking or action without claiming execution. "
         "Onset, progressive, perfect, completion, and result predicates claim a later "
-        "truth stage and must be rejected when that stage is not established. "
+        "truth stage and must be rejected when that stage is not established. For an "
+        "information check, an equivalent of 'I'll check'/'我来查一下' is prospective; "
+        "an equivalent of 'I checked'/'我查过/我查了一下' plus an answer proposition "
+        "is retrospective Evidence acquisition and an unverified result. "
         "Reject only when the sentence contains an unverified result, changed-world "
         "claim, already-started/completed claim, or when it invents a physical "
         "instrument, source, sensor, observation, action, personal fact, or world "
@@ -155,7 +162,9 @@ def fast_first_response_truth_prompt(
         "action after the target meaning is supplied. "
         "For a command addressed to Chromie, first-person self-reference may be the "
         "correct actor; reject only when the wording actually assigns Chromie's owed "
-        "action to the human or otherwise reverses the grounded semantic roles. "
+        "action to the human or otherwise reverses the grounded semantic roles. Reject "
+        "unrequested joint-participation wording such as accompanying the human or acting "
+        "together with them when only Chromie's action was requested. "
         "A human's feeling must remain the human's, and repeating Chromie's last utterance "
         "must use the supplied assistant utterance. A progress question that asks "
         "the human to supply or reconfirm information without an InformationGap "
@@ -257,13 +266,18 @@ def fast_first_response_prompt(
         "or speaking now adds no useful semantic delta. At truth_stage=pre_evidence, no check, "
         "execution, or fresh Evidence has happened. Say only a present "
         "acknowledgement or prospective intention; never claim or predict a result, "
-        "completion, method, instrument, source, sensor, or screen. A progress "
+        "completion, method, instrument, source, sensor, or screen. A check must use "
+        "prospective grammar (an equivalent of 'I'll check' or '我来查一下'), never "
+        "retrospective/perfect grammar (an equivalent of 'I checked' or "
+        "'我查过/我查了一下') and never the requested proposition's answer. A progress "
         "Activity is not a clarification: never ask a question, request a choice, "
         "or ask the person to reconfirm supplied meaning. Preserve who said, felt, "
         "perceived, or did each thing: the human's first person never becomes "
         "Chromie's first person. An imperative addressed to Chromie makes Chromie "
         "the actor. Reply to a command with Chromie's first-person intention; never "
-        "repeat the commanded action with the human as its subject. Do not turn a command into an "
+        "repeat the commanded action with the human as its subject. Do not turn a command "
+        "into an invitation, accompaniment, or joint activity with the human unless joint "
+        "participation is part of the authoritative Responsibility. Do not turn a command into an "
         "observation about the human's hobbies, practice, preferences, or recent "
         "activity. For a human feeling, acknowledge the human as 你/you, never as "
         "我/I. For a request to restate Chromie's last utterance, use only the "
@@ -362,7 +376,12 @@ def fast_plan_prompt(
         ),
     )
     grounding = list(goal_context.authoritative_goals)
-    response_only, requires_execution = planner_goal_execution_requirements(grounding)
+    # Re-entry may close an originally effectful Goal from trusted terminal
+    # Evidence.  Use the shared scoped Goal context instead of reclassifying the
+    # original Goal shape, which would contradict the re-entry schema and tell
+    # the model to execute already-completed Work again.
+    response_only = goal_context.response_only
+    requires_execution = goal_context.requires_execution
     argument_grounding_contract = (
         EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
         + "For chromie.memory.retrieve_verified_tool_result, all resolved "
@@ -389,8 +408,15 @@ def fast_plan_prompt(
         "or workflow vocabulary, and never turn a completed-but-unqualified claim into "
         "verified completion. The typed Planner re-entry scope and FINAL CANONICAL "
         "GOALS are exact; do not claim completion of sibling effects found only in "
-        "the original turn or source_text. Correlate terminal Evidence with the "
-        "authoritative source Plan before interpreting its exact completed Work. "
+        "the original turn or source_text. The original user turn and source Plan "
+        "are historical provenance, not a fresh command. A completed source-Plan "
+        "step is prior Work and must not be copied into the new steps array. When "
+        "trusted Evidence completes every scoped Goal and a completion response is "
+        "still useful, use respond outcomes with exact Evidence-grounded wording, "
+        "zero steps, exact satisfaction, and no sibling unmet requirements. Author "
+        "new steps only for a distinct still-open requirement made necessary by the "
+        "new state. Correlate terminal Evidence with the authoritative source Plan "
+        "before interpreting its exact completed Work. "
         if isinstance(context.get("result_evidence_reentry"), dict)
         else ""
     )
@@ -508,7 +534,7 @@ def fast_plan_prompt(
             "Fast terminal scope permits at most one executable step per goal. A count argument performs repetition inside one skill call; never duplicate a step to implement repeated blinks, nods, or similar motions. Respond goals have no executable step. "
             "For a terminal plan, every per-goal outcome is execute or respond, coverage is complete, and the top-level disposition exactly aggregates the outcome dispositions. A respond outcome contains the actual answer now and references no steps. An execute outcome references every and only the model-authored steps owned by that goal. "
             "For semantic escalation, author disposition=escalate, coverage=partial or uncertain, steps=[], a non-empty top-level escalation_reason, and one escalate outcome for every canonical goal. Each escalate outcome must explain its own unresolved need, reference no steps, carry no response_text, and include a non-exact prospective satisfaction judgment. Do not mix escalation outcomes with executable or response outcomes. "
-            "goal_satisfaction and every per-goal satisfaction are model judgments about prospective plan adequacy. A score from 0.95 through 1.0 requires status=exact. Escalation cannot claim exact satisfaction. "
+            "goal_satisfaction and every per-goal satisfaction are model judgments about prospective plan adequacy. A score from 0.95 through 1.0 requires status=exact. Escalation cannot claim exact satisfaction and therefore every escalation satisfaction score must be below 0.95. "
             "Generic response transport is not a task-plan step, so chromie.speak is never a plan step. Do not replace a conversational answer with a gesture or attention action. "
             "Use plan_relation=exact unless the plan materially changes the request; safe_adjustment or alternative requires user_confirmation_required=true and explanatory response_text. "
             "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. Return JSON only.\n\n"
@@ -556,7 +582,7 @@ def fast_plan_prompt(
         "Generic speech transport is not a plan step. Read canonical Goal output_mode as provider-neutral WHAT, then decide HOW from current trusted context, Evidence, and the qualified Capability catalog. output_mode=speech is directly authored conversation: use disposition=respond with the actual response_text now. output_mode=information may also respond immediately when the supplied trusted context or Evidence already grounds the requested answer; otherwise select exact information Work from the catalog, or escalate when Fast cannot resolve the need. output_mode=stateful_effect, body_action, media_playback, and provider-backed vocal performance modes cannot be completed merely by response_text. For styled_speech, recitation, singing, humming, or nonverbal_vocalization, execute only when exact capability_id chromie.vocal.perform advertises the authoritative mode; otherwise escalate with a truthful unavailable/refused/clarification outcome. For media_playback, use exactly one `chromie.media.<media_operation>` capability copied from the qualified catalog and preserve the requested lifecycle operation. For stateful_effect, select only an exact Capability whose declared semantics can cause the requested durable or future state change; never infer provider requirement or execution lane from Goal metadata. Executable outcomes may also carry response_text when it is a still-needed prospective conversational delta; use Interaction Context to omit equivalent delivered or pending speech, and never treat that text as execution evidence. Playback of existing music, recordings, streams, or sound effects is never evidence for singing. Greeting wording and length are ordinary model-authored conversational choices governed by the supplied scene, relationship context, and owner-approved personality. "
         "Every executable step must use capability_id plus source_goal_ids copied from the canonical goals. Do not use catalog-only parameters, action, input_schema, route, or step_type fields. "
         "When reality can resolve uncertainty more cheaply than guessing, ordinary Planner Work may use step_purpose=acquire_information with expected_outcome describing the concrete observation that would make progress possible. Select only an exact registered Capability whose declared semantics actually acquire that information; gaze/body/perception is eligible only when advertised by that Capability and remains subject to normal Runtime safety. For all steps, expected_outcome is a prospective, falsifiable expectation rather than Evidence. On trusted result re-entry compare actual Evidence with that expectation and revise Work/Situation when they disagree; never rewrite Evidence to match the Plan. "
-        "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. If steps are present, top-level disposition cannot be respond. "
+        "goal_satisfaction measures prospective plan adequacy: planned steps count as satisfying their goals if successful, so pending execution alone is never an unmet requirement. A score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Escalation cannot claim exact satisfaction and therefore every escalation satisfaction score must be below 0.95. If steps are present, top-level disposition cannot be respond. "
         "For every terminal or escalation result, goal_outcomes must be keyed exactly once by every supplied canonical Goal ID. Each execute outcome needs its real step_ids; each respond outcome needs non-empty response_text and step_ids=[]; each escalation outcome needs its unresolved reason and non-exact satisfaction. "
         "Valid examples: execute uses owned steps and execute outcomes; mixed uses owned steps plus respond outcomes; escalation uses steps=[], one escalate outcome per Goal, and non-null non-exact goal_satisfaction. "
         "Use plan_relation=exact for an exact plan. A safe_adjustment or alternative must set user_confirmation_required=true so the host holds execution for approval. "
@@ -992,6 +1018,21 @@ def deep_plan_prompt(
     previous_section = bounded_json(previous_raw, 5000) if previous_raw is not None else "null"
     response_only = goal_context.response_only
     requires_execution = goal_context.requires_execution
+    result_evidence_contract = (
+        "This is a trusted terminal-Evidence Planner re-entry, not a new user turn. "
+        "Only the typed re-entry Goal scope and FINAL CANONICAL GOALS are current "
+        "semantic authority; the original utterance, source_text, and source Plan "
+        "are historical provenance for correlation. Never narrate, satisfy, or list "
+        "an excluded sibling Goal. A source-Plan step reported completed is prior "
+        "Work and must not be copied into this output's steps array. When trusted "
+        "Evidence completes every scoped Goal and a completion response is still "
+        "useful, author respond outcomes with exact Evidence-grounded wording, zero "
+        "steps, exact satisfaction, and no sibling unmet requirements. Author new "
+        "steps only for a distinct still-open requirement made necessary by the new "
+        "state; never replay completed Work merely because Evidence arrived. "
+        if isinstance(context.get("result_evidence_reentry"), dict)
+        else ""
+    )
     provider_vocal_goal_ids = sorted(
         planner_provider_vocal_goal_ids(grounding)
     )
@@ -1042,6 +1083,7 @@ def deep_plan_prompt(
         f"{goal_progress_communication_prompt('Planner deep pass')}\n\n"
         f"Goal-scoped Interaction Context JSON:\n{bounded_json(context.get('interaction_context') or {}, 8000)}\n\n"
         "Use Interaction Context to reason from what Chromie actually delivered, what trusted evidence says completed or failed, what remains pending, and what is new; produce only the still-needed conversational and effectful delta. Preserve owner and event_type evidence strength: generated or scheduled speech is not proof the user heard it, a proposal or committed request is not completion, and execution completion must retain execution_closure evidence references. Missing or undelivered communication may still leave a meaningful conversational delta; decide that from the current Goal and Interaction Context rather than from an earlier stage's private preference. Add response_text only when it materially improves the current interaction; avoid filler and repetition. Repeat an act only when the current meaning justifies it, such as an explicit repeat, retry, correction, changed state, new evidence, or clarification. The current canonical Goals and validation feedback remain authoritative. "
+        f"{result_evidence_contract}"
         "The active task bindings are historical Host/runtime context. Their "
         "task_id, request_id, canonical_plan_id, and prior step IDs are not "
         "current Deep Planner step IDs. Never copy them into current "

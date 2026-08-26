@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 """Constrained-decoder schema construction for Goal Association model DTOs.
 
 This module has no model client, Goal state, or continuity decision lifecycle.
 """
+
+from __future__ import annotations
 
 import copy
 from typing import Any, Literal
@@ -209,6 +209,29 @@ def goal_association_response_schema(
                 constrain(value)
 
     constrain(schema)
+    recipient_schema = schema.get("$defs", {}).get(
+        "GoalAssociationModelResourceRecipient"
+    )
+    if isinstance(recipient_schema, dict):
+        recipient_properties = recipient_schema.setdefault("properties", {})
+        recipient_properties["referent_id"] = (
+            {
+                "anyOf": [
+                    {"type": "string", "enum": referent_ids},
+                    {"type": "null"},
+                ]
+            }
+            if referent_ids
+            else {"type": "null"}
+        )
+        recipient_properties["description"] = {
+            "type": "string",
+            "minLength": 1,
+            "description": (
+                "Human-facing recipient meaning. Use the current-turn surface or "
+                "requester when no supplied discourse referent ID exists."
+            ),
+        }
     # Apply the canonical binding clauses before copying the binding schema into
     # Responsibility-specific oneOf branches.  Applying them only to ``$defs``
     # after those copies are built leaves the active constrained-decoder branch
@@ -1027,6 +1050,15 @@ def coverage_certificate_response_schema(
                     branch_properties["required_output_mode"] = {
                         "const": output_mode
                     }
+                    if coverage == "covered" and output_mode != "information":
+                        # The candidate and this responsibility branch already
+                        # assert one exact non-information observable outcome.
+                        # A false independence flag would contradict that branch
+                        # and can make a coordinated body/vocal effect disappear
+                        # during the audit's role-conflict normalization.
+                        branch_properties["independently_satisfiable"] = {
+                            "const": True
+                        }
                 return {
                     "type": "object",
                     "additionalProperties": False,

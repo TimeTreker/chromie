@@ -399,6 +399,7 @@ class FastPlannerFirstResponseTruthCertificate(BaseModel):
     has_unverified_result_or_completion_claim: bool = False
     has_ungrounded_method_or_world_claim: bool = False
     has_semantic_perspective_contradiction: bool = False
+    has_out_of_scope_goal_claim: bool = False
     decision: Literal["accept", "reject"]
 
     @model_validator(mode="after")
@@ -407,6 +408,7 @@ class FastPlannerFirstResponseTruthCertificate(BaseModel):
             self.has_unverified_result_or_completion_claim
             or self.has_ungrounded_method_or_world_claim
             or self.has_semantic_perspective_contradiction
+            or self.has_out_of_scope_goal_claim
         )
         if self.decision == "accept" and has_violation:
             raise ValueError("accept requires every truth-audit flag to be false")

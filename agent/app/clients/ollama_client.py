@@ -910,11 +910,23 @@ class OllamaClient:
 
         try:
             parsed = json.loads(cleaned)
-        except json.JSONDecodeError:
-            match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-            if not match:
+        except json.JSONDecodeError as original_error:
+            object_start = cleaned.find("{")
+            if object_start < 0:
                 raise
-            parsed = json.loads(match.group(0))
+            try:
+                parsed, consumed = json.JSONDecoder().raw_decode(
+                    cleaned[object_start:]
+                )
+            except json.JSONDecodeError:
+                raise original_error from None
+            trailing = cleaned[object_start + consumed :]
+            if "{" in trailing:
+                # Preserve the existing rejection of multiple competing JSON
+                # objects. Raw decoding is used only to isolate one complete
+                # object from harmless surrounding prose or unmatched closing
+                # delimiters emitted after a schema-complete response.
+                raise original_error from None
 
         if not isinstance(parsed, dict):
             raise ValueError("Ollama JSON response is not an object")

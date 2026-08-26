@@ -477,6 +477,9 @@ def normalize_grounded_binding_types(
             for source_ref in goal_source_refs
             for pair in ordinary_pairs_by_ref.get(source_ref, set())
         }
+        source_names_by_value: dict[str, set[str]] = {}
+        for source_name, source_value in expected_ordinary_pairs:
+            source_names_by_value.setdefault(source_value, set()).add(source_name)
         surfaces: list[tuple[str, Any]] = [("bindings", goal.get("bindings"))]
         resource = goal.get("resource_responsibility")
         if isinstance(resource, dict):
@@ -524,6 +527,37 @@ def normalize_grounded_binding_types(
                     name,
                     value,
                 ) in expected_ordinary_pairs
+                source_names_for_value = source_names_by_value.get(value, set())
+                if (
+                    surface_name == "resource.query_scope"
+                    and name == "location"
+                    and len(source_names_for_value) == 1
+                    and "location" not in source_names_for_value
+                ):
+                    # The provider preserved one exact authoritative GI value but
+                    # attached the wrong query-scope label. Project the unique
+                    # source binding name; no source-language meaning is inferred.
+                    source_name = next(iter(source_names_for_value))
+                    canonical_type = (
+                        "temporal_scope"
+                        if source_name in {"date", "time", "temporal_scope"}
+                        else source_name
+                    )
+                    binding["name"] = source_name
+                    binding["entity_type"] = canonical_type
+                    repaired.append(
+                        {
+                            "path": (
+                                f"new_goals[{goal_index}].{surface_name}"
+                                f"[{binding_index}]"
+                            ),
+                            "from": f"{name}/{entity_type}",
+                            "to": f"{source_name}/{canonical_type}",
+                            "value_unchanged": True,
+                            "source_pair_grounded": True,
+                        }
+                    )
+                    continue
                 if surface_name == "bindings" and source_pair_grounded:
                     canonical_type: str | None = None
                     if name == "direction" and entity_type in {
@@ -1007,6 +1041,7 @@ def non_verbatim_explicit_location_bindings(
         "city",
         "country",
         "county",
+        "geographic",
         "location",
         "place",
         "relative_location",
@@ -1025,6 +1060,7 @@ def non_verbatim_explicit_location_bindings(
                 "city",
                 "country",
                 "county",
+                "geographic",
                 "location",
                 "place",
                 "region",

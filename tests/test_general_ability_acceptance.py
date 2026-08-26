@@ -19,6 +19,7 @@ from scripts.general_ability_acceptance import (
     _fast_response_timing_evidence,
     _run_live_case,
     _runtime_provenance,
+    _speech_text,
     _write_reviewer_packet,
     build_parser,
     level_a_keys,
@@ -36,6 +37,30 @@ from scripts.interaction_text_mujoco_check import build_parser as build_text_che
 
 
 class GeneralAbilityAcceptanceTests(unittest.TestCase):
+    def test_speech_text_includes_completed_detached_result_delivery(self) -> None:
+        summary = {
+            "interaction_response": {"speech": []},
+            "user_outcome": {
+                "observations": [
+                    {
+                        "type": "speech.output",
+                        "status": "completed",
+                        "text": "I looked at you, then blinked twice.",
+                    },
+                    {
+                        "type": "speech.output",
+                        "status": "failed",
+                        "text": "This was never delivered.",
+                    },
+                ]
+            },
+        }
+
+        self.assertEqual(
+            _speech_text(summary),
+            "I looked at you, then blinked twice.",
+        )
+
     def test_runtime_provenance_is_revision_bound_for_target_closure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "runtime-identity.json"
@@ -639,6 +664,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertEqual(len(case.turns), 2)
         self.assertEqual(case.turns[0].case_id, "weather_context")
+        self.assertEqual(
+            case.turns[0].expected_capabilities,
+            ("chromie.weather.lookup",),
+        )
         self.assertEqual(case.turns[1].language, "zh-CN")
         self.assertEqual(case.turns[1].min_new_goal_count, 3)
         self.assertEqual(case.turns[1].min_goal_outcome_count, 3)

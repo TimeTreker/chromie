@@ -12,7 +12,6 @@ from types import MethodType
 from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
-from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
@@ -153,12 +152,48 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
+        mixed_schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-walk", "goal-sing"],
+            allowed_capability_ids=["soridormi.walk_forward"],
+            requires_execution=True,
+            provider_vocal_goal_ids=["goal-sing"],
+        )
+        self.assertIn(
+            "mixed",
+            mixed_schema["properties"]["disposition"]["enum"],
+        )
+        walk_outcome = mixed_schema["properties"]["goal_outcomes"][
+            "properties"
+        ]["goal-walk"]
+        self.assertIn(
+            "execute",
+            walk_outcome["properties"]["disposition"]["enum"],
+        )
+        sing_outcome = mixed_schema["properties"]["goal_outcomes"][
+            "properties"
+        ]["goal-sing"]
+        self.assertNotIn(
+            "execute",
+            sing_outcome["properties"]["disposition"]["enum"],
+        )
+        self.assertEqual(
+            sing_outcome["properties"]["step_ids"]["maxItems"],
+            0,
+        )
+
     def test_coverage_review_schema_requires_branch_complete_output(self) -> None:
         schema = planner_coverage_review_response_schema()
 
         self.assertEqual(
             set(schema["required"]),
-            {"decision", "confidence", "uncovered_requirements", "reason"},
+            {
+                "decision",
+                "confidence",
+                "semantic_mismatch_found",
+                "uncovered_requirements",
+                "reason",
+            },
         )
         branches = schema["allOf"][0]["anyOf"]
         self.assertEqual(
@@ -895,9 +930,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(likely)
 
     def test_planner_prompts_preserve_requested_concurrency(self) -> None:
-        from agent.app.deep_planner import DeepPlannerResolver
-        from agent.app.fast_planner import FastPlannerResolver
-
         fast_source = inspect.getsource(planner_prompt.fast_plan_prompt)
         deep_source = inspect.getsource(planner_prompt.deep_plan_prompt)
         for source in (fast_source, deep_source):

@@ -14,6 +14,26 @@ from agent.app.clients.ollama_client import (
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
+    def test_parse_json_accepts_one_complete_object_with_extra_closing_delimiter(self) -> None:
+        client = OllamaClient(
+            base_url="http://chromie-llm:11434",
+            model="test-model",
+        )
+
+        self.assertEqual(
+            client._parse_json('{"activity":{"text":"ready"}}}'),
+            {"activity": {"text": "ready"}},
+        )
+
+    def test_parse_json_rejects_multiple_competing_objects(self) -> None:
+        client = OllamaClient(
+            base_url="http://chromie-llm:11434",
+            model="test-model",
+        )
+
+        with self.assertRaises(json.JSONDecodeError):
+            client._parse_json('{"decision":"one"} {"decision":"two"}')
+
     async def test_generate_renders_stable_layers_before_volatile_suffix(self) -> None:
         response = mock.Mock()
         response.status_code = 200

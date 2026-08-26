@@ -5419,6 +5419,20 @@ class VoiceAssistant:
             item.local_ref for item in responsibilities
         }
         if isinstance(association, dict):
+            scoped_new_goals: list[dict[str, Any]] = []
+            for item in association.get("new_goals") or []:
+                if (
+                    not isinstance(item, dict)
+                    or str(item.get("goal_id") or "").strip()
+                    not in scoped_goal_set
+                ):
+                    continue
+                scoped_goal = dict(item)
+                # source_text can contain excluded sibling responsibilities from
+                # the originating multi-Goal turn.  The scoped description,
+                # bindings, and success criteria retain this Goal's exact meaning.
+                scoped_goal.pop("source_text", None)
+                scoped_new_goals.append(scoped_goal)
             association = {
                 **association,
                 "associations": [
@@ -5431,12 +5445,7 @@ class VoiceAssistant:
                         if str(value).strip()
                     )
                 ],
-                "new_goals": [
-                    dict(item)
-                    for item in association.get("new_goals") or []
-                    if isinstance(item, dict)
-                    and str(item.get("goal_id") or "").strip() in scoped_goal_set
-                ],
+                "new_goals": scoped_new_goals,
             }
 
         sid = str(

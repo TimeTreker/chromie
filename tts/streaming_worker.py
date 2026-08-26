@@ -122,6 +122,19 @@ class StreamingProcessWorker:
                             "worker_queue_wait_seconds": queue_wait_seconds,
                         }
                         event_type = str(event.get("type") or "")
+                        if event_type == "ready":
+                            # ``ready`` is a startup control event, never a
+                            # synthesis result. A cancellation-time restart
+                            # used to be shielded in a background task, which
+                            # could release the singleton lock before startup
+                            # consumed this message. Ignore the harmless
+                            # control event defensively while restart now stays
+                            # inside the lock below.
+                            logger.warning(
+                                "Discarded delayed startup event inside synthesis stream: %s",
+                                self._name,
+                            )
+                            continue
                         if event_type == "error":
                             message = str(event.get("message") or "worker synthesis failed")
                             self._invalidate_after_failure(reason="worker_error")
@@ -243,7 +256,10 @@ class StreamingProcessWorker:
     async def _restart_after_failure(self, *, cancelled: bool) -> None:
         self._terminate_sync()
         try:
-            await asyncio.shield(self._start())
+            # ``stream`` still owns the singleton lock here. Await startup in
+            # this task so no background coroutine can consume the new pipe
+            # after the lock has been released to the next request.
+            await self._start()
         except Exception:
             logger.exception("Failed to restart streaming worker %s", self._name)
         self.restart_count += 1

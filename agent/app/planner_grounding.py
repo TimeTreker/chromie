@@ -182,10 +182,20 @@ def _argument_schema_accepts_canonical_binding(
         return isinstance(value, str)
     if value_type == "boolean":
         return isinstance(value, bool)
-    if value_type == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
-    if value_type == "number":
-        return isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)
+    if value_type in {"integer", "number"}:
+        numeric_values = semantic_numeric_values(value)
+        if len(numeric_values) != 1:
+            return False
+        numeric_value = next(iter(numeric_values))
+        if value_type == "integer" and numeric_value != numeric_value.to_integral_value():
+            return False
+        minimum = argument_schema.get("minimum")
+        maximum = argument_schema.get("maximum")
+        if minimum is not None and numeric_value < Decimal(str(minimum)):
+            return False
+        if maximum is not None and numeric_value > Decimal(str(maximum)):
+            return False
+        return True
     return False
 
 _SINGLE_SEMANTIC_NUMBER = re.compile(

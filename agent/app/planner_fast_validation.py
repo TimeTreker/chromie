@@ -80,8 +80,17 @@ def planner_validation_error_items(
     unique: list[dict[str, Any]] = []
     seen: set[tuple[str, tuple[Any, ...]]] = set()
     for item in feedback:
+        message = str(item.get("msg") or item.get("message") or "")
+        if not message:
+            message = json.dumps(
+                item,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
         key = (
-            str(item.get("msg") or item.get("message") or ""),
+            message,
             tuple(item.get("loc") or []),
         )
         if key in seen:

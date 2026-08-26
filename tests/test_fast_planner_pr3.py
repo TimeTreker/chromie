@@ -11,9 +11,9 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.fast_planner import FastPlannerResolver
-from agent.app import planner_validation
 from agent.app import planner_fast_validation
 from agent.app.planner_model_contract import (
+    PlannerCoverageReview,
     PlannerDTOContractError,
     PlannerModelOutput,
     is_planner_step_capability,
@@ -21,6 +21,7 @@ from agent.app.planner_model_contract import (
 from agent.app.planner_schema import canonical_goal_binding_argument_response_schema
 from agent.app.planner_context import goal_association_prompt_projection
 from agent.app.planner_validation import (
+    normalize_common_planner_output,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
     validate_goal_responsibility_outcomes,
@@ -446,7 +447,7 @@ def multi_goal_plan(
     }
 
 
-def retained_weather_followup_fixture() -> tuple[dict, AgentRunRequest]:
+def retained_weather_followup_fixture() -> tuple[dict, CognitiveWorkRequest]:
     goal_id = "goal-weather"
     evidence_first = "重庆今天有雷雨和冰雹，而且降雨概率很大。所以需要带伞。"
     primary = {
@@ -659,6 +660,56 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
+    def test_coverage_review_cannot_accept_a_reported_semantic_mismatch(self):
+        with self.assertRaisesRegex(
+            ValidationError,
+            "accepted coverage cannot report a semantic mismatch",
+        ):
+            PlannerCoverageReview.model_validate(
+                {
+                    "decision": "accept",
+                    "confidence": 1.0,
+                    "semantic_mismatch_found": True,
+                    "uncovered_requirements": [],
+                    "reason": "The selected effect is only an approximation.",
+                }
+            )
+
+        schema = planner_schema.planner_coverage_review_response_schema()
+        self.assertIn("semantic_mismatch_found", schema["required"])
+        accepted_branch = schema["allOf"][-1]["anyOf"][0]["properties"]
+        self.assertFalse(accepted_branch["semantic_mismatch_found"]["const"])
+
+    def test_single_goal_fast_escalation_uses_advertised_per_goal_contract(self):
+        goal_id = "goal-weather"
+        raw = multi_goal_plan(
+            disposition="escalate",
+            coverage="partial",
+            confidence=0.9,
+            goal_summary="Fresh weather evidence requires deeper planning.",
+            steps=[],
+            goal_outcomes={
+                goal_id: escalate_outcome(
+                    goal_id, "Fresh provider evidence is still required."
+                )
+            },
+            goal_satisfaction=unsatisfied_satisfaction(
+                [goal_id], "Fresh provider evidence is still required."
+            ),
+            escalation_reason="fresh provider evidence requires deep planning",
+            unresolved=["fresh provider evidence"],
+        )
+
+        output = validate_planner_model_output(
+            raw,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=[goal_id],
+        )
+
+        self.assertEqual(output.disposition, "escalate")
+        self.assertEqual(set(output.goal_outcomes), {goal_id})
+        self.assertEqual(output.goal_satisfaction.status, "unsatisfied")
+
     def test_stop_remains_a_deterministic_control_not_a_planner_step(self):
         self.assertFalse(is_planner_step_capability("soridormi.stop"))
         self.assertFalse(is_planner_step_capability("chromie.speak"))
@@ -1165,6 +1216,144 @@ class CanonicalPlanContractTests(unittest.TestCase):
 
 
 class PlannerStructuralNormalizationTests(unittest.TestCase):
+    def test_exact_reentry_responses_override_stale_source_plan_aggregate(self):
+        raw = {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "Report retained completion evidence.",
+            "response_text": "Stale limitation from an unscoped sibling Goal.",
+            "steps": [],
+            "escalation_reason": "",
+            "unresolved": [],
+            "parameter_resolutions": [],
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "I completed the walk.",
+                    "unresolved": [],
+                    "step_ids": [],
+                    "satisfaction": exact_satisfaction(["goal-walk"]),
+                    "rationale": "The retained execution evidence proves the walk completed.",
+                },
+                "goal-blink": {
+                    "disposition": "respond",
+                    "coverage": "complete",
+                    "response_text": "I completed the blink.",
+                    "unresolved": [],
+                    "step_ids": [],
+                    "satisfaction": exact_satisfaction(["goal-blink"]),
+                    "rationale": "The retained execution evidence proves the blink completed.",
+                },
+            },
+            "goal_satisfaction": {
+                "score": 2 / 3,
+                "status": "partial",
+                "satisfied_goal_ids": ["goal-walk", "goal-blink"],
+                "unmet_goal_ids": ["goal-blink"],
+                "unmet_requirements": ["singing"],
+                "rationale": "Stale source-plan accounting.",
+            },
+            "plan_relation": "exact",
+            "user_confirmation_required": False,
+        }
+
+        normalized, repairs = normalize_common_planner_output(
+            raw,
+            authoritative_goals=[
+                {"goal_id": "goal-walk"},
+                {"goal_id": "goal-blink"},
+            ],
+            capability_payload=[],
+        )
+
+        self.assertEqual(normalized["disposition"], "respond")
+        self.assertEqual(
+            normalized["response_text"],
+            "I completed the walk. I completed the blink.",
+        )
+        self.assertEqual(
+            normalized["goal_satisfaction"]["satisfied_goal_ids"],
+            ["goal-walk", "goal-blink"],
+        )
+        self.assertEqual(normalized["goal_satisfaction"]["unmet_goal_ids"], [])
+        self.assertEqual(normalized["goal_satisfaction"]["unmet_requirements"], [])
+        self.assertTrue(repairs["terminal_response_goal_outcome_accounting"])
+        validated = validate_planner_model_output(
+            normalized,
+            planner_tier="fast",
+            expected_goal_ids_for_turn=["goal-walk", "goal-blink"],
+        )
+        self.assertEqual(validated.disposition, "respond")
+
+    def test_unanimous_nonexecuting_outcome_drops_stale_execution_mechanics(self):
+        raw = {
+            "disposition": "unavailable",
+            "coverage": "complete",
+            "confidence": 0.9,
+            "goal_summary": "Weather evidence is unavailable.",
+            "response_text": "I could not obtain the weather evidence.",
+            "steps": [{"step_id": "stale"}],
+            "parameter_resolutions": [{"step_id": "stale"}],
+            "time_conditions": [{"kind": "stale"}],
+            "goal_outcomes": {
+                "goal-weather": {
+                    "disposition": "unavailable",
+                    "coverage": "complete",
+                }
+            },
+            "plan_relation": "safe_adjustment",
+            "user_confirmation_required": True,
+        }
+
+        normalized, repairs = normalize_common_planner_output(
+            raw,
+            authoritative_goals=[{"goal_id": "goal-weather"}],
+            capability_payload=[],
+        )
+
+        self.assertEqual(normalized["plan_relation"], "exact")
+        self.assertFalse(normalized["user_confirmation_required"])
+        self.assertEqual(normalized["steps"], [])
+        self.assertEqual(normalized["parameter_resolutions"], [])
+        self.assertEqual(normalized["time_conditions"], [])
+        self.assertTrue(repairs["nonexecuting_plan_mechanics"])
+
+    def test_numeric_capability_argument_string_is_mechanically_typed(self):
+        raw = {
+            "disposition": "execute",
+            "coverage": "complete",
+            "steps": [
+                {
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_velocity",
+                    "args": {"vx_mps": "0.2", "duration_s": "10"},
+                }
+            ],
+        }
+        capability_payload = [
+            {
+                "capability_id": "soridormi.walk_velocity",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "vx_mps": {"type": "number"},
+                        "duration_s": {"type": "integer"},
+                    },
+                },
+            }
+        ]
+
+        normalized, repairs = normalize_common_planner_output(
+            raw,
+            authoritative_goals=[],
+            capability_payload=capability_payload,
+        )
+
+        self.assertEqual(normalized["steps"][0]["args"], {"vx_mps": 0.2, "duration_s": 10})
+        self.assertEqual(len(repairs["capability_argument_types"]), 2)
+
     def test_single_response_goal_outcome_populates_redundant_top_level_fields(self):
         output = validate_planner_model_output(
             {
@@ -1312,6 +1501,34 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_capability_repair_feedback_keeps_distinct_argument_failures(self):
+        error = planner_fast_validation.CapabilityArgumentValidationError(
+            [
+                {
+                    "type": "invalid_args",
+                    "step_id": "walk",
+                    "capability_id": "soridormi.walk_velocity",
+                    "errors": ["args.vx_mps expected number"],
+                },
+                {
+                    "type": "invalid_args",
+                    "step_id": "turn",
+                    "capability_id": "soridormi.turn_in_place",
+                    "errors": ["args.yaw_radps exceeds maximum"],
+                },
+            ]
+        )
+
+        items = planner_fast_validation.planner_validation_error_items(
+            error,
+            raw={},
+            planner_tier="fast",
+            expected_goal_ids_for_turn=[],
+            include_canonical_plan_diagnostics=False,
+        )
+
+        self.assertEqual([item["step_id"] for item in items], ["walk", "turn"])
+
     def test_terminal_evidence_reentry_survives_final_plan_validation(self):
         response_text = "今晚重庆降雨概率最高约76%，不是确定会下雨。"
         raw = multi_goal_plan(
@@ -1384,6 +1601,16 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.response_text, response_text)
         self.assertEqual(plan.steps, [])
         self.assertEqual(plan.metadata["path_classification"], "terminal")
+        planning_prompt = str(ollama.prompts[0][0])
+        self.assertIn(
+            "original user turn and source Plan are historical provenance",
+            planning_prompt,
+        )
+        self.assertNotIn(
+            "At least one canonical Goal requires provider/effect evidence.",
+            planning_prompt,
+        )
+        self.assertEqual(ollama.prompts[0][1]["options"]["num_predict"], 2048)
         response_schema = ollama.prompts[0][1]["response_format"]
         self.assertIn(
             "a probability below 100% remains a possibility/probability",
@@ -1524,7 +1751,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(result.activity.truth_stage, "pre_evidence")
         prompt, kwargs = ollama.prompts[0]
         rendered = prompt.render() if hasattr(prompt, "render") else str(prompt)
-        self.assertEqual(kwargs["options"]["num_predict"], 128)
+        self.assertEqual(kwargs["options"]["num_predict"], 256)
+        self.assertIn("✅", kwargs["options"]["stop"])
         self.assertIn("Required response language: zh-CN", rendered)
         self.assertIn("never emit a role field", rendered)
         self.assertNotIn("role=progress", rendered)
@@ -1552,7 +1780,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             progress["properties"]["text"]["pattern"],
             r"^[^?？]*$",
         )
-        self.assertEqual(kwargs["options"]["num_predict"], 128)
+        self.assertEqual(kwargs["options"]["num_predict"], 256)
         self.assertEqual(kwargs["options"]["num_ctx"], 6144)
         _, truth_kwargs = ollama.prompts[1]
         self.assertEqual(
@@ -2236,14 +2464,15 @@ class FastPlannerResolverTests(unittest.TestCase):
             "bounded first-response phase completed with no committed speech",
             advance_prompt,
         )
-        execute_constraint = next(
-            item
-            for item in ollama.prompts[0][1]["response_format"]["allOf"]
-            if item.get("if", {})
-            .get("properties", {})
-            .get("disposition", {})
-            .get("enum")
-            == ["execute", "mixed"]
+        self.assertTrue(
+            any(
+                item.get("if", {})
+                .get("properties", {})
+                .get("disposition", {})
+                .get("enum")
+                == ["execute", "mixed"]
+                for item in ollama.prompts[0][1]["response_format"]["allOf"]
+            )
         )
         self.assertEqual(
             ollama.prompts[0][1]["response_format"]["properties"]["activities"]
@@ -2725,6 +2954,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("invents a physical instrument", prompt)
         self.assertIn("never say Chromie will look at a phone", prompt)
         self.assertIn("assigns Chromie's owed action to the human", prompt)
+        self.assertIn("unrequested joint-participation wording", prompt)
         self.assertIn("look outside or use direct perception", prompt)
         self.assertIn(
             "in a human command addressed to Chromie, Chromie is the commanded actor",
@@ -2732,6 +2962,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn(
             "first-person subject is the correct actor",
+            planner_prompt.fast_first_response_truth_system_prompt(),
+        )
+        self.assertIn(
+            "makes the human a co-participant",
             planner_prompt.fast_first_response_truth_system_prompt(),
         )
         author_prompt = str(
@@ -2742,7 +2976,14 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("An imperative addressed to Chromie makes Chromie the actor", author_prompt)
         self.assertIn("Chromie's first-person intention", author_prompt)
+        self.assertIn("invitation, accompaniment, or joint activity", author_prompt)
         self.assertIn("prospective intention", prompt)
+        self.assertIn("I checked", prompt)
+        self.assertIn("我查过/我查了一下", prompt)
+        self.assertIn(
+            "has_unverified_result_or_completion_claim=true",
+            planner_prompt.fast_first_response_truth_system_prompt(),
+        )
 
         ollama = ScriptedOllama(
             [
@@ -2777,10 +3018,13 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "has_unverified_result_or_completion_claim",
                 "has_ungrounded_method_or_world_claim",
                 "has_semantic_perspective_contradiction",
+                "has_out_of_scope_goal_claim",
                 "decision",
             ],
         )
         self.assertIn("has_semantic_perspective_contradiction", truth_schema["properties"])
+        self.assertIn("has_out_of_scope_goal_claim", truth_schema["properties"])
+        self.assertIn("has_out_of_scope_goal_claim", truth_schema["required"])
 
     def test_first_response_schema_avoids_provider_think_control_token(self):
         schema = planner_schema.fast_first_response_response_schema(
@@ -3138,7 +3382,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("soridormi.walk_forward", rendered)
 
     def test_fast_planner_prompt_uses_gateway_original_user_wording(self):
-        resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
         responsibility = {
             "local_ref": "weather",
             "outcome": "determine whether Chongqing is hot tonight",
@@ -3177,7 +3420,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("Current user turn:\n  今晚，重庆热不热？  ", str(prompt))
 
     def test_first_activity_weather_prompt_fits_declared_context_budget(self):
-        resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
         responsibility = {
             "local_ref": "weather",
             "outcome": "Tell the user whether it will rain in Chongqing tonight.",
@@ -3314,7 +3556,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(gap["properties"]["resolved"]["const"], False)
 
     def test_first_activity_plan_keeps_late_catalog_semantics_visible(self):
-        resolver = FastPlannerResolver(FakeOllama({}), FakeCatalog())
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
                 "local_ref": "weather",
