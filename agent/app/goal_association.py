@@ -492,35 +492,52 @@ class GoalAssociationResolver:
                             final_certificate.model_dump(mode="json")
                         )
                         if certificate is not None:
-                            initial_classifications = {
-                                " ".join(
-                                    item.source_excerpt.strip().casefold().split()
-                                ): (
-                                    item.role,
-                                    item.required_goal_shape,
-                                    item.required_information_domain,
-                                    item.required_output_mode,
-                                )
-                                for item in certificate.responsibility_items
-                            }
-                            final_classifications = {
-                                " ".join(
-                                    item.source_excerpt.strip().casefold().split()
-                                ): (
-                                    item.role,
-                                    item.required_goal_shape,
-                                    item.required_information_domain,
-                                    item.required_output_mode,
-                                )
-                                for item in final_certificate.responsibility_items
-                            }
+                            def classifications_by_candidate(
+                                coverage_certificate: Any,
+                            ) -> dict[int, set[tuple[str, str, str, str]]]:
+                                classifications: dict[
+                                    int, set[tuple[str, str, str, str]]
+                                ] = {}
+                                for item in coverage_certificate.responsibility_items:
+                                    classification = (
+                                        item.role,
+                                        item.required_goal_shape,
+                                        item.required_information_domain,
+                                        item.required_output_mode,
+                                    )
+                                    for candidate_index in item.candidate_goal_indices:
+                                        classifications.setdefault(
+                                            candidate_index, set()
+                                        ).add(classification)
+                                return classifications
+
+                            # Source excerpts are evidence citations, not durable
+                            # semantic identity. A fresh audit may cite a slightly
+                            # wider or narrower contiguous span while preserving the
+                            # exact candidate-owned classification.
+                            initial_classifications = classifications_by_candidate(
+                                certificate
+                            )
+                            final_classifications = classifications_by_candidate(
+                                final_certificate
+                            )
                             classification_drift = {
-                                excerpt: {
-                                    "initial": list(classification),
-                                    "final": list(final_classifications.get(excerpt, ())),
+                                str(candidate_index): {
+                                    "initial": sorted(
+                                        list(item) for item in classifications
+                                    ),
+                                    "final": sorted(
+                                        list(item)
+                                        for item in final_classifications.get(
+                                            candidate_index, set()
+                                        )
+                                    ),
                                 }
-                                for excerpt, classification in initial_classifications.items()
-                                if final_classifications.get(excerpt) != classification
+                                for candidate_index, classifications in (
+                                    initial_classifications.items()
+                                )
+                                if final_classifications.get(candidate_index)
+                                != classifications
                             }
                             if classification_drift:
                                 raise ValueError(

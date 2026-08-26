@@ -16,6 +16,7 @@ from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnava
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
     _extract_json_object,
+    _coverage_source_tokens,
     _payload_message_texts,
     _project_audited_atomic_contract,
     _reject_canonical_goal_identity_refs,
@@ -122,6 +123,85 @@ class GoalInterpreterContractTests(unittest.TestCase):
                     ]
                 },
             )
+
+    def test_interpretation_drops_mechanically_spatial_speed_noise(self) -> None:
+        decision = OllamaGoalInterpreter._validate_interpretation_content(
+            GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN"),
+            json.dumps(
+                {
+                    "confidence": 0.99,
+                    "responsibilities": [
+                        {
+                            "local_ref": "r1",
+                            "outcome": "你往前走 10 秒。",
+                            "bindings": {
+                                "location": "往前",
+                                "duration": "10 秒",
+                                "speed": "往前",
+                            },
+                            "output_mode": "body_action",
+                            "confidence": 0.99,
+                        }
+                    ],
+                    "unresolved": [],
+                },
+                ensure_ascii=False,
+            ),
+        )
+
+        self.assertEqual(
+            decision.responsibilities[0].bindings,
+            {"location": "往前", "duration": "10 秒"},
+        )
+
+    def test_atomic_coverage_collapses_exact_duplicate_positive_rows(self) -> None:
+        request = GoalInterpretationRequest(text="你刚才说什么？", language="zh-CN")
+        tokens = _coverage_source_tokens(request.text)
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.99,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "重复刚才的回答",
+                        "bindings": {
+                            "prior_assistant_utterance": "你好呀，人类！"
+                        },
+                        "output_mode": "speech",
+                        "confidence": 0.99,
+                    }
+                ],
+                "unresolved": [],
+            }
+        )
+        row = {
+            "source_start_token_ref": tokens[0]["ref"],
+            "source_end_token_ref": tokens[-1]["ref"],
+            "role": "responsibility",
+            "coverage": "covered",
+            "independently_satisfiable": True,
+            "responsibility_refs": ["r1"],
+            "required_output_mode": "speech",
+        }
+        raw = {
+            "responsibility_items": [
+                {**row, "audit_ref": "a1"},
+                {**row, "audit_ref": "a2"},
+            ],
+            "supporting_items": [],
+            "reason_summary": "One request was duplicated mechanically.",
+        }
+
+        certificate, problems = (
+            OllamaGoalInterpreter._validate_responsibility_coverage_content(
+                request,
+                decision,
+                json.dumps(raw, ensure_ascii=False),
+            )
+        )
+
+        self.assertEqual(problems, [])
+        self.assertEqual(len(certificate.responsibility_items), 1)
 
     def test_speed_alias_cannot_bypass_canonical_provenance_field(self) -> None:
         with self.assertRaisesRegex(
@@ -2091,7 +2171,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             timeout_ms=800,
         )
 
-    async def test_spatial_value_mistyped_as_speed_escalates_once_from_source(self) -> None:
+    async def test_spatial_value_mistyped_as_speed_is_removed_before_audit(self) -> None:
         interpreter = self._interpreter()
         invalid = {
             "confidence": 0.96,
@@ -2112,8 +2192,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ],
             "unresolved": [],
         }
-        corrected = copy.deepcopy(invalid)
-        del corrected["responsibilities"][0]["bindings"]["speed"]
         coverage = {
             "responsibility_items": [
                 {
@@ -2131,7 +2209,6 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
             side_effect=[
                 {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
-                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
                 {"message": {"content": json.dumps(coverage, ensure_ascii=False)}},
             ]
         )
@@ -2145,17 +2222,9 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
             [
                 "goal_interpretation",
-                "goal_interpretation_deep",
                 "goal_interpretation_responsibility_coverage",
             ],
         )
-        deep_payload = interpreter._chat.await_args_list[1].args[0]
-        binding_contract = deep_payload["format"]["$defs"][
-            "CognitiveResponsibilityProposal"
-        ]["properties"]["bindings"]
-        self.assertNotIn("speed", binding_contract["properties"])
-        self.assertIn("duration", binding_contract["properties"])
-        self.assertFalse(binding_contract["additionalProperties"])
 
     async def test_independent_coverage_resegments_collapsed_effects_from_source(self) -> None:
         interpreter = self._interpreter()

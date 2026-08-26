@@ -594,6 +594,48 @@ def _materialize_coverage_source_excerpts(
 ) -> dict[str, Any]:
     """Derive exact audit excerpts from contiguous model-cited source tokens."""
 
+    raw_responsibility_items = raw.get("responsibility_items")
+    if isinstance(raw_responsibility_items, list):
+        unique_items: list[Any] = []
+        retained_ref_by_signature: dict[str, str] = {}
+        duplicate_ref_aliases: dict[str, str] = {}
+        for item in raw_responsibility_items:
+            if not isinstance(item, dict):
+                unique_items.append(item)
+                continue
+            signature_payload = {
+                key: value for key, value in item.items() if key != "audit_ref"
+            }
+            signature = json.dumps(
+                signature_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
+            audit_ref = str(item.get("audit_ref") or "").strip()
+            retained_ref = retained_ref_by_signature.get(signature)
+            if retained_ref is not None:
+                if audit_ref:
+                    duplicate_ref_aliases[audit_ref] = retained_ref
+                continue
+            retained_ref_by_signature[signature] = audit_ref
+            unique_items.append(item)
+        if len(unique_items) != len(raw_responsibility_items):
+            raw["responsibility_items"] = unique_items
+            supporting_items = raw.get("supporting_items")
+            if isinstance(supporting_items, list):
+                for item in supporting_items:
+                    if not isinstance(item, dict):
+                        continue
+                    related_refs = item.get("related_audit_refs")
+                    if isinstance(related_refs, list):
+                        item["related_audit_refs"] = list(
+                            dict.fromkeys(
+                                duplicate_ref_aliases.get(str(ref), str(ref))
+                                for ref in related_refs
+                            )
+                        )
+
     source = " ".join(str(request.text or "").strip().split())
     tokens = _coverage_source_tokens(source)
     by_ref = {str(item["ref"]): item for item in tokens}
@@ -1484,6 +1526,44 @@ def _reject_unprovenanced_speed_bindings(
                 "Speed must preserve an explicitly supplied pace or velocity surface; "
                 "omit it when the authoritative meaning supplies none."
             )
+
+
+def _strip_mechanically_unprovenanced_speed_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Drop speed only when source/context mechanics prove it was invented.
+
+    This does not decide which wording means a pace. It removes an optional model
+    field only when its scalar is absent from both authoritative source and bounded
+    semantic context, or when it duplicates the already-owned location scalar.
+    The remaining WHAT still passes every normal validator.
+    """
+
+    current_turn = " ".join((request.text or "").strip().split()).casefold()
+    contextual_values = _semantic_context_string_values(request.context)
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for item in responsibilities:
+        bindings = item.get("bindings") if isinstance(item, dict) else None
+        if not isinstance(bindings, dict) or "speed" not in bindings:
+            continue
+        raw_speed = bindings.get("speed")
+        if isinstance(raw_speed, bool) or not isinstance(raw_speed, str):
+            continue
+        speed = " ".join(raw_speed.strip().split())
+        folded = speed.casefold()
+        raw_location = bindings.get("location")
+        location = (
+            " ".join(raw_location.strip().split()).casefold()
+            if isinstance(raw_location, str)
+            else ""
+        )
+        if (location and folded == location) or not (
+            speed and (folded in current_turn or folded in contextual_values)
+        ):
+            bindings.pop("speed", None)
 
 
 def _reject_non_scalar_duration_bindings(parsed: dict[str, Any]) -> None:
@@ -3432,6 +3512,48 @@ class OllamaGoalInterpreter:
             decision=decision,
         )
         certificate = GoalInterpretationCoverageCertificate.model_validate(raw)
+        # Constrained decoding can repeat one byte-equivalent positive audit row
+        # under a fresh audit_ref. Audit identity is mechanical; duplicate rows do
+        # not prove two outcomes. Collapse only rows whose complete source span,
+        # classification, ownership, and modality already agree, and remap any
+        # supporting relation references to the retained identity.
+        unique_responsibility_items: list[Any] = []
+        retained_ref_by_signature: dict[tuple[Any, ...], str] = {}
+        duplicate_ref_aliases: dict[str, str] = {}
+        for index, item in enumerate(certificate.responsibility_items):
+            audit_ref = str(item.audit_ref or f"a{index + 1}").strip()
+            signature = (
+                item.source_excerpt,
+                item.role,
+                item.coverage,
+                item.independently_satisfiable,
+                tuple(item.responsibility_refs),
+                item.required_output_mode,
+            )
+            retained_ref = retained_ref_by_signature.get(signature)
+            if retained_ref is not None:
+                duplicate_ref_aliases[audit_ref] = retained_ref
+                continue
+            retained_ref_by_signature[signature] = audit_ref
+            unique_responsibility_items.append(item)
+        if duplicate_ref_aliases:
+            normalized_supporting_items = []
+            for item in certificate.supporting_items:
+                normalized_refs = list(
+                    dict.fromkeys(
+                        duplicate_ref_aliases.get(ref, ref)
+                        for ref in item.related_audit_refs
+                    )
+                )
+                normalized_supporting_items.append(
+                    item.model_copy(update={"related_audit_refs": normalized_refs})
+                )
+            certificate = certificate.model_copy(
+                update={
+                    "responsibility_items": unique_responsibility_items,
+                    "supporting_items": normalized_supporting_items,
+                }
+            )
         by_ref = {item.local_ref: item for item in decision.responsibilities}
         normalized_turn = " ".join(request.text.strip().split())
         problems: list[str] = []
@@ -3839,6 +3961,7 @@ class OllamaGoalInterpreter:
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
+        _strip_mechanically_unprovenanced_speed_bindings(request, parsed)
         _reject_unprovenanced_speed_bindings(request, parsed)
         _reject_non_scalar_duration_bindings(parsed)
         _reject_runtime_identity_bindings(request, parsed)

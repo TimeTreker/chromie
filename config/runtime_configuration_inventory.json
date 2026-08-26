@@ -497,6 +497,7 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
+        "env/modes/qualification.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "env/validation/architecture.env",

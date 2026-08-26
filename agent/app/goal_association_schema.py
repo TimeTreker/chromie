@@ -1144,9 +1144,23 @@ def coverage_certificate_response_schema(
                     branch_properties["required_goal_shape"] = {
                         "const": shape
                     }
-                    branch_properties["required_information_domain"] = {
-                        "const": information_domain
-                    }
+                    if shape == "information_resource":
+                        # The candidate's domain is the claim under review. Binding
+                        # the independent auditor to it would make a wrong broad
+                        # domain self-certifying instead of repairable.
+                        branch_properties["required_information_domain"] = {
+                            "enum": [
+                                "local_clock",
+                                "weather_forecast",
+                                "external_grounded_information",
+                                "direct_environment_perception",
+                                "private_runtime_information",
+                            ]
+                        }
+                    else:
+                        branch_properties["required_information_domain"] = {
+                            "const": information_domain
+                        }
                     branch_properties["required_output_mode"] = {
                         "const": output_mode
                     }

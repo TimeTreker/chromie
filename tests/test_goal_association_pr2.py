@@ -1926,6 +1926,94 @@ class GoalExecutionContractTests(unittest.TestCase):
             problems,
         )
 
+    def test_information_coverage_decoder_does_not_self_certify_candidate_domain(self):
+        candidate = GoalAssociationModelGoal.model_validate(
+            goal(
+                "Determine whether it will rain.",
+                "information",
+                resource=resource_responsibility(
+                    kind="information",
+                    information_domain="external_grounded_information",
+                    description="whether it will rain",
+                    attributes=[binding("location", "place", "outside")],
+                ),
+            )
+        )
+        schema = ga_schema.coverage_certificate_response_schema(
+            [candidate], authoritative_turn="Will it rain?"
+        )
+        branches = schema["properties"]["responsibility_items"]["items"][
+            "oneOf"
+        ]
+        covered = next(
+            branch
+            for branch in branches
+            if branch["properties"]["coverage"].get("const") == "covered"
+            and branch["properties"]["candidate_goal_indices"].get("const")
+            == [0]
+        )
+        domain = covered["properties"]["required_information_domain"]
+
+        self.assertNotIn("const", domain)
+        self.assertIn("weather_forecast", domain["enum"])
+        self.assertIn("external_grounded_information", domain["enum"])
+
+    def test_fresh_audit_may_restate_span_without_changing_candidate_classification(self):
+        candidates = create_goals(
+            goal("Look at me", "body_action", source_responsibility_refs=["r1"]),
+            goal("blink twice", "body_action", source_responsibility_refs=["r2"]),
+        )
+        initial_coverage = certificate(
+            coverage_item(
+                "Look at me", 0, required_output_mode="body_action"
+            ),
+            coverage_item(
+                "blink twice", 1, required_output_mode="body_action"
+            ),
+            coverage_item(
+                "Look at me, then blink twice.",
+                0,
+                required_output_mode="body_action",
+            ),
+        )
+        final_coverage = certificate(
+            coverage_item(
+                "Look at me", 0, required_output_mode="body_action"
+            ),
+            coverage_item(
+                "then blink twice", 1, required_output_mode="body_action"
+            ),
+        )
+        ollama = ScriptedOllama(
+            [candidates, initial_coverage, candidates, final_coverage]
+        )
+        req = request("Look at me, then blink twice.", language="en-US")
+        req = req.model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "Look at me",
+                        "bindings": {},
+                        "output_mode": "body_action",
+                        "confidence": 0.99,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "blink twice",
+                        "bindings": {"after": "r1", "count": 2},
+                        "output_mode": "body_action",
+                        "confidence": 0.99,
+                    },
+                )
+            }
+        )
+
+        result = asyncio.run(GoalAssociationResolver(ollama).resolve(req))
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.new_goals), 2)
+
     def test_typed_coverage_feedback_repairs_bundle_goal_shape_once(self):
         initial = create_goals(
             goal(
