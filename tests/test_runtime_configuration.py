@@ -374,9 +374,21 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", launcher)
-        self.assertIn("context=${COSYVOICE_BRAIN_NUM_CTX}", launcher)
+        self.assertIn("context_fallback=${COSYVOICE_BRAIN_NUM_CTX}", launcher)
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", services)
-        self.assertIn("context=$COSYVOICE_BRAIN_NUM_CTX", services)
+        self.assertIn("context_fallback=$COSYVOICE_BRAIN_NUM_CTX", services)
+        self.assertIn(
+            '${AGENT_DEEP_PLANNER_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}',
+            services,
+        )
+        self.assertNotIn(
+            'EFFECTIVE_DEEP_PLANNER_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
+            launcher,
+        )
+        self.assertNotIn(
+            'export AGENT_DEEP_PLANNER_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
+            services,
+        )
         self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", services)
         self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
         self.assertNotIn("EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL", launcher)

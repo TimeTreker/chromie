@@ -160,8 +160,11 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
 The RTX 4090 Laptop profile uses that compact policy with one 32768-token Qwen
-runner and quantized KV cache. The RTX 5090 profile opts out and keeps its
-declared Qwen/Gemma role split resident when memory permits.
+runner and quantized KV cache. Compact cognition selects the shared model and
+uses that context only as a fallback; generated role contexts remain
+authoritative, including the qualification-only Deep Planner context. The RTX
+5090 profile opts out and keeps its declared Qwen/Gemma role split resident when
+memory permits.
 Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
 only `chromie-llm` to clear stale runners left by an earlier launch. Select a
 fallback explicitly with
