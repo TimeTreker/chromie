@@ -162,6 +162,12 @@ class _GoalInterpretationLocationProvenanceViolation(
     """A location field crossed GI's exact source/context provenance boundary."""
 
 
+class _GoalInterpretationSpeedProvenanceViolation(
+    _GoalInterpretationSemanticStructureViolation
+):
+    """A speed field was invented or conflicts with another typed dimension."""
+
+
 def _without_goal_interpretation_authority(value: Any) -> Any:
     """Strip downstream authority and retired route classifications from context."""
 
@@ -1304,6 +1310,85 @@ def _reject_unprovenanced_location_bindings(
         )
 
 
+def _reject_unprovenanced_speed_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Reject speed values that lack source/context evidence or are spatial aliases.
+
+    The host does not decide which wording means a pace. It only enforces the
+    model-facing typed contract: a model-authored speed scalar must be copied
+    from the authoritative turn or bounded semantic continuity context, and the
+    same scalar cannot simultaneously occupy the location dimension. A
+    violation requires fresh source interpretation rather than mutation of the
+    rejected semantics.
+    """
+
+    current_turn = " ".join((request.text or "").strip().split()).casefold()
+    contextual_values = _semantic_context_string_values(request.context)
+    source_numbers = _decimal_values(request.text)
+    context_numbers = {
+        number
+        for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS
+        for number in _decimal_values(request.context.get(key))
+    }
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict) or "speed" not in bindings:
+            continue
+        raw_speed = bindings.get("speed")
+        speed_values = raw_speed if isinstance(raw_speed, list) else [raw_speed]
+        raw_location = bindings.get("location")
+        location = (
+            " ".join(raw_location.strip().split()).casefold()
+            if isinstance(raw_location, str)
+            else ""
+        )
+        for value_index, scalar in enumerate(speed_values):
+            suffix = f"[{value_index}]" if isinstance(raw_speed, list) else ""
+            if isinstance(scalar, bool) or not isinstance(
+                scalar, (str, int, float, Decimal)
+            ):
+                raise _GoalInterpretationSpeedProvenanceViolation(
+                    "Goal Interpretation speed binding must be a source-backed "
+                    "pace or velocity scalar: "
+                    f"responsibilities[{index}].bindings.speed{suffix}={scalar!r}."
+                )
+            if isinstance(scalar, str):
+                speed = " ".join(scalar.strip().split())
+                folded = speed.casefold()
+                if location and folded == location:
+                    raise _GoalInterpretationSpeedProvenanceViolation(
+                        "Goal Interpretation assigned the same source surface to "
+                        "conflicting typed dimensions: "
+                        f"responsibilities[{index}].bindings.location and speed "
+                        f"both equal {speed!r}. Direction/location is never speed."
+                    )
+                if speed and (folded in current_turn or folded in contextual_values):
+                    continue
+            else:
+                try:
+                    numeric_speed = Decimal(str(scalar))
+                except InvalidOperation:
+                    numeric_speed = None
+                if numeric_speed is not None and (
+                    numeric_speed in source_numbers or numeric_speed in context_numbers
+                ):
+                    continue
+            raise _GoalInterpretationSpeedProvenanceViolation(
+                "Goal Interpretation speed binding has no authoritative surface "
+                "provenance: "
+                f"responsibilities[{index}].bindings.speed{suffix}={scalar!r}. "
+                "Speed must preserve an explicitly supplied pace or velocity surface; "
+                "omit it when the authoritative meaning supplies none."
+            )
+
+
 def _reject_runtime_identity_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -2396,6 +2481,7 @@ class OllamaGoalInterpreter:
         request: GoalInterpretationRequest,
         *,
         constrain_location_provenance: bool = False,
+        constrain_speed_provenance: bool = False,
         atomic_coverage_certificate: GoalInterpretationCoverageCertificate | None = None,
         source_structure_violation: str = "",
     ) -> dict[str, Any]:
@@ -2670,7 +2756,7 @@ class OllamaGoalInterpreter:
                             },
                         }
                     )
-        if constrain_location_provenance:
+        if constrain_location_provenance or constrain_speed_provenance:
             exact_surfaces = _short_exact_surface_substrings(request.text)
             responsibility_schema = (
                 payload.get("format", {})
@@ -2682,32 +2768,46 @@ class OllamaGoalInterpreter:
                     "bindings"
                 )
                 if isinstance(binding_schema, dict):
-                    binding_schema.setdefault("properties", {})["location"] = {
-                        "type": "string",
-                        "enum": exact_surfaces,
-                        "description": (
-                            "If location is present, copy one exact contiguous source "
-                            "surface; never translate or transliterate it."
-                        ),
-                    }
-                    binding_schema["propertyNames"] = {
-                        "anyOf": [
-                            {"const": "location"},
-                            {
-                                "not": {
-                                    "pattern": (
-                                        r"(?:^|[_\-\s])"
-                                        r"[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]"
-                                        r"(?:$|[_\-\s])"
-                                    )
-                                }
-                            },
-                        ],
-                        "description": (
-                            "Location meaning has exactly one canonical binding name: "
-                            "location. Other semantic dimensions remain writable."
-                        ),
-                    }
+                    binding_properties = binding_schema.setdefault("properties", {})
+                    if constrain_location_provenance:
+                        binding_properties["location"] = {
+                            "type": "string",
+                            "enum": exact_surfaces,
+                            "description": (
+                                "If location is present, copy one exact contiguous source "
+                                "surface; never translate or transliterate it."
+                            ),
+                        }
+                        binding_schema["propertyNames"] = {
+                            "anyOf": [
+                                {"const": "location"},
+                                {
+                                    "not": {
+                                        "pattern": (
+                                            r"(?:^|[_\-\s])"
+                                            r"[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]"
+                                            r"(?:$|[_\-\s])"
+                                        )
+                                    }
+                                },
+                            ],
+                            "description": (
+                                "Location meaning has exactly one canonical binding name: "
+                                "location. Other semantic dimensions remain writable."
+                            ),
+                        }
+                    if constrain_speed_provenance:
+                        binding_properties["speed"] = {
+                            "anyOf": [
+                                {"type": "string", "enum": exact_surfaces},
+                                {"type": "number"},
+                            ],
+                            "description": (
+                                "If speed is present, copy one exact contiguous source "
+                                "pace/velocity surface or explicit numeric velocity; omit "
+                                "speed when the source supplies no pace or velocity."
+                            ),
+                        }
         return payload
 
     @staticmethod
@@ -3401,6 +3501,7 @@ class OllamaGoalInterpreter:
                 self.build_deep_interpretation_payload(
                     request,
                     atomic_coverage_certificate=coverage_certificate,
+                    constrain_speed_provenance=True,
                 ),
                 stage="goal_interpretation_deep",
                 request=request,
@@ -3493,6 +3594,7 @@ class OllamaGoalInterpreter:
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
+        _reject_unprovenanced_speed_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
         _strip_language_envelope_bindings(request, parsed)
         _strip_redundant_conversational_turn_echo_bindings(request, parsed)
@@ -3616,6 +3718,7 @@ class OllamaGoalInterpreter:
                 deep = await self._chat_logged(
                     self.build_deep_interpretation_payload(
                         request,
+                        constrain_speed_provenance=True,
                         source_structure_violation=str(exc),
                     ),
                     stage="goal_interpretation_deep",

@@ -647,6 +647,35 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("list_runtime_ollama_models.sh", warm)
         self.assertNotIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', orchestrator)
 
+    def test_active_model_inventory_includes_distinct_fast_truth_model(self) -> None:
+        env = {
+            **os.environ,
+            "CHROMIE_ACTIVE_PROFILE": "test",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED": "0",
+            "AGENT_GOAL_INTERPRETER_MODEL": "shared-fast",
+            "AGENT_USE_LLM": "1",
+            "AGENT_MODEL": "shared-fast",
+            "AGENT_GOAL_ASSOCIATION_ENABLED": "1",
+            "AGENT_GOAL_ASSOCIATION_MODEL": "shared-fast",
+            "AGENT_FAST_PLANNER_ENABLED": "1",
+            "AGENT_FAST_PLANNER_MODEL": "shared-fast",
+            "AGENT_FAST_FIRST_RESPONSE_MODEL": "shared-fast",
+            "AGENT_FAST_TRUTH_MODEL": "distinct-truth",
+            "AGENT_DEEP_PLANNER_ENABLED": "0",
+            "AGENT_SOCIAL_ATTENTION_MODE": "off",
+        }
+
+        result = subprocess.run(
+            [str(ROOT / "scripts" / "list_runtime_ollama_models.sh")],
+            cwd=ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.stdout.splitlines(), ["shared-fast", "distinct-truth"])
+
 
 if __name__ == "__main__":
     unittest.main()

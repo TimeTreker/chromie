@@ -21,6 +21,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _reject_noncanonical_count_bindings,
     _reject_planner_shaped_goal_interpretation,
     _reject_unprovenanced_location_bindings,
+    _reject_unprovenanced_speed_bindings,
     _reject_untyped_coordination_bindings,
     _strip_bound_values_from_unresolved,
     _without_goal_interpretation_authority,
@@ -49,6 +50,57 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
 
 
 class GoalInterpreterContractTests(unittest.TestCase):
+    def test_speed_requires_authoritative_source_or_context_provenance(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "speed binding has no authoritative surface provenance"
+        ):
+            _reject_unprovenanced_speed_bindings(
+                GoalInterpretationRequest(text="run forward for 15 seconds"),
+                {
+                    "responsibilities": [
+                        {
+                            "bindings": {
+                                "location": "forward",
+                                "duration": "15 seconds",
+                                "speed": "none",
+                            }
+                        }
+                    ]
+                },
+            )
+
+    def test_speed_cannot_retype_the_same_spatial_surface(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "conflicting typed dimensions.*Direction/location is never speed"
+        ):
+            _reject_unprovenanced_speed_bindings(
+                GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN"),
+                {
+                    "responsibilities": [
+                        {
+                            "bindings": {
+                                "location": "往前",
+                                "duration": "10 秒",
+                                "speed": "往前",
+                            }
+                        }
+                    ]
+                },
+            )
+
+    def test_explicit_speed_surface_remains_what_evidence(self) -> None:
+        parsed = {
+            "responsibilities": [
+                {"bindings": {"location": "forward", "speed": "quickly"}}
+            ]
+        }
+
+        _reject_unprovenanced_speed_bindings(
+            GoalInterpretationRequest(text="walk forward quickly"), parsed
+        )
+
+        self.assertEqual(parsed["responsibilities"][0]["bindings"]["speed"], "quickly")
+
     def test_coverage_contract_structurally_partitions_outcomes_and_constraints(self) -> None:
         with self.assertRaisesRegex(ValidationError, "responsibility"):
             GoalInterpretationCoverageCertificate.model_validate(
@@ -1316,6 +1368,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         payload = interpreter.build_deep_interpretation_payload(
             GoalInterpretationRequest(text="Look at me, then blink twice."),
             atomic_coverage_certificate=certificate,
+            constrain_speed_provenance=True,
         )
         responsibility_model = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
@@ -1336,6 +1389,11 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             ]["const"],
             "a1",
         )
+        speed_contract = responsibility_model["properties"]["bindings"][
+            "properties"
+        ]["speed"]
+        self.assertNotIn("none", speed_contract["anyOf"][0]["enum"])
+        self.assertIn("blink", speed_contract["anyOf"][0]["enum"])
 
     def test_system_prompt_names_what_only_boundary(self) -> None:
         prompt = self._interpreter().load_system_prompt()
@@ -1916,6 +1974,71 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             model="test-model",
             timeout_ms=800,
         )
+
+    async def test_spatial_value_mistyped_as_speed_escalates_once_from_source(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.96,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "你往前走 10 秒",
+                    "bindings": {
+                        "duration": "10 秒",
+                        "location": "往前",
+                        "speed": "往前",
+                    },
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.96,
+                }
+            ],
+            "unresolved": [],
+        }
+        corrected = copy.deepcopy(invalid)
+        del corrected["responsibilities"][0]["bindings"]["speed"]
+        coverage = {
+            "responsibility_items": [
+                {
+                    "source_excerpt": "你往前走 10 秒",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                }
+            ],
+            "supporting_items": [],
+            "reason_summary": "One body outcome preserves direction and duration.",
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(coverage, ensure_ascii=False)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN")
+        )
+
+        self.assertNotIn("speed", result.responsibilities[0].bindings)
+        self.assertEqual(
+            [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
+            [
+                "goal_interpretation",
+                "goal_interpretation_deep",
+                "goal_interpretation_responsibility_coverage",
+            ],
+        )
+        deep_payload = interpreter._chat.await_args_list[1].args[0]
+        speed_contract = deep_payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]["properties"]["speed"]
+        self.assertNotIn("none", speed_contract["anyOf"][0]["enum"])
+        self.assertIn("往前", speed_contract["anyOf"][0]["enum"])
 
     async def test_independent_coverage_resegments_collapsed_effects_from_source(self) -> None:
         interpreter = self._interpreter()
