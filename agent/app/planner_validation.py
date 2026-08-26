@@ -351,6 +351,7 @@ def qualify_capability_catalog_for_information_domains(
     capabilities: list[dict[str, Any]],
     *,
     authoritative_goals: list[dict[str, Any]],
+    retained_capability_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Remove explicitly wrong-domain information providers before planning.
 
@@ -384,6 +385,11 @@ def qualify_capability_catalog_for_information_domains(
     if not required_domains:
         return list(capabilities)
 
+    retained_ids = {
+        " ".join(str(value or "").strip().split())
+        for value in (retained_capability_ids or set())
+        if " ".join(str(value or "").strip().split())
+    }
     qualified: list[dict[str, Any]] = []
     for capability in capabilities:
         if not isinstance(capability, dict):
@@ -400,7 +406,20 @@ def qualify_capability_catalog_for_information_domains(
         scope = scope if isinstance(scope, dict) else {}
         domain = " ".join(str(scope.get("domain") or "").strip().split())
         if domain and domain not in required_domains:
-            continue
+            capability_id = " ".join(
+                str(capability.get("capability_id") or "").strip().split()
+            )
+            # ``external_grounded_information`` is the existing provider-neutral
+            # broad Goal domain.  When the earlier Fast HOW pass already authored
+            # and dispatched a provisional, exactly correlated read Capability,
+            # preserve that specific choice for reconciliation.  This does not
+            # expose a same-class substitute or infer a provider from wording;
+            # other broad-domain capabilities remain filtered out.
+            if not (
+                required_domains == {"external_grounded_information"}
+                and capability_id in retained_ids
+            ):
+                continue
         qualified.append(capability)
     return qualified
 
@@ -2748,6 +2767,7 @@ def qualify_planner_capability_payload(
     capabilities: list[dict[str, Any]],
     *,
     authoritative_goals: list[dict[str, Any]],
+    retained_capability_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Apply the same typed semantic applicability filter at either depth.
 
@@ -2763,6 +2783,7 @@ def qualify_planner_capability_payload(
     domain_qualified = qualify_capability_catalog_for_information_domains(
         output_mode_qualified,
         authoritative_goals=authoritative_goals,
+        retained_capability_ids=retained_capability_ids,
     )
     return qualify_capability_catalog_for_typed_binding_values(
         domain_qualified,

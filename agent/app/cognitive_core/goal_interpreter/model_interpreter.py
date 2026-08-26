@@ -379,6 +379,7 @@ def _strip_certificate_owned_coordination_bindings(parsed: dict[str, Any]) -> No
 
 
 _MALFORMED_BINDING_NAME = re.compile(r"[{}\[\]\"'“”‘’,:;/\\]")
+_MALFORMED_BINDING_VALUE = re.compile(r"[\"”]\s*[:：]|//|/\*")
 _CORRUPTED_COUNT_BINDING = re.compile(
     r"^\s*count\s*[\"'“”‘’]*\s*[:：]\s*([+-]?\d+)(?:\D|$)",
     re.IGNORECASE,
@@ -445,6 +446,39 @@ def _reject_malformed_binding_names(parsed: dict[str, Any]) -> None:
                 raise ValueError(
                     "malformed Goal Interpretation binding name at "
                     f"responsibilities[{responsibility_index}].bindings: {name!r}"
+                )
+
+
+def _reject_malformed_binding_values(parsed: dict[str, Any]) -> None:
+    """Reject provider JSON/comment syntax fused into a scalar value.
+
+    Human-semantic values may contain ordinary punctuation, including numeric
+    times such as ``12:30``.  A quote immediately followed by a field separator
+    or a comment opener, however, is mechanically leaked serialization syntax,
+    not a semantic surface.  Failing this at the DTO boundary lets the existing
+    one-shot contract repair regenerate the object before the corrupt field can
+    become a canonical Goal binding.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for responsibility_index, item in enumerate(responsibilities):
+        bindings = item.get("bindings") if isinstance(item, dict) else None
+        if not isinstance(bindings, dict):
+            continue
+        for raw_name, raw_value in bindings.items():
+            values = raw_value if isinstance(raw_value, list) else [raw_value]
+            for value_index, value in enumerate(values):
+                if not isinstance(value, str) or not _MALFORMED_BINDING_VALUE.search(
+                    value
+                ):
+                    continue
+                suffix = f"[{value_index}]" if isinstance(raw_value, list) else ""
+                raise ValueError(
+                    "malformed Goal Interpretation binding value at "
+                    f"responsibilities[{responsibility_index}].bindings."
+                    f"{raw_name}{suffix}: {value!r}"
                 )
 
 
@@ -2130,11 +2164,18 @@ class OllamaGoalInterpreter:
             "Goal relationship only when the current turn actually refers to that same "
             "Goal; never attach an unrelated new request to the most recent Goal merely "
             "because its ID is available. "
+            "A name used only to address the conversational partner is a vocative, not "
+            "a separate outcome, location, or body action. A standalone letter, symbol, "
+            "or similarly low-information fragment without uniquely resolving continuity "
+            "context has unresolved intended meaning; do not assume the person requested "
+            "an echo or nearby action. "
             "Preserve speaker and actor perspective: the user's first person belongs "
             "to the user, while second-person references addressed to Chromie belong "
-            "to Chromie. A question about what Chromie just said uses the most recent "
-            "accepted assistant utterance from dialogue and is new conversational work, "
-            "not continuation of the prior utterance's Goal. "
+            "to Chromie. A question about what Chromie just said makes the outcome repeat "
+            "or report the most recent accepted assistant utterance from dialogue and "
+            "binds its exact delivered text as prior_assistant_utterance. Never bind the "
+            "current question itself as the prior utterance. This is new conversational "
+            "work, not continuation of the prior utterance's Goal. "
             "A declarative statement that explains why a requested answer matters, "
             "describes the person's situation, or states a future plan is context "
             "unless the person also asks Chromie to do something with it. Never invent "
@@ -3119,6 +3160,19 @@ class OllamaGoalInterpreter:
                     "enum": candidate_refs,
                 }
                 refs["uniqueItems"] = True
+            item_schema.setdefault("allOf", []).append(
+                {
+                    "if": {
+                        "properties": {"coverage": {"const": "missing"}},
+                        "required": ["coverage"],
+                    },
+                    "then": {
+                        "properties": {
+                            "responsibility_refs": {"maxItems": 0}
+                        }
+                    },
+                }
+            )
         candidates = [
             {
                 "local_ref": item.local_ref,
@@ -3790,6 +3844,7 @@ class OllamaGoalInterpreter:
         _strip_redundant_outcome_echo_bindings(parsed)
         _normalize_corrupted_count_binding_names(parsed)
         _reject_malformed_binding_names(parsed)
+        _reject_malformed_binding_values(parsed)
         _reject_transport_echo_bindings(request, parsed)
         if certificate_owns_coordination:
             _strip_certificate_owned_coordination_bindings(parsed)
@@ -3904,14 +3959,26 @@ class OllamaGoalInterpreter:
                         f"{type(audit_exc).__name__}: {audit_exc}"
                     ) from audit_exc
             try:
+                candidate_binding_names = _goal_interpretation_binding_names(
+                    _extract_json_object(content)
+                )
+                if isinstance(exc, _GoalInterpretationSpeedProvenanceViolation):
+                    # The typed validator has already proved that this candidate
+                    # dimension is not speed.  Retaining it in the closed recovery
+                    # grammar made the deep model reuse the rejected label and, in
+                    # observed turns, move a valid duration scalar into it.  Other
+                    # mechanically valid candidate dimensions remain available.
+                    candidate_binding_names = [
+                        name
+                        for name in candidate_binding_names
+                        if name.strip().casefold() != "speed"
+                    ]
                 deep = await self._chat_logged(
                     self.build_deep_interpretation_payload(
                         request,
                         constrain_location_provenance=True,
                         constrain_speed_provenance=True,
-                        constrained_binding_names=_goal_interpretation_binding_names(
-                            _extract_json_object(content)
-                        ),
+                        constrained_binding_names=candidate_binding_names,
                         source_structure_violation=str(exc),
                     ),
                     stage="goal_interpretation_deep",

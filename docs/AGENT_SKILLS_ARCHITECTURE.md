@@ -28,7 +28,17 @@ Before the Planner model sees candidates, the selection service mechanically
 intersects each package's declared `applicable_output_modes` and
 `applicable_information_domains` with the current canonical Goals. This is a
 typed disclosure boundary, not semantic classification: the Host does not infer
-a route or choose a Skill from user wording.
+a route or choose a Skill from user wording. When Goal Association broadens an
+external-information Goal after Fast Planner already authored exact provisional
+Work, the qualifier may retain only the exact capability IDs from that
+correlated Work; it does not expose other narrower-domain capabilities or make a
+new semantic choice. This preserves the Planner's existing HOW decision through
+canonical reconciliation without turning the Host into a capability selector.
+
+The selection decoder requires the `selected_agent_skills` array for both
+`select_skills` and `no_skill` decisions (empty only for `no_skill`) and bounds
+selection rationales. A model cannot spend the output budget on prose and omit
+the authoritative selection payload.
 
 ## Purpose
 

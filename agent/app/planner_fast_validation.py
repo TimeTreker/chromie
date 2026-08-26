@@ -273,13 +273,14 @@ def restore_required_capability_args_from_responsibilities(
     responsibilities: list[CognitiveResponsibilityProposal],
     capabilities: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Restore omitted required args when GI already owns the exact value.
+    """Restore omitted direct args when GI already owns the exact value.
 
     The model still owns Capability selection. Once it selects a Capability,
-    copying an identically named required input from every cited Responsibility
-    is mechanical provenance preservation, not a new HOW decision. Conflicting,
-    partial, transformed, optional, or defaulted inputs remain model-owned and
-    fail through the normal contract boundary.
+    copying an identically named accepted input from every cited Responsibility
+    is mechanical provenance preservation, not a new HOW decision. This includes
+    an optional provider input with a default: an explicit human value must win
+    over that default. Conflicting, partial, or transformed inputs remain
+    model-owned and fail through the normal contract boundary.
     """
 
     activities = raw.get("activities")
@@ -309,7 +310,6 @@ def restore_required_capability_args_from_responsibilities(
         properties = input_schema.get("properties")
         if not isinstance(properties, dict):
             properties = {}
-        required = [str(item) for item in input_schema.get("required") or []]
         source_refs = [
             str(item)
             for item in activity.get("source_responsibility_refs") or []
@@ -323,11 +323,8 @@ def restore_required_capability_args_from_responsibilities(
         else:
             args = dict(args)
         changed = False
-        for parameter in required:
+        for parameter in properties:
             if parameter in args:
-                continue
-            parameter_schema = properties.get(parameter)
-            if isinstance(parameter_schema, dict) and "default" in parameter_schema:
                 continue
             if not all(
                 parameter in by_ref[source_ref].bindings
@@ -350,7 +347,7 @@ def restore_required_capability_args_from_responsibilities(
                     "capability_id": capability_id,
                     "parameter": parameter,
                     "source_responsibility_refs": source_refs,
-                    "recovery": "restored_required_arg_from_authoritative_responsibility",
+                    "recovery": "restored_exact_arg_from_authoritative_responsibility",
                 }
             )
         if changed:

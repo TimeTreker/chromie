@@ -41,6 +41,28 @@
         }
       },
       {
+        "stage": "goal_interpretation_deep",
+        "decision": {
+          "confidence": 0.97,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "快速向前移动十来秒",
+              "bindings": {
+                "direction": "forward",
+                "duration_text": "十来秒",
+                "speed": "速度点"
+              },
+              "confidence": 0.97,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "output_mode": "body_action"
+            }
+          ],
+          "unresolved": []
+        }
+      },
+      {
         "stage": "goal_interpretation_responsibility_coverage",
         "decision": {
           "responsibility_items": [
@@ -61,9 +83,10 @@
   },
   "expect": {
     "confidence": 0.97,
-    "llm_calls": 2,
+    "llm_calls": 3,
     "llm_stages": [
       "goal_interpretation",
+      "goal_interpretation_deep",
       "goal_interpretation_responsibility_coverage"
     ],
     "unresolved": [],
@@ -74,7 +97,7 @@
         "bindings": {
           "direction": "forward",
           "duration_text": "十来秒",
-          "pace": "faster"
+          "speed": "速度点"
         },
         "confidence": 0.97,
         "relationship": "new",

@@ -814,9 +814,16 @@ class FastPlannerResolver:
         if response_only:
             executable = []
         projected_payload = [fast_capability_payload(item) for item in executable]
+        retained_capability_ids = {
+            str(item.get("capability_id") or "").strip()
+            for item in context.get("existing_work_activities") or []
+            if isinstance(item, dict)
+            and str(item.get("capability_id") or "").strip()
+        }
         capability_payload = qualify_planner_capability_payload(
             projected_payload,
             authoritative_goals=authoritative_goals,
+            retained_capability_ids=retained_capability_ids,
         )[: self.max_capabilities]
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         contract_schema = (

@@ -3187,10 +3187,10 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         self.assertEqual(bindings["minItems"], 1)
         self.assertEqual(bindings["maxItems"], 1)
         self.assertEqual(
-            bindings["items"]["oneOf"][0]["properties"]["value"],
+            bindings["prefixItems"][0]["properties"]["value"],
             {"const": "10 秒"},
         )
-        duration_binding = bindings["items"]["oneOf"][0]
+        duration_binding = bindings["prefixItems"][0]
         self.assertFalse(
             list(
                 Draft202012Validator(duration_binding).iter_errors(
@@ -3218,9 +3218,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         speed_branch = speed_schema["$defs"]["GoalAssociationModelGoal"][
             "oneOf"
         ][0]
-        speed_binding = speed_branch["properties"]["bindings"]["items"][
-            "oneOf"
-        ][0]
+        speed_binding = speed_branch["properties"]["bindings"]["prefixItems"][0]
         self.assertEqual(
             speed_binding["properties"]["value"],
             {"const": "quick"},
@@ -3251,11 +3249,44 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         count_binding = count_schema["$defs"]["GoalAssociationModelGoal"][
             "oneOf"
-        ][0]["properties"]["bindings"]["items"]["oneOf"][0]
+        ][0]["properties"]["bindings"]["prefixItems"][0]
         self.assertTrue(
             list(
                 Draft202012Validator(count_binding).iter_errors(
                     binding("count", "integer", "1 次")
+                )
+            )
+        )
+
+        identity_schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "speech"},
+            responsibility_bindings={
+                "r1": {"name": "entity_id", "value": "chromie"}
+            },
+        )
+        identity_bindings = identity_schema["$defs"][
+            "GoalAssociationModelGoal"
+        ]["oneOf"][0]["properties"]["bindings"]
+        self.assertEqual(
+            [
+                item["properties"]["name"]["const"]
+                for item in identity_bindings["prefixItems"]
+            ],
+            ["name", "value"],
+        )
+        duplicate_name_rows = [
+            binding("name", "entity_id", "entity_id"),
+            binding("name", "name", "entity_id"),
+        ]
+        self.assertTrue(
+            list(
+                Draft202012Validator(identity_bindings).iter_errors(
+                    duplicate_name_rows
                 )
             )
         )

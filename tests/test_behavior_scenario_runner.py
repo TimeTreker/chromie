@@ -128,12 +128,13 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             turns[1]["llm_stages"],
             [
                 "goal_interpretation",
+                "goal_interpretation_deep",
                 "goal_interpretation_responsibility_coverage",
             ],
         )
         self.assertEqual(
             turns[2]["interpretation"]["responsibilities"][0]["bindings"],
-            {"direction": "forward", "duration_s": 15, "pace": "quickly"},
+            {"direction": "forward", "duration_s": 15, "speed": "quickly"},
         )
         self.assertIn(
             "What is the weather in Beijing today?",

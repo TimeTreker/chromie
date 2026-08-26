@@ -581,6 +581,12 @@ class AgentSkillSelectionService:
                     selected = properties.get("selected_agent_skills")
                     if isinstance(selected, dict):
                         selected["maxItems"] = self.max_selected
+                    reason_summary = properties.get("reason_summary")
+                    if isinstance(reason_summary, dict):
+                        reason_summary["maxLength"] = 160
+                    rationale = properties.get("rationale")
+                    if isinstance(rationale, dict):
+                        rationale["maxLength"] = 160
                 if node.get("type") == "object":
                     node["additionalProperties"] = False
                 for value in node.values():
@@ -590,6 +596,9 @@ class AgentSkillSelectionService:
                     constrain(value)
 
         constrain(schema)
+        required_fields = schema.setdefault("required", [])
+        if "selected_agent_skills" not in required_fields:
+            required_fields.append("selected_agent_skills")
         schema.setdefault("allOf", []).append(
             {
                 "if": {

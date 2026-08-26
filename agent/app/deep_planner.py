@@ -183,6 +183,12 @@ class DeepPlannerResolver:
         qualified_payload = qualify_planner_capability_payload(
             full_payload,
             authoritative_goals=authoritative_goals,
+            retained_capability_ids={
+                str(item.get("capability_id") or "").strip()
+                for item in context.get("existing_work_activities") or []
+                if isinstance(item, dict)
+                and str(item.get("capability_id") or "").strip()
+            },
         )
         payload = qualified_payload[: self.max_capabilities]
         omitted_domain_capability_ids = sorted(

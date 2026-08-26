@@ -1026,6 +1026,30 @@ def canonical_plan_response_schema(
                     step_ids_field = specialized_properties.get("step_ids")
                     if isinstance(step_ids_field, dict):
                         step_ids_field["maxItems"] = 0
+                deep_outcome_disposition = specialized_properties.get("disposition")
+                allowed_deep_outcomes = set(
+                    deep_outcome_disposition.get("enum") or []
+                    if isinstance(deep_outcome_disposition, dict)
+                    else []
+                )
+                deep_outcome_branches = [
+                    copy.deepcopy(branch)
+                    for branch in base_branches
+                    if set(
+                        branch.get("properties", {})
+                        .get("disposition", {})
+                        .get("enum", [])
+                    ).intersection(allowed_deep_outcomes)
+                ]
+                if deep_outcome_branches:
+                    # Deep outcomes are inlined because the deployed decoder does
+                    # not reliably apply nested requirements through a dynamic
+                    # $ref.  Keep its semantic choice open, but expose the DTO
+                    # invariant that execute owns at least one step ID and all
+                    # non-executing outcomes own none.
+                    specialized.setdefault("allOf", []).append(
+                        {"anyOf": deep_outcome_branches}
+                    )
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -1127,8 +1151,17 @@ def canonical_plan_response_schema(
                         "properties": {
                             "disposition": {"enum": ["execute"]},
                             "response_text": {"maxLength": 0},
+                            "steps": {"minItems": 1},
                         },
-                        "required": ["disposition", "response_text"],
+                        "required": ["disposition", "response_text", "steps"],
+                    },
+                    {
+                        "properties": {
+                            "disposition": {"enum": ["mixed"]},
+                            "response_text": {"minLength": 1},
+                            "steps": {"minItems": 1},
+                        },
+                        "required": ["disposition", "response_text", "steps"],
                     },
                     {
                         "properties": {
@@ -1136,8 +1169,9 @@ def canonical_plan_response_schema(
                                 "enum": ["clarify", "unavailable", "refused"]
                             },
                             "response_text": {"minLength": 1},
+                            "steps": {"maxItems": 0},
                         },
-                        "required": ["disposition", "response_text"],
+                        "required": ["disposition", "response_text", "steps"],
                     },
                 ]
             }
@@ -1675,6 +1709,53 @@ def fast_multi_goal_response_schema(
             }
             assignment_branches.append(branch)
         schema.setdefault("allOf", []).append({"anyOf": assignment_branches})
+    elif len(allowed_goals) == 1 and requires_execution:
+        # The single-Goal fast schema has no nested outcome map from which to
+        # derive its aggregate.  Encode the same mechanical invariant directly:
+        # an executable result owns exactly one simple step, while clarification
+        # or semantic escalation owns none and cannot claim exact satisfaction.
+        schema.setdefault("allOf", []).append(
+            {
+                "anyOf": [
+                    {
+                        "properties": {
+                            "disposition": {"enum": ["execute"]},
+                            "steps": {"minItems": 1, "maxItems": 1},
+                            "goal_satisfaction": {
+                                "properties": {"status": {"enum": ["exact"]}}
+                            },
+                        },
+                        "required": [
+                            "disposition",
+                            "steps",
+                            "goal_satisfaction",
+                        ],
+                    },
+                    {
+                        "properties": {
+                            "disposition": {"enum": ["clarify", "escalate"]},
+                            "steps": {"maxItems": 0},
+                            "goal_satisfaction": {
+                                "properties": {
+                                    "status": {
+                                        "enum": [
+                                            "substantial",
+                                            "partial",
+                                            "unsatisfied",
+                                        ]
+                                    }
+                                }
+                            },
+                        },
+                        "required": [
+                            "disposition",
+                            "steps",
+                            "goal_satisfaction",
+                        ],
+                    },
+                ]
+            }
+        )
 
     _constrain_plan_relation_confirmation(schema)
 

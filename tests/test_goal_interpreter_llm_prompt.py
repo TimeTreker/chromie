@@ -1152,6 +1152,32 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 ),
             )
 
+    def test_interpretation_rejects_serialized_field_syntax_in_binding_value(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "malformed Goal Interpretation binding value"
+        ):
+            OllamaGoalInterpreter._validate_interpretation_content(
+                GoalInterpretationRequest(text="Nod twice."),
+                json.dumps(
+                    {
+                        "confidence": 1.0,
+                        "responsibilities": [
+                            {
+                                "local_ref": "r1",
+                                "outcome": "nod twice",
+                                "bindings": {
+                                    "count": 2,
+                                    "nod twice": 'sequence": ',
+                                },
+                                "output_mode": "body_action",
+                                "confidence": 1.0,
+                            }
+                        ],
+                        "unresolved": [],
+                    }
+                ),
+            )
+
     def test_audited_resegmentation_discards_provisional_free_form_coordination(self) -> None:
         decision = OllamaGoalInterpreter._validate_interpretation_content(
             GoalInterpretationRequest(text="walk and sing"),
@@ -1524,6 +1550,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("Do not decide whether downstream work", prompt)
         self.assertIn("Preserve speaker, experiencer, actor, addressee", prompt)
         self.assertIn("most recent accepted assistant/Chromie utterance", prompt)
+        self.assertIn("vocative, not an independently satisfiable outcome", prompt)
+        self.assertIn("prior_assistant_utterance", prompt)
+        self.assertIn("standalone letter, symbol", prompt)
         self.assertIn("does not continue, resume, or modify the old Goal", prompt)
         self.assertIn("Coordination does not merge independently observable effects", prompt)
         self.assertIn("Coordination grammar in any language", prompt)
@@ -1554,6 +1583,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         self.assertIn("most recent accepted assistant utterance", turn_prompt)
         self.assertIn("not continuation of the prior utterance's Goal", turn_prompt)
+        self.assertIn("prior_assistant_utterance", turn_prompt)
+        self.assertIn("vocative, not a separate outcome", turn_prompt)
+        self.assertIn("standalone letter, symbol", turn_prompt)
         self.assertIn("Most recent accepted Chromie/assistant utterance JSON", turn_prompt)
         self.assertIn('"role":"assistant"', turn_prompt)
         self.assertIn('"text":"你好呀！"', turn_prompt)
@@ -2116,11 +2148,12 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         deep_payload = interpreter._chat.await_args_list[1].args[0]
-        speed_contract = deep_payload["format"]["$defs"][
+        binding_contract = deep_payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
-        ]["properties"]["bindings"]["properties"]["speed"]
-        self.assertNotIn("none", speed_contract["anyOf"][0]["enum"])
-        self.assertIn("往前", speed_contract["anyOf"][0]["enum"])
+        ]["properties"]["bindings"]
+        self.assertNotIn("speed", binding_contract["properties"])
+        self.assertIn("duration", binding_contract["properties"])
+        self.assertFalse(binding_contract["additionalProperties"])
 
     async def test_independent_coverage_resegments_collapsed_effects_from_source(self) -> None:
         interpreter = self._interpreter()
@@ -2381,6 +2414,24 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                 "goal_interpretation_responsibility_coverage",
                 "goal_interpretation_responsibility_coverage_repair",
             ],
+        )
+        coverage_item_schema = interpreter._chat.await_args_list[0].args[0][
+            "format"
+        ]["$defs"]["GoalInterpretationResponsibilityCoverageItem"]
+        self.assertTrue(
+            any(
+                clause.get("if", {})
+                .get("properties", {})
+                .get("coverage", {})
+                .get("const")
+                == "missing"
+                and clause.get("then", {})
+                .get("properties", {})
+                .get("responsibility_refs", {})
+                .get("maxItems")
+                == 0
+                for clause in coverage_item_schema["allOf"]
+            )
         )
 
     async def test_interpret_goal_accepts_valid_what_only_output(self) -> None:

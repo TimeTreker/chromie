@@ -310,7 +310,13 @@ def goal_association_response_schema(
                 canonical_entity_type = {
                     "after": "sequence_ref",
                     "before": "sequence_ref",
+                    "count": "count",
+                    "direction": "direction",
+                    "distance": "distance",
+                    "duration": "duration",
                     "parallel_with": "sequence_ref",
+                    "quantity": "quantity",
+                    "speed": "speed",
                     **(entity_type_by_name or {}),
                 }.get(normalized_name)
                 if canonical_entity_type is not None:
@@ -329,7 +335,16 @@ def goal_association_response_schema(
                     )
                 )
                 binding_branches.append(binding_branch)
-            constrained["items"] = {"oneOf": binding_branches}
+            # Each expected source binding is already ordered by the accepted
+            # Responsibility DTO.  A free oneOf item grammar plus ``contains``
+            # allowed the deployed structured decoder to repeat one legal row
+            # and omit another (for example two ``name`` rows and no ``value``
+            # row).  Positional branches make the complete closed projection
+            # visible at the decoder boundary; no semantic value or type is
+            # invented here.
+            constrained["prefixItems"] = binding_branches
+            constrained["items"] = False
+            constrained["uniqueItems"] = True
             constrained["allOf"] = [
                 {
                     "contains": {
@@ -391,6 +406,7 @@ def goal_association_response_schema(
                     properties["bindings"] = exact_binding_array_schema(
                         properties.get("bindings") or {},
                         expected_bindings,
+                        entity_type_by_name={"location": "location"},
                     )
             elif resource_variant == "physical_object":
                 physical_schema = copy.deepcopy(

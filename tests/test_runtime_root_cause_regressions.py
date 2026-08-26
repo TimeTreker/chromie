@@ -13,6 +13,9 @@ from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.planner_model_contract import PlannerModelOutput
+from agent.app.planner_fast_validation import (
+    restore_required_capability_args_from_responsibilities,
+)
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
@@ -24,7 +27,10 @@ from agent.app.planner_validation import (
     qualify_capability_catalog_for_information_domains,
     validate_goal_responsibility_outcomes,
 )
-from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CognitiveWorkRequest,
+)
 from tests.cognitive_work_test_support import cognitive_work_request
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.input_session_runtime import input_session_runtime_for
@@ -64,6 +70,55 @@ def _allows_null(node: Any) -> bool:
 
 
 class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
+    def test_fast_advance_explicit_binding_overrides_optional_provider_default(self) -> None:
+        raw = {
+            "activities": [
+                {
+                    "role": "capability",
+                    "capability_id": "soridormi.blink_eyes",
+                    "activity_id": "blink-once",
+                    "args": {"intensity": 1.0},
+                    "source_responsibility_refs": ["r2"],
+                }
+            ]
+        }
+        responsibilities = [
+            CognitiveResponsibilityProposal(
+                local_ref="r2",
+                outcome="blink once",
+                bindings={"count": 1},
+                confidence=1.0,
+                relationship="new",
+                target_goal_ids=[],
+                output_mode="body_action",
+            )
+        ]
+        capabilities = [
+            {
+                "capability_id": "soridormi.blink_eyes",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "count": {"type": "number", "default": 2},
+                        "intensity": {"type": "number", "default": 1.0},
+                    },
+                },
+            }
+        ]
+
+        restored, repairs = restore_required_capability_args_from_responsibilities(
+            raw,
+            responsibilities=responsibilities,
+            capabilities=capabilities,
+        )
+
+        self.assertEqual(restored["activities"][0]["args"]["count"], 1)
+        self.assertEqual(repairs[0]["parameter"], "count")
+        self.assertEqual(
+            repairs[0]["recovery"],
+            "restored_exact_arg_from_authoritative_responsibility",
+        )
+
     def test_typed_information_domain_qualifies_deep_planner_catalog(self) -> None:
         capabilities = [
             {
@@ -111,6 +166,43 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             [item["capability_id"] for item in qualified],
             [
                 "chromie.environment.observe",
+                "chromie.memory.retrieve_verified_tool_result",
+            ],
+        )
+        broad_goal = [
+            {
+                "goal_id": "goal-broad-read",
+                "resource_responsibility": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource": {
+                        "kind": "information",
+                        "attributes": {
+                            "information_domain": {
+                                "value": "external_grounded_information"
+                            }
+                        },
+                    },
+                },
+            }
+        ]
+        self.assertEqual(
+            qualify_capability_catalog_for_information_domains(
+                capabilities,
+                authoritative_goals=broad_goal,
+            ),
+            [capabilities[2]],
+        )
+        self.assertEqual(
+            [
+                item["capability_id"]
+                for item in qualify_capability_catalog_for_information_domains(
+                    capabilities,
+                    authoritative_goals=broad_goal,
+                    retained_capability_ids={"chromie.weather.lookup"},
+                )
+            ],
+            [
+                "chromie.weather.lookup",
                 "chromie.memory.retrieve_verified_tool_result",
             ],
         )
@@ -176,6 +268,57 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(
             "execute",
             sing_outcome["properties"]["disposition"]["enum"],
+        )
+        self.assertTrue(
+            any(
+                branch.get("properties", {})
+                .get("disposition", {})
+                .get("enum")
+                == ["execute"]
+                and branch.get("properties", {})
+                .get("step_ids", {})
+                .get("minItems")
+                == 1
+                for clause in walk_outcome["allOf"]
+                for branch in clause.get("anyOf", [])
+            )
+        )
+        self.assertTrue(
+            any(
+                branch.get("properties", {})
+                .get("disposition", {})
+                .get("enum")
+                == ["mixed"]
+                and branch.get("properties", {}).get("steps", {}).get("minItems")
+                == 1
+                for clause in mixed_schema["allOf"]
+                for branch in clause.get("anyOf", [])
+            )
+        )
+
+        single_fast = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-weather"],
+            allowed_capability_ids=["chromie.weather.lookup"],
+            requires_execution=True,
+        )
+        self.assertTrue(
+            any(
+                branch.get("properties", {})
+                .get("disposition", {})
+                .get("enum")
+                and "escalate"
+                in branch.get("properties", {})
+                .get("disposition", {})
+                .get("enum", [])
+                and "exact"
+                not in branch.get("properties", {})
+                .get("goal_satisfaction", {})
+                .get("properties", {})
+                .get("status", {})
+                .get("enum", [])
+                for clause in single_fast["allOf"]
+                for branch in clause.get("anyOf", [])
+            )
         )
         self.assertEqual(
             sing_outcome["properties"]["step_ids"]["maxItems"],

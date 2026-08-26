@@ -1900,7 +1900,14 @@ uses the same WHAT-only authority. It is not a repair reviewer and receives no a
 Capability/planning authority. Fast Planner—not GI—owns execution-input completeness,
 input-source/default policy, clarification selection for HOW, exact Capability identity,
 arguments, Work, timing, and communication. Deterministic validation may reject malformed
-or authority-violating GI output, but it must not manufacture user meaning.
+or authority-violating GI output, but it must not manufacture user meaning. Rejected typed
+dimensions are removed from the one constrained recovery surface so Deep GI cannot preserve
+the invalid field by moving an unrelated duration, direction, or action into it. Malformed
+serialization fragments inside binding values are DTO corruption, not semantic facts.
+Conversational grounding follows the same rule: a vocative does not become a second effect;
+a repeat request binds the exact most recently accepted assistant utterance; and a standalone
+low-information symbol without resolving context retains unresolved intended meaning rather
+than being treated as an echo request or nearby body action.
 
 A semantic interpretation failure is retained as `interpretation_unavailable`; it must not
 be rounded into capability inability, execution failure, an empty result, or a user-facing
@@ -2364,7 +2371,13 @@ validation checks that the value equals the claimed step argument and that
 every explicit numeric value in an executable Goal is accounted for by a
 resolution owned by that Goal. Provenance does not require the model to copy a
 second free-text excerpt: the immutable Goal ID is the stable reference. The
-Host neither infers the argument mapping nor substitutes a default.
+Host neither infers the argument mapping nor substitutes a default. At the
+pre-Association Fast Activity boundary, when a selected capability has an
+identically named input and every cited Responsibility supplies one agreeing
+exact value, deterministic materialization restores an omitted direct argument
+even if the provider schema marks that input optional with a default. This is
+provenance preservation after model-owned capability selection; conflicting,
+transformed, or differently named inputs remain Planner-owned and fail closed.
 
 For a Fast Planner request containing multiple authoritative goals, the model
 emits one required decision record per Goal ID rather than a CanonicalPlan-shaped

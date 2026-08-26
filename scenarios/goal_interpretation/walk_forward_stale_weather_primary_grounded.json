@@ -40,6 +40,28 @@
         }
       },
       {
+        "stage": "goal_interpretation_deep",
+        "decision": {
+          "confidence": 0.97,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "walk forward quickly for 15 seconds",
+              "bindings": {
+                "direction": "forward",
+                "duration_s": 15,
+                "speed": "quickly"
+              },
+              "confidence": 0.97,
+              "relationship": "new",
+              "target_goal_ids": [],
+              "output_mode": "body_action"
+            }
+          ],
+          "unresolved": []
+        }
+      },
+      {
         "stage": "goal_interpretation_responsibility_coverage",
         "decision": {
           "responsibility_items": [
@@ -60,9 +82,10 @@
   },
   "expect": {
     "confidence": 0.97,
-    "llm_calls": 2,
+    "llm_calls": 3,
     "llm_stages": [
       "goal_interpretation",
+      "goal_interpretation_deep",
       "goal_interpretation_responsibility_coverage"
     ],
     "unresolved": [],
@@ -73,7 +96,7 @@
         "bindings": {
           "direction": "forward",
           "duration_s": 15,
-          "pace": "quickly"
+          "speed": "quickly"
         },
         "confidence": 0.97,
         "relationship": "new",

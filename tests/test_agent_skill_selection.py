@@ -214,6 +214,10 @@ class AgentSkillSelectionTests(unittest.TestCase):
             branch["else"]["properties"]["selected_agent_skills"]["maxItems"],
             0,
         )
+        self.assertIn("selected_agent_skills", schema["required"])
+        self.assertEqual(schema["properties"]["reason_summary"]["maxLength"], 160)
+        item_schema = schema["$defs"]["AgentSkillSelectionModelItem"]
+        self.assertEqual(item_schema["properties"]["rationale"]["maxLength"], 160)
     def test_empty_registry_returns_no_candidates_without_model_call(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             registry = self._registry(Path(temp_dir))
