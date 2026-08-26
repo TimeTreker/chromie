@@ -2885,13 +2885,14 @@ class OllamaGoalInterpreter:
                         recovery_binding_names = {
                             "after",
                             "before",
-                            "count",
-                            "item_count",
                             "location",
                             "parallel_with",
-                            "repetition_count",
                             *(constrained_binding_names or []),
                         }
+                        if constrained_binding_names is not None:
+                            for name in list(binding_properties):
+                                if name not in recovery_binding_names:
+                                    binding_properties.pop(name)
                         for name in sorted(recovery_binding_names):
                             if not _is_noncanonical_speed_binding_name(name):
                                 binding_properties.setdefault(name, {})
@@ -2900,7 +2901,9 @@ class OllamaGoalInterpreter:
                             binding_schema["description"] = (
                                 "During source-based recovery, reuse only mechanically "
                                 "validated candidate dimensions or the existing canonical "
-                                "location, count, and sibling-coordination fields. "
+                                "location and sibling-coordination fields. Count fields "
+                                "remain available only when the validated candidate "
+                                "already contained that exact dimension. "
                                 "Omit a dimension when the source does not support it."
                             )
                         if "duration" in binding_properties:

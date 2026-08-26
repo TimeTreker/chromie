@@ -1448,8 +1448,13 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         binding_contract = responsibility_model["properties"]["bindings"]
         self.assertNotIn("speed", binding_contract["properties"])
+        self.assertNotIn("count", binding_contract["properties"])
+        self.assertNotIn("item_count", binding_contract["properties"])
+        self.assertNotIn("repetition_count", binding_contract["properties"])
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(binding_contract).validate({"speed": "blink"})
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(binding_contract).validate({"repetition_count": 1})
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(binding_contract).validate({"speed_mode": "none"})
         self.assertNotIn("speed_mode", binding_contract["properties"])
@@ -1459,6 +1464,18 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             Draft202012Validator(binding_contract).validate(
                 {"speed_mode_value": "none"}
             )
+
+        count_payload = interpreter.build_deep_interpretation_payload(
+            GoalInterpretationRequest(text="Look at me, then blink twice."),
+            atomic_coverage_certificate=certificate,
+            constrain_speed_provenance=True,
+            constrained_binding_names=["repetition_count"],
+        )
+        count_contract = count_payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]
+        self.assertIn("repetition_count", count_contract["properties"])
+        Draft202012Validator(count_contract).validate({"repetition_count": 2})
 
     def test_system_prompt_names_what_only_boundary(self) -> None:
         prompt = self._interpreter().load_system_prompt()
