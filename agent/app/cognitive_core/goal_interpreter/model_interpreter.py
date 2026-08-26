@@ -1294,6 +1294,12 @@ def _reject_unprovenanced_location_bindings(
                 "from the authoritative turn without renaming the typed dimension."
             )
         raw_location = bindings.get("location")
+        if raw_location is not None and not isinstance(raw_location, str):
+            raise _GoalInterpretationLocationProvenanceViolation(
+                "Goal Interpretation location binding must be one exact "
+                "source/context string scalar: "
+                f"responsibilities[{index}].bindings.location={raw_location!r}."
+            )
         if not isinstance(raw_location, str):
             continue
         location = " ".join(raw_location.strip().split())
@@ -1443,6 +1449,27 @@ def _reject_unprovenanced_speed_bindings(
                 f"responsibilities[{index}].bindings.speed{suffix}={scalar!r}. "
                 "Speed must preserve an explicitly supplied pace or velocity surface; "
                 "omit it when the authoritative meaning supplies none."
+            )
+
+
+def _reject_non_scalar_duration_bindings(parsed: dict[str, Any]) -> None:
+    """Keep the existing duration dimension scalar for downstream grounding."""
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for index, item in enumerate(responsibilities):
+        bindings = item.get("bindings") if isinstance(item, dict) else None
+        if not isinstance(bindings, dict) or "duration" not in bindings:
+            continue
+        duration = bindings.get("duration")
+        if isinstance(duration, bool) or not isinstance(
+            duration, (str, int, float, Decimal)
+        ):
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation duration binding must remain one scalar "
+                "source value, never a nested provider-shaped object: "
+                f"responsibilities[{index}].bindings.duration={duration!r}."
             )
 
 
@@ -2863,7 +2890,6 @@ class OllamaGoalInterpreter:
                             "location",
                             "parallel_with",
                             "repetition_count",
-                            "speed",
                             *(constrained_binding_names or []),
                         }
                         for name in sorted(recovery_binding_names):
@@ -2874,20 +2900,36 @@ class OllamaGoalInterpreter:
                             binding_schema["description"] = (
                                 "During source-based recovery, reuse only mechanically "
                                 "validated candidate dimensions or the existing canonical "
-                                "location, speed, count, and sibling-coordination fields. "
+                                "location, count, and sibling-coordination fields. "
                                 "Omit a dimension when the source does not support it."
                             )
-                        binding_properties["speed"] = {
-                            "anyOf": [
-                                {"type": "string", "enum": exact_surfaces},
-                                {"type": "number"},
-                            ],
-                            "description": (
-                                "If speed is present, copy one exact contiguous source "
-                                "pace/velocity surface or explicit numeric velocity; omit "
-                                "speed when the source supplies no pace or velocity."
-                            ),
-                        }
+                        if "duration" in binding_properties:
+                            binding_properties["duration"] = {
+                                "anyOf": [
+                                    {"type": "string", "enum": exact_surfaces},
+                                    {"type": "number"},
+                                ],
+                                "description": (
+                                    "If duration is present, preserve one scalar exact "
+                                    "source surface or explicit numeric duration; never "
+                                    "emit a nested value/unit object."
+                                ),
+                            }
+                        if (
+                            constrained_binding_names is None
+                            or "speed" in constrained_binding_names
+                        ):
+                            binding_properties["speed"] = {
+                                "anyOf": [
+                                    {"type": "string", "enum": exact_surfaces},
+                                    {"type": "number"},
+                                ],
+                                "description": (
+                                    "If speed is present, copy one exact contiguous source "
+                                    "pace/velocity surface or explicit numeric velocity; "
+                                    "omit speed when the source supplies no pace or velocity."
+                                ),
+                            }
                         forbidden_speed_binding_names = {"pace", "velocity"}
                         for dimension in ("speed", "pace", "velocity"):
                             for qualifier in ("level", "mode", "setting", "value"):
@@ -3635,6 +3677,7 @@ class OllamaGoalInterpreter:
                 self.build_deep_interpretation_payload(
                     request,
                     atomic_coverage_certificate=coverage_certificate,
+                    constrain_location_provenance=True,
                     constrain_speed_provenance=True,
                     constrained_binding_names=list(
                         dict.fromkeys(
@@ -3736,6 +3779,7 @@ class OllamaGoalInterpreter:
         _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
         _reject_unprovenanced_speed_bindings(request, parsed)
+        _reject_non_scalar_duration_bindings(parsed)
         _reject_runtime_identity_bindings(request, parsed)
         _strip_language_envelope_bindings(request, parsed)
         _strip_redundant_conversational_turn_echo_bindings(request, parsed)
@@ -3859,6 +3903,7 @@ class OllamaGoalInterpreter:
                 deep = await self._chat_logged(
                     self.build_deep_interpretation_payload(
                         request,
+                        constrain_location_provenance=True,
                         constrain_speed_provenance=True,
                         constrained_binding_names=_goal_interpretation_binding_names(
                             _extract_json_object(content)

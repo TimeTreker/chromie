@@ -51,6 +51,40 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
 
 
 class GoalInterpreterContractTests(unittest.TestCase):
+    def test_duration_and_location_bindings_remain_scalar(self) -> None:
+        base = {
+            "confidence": 1.0,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "move forward for 15 seconds",
+                    "bindings": {},
+                    "output_mode": "body_action",
+                    "confidence": 1.0,
+                }
+            ],
+            "unresolved": [],
+        }
+        nested_duration = copy.deepcopy(base)
+        nested_duration["responsibilities"][0]["bindings"] = {
+            "duration": {"value": "15", "unit": "seconds"}
+        }
+        with self.assertRaisesRegex(ValueError, "duration binding must remain one scalar"):
+            OllamaGoalInterpreter._validate_interpretation_content(
+                GoalInterpretationRequest(text="move forward for 15 seconds"),
+                json.dumps(nested_duration),
+            )
+
+        nested_location = copy.deepcopy(base)
+        nested_location["responsibilities"][0]["bindings"] = {
+            "location": {"value": "forward"}
+        }
+        with self.assertRaisesRegex(ValueError, "location binding must be one exact"):
+            OllamaGoalInterpreter._validate_interpretation_content(
+                GoalInterpretationRequest(text="move forward for 15 seconds"),
+                json.dumps(nested_location),
+            )
+
     def test_speed_requires_authoritative_source_or_context_provenance(self) -> None:
         with self.assertRaisesRegex(
             ValueError, "speed binding has no authoritative surface provenance"
@@ -1412,13 +1446,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             ]["const"],
             "a1",
         )
-        speed_contract = responsibility_model["properties"]["bindings"][
-            "properties"
-        ]["speed"]
-        self.assertNotIn("none", speed_contract["anyOf"][0]["enum"])
-        self.assertIn("blink", speed_contract["anyOf"][0]["enum"])
         binding_contract = responsibility_model["properties"]["bindings"]
-        Draft202012Validator(binding_contract).validate({"speed": "blink"})
+        self.assertNotIn("speed", binding_contract["properties"])
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(binding_contract).validate({"speed": "blink"})
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(binding_contract).validate({"speed_mode": "none"})
         self.assertEqual(
