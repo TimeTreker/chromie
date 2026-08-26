@@ -2838,6 +2838,24 @@ class OllamaGoalInterpreter:
                                 "speed when the source supplies no pace or velocity."
                             ),
                         }
+                        forbidden_speed_binding_names = {"pace", "velocity"}
+                        for dimension in ("speed", "pace", "velocity"):
+                            for qualifier in ("level", "mode", "setting", "value"):
+                                forbidden_speed_binding_names.add(
+                                    f"{dimension}_{qualifier}"
+                                )
+                                forbidden_speed_binding_names.add(
+                                    f"{qualifier}_{dimension}"
+                                )
+                        for alias in sorted(forbidden_speed_binding_names):
+                            binding_properties[alias] = {
+                                "const": "__forbidden_noncanonical_speed_binding__",
+                                "description": (
+                                    "Reserved invalid marker for a noncanonical speed "
+                                    "binding name. Never emit this property; use speed "
+                                    "only for source-backed pace/velocity meaning."
+                                ),
+                            }
                         speed_name_constraint = {
                             "anyOf": [
                                 {"const": "speed"},

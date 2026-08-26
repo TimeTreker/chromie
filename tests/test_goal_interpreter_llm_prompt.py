@@ -1420,6 +1420,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         Draft202012Validator(binding_contract).validate({"speed": "blink"})
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(binding_contract).validate({"speed_mode": "none"})
+        self.assertEqual(
+            binding_contract["properties"]["speed_mode"]["const"],
+            "__forbidden_noncanonical_speed_binding__",
+        )
 
     def test_system_prompt_names_what_only_boundary(self) -> None:
         prompt = self._interpreter().load_system_prompt()
