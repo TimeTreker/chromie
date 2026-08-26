@@ -341,9 +341,15 @@ def goal_association_response_schema(
             # and omit another (for example two ``name`` rows and no ``value``
             # row).  Positional branches make the complete closed projection
             # visible at the decoder boundary; no semantic value or type is
-            # invented here.
+            # invented here.  Keep ``items`` schema-valued even though
+            # ``maxItems`` prevents a suffix: Ollama 0.32's guided parser does
+            # not accept the JSON Schema boolean form ``items: false``.
             constrained["prefixItems"] = binding_branches
-            constrained["items"] = False
+            constrained["items"] = (
+                {"oneOf": copy.deepcopy(binding_branches)}
+                if binding_branches
+                else copy.deepcopy(binding_item_template)
+            )
             constrained["uniqueItems"] = True
             constrained["allOf"] = [
                 {

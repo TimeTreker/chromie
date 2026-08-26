@@ -3186,6 +3186,8 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         self.assertEqual(bindings["minItems"], 1)
         self.assertEqual(bindings["maxItems"], 1)
+        self.assertIsInstance(bindings["items"], dict)
+        self.assertNotEqual(bindings["items"], False)
         self.assertEqual(
             bindings["prefixItems"][0]["properties"]["value"],
             {"const": "10 秒"},
