@@ -1339,7 +1339,37 @@ def _reject_unprovenanced_speed_bindings(
         if not isinstance(item, dict):
             continue
         bindings = item.get("bindings")
-        if not isinstance(bindings, dict) or "speed" not in bindings:
+        if not isinstance(bindings, dict):
+            continue
+        speed_dimension_tokens = {"speed", "pace", "velocity"}
+        speed_alias_qualifiers = {"level", "mode", "setting", "value"}
+        speed_aliases: list[str] = []
+        for raw_name in bindings:
+            normalized_name = str(raw_name).strip().casefold()
+            if normalized_name == "speed":
+                continue
+            name_tokens = set(
+                re.sub(
+                    r"(?<=[a-z0-9])(?=[A-Z])|[^A-Za-z0-9]+",
+                    " ",
+                    str(raw_name),
+                )
+                .casefold()
+                .split()
+            )
+            if (
+                name_tokens & speed_dimension_tokens
+                and name_tokens - speed_dimension_tokens <= speed_alias_qualifiers
+            ):
+                speed_aliases.append(str(raw_name))
+        if speed_aliases:
+            raise _GoalInterpretationSpeedProvenanceViolation(
+                "Goal Interpretation speed meaning must use the canonical "
+                f"bindings.speed field; noncanonical speed binding name(s) at "
+                f"responsibilities[{index}]: {speed_aliases!r}. Regenerate from "
+                "the authoritative turn without renaming the typed dimension."
+            )
+        if "speed" not in bindings:
             continue
         raw_speed = bindings.get("speed")
         speed_values = raw_speed if isinstance(raw_speed, list) else [raw_speed]
@@ -2808,6 +2838,42 @@ class OllamaGoalInterpreter:
                                 "speed when the source supplies no pace or velocity."
                             ),
                         }
+                        speed_name_constraint = {
+                            "anyOf": [
+                                {"const": "speed"},
+                                {
+                                    "not": {
+                                        "pattern": (
+                                            r"^(?:"
+                                            r"[Pp][Aa][Cc][Ee]|"
+                                            r"[Vv][Ee][Ll][Oo][Cc][Ii][Tt][Yy]|"
+                                            r"(?:[Ss][Pp][Ee][Ee][Dd]|"
+                                            r"[Pp][Aa][Cc][Ee]|"
+                                            r"[Vv][Ee][Ll][Oo][Cc][Ii][Tt][Yy])"
+                                            r"(?:[_\-\s](?:"
+                                            r"[Ll][Ee][Vv][Ee][Ll]|"
+                                            r"[Mm][Oo][Dd][Ee]|"
+                                            r"[Ss][Ee][Tt][Tt][Ii][Nn][Gg]|"
+                                            r"[Vv][Aa][Ll][Uu][Ee]))+"
+                                            r")$"
+                                        )
+                                    }
+                                },
+                            ],
+                            "description": (
+                                "Speed meaning has exactly one canonical binding name: "
+                                "speed. Other semantic dimensions remain writable."
+                            ),
+                        }
+                        if constrain_location_provenance:
+                            binding_schema["propertyNames"] = {
+                                "allOf": [
+                                    binding_schema["propertyNames"],
+                                    speed_name_constraint,
+                                ]
+                            }
+                        else:
+                            binding_schema["propertyNames"] = speed_name_constraint
         return payload
 
     @staticmethod

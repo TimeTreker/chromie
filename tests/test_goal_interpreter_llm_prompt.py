@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import ValidationError
 
 from agent.app.clients.ollama_client import OllamaGenerationError
@@ -82,6 +83,27 @@ class GoalInterpreterContractTests(unittest.TestCase):
                                 "location": "往前",
                                 "duration": "10 秒",
                                 "speed": "往前",
+                            }
+                        }
+                    ]
+                },
+            )
+
+    def test_speed_alias_cannot_bypass_canonical_provenance_field(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "speed meaning must use the canonical bindings.speed field"
+        ):
+            _reject_unprovenanced_speed_bindings(
+                GoalInterpretationRequest(
+                    text="你往前跑15秒，然后在边跑边唱歌。", language="zh-CN"
+                ),
+                {
+                    "responsibilities": [
+                        {
+                            "bindings": {
+                                "duration": "15",
+                                "location": "往前",
+                                "speed_mode": "none",
                             }
                         }
                     ]
@@ -1394,6 +1416,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         ]["speed"]
         self.assertNotIn("none", speed_contract["anyOf"][0]["enum"])
         self.assertIn("blink", speed_contract["anyOf"][0]["enum"])
+        binding_contract = responsibility_model["properties"]["bindings"]
+        Draft202012Validator(binding_contract).validate({"speed": "blink"})
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(binding_contract).validate({"speed_mode": "none"})
 
     def test_system_prompt_names_what_only_boundary(self) -> None:
         prompt = self._interpreter().load_system_prompt()
