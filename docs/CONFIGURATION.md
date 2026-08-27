@@ -257,7 +257,7 @@ Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` for retained compound-meaning fidelity. |
+| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3:4b-instruct-2507-q4_K_M`, and RTX 5090 uses `qwen3.5:9b`. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for WHAT-only Fast interpretation, its optional mechanical DTO repair, or one allowed source-based Deep GI interpretation. |

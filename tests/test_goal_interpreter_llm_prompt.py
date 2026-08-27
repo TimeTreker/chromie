@@ -29,6 +29,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _reject_unprovenanced_speed_bindings,
     _reject_untyped_coordination_bindings,
     _strip_bound_values_from_unresolved,
+    _strip_mechanically_unprovenanced_speed_bindings,
     _without_goal_interpretation_authority,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import (
@@ -137,6 +138,24 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 },
             )
 
+    def test_numeric_speed_without_source_provenance_is_mechanically_removed(self) -> None:
+        parsed = {
+            "responsibilities": [
+                {"bindings": {"count": 2, "speed": 1}},
+                {"bindings": {"duration": "10 秒", "speed": 0}},
+            ]
+        }
+
+        _strip_mechanically_unprovenanced_speed_bindings(
+            GoalInterpretationRequest(text="Nod twice, then blink once."),
+            parsed,
+        )
+
+        self.assertEqual(parsed["responsibilities"][0]["bindings"], {"count": 2})
+        self.assertEqual(
+            parsed["responsibilities"][1]["bindings"], {"duration": "10 秒"}
+        )
+
     def test_interpretation_drops_mechanically_spatial_speed_noise(self) -> None:
         decision = OllamaGoalInterpreter._validate_interpretation_content(
             GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN"),
@@ -197,6 +216,10 @@ class GoalInterpreterContractTests(unittest.TestCase):
             "required_output_mode": "speech",
         }
         raw = {
+            # Retained/historical certificates may carry the old redundant
+            # scalar. The positive array is authoritative and duplicate
+            # materialization may shrink it further.
+            "independent_outcome_count": 12,
             "responsibility_items": [
                 {**row, "audit_ref": "a1"},
                 {**row, "audit_ref": "a2"},
@@ -215,6 +238,7 @@ class GoalInterpreterContractTests(unittest.TestCase):
 
         self.assertEqual(problems, [])
         self.assertEqual(len(certificate.responsibility_items), 1)
+        self.assertEqual(certificate.independent_outcome_count, 1)
 
     def test_speed_alias_cannot_bypass_canonical_provenance_field(self) -> None:
         with self.assertRaisesRegex(
@@ -275,7 +299,7 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 {
                     "source_excerpt": "walk",
                     "role": "responsibility",
-                    "coverage": "missing",
+                    "coverage": "representation_mismatch",
                     "independently_satisfiable": True,
                     "responsibility_refs": [],
                     "required_output_mode": "body_action",
@@ -520,6 +544,76 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             timeout_ms=800,
         )
 
+    def test_coverage_admission_normalizes_terminal_punctuation_and_typed_signals(
+        self,
+    ) -> None:
+        request = GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN")
+        echoed_body_as_speech = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.75,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "你往前走 10 秒",
+                        "bindings": {"duration": "10 秒"},
+                        "output_mode": "speech",
+                        "confidence": 0.75,
+                    }
+                ],
+                "unresolved": [],
+            }
+        )
+        empathetic_speech = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.75,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "表达对当前疲劳状态的共情",
+                        "bindings": {
+                            "severity": "mild",
+                            "time_scope": "current",
+                        },
+                        "output_mode": "speech",
+                        "confidence": 0.75,
+                    }
+                ],
+                "unresolved": [],
+            }
+        )
+
+        self.assertTrue(
+            self._interpreter()._responsibility_coverage_required(
+                request, echoed_body_as_speech
+            )
+        )
+        self.assertFalse(
+            self._interpreter()._responsibility_coverage_required(
+                GoalInterpretationRequest(text="我有点累。", language="zh-CN"),
+                empathetic_speech,
+            )
+        )
+        weather_information = GoalInterpretationDecision.model_validate(
+            {
+                **_valid_output(),
+                "responsibilities": [
+                    {
+                        **_valid_output()["responsibilities"][0],
+                        "bindings": {"location": "重庆", "time": "今天"},
+                        "output_mode": "information",
+                    }
+                ],
+            }
+        )
+        self.assertFalse(
+            self._interpreter()._responsibility_coverage_required(
+                GoalInterpretationRequest(
+                    text="今天重庆天气怎么样？", language="zh-CN"
+                ),
+                weather_information,
+            )
+        )
+
     def test_coverage_prompt_uses_distinct_structural_item_contracts(self) -> None:
         interpreter = self._interpreter()
         payload = interpreter.build_responsibility_coverage_payload(
@@ -570,13 +664,18 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("negative clause is not automatically", prompt)
         candidate_prompt = payload["messages"][1]["content"]
         candidate_section = candidate_prompt.split(
-            "Candidate Responsibility DTOs (claims to audit, not source):\n",
+            "Candidate Responsibility DTOs (ownership claims only; their mode is deliberately omitted):\n",
             1,
-        )[1]
-        self.assertIn('"output_mode"', candidate_section)
-        self.assertIn("Final atomicity check", candidate_section)
-        self.assertIn("MODALITY COUNT IS AUTHORITATIVE", candidate_section)
+        )[1].split("Final atomicity check", 1)[0]
+        self.assertNotIn('"output_mode"', candidate_section)
+        self.assertIn("source's complete positive predicates", candidate_prompt)
+        self.assertIn("role=constraint, never context", prompt)
+        self.assertIn("Final atomicity check", candidate_prompt)
+        self.assertIn("positive-item array itself", candidate_prompt)
         self.assertIn("AUTHORITATIVE SOURCE TOKENS", candidate_prompt)
+        self.assertNotIn(
+            "independent_outcome_count", schema["properties"]
+        )
         responsibility_item = schema["$defs"][
             "GoalInterpretationResponsibilityCoverageItem"
         ]
@@ -692,12 +791,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                                 "source_start_token_ref": "t0",
                                 "source_end_token_ref": "t0",
                                 "role": "context",
-                                "coverage": "missing",
+                                "coverage": "covered",
                                 "independently_satisfiable": False,
-                                "responsibility_refs": ["blink"],
+                                "responsibility_refs": [],
                                 "required_output_mode": "none",
-                                "relation_kind": "ordered",
-                                "related_audit_refs": ["a1"],
+                                "relation_kind": "none",
+                                "related_audit_refs": [],
                             }
                         ],
                         "reason_summary": "The cited source owns the blink outcome.",
@@ -772,7 +871,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                             {
                                 "source_start_token_ref": "t2",
                                 "source_end_token_ref": "t2",
-                                "role": "constraint",
+                                "role": "context",
                                 "coverage": "covered",
                                 "independently_satisfiable": False,
                                 "responsibility_refs": ["walk", "blink"],
@@ -792,6 +891,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             certificate.supporting_items[0].related_audit_refs,
             ["a1", "a2"],
         )
+        self.assertEqual(certificate.supporting_items[0].role, "constraint")
+        self.assertEqual(certificate.supporting_items[0].relation_kind, "ordered")
 
     def test_coverage_projects_relation_candidate_owners_from_audit_refs(self) -> None:
         request = GoalInterpretationRequest(text="run while singing")
@@ -1039,7 +1140,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                     "source_end_token_ref": "t3",
                     "audit_ref": "a1",
                     "role": "responsibility",
-                    "coverage": "representation_mismatch",
+                    "coverage": "missing",
                     "independently_satisfiable": True,
                     "responsibility_refs": [],
                     "required_output_mode": "speech",
@@ -1050,7 +1151,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t3",
                     "role": "constraint",
-                    "coverage": "representation_mismatch",
+                    "coverage": "missing",
                     "independently_satisfiable": False,
                     "responsibility_refs": [],
                     "required_output_mode": "none",
@@ -1068,7 +1169,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
 
         self.assertEqual(certificate.supporting_items[0].related_audit_refs, ["a1"])
-        self.assertTrue(any(problem.startswith("representation_mismatch:") for problem in problems))
+        self.assertEqual(certificate.supporting_items[0].responsibility_refs, [])
+        self.assertTrue(any(problem.startswith("missing:constraint:") for problem in problems))
 
     def test_coverage_canonicalizes_cited_spans_and_relation_refs_to_source_order(self) -> None:
         request = GoalInterpretationRequest(text="walk then sing while blinking")
@@ -1732,16 +1834,13 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             responsibility["properties"]["outcome"]["description"],
         )
         bindings_schema = responsibility["properties"]["bindings"]
-        self.assertIn("propertyNames", bindings_schema)
-        self.assertNotRegex(
-            'count”: 2, // commentary',
-            bindings_schema["propertyNames"]["allOf"][0]["pattern"],
-        )
+        self.assertFalse(bindings_schema["additionalProperties"])
+        self.assertNotIn("propertyNames", bindings_schema)
         count_schema = bindings_schema["properties"]["count"]
         self.assertEqual(count_schema["type"], "integer")
         self.assertEqual(count_schema["minimum"], 1)
         for alias in ("item_count", "repetition_count"):
-            self.assertIn(alias, bindings_schema["properties"])
+            self.assertNotIn(alias, bindings_schema["properties"])
             with self.assertRaises(JsonSchemaValidationError):
                 Draft202012Validator(bindings_schema).validate({alias: 2})
 
@@ -1844,6 +1943,27 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 available_request,
                 {"responsibilities": [{"bindings": {"prior_assistant_utterance": "你好"}}]},
             )
+
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 1.0,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "repeat the most recent accepted assistant utterance",
+                        "bindings": {"prior_assistant_utterance": "你好呀！"},
+                        "output_mode": "speech",
+                        "confidence": 1.0,
+                    }
+                ],
+                "unresolved": [],
+            }
+        )
+        self.assertFalse(
+            self._interpreter()._responsibility_coverage_required(
+                available_request, decision
+            )
+        )
 
     def test_system_prompt_preserves_speaker_and_immediate_conversation_boundaries(self) -> None:
         prompt = self._interpreter().load_system_prompt()
@@ -2716,7 +2836,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ["a1", "a2"],
         )
 
-    async def test_mechanically_invalid_coverage_certificate_gets_one_dto_repair(self) -> None:
+    async def test_missing_coverage_with_owner_becomes_resegmentation_mismatch(self) -> None:
         interpreter = self._interpreter()
         decision = GoalInterpretationDecision.model_validate(
             {
@@ -2747,12 +2867,23 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "supporting_items": [],
             "reason_summary": "Invalid missing ownership.",
         }
-        repaired = copy.deepcopy(invalid)
-        repaired["responsibility_items"][0]["coverage"] = "covered"
+        resegmented = {
+            "confidence": 1.0,
+            "responsibilities": [
+                {
+                    "local_ref": "a1",
+                    "outcome": "walk forward",
+                    "bindings": {},
+                    "output_mode": "body_action",
+                    "confidence": 1.0,
+                }
+            ],
+            "unresolved": [],
+        }
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
             side_effect=[
                 {"message": {"content": json.dumps(invalid)}},
-                {"message": {"content": json.dumps(repaired)}},
+                {"message": {"content": json.dumps(resegmented)}},
             ]
         )
 
@@ -2761,12 +2892,12 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             decision,
         )
 
-        self.assertEqual(result, decision)
+        self.assertEqual(result.responsibilities[0].output_mode, "body_action")
         self.assertEqual(
             [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
             [
                 "goal_interpretation_responsibility_coverage",
-                "goal_interpretation_responsibility_coverage_repair",
+                "goal_interpretation_deep",
             ],
         )
         coverage_item_schema = interpreter._chat.await_args_list[0].args[0][
@@ -2774,21 +2905,22 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         ]["$defs"]["GoalInterpretationResponsibilityCoverageItem"]
         self.assertTrue(
             any(
-                clause.get("if", {})
-                .get("properties", {})
-                .get("coverage", {})
-                .get("const")
-                == "missing"
-                and clause.get("then", {})
-                .get("properties", {})
-                .get("responsibility_refs", {})
-                .get("maxItems")
-                == 0
+                any(
+                    variant.get("properties", {})
+                    .get("coverage", {})
+                    .get("const")
+                    == "missing"
+                    and variant.get("properties", {})
+                    .get("responsibility_refs", {})
+                    .get("maxItems")
+                    == 0
+                    for variant in clause.get("oneOf", [])
+                )
                 for clause in coverage_item_schema["allOf"]
             )
         )
 
-    async def test_coverage_repair_preserves_explicit_atomic_count(self) -> None:
+    async def test_coverage_repair_cannot_change_positive_audit_contract(self) -> None:
         interpreter = self._interpreter()
         request = GoalInterpretationRequest(text="Nod twice, then blink once.")
         merged = GoalInterpretationDecision.model_validate(
@@ -2906,27 +3038,49 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        result = await interpreter._ensure_atomic_responsibility_coverage(
-            request,
-            merged,
-        )
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "coverage DTO repair changed positive audit identity or mode",
+        ):
+            await interpreter._ensure_atomic_responsibility_coverage(
+                request,
+                merged,
+            )
 
-        self.assertEqual(
-            [item.local_ref for item in result.responsibilities], ["a1", "a2"]
-        )
-        self.assertEqual(result.responsibilities[1].bindings["after"], "a1")
+        self.assertEqual(interpreter._chat.await_count, 2)
         repair_schema = interpreter._chat.await_args_list[1].args[0]["format"]
-        self.assertEqual(
-            repair_schema["properties"]["independent_outcome_count"]["const"],
-            2,
+        self.assertNotIn(
+            "independent_outcome_count", repair_schema["properties"]
         )
         self.assertEqual(
             repair_schema["properties"]["responsibility_items"]["minItems"],
-            2,
+            1,
         )
         self.assertEqual(
             repair_schema["properties"]["responsibility_items"]["maxItems"],
-            2,
+            1,
+        )
+        responsibility_item_schema = repair_schema["$defs"][
+            "GoalInterpretationResponsibilityCoverageItem"
+        ]
+        self.assertEqual(
+            responsibility_item_schema["properties"]["audit_ref"]["enum"],
+            ["a1"],
+        )
+        self.assertTrue(
+            any(
+                clause.get("if", {})
+                .get("properties", {})
+                .get("audit_ref", {})
+                .get("const")
+                == "a1"
+                and clause.get("then", {})
+                .get("properties", {})
+                .get("required_output_mode", {})
+                .get("const")
+                == "body_action"
+                for clause in responsibility_item_schema["allOf"]
+            )
         )
 
     async def test_smaller_audit_cannot_erase_validated_consequential_effect(self) -> None:
@@ -3264,21 +3418,68 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         payload = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(text="walk and blink")
         )
-        property_name_contract = payload["format"]["$defs"][
+        binding_schema = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
-        ]["properties"]["bindings"]["propertyNames"]
-        forbidden = set(property_name_contract["allOf"][1]["not"]["enum"])
+        ]["properties"]["bindings"]
+        self.assertFalse(binding_schema["additionalProperties"])
+        binding_properties = binding_schema["properties"]
         self.assertTrue(
-            {"concurrent_action", "capability", "agent_skill"}.issubset(forbidden)
+            {
+                "count",
+                "duration",
+                "location",
+                "speed",
+                "time_scope",
+                "recipient",
+                "parallel_with",
+            }.issubset(binding_properties)
         )
-        binding_properties = payload["format"]["$defs"][
+        self.assertNotIn("source", binding_properties)
+        self.assertNotIn("topic", binding_properties)
+        self.assertNotIn("value", binding_properties)
+        for forbidden_name in (
+            "action",
+            "action_type",
+            "concurrent_action",
+            "capability",
+            "output_mode",
+            "description",
+            "outcome",
+            "item_count",
+            "repetition_count",
+        ):
+            self.assertNotIn(forbidden_name, binding_properties)
+
+        confidence_schema = payload["format"]["properties"]["confidence"]
+        self.assertEqual(confidence_schema["enum"], [0.0, 0.25, 0.5, 0.75, 1.0])
+        responsibility_confidence = payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
-        ]["properties"]["bindings"]["properties"]
-        for forbidden_name in ("action", "concurrent_action", "capability"):
-            self.assertEqual(
-                binding_properties[forbidden_name]["const"],
-                "__forbidden_hidden_effect_or_how_binding__",
-            )
+        ]["properties"]["confidence"]
+        self.assertEqual(
+            responsibility_confidence["enum"], [0.0, 0.25, 0.5, 0.75, 1.0]
+        )
+
+    def test_coverage_schema_closes_missing_candidate_ownership(self) -> None:
+        interpreter = self._interpreter()
+        decision = GoalInterpretationDecision.model_validate(_valid_output())
+        item_schema = interpreter.build_responsibility_coverage_payload(
+            GoalInterpretationRequest(text="What is the weather in Chongqing?"),
+            decision,
+        )["format"]["$defs"]["GoalInterpretationResponsibilityCoverageItem"]
+        valid = {
+            "audit_ref": "a1",
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t2",
+            "role": "responsibility",
+            "coverage": "missing",
+            "independently_satisfiable": True,
+            "responsibility_refs": [],
+            "required_output_mode": "information",
+        }
+        Draft202012Validator(item_schema).validate(valid)
+        invalid = {**valid, "responsibility_refs": ["r1"]}
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(item_schema).validate(invalid)
 
     async def test_interpret_goal_accepts_valid_what_only_output(self) -> None:
         interpreter = self._interpreter()
@@ -3290,7 +3491,54 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.responsibilities[0].local_ref, "r1")
         self.assertEqual(result.responsibilities[0].output_mode, "information")
-        self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_dto_shape_failure_precedes_transport_echo_semantic_audit(self) -> None:
+        interpreter = self._interpreter()
+        malformed = {
+            "confidence": 0.99,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "move toward the speaker",
+                    "bindings": {"location": "Please come here."},
+                    "output_mode": "body_action",
+                    "confidence": -1,
+                }
+            ],
+            "unresolved": [],
+        }
+        repaired = {
+            "confidence": 1.0,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "move toward the speaker",
+                    "bindings": {"location": "here"},
+                    "output_mode": "body_action",
+                    "confidence": 1.0,
+                }
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(malformed)}},
+                {"message": {"content": json.dumps(repaired)}},
+            ]
+        )
+        interpreter._ensure_atomic_responsibility_coverage = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=lambda _request, decision, **_kwargs: decision
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="Please come here.")
+        )
+
+        self.assertEqual(result.responsibilities[0].confidence, 1.0)
+        self.assertEqual(
+            [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
+            ["goal_interpretation", "goal_interpretation_contract_repair"],
+        )
 
     async def test_provider_key_value_bindings_are_mechanically_normalized(self) -> None:
         interpreter = self._interpreter()
@@ -3456,7 +3704,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "CognitiveResponsibilityProposal"
         ]["properties"]["bindings"]
         self.assertIn("duration", binding_contract["properties"])
-        self.assertNotEqual(binding_contract.get("additionalProperties"), False)
+        self.assertFalse(binding_contract["additionalProperties"])
 
     async def test_transport_echo_uses_atomic_audit_before_fresh_resegmentation(self) -> None:
         interpreter = self._interpreter()
@@ -3767,10 +4015,8 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         binding_contract = repair_schema["$defs"]["CognitiveResponsibilityProposal"][
             "properties"
         ]["bindings"]
-        self.assertEqual(
-            binding_contract["propertyNames"]["allOf"][-1]["anyOf"][0],
-            {"const": "location"},
-        )
+        self.assertFalse(binding_contract["additionalProperties"])
+        self.assertNotIn("propertyNames", binding_contract)
 
     async def test_location_alias_cannot_escape_surface_provenance(self) -> None:
         interpreter = self._interpreter()
@@ -4288,7 +4534,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "goal_interpretation_responsibility_coverage",
         )
 
-    async def test_single_greeting_with_source_message_survives_audit_mode_dispute(self) -> None:
+    async def test_single_non_echo_greeting_skips_broad_coverage_reclassification(self) -> None:
         interpreter = self._interpreter()
         greeting = {
             "confidence": 0.99,
@@ -4330,7 +4576,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.responsibilities[0].output_mode, "speech")
         self.assertEqual(result.responsibilities[0].bindings, {"message": "你好"})
-        self.assertEqual(interpreter._chat.await_count, 2)
+        self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_transport_echo_bindings_escalate_once_from_source(self) -> None:
         interpreter = self._interpreter()

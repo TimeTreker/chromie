@@ -266,15 +266,15 @@ projections or references, not independently authored copies. Natural-language
 `description` fields summarize canonical semantics; they are not another source
 of truth that later code reconciles against typed fields.
 
-An ephemeral coverage certificate is evidence about candidate Goal semantics, not
-another mutable Goal model. It may be retained immutably in traces, but its only
-control authority is to accept the candidate, permit one fresh source-based
-interpretation, or fail closed. It may not mutate Goals or enter its own repair
-workflow. Its source provenance is a model-cited contiguous token-ref span that
-trusted code materializes from the authoritative turn; the model does not author a
-second textual copy. Typed ordered/parallel supporting items also identify their
-candidate Responsibility participants so trusted code can verify the corresponding
-`before`/`after` or `parallel_with` bindings without interpreting coordination words.
+Responsibility coverage is evidence carried by the primary GI semantic result, not
+another mutable Goal model and not a second LLM-authored certificate. It may be
+retained immutably in traces, but it creates no separate control authority or
+repair workflow. Source provenance is cited from the authoritative turn and
+materialized by trusted code rather than retyped as a second semantic copy. Typed
+ordered/parallel sibling references let trusted code verify `before`/`after` or
+`parallel_with` integrity without interpreting coordination words. A downstream
+Goal Association or Planner consumes this accepted evidence within its distinct
+authority; neither calls a semantic reviewer to reinterpret GI WHAT.
 
 ### Capability grounding requires semantic entailment
 
@@ -302,7 +302,7 @@ epistemically unknown; a generic web or weather source is not silently promoted 
 
 Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
 
-The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast qualification/reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep repair/safety/diagnostic validation mechanics; `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected; and `planner_audit.py` contains the already-existing bounded model-assisted communication/coverage audits used inside Planner reasoning. The former `planner_contract.py` compatibility surface is removed. Fast/Deep Resolvers retain model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
+The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast qualification/reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. Legacy model-assisted same-owner communication/coverage confirmation in `planner_audit.py` is not a distinct planning authority and must be folded into the primary Planner result or removed under Charter principles 30–31; deterministic audit helpers may remain. The former `planner_contract.py` compatibility surface is removed. Fast/Deep Resolvers retain model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
 
 ### Planner owns how Chromie says established meaning
 
@@ -1799,22 +1799,18 @@ and explicitly discriminated:
 - `create_goals` for one natural-language description per independent new goal;
 - `clarify` for one concise user-facing question.
 
-Goal Association has one bounded semantic transaction. The primary model result
-may receive one mechanical DTO repair. Every newly proposed Goal set then receives
-one independent responsibility-coverage audit; pure association and clarification
-branches have no new candidate set to audit.
-An invalid audit fails closed. A rejected audit permits exactly one fresh
-interpretation from the authoritative turn; that fresh interpretation receives no
-DTO repair and must pass one final audit. No later stage may repair the audit,
-restore fields from an earlier candidate, align a revised candidate to an earlier
-candidate, or hand Goal meaning to Planner. The complete logical invocation DAG is:
+Goal Association has one bounded semantic transaction. Its primary model result
+conserves the accepted GI Responsibilities while deciding only canonical Goal
+identity and continuity, and may receive one mechanical DTO repair. There is no
+second coverage reviewer, fresh interpretation, or final semantic audit. A
+semantic, grounding, or Responsibility-conservation rejection fails closed. No
+later stage may restore fields from an earlier candidate, reinterpret GI meaning,
+or hand Goal meaning to Planner. The complete logical invocation DAG is:
 
 ```text
 primary interpretation
   -> optional one DTO repair
-  -> coverage audit
-  -> optional one fresh interpretation after semantic rejection
-  -> final coverage audit
+  -> deterministic provenance and Responsibility-conservation validation
   -> commit or fail closed
 ```
 
@@ -1873,10 +1869,11 @@ state, retained Goal bindings, or other authoritative references exposed through
 Situation. Planner owns only how to realize an already-defined outcome. A
 material-binding provenance contradiction is not repaired by copying values from
 an earlier candidate or by narrowing the Host schema to a guessed clarification.
-The primary Goal Association DTO may receive its one mechanical repair; a rejected
-coverage proof may permit one fresh source-based interpretation, whose model may
-choose a genuine clarification when the user can resolve the gap. Invalid or
-repeatedly incomplete output fails closed with no Goal commit or effect.
+The primary Goal Association DTO may receive its one mechanical repair. A semantic,
+grounding, or Responsibility-conservation rejection is terminal at that authority;
+GA does not launch a reviewer or fresh interpretation to rewrite GI meaning. A
+genuine unresolved meaning returns through the designated GI/user-clarification
+path. Invalid or incomplete output fails closed with no Goal commit or effect.
 
 Fast/Deep Goal Interpretation are depths of the same WHAT authority. Their maintained
 model-facing contract is provider-neutral Responsibility evidence only: intended outcome,
@@ -1889,6 +1886,7 @@ The maintained GI transaction is deliberately bounded:
 ```text
 primary Fast Goal Interpretation from the authoritative admitted turn
   -> optional one same-stage mechanical DTO repair when schema shape is malformed
+  -> deterministic validation of primary-result source/coverage evidence
   -> accept when WHAT is sufficiently resolved
   -> otherwise at most one source-based Deep Goal Interpretation when consequential
      ambiguity remains in intended outcome, scope, Goal relation, or referent
@@ -2159,72 +2157,41 @@ Possible goals:
 2. obtain coffee;
 3. retrieve weather.
 
-#### 7.1.1 Responsibility coverage is an explicit trusted-boundary proof
+#### 7.1.1 Responsibility coverage is primary-result evidence
 
-The semantic model still owns the judgment about what is an independent human
+The GI semantic model owns the judgment about what is an independent human
 outcome. The Host must not reproduce that judgment with verbs, regexes, action
-lists, or provider names. But accepting an unconstrained list of model-authored
-Goals is also insufficient: a model can understand several requested outcomes in
-its reasoning and still omit or over-merge one in the structured result.
+lists, provider names, or a second LLM reviewer. The primary GI result therefore
+contains the complete Responsibility inventory and the minimum source-grounding
+evidence needed to validate each item. The same item owns its provider-neutral
+mode, material bindings, relationship, and sibling references; no parallel
+`audit_ref`/candidate-mapping representation rewrites those facts.
 
-For effectful/high-risk segmentation, Goal Association therefore performs a
-separate focused responsibility-coverage audit over the authoritative user turn
-and the already proposed zero-based Goal candidates. The audit classifies each
-material current-turn fragment as one of:
+Trusted validation checks only mechanics:
 
-- `responsibility`: a positive outcome Chromie owes;
-- `constraint`: a modifier, prohibition, timing, or other boundary on owned work;
-- `context`: reference/background that does not itself require completion;
-- `framing`: politeness or social preamble attached to substantive work.
+- Responsibility identities and sibling references are closed and unique;
+- source references belong to the authoritative admitted turn;
+- explicit material numbers and directly named entities retain valid provenance;
+- modes and relationship tokens belong to the closed provider-neutral contract;
+- ordered and parallel bindings reference actual sibling Responsibilities;
+- unavailable provider support does not remove the semantic Responsibility.
 
-Each item carries a verbatim current-turn `source_excerpt`. A covered positive
-responsibility owns exactly one Goal candidate; constraints may bind to affected
-Goals; context and framing own none. The model also states whether a positive
-responsibility is independently satisfiable and whether it requires an information
-resource, physical resource, persistent effect, or ordinary Goal shape. Temporal
-constraints are audited for source-grounded human semantic preservation only; Goal
-Association does not decompose them into provider date/period dimensions. The trusted
-Host compares those authored claims only with typed candidate fields, then checks
-structure and provenance:
+Completeness and independence remain one model-authored semantic decision in the
+primary result. If that decision is unreliable, development improves the primary
+prompt, schema, model choice, or deterministic representation and reruns the
+aggregate semantic cohort. Production does not add a critic, coverage auditor,
+resegmentation reviewer, or semantic repair call. A mechanically malformed DTO may
+receive the one same-stage shape regeneration allowed by the Charter without
+changing semantic claims. Genuine unresolved meaning follows the single Deep-GI,
+user-clarification, or fail-closed path.
 
-- every accepted Goal candidate is justified by at least one covered positive
-  responsibility;
-- missing or clarification-required material meaning cannot pass an `accept`
-  review;
-- when an audit says `missing` while also naming a candidate Goal, the Host may
-  mechanically normalize that contradictory shape to `representation_mismatch` with
-  the same candidate index; when `clarification_required` names a candidate, the Host
-  drops the impossible ownership index. Both normalizations preserve a rejecting
-  verdict and never repair semantic meaning or turn a reject into accept;
-- two independently satisfiable positive outcomes cannot be assigned to the
-  same Goal candidate;
-- every current-turn excerpt is source-grounded rather than translated or
-  invented;
-- unavailable provider support does not remove the semantic responsibility.
-
-A rejected audit authorizes one fresh model-owned resegmentation from the
-authoritative turn. The revised candidate set must pass one independent coverage
-recheck before canonical Goal state is committed. A second rejection fails
-closed. This creates containment without transferring semantic authority to the
-Host and directly prevents a compound request such as walking, singing, and
-blinking from silently becoming only one observable responsibility.
-
-The GI atomic audit receives each candidate's `output_mode` as a candidate claim, not
-as source evidence, so it can detect a single DTO that merged independently observable
-effects with different WHAT modes. When the audit maps every source outcome bijectively
-to an already-correct candidate and only its typed order/concurrency relation or mode is
-missing, Host may project those exact audit-owned fields onto the same candidates and
-revalidate the certificate. It does not regenerate or infer semantics. Non-bijective,
-missing, or over-merged coverage still takes the one source-based resegmentation path.
-
-The audit is an authority-ephemeral proof certificate, not a second mutable Goal
-model. It may be retained immutably in traces and reviewed evidence, but its only
-control effects are `accept`, `reconsider_once`, and `fail_closed`. Model output
-contains only the source-grounded item judgments needed for the proof: source
-excerpt, semantic role, coverage state, independence judgment, and candidate Goal
-mapping. The Host derives the overall verdict and the candidate indices lacking a
-positive responsibility owner. Those redundant values are not model-authored and
-therefore cannot need normalization or repair.
+Goal Association consumes the accepted GI inventory and must conserve it while
+deciding canonical Goal identity and continuity. Its primary result may be checked
+mechanically for one-to-one Responsibility conservation, source provenance, and
+typed binding preservation, but GA does not invoke another model to decide whether
+GI understood the user correctly. Planner likewise consumes canonical WHAT and
+cannot reinterpret it from Capability availability. This keeps the earliest
+semantic boundary responsible without paying for a live confirmation chain.
 
 ### 7.2 Plan steps are not goals
 
@@ -2318,12 +2285,11 @@ the resource shape, information domain, and qualified Capability semantics parti
 in HOW selection. Host performs only the typed join and revision trigger; it does not
 choose or substitute a Capability.
 
-The independent atomic-coverage audit cites authoritative source tokens. When a
-candidate Responsibility's model-owned outcome is one unique token-aligned verbatim
-slice of that same source, trusted validation uses that exact slice instead of a
-decoder span that swallowed an adjacent sibling predicate. This is a provenance
-normalization only: it cannot change ownership, coverage, output mode, relation, or
-split an overmerged candidate, which therefore still fails closed.
+The primary GI Responsibility evidence cites authoritative source tokens. Trusted
+validation may materialize those references and check their provenance, but it
+cannot change ownership, output mode, relation, or split an overmerged candidate.
+Semantic incompleteness therefore remains a failure of the primary semantic owner,
+not an invitation for Planner to run another interpretation.
 
 It may:
 

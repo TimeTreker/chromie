@@ -59,13 +59,12 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "goal-interpretation": TestGroup(
-        "Protective filtering, capability grounding, Goal Interpretation, and regressions.",
+        "Goal Interpretation endpoint, semantic-authority boundary, and model-contract regressions.",
         (
             _unittest(
-                "tests.test_goal_interpreter_core",
-                "tests.test_goal_interpreter_capability_routing",
-                "tests.test_llm_capability_routing",
-                "tests.test_capability_goal_interpretation_actions",
+                "tests.test_cognitive_core_interpretation_endpoint",
+                "tests.test_goal_interpreter_llm_prompt",
+                "tests.test_semantic_authority",
             ),
         ),
     ),

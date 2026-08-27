@@ -153,10 +153,10 @@ ordinary initial requests omit it. They do not accept a Goal-Interpreter `route_
 
 The maintained Cognitive Core interpretation result contains first-class
 `responsibilities` as provider-neutral Goal-Interpretation evidence: a local reference,
-human outcome, material semantic bindings, Goal relationship, and exact output mode.
-Effectful or multi-Responsibility results cross a separate source-based atomic-coverage
-certificate before acceptance; that transient proof does not become another Goal or
-planning owner. Responsibility evidence is the authoritative WHAT handoff
+human outcome, material semantic bindings, Goal relationship, exact output mode, and
+the primary-result source evidence required for mechanical coverage validation.
+Effectful or multi-Responsibility results do not cross a second LLM coverage reviewer.
+Responsibility evidence is the authoritative WHAT handoff
 for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
 Capability IDs, executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
@@ -170,9 +170,10 @@ its maintained schema contains no planning-gap or resolution-policy fields.
 authoritative turn, GI Responsibilities, response language, bounded interaction state,
 and the small owner-approved speaking-style projection. It returns
 `FastPlannerFirstResponse`: zero or one exact `progress` or `complete_response`
-Communicative Activity. Before returning a non-null Activity, Fast Planner performs
-exactly one bounded same-owner Epistemic Qualification and records its accept-only
-or reject-only certificate in metadata. The check cannot rewrite text, retry, select a Capability,
+Communicative Activity with the epistemic/grounding evidence required for deterministic
+validation in that same primary result. A separate same-owner Epistemic Qualification
+LLM call is prohibited; the current development implementation's legacy call is a
+Charter nonconformity pending removal. Validation cannot rewrite text, retry, select a Capability,
 resolve an execution input, create a planning InformationGap, or ask a clarification;
 rejection or checker failure returns a null Activity. Runtime may then structurally
 validate and start accepted exact wording immediately; optional Social Attention
@@ -320,15 +321,15 @@ Acquisition location, distance, direction, and route are typed only in
 `resource.attributes` remains the typed query-scope owner for information
 resources such as weather location, time, and requested aspects.
 
-Every newly proposed Goal set crosses the same bounded transaction: primary
-interpretation, at most one DTO repair, one responsibility-coverage certificate,
-at most one fresh interpretation after certificate rejection, and one final
-certificate. The maximum is five logical semantic invocations. A fresh
-interpretation receives no DTO repair, and an invalid certificate receives no
-repair. Certificate output contains source-grounded item judgments only; the
-Host derives `accept`, `reconsider_once`, or `fail_closed` and may retain the
-immutable certificate as trace evidence without giving it Goal lifecycle
-authority.
+The target bounded transaction has one primary Goal Association semantic result
+and at most one same-stage regeneration for a mechanically malformed DTO. It
+mechanically conserves the authoritative GI Responsibilities and their integrated
+source/coverage evidence; it does not invoke a coverage reviewer, critic, fresh
+interpretation, or final semantic recheck. A semantic, grounding, or conservation
+rejection fails closed and cannot be repaired at the same authority. The current
+development implementation still contains the older certificate/reconsideration
+path; that path is a documented Charter nonconformity, not a supported contract or
+release-ready behavior, and must be removed before qualification.
 
 `GoalAssociationResolution.resolution_status` is the terminal contract:
 `resolved` or `fail_closed`. `fail_closed` contains no associations, new Goals,

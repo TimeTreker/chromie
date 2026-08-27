@@ -940,18 +940,23 @@ def _materialize_coverage_source_excerpts(
     for index, item in enumerate(responsibility_items):
         if isinstance(item, dict) and not str(item.get("audit_ref") or "").strip():
             item["audit_ref"] = f"a{index + 1}"
+        if (
+            isinstance(item, dict)
+            and str(item.get("coverage") or "") == "missing"
+            and item.get("responsibility_refs")
+        ):
+            # ``missing`` definitionally means that no candidate owns the source
+            # outcome. Some Ollama grammars do not enforce the schema's nested
+            # oneOf and emit both missing and an explicit candidate ref. Preserve
+            # the typed ownership evidence and classify the contradiction as a
+            # representation mismatch so the normal audited resegmentation path
+            # repairs the candidate; do not accept it as covered or discard its
+            # source-based mismatch claim.
+            item["coverage"] = "representation_mismatch"
     supporting_items = raw.get("supporting_items")
     for item in supporting_items if isinstance(supporting_items, list) else []:
         if not isinstance(item, dict):
             continue
-        if str(item.get("role") or "") in {"context", "framing"}:
-            # These schema roles are definitionally acknowledged without owning
-            # a candidate Responsibility. Clear model-emitted ownership fields;
-            # this is a closed mechanical projection, not semantic reclassification.
-            item["coverage"] = "covered"
-            item["responsibility_refs"] = []
-            item["relation_kind"] = "none"
-            item["related_audit_refs"] = []
         relation_kind = str(item.get("relation_kind") or "none")
         related_audit_refs = item.get("related_audit_refs")
         if not isinstance(related_audit_refs, list):
@@ -986,6 +991,22 @@ def _materialize_coverage_source_excerpts(
                 if str(responsibility_item.get("audit_ref") or "").strip()
                 in cited_audit_refs
             ]
+        if str(item.get("role") or "") in {"context", "framing"}:
+            if relation_kind in {"ordered", "parallel"}:
+                # The model already emitted a closed typed relation and its
+                # positive audit endpoints. ``context``/``framing`` is therefore
+                # only a mechanically wrong DTO role: typed relations are
+                # constraints by schema definition. Preserve the semantic claim
+                # and repair only its closed role token.
+                item["role"] = "constraint"
+                item["coverage"] = "covered"
+            else:
+                # Ordinary context/framing is acknowledged without owning a
+                # candidate Responsibility.
+                item["coverage"] = "covered"
+                item["responsibility_refs"] = []
+                item["relation_kind"] = "none"
+                item["related_audit_refs"] = []
         if (
             str(item.get("role") or "") == "constraint"
             and str(item.get("coverage") or "") != "covered"
@@ -1015,7 +1036,15 @@ def _materialize_coverage_source_excerpts(
             if isinstance(responsibility_item, dict)
             and str(responsibility_item.get("audit_ref") or "").strip()
         }
-        if set(item["related_audit_refs"]).issubset(responsibility_items_by_ref):
+        if str(item.get("coverage") or "") == "missing":
+            # Missing constraint coverage may cite its positive audit owner but,
+            # like missing positive coverage, cannot simultaneously claim a
+            # candidate owner. Keep the typed audit link and clear only the
+            # contradictory candidate-owner projection.
+            item["responsibility_refs"] = []
+        elif set(item["related_audit_refs"]).issubset(
+            responsibility_items_by_ref
+        ):
             # Candidate ownership is redundant with typed atomic audit refs.
             # Project it mechanically so resegmentation receives one owner for an
             # ordinary modifier and the exact endpoints for a typed relation.
@@ -1767,6 +1796,12 @@ def _strip_mechanically_unprovenanced_speed_bindings(
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
     contextual_values = _semantic_context_string_values(request.context)
+    source_numbers = _decimal_values(request.text)
+    context_numbers = {
+        number
+        for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS
+        for number in _decimal_values(request.context.get(key))
+    }
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1775,7 +1810,18 @@ def _strip_mechanically_unprovenanced_speed_bindings(
         if not isinstance(bindings, dict) or "speed" not in bindings:
             continue
         raw_speed = bindings.get("speed")
-        if isinstance(raw_speed, bool) or not isinstance(raw_speed, str):
+        if isinstance(raw_speed, bool):
+            bindings.pop("speed", None)
+            continue
+        if isinstance(raw_speed, (int, float, Decimal)):
+            try:
+                numeric_speed = Decimal(str(raw_speed))
+            except InvalidOperation:
+                numeric_speed = None
+            if numeric_speed not in source_numbers | context_numbers:
+                bindings.pop("speed", None)
+            continue
+        if not isinstance(raw_speed, str):
             continue
         speed = " ".join(raw_speed.strip().split())
         folded = speed.casefold()
@@ -2569,6 +2615,16 @@ class OllamaGoalInterpreter:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
         schema["required"] = ["confidence", "responsibilities", "unresolved"]
+        confidence_values = [0.0, 0.25, 0.5, 0.75, 1.0]
+        aggregate_confidence = schema.get("properties", {}).get("confidence")
+        if isinstance(aggregate_confidence, dict):
+            aggregate_confidence.pop("minimum", None)
+            aggregate_confidence.pop("maximum", None)
+            aggregate_confidence["enum"] = confidence_values
+            aggregate_confidence["description"] = (
+                "Required confidence evidence selected from the bounded numeric "
+                "scale 0, 0.25, 0.5, 0.75, or 1."
+            )
         if forbidden_unresolved_values:
             unresolved = schema.get("properties", {}).get("unresolved")
             if isinstance(unresolved, dict):
@@ -2623,52 +2679,23 @@ class OllamaGoalInterpreter:
                 )
             bindings = responsibility.get("properties", {}).get("bindings")
             if isinstance(bindings, dict):
-                hidden_effect_or_how_names = [
-                    "action",
-                    "activity",
-                    "effect",
-                    "outcome",
-                    "concurrent_action",
-                    "secondary_action",
-                    "parallel_action",
-                    "simultaneous_action",
-                    "capability",
-                    "capability_id",
-                    "skill",
-                    "agent_skill",
-                    "provider",
-                    "execution",
-                ]
-                property_name_contract: dict[str, Any] = {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 80,
-                    "pattern": r"^[^{}\[\]\"'“”‘’,:;/\\]+$",
-                    "description": (
-                        "A semantic dimension name only; never embed JSON syntax, "
-                        "quotes, punctuation, comments, or another field in a key."
-                    ),
-                }
-                forbidden_binding_names = [
-                    "item_count",
-                    "repetition_count",
-                    *hidden_effect_or_how_names,
-                ]
-                if prior_assistant_utterance is None:
-                    forbidden_binding_names.append("prior_assistant_utterance")
-                property_name_contract = {
-                    "allOf": [
-                        property_name_contract,
-                        {"not": {"enum": forbidden_binding_names}},
-                    ],
-                    "description": (
-                        "A semantic dimension name only. Legacy count aliases are "
-                        "unavailable; use count. prior_assistant_utterance is also "
-                        "unavailable unless this request supplies accepted prior speech."
-                    ),
-                }
-                bindings["propertyNames"] = property_name_contract
-                binding_properties = bindings.setdefault("properties", {})
+                # Ollama does not reliably enforce propertyNames on an open object.
+                # Advertising forbidden names with sentinel const values also gives a
+                # small structured decoder legal ways to emit the exact HOW/envelope
+                # fields the contract rejects. Keep the canonical DTO dictionary, but
+                # close its model-facing vocabulary around provider-neutral human
+                # semantic dimensions. Deep/source recovery may narrow this same set;
+                # no runtime Capability or case-specific phrase enters the schema.
+                bindings.pop("propertyNames", None)
+                bindings["additionalProperties"] = False
+                bindings["description"] = (
+                    "Zero or more material human-semantic dimensions using only the "
+                    "typed properties exposed here. Observable effects belong in sibling "
+                    "Responsibility outcomes; DTO fields, HOW, provider, Capability, "
+                    "execution, and explanatory prose are not bindings."
+                )
+                binding_properties: dict[str, Any] = {}
+                bindings["properties"] = binding_properties
                 binding_properties["count"] = {
                     "type": "integer",
                     "minimum": 1,
@@ -2677,23 +2704,6 @@ class OllamaGoalInterpreter:
                         "quantity; never emit aliases, number words, or numeric strings."
                     ),
                 }
-                for alias in ("item_count", "repetition_count"):
-                    binding_properties[alias] = {
-                        "const": "__forbidden_noncanonical_count_binding__",
-                        "description": (
-                            "Reserved invalid marker. Never emit this property; use the "
-                            "canonical count property instead."
-                        ),
-                    }
-                for forbidden_name in hidden_effect_or_how_names:
-                    binding_properties[forbidden_name] = {
-                        "const": "__forbidden_hidden_effect_or_how_binding__",
-                        "description": (
-                            "Reserved invalid marker. Never emit this property: "
-                            "observable effects require sibling Responsibilities, and "
-                            "HOW fields are outside Goal Interpretation authority."
-                        ),
-                    }
                 turn_surface = " ".join(str(admitted_turn or "").strip().split())
                 non_turn_string: dict[str, Any] = {
                     "type": "string",
@@ -2723,6 +2733,53 @@ class OllamaGoalInterpreter:
                         "property when no pace or velocity is supplied; never emit null."
                     ),
                 }
+                generic_scalar = {
+                    "anyOf": [
+                        {"type": "string", "minLength": 1},
+                        {"type": "number"},
+                        {"type": "boolean"},
+                        {
+                            "type": "array",
+                            "items": {
+                                "anyOf": [
+                                    {"type": "string", "minLength": 1},
+                                    {"type": "number"},
+                                    {"type": "boolean"},
+                                ]
+                            },
+                            "minItems": 1,
+                            "maxItems": 12,
+                        },
+                    ],
+                    "description": (
+                        "One source/context-backed human-semantic scalar or short scalar "
+                        "list; never a nested execution/provider object or explanation."
+                    ),
+                }
+                for semantic_name in (
+                    "actor",
+                    "addressee",
+                    "experiencer",
+                    "entity",
+                    "item",
+                    "quantity",
+                    "distance",
+                    "direction",
+                    "time",
+                    "time_scope",
+                    "severity",
+                    "intensity",
+                    "magnitude",
+                    "threshold",
+                    "subtype",
+                    "polarity",
+                    "comparison",
+                    "recipient",
+                    "proposition",
+                    "preference",
+                    "attribute",
+                ):
+                    binding_properties[semantic_name] = generic_scalar
                 sibling_ref_value = {
                     "anyOf": [
                         {"type": "string", "enum": local_refs},
@@ -2750,13 +2807,16 @@ class OllamaGoalInterpreter:
                         ),
                     }
                 else:
-                    binding_properties["prior_assistant_utterance"] = {
-                        "const": "__forbidden_unavailable_prior_utterance__",
-                        "description": (
-                            "Reserved invalid marker. Never emit this property because "
-                            "no accepted prior assistant utterance is supplied."
-                        ),
-                    }
+                    binding_properties.pop("prior_assistant_utterance", None)
+            item_confidence = responsibility.get("properties", {}).get("confidence")
+            if isinstance(item_confidence, dict):
+                item_confidence.pop("minimum", None)
+                item_confidence.pop("maximum", None)
+                item_confidence["enum"] = confidence_values
+                item_confidence["description"] = (
+                    "Confidence in this one Responsibility selected from the bounded "
+                    "numeric scale 0, 0.25, 0.5, 0.75, or 1."
+                )
             output_mode = responsibility.get("properties", {}).get("output_mode")
             if isinstance(output_mode, dict):
                 output_mode.pop("enum", None)
@@ -3393,35 +3453,6 @@ class OllamaGoalInterpreter:
                                 "surface; never translate or transliterate it."
                             ),
                         }
-                        location_name_constraint = {
-                            "anyOf": [
-                                {"const": "location"},
-                                {
-                                    "not": {
-                                        "pattern": (
-                                            r"(?:^|[_\-\s])"
-                                            r"[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]"
-                                            r"(?:$|[_\-\s])"
-                                        )
-                                    }
-                                },
-                            ],
-                            "description": (
-                                "Location meaning has exactly one canonical binding name: "
-                                "location. Other semantic dimensions remain writable."
-                            ),
-                        }
-                        existing_name_constraint = binding_schema.get("propertyNames")
-                        binding_schema["propertyNames"] = (
-                            {
-                                "allOf": [
-                                    existing_name_constraint,
-                                    location_name_constraint,
-                                ]
-                            }
-                            if isinstance(existing_name_constraint, dict)
-                            else location_name_constraint
-                        )
                     if constrain_speed_provenance:
                         recovery_binding_names = {
                             "after",
@@ -3474,63 +3505,6 @@ class OllamaGoalInterpreter:
                                     "omit speed when the source supplies no pace or velocity."
                                 ),
                             }
-                        if constrained_binding_names is None:
-                            forbidden_speed_binding_names = {"pace", "velocity"}
-                            for dimension in ("speed", "pace", "velocity"):
-                                for qualifier in ("level", "mode", "setting", "value"):
-                                    forbidden_speed_binding_names.add(
-                                        f"{dimension}_{qualifier}"
-                                    )
-                                    forbidden_speed_binding_names.add(
-                                        f"{qualifier}_{dimension}"
-                                    )
-                            for alias in sorted(forbidden_speed_binding_names):
-                                binding_properties[alias] = {
-                                    "const": "__forbidden_noncanonical_speed_binding__",
-                                    "description": (
-                                        "Reserved invalid marker for a noncanonical speed "
-                                        "binding name. Never emit this property; use speed "
-                                        "only for source-backed pace/velocity meaning."
-                                    ),
-                                }
-                        speed_name_constraint = {
-                            "anyOf": [
-                                {"const": "speed"},
-                                {
-                                    "not": {
-                                        "pattern": (
-                                            r"^(?:"
-                                            r"[Pp][Aa][Cc][Ee]|"
-                                            r"[Vv][Ee][Ll][Oo][Cc][Ii][Tt][Yy]|"
-                                            r"(?:[Ss][Pp][Ee][Ee][Dd]|"
-                                            r"[Pp][Aa][Cc][Ee]|"
-                                            r"[Vv][Ee][Ll][Oo][Cc][Ii][Tt][Yy])"
-                                            r"(?:[_\-\s](?:"
-                                            r"[Ll][Ee][Vv][Ee][Ll]|"
-                                            r"[Mm][Oo][Dd][Ee]|"
-                                            r"[Ss][Ee][Tt][Tt][Ii][Nn][Gg]|"
-                                            r"[Vv][Aa][Ll][Uu][Ee]))+"
-                                            r")$"
-                                        )
-                                    }
-                                },
-                            ],
-                            "description": (
-                                "Speed meaning has exactly one canonical binding name: "
-                                "speed. Other semantic dimensions remain writable."
-                            ),
-                        }
-                        existing_name_constraint = binding_schema.get("propertyNames")
-                        binding_schema["propertyNames"] = (
-                            {
-                                "allOf": [
-                                    existing_name_constraint,
-                                    speed_name_constraint,
-                                ]
-                            }
-                            if isinstance(existing_name_constraint, dict)
-                            else speed_name_constraint
-                        )
         return payload
 
     @staticmethod
@@ -3540,13 +3514,13 @@ class OllamaGoalInterpreter:
     ) -> bool:
         """Audit candidates whose structured shape can conceal material effects.
 
-        Multiple candidates and effect-bearing modes already require independent
-        source coverage.  A single ``speech`` candidate also requires it when it
-        carries material bindings or merely copies the entire admitted turn as its
-        outcome. Those are provider-neutral structural signals that the item may be
-        an undifferentiated task echo rather than an authored conversational reply,
-        and they prevent a merged multimodal task from suppressing its own audit
-        merely by being mislabeled as speech.
+        Multiple candidates and effect-bearing modes require independent source
+        coverage. A single ``speech`` candidate requires it only when it merely
+        copies the admitted turn as its outcome. A non-echo conversational outcome
+        with semantic bindings is already atomic in its structured shape; sending
+        it to a second broad classifier allowed the auditor to relabel a correct
+        empathetic response as a body action. A merged physical/multimodal turn
+        mislabeled as speech still exposes its source echo and remains audited.
         """
 
         effect_modes = {
@@ -3560,14 +3534,50 @@ class OllamaGoalInterpreter:
             "stateful_effect",
             "other",
         }
-        normalized_source = " ".join(request.text.strip().casefold().split())
+        if (
+            len(decision.responsibilities) == 1
+            and decision.responsibilities[0].output_mode == "speech"
+            and set(decision.responsibilities[0].bindings)
+            == {"prior_assistant_utterance"}
+        ):
+            # The exact accepted utterance is already enforced against bounded
+            # dialogue evidence.  Auditing this one conversational obligation as
+            # atomic source coverage asks a second model to rediscover content
+            # that intentionally does not occur in the current question and can
+            # only turn a valid repeat/report Responsibility into a false miss.
+            return False
+        normalized_source = _normalized_turn_echo(request.text)
+        audit_sensitive_dimensions = {
+            "count",
+            "duration",
+            "speed",
+            "distance",
+            "direction",
+            "quantity",
+        }
+
+        def has_structural_audit_signal(item: Any) -> bool:
+            binding_names = {
+                str(name).strip().casefold() for name in item.bindings
+            }
+            physical_dimensions_present = bool(
+                binding_names & audit_sensitive_dimensions
+            )
+            if item.output_mode == "speech":
+                return physical_dimensions_present or (
+                    "location" in binding_names
+                    and bool(binding_names & {"time", "time_scope"})
+                )
+            if item.output_mode == "information":
+                return physical_dimensions_present
+            return False
+
         return len(decision.responsibilities) > 1 or any(
             item.output_mode in effect_modes
-            or (item.output_mode == "speech" and bool(item.bindings))
+            or has_structural_audit_signal(item)
             or (
                 item.output_mode == "speech"
-                and " ".join(item.outcome.strip().casefold().split())
-                == normalized_source
+                and _normalized_turn_echo(item.outcome) == normalized_source
             )
             for item in decision.responsibilities
         )
@@ -3585,9 +3595,15 @@ class OllamaGoalInterpreter:
         candidate_refs = [item.local_ref for item in decision.responsibilities]
         schema = GoalInterpretationCoverageCertificate.model_json_schema()
         schema["additionalProperties"] = False
+        # The positive-item array is the authoritative count. Asking a small
+        # structured decoder to repeat that length in a second field created a
+        # contradictory repair authority: observed audits emitted three complete
+        # items with ``independent_outcome_count=2``, and the repair grammar then
+        # forced the incorrect two. Keep the historical DTO field readable, but
+        # remove this mechanically derived value from the model-facing contract.
+        schema.get("properties", {}).pop("independent_outcome_count", None)
         schema["required"] = [
             "responsibility_items",
-            "independent_outcome_count",
             "supporting_items",
             "reason_summary",
         ]
@@ -3765,25 +3781,57 @@ class OllamaGoalInterpreter:
                     "satisfiable source outcome. Select from the per-mode semantic "
                     "descriptions; audible output alone never implies media_playback."
                 )
-            item_schema.setdefault("allOf", []).append(
-                {
-                    "if": {
-                        "properties": {"coverage": {"const": "missing"}},
-                        "required": ["coverage"],
-                    },
-                    "then": {
-                        "properties": {
-                            "responsibility_refs": {"maxItems": 0}
-                        }
-                    },
-                }
-            )
+            if item_schema_name == "GoalInterpretationResponsibilityCoverageItem":
+                item_schema.setdefault("allOf", []).append(
+                    {
+                        "oneOf": [
+                            {
+                                "properties": {
+                                    "coverage": {"const": "missing"},
+                                    "responsibility_refs": {"maxItems": 0},
+                                },
+                                "required": ["coverage", "responsibility_refs"],
+                            },
+                            {
+                                "properties": {
+                                    "coverage": {
+                                        "enum": [
+                                            "covered",
+                                            "clarification_required",
+                                            "representation_mismatch",
+                                        ]
+                                    },
+                                    "responsibility_refs": {"minItems": 1},
+                                },
+                                "required": ["coverage", "responsibility_refs"],
+                            },
+                        ],
+                        "description": (
+                            "Missing means no candidate owns the source outcome and "
+                            "therefore requires an empty responsibility_refs array; every "
+                            "other coverage judgment cites at least one candidate owner."
+                        ),
+                    }
+                )
+            else:
+                item_schema.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {"coverage": {"const": "missing"}},
+                            "required": ["coverage"],
+                        },
+                        "then": {
+                            "properties": {
+                                "responsibility_refs": {"maxItems": 0}
+                            }
+                        },
+                    }
+                )
         candidates = [
             {
                 "local_ref": item.local_ref,
                 "outcome": item.outcome,
                 "bindings": item.bindings,
-                "output_mode": item.output_mode,
             }
             for item in decision.responsibilities
         ]
@@ -3815,117 +3863,50 @@ class OllamaGoalInterpreter:
                     "role": "system",
                     "content": (
                         "You are Chromie's independent atomic Responsibility coverage "
-                        "auditor inside Goal Interpretation. Read the authoritative user "
-                        "turn from scratch within the supplied bounded semantic continuity "
-                        "context. Candidate prose is not source evidence. The continuity "
-                        "context is source evidence only for resolving an actual reference, "
-                        "ellipsis, clarification, continuation, or resumption in the current "
-                        "turn. A contextual continuation/resumption inherits the observable "
-                        "outcome and provider-neutral mode of its exact retained Goal; do not "
-                        "mark that outcome missing merely because the latest surface does not "
-                        "repeat its action words. Cite "
-                        "each coherent semantic source span only with "
-                        "source_start_token_ref and "
-                        "source_end_token_ref from the supplied source-token table. "
-                        "Trusted code derives the exact excerpt; never retype, translate, "
-                        "or correct source spelling. The token table is only a citation "
-                        "mechanism; do not inventory or classify every token. Punctuation, "
-                        "function words, and politeness need no standalone item. Cite a "
-                        "complete semantically coherent outcome or constraint span rather "
-                        "than splitting its words into fragments. A token, syllable, noun, "
-                        "duration, connector, location marker, or partial verb phrase is "
-                        "never independently satisfiable by itself. Count observable "
-                        "predicate outcomes, not tokens: if your reason summary says the "
-                        "turn asks for two actions, responsibility_items must contain two "
-                        "complete action predicates, not an inventory of their characters. "
-                        "A positive "
-                        "observable outcome is role=responsibility. Duration, count, "
-                        "distance, direction, ordering, timing, manner, style, prohibition, "
-                        "and other modifiers are role=constraint on an outcome, not another "
-                        "Responsibility. One action together with its duration, count, "
-                        "direction, distance, manner, or style remains exactly one positive "
-                        "outcome; never emit the modifier as another positive item. Put "
-                        "every role=responsibility item only in "
-                        "responsibility_items. Put every role=constraint, context, or "
-                        "framing item only in supporting_items; those items must use "
-                        "independently_satisfiable=false and required_output_mode=none "
-                        "because they never inherit an outcome mode. Context and politeness "
-                        "framing own no candidate. "
-                        "A negative clause is not automatically a second positive body "
-                        "outcome. Use supplied retained-Goal lifecycle evidence: a request "
-                        "to cancel or pause currently active work remains an independently "
-                        "owed relationship outcome, but wording that only prohibits replay "
-                        "of already-terminal work is supporting constraint/context on the "
-                        "still-positive current outcomes. Never classify an already-true "
-                        "idle/no-replay state as new positive embodiment merely because an "
-                        "action verb appears under negation. "
-                        "Coordination grammar never demotes a positive effect to a constraint: "
-                        "when a person can judge two effects completed independently, emit "
-                        "two independently_satisfiable responsibility_items even when the "
-                        "candidate merged them. Every independently satisfiable item must "
-                        "map to exactly one candidate local_ref when a candidate attempts "
-                        "that outcome. If one invalid candidate merged multiple outcomes, "
-                        "cite that same candidate on each item so trusted validation can "
-                        "reject the overmerge. Use coverage=missing when no candidate "
-                        "attempts an outcome, representation_mismatch when a candidate has "
-                        "the wrong atomic shape or output mode, and clarification_required "
-                        "only for genuine unresolved human meaning. For a responsibility, "
-                        "A shared broad mode never merges effects: locomotion, turning, gaze, "
-                        "blinking, nodding, gesture, and posture are separate positive body "
-                        "outcomes whenever each can be observed completed independently, "
-                        "including when one occurs while or during another. "
-                        "required_output_mode is the exact provider-neutral WHAT mode, "
-                        "never a Capability or lane: singing or a song is singing; ordinary "
-                        "conversational wording is speech. Content genre alone never creates "
-                        "a performance mode: telling a joke, story, riddle, explanation, or "
-                        "answer is speech unless the source explicitly requests singing, "
-                        "melody, recitation, or another performance style. A requested musical vocal "
-                        "performance is always singing in every language, even when no "
-                        "lyrics are supplied and even though its result will eventually be "
-                        "audible; it is never ordinary speech or a response-transport "
-                        "choice. Locomotion, gaze, blink, gesture, "
-                        "and posture are body_action. Assign each mode from that item's "
-                        "own cited source span; never swap, rotate, or copy modes between "
-                        "adjacent coordinated outcomes. A run/walk span is body_action "
-                        "and a sing/song span is singing, including when they overlap in "
-                        "time. Grammatical fusion, shared aspect, or a while/during relation "
-                        "never makes those separately observable effects one predicate. A "
-                        "request to acquire, carry, bring, fetch, retrieve, or hand over a "
-                        "physical object is one physical-delivery body_action Responsibility, "
-                        "not speech; acquisition, carrying, and handover are stages of that "
-                        "one human outcome rather than separate Responsibilities. "
-                        "Assign positive source items unique audit_ref values a1, a2, and "
-                        "so on in source order. This is audit identity only, never a Goal ID. "
-                        "Positive Responsibility source spans must be disjoint: cite only "
-                        "the tokens that express that one effect and never include another "
-                        "positive item's action tokens. Overlapping positive spans are an "
-                        "invalid audit. "
-                        "Ordering and concurrency words are material supporting constraints, "
-                        "not disposable grammar. Put an ordered relation such as before, "
-                        "after, then, next, followed by, or its equivalent in any language in "
-                        "supporting_items. Put a simultaneous relation such as while, together, "
-                        "simultaneously, at the same time, or its equivalent in any language in "
-                        "supporting_items. Set relation_kind=ordered and list its candidate "
-                        "responsibility_refs in source order for an ordered relation. Set "
-                        "relation_kind=parallel and list the complete concurrent candidate "
-                        "set for a simultaneous relation. For either typed relation, also "
-                        "list the corresponding positive-item audit_ref values in "
-                        "related_audit_refs. A duration, count, direction, distance, "
-                        "manner, style, prohibition, or other ordinary constraint uses "
-                        "relation_kind=none and cites only the exact positive audit_ref "
-                        "values it modifies. Context and framing use "
-                        "related_audit_refs=[]. "
-                        "Do not type the same set of outcome audit refs as both ordered and "
-                        "parallel. When a later effect begins during an ongoing effect, "
-                        "parallel owns their overlap; onset wording is a non-relation "
-                        "constraint rather than a contradictory ordered relation. "
-                        "The relation source span must be cited even when "
-                        "the candidate omitted it. A comma, punctuation, a plain conjunction "
-                        "such as and/or, or list enumeration alone does not state order or "
-                        "concurrency; use relation_kind=none unless the source semantically "
-                        "states before/after/then/next or simultaneous overlap. "
-                        "Do not plan, select Capabilities, add Goals, or repair candidates. "
-                        "Return JSON only."
+                        "auditor inside Goal Interpretation. Audit only atomic source "
+                        "coverage; do not plan, select Capabilities, or rewrite candidates. "
+                        "The authoritative turn is source evidence. Bounded continuity "
+                        "context may resolve only an actual reference, ellipsis, continuation, "
+                        "or resumption. Candidate DTO prose is a claim to check, never source. "
+                        "Cite complete coherent spans with source_start_token_ref and "
+                        "source_end_token_ref; trusted code materializes their exact text. "
+                        "Do not inventory tokens. A positive predicate outcome goes only in "
+                        "responsibility_items. Its arguments and body parts stay inside that "
+                        "one predicate: a noun, syllable, partial verb phrase, duration, count, "
+                        "distance, direction, location, speed, manner, style, punctuation, or "
+                        "connector is never another outcome. Put every constraint, context, "
+                        "or framing span only in supporting_items with "
+                        "independently_satisfiable=false and required_output_mode=none. "
+                        "Emit one positive item per complete predicate effect the person can "
+                        "accept or reject independently. A shared broad mode never merges "
+                        "effects. Coordination can relate complete effects but cannot create "
+                        "one from a modifier. If a candidate merged multiple effects, cite "
+                        "that same candidate on each positive item. Use coverage=missing only "
+                        "when no candidate attempts the item and then use no candidate refs; "
+                        "use representation_mismatch for an attempted item with wrong shape "
+                        "or mode. clarification_required is only genuine unresolved meaning. "
+                        "Classify required_output_mode from the cited predicate itself: "
+                        "locomotion, gaze, blink, gesture, posture, manipulation, carrying, "
+                        "and handover are body_action; external, changing, observed, or "
+                        "private-runtime facts are information; ordinary conversation fixed "
+                        "by context is speech; singing or a song is singing. Content genre "
+                        "alone never creates a performance mode. A requested musical vocal "
+                        "performance is always singing, while a speed or manner word is never "
+                        "vocal performance. A physical fetch/delivery is one body_action. "
+                        "Assign a1, a2, and so on in source order. Positive spans must be "
+                        "disjoint and each must contain its own complete predicate; never "
+                        "split one predicate into its verb and argument. "
+                        "Ordering and concurrency words are material supporting constraints. "
+                        "Use relation_kind=ordered for explicit before/after/then relations "
+                        "and relation_kind=parallel for explicit overlap, citing all positive "
+                        "audit refs and candidate owners. A typed ordered/parallel item always "
+                        "uses role=constraint, never context or framing. An ordinary constraint uses "
+                        "relation_kind=none and cites only its positive audit owner. Context "
+                        "uses no owner. A comma or plain and/or alone states neither order nor "
+                        "overlap. A negative clause is not automatically a new positive body "
+                        "outcome: use retained Goal lifecycle evidence for real cancel/pause, "
+                        "and treat a no-replay condition on terminal work as constraint/context. "
+                        "Return the compact certificate as JSON only."
                     ),
                 },
                 {
@@ -3937,22 +3918,23 @@ class OllamaGoalInterpreter:
                         f"{_bounded_json(_coverage_source_tokens(request.text), max_chars=5000)}\n\n"
                         "BOUNDED SEMANTIC CONTINUITY CONTEXT (reference resolution only):\n"
                         f"{_bounded_json(semantic_continuity_context, max_chars=4200)}\n\n"
-                        "Candidate Responsibility DTOs (claims to audit, not source):\n"
+                        "Candidate Responsibility DTOs (ownership claims only; their "
+                        "mode is deliberately omitted):\n"
                         f"{_bounded_json(candidates, max_chars=5000)}\n\n"
                         f"{retained_atomic_contract}\n\n"
-                        "Final atomicity check: inspect each candidate outcome, its "
-                        "bindings, and output_mode for multiple independently observable "
-                        "effects. If one candidate combines effects with different WHAT "
+                        "Final atomicity check: inventory the source's complete positive "
+                        "predicates and classify their modes before mapping them to candidate "
+                        "ownership. Candidate wording and grouping cannot determine the source "
+                        "inventory or mode. Inspect each candidate outcome and bindings only "
+                        "after that source-first inventory. If one candidate combines effects with different WHAT "
                         "modes, emit one responsibility item per effect and cite that same "
                         "candidate ref on each item so the overmerge is rejected. Do not "
-                        "call such a multimodal combination one outcome.\n\n"
-                        "MODALITY COUNT IS AUTHORITATIVE: count the observable effects "
-                        "again immediately before JSON. If one source predicate requests "
-                        "both an embodied effect and a vocal performance, emit two positive "
-                        "responsibility_items with their own exact modes even when the "
-                        "candidate used one outcome, one broad mode, or stored the second "
-                        "effect in a binding. The number of responsibility_items must equal "
-                        "that final effect count.\n\n"
+                        "call such a multimodal combination one outcome. The positive-item "
+                        "array itself is the complete outcome count; do not emit a separate "
+                        "count field. Before JSON, scan the source once for explicit "
+                        "before/after/then ordering and once for explicit simultaneous "
+                        "overlap; preserve each found relation in supporting_items with all "
+                        "positive audit endpoints.\n\n"
                         "Cite only coherent positive-outcome and material-constraint spans; "
                         "do not inventory the source-token table. Return the coverage "
                         "certificate."
@@ -3975,16 +3957,6 @@ class OllamaGoalInterpreter:
             reason_summary["description"] = (
                 "One short sentence naming only the coverage decision; do not quote "
                 "or translate source text."
-            )
-        independent_outcome_count = payload["format"].get("properties", {}).get(
-            "independent_outcome_count"
-        )
-        if isinstance(independent_outcome_count, dict):
-            independent_outcome_count.pop("default", None)
-            independent_outcome_count["description"] = (
-                "Count the independently satisfiable positive source outcomes before "
-                "listing them. This integer must exactly equal responsibility_items "
-                "length."
             )
         if self.keep_alive:
             payload["keep_alive"] = self.keep_alive
@@ -4012,23 +3984,54 @@ class OllamaGoalInterpreter:
             previous_raw = _extract_json_object(previous_content)
         except (ValueError, TypeError):
             previous_raw = {}
-        claimed_count = previous_raw.get("independent_outcome_count")
-        if (
-            isinstance(claimed_count, int)
-            and not isinstance(claimed_count, bool)
-            and 1 <= claimed_count <= 12
-        ):
-            schema_properties = payload.get("format", {}).get("properties", {})
-            count_schema = schema_properties.get("independent_outcome_count")
-            responsibility_items_schema = schema_properties.get(
-                "responsibility_items"
-            )
-            if isinstance(count_schema, dict):
-                count_schema.clear()
-                count_schema.update({"type": "integer", "const": claimed_count})
-            if isinstance(responsibility_items_schema, dict):
-                responsibility_items_schema["minItems"] = claimed_count
-                responsibility_items_schema["maxItems"] = claimed_count
+        previous_items = previous_raw.get("responsibility_items")
+        preserved_modes: dict[str, str] = {}
+        preserved_audit_refs: list[str] = []
+        if isinstance(previous_items, list):
+            for item in previous_items:
+                if not isinstance(item, dict):
+                    continue
+                audit_ref = str(item.get("audit_ref") or "").strip()
+                required_mode = str(
+                    item.get("required_output_mode") or ""
+                ).strip()
+                if audit_ref and required_mode and required_mode != "none":
+                    preserved_modes[audit_ref] = required_mode
+                    preserved_audit_refs.append(audit_ref)
+        responsibility_items_schema = payload.get("format", {}).get(
+            "properties", {}
+        ).get("responsibility_items")
+        if preserved_audit_refs and isinstance(responsibility_items_schema, dict):
+            responsibility_items_schema["minItems"] = len(preserved_audit_refs)
+            responsibility_items_schema["maxItems"] = len(preserved_audit_refs)
+        responsibility_item_schema = (
+            payload.get("format", {})
+            .get("$defs", {})
+            .get("GoalInterpretationResponsibilityCoverageItem")
+        )
+        if isinstance(responsibility_item_schema, dict):
+            audit_ref_schema = responsibility_item_schema.get(
+                "properties", {}
+            ).get("audit_ref")
+            if preserved_audit_refs and isinstance(audit_ref_schema, dict):
+                audit_ref_schema["enum"] = list(dict.fromkeys(preserved_audit_refs))
+            mode_locks = responsibility_item_schema.setdefault("allOf", [])
+            for audit_ref, required_mode in preserved_modes.items():
+                mode_locks.append(
+                    {
+                        "if": {
+                            "properties": {"audit_ref": {"const": audit_ref}},
+                            "required": ["audit_ref"],
+                        },
+                        "then": {
+                            "properties": {
+                                "required_output_mode": {
+                                    "const": required_mode
+                                }
+                            }
+                        },
+                    }
+                )
         messages = payload.get("messages")
         if isinstance(messages, list) and len(messages) >= 2:
             system = messages[0]
@@ -4041,7 +4044,9 @@ class OllamaGoalInterpreter:
                     "structure. Positive spans must be disjoint and numbered in source "
                     "order. The same endpoint set cannot be both ordered and parallel; "
                     "select the one source-grounded completion relation that preserves "
-                    "overlap without contradiction. Do not repair or copy candidate "
+                    "overlap without contradiction. Preserve every schema-locked "
+                    "audit_ref output mode; it is semantic evidence from the same audit, "
+                    "not malformed structure. Do not repair or copy candidate "
                     "Responsibility wording. Return JSON only."
                 )
             if isinstance(user, dict):
@@ -4049,15 +4054,8 @@ class OllamaGoalInterpreter:
                     str(user.get("content") or "")
                     + "\n\nThe previous certificate was mechanically invalid: "
                     + str(validation_error)[:500]
-                    + (
-                        ". Preserve the auditor-owned independent_outcome_count="
-                        f"{claimed_count} and emit exactly that many positive items."
-                        if isinstance(claimed_count, int)
-                        and not isinstance(claimed_count, bool)
-                        and 1 <= claimed_count <= 12
-                        else ""
-                    )
-                    + ". Regenerate one fresh certificate from the source tokens."
+                    + ". Derive the outcome count only from the complete positive-item "
+                    "array. Regenerate one fresh certificate from the source tokens."
                 )
         return payload
 
@@ -4073,13 +4071,9 @@ class OllamaGoalInterpreter:
         if normalize_repaired_singleton_relations:
             responsibility_items = raw.get("responsibility_items")
             supporting_items = raw.get("supporting_items")
-            claimed_count = raw.get("independent_outcome_count")
             if (
-                isinstance(claimed_count, int)
-                and not isinstance(claimed_count, bool)
-                and isinstance(responsibility_items, list)
-                and claimed_count == len(responsibility_items)
-                and claimed_count >= 2
+                isinstance(responsibility_items, list)
+                and responsibility_items
                 and isinstance(supporting_items, list)
             ):
                 known_audit_refs = {
@@ -4110,18 +4104,24 @@ class OllamaGoalInterpreter:
                         and set(related_refs).issubset(known_audit_refs)
                     ):
                         # This is the single allowed mechanical cleanup after the
-                        # model's one DTO-repair attempt.  The repaired certificate
-                        # has already fixed and exactly populated its positive-item
-                        # count, so a typed relation with only one endpoint cannot
-                        # express coordination.  Preserve it as an ordinary owned
-                        # constraint instead of either inventing another endpoint or
-                        # rejecting an otherwise complete atomic audit.
+                        # model's one DTO-repair attempt.  Repair is locked to the
+                        # original positive audit identities, so a typed relation
+                        # with only one endpoint cannot express coordination.
+                        # Preserve it as an ordinary owned constraint instead of
+                        # inventing another endpoint or changing source semantics.
                         item["relation_kind"] = "none"
         _materialize_coverage_source_excerpts(
             request,
             raw,
             decision=decision,
         )
+        responsibility_items = raw.get("responsibility_items")
+        if isinstance(responsibility_items, list) and responsibility_items:
+            # Normalize retained/historical certificates mechanically after
+            # source materialization has collapsed any byte-identical rows. The
+            # array is the evidence; its length cannot be contradicted by a
+            # redundant scalar emitted by the same model call.
+            raw["independent_outcome_count"] = len(responsibility_items)
         certificate = GoalInterpretationCoverageCertificate.model_validate(raw)
         # Constrained decoding can repeat one byte-equivalent positive audit row
         # under a fresh audit_ref. Audit identity is mechanical; duplicate rows do
@@ -4162,6 +4162,9 @@ class OllamaGoalInterpreter:
             certificate = certificate.model_copy(
                 update={
                     "responsibility_items": unique_responsibility_items,
+                    "independent_outcome_count": len(
+                        unique_responsibility_items
+                    ),
                     "supporting_items": normalized_supporting_items,
                 }
             )
@@ -4363,6 +4366,21 @@ class OllamaGoalInterpreter:
             ValidationError,
         ) as exc:
             try:
+                rejected_raw = _extract_json_object(audit_content)
+            except (ValueError, TypeError):
+                rejected_raw = {}
+            rejected_positive_contract = [
+                (
+                    str(item.get("audit_ref") or "").strip(),
+                    str(item.get("required_output_mode") or "").strip(),
+                )
+                for item in rejected_raw.get("responsibility_items") or []
+                if isinstance(item, dict)
+                and str(item.get("audit_ref") or "").strip()
+                and str(item.get("required_output_mode") or "").strip()
+                not in {"", "none"}
+            ]
+            try:
                 repaired_audit = await self._chat_logged(
                     self.build_responsibility_coverage_repair_payload(
                         request,
@@ -4381,12 +4399,28 @@ class OllamaGoalInterpreter:
                         normalize_repaired_singleton_relations=True,
                     )
                 )
+                repaired_positive_contract = [
+                    (
+                        str(item.audit_ref).strip(),
+                        str(item.required_output_mode).strip(),
+                    )
+                    for item in coverage_certificate.responsibility_items
+                ]
+                if (
+                    rejected_positive_contract
+                    and repaired_positive_contract
+                    != rejected_positive_contract
+                ):
+                    raise _GoalInterpretationSemanticStructureViolation(
+                        "coverage DTO repair changed positive audit identity or mode"
+                    )
             except (
                 httpx.HTTPError,
                 ValueError,
                 TypeError,
                 OllamaGenerationError,
             ) as repair_exc:
+                coverage_certificate = None
                 problems = [
                     "coverage_contract_invalid_after_one_dto_repair:"
                     f"{type(repair_exc).__name__}:{repair_exc}"
@@ -4621,7 +4655,15 @@ class OllamaGoalInterpreter:
         parsed = _extract_json_object(content)
         _normalize_mechanical_goal_interpretation_dto(parsed)
         _strip_bound_values_from_unresolved(parsed)
+        # Planner/route fields are an authority violation rather than a generic
+        # malformed DTO and therefore retain their source-based deep escalation.
         _reject_planner_shaped_goal_interpretation(parsed)
+        # Validate the model DTO's closed mechanical shape before semantic
+        # provenance checks choose an escalation path.  Otherwise one response
+        # containing both an envelope echo and an out-of-range confidence value
+        # enters the transport-echo audit, where the unrelated shape failure is
+        # misreported and cannot use the one permitted same-stage DTO repair.
+        GoalInterpretationDecision.model_validate(parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)

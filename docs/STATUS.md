@@ -72,6 +72,18 @@ human-facing behavior is considered qualified.
 
 ## Current implementation and verification state
 
+Charter principles 30–31 now require semantic grounding/coverage evidence to be
+authored in each authority's primary result and prohibit same-authority LLM
+reviewer/semantic-repair chains. The current GI and Goal Association implementations
+still contain legacy independent coverage-certificate calls, and Fast Planner still
+contains same-owner model-assisted qualification/audit paths; existing focused tests
+still exercise those paths. This is an implementation/automated-verification gap, not qualified
+target behavior. The latest retained GI-only iteration 50 on RTX 4090/Qwen3 4B
+completed 32/36 contract-valid cases (38/42 turns) and approximately 25/36 strict
+semantic passes; four coverage-contract failures returned HTTP 503. That evidence
+is the basis for removing the extra semantic calls rather than extending their
+prompt/repair machinery. Release readiness remains development only.
+
 | Area | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|---|
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |

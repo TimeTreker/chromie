@@ -43,6 +43,14 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
 - Do not expose raw motors, joints, torques, or actuator arrays to the LLM.
 - Keep stop, cancel, emergency, silence, and unusable-audio decisions
   deterministic.
+- Treat each semantic authority's primary LLM result as its sole writable
+  semantic decision. Do not add reviewer, critic, coverage, rescoring,
+  resegmentation, or semantic-repair calls at the same authority. Required
+  grounding evidence belongs in the primary result; only one mechanically
+  malformed DTO regeneration or one explicitly designated deeper-cognition
+  delegation for genuine unresolved meaning is allowed under Project Charter
+  principles 30–31. Before adding any model invocation, name its distinct owner
+  and decision contract and show that it does not reinterpret upstream meaning.
 - Add new side effects behind explicit policy, confirmation, monitoring, and
   default-off rollout gates.
 - Preserve compatibility adapters until a documented migration and rollback

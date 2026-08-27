@@ -97,6 +97,18 @@ semantics become clearer.
   user-resolvable clarification, or fail closed. A same-stage retry may repair
   only a mechanically malformed DTO, at most once; it must not rewrite
   semantics or grow into a repair chain.
+- One semantic authority must produce its complete semantic result in its primary
+  model invocation. Do not add a second LLM call to confirm, criticize, score,
+  audit, resegment, or repair that same decision; renaming such a call does not
+  create a new authority. Put required grounding/coverage evidence in the primary
+  result and improve its prompt, schema, model, or deterministic validation when
+  it is unreliable. A later model call is allowed only for a genuinely distinct
+  downstream authority or the one designated deeper-cognition delegation for
+  unresolved meaning, and it must not reinterpret or repair upstream semantics.
+  If current code or a lower-authority document conflicts with Project Charter
+  principles 30–31, treat that conflict as a blocker to remove, not precedent to
+  extend. Report the conflict before implementation and update the canonical
+  authority in the same change after explicit owner authorization.
 - For every user-reported behavior defect, follow the executable
   scenario-driven loop without waiting for the user to request it again:
   retain the originating single- or multi-turn episode, reproduce the earliest

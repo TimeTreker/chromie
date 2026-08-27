@@ -11,6 +11,14 @@ binding constraints for normal development. Implementations, prompts, tests,
 compatibility paths, and local exceptions must not silently weaken, reinterpret,
 or bypass them merely because doing so would make a change easier.
 
+Every human or coding agent must read these principles before changing project
+behavior or architecture and must treat them as requirements, not optional context.
+A coding agent has no authority to ignore a principle, hide a conflict behind a
+prompt, validator, audit, fallback, compatibility path, or local experiment, or
+continue extending a known nonconforming implementation. When source or a
+lower-authority document disagrees, the agent must report the conflict and follow
+the owner-approved Charter target; historical code is evidence, not permission.
+
 These principles are deliberately stable, not infallible. New evidence may show
 that a principle is incomplete, internally inconsistent, or now prevents the
 correct general design. In that case the developer or coding agent should stop
@@ -814,39 +822,49 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    event important enough to change what Chromie should do must escalate through
    normal Cognitive Core / Goal reasoning. Unanchored baseline embodiment remains a
    separate concern.
-30. **Semantic decomposition must prove responsibility coverage.** The model owns
-   the semantic judgment about which user outcomes are independent Goals; Host
-   code must not recover that meaning with phrase rules or action dictionaries.
-   Before an effectful, multi-Responsibility, or otherwise consequential GI result
-   becomes accepted WHAT, a separate source-based model invocation audits the
-   authoritative turn independently of the candidate prose. It cites bounded
-   source-token refs that trusted code materializes into exact contiguous source
-   spans, rather than retyping or correcting the person's wording, and classifies
-   those spans as positive Responsibilities, constraints, context, or framing;
-   maps each positive Responsibility to candidate `local_ref` identity; and declares
-   the required provider-neutral output mode. Goal Association may independently
-   verify the resulting canonical Goal transaction, but it must not be the first
-   boundary capable of noticing that GI already collapsed or invented WHAT. The
-   Host checks only mechanical invariants over model-authored claims: source-token
-   provenance, valid candidate references, positive ownership, output-mode
-   agreement, typed order/concurrency preservation, and one owner for each
-   independently satisfiable outcome. It never
-   discovers actions from words or reserves action-like binding keys. Provider
-   availability never erases a requested Responsibility. The audit receives the
-   candidate refs, outcomes, and material bindings but not the candidate's claimed
-   `output_mode`; required modality must be an independent source judgment rather
-   than an echo of the value under review. Material cross-Responsibility order is
-   retained in `before`/`after` sibling-`local_ref` bindings, and requested
-   concurrency in `parallel_with` sibling-`local_ref` bindings. These are WHAT
-   relations, not Runtime scheduling permission; Planner still owns timing and the
-   Host only rejects timing that contradicts the typed relation or provider resource
-   contract. A rejected audit permits
-   at most one fresh source-based GI resegmentation followed by one final audit;
-   if a deeper source pass has already occurred, rejection fails closed rather than
-   starting a second semantic pass or committing partial WHAT.
+30. **Semantic decomposition must prove responsibility coverage in its primary
+   result, not through a reviewer chain.** The model that owns a semantic stage
+   must author the complete set of independently satisfiable outcomes, their
+   provider-neutral modes, material bindings, source-grounding evidence, and typed
+   order/concurrency relations in that stage's primary result. That result is the
+   one model-authored semantic source of truth. A second LLM invocation must not be
+   added merely to confirm, criticize, score, audit, resegment, or repair the same
+   semantic decision. Calling such an invocation an auditor, verifier, critic,
+   qualification pass, or fresh interpretation does not create a distinct
+   authority and does not exempt it from this rule.
+
+   Trusted code validates only mechanical invariants over the primary result:
+   schema shape, bounded source provenance, exact references, typed cardinality,
+   closed output modes, and sibling relation integrity. It must not recover user
+   meaning with phrase rules, action dictionaries, a second writable semantic
+   representation, or a downstream model's preferred interpretation. A
+   mechanically malformed DTO may be regenerated once at the same stage only when
+   the repair is constrained to preserve every already-authored semantic claim. A
+   semantic, grounding, or coverage rejection is not repairable at that stage. A
+   genuinely unresolved consequential meaning may delegate once from the
+   authoritative source to the designated deeper cognition, ask a genuine
+   user-resolvable clarification, or fail closed; it must not enter a chain of
+   same-authority model calls.
+
+   Goal Interpretation therefore carries its own Responsibility-coverage evidence
+   in the primary WHAT result. Goal Association must conserve those accepted
+   Responsibilities while owning only canonical Goal identity and continuity, and
+   Planner must consume them while owning only HOW. Neither downstream authority
+   may reinterpret or repair GI meaning. Provider availability never erases a
+   requested Responsibility. Material cross-Responsibility order remains in
+   `before`/`after` sibling-`local_ref` bindings and requested concurrency in
+   `parallel_with`; these are WHAT relations, not Runtime scheduling permission.
 31. **One model-authored semantic fact must have one model-facing source of truth.**
    When other execution fields are deterministic projections of one semantic
    decision, they do not belong beside that decision as writable model inputs.
+   The same fact also must not be authored again in a second model invocation at
+   the same authority boundary. A new model call is justified only by a distinct
+   owner and decision contract or by the one explicit deeper-cognition delegation
+   for genuinely unresolved meaning; latency, low confidence in a prior model,
+   validation convenience, or the label “audit” does not create new authority.
+   Development must improve the primary prompt, schema, model choice, or
+   deterministic mechanics when that primary result is unreliable instead of
+   inserting a semantic confirmation or repair chain into the live robot path.
    Goal Association therefore authors `output_mode` as the sole execution
    discriminant; the Host derives responsibility kind, execution lane, and
    provider requirement only after validation and may retain those projections in
