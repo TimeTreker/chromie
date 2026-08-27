@@ -26,11 +26,13 @@ The machine-readable ownership map and archive rules are defined in [Documentati
    validation, and release readiness.
 8. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
 9. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
-10. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
-11. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
+10. [Latest Handoff](../HANDOFF.md) - volatile cross-machine execution snapshot;
+    the checkpoint remains authoritative.
+11. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
+12. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
    [Acceptance](ACCEPTANCE.md) - interface and evidence details.
-12. Component documents - local implementation boundaries.
-13. Decision documents - rationale for an established design.
+13. Component documents - local implementation boundaries.
+14. Decision documents - rationale for an established design.
 
 When documents disagree, correct the lower-authority document.
 
@@ -44,6 +46,7 @@ When documents disagree, correct the lower-authority document.
 | What exists and what evidence is retained? | `docs/STATUS.md` |
 | What milestone is next and what closes it? | `ROADMAP.md` |
 | Where should development resume? | `DEVELOPMENT_CHECKPOINT.md` |
+| What exact cross-machine commands, runtime identities, and private evidence paths resume the current checkpoint? | `HANDOFF.md` as a volatile snapshot; `DEVELOPMENT_CHECKPOINT.md` remains the resume authority |
 | How do I install, run, inspect, or recover it? | `CHROMIE_RUNBOOK.md` |
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
@@ -102,6 +105,7 @@ in order:
 - [Current Status](STATUS.md)
 - [Roadmap](../ROADMAP.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+- [Latest Handoff](../HANDOFF.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
@@ -194,6 +198,7 @@ mechanical-contract owner.
 - [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
 - [User Manual](USER_MANUAL.md)
 - [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+- [Latest Handoff](../HANDOFF.md)
 - [Operations Runbook](../CHROMIE_RUNBOOK.md)
 - [Configuration Reference](CONFIGURATION.md)
 - [API Reference](API_REFERENCE.md)

@@ -9,10 +9,11 @@ Guidance for coding agents working on Chromie.
 3. `docs/STATUS.md` — current implementation and evidence authority
 4. `ROADMAP.md` — milestone intent and exit criteria
 5. `DEVELOPMENT_CHECKPOINT.md` — exact resume point
-6. `README.md` and the relevant component README
-7. `docs/ACCEPTANCE.md` — required validation level
-8. `docs/README.md` — documentation ownership and update rules
-9. `CONTRIBUTING.md` — required defect-analysis, implementation, and delivery process
+6. `HANDOFF.md` — volatile cross-machine commands, identities, and evidence paths
+7. `README.md` and the relevant component README
+8. `docs/ACCEPTANCE.md` — required validation level
+9. `docs/README.md` — documentation ownership and update rules
+10. `CONTRIBUTING.md` — required defect-analysis, implementation, and delivery process
 
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
