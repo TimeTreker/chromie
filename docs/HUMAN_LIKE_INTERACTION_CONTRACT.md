@@ -74,6 +74,15 @@ visible failure, but it is often caused earlier by ASR uncertainty, routing,
 state coordination, capability grounding, confirmation, execution evidence, or
 test coverage.
 
+For a newly changed revision or a set of due live cases, establish that state
+from one immutable manifest-owned cohort before editing source: run every case,
+collect one post-cohort debug bundle, judge mechanical passes as well as
+failures, and cluster shared earliest boundaries. Do not alternate isolated
+case runs and source edits before this aggregate baseline. After diagnosis, use
+a focused case to validate one fix, then rerun its ability class and the full
+cohort on the changed revision. Stop early only for a hard safety, provenance,
+service-integrity, or safe-idle failure, and record that cohort as incomplete.
+
 Classify the root cause before choosing a fix:
 
 - **ASR/audio** - the transcript is wrong, uncertain, clipped, duplicated, or
@@ -197,6 +206,14 @@ first-response phase; after that commitment, remaining Fast planning and Goal
 Association consume it concurrently. Deep Goal Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
+For a conversational Responsibility, GI describes the communicative obligation or
+proposition and never the sentence Chromie will say; Planner remains the only exact-
+wording owner. Absence of accepted assistant dialogue is represented once by the empty
+bounded dialogue, never by a textual sentinel that a model could repeat as semantic
+content. A `prior_assistant_utterance` binding is available only when the same bounded
+request supplies a real accepted assistant utterance, and its value must equal the
+exact projected text. New item and repetition quantities cross GI under the single
+canonical positive-integer binding `count`.
 Before an effectful or multi-Responsibility GI result is accepted, an independent
 source-based coverage certificate must account for the authoritative turn and prove
 one candidate owner per independently satisfiable outcome. Trusted code validates

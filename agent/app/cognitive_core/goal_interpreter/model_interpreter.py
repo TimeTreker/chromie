@@ -336,6 +336,121 @@ def _strip_redundant_outcome_echo_bindings(parsed: dict[str, Any]) -> None:
                 bindings.pop(raw_name, None)
 
 
+_HIDDEN_EFFECT_OR_HOW_BINDING_TOKENS = {
+    "action",
+    "actions",
+    "activity",
+    "activities",
+    "effect",
+    "effects",
+    "outcome",
+    "outcomes",
+    "capability",
+    "capabilities",
+    "skill",
+    "skills",
+    "provider",
+    "providers",
+    "execution",
+    "executions",
+}
+_RETAINED_CONTEXT_EFFECT_BINDING_NAMES = {"previous_action", "prior_action"}
+
+
+def _is_hidden_effect_or_how_binding_name(raw_name: Any) -> bool:
+    normalized = "_".join(
+        str(raw_name).strip().casefold().replace("-", "_").split()
+    )
+    if normalized in _RETAINED_CONTEXT_EFFECT_BINDING_NAMES:
+        return False
+    tokens = {token for token in normalized.split("_") if token}
+    return bool(tokens & _HIDDEN_EFFECT_OR_HOW_BINDING_TOKENS)
+
+
+def _hidden_effect_responsibility_count_floor(parsed: dict[str, Any]) -> int | None:
+    """Derive a conservative atomic-count floor from an invalid DTO structure.
+
+    This does not interpret user words. A candidate field that explicitly claims
+    a concurrent/secondary/parallel/simultaneous action or an action sequence/list
+    proves that the candidate attempted to store another observable effect outside
+    a sibling Responsibility. Each affected candidate therefore raises the fresh
+    source pass floor by one. Pure HOW fields such as Capability do not.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list) or not responsibilities:
+        return None
+    structural_markers = {
+        "concurrent",
+        "secondary",
+        "parallel",
+        "simultaneous",
+        "sequence",
+        "list",
+        "steps",
+    }
+    affected_candidates = 0
+    for item in responsibilities:
+        bindings = item.get("bindings") if isinstance(item, dict) else None
+        if not isinstance(bindings, dict):
+            continue
+        has_hidden_effect = False
+        for raw_name in bindings:
+            normalized = "_".join(
+                str(raw_name).strip().casefold().replace("-", "_").split()
+            )
+            if normalized in _RETAINED_CONTEXT_EFFECT_BINDING_NAMES:
+                continue
+            tokens = {token for token in normalized.split("_") if token}
+            effect_tokens = tokens & {
+                "action",
+                "actions",
+                "activity",
+                "activities",
+                "effect",
+                "effects",
+                "outcome",
+                "outcomes",
+            }
+            if effect_tokens and (
+                tokens & structural_markers
+                or effect_tokens & {"actions", "activities", "effects", "outcomes"}
+            ):
+                has_hidden_effect = True
+                break
+        if has_hidden_effect:
+            affected_candidates += 1
+    if not affected_candidates:
+        return None
+    return min(12, len(responsibilities) + affected_candidates)
+
+
+def _reject_hidden_effect_or_how_bindings(parsed: dict[str, Any]) -> None:
+    """Reject binding dimensions that conceal another effect or downstream HOW.
+
+    Exact ``action``/``effect`` echoes are removed by the normalization above.
+    Compound names such as ``concurrent_action`` can instead hide a missing
+    sibling Responsibility, while Capability/Skill/provider/execution names cross
+    GI's WHAT-only authority.  This is a mechanical field-name contract, not a
+    phrase-to-intent rule; source-based deep GI gets the one allowed retry.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for responsibility_index, item in enumerate(responsibilities):
+        bindings = item.get("bindings") if isinstance(item, dict) else None
+        if not isinstance(bindings, dict):
+            continue
+        for raw_name in bindings:
+            if _is_hidden_effect_or_how_binding_name(raw_name):
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Goal Interpretation binding conceals an observable effect or "
+                    "downstream HOW field: "
+                    f"responsibilities[{responsibility_index}].bindings.{raw_name}"
+                )
+
+
 def _strip_certificate_owned_coordination_bindings(parsed: dict[str, Any]) -> None:
     """Discard provisional relation fields before audited certificate projection.
 
@@ -528,10 +643,12 @@ def _short_exact_surface_substrings(text: str) -> list[str]:
     surface = " ".join(str(text or "").strip().split())
     if not surface or len(surface) > 40:
         return []
+    normalized_surface = _normalized_turn_echo(surface)
     values = {
         surface[start:end]
         for start in range(len(surface))
         for end in range(start + 1, len(surface) + 1)
+        if _normalized_turn_echo(surface[start:end]) != normalized_surface
     }
     return sorted(values, key=lambda value: (len(value), value))
 
@@ -892,13 +1009,6 @@ def _materialize_coverage_source_excerpts(
                 # already-emitted owner makes the DTO valid without changing its
                 # coverage judgment or choosing a new semantic relation.
                 item["related_audit_refs"] = overlapping_audit_refs
-        if relation_kind != "none" and len(item["related_audit_refs"]) < 2:
-            # ordered/parallel are relations among independently observable
-            # outcomes. A model label attached to only one audited outcome is
-            # definitionally a modifier, not a typed coordination relation.
-            # Keep the cited constraint and its explicit atomic owner while
-            # clearing only the impossible relation shape.
-            item["relation_kind"] = "none"
         responsibility_items_by_ref = {
             str(responsibility_item.get("audit_ref") or "").strip(): responsibility_item
             for responsibility_item in responsibility_items
@@ -975,6 +1085,8 @@ def _project_audited_atomic_contract(
 def _project_audited_contract_onto_covered_candidates(
     decision: GoalInterpretationDecision,
     certificate: GoalInterpretationCoverageCertificate,
+    *,
+    preserve_unowned_consequential_effects: bool = False,
 ) -> GoalInterpretationDecision | None:
     """Project a bijective audit onto existing candidates without reinterpreting.
 
@@ -1000,8 +1112,19 @@ def _project_audited_contract_onto_covered_candidates(
             return None
         audit_to_candidate[item.audit_ref] = candidate_ref
         candidate_owners.add(candidate_ref)
-    if candidate_owners != candidate_refs:
-        return None
+    unowned_candidate_refs = candidate_refs - candidate_owners
+    if unowned_candidate_refs:
+        if not preserve_unowned_consequential_effects:
+            return None
+        by_candidate_ref = {
+            item.local_ref: item for item in decision.responsibilities
+        }
+        if any(
+            by_candidate_ref[candidate_ref].output_mode
+            not in _CONSEQUENTIAL_EFFECT_OUTPUT_MODES
+            for candidate_ref in unowned_candidate_refs
+        ):
+            return None
 
     payload = decision.model_dump(mode="python")
     by_ref = {
@@ -1034,6 +1157,102 @@ def _project_audited_contract_onto_covered_candidates(
                     for sibling_ref in refs
                     if sibling_ref != candidate_ref
                 ]
+    return GoalInterpretationDecision.model_validate(payload)
+
+
+_CONSEQUENTIAL_EFFECT_OUTPUT_MODES = {
+    "styled_speech",
+    "recitation",
+    "singing",
+    "humming",
+    "nonverbal_vocalization",
+    "body_action",
+    "media_playback",
+    "stateful_effect",
+}
+
+
+def _unowned_consequential_effect_refs(
+    decision: GoalInterpretationDecision,
+    certificate: GoalInterpretationCoverageCertificate,
+) -> list[str]:
+    """Return model-authored effects that one smaller audit did not account for.
+
+    The source audit may remove an invented conversational or information claim,
+    but a single stochastic count must not silently erase an already validated
+    embodied, vocal-performance, media, or state-changing effect. The caller
+    still requires every audited item to validate and either projects the audit
+    onto a bijective candidate subset or performs source-based resegmentation.
+    """
+
+    owned_refs = {
+        candidate_ref
+        for item in certificate.responsibility_items
+        for candidate_ref in item.responsibility_refs
+    }
+    return [
+        item.local_ref
+        for item in decision.responsibilities
+        if item.local_ref not in owned_refs
+        and item.output_mode in _CONSEQUENTIAL_EFFECT_OUTPUT_MODES
+    ]
+
+
+def _append_preserved_consequential_effects(
+    resegmented: GoalInterpretationDecision,
+    original: GoalInterpretationDecision,
+    preserved_refs: list[str],
+) -> GoalInterpretationDecision:
+    """Compose audited splits with independently model-authored effect siblings.
+
+    This is used only when the audit proved that another candidate was
+    overmerged. Coordination belongs to the audit during resegmentation, so
+    provisional sibling refs are removed from the retained candidates instead of
+    being guessed across the new audit identities.
+    """
+
+    if not preserved_refs:
+        return resegmented
+    payload = resegmented.model_dump(mode="python")
+    used_refs = {
+        str(item.get("local_ref") or "").strip()
+        for item in payload.get("responsibilities") or []
+        if isinstance(item, dict)
+    }
+    original_by_ref = {
+        item.local_ref: item for item in original.responsibilities
+    }
+    for preserved_ref in preserved_refs:
+        if len(payload["responsibilities"]) >= 12:
+            raise _GoalInterpretationSemanticStructureViolation(
+                "preserved consequential effects exceed the Responsibility limit"
+            )
+        item = original_by_ref[preserved_ref].model_dump(mode="python")
+        local_ref = preserved_ref
+        if local_ref in used_refs:
+            local_ref = next(
+                (
+                    f"r{index}"
+                    for index in range(1, 13)
+                    if f"r{index}" not in used_refs
+                ),
+                "",
+            )
+        if not local_ref:
+            raise _GoalInterpretationSemanticStructureViolation(
+                "no local_ref remains for a preserved consequential effect"
+            )
+        bindings = dict(item.get("bindings") or {})
+        for field in ("before", "after", "parallel_with"):
+            bindings.pop(field, None)
+        item["local_ref"] = local_ref
+        item["bindings"] = bindings
+        payload["responsibilities"].append(item)
+        used_refs.add(local_ref)
+    payload["confidence"] = min(
+        float(payload.get("confidence") or 0.0),
+        float(original.confidence),
+    )
     return GoalInterpretationDecision.model_validate(payload)
 
 
@@ -1073,7 +1292,7 @@ def _reject_noncanonical_count_bindings(parsed: dict[str, Any]) -> None:
     same-stage repair can regenerate the semantic value.
     """
 
-    count_names = {"count", "item_count", "repetition_count"}
+    legacy_count_names = {"item_count", "repetition_count"}
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1087,7 +1306,13 @@ def _reject_noncanonical_count_bindings(parsed: dict[str, Any]) -> None:
             name = "_".join(
                 str(raw_name).strip().casefold().replace("-", "_").split()
             )
-            if name not in count_names:
+            if name in legacy_count_names:
+                raise ValueError(
+                    "non-canonical count binding name: "
+                    f"responsibilities[{responsibility_index}].bindings.{raw_name}; "
+                    "use bindings.count"
+                )
+            if name != "count":
                 continue
             valid = isinstance(value, int) and not isinstance(value, bool) and value > 0
             if not valid:
@@ -1755,6 +1980,50 @@ def _strip_redundant_conversational_turn_echo_bindings(
             bindings[binding_name] = filtered
 
 
+def _strip_transport_echo_bindings_for_atomic_audit(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> int:
+    """Remove envelope-equivalent values only from a non-authoritative audit copy.
+
+    A whole-turn binding cannot enter semantic state, but the remaining candidate
+    shape is still useful input to the independent atomic source audit.  The
+    caller must never accept this copy directly: after the audit either a fresh
+    certificate-bound interpretation is produced or the result is run through
+    the complete validator again.
+    """
+
+    turn_echo = _normalized_turn_echo(request.text or "")
+    if not turn_echo:
+        return 0
+    removed = 0
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return 0
+    for item in responsibilities:
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for binding_name, value in list(bindings.items()):
+            values = value if isinstance(value, list) else [value]
+            filtered = [
+                scalar
+                for scalar in values
+                if not (
+                    isinstance(scalar, str)
+                    and _normalized_turn_echo(scalar) == turn_echo
+                )
+            ]
+            removed += len(values) - len(filtered)
+            if not filtered:
+                bindings.pop(binding_name, None)
+            elif isinstance(value, list) and len(filtered) != len(values):
+                bindings[binding_name] = filtered
+    return removed
+
+
 def _reject_transport_echo_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -2094,7 +2363,9 @@ def _compact_recent_dialogue(
     return compact
 
 
-def _most_recent_assistant_utterance(context: dict[str, Any]) -> dict[str, Any]:
+def _most_recent_assistant_utterance(
+    context: dict[str, Any],
+) -> dict[str, Any] | None:
     """Expose one accepted speaker-role fact without interpreting the new turn."""
 
     for item in reversed(_compact_recent_dialogue(context)):
@@ -2105,7 +2376,41 @@ def _most_recent_assistant_utterance(context: dict[str, Any]) -> dict[str, Any]:
                 "role": "assistant",
                 "text": item["text"],
             }
-    return {"status": "unavailable"}
+    return None
+
+
+def _reject_unavailable_or_mismatched_prior_assistant_utterance(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Keep prior-speech evidence exact and absent when no such evidence exists."""
+
+    prior = _most_recent_assistant_utterance(request.context)
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for responsibility_index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        bindings = item.get("bindings")
+        if not isinstance(bindings, dict):
+            continue
+        for raw_name, value in bindings.items():
+            name = "_".join(
+                str(raw_name).strip().casefold().replace("-", "_").split()
+            )
+            if name != "prior_assistant_utterance":
+                continue
+            if prior is None:
+                raise _GoalInterpretationAuthorityViolation(
+                    "prior_assistant_utterance was emitted without an accepted prior "
+                    f"assistant utterance at responsibilities[{responsibility_index}]"
+                )
+            if value != prior["text"]:
+                raise _GoalInterpretationAuthorityViolation(
+                    "prior_assistant_utterance must equal the exact supplied prior text at "
+                    f"responsibilities[{responsibility_index}]"
+                )
 
 
 def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
@@ -2209,6 +2514,14 @@ class OllamaGoalInterpreter:
         session_context = _without_goal_interpretation_authority(
             _goal_interpretation_prompt_context(request.context)
         )
+        recent_dialogue = _compact_recent_dialogue(request.context)
+        prior_assistant_utterance = _most_recent_assistant_utterance(request.context)
+        prior_assistant_context = (
+            "Most recent accepted Chromie/assistant utterance JSON:"
+            f"{_bounded_json(prior_assistant_utterance, max_chars=420)}\n"
+            if prior_assistant_utterance is not None
+            else ""
+        )
         return (
             "Current Turn:\n"
             f"Latest user input: {request.text}\n"
@@ -2220,108 +2533,28 @@ class OllamaGoalInterpreter:
             "Interaction context JSON:"
             f"{_bounded_json(_without_goal_interpretation_authority(request.context.get('interaction_context') or {}), max_chars=2400)}\n"
             "Recent accepted dialogue JSON:"
-            f"{_bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1800)}\n"
-            "Most recent accepted Chromie/assistant utterance JSON:"
-            f"{_bounded_json(_most_recent_assistant_utterance(request.context), max_chars=420)}\n"
+            f"{_bounded_json_array(recent_dialogue, max_chars=1800)}\n"
+            f"{prior_assistant_context}"
             "Retained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:"
             f"{_bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1400)}\n"
             "Active Task/Activity progress with identity and pending clarification JSON:"
             f"{_bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1400)}\n\n"
-            "Interpret contextual WHAT. For every Responsibility, copy exactly one "
-            "relationship protocol token from new, continue, modify, clarify, confirm, "
-            "reject, cancel, pause, resume, merge, split, or reference, and copy exact "
-            "target Goal IDs. Never inflect, conjugate, translate, or paraphrase a "
-            "relationship token. A short answer to a pending clarification supplies the "
-            "applicable semantic binding and relates to that Goal; it is not an isolated "
-            "new request. Do not create, resolve, classify, or copy an InformationGap. "
-            "Do not decide that a Capability/execution parameter is missing or choose "
-            "ask_user, context, observation, query, or default. Missing execution inputs "
-            "belong to Fast Planner. External Evidence is fresh Evidence, not semantic "
-            "uncertainty or a value to ask the user for. Goal Association will verify and "
-            "commit the Goal relationship. A semantically independent new outcome is "
-            "relationship=new even when completed or recent Goals are present in "
-            "Context. Use continue/modify/clarify/confirm/reference or another existing-"
-            "Goal relationship only when the current turn actually refers to that same "
-            "Goal; never attach an unrelated new request to the most recent Goal merely "
-            "because its ID is available. "
-            "A name used only to address the conversational partner is a vocative, not "
-            "a separate outcome, location, or body action. A standalone letter, symbol, "
-            "or similarly low-information fragment without uniquely resolving continuity "
-            "context has unresolved intended meaning; do not assume the person requested "
-            "an echo or nearby action. "
-            "Preserve speaker and actor perspective: the user's first person belongs "
-            "to the user, while second-person references addressed to Chromie belong "
-            "to Chromie. A question about what Chromie just said makes the outcome repeat "
-            "or report the most recent accepted assistant utterance from dialogue and "
-            "binds its exact delivered text as prior_assistant_utterance. Never bind the "
-            "current question itself as the prior utterance. This is new conversational "
-            "work, not continuation of the prior utterance's Goal. "
-            "A declarative statement that explains why a requested answer matters, "
-            "describes the person's situation, or states a future plan is context "
-            "unless the person also asks Chromie to do something with it. Never invent "
-            "a Responsibility to confirm, acknowledge, remember, record, schedule, "
-            "monitor, or act on that statement. "
-            "A Responsibility that continues or resumes one supplied Goal must preserve "
-            "that Goal's provider-neutral WHAT output_mode. Continuation of body action, "
-            "media, information, stateful effect, or vocal performance never becomes "
-            "ordinary speech merely because the current turn is a short reference. "
-            "Preserve deictic spatial meaning such as here/there, inside/outside, "
-            "ahead/behind, and equivalent expressions in any language as an exact "
-            "current-turn location or direction binding when it changes the outcome. "
-            "Any place or spatial-location meaning uses the one canonical binding name "
-            "location; never rename that dimension to location_scope, target_location, "
-            "place_location, or another alias. "
-            "Use speed only when the person explicitly supplied pace or velocity meaning. "
-            "Do not invent a normal/default speed, and never store a duration phrase, "
-            "repetition word, action verb, or direction under speed; keep those in their "
-            "own semantic dimensions. "
-            "Return responsibilities, confidence, and unresolved semantic uncertainty. "
-            "For directly named entities, preserve "
-            "the exact current-turn user-language surface in bindings; never translate or "
-            "provider-canonicalize it. Perform a literal surface audit before returning: "
-            "The request-envelope language tag and the whole Latest user input are not "
-            "semantic bindings; never copy either into bindings as a substitute for "
-            "atomic material facts. A coordination binding may contain only exact "
-            "sibling local_ref values, never another effect's free-form wording. "
-            "every current-turn named or deictic location binding value must occur as "
-            "one exact contiguous substring in Latest user input. For this rule the "
-            "authoritative input is "
-            f"{json.dumps(request.text, ensure_ascii=False)}; a translated equivalent "
-            "does not occur there and is invalid. Preserve every explicit Arabic "
-            "numeric token from Latest user input verbatim in an atomic material "
-            "binding; never spell it out, translate it, round it, or replace it with "
-            "a default. Classify only the human-facing WHAT. Use output_mode=speech for "
-            "ordinary conversation whose answer is already entailed by the supplied "
-            "bounded semantic context and therefore needs only authored conversational "
-            "wording. Use output_mode=information when the requested factual answer is "
-            "not fixed by that semantic context, including external, changing, observed, "
-            "or private-runtime information. Current presence of a person, object, or "
-            "event in the surroundings is observed information even when the question "
-            "is phrased conversationally as what Chromie thinks. This classifies the "
-            "human-facing WHAT; it "
-            "does not decide whether or how Planner acquires Evidence. Speech applies "
-            "only when the requested observable outcome itself is ordinary authored "
-            "conversation. An embodied, vocal-performance, media, or state-changing "
-            "request never becomes speech merely because it was expressed in dialogue "
-            "or can be described in words. Use "
-            "output_mode=stateful_effect when the requested "
-            "WHAT is a durable or future state change outside embodiment, such as recording, "
-            "scheduling, changing a setting, or sending later. Locomotion, posture, "
-            "gaze, gesture, physical manipulation, carrying, and handover remain "
-            "body_action even when they change location or physical state. Preserve body, media, and vocal "
-            "effects in their exact observable modes. Perform one final modality and "
-            "atomicity audit across languages: grammatical fusion, shared aspect, or a "
-            "while/during relation never merges independently observable locomotion and "
-            "vocal performance into one outcome. Emit each independently judgeable effect "
-            "as its own Responsibility and preserve their parallel relation. A request to "
-            "acquire, carry, bring, fetch, retrieve, or hand over a physical object is one "
-            "physical-delivery body_action Responsibility, never ordinary speech merely "
-            "because the recipient is addressed in conversation. Do not decide whether downstream "
-            "work, fresh Evidence, a Capability, or a provider is required; Planner owns "
-            "that judgment from canonical Goal state, trusted Evidence, and available "
-            "Capabilities. No route, intent, response wording, Activity, Work, "
-            "Plan, Capability, Tool, provider, executable args, or input-resolution "
-            "strategy. Copy only Goal IDs explicitly supplied in Context."
+            "Interpret this turn under the system WHAT-only contract. Return the complete "
+            "set of independently satisfiable Responsibilities, material semantic bindings, "
+            "canonical relationship tokens and supplied target Goal IDs, confidence, and "
+            "only genuine unresolved user meaning. For speech, outcome describes the "
+            "communicative obligation or proposition to convey; Planner alone authors the "
+            "exact utterance. Bind prior_assistant_utterance only when a real utterance "
+            "object is supplied above and the current turn asks what Chromie said; copy "
+            "only that object's exact text. Use the one canonical positive integer binding "
+            "count for requested item or repetition quantity. Preserve perspective, "
+            "polarity, every independently observable effect, and exact source-grounded "
+            "modality. Do not copy envelope fields, status markers, whole-turn echoes, "
+            "InformationGaps, or HOW fields into bindings. Directly named entities and "
+            "deictic locations remain exact current-turn surfaces; every such location "
+            "binding must occur as one contiguous substring of "
+            f"{json.dumps(request.text, ensure_ascii=False)}. Preserve explicit Arabic "
+            "numbers as material typed values. Return JSON only."
         )
 
     @staticmethod
@@ -2330,6 +2563,8 @@ class OllamaGoalInterpreter:
         forbidden_unresolved_values: tuple[str, ...] = (),
         new_relationship_only: bool = False,
         allowed_goal_ids: tuple[str, ...] = (),
+        prior_assistant_utterance: str | None = None,
+        admitted_turn: str = "",
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -2345,6 +2580,7 @@ class OllamaGoalInterpreter:
             "CognitiveResponsibilityProposal"
         )
         if isinstance(responsibility, dict):
+            local_refs = [f"r{index}" for index in range(1, 13)]
             required = [
                 "local_ref",
                 "outcome",
@@ -2372,11 +2608,38 @@ class OllamaGoalInterpreter:
                     "Exactly one independently satisfiable provider-neutral outcome. "
                     "Never combine coordinated positive effects: each embodied, vocal, "
                     "media, information, or conversational effect that can be accepted "
-                    "or rejected on its own requires a sibling Responsibility."
+                    "or rejected on its own requires a sibling Responsibility. For "
+                    "speech, describe the communicative obligation or proposition; never "
+                    "write the exact utterance, which Planner alone authors."
+                )
+            local_ref = responsibility.get("properties", {}).get("local_ref")
+            if isinstance(local_ref, dict):
+                local_ref.pop("minLength", None)
+                local_ref.pop("maxLength", None)
+                local_ref["enum"] = local_refs
+                local_ref["description"] = (
+                    "One turn-local mechanical reference from r1 through r12. "
+                    "It is not a Goal, Task, Plan, Activity, or provider identity."
                 )
             bindings = responsibility.get("properties", {}).get("bindings")
             if isinstance(bindings, dict):
-                bindings["propertyNames"] = {
+                hidden_effect_or_how_names = [
+                    "action",
+                    "activity",
+                    "effect",
+                    "outcome",
+                    "concurrent_action",
+                    "secondary_action",
+                    "parallel_action",
+                    "simultaneous_action",
+                    "capability",
+                    "capability_id",
+                    "skill",
+                    "agent_skill",
+                    "provider",
+                    "execution",
+                ]
+                property_name_contract: dict[str, Any] = {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80,
@@ -2386,14 +2649,112 @@ class OllamaGoalInterpreter:
                         "quotes, punctuation, comments, or another field in a key."
                     ),
                 }
+                forbidden_binding_names = [
+                    "item_count",
+                    "repetition_count",
+                    *hidden_effect_or_how_names,
+                ]
+                if prior_assistant_utterance is None:
+                    forbidden_binding_names.append("prior_assistant_utterance")
+                property_name_contract = {
+                    "allOf": [
+                        property_name_contract,
+                        {"not": {"enum": forbidden_binding_names}},
+                    ],
+                    "description": (
+                        "A semantic dimension name only. Legacy count aliases are "
+                        "unavailable; use count. prior_assistant_utterance is also "
+                        "unavailable unless this request supplies accepted prior speech."
+                    ),
+                }
+                bindings["propertyNames"] = property_name_contract
                 binding_properties = bindings.setdefault("properties", {})
-                for count_name in ("count", "item_count", "repetition_count"):
-                    binding_properties[count_name] = {
-                        "type": "integer",
-                        "minimum": 1,
+                binding_properties["count"] = {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": (
+                        "Canonical positive JSON integer for an item or repetition "
+                        "quantity; never emit aliases, number words, or numeric strings."
+                    ),
+                }
+                for alias in ("item_count", "repetition_count"):
+                    binding_properties[alias] = {
+                        "const": "__forbidden_noncanonical_count_binding__",
                         "description": (
-                            "Canonical positive JSON integer for a typed repetition "
-                            "count; never emit number words or numeric strings."
+                            "Reserved invalid marker. Never emit this property; use the "
+                            "canonical count property instead."
+                        ),
+                    }
+                for forbidden_name in hidden_effect_or_how_names:
+                    binding_properties[forbidden_name] = {
+                        "const": "__forbidden_hidden_effect_or_how_binding__",
+                        "description": (
+                            "Reserved invalid marker. Never emit this property: "
+                            "observable effects require sibling Responsibilities, and "
+                            "HOW fields are outside Goal Interpretation authority."
+                        ),
+                    }
+                turn_surface = " ".join(str(admitted_turn or "").strip().split())
+                non_turn_string: dict[str, Any] = {
+                    "type": "string",
+                    "minLength": 1,
+                }
+                if turn_surface:
+                    non_turn_string["not"] = {"const": turn_surface}
+                binding_properties["location"] = {
+                    **non_turn_string,
+                    "description": (
+                        "One exact source/context location string, never the complete "
+                        "admitted user turn."
+                    ),
+                }
+                binding_properties["duration"] = {
+                    "anyOf": [non_turn_string, {"type": "number"}],
+                    "description": (
+                        "One source-backed elapsed-time scalar. Preserve an explicit "
+                        "number as a JSON number or one exact source/context string; "
+                        "never emit a nested value/unit object or null."
+                    ),
+                }
+                binding_properties["speed"] = {
+                    "anyOf": [non_turn_string, {"type": "number"}],
+                    "description": (
+                        "A source-backed pace or velocity string/number only. Omit this "
+                        "property when no pace or velocity is supplied; never emit null."
+                    ),
+                }
+                sibling_ref_value = {
+                    "anyOf": [
+                        {"type": "string", "enum": local_refs},
+                        {
+                            "type": "array",
+                            "items": {"type": "string", "enum": local_refs},
+                            "minItems": 1,
+                            "maxItems": 11,
+                            "uniqueItems": True,
+                        },
+                    ],
+                    "description": (
+                        "One exact sibling local_ref or a non-empty unique list of "
+                        "sibling local_ref values; never effect wording."
+                    ),
+                }
+                for relation_name in ("before", "after", "parallel_with"):
+                    binding_properties[relation_name] = sibling_ref_value
+                if prior_assistant_utterance is not None:
+                    binding_properties["prior_assistant_utterance"] = {
+                        "const": prior_assistant_utterance,
+                        "description": (
+                            "The exact most recent accepted assistant utterance supplied "
+                            "by bounded dialogue context; never paraphrase or truncate it."
+                        ),
+                    }
+                else:
+                    binding_properties["prior_assistant_utterance"] = {
+                        "const": "__forbidden_unavailable_prior_utterance__",
+                        "description": (
+                            "Reserved invalid marker. Never emit this property because "
+                            "no accepted prior assistant utterance is supplied."
                         ),
                     }
             output_mode = responsibility.get("properties", {}).get("output_mode")
@@ -2403,7 +2764,9 @@ class OllamaGoalInterpreter:
                     {
                         "const": "singing",
                         "description": (
-                            "A requested act of singing or song, with or without lyrics."
+                            "A requested act for Chromie to sing or perform a song, "
+                            "with or without lyrics. Never use media_playback for the "
+                            "performer's own singing."
                         ),
                     },
                     {
@@ -2457,18 +2820,22 @@ class OllamaGoalInterpreter:
                     },
                     {
                         "const": "media_playback",
-                        "description": "Control or playback of existing media.",
+                        "description": (
+                            "Only control or playback of existing recorded media. Never "
+                            "use this for Chromie to sing, hum, recite, or otherwise "
+                            "perform vocally."
+                        ),
                     },
                 ]
                 output_mode["oneOf"] = output_mode_variants
                 output_mode["description"] = (
                     "Provider-neutral WHAT category for this one atomic outcome. "
-                    "Use speech for ordinary conversation whose answer is already entailed "
-                    "by supplied bounded semantic context and needs only authored wording. "
+                    "Use speech for an ordinary conversational obligation whose semantic "
+                    "content is fixed by supplied bounded context. Planner alone authors "
+                    "the exact utterance. "
                     "Use information for a factual answer not fixed by that semantic "
                     "context; this category does not decide whether or how Planner acquires "
-                    "Evidence. Speech applies only when the requested observable outcome "
-                    "itself is ordinary authored conversation. Embodied, vocal-performance, "
+                    "Evidence. Embodied, vocal-performance, "
                     "media, and state-changing requests retain their exact modes even when "
                     "expressed in dialogue. Use stateful_effect only for durable/future "
                     "state changes outside embodiment; every physical motion, posture, gaze, "
@@ -2590,6 +2957,7 @@ class OllamaGoalInterpreter:
     def build_interpretation_payload(
         self, request: GoalInterpretationRequest
     ) -> dict[str, Any]:
+        prior = _most_recent_assistant_utterance(request.context)
         payload: dict[str, Any] = {
             "model": self.model,
             "stream": False,
@@ -2609,6 +2977,10 @@ class OllamaGoalInterpreter:
                     _canonical_goal_ids_from_context(request.context)
                 ),
                 allowed_goal_ids=_canonical_goal_ids_from_context(request.context),
+                prior_assistant_utterance=(
+                    prior["text"] if prior is not None else None
+                ),
+                admitted_turn=request.text,
             ),
         }
         if self.keep_alive:
@@ -2626,6 +2998,7 @@ class OllamaGoalInterpreter:
         forbidden_unresolved_values = self._already_bound_unresolved_values(
             validation_error
         )
+        prior = _most_recent_assistant_utterance(request.context)
         payload = self.build_interpretation_payload(request)
         payload["format"] = self._goal_interpretation_response_schema(
             forbidden_unresolved_values=forbidden_unresolved_values,
@@ -2633,6 +3006,10 @@ class OllamaGoalInterpreter:
                 _canonical_goal_ids_from_context(request.context)
             ),
             allowed_goal_ids=_canonical_goal_ids_from_context(request.context),
+            prior_assistant_utterance=(
+                prior["text"] if prior is not None else None
+            ),
+            admitted_turn=request.text,
         )
         bound_uncertainty_repair = (
             " The rejected DTO copied already-resolved binding values into top-level "
@@ -2691,6 +3068,7 @@ class OllamaGoalInterpreter:
         constrain_location_provenance: bool = False,
         constrain_speed_provenance: bool = False,
         constrained_binding_names: list[str] | None = None,
+        minimum_responsibility_count: int | None = None,
         atomic_coverage_certificate: GoalInterpretationCoverageCertificate | None = None,
         source_structure_violation: str = "",
     ) -> dict[str, Any]:
@@ -2701,8 +3079,36 @@ class OllamaGoalInterpreter:
         reviewing or repairing prior model wording.
         """
 
+        if constrained_binding_names is not None:
+            constrained_binding_names = list(
+                dict.fromkeys(
+                    "count"
+                    if "_".join(
+                        str(name).strip().casefold().replace("-", "_").split()
+                    )
+                    in {"item_count", "repetition_count"}
+                    else str(name)
+                    for name in constrained_binding_names
+                )
+            )
+
         payload = self.build_interpretation_payload(request)
         payload["model"] = self.deep_model
+        if minimum_responsibility_count is not None:
+            responsibilities_schema = payload.get("format", {}).get(
+                "properties", {}
+            ).get("responsibilities")
+            if isinstance(responsibilities_schema, dict):
+                existing_minimum = responsibilities_schema.get("minItems", 1)
+                responsibilities_schema["minItems"] = max(
+                    int(existing_minimum),
+                    min(12, int(minimum_responsibility_count)),
+                )
+                responsibilities_schema["description"] = (
+                    "Complete atomic Responsibility set. The rejected candidate DTO "
+                    "structurally concealed one or more observable effects, so emit at "
+                    "least the schema minimum as sibling Responsibilities."
+                )
         # The deeper source-based pass is a separate semantic invocation, not
         # provider chain-of-thought. Qwen can spend the entire bounded structured-
         # output budget in provider thinking and return no DTO, so keep that
@@ -2987,7 +3393,7 @@ class OllamaGoalInterpreter:
                                 "surface; never translate or transliterate it."
                             ),
                         }
-                        binding_schema["propertyNames"] = {
+                        location_name_constraint = {
                             "anyOf": [
                                 {"const": "location"},
                                 {
@@ -3005,6 +3411,17 @@ class OllamaGoalInterpreter:
                                 "location. Other semantic dimensions remain writable."
                             ),
                         }
+                        existing_name_constraint = binding_schema.get("propertyNames")
+                        binding_schema["propertyNames"] = (
+                            {
+                                "allOf": [
+                                    existing_name_constraint,
+                                    location_name_constraint,
+                                ]
+                            }
+                            if isinstance(existing_name_constraint, dict)
+                            else location_name_constraint
+                        )
                     if constrain_speed_provenance:
                         recovery_binding_names = {
                             "after",
@@ -3103,15 +3520,17 @@ class OllamaGoalInterpreter:
                                 "speed. Other semantic dimensions remain writable."
                             ),
                         }
-                        if constrain_location_provenance:
-                            binding_schema["propertyNames"] = {
+                        existing_name_constraint = binding_schema.get("propertyNames")
+                        binding_schema["propertyNames"] = (
+                            {
                                 "allOf": [
-                                    binding_schema["propertyNames"],
+                                    existing_name_constraint,
                                     speed_name_constraint,
                                 ]
                             }
-                        else:
-                            binding_schema["propertyNames"] = speed_name_constraint
+                            if isinstance(existing_name_constraint, dict)
+                            else speed_name_constraint
+                        )
         return payload
 
     @staticmethod
@@ -3168,6 +3587,7 @@ class OllamaGoalInterpreter:
         schema["additionalProperties"] = False
         schema["required"] = [
             "responsibility_items",
+            "independent_outcome_count",
             "supporting_items",
             "reason_summary",
         ]
@@ -3236,6 +3656,32 @@ class OllamaGoalInterpreter:
                         "framing use an empty array."
                     ),
                 }
+                item_schema.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {
+                                "relation_kind": {
+                                    "enum": ["ordered", "parallel"]
+                                }
+                            },
+                            "required": ["relation_kind"],
+                        },
+                        "then": {
+                            "properties": {
+                                "related_audit_refs": {
+                                    "type": "array",
+                                    "minItems": 2,
+                                    "maxItems": 12,
+                                    "uniqueItems": True,
+                                    "items": {
+                                        "type": "string",
+                                        "enum": audit_refs,
+                                    },
+                                }
+                            }
+                        },
+                    }
+                )
             refs = item_schema.get("properties", {}).get("responsibility_refs")
             if isinstance(refs, dict):
                 refs["items"] = {
@@ -3243,6 +3689,82 @@ class OllamaGoalInterpreter:
                     "enum": candidate_refs,
                 }
                 refs["uniqueItems"] = True
+            required_output_mode = properties.get("required_output_mode")
+            if (
+                item_schema_name
+                == "GoalInterpretationResponsibilityCoverageItem"
+                and isinstance(required_output_mode, dict)
+            ):
+                required_output_mode.pop("enum", None)
+                required_output_mode["oneOf"] = [
+                    {
+                        "const": "singing",
+                        "description": (
+                            "Chromie is asked to sing or perform a song, with or "
+                            "without lyrics. This is never media playback."
+                        ),
+                    },
+                    {
+                        "const": "body_action",
+                        "description": (
+                            "Locomotion, gaze, blink, gesture, posture, physical "
+                            "manipulation, carrying, or handover."
+                        ),
+                    },
+                    {
+                        "const": "speech",
+                        "description": (
+                            "Ordinary conversational wording such as an answer, joke, "
+                            "story, or explanation without a requested vocal performance."
+                        ),
+                    },
+                    {
+                        "const": "information",
+                        "description": (
+                            "The person wants Chromie to determine or provide factual, "
+                            "observed, private-runtime, or changing information."
+                        ),
+                    },
+                    {
+                        "const": "stateful_effect",
+                        "description": (
+                            "A durable or future non-embodied state change such as "
+                            "recording, scheduling, changing a setting, or sending later."
+                        ),
+                    },
+                    {
+                        "const": "styled_speech",
+                        "description": "Spoken words with requested style but no melody.",
+                    },
+                    {
+                        "const": "recitation",
+                        "description": "Recitation of authored text, not singing.",
+                    },
+                    {
+                        "const": "humming",
+                        "description": "Requested humming without words.",
+                    },
+                    {
+                        "const": "nonverbal_vocalization",
+                        "description": (
+                            "A non-speech voice sound such as laughing, sighing, or "
+                            "coughing; never singing, humming, or media playback."
+                        ),
+                    },
+                    {
+                        "const": "media_playback",
+                        "description": (
+                            "Only control or playback of existing recorded media. Never "
+                            "use this when Chromie is asked to sing, hum, recite, or "
+                            "otherwise perform vocally."
+                        ),
+                    },
+                ]
+                required_output_mode["description"] = (
+                    "Exact provider-neutral WHAT mode of this independently "
+                    "satisfiable source outcome. Select from the per-mode semantic "
+                    "descriptions; audible output alone never implies media_playback."
+                )
             item_schema.setdefault("allOf", []).append(
                 {
                     "if": {
@@ -3454,6 +3976,16 @@ class OllamaGoalInterpreter:
                 "One short sentence naming only the coverage decision; do not quote "
                 "or translate source text."
             )
+        independent_outcome_count = payload["format"].get("properties", {}).get(
+            "independent_outcome_count"
+        )
+        if isinstance(independent_outcome_count, dict):
+            independent_outcome_count.pop("default", None)
+            independent_outcome_count["description"] = (
+                "Count the independently satisfiable positive source outcomes before "
+                "listing them. This integer must exactly equal responsibility_items "
+                "length."
+            )
         if self.keep_alive:
             payload["keep_alive"] = self.keep_alive
         return payload
@@ -3463,6 +3995,7 @@ class OllamaGoalInterpreter:
         request: GoalInterpretationRequest,
         decision: GoalInterpretationDecision,
         *,
+        previous_content: str,
         validation_error: Exception,
         authoritative_atomic_certificate: (
             GoalInterpretationCoverageCertificate | None
@@ -3475,6 +4008,27 @@ class OllamaGoalInterpreter:
             decision,
             authoritative_atomic_certificate=authoritative_atomic_certificate,
         )
+        try:
+            previous_raw = _extract_json_object(previous_content)
+        except (ValueError, TypeError):
+            previous_raw = {}
+        claimed_count = previous_raw.get("independent_outcome_count")
+        if (
+            isinstance(claimed_count, int)
+            and not isinstance(claimed_count, bool)
+            and 1 <= claimed_count <= 12
+        ):
+            schema_properties = payload.get("format", {}).get("properties", {})
+            count_schema = schema_properties.get("independent_outcome_count")
+            responsibility_items_schema = schema_properties.get(
+                "responsibility_items"
+            )
+            if isinstance(count_schema, dict):
+                count_schema.clear()
+                count_schema.update({"type": "integer", "const": claimed_count})
+            if isinstance(responsibility_items_schema, dict):
+                responsibility_items_schema["minItems"] = claimed_count
+                responsibility_items_schema["maxItems"] = claimed_count
         messages = payload.get("messages")
         if isinstance(messages, list) and len(messages) >= 2:
             system = messages[0]
@@ -3495,6 +4049,14 @@ class OllamaGoalInterpreter:
                     str(user.get("content") or "")
                     + "\n\nThe previous certificate was mechanically invalid: "
                     + str(validation_error)[:500]
+                    + (
+                        ". Preserve the auditor-owned independent_outcome_count="
+                        f"{claimed_count} and emit exactly that many positive items."
+                        if isinstance(claimed_count, int)
+                        and not isinstance(claimed_count, bool)
+                        and 1 <= claimed_count <= 12
+                        else ""
+                    )
                     + ". Regenerate one fresh certificate from the source tokens."
                 )
         return payload
@@ -3504,8 +4066,57 @@ class OllamaGoalInterpreter:
         request: GoalInterpretationRequest,
         decision: GoalInterpretationDecision,
         content: str,
+        *,
+        normalize_repaired_singleton_relations: bool = False,
     ) -> tuple[GoalInterpretationCoverageCertificate, list[str]]:
         raw = _extract_json_object(content)
+        if normalize_repaired_singleton_relations:
+            responsibility_items = raw.get("responsibility_items")
+            supporting_items = raw.get("supporting_items")
+            claimed_count = raw.get("independent_outcome_count")
+            if (
+                isinstance(claimed_count, int)
+                and not isinstance(claimed_count, bool)
+                and isinstance(responsibility_items, list)
+                and claimed_count == len(responsibility_items)
+                and claimed_count >= 2
+                and isinstance(supporting_items, list)
+            ):
+                known_audit_refs = {
+                    str(item.get("audit_ref") or "").strip()
+                    for item in responsibility_items
+                    if isinstance(item, dict)
+                    and str(item.get("audit_ref") or "").strip()
+                }
+                for item in supporting_items:
+                    if not isinstance(item, dict):
+                        continue
+                    relation_kind = str(item.get("relation_kind") or "none")
+                    related_refs = item.get("related_audit_refs")
+                    related_refs = (
+                        list(
+                            dict.fromkeys(
+                                str(ref).strip()
+                                for ref in related_refs
+                                if str(ref).strip()
+                            )
+                        )
+                        if isinstance(related_refs, list)
+                        else []
+                    )
+                    if (
+                        relation_kind in {"ordered", "parallel"}
+                        and len(related_refs) == 1
+                        and set(related_refs).issubset(known_audit_refs)
+                    ):
+                        # This is the single allowed mechanical cleanup after the
+                        # model's one DTO-repair attempt.  The repaired certificate
+                        # has already fixed and exactly populated its positive-item
+                        # count, so a typed relation with only one endpoint cannot
+                        # express coordination.  Preserve it as an ordinary owned
+                        # constraint instead of either inventing another endpoint or
+                        # rejecting an otherwise complete atomic audit.
+                        item["relation_kind"] = "none"
         _materialize_coverage_source_excerpts(
             request,
             raw,
@@ -3553,6 +4164,9 @@ class OllamaGoalInterpreter:
                     "responsibility_items": unique_responsibility_items,
                     "supporting_items": normalized_supporting_items,
                 }
+            )
+            certificate = GoalInterpretationCoverageCertificate.model_validate(
+                certificate.model_dump(mode="python")
             )
         by_ref = {item.local_ref: item for item in decision.responsibilities}
         normalized_turn = " ".join(request.text.strip().split())
@@ -3731,16 +4345,18 @@ class OllamaGoalInterpreter:
 
         problems: list[str]
         coverage_certificate: GoalInterpretationCoverageCertificate | None = None
+        audit_content = ""
         try:
             audit = await self._chat_logged(
                 self.build_responsibility_coverage_payload(request, decision),
                 stage="goal_interpretation_responsibility_coverage",
                 request=request,
             )
+            audit_content = str(audit.get("message", {}).get("content") or "")
             coverage_certificate, problems = self._validate_responsibility_coverage_content(
                 request,
                 decision,
-                str(audit.get("message", {}).get("content") or ""),
+                audit_content,
             )
         except (
             _GoalInterpretationSemanticStructureViolation,
@@ -3751,6 +4367,7 @@ class OllamaGoalInterpreter:
                     self.build_responsibility_coverage_repair_payload(
                         request,
                         decision,
+                        previous_content=audit_content,
                         validation_error=exc,
                     ),
                     stage="goal_interpretation_responsibility_coverage_repair",
@@ -3761,6 +4378,7 @@ class OllamaGoalInterpreter:
                         request,
                         decision,
                         str(repaired_audit.get("message", {}).get("content") or ""),
+                        normalize_repaired_singleton_relations=True,
                     )
                 )
             except (
@@ -3818,9 +4436,16 @@ class OllamaGoalInterpreter:
             return decision
 
         if coverage_certificate is not None:
+            unowned_effect_refs = _unowned_consequential_effect_refs(
+                decision,
+                coverage_certificate,
+            )
             projected = _project_audited_contract_onto_covered_candidates(
                 decision,
                 coverage_certificate,
+                preserve_unowned_consequential_effects=bool(
+                    unowned_effect_refs
+                ),
             )
             if projected is not None:
                 _, projected_problems = self._validate_responsibility_coverage_content(
@@ -3831,6 +4456,15 @@ class OllamaGoalInterpreter:
                         ensure_ascii=False,
                     ),
                 )
+                allowed_unowned_problems = {
+                    f"unjustified_responsibility:{candidate_ref}"
+                    for candidate_ref in unowned_effect_refs
+                }
+                projected_problems = [
+                    problem
+                    for problem in projected_problems
+                    if problem not in allowed_unowned_problems
+                ]
                 if not projected_problems:
                     return projected
 
@@ -3856,19 +4490,43 @@ class OllamaGoalInterpreter:
                 + ";".join(problems)
             )
         try:
+            unowned_effect_refs = _unowned_consequential_effect_refs(
+                decision,
+                coverage_certificate,
+            )
+            audit_owner_counts: dict[str, int] = {}
+            for item in coverage_certificate.responsibility_items:
+                for candidate_ref in item.responsibility_refs:
+                    audit_owner_counts[candidate_ref] = (
+                        audit_owner_counts.get(candidate_ref, 0) + 1
+                    )
+            preserved_effect_refs = (
+                unowned_effect_refs
+                if any(count > 1 for count in audit_owner_counts.values())
+                else []
+            )
+            recovery_binding_names = list(
+                dict.fromkeys(
+                    name
+                    for responsibility in decision.responsibilities
+                    for name in responsibility.bindings
+                )
+            )
+            if _decimal_values(request.text):
+                # A candidate that already dropped an explicit source number has
+                # not proved which semantic dimension owns it. Closing the deep
+                # recovery grammar to only that candidate's binding names makes
+                # preservation impossible (for example, it cannot add duration).
+                # Keep the normal typed grammar open; the numeric/provenance
+                # validators still reject invention, rewriting, or loss.
+                recovery_binding_names = None
             deep = await self._chat_logged(
                 self.build_deep_interpretation_payload(
                     request,
                     atomic_coverage_certificate=coverage_certificate,
                     constrain_location_provenance=True,
                     constrain_speed_provenance=True,
-                    constrained_binding_names=list(
-                        dict.fromkeys(
-                            name
-                            for responsibility in decision.responsibilities
-                            for name in responsibility.bindings
-                        )
-                    ),
+                    constrained_binding_names=recovery_binding_names,
                 ),
                 stage="goal_interpretation_deep",
                 request=request,
@@ -3883,6 +4541,7 @@ class OllamaGoalInterpreter:
                     reconsidered,
                     coverage_certificate,
                 )
+            audited_reconsidered = reconsidered
             # The independent certificate is the semantic authority that caused
             # resegmentation.  Validate the projected result against that same
             # certificate; asking a second model audit here allowed a fresh,
@@ -3912,7 +4571,7 @@ class OllamaGoalInterpreter:
                 )
             _, final_problems = self._validate_responsibility_coverage_content(
                 request,
-                reconsidered,
+                audited_reconsidered,
                 json.dumps(projected_certificate),
             )
             if final_problems:
@@ -3920,6 +4579,11 @@ class OllamaGoalInterpreter:
                     "fresh Goal Interpretation failed final atomic coverage: "
                     + ";".join(final_problems)
                 )
+            reconsidered = _append_preserved_consequential_effects(
+                audited_reconsidered,
+                decision,
+                preserved_effect_refs,
+            )
             return reconsidered
         except (
             httpx.HTTPError,
@@ -3952,6 +4616,7 @@ class OllamaGoalInterpreter:
         content: str,
         *,
         certificate_owns_coordination: bool = False,
+        allow_dropped_explicit_numbers_for_atomic_audit: bool = False,
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
         _normalize_mechanical_goal_interpretation_dto(parsed)
@@ -3965,9 +4630,11 @@ class OllamaGoalInterpreter:
         _reject_unprovenanced_speed_bindings(request, parsed)
         _reject_non_scalar_duration_bindings(parsed)
         _reject_runtime_identity_bindings(request, parsed)
+        _reject_unavailable_or_mismatched_prior_assistant_utterance(request, parsed)
         _strip_language_envelope_bindings(request, parsed)
         _strip_redundant_conversational_turn_echo_bindings(request, parsed)
         _strip_redundant_outcome_echo_bindings(parsed)
+        _reject_hidden_effect_or_how_bindings(parsed)
         _normalize_corrupted_count_binding_names(parsed)
         _reject_malformed_binding_names(parsed)
         _reject_malformed_binding_values(parsed)
@@ -3975,7 +4642,8 @@ class OllamaGoalInterpreter:
         if certificate_owns_coordination:
             _strip_certificate_owned_coordination_bindings(parsed)
         _reject_untyped_coordination_bindings(parsed)
-        _reject_dropped_explicit_numeric_bindings(request, parsed)
+        if not allow_dropped_explicit_numbers_for_atomic_audit:
+            _reject_dropped_explicit_numeric_bindings(request, parsed)
         _reject_noncanonical_count_bindings(parsed)
         return GoalInterpretationDecision.model_validate(parsed)
 
@@ -4061,6 +4729,50 @@ class OllamaGoalInterpreter:
                 request.sid,
                 exc,
             )
+            audit_candidate = _extract_json_object(content)
+            _normalize_mechanical_goal_interpretation_dto(audit_candidate)
+            removed_transport_echoes = (
+                _strip_transport_echo_bindings_for_atomic_audit(
+                    request,
+                    audit_candidate,
+                )
+            )
+            if removed_transport_echoes:
+                try:
+                    candidate = self._validate_interpretation_content(
+                        request,
+                        json.dumps(audit_candidate, ensure_ascii=False),
+                        allow_dropped_explicit_numbers_for_atomic_audit=True,
+                    )
+                    audited = await self._ensure_atomic_responsibility_coverage(
+                        request,
+                        candidate,
+                        allow_resegmentation=True,
+                    )
+                    # The sanitized candidate was audit input only. The complete
+                    # validator remains the sole acceptance boundary and catches
+                    # any explicit number that existed only inside the rejected
+                    # envelope echo.
+                    return self._validate_interpretation_content(
+                        request,
+                        json.dumps(audited.model_dump(mode="json"), ensure_ascii=False),
+                    )
+                except _GoalInterpretationAuthorityViolation as audit_exc:
+                    if not _decimal_values(request.text):
+                        raise InterpretationUnavailableError(
+                            "invalid_goal_interpretation_after_transport_echo_audit: "
+                            f"{type(audit_exc).__name__}: {audit_exc}"
+                        ) from audit_exc
+                    logger.warning(
+                        "Transport-echo audit retained atomic structure but not all "
+                        "explicit numbers sid=%s; continuing to one fresh source pass",
+                        request.sid,
+                    )
+                except Exception as audit_exc:
+                    raise InterpretationUnavailableError(
+                        "invalid_goal_interpretation_after_transport_echo_audit: "
+                        f"{type(audit_exc).__name__}: {audit_exc}"
+                    ) from audit_exc
             if "coordination bindings must contain only exact sibling" in str(exc):
                 # The invalid relation field itself carries no trustworthy
                 # semantic authority. Strip it and send the remaining candidate
@@ -4085,8 +4797,24 @@ class OllamaGoalInterpreter:
                         f"{type(audit_exc).__name__}: {audit_exc}"
                     ) from audit_exc
             try:
+                rejected_candidate = _extract_json_object(content)
                 candidate_binding_names = _goal_interpretation_binding_names(
-                    _extract_json_object(content)
+                    rejected_candidate
+                )
+                hidden_effect_or_how_violation = (
+                    "binding conceals an observable effect or downstream HOW field"
+                    in str(exc)
+                )
+                if hidden_effect_or_how_violation:
+                    candidate_binding_names = [
+                        name
+                        for name in candidate_binding_names
+                        if not _is_hidden_effect_or_how_binding_name(name)
+                    ]
+                minimum_responsibility_count = (
+                    _hidden_effect_responsibility_count_floor(rejected_candidate)
+                    if hidden_effect_or_how_violation
+                    else None
                 )
                 if isinstance(exc, _GoalInterpretationSpeedProvenanceViolation):
                     # The typed validator has already proved that this candidate
@@ -4099,12 +4827,19 @@ class OllamaGoalInterpreter:
                         for name in candidate_binding_names
                         if name.strip().casefold() != "speed"
                     ]
+                if _decimal_values(request.text) and not hidden_effect_or_how_violation:
+                    # The rejected candidate cannot constrain the semantic name
+                    # of an explicit number it omitted. Let the fresh source pass
+                    # use the normal typed binding grammar so it can preserve the
+                    # number under its proper dimension.
+                    candidate_binding_names = None
                 deep = await self._chat_logged(
                     self.build_deep_interpretation_payload(
                         request,
                         constrain_location_provenance=True,
                         constrain_speed_provenance=True,
                         constrained_binding_names=candidate_binding_names,
+                        minimum_responsibility_count=minimum_responsibility_count,
                         source_structure_violation=str(exc),
                     ),
                     stage="goal_interpretation_deep",

@@ -186,8 +186,10 @@ class GoalInterpretationResponsibilityCoverageItem(
     ] = Field(
         description=(
             "Exact provider-neutral WHAT mode for this positive outcome. "
-            "Singing or a song is singing; ordinary conversational wording is "
-            "speech; locomotion, gaze, blink, gesture, and posture are body_action."
+            "Chromie's own singing or song performance is singing and never "
+            "media_playback; media_playback means control of existing recorded media. "
+            "Ordinary conversational wording is speech; locomotion, gaze, blink, "
+            "gesture, and posture are body_action."
         )
     )
 
@@ -281,6 +283,16 @@ class GoalInterpretationCoverageCertificate(BaseModel):
         max_length=12,
         description="Positive outcome items only; every item has role=responsibility.",
     )
+    independent_outcome_count: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description=(
+            "The auditor's explicit count of independently satisfiable positive "
+            "outcomes. Production coverage schemas require this field; the optional "
+            "model default keeps retained historical certificates readable."
+        ),
+    )
     supporting_items: list[GoalInterpretationSupportingCoverageItem] = Field(
         default_factory=list,
         max_length=20,
@@ -294,3 +306,16 @@ class GoalInterpretationCoverageCertificate(BaseModel):
     @classmethod
     def normalize_reason_summary(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
+
+    @model_validator(mode="after")
+    def validate_independent_outcome_count(
+        self,
+    ) -> "GoalInterpretationCoverageCertificate":
+        if (
+            self.independent_outcome_count is not None
+            and self.independent_outcome_count != len(self.responsibility_items)
+        ):
+            raise ValueError(
+                "independent_outcome_count must equal responsibility_items length"
+            )
+        return self

@@ -445,6 +445,25 @@ metrics, and the earliest suspect boundary. The score never overrides a hard
 failure. Use `--only-case CASE_ID` for the originating defect, then run the full
 ability class after the fix.
 
+When the evaluated revision contains unqualified behavior changes, or more than
+one live case is due, do not begin with repeated `--only-case` runs. Bind one
+clean deployed revision and runtime identity, run the complete authoritative
+manifest in one invocation, and keep source and services unchanged between
+cases. After the cohort exits, collect exactly one correlated bundle before any
+source edit:
+
+```bash
+./scripts/collect_debug_bundle.sh
+```
+
+Judge every case, including mechanical passes, from the aggregate summary and
+bundle; then group failures by the earliest shared boundary. Use
+`--only-case` only after that diagnosis to validate one proposed fix, followed
+by the affected ability class and the complete manifest on the changed
+revision. A hard safety, provenance, service-integrity, or safe-idle failure may
+stop the cohort, but the result is incomplete and cannot support a passing
+claim. See [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
+
 Warm fast-response cases use two non-overlapping contract intervals. The Planner
 budget is measured from the retained `fast_planner_first_response.started_elapsed_ms`
 (the validated GI handoff) to its `finished_elapsed_ms` commitment. The delivery

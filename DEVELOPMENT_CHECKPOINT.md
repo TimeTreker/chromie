@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 
 Status: current resume point; owner-approved Continuous Mind runtime closure in progress
-Updated: 2026-08-25
+Updated: 2026-08-27
 Remote baseline: `47dbfbcc22eb8d008af1b31d414d17d64b080c4f` (`Restore cognitive authority boundaries`)
 Archive baseline: user-supplied `chromie_20260825.zip`, verified against the same current source shape.
 
@@ -157,4 +157,4 @@ The second architecture slice closes the first real live Situation path without 
 5. Provider-state re-entry, including restart catalog revalidation, no longer fabricates `evidence_ref` provenance or accidentally qualify speech as `post_evidence`. Terminal execution/result observations retain the separate Evidence path.
 6. This is intentionally **not** full scene/body/world-model closure. Generic trusted camera/scene/body/environment source adapters remain to be implemented only when a source can state its own bounded authority contract; Situation must not infer those facts from desired Goals or Plans.
 
-Planner-authored time readiness, selective Situation re-entry, current-context Memory activation, bounded information-acquisition expectations, and the audited coordinator/docs/compatibility cleanup are source-closed without new semantic managers. The next binding step is full current-revision qualification on the exact committed tree; any further source patch must be justified by qualification evidence or a newly proven ownership/reconstructability defect.
+Planner-authored time readiness, selective Situation re-entry, current-context Memory activation, bounded information-acquisition expectations, and the audited coordinator/docs/compatibility cleanup are source-closed without new semantic managers. GI now describes only the communicative obligation/proposition, Planner alone authors words, unavailable prior dialogue is omitted, request-specific schema plus parsing require exact real prior text, and new count emission uses only `count`; focused regressions are retained in `tests/test_goal_interpreter_llm_prompt.py`. The immutable diagnostic Level C cohort bound to dirty source tree `c73917dcbb010e23855053f17f41922caf1e094a9f57165c4ddccea57bb0122f` completed all 36 cases on 2026-08-27, then produced exactly one bundle (`chromie_debug_bundle_20260827_144937.tar.gz`): 17 passed and 19 failed. Both identity cases retained WHAT-only GI with no unavailable prior-utterance sentinel, while failing the 2-second GI-to-Fast-Planner commitment target; nine cases failed closed at shared GI DTO/provenance boundaries, two at GA structured-output validation, and eight at response/evidence/latency assertions. The next binding source iteration starts with the shared GI fail-closed cluster, then uses one focused regression, its ability class, canonical gates, and a complete immutable cohort before a revision-level claim; this diagnostic dirty-tree evidence is not release qualification.

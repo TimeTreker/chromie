@@ -124,6 +124,34 @@ to retained evidence or clearly marked as an inference that still needs proof.
 The final delivery may include a patch, commit, or pull request, but none of
 those artifacts replaces the required explanation.
 
+## Aggregate-first live iteration
+
+When the current revision contains behavior changes that have not yet been
+qualified, or when multiple live cases are due, the first live reproduction is
+the complete manifest-owned cohort, not a sequence of case/edit/case loops.
+Capture one clean source and deployed runtime identity, start the cohort once,
+and keep that revision and runtime immutable until the runner finishes. Do not
+change source, prompts, profiles, services, or scenario selection between cases.
+
+After all selected cases finish, collect one post-cohort bundle:
+
+```bash
+./scripts/collect_debug_bundle.sh
+```
+
+Review the aggregate summary, every deterministic and semantic case (including
+mechanical passes), and the single correlated bundle together. Group failures
+by earliest responsible boundary before choosing a source change; do not treat
+every utterance as an independent bug. A hard safety, provenance,
+service-integrity, or safe-idle failure may terminate the run, but the retained
+result is then an incomplete cohort, not a passing subset.
+
+After aggregate diagnosis, a focused case is appropriate for validating one
+proposed fix. Then run its ability class and the complete cohort again on the
+changed revision before making another broad change or claiming the revision is
+qualified. Focused runs accelerate a known iteration; they do not replace the
+aggregate baseline or the post-change aggregate result.
+
 ## LLM-versus-workflow root-cause method
 
 Any coding agent investigating Chromie, including an interactive Codex or
@@ -136,9 +164,11 @@ last spoken sentence.
    the observed user-visible result, the current Git revision, and the runtime
    profile. Do not simplify the utterance into an easier phrase before the
    failing run has been preserved.
-2. Reproduce through the highest safe applicable profile. Immediately collect
-   the bounded runtime evidence so later calls do not push the failure outside
-   the retained log window:
+2. Reproduce through the highest safe applicable profile. For an isolated
+   retained defect, immediately collect the bounded runtime evidence so later
+   calls do not push the failure outside the retained log window. For an
+   aggregate iteration, do not collect or edit between cases; collect exactly
+   once after the cohort finishes as required above:
 
    ```bash
    ./scripts/collect_debug_bundle.sh

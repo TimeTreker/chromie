@@ -97,7 +97,10 @@ class CognitiveResponsibilityProposal(BaseModel):
             "that can be independently accepted or rejected requires its own sibling "
             "Responsibility. Preserve the "
             "requested answer or judgment and proposition polarity: a question about "
-            "whether P is true must not be rewritten as the assertion that P is true."
+            "whether P is true must not be rewritten as the assertion that P is true. "
+            "For conversational speech, describe the communicative obligation or "
+            "proposition to convey; never write the exact words Chromie will say. "
+            "Planner alone authors the utterance."
         ),
     )
     bindings: dict[str, Any] = Field(

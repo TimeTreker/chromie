@@ -109,6 +109,20 @@ semantics become clearer.
   pass. Physical microphone, speaker, or robot evidence remains supervised;
   report that evidence gap explicitly instead of claiming it from text,
   virtual-audio, or simulator results.
+- When an evaluated revision contains externally made or otherwise unqualified
+  behavior changes, or when more than one live case is due, establish the live
+  baseline as one aggregate iteration before changing source. Bind one deployed
+  revision and runtime identity, run the complete manifest-owned cohort in one
+  invocation, and do not edit source, rebuild, restart, or substitute isolated
+  cases between cohort cases. After the cohort ends, run
+  `./scripts/collect_debug_bundle.sh` exactly once, judge every case (including
+  mechanical passes), and cluster failures by their earliest shared boundary
+  before selecting a fix. A focused `--only-case`/`--case` run is allowed after
+  aggregate diagnosis to test one proposed change; rerun the complete cohort on
+  the changed revision before another broad change or any revision-level claim.
+  A hard safety, provenance, service-integrity, or safe-idle failure may stop the
+  cohort early; retain one bundle at that stop and report the cohort as
+  incomplete rather than silently continuing or treating it as a pass.
 - Keep microphone, VAD, playback, interruption, conversation state, and Trusted
   Capability Runtime coordination in the host Orchestrator.
 - Keep embodied planning, execution, resource safety, stop/emergency behavior,

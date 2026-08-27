@@ -15,13 +15,16 @@ from agent.app.cognitive_core.goal_interpreter.engine import interpret_goal
 from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     OllamaGoalInterpreter,
+    _GoalInterpretationSemanticStructureViolation,
     _extract_json_object,
     _coverage_source_tokens,
     _payload_message_texts,
     _project_audited_atomic_contract,
     _reject_canonical_goal_identity_refs,
+    _reject_hidden_effect_or_how_bindings,
     _reject_noncanonical_count_bindings,
     _reject_planner_shaped_goal_interpretation,
+    _reject_unavailable_or_mismatched_prior_assistant_utterance,
     _reject_unprovenanced_location_bindings,
     _reject_unprovenanced_speed_bindings,
     _reject_untyped_coordination_bindings,
@@ -52,6 +55,16 @@ def _valid_output(*, local_ref: str = "r1") -> dict[str, object]:
 
 
 class GoalInterpreterContractTests(unittest.TestCase):
+    def test_hidden_effect_and_how_binding_names_are_rejected(self) -> None:
+        for binding_name in ("concurrent_action", "capability", "agent_skill"):
+            with self.subTest(binding_name=binding_name):
+                parsed = _valid_output()
+                parsed["responsibilities"][0]["bindings"] = {binding_name: "blink"}  # type: ignore[index]
+                with self.assertRaises(
+                    _GoalInterpretationSemanticStructureViolation
+                ):
+                    _reject_hidden_effect_or_how_bindings(parsed)
+
     def test_duration_and_location_bindings_remain_scalar(self) -> None:
         base = {
             "confidence": 1.0,
@@ -575,6 +588,24 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("source_end_token_ref", responsibility_item["properties"])
         self.assertNotIn("source_token_refs", responsibility_item["properties"])
         self.assertNotIn("source_excerpt", responsibility_item["properties"])
+        supporting_item = schema["$defs"][
+            "GoalInterpretationSupportingCoverageItem"
+        ]
+        relation_clause = next(
+            clause
+            for clause in supporting_item["allOf"]
+            if clause.get("if", {})
+            .get("properties", {})
+            .get("relation_kind", {})
+            .get("enum")
+            == ["ordered", "parallel"]
+        )
+        self.assertEqual(
+            relation_clause["then"]["properties"]["related_audit_refs"][
+                "minItems"
+            ],
+            2,
+        )
 
     def test_coverage_prompt_supplies_bounded_context_for_deictic_continuation(
         self,
@@ -1289,7 +1320,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertEqual(decision.responsibilities[0].bindings, {})
         self.assertEqual(decision.responsibilities[1].bindings, {})
 
-    def test_coverage_clears_impossible_single_outcome_typed_relation(self) -> None:
+    def test_coverage_rejects_impossible_single_outcome_typed_relation(self) -> None:
         request = GoalInterpretationRequest(text="walk for 10 seconds")
         decision = GoalInterpretationDecision.model_validate(
             {
@@ -1306,7 +1337,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "unresolved": [],
             }
         )
-        certificate, problems = (
+        with self.assertRaisesRegex(ValidationError, "at least two positive audit refs"):
             OllamaGoalInterpreter._validate_responsibility_coverage_content(
                 request,
                 decision,
@@ -1341,11 +1372,6 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                     }
                 ),
             )
-        )
-
-        self.assertEqual(problems, [])
-        self.assertEqual(certificate.supporting_items[0].relation_kind, "none")
-        self.assertEqual(certificate.supporting_items[0].related_audit_refs, ["a1"])
 
     def test_singleton_relation_is_not_expanded_through_merged_candidate(self) -> None:
         request = GoalInterpretationRequest(text="run and sing")
@@ -1364,7 +1390,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 "unresolved": [],
             }
         )
-        certificate, problems = (
+        with self.assertRaisesRegex(ValidationError, "at least two positive audit refs"):
             OllamaGoalInterpreter._validate_responsibility_coverage_content(
                 request,
                 decision,
@@ -1409,14 +1435,110 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                     }
                 ),
             )
+
+    def test_one_repaired_singleton_relation_becomes_owned_nonrelation(self) -> None:
+        request = GoalInterpretationRequest(text="run while sing")
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.95,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "run",
+                        "bindings": {"parallel_with": ["r2"]},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "sing",
+                        "bindings": {"parallel_with": ["r1"]},
+                        "output_mode": "singing",
+                        "confidence": 0.95,
+                    },
+                ],
+                "unresolved": [],
+            }
+        )
+        repaired = {
+            "independent_outcome_count": 2,
+            "responsibility_items": [
+                {
+                    "source_start_token_ref": "t0",
+                    "source_end_token_ref": "t0",
+                    "audit_ref": "a1",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "source_start_token_ref": "t2",
+                    "source_end_token_ref": "t2",
+                    "audit_ref": "a2",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r2"],
+                    "required_output_mode": "singing",
+                },
+            ],
+            "supporting_items": [
+                {
+                    "source_start_token_ref": "t1",
+                    "source_end_token_ref": "t1",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "none",
+                    "relation_kind": "ordered",
+                    "related_audit_refs": ["a2"],
+                },
+                {
+                    "source_start_token_ref": "t1",
+                    "source_end_token_ref": "t1",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1", "r2"],
+                    "required_output_mode": "none",
+                    "relation_kind": "parallel",
+                    "related_audit_refs": ["a1", "a2"],
+                },
+            ],
+            "reason_summary": "Two parallel outcomes and one onset modifier.",
+        }
+
+        with self.assertRaisesRegex(
+            _GoalInterpretationSemanticStructureViolation,
+            "same outcome set as both ordered and parallel",
+        ):
+            OllamaGoalInterpreter._validate_responsibility_coverage_content(
+                request,
+                decision,
+                json.dumps(repaired),
+            )
+
+        certificate, problems = (
+            OllamaGoalInterpreter._validate_responsibility_coverage_content(
+                request,
+                decision,
+                json.dumps(repaired),
+                normalize_repaired_singleton_relations=True,
+            )
         )
 
         self.assertEqual(
-            [item.source_excerpt for item in certificate.responsibility_items],
-            ["run", "sing"],
+            [item.relation_kind for item in certificate.supporting_items],
+            ["none", "parallel"],
         )
-        self.assertIn("overmerged_independent_responsibilities:merged", problems)
-        self.assertIn("output_mode_mismatch:merged:singing:body_action", problems)
+        self.assertEqual(
+            certificate.supporting_items[0].related_audit_refs,
+            ["a2"],
+        )
+        self.assertEqual(problems, [])
 
     def test_audited_atomic_contract_projects_modes_and_order(self) -> None:
         decision = GoalInterpretationDecision.model_validate(
@@ -1580,8 +1702,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         count_contract = count_payload["format"]["$defs"][
             "CognitiveResponsibilityProposal"
         ]["properties"]["bindings"]
-        self.assertIn("repetition_count", count_contract["properties"])
-        Draft202012Validator(count_contract).validate({"repetition_count": 2})
+        self.assertIn("count", count_contract["properties"])
+        self.assertNotIn("repetition_count", count_contract["properties"])
+        Draft202012Validator(count_contract).validate({"count": 2})
 
     def test_system_prompt_names_what_only_boundary(self) -> None:
         prompt = self._interpreter().load_system_prompt()
@@ -1599,7 +1722,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         self.assertIn("A pace modifier is never a `time_modifier`", prompt)
 
-        schema = self._interpreter()._goal_interpretation_response_schema()
+        schema = self._interpreter()._goal_interpretation_response_schema(
+            prior_assistant_utterance="你好呀！",
+            admitted_turn="你刚才说什么？",
+        )
         responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
         self.assertIn(
             "Never combine coordinated positive effects",
@@ -1609,13 +1735,71 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("propertyNames", bindings_schema)
         self.assertNotRegex(
             'count”: 2, // commentary',
-            bindings_schema["propertyNames"]["pattern"],
+            bindings_schema["propertyNames"]["allOf"][0]["pattern"],
         )
-        count_schema = bindings_schema["properties"][
-            "count"
-        ]
+        count_schema = bindings_schema["properties"]["count"]
         self.assertEqual(count_schema["type"], "integer")
         self.assertEqual(count_schema["minimum"], 1)
+        for alias in ("item_count", "repetition_count"):
+            self.assertIn(alias, bindings_schema["properties"])
+            with self.assertRaises(JsonSchemaValidationError):
+                Draft202012Validator(bindings_schema).validate({alias: 2})
+
+        Draft202012Validator(bindings_schema).validate(
+            {"prior_assistant_utterance": "你好呀！"}
+        )
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(bindings_schema).validate(
+                {"prior_assistant_utterance": "你好"}
+            )
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(bindings_schema).validate({"speed": None})
+        Draft202012Validator(bindings_schema).validate({"speed": "quickly"})
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(bindings_schema).validate(
+                {"parallel_with": "sing at the same time"}
+            )
+        Draft202012Validator(bindings_schema).validate({"parallel_with": "r2"})
+        self.assertEqual(
+            responsibility["properties"]["local_ref"]["enum"][:2],
+            ["r1", "r2"],
+        )
+
+        no_history_schema = self._interpreter()._goal_interpretation_response_schema(
+            admitted_turn="边走边唱歌。"
+        )
+        no_history_bindings = no_history_schema["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(no_history_bindings).validate(
+                {"prior_assistant_utterance": "unavailable"}
+            )
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(no_history_bindings).validate(
+                {"location": "边走边唱歌。"}
+            )
+        Draft202012Validator(no_history_bindings).validate({"location": "边"})
+
+        constrained_location = self._interpreter().build_deep_interpretation_payload(
+            GoalInterpretationRequest(text="边走边唱歌。", language="zh-CN"),
+            constrain_location_provenance=True,
+        )["format"]["$defs"]["CognitiveResponsibilityProposal"]["properties"][
+            "bindings"
+        ]["properties"]["location"]
+        self.assertIn("边", constrained_location["enum"])
+        self.assertNotIn("边走边唱歌。", constrained_location["enum"])
+        self.assertNotIn("边走边唱歌", constrained_location["enum"])
+        self.assertNotIn(
+            "Nod twice, then blink once",
+            self._interpreter()
+            .build_deep_interpretation_payload(
+                GoalInterpretationRequest(text="Nod twice, then blink once."),
+                constrain_location_provenance=True,
+            )["format"]["$defs"]["CognitiveResponsibilityProposal"]["properties"][
+                "bindings"
+            ]["properties"]["location"]["enum"],
+        )
 
     def test_typed_count_contract_requires_canonical_positive_integer(self) -> None:
         _reject_noncanonical_count_bindings(
@@ -1625,6 +1809,42 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             _reject_noncanonical_count_bindings(
                 {"responsibilities": [{"bindings": {"count": "twice"}}]}
             )
+
+        for alias in ("item_count", "repetition_count"):
+            with self.assertRaisesRegex(ValueError, "use bindings.count"):
+                _reject_noncanonical_count_bindings(
+                    {"responsibilities": [{"bindings": {alias: 2}}]}
+                )
+
+    def test_prior_assistant_binding_requires_exact_available_evidence(self) -> None:
+        unavailable_request = GoalInterpretationRequest(
+            text="你是谁？", language="zh-CN"
+        )
+        unavailable = {
+            "responsibilities": [
+                {"bindings": {"prior_assistant_utterance": "unavailable"}}
+            ]
+        }
+        with self.assertRaisesRegex(ValueError, "without an accepted prior"):
+            _reject_unavailable_or_mismatched_prior_assistant_utterance(
+                unavailable_request, unavailable
+            )
+
+        available_request = GoalInterpretationRequest(
+            text="你刚才说什么？",
+            language="zh-CN",
+            context={"history": [{"role": "assistant", "text": "你好呀！"}]},
+        )
+        _reject_unavailable_or_mismatched_prior_assistant_utterance(
+            available_request,
+            {"responsibilities": [{"bindings": {"prior_assistant_utterance": "你好呀！"}}]},
+        )
+        with self.assertRaisesRegex(ValueError, "exact supplied prior text"):
+            _reject_unavailable_or_mismatched_prior_assistant_utterance(
+                available_request,
+                {"responsibilities": [{"bindings": {"prior_assistant_utterance": "你好"}}]},
+            )
+
     def test_system_prompt_preserves_speaker_and_immediate_conversation_boundaries(self) -> None:
         prompt = self._interpreter().load_system_prompt()
         self.assertIn("Do not decide whether downstream work", prompt)
@@ -1647,8 +1867,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         turn_prompt = self._interpreter().build_interpretation_user_prompt(
             GoalInterpretationRequest(text="边走边唱歌。", language="zh-CN")
         )
-        self.assertIn("whole Latest user input", turn_prompt)
-        self.assertIn("not semantic bindings", turn_prompt)
+        self.assertIn("Planner alone authors the exact utterance", turn_prompt)
+        self.assertIn("Recent accepted dialogue JSON:[]", turn_prompt)
+        self.assertNotIn("Most recent accepted Chromie/assistant utterance JSON", turn_prompt)
+        self.assertNotIn('"status":"unavailable"', turn_prompt)
 
         turn_prompt = self._interpreter().build_interpretation_user_prompt(
             GoalInterpretationRequest(
@@ -1662,12 +1884,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 },
             )
         )
-        self.assertIn("most recent accepted assistant utterance", turn_prompt)
-        self.assertIn("not continuation of the prior utterance's Goal", turn_prompt)
         self.assertIn("prior_assistant_utterance", turn_prompt)
-        self.assertIn("vocative, not a separate outcome", turn_prompt)
-        self.assertIn("standalone letter, symbol", turn_prompt)
-        self.assertIn("Current presence of a person, object, or event", turn_prompt)
         self.assertIn("Most recent accepted Chromie/assistant utterance JSON", turn_prompt)
         self.assertIn('"role":"assistant"', turn_prompt)
         self.assertIn('"text":"你好呀！"', turn_prompt)
@@ -1681,9 +1898,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("verbatim contiguous span", prompt)
         self.assertIn("Never translate, transliterate, shorten, expand", prompt)
         self.assertIn("Preserve temporal scope as human semantic meaning", prompt)
-        self.assertIn("never derive provider-facing temporal dimensions", prompt)
+        self.assertIn("Never derive provider-facing temporal dimensions", prompt)
         self.assertIn("timezone conversions", prompt)
-        self.assertIn("do not make it unresolved WHAT", prompt)
+        self.assertIn("does not become unresolved WHAT", prompt)
         self.assertNotIn("day_part", prompt)
         self.assertNotIn("date=today", prompt)
 
@@ -1693,10 +1910,9 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 language="zh-CN",
             )
         )
-        self.assertIn("literal surface audit", turn_prompt)
-        self.assertIn('authoritative input is "今天晚上重庆热不热？"', turn_prompt)
-        self.assertIn("translated equivalent", turn_prompt)
-        self.assertIn("one canonical binding name location", turn_prompt)
+        self.assertIn("exact current-turn surfaces", turn_prompt)
+        self.assertIn('"今天晚上重庆热不热？"', turn_prompt)
+        self.assertIn("one contiguous substring", turn_prompt)
 
     def test_system_prompt_preserves_requested_judgment_without_asserting_the_answer(self) -> None:
         prompt = self._interpreter().load_system_prompt().casefold()
@@ -1705,26 +1921,26 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("must not become an assertion", prompt)
         self.assertIn("does not become unresolved merely because its answer is unknown", prompt)
         self.assertIn("unknown answer evidence is downstream evidence/readiness", prompt)
-        self.assertIn("do not create or resolve an informationgap", prompt)
+        self.assertIn("do not create, copy, or resolve an informationgap", prompt)
         self.assertIn("external or changing information", prompt)
         self.assertIn("declarative statement", prompt)
         self.assertIn("states a future plan is context", prompt)
         self.assertIn("do not invent a responsibility to confirm", prompt)
 
     def test_current_turn_prompt_distinguishes_missing_binding_from_requested_evidence(self) -> None:
-        prompt = self._interpreter().build_interpretation_user_prompt(
+        interpreter = self._interpreter()
+        system_prompt = interpreter.load_system_prompt()
+        prompt = interpreter.build_interpretation_user_prompt(
             GoalInterpretationRequest(
                 text="哎，今天上午重庆会不会下雨？",
                 language="zh-CN",
             )
         )
 
-        self.assertIn("Missing execution inputs belong to Fast Planner", prompt)
-        self.assertIn("External Evidence is fresh Evidence", prompt)
-        self.assertIn("External Evidence is fresh Evidence, not semantic uncertainty", prompt)
-        self.assertIn("Preserve body, media, and vocal effects", prompt)
-        self.assertIn("Do not decide whether downstream work, fresh Evidence", prompt)
-        self.assertIn("semantically independent new outcome", prompt)
+        self.assertIn("A missing execution input does not make", system_prompt)
+        self.assertIn("External or changing information", system_prompt)
+        self.assertIn("only genuine unresolved user meaning", prompt)
+        self.assertIn("HOW fields", prompt)
 
     def test_deep_payload_reasons_from_source_without_prior_dto(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -1809,6 +2025,76 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             if item.get("const") == "nonverbal_vocalization"
         )
         self.assertIn("excludes singing", nonverbal["description"])
+        media_playback = next(
+            item
+            for item in properties["output_mode"]["oneOf"]
+            if item.get("const") == "media_playback"
+        )
+        self.assertIn("existing recorded media", media_playback["description"])
+        self.assertIn("Never use this for Chromie to sing", media_playback["description"])
+
+    def test_coverage_schema_describes_vocal_performance_modes_per_enum_value(
+        self,
+    ) -> None:
+        interpreter = self._interpreter()
+        request = GoalInterpretationRequest(
+            text="run while singing",
+            language="en-US",
+        )
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.95,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "run forward",
+                        "bindings": {},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "sing while running",
+                        "bindings": {"parallel_with": ["r1"]},
+                        "output_mode": "singing",
+                        "confidence": 0.95,
+                    },
+                ],
+                "unresolved": [],
+            }
+        )
+
+        schema = interpreter.build_responsibility_coverage_payload(
+            request,
+            decision,
+        )["format"]
+        required_mode = schema["$defs"][
+            "GoalInterpretationResponsibilityCoverageItem"
+        ]["properties"]["required_output_mode"]
+        variants = {item["const"]: item for item in required_mode["oneOf"]}
+
+        self.assertNotIn("enum", required_mode)
+        self.assertEqual(set(variants), {
+            "speech",
+            "styled_speech",
+            "recitation",
+            "singing",
+            "humming",
+            "nonverbal_vocalization",
+            "body_action",
+            "media_playback",
+            "information",
+            "stateful_effect",
+        })
+        self.assertIn("never media playback", variants["singing"]["description"])
+        self.assertIn(
+            "existing recorded media",
+            variants["media_playback"]["description"],
+        )
+        self.assertIn(
+            "Never use this when Chromie is asked to sing",
+            variants["media_playback"]["description"],
+        )
 
     def test_decoder_schema_structurally_rejects_removed_readiness_fields(self) -> None:
         responsibility_schema = self._interpreter()._goal_interpretation_response_schema(
@@ -1829,7 +2115,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
     def test_output_mode_prompt_distinguishes_work_from_response_transport(self) -> None:
         prompt = self._interpreter().load_system_prompt()
         self.assertIn("not the eventual response transport", prompt)
-        self.assertIn("Use output_mode=speech for ordinary conversation", prompt)
+        self.assertIn("Use output_mode=speech when", prompt)
         self.assertIn("not fixed by that semantic context", prompt)
         self.assertIn("Do not decide whether downstream work", prompt)
         self.assertIn("Planner owns that judgment", prompt)
@@ -1839,9 +2125,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 language="en-US",
             )
         )
-        self.assertIn("Use output_mode=speech for ordinary conversation", user_prompt)
-        self.assertIn("not fixed by that semantic context", user_prompt)
-        self.assertIn("Planner owns that judgment", user_prompt)
+        self.assertIn("Planner alone authors the exact utterance", user_prompt)
+        self.assertIn("only genuine unresolved user meaning", user_prompt)
 
     def test_configured_goal_interpretation_output_budget_is_not_silently_capped(self) -> None:
         interpreter = OllamaGoalInterpreter(
@@ -1983,8 +2268,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             1,
         )
         _, user_prompt, _ = _payload_message_texts(payload)
-        self.assertIn("copy exactly one relationship protocol token", user_prompt)
-        self.assertIn("Never inflect, conjugate, translate", user_prompt)
+        self.assertIn("canonical relationship tokens", user_prompt)
+        self.assertIn("supplied target Goal IDs", user_prompt)
 
         repair = interpreter.build_interpretation_repair_payload(
             GoalInterpretationRequest(
@@ -2145,9 +2430,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         self.assertIn('"output_mode":"body_action"', prompt)
         self.assertNotIn("completion_requires_work", prompt)
-        self.assertIn(
-            "continues or resumes one supplied Goal must preserve", prompt
-        )
+        self.assertIn("exact source-grounded modality", prompt)
 
     def test_repair_prompt_does_not_replay_rejected_output(self) -> None:
         interpreter = self._interpreter()
@@ -2505,6 +2788,498 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
+    async def test_coverage_repair_preserves_explicit_atomic_count(self) -> None:
+        interpreter = self._interpreter()
+        request = GoalInterpretationRequest(text="Nod twice, then blink once.")
+        merged = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.95,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "Nod twice, then blink once.",
+                        "bindings": {"count": 2},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    }
+                ],
+                "unresolved": [],
+            }
+        )
+        invalid_singleton = {
+            "independent_outcome_count": 2,
+            "responsibility_items": [
+                {
+                    "source_start_token_ref": "t0",
+                    "source_end_token_ref": "t5",
+                    "audit_ref": "a1",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                }
+            ],
+            "supporting_items": [
+                {
+                    "source_start_token_ref": "t3",
+                    "source_end_token_ref": "t3",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "none",
+                    "relation_kind": "ordered",
+                    "related_audit_refs": ["a1"],
+                }
+            ],
+            "reason_summary": "Two independently satisfiable outcomes are present.",
+        }
+        repaired_atomic = {
+            "independent_outcome_count": 2,
+            "responsibility_items": [
+                {
+                    "source_start_token_ref": "t0",
+                    "source_end_token_ref": "t1",
+                    "audit_ref": "a1",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "source_start_token_ref": "t4",
+                    "source_end_token_ref": "t5",
+                    "audit_ref": "a2",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+            ],
+            "supporting_items": [
+                {
+                    "source_start_token_ref": "t3",
+                    "source_end_token_ref": "t3",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "none",
+                    "relation_kind": "ordered",
+                    "related_audit_refs": ["a1", "a2"],
+                }
+            ],
+            "reason_summary": "Two atomic outcomes are ordered.",
+        }
+        resegmented = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "a1",
+                    "outcome": "Nod twice",
+                    "bindings": {"count": 2},
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "a2",
+                    "outcome": "Blink once",
+                    "bindings": {"count": 1},
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid_singleton)}},
+                {"message": {"content": json.dumps(repaired_atomic)}},
+                {"message": {"content": json.dumps(resegmented)}},
+            ]
+        )
+
+        result = await interpreter._ensure_atomic_responsibility_coverage(
+            request,
+            merged,
+        )
+
+        self.assertEqual(
+            [item.local_ref for item in result.responsibilities], ["a1", "a2"]
+        )
+        self.assertEqual(result.responsibilities[1].bindings["after"], "a1")
+        repair_schema = interpreter._chat.await_args_list[1].args[0]["format"]
+        self.assertEqual(
+            repair_schema["properties"]["independent_outcome_count"]["const"],
+            2,
+        )
+        self.assertEqual(
+            repair_schema["properties"]["responsibility_items"]["minItems"],
+            2,
+        )
+        self.assertEqual(
+            repair_schema["properties"]["responsibility_items"]["maxItems"],
+            2,
+        )
+
+    async def test_smaller_audit_cannot_erase_validated_consequential_effect(self) -> None:
+        interpreter = self._interpreter()
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.95,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "walk ahead quickly for 15 seconds",
+                        "bindings": {"duration": 15, "speed": "quickly"},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "sing while walking",
+                        "bindings": {},
+                        "output_mode": "singing",
+                        "confidence": 0.95,
+                    },
+                    {
+                        "local_ref": "r3",
+                        "outcome": "blink eyes simultaneously",
+                        "bindings": {},
+                        "output_mode": "body_action",
+                        "confidence": 0.95,
+                    },
+                ],
+                "unresolved": [],
+            }
+        )
+        smaller_audit = {
+            "independent_outcome_count": 2,
+            "responsibility_items": [
+                {
+                    "source_excerpt": "walk ahead for 15 seconds quickly",
+                    "audit_ref": "a1",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "source_excerpt": "singing",
+                    "audit_ref": "a2",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r2"],
+                    "required_output_mode": "singing",
+                },
+            ],
+            "supporting_items": [
+                {
+                    "source_excerpt": "singing and blinking eyes simultaneously",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1", "r2"],
+                    "required_output_mode": "none",
+                    "relation_kind": "parallel",
+                    "related_audit_refs": ["a1", "a2"],
+                }
+            ],
+            "reason_summary": "The smaller audit omitted one effect candidate.",
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={"message": {"content": json.dumps(smaller_audit)}}
+        )
+
+        result = await interpreter._ensure_atomic_responsibility_coverage(
+            GoalInterpretationRequest(
+                text=(
+                    "walk ahead for 15 seconds quickly, singing and blinking eyes "
+                    "simultaneously"
+                )
+            ),
+            decision,
+        )
+
+        self.assertEqual(len(result.responsibilities), 3)
+        self.assertEqual(result.responsibilities[2].local_ref, "r3")
+        self.assertEqual(result.responsibilities[2].output_mode, "body_action")
+        self.assertEqual(result.responsibilities[0].bindings["parallel_with"], ["r2"])
+        self.assertEqual(result.responsibilities[1].bindings["parallel_with"], ["r1"])
+        self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_resegmentation_preserves_unowned_effect_sibling(self) -> None:
+        interpreter = self._interpreter()
+        decision = GoalInterpretationDecision.model_validate(
+            {
+                "confidence": 0.9,
+                "responsibilities": [
+                    {
+                        "local_ref": "r1",
+                        "outcome": "run forward for 15 seconds while blinking eyes",
+                        "bindings": {"duration": 15},
+                        "output_mode": "body_action",
+                        "confidence": 0.9,
+                    },
+                    {
+                        "local_ref": "r2",
+                        "outcome": "sing a song",
+                        "bindings": {},
+                        "output_mode": "singing",
+                        "confidence": 0.9,
+                    },
+                ],
+                "unresolved": [],
+            }
+        )
+        split_audit = {
+            "independent_outcome_count": 2,
+            "responsibility_items": [
+                {
+                    "source_excerpt": "run forward for 15 seconds",
+                    "audit_ref": "a1",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "source_excerpt": "blinking eyes",
+                    "audit_ref": "a2",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+            ],
+            "supporting_items": [
+                {
+                    "source_excerpt": "while blinking eyes",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "none",
+                    "relation_kind": "parallel",
+                    "related_audit_refs": ["a1", "a2"],
+                }
+            ],
+            "reason_summary": "The first candidate merged two body effects.",
+        }
+        resegmented = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "a1",
+                    "outcome": "run forward for 15 seconds",
+                    "bindings": {"duration": 15},
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "a2",
+                    "outcome": "blink eyes while running",
+                    "bindings": {},
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(split_audit)}},
+                {"message": {"content": json.dumps(resegmented)}},
+            ]
+        )
+
+        result = await interpreter._ensure_atomic_responsibility_coverage(
+            GoalInterpretationRequest(
+                text=(
+                    "run forward for 15 seconds while blinking eyes, then sing a song"
+                )
+            ),
+            decision,
+        )
+
+        self.assertEqual(
+            [item.output_mode for item in result.responsibilities],
+            ["body_action", "body_action", "singing"],
+        )
+        self.assertEqual(result.responsibilities[2].outcome, "sing a song")
+        self.assertEqual(result.responsibilities[0].bindings["parallel_with"], ["a2"])
+        self.assertEqual(result.responsibilities[1].bindings["parallel_with"], ["a1"])
+        self.assertEqual(interpreter._chat.await_count, 2)
+
+    async def test_hidden_concurrent_action_deepens_before_coverage(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.9,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "run forward for 15 seconds while blinking eyes",
+                    "bindings": {
+                        "duration": 15,
+                        "concurrent_action": "blink_eyes",
+                    },
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.9,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "sing a song",
+                    "bindings": {"capability": "sing"},
+                    "output_mode": "singing",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.9,
+                },
+            ],
+            "unresolved": [],
+        }
+        corrected = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "run forward for 15 seconds",
+                    "bindings": {"duration": 15},
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "blink eyes while running",
+                    "bindings": {},
+                    "output_mode": "body_action",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+                {
+                    "local_ref": "r3",
+                    "outcome": "sing a song",
+                    "bindings": {},
+                    "output_mode": "singing",
+                    "relationship": "new",
+                    "target_goal_ids": [],
+                    "confidence": 0.95,
+                },
+            ],
+            "unresolved": [],
+        }
+        coverage = {
+            "independent_outcome_count": 3,
+            "responsibility_items": [
+                {
+                    "source_excerpt": "往前跑个15秒",
+                    "audit_ref": "a1",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "source_excerpt": "眨眼睛",
+                    "audit_ref": "a2",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r2"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "source_excerpt": "唱个歌",
+                    "audit_ref": "a3",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r3"],
+                    "required_output_mode": "singing",
+                },
+            ],
+            "supporting_items": [],
+            "reason_summary": "Three observable effects are independently covered.",
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid)}},
+                {"message": {"content": json.dumps(corrected)}},
+                {"message": {"content": json.dumps(coverage)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(
+                text="你给我往前跑个15秒，边跑边眨眼睛，能唱歌，你给我唱个歌。",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual(len(result.responsibilities), 3)
+        deep_binding_schema = interpreter._chat.await_args_list[1].args[0][
+            "format"
+        ]["$defs"]["CognitiveResponsibilityProposal"]["properties"]["bindings"]
+        self.assertFalse(deep_binding_schema["additionalProperties"])
+        self.assertEqual(
+            set(deep_binding_schema["properties"]),
+            {"before", "after", "parallel_with", "location", "duration"},
+        )
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].args[0]["format"]["properties"]
+            ["responsibilities"]["minItems"],
+            3,
+        )
+        self.assertEqual(
+            [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
+            [
+                "goal_interpretation",
+                "goal_interpretation_deep",
+                "goal_interpretation_responsibility_coverage",
+            ],
+        )
+
+    def test_dynamic_schema_forbids_common_hidden_effect_binding_names(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="walk and blink")
+        )
+        property_name_contract = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]["propertyNames"]
+        forbidden = set(property_name_contract["allOf"][1]["not"]["enum"])
+        self.assertTrue(
+            {"concurrent_action", "capability", "agent_skill"}.issubset(forbidden)
+        )
+        binding_properties = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]["properties"]
+        for forbidden_name in ("action", "concurrent_action", "capability"):
+            self.assertEqual(
+                binding_properties[forbidden_name]["const"],
+                "__forbidden_hidden_effect_or_how_binding__",
+            )
+
     async def test_interpret_goal_accepts_valid_what_only_output(self) -> None:
         interpreter = self._interpreter()
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
@@ -2636,7 +3411,153 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         deep_payload = interpreter._chat.await_args_list[1].args[0]
         system_text, user_text, _all_text = _payload_message_texts(deep_payload)
         self.assertIn("Audit declarative context before counting outcomes", system_text)
-        self.assertIn("states a future plan is context", user_text)
+        self.assertIn("states a future plan is context", system_text)
+
+    async def test_numeric_source_recovery_can_add_missing_typed_dimension(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "move forward for 10 seconds",
+                    "bindings": {"location": "你往前走 10 秒。"},
+                    "output_mode": "body_action",
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        recovered = copy.deepcopy(invalid)
+        recovered["responsibilities"][0]["bindings"] = {
+            "location": "往前",
+            "duration": 10,
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(recovered, ensure_ascii=False)}},
+            ]
+        )
+        interpreter._ensure_atomic_responsibility_coverage = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=lambda _request, decision, **_kwargs: decision
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="你往前走 10 秒。", language="zh-CN")
+        )
+
+        self.assertEqual(
+            result.responsibilities[0].bindings,
+            {"location": "往前", "duration": 10},
+        )
+        deep_payload = interpreter._chat.await_args_list[1].args[0]
+        binding_contract = deep_payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["bindings"]
+        self.assertIn("duration", binding_contract["properties"])
+        self.assertNotEqual(binding_contract.get("additionalProperties"), False)
+
+    async def test_transport_echo_uses_atomic_audit_before_fresh_resegmentation(self) -> None:
+        interpreter = self._interpreter()
+        invalid = {
+            "confidence": 0.95,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "sing while walking",
+                    "bindings": {"location": "边走边唱歌。"},
+                    "output_mode": "singing",
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        certificate = {
+            "responsibility_items": [
+                {
+                    "audit_ref": "a1",
+                    "source_excerpt": "走",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "body_action",
+                },
+                {
+                    "audit_ref": "a2",
+                    "source_excerpt": "唱歌",
+                    "role": "responsibility",
+                    "coverage": "covered",
+                    "independently_satisfiable": True,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "singing",
+                },
+            ],
+            "supporting_items": [
+                {
+                    "source_excerpt": "边走边",
+                    "role": "constraint",
+                    "coverage": "covered",
+                    "independently_satisfiable": False,
+                    "responsibility_refs": ["r1"],
+                    "required_output_mode": "none",
+                    "relation_kind": "parallel",
+                    "related_audit_refs": ["a1", "a2"],
+                }
+            ],
+            "reason_summary": "Walking and singing are independent parallel effects.",
+        }
+        resegmented = {
+            "confidence": 0.98,
+            "responsibilities": [
+                {
+                    "local_ref": "a1",
+                    "outcome": "walk",
+                    "bindings": {},
+                    "output_mode": "body_action",
+                    "confidence": 0.98,
+                },
+                {
+                    "local_ref": "a2",
+                    "outcome": "sing a song",
+                    "bindings": {},
+                    "output_mode": "singing",
+                    "confidence": 0.98,
+                },
+            ],
+            "unresolved": [],
+        }
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(certificate, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(resegmented, ensure_ascii=False)}},
+            ]
+        )
+
+        result = await interpreter.interpret_goal(
+            GoalInterpretationRequest(text="边走边唱歌。", language="zh-CN")
+        )
+
+        self.assertEqual(
+            [item.output_mode for item in result.responsibilities],
+            ["body_action", "singing"],
+        )
+        self.assertEqual(
+            result.responsibilities[0].bindings["parallel_with"], ["a2"]
+        )
+        self.assertEqual(
+            result.responsibilities[1].bindings["parallel_with"], ["a1"]
+        )
+        self.assertEqual(
+            [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
+            [
+                "goal_interpretation",
+                "goal_interpretation_responsibility_coverage",
+                "goal_interpretation_deep",
+            ],
+        )
 
     def test_body_action_remains_a_what_modality_not_readiness(self) -> None:
         responsibility = CognitiveResponsibilityProposal.model_validate(
@@ -2847,7 +3768,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             "properties"
         ]["bindings"]
         self.assertEqual(
-            binding_contract["propertyNames"]["anyOf"][0],
+            binding_contract["propertyNames"]["allOf"][-1]["anyOf"][0],
             {"const": "location"},
         )
 
@@ -2893,8 +3814,9 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("location_scope", result.responsibilities[0].bindings)
         self.assertEqual(interpreter._chat.await_count, 2)
         deep_payload = interpreter._chat.await_args_list[1].args[0]
-        _system_text, user_text, _all_text = _payload_message_texts(deep_payload)
-        self.assertIn("canonical binding name location", user_text)
+        system_text, user_text, _all_text = _payload_message_texts(deep_payload)
+        self.assertIn("canonical binding name `location`", system_text)
+        self.assertIn("deictic locations remain exact current-turn surfaces", user_text)
 
     def test_location_direction_is_not_misclassified_as_location_alias(self) -> None:
         parsed = {
@@ -3422,6 +4344,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                         "language": "zh-CN",
                         "text": "边走边唱歌",
                     },
+                    "output_mode": "singing",
                     "confidence": 0.95,
                 }
             ],
@@ -3440,7 +4363,7 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                 {
                     "local_ref": "sing",
                     "outcome": "sing audibly while walking",
-                    "bindings": {"coordinate_with": "walk"},
+                    "bindings": {},
                     "output_mode": "singing",
                     "confidence": 0.95,
                 },
@@ -3450,36 +4373,49 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
             side_effect=[
                 {"message": {"content": json.dumps(invalid, ensure_ascii=False)}},
-                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
                 {
                     "message": {
                         "content": json.dumps(
                             {
                                 "responsibility_items": [
                                     {
+                                        "audit_ref": "walk",
                                         "source_excerpt": "边走",
                                         "role": "responsibility",
                                         "coverage": "covered",
                                         "independently_satisfiable": True,
-                                        "responsibility_refs": ["walk"],
+                                        "responsibility_refs": ["combined"],
                                         "required_output_mode": "body_action",
                                     },
                                     {
+                                        "audit_ref": "sing",
                                         "source_excerpt": "唱歌",
                                         "role": "responsibility",
                                         "coverage": "covered",
                                         "independently_satisfiable": True,
-                                        "responsibility_refs": ["sing"],
+                                        "responsibility_refs": ["combined"],
                                         "required_output_mode": "singing",
                                     },
                                 ],
-                                "supporting_items": [],
+                                "supporting_items": [
+                                    {
+                                        "source_excerpt": "边走边",
+                                        "role": "constraint",
+                                        "coverage": "covered",
+                                        "independently_satisfiable": False,
+                                        "responsibility_refs": ["combined"],
+                                        "required_output_mode": "none",
+                                        "relation_kind": "parallel",
+                                        "related_audit_refs": ["walk", "sing"],
+                                    }
+                                ],
                                 "reason_summary": "Walking and singing are separately observable.",
                             },
                             ensure_ascii=False,
                         )
                     }
                 },
+                {"message": {"content": json.dumps(corrected, ensure_ascii=False)}},
             ]
         )
 
@@ -3492,7 +4428,11 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ["walk", "sing"],
         )
         self.assertEqual(interpreter._chat.await_count, 3)
-        deep_call = interpreter._chat.await_args_list[1]
+        self.assertEqual(
+            interpreter._chat.await_args_list[1].kwargs["stage"],
+            "goal_interpretation_responsibility_coverage",
+        )
+        deep_call = interpreter._chat.await_args_list[2]
         self.assertEqual(deep_call.kwargs["stage"], "goal_interpretation_deep")
         self.assertIn("No prior interpretation DTO", deep_call.args[0]["messages"][1]["content"])
 

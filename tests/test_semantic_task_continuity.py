@@ -255,6 +255,7 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
         self.assertIn("task-coffee-001", prompt)
         self.assertIn("Prepare or obtain coffee", prompt)
         self.assertIn("Active Task/Activity progress with identity", prompt)
-        self.assertIn("Interpret contextual WHAT", prompt)
+        self.assertIn("Interpret this turn under the system WHAT-only contract", prompt)
+        self.assertIn("canonical relationship tokens", prompt)
         self.assertNotIn('"route"', prompt)
         self.assertNotIn('"intent"', prompt)

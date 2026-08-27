@@ -258,7 +258,42 @@ When evidence supports only a hypothesis, label it as an inference and retain th
 next test needed to confirm or reject it. Do not present correlation, a nearby
 error, or the last visible symptom as the root cause.
 
-### 7.2 Daily-life generated-voice repair loop
+### 7.2 Aggregate-first live iteration
+
+Use one immutable aggregate cohort as the baseline whenever the evaluated
+revision contains externally made or otherwise unqualified behavior changes,
+or when multiple live cases are due:
+
+```text
+clean deployed revision and runtime identity
+  -> complete manifest-owned live cohort
+  -> one post-cohort debug bundle
+  -> deterministic plus semantic judgment of every case
+  -> shared-boundary root-cause clusters
+  -> one source iteration
+  -> focused regression and ability class
+  -> complete cohort again
+```
+
+Invoke the whole authoritative manifest once. Do not edit source, prompts,
+profiles, tests, or documentation; rebuild or restart services; or replace the
+remaining cohort with `--only-case`/`--case` runs after an individual failure.
+Per-case isolation belongs inside the runner and does not authorize a different
+revision per case. When the run ends, invoke
+`scripts/collect_debug_bundle.sh` exactly once unless the cohort runner already
+owns that option. Inspect the aggregate summary, all case evidence, and that one
+bundle before selecting a fix. Judge mechanical passes as well as failures so a
+weak oracle cannot hide unnatural or ungrounded behavior.
+
+Cluster the results by the earliest shared wrong boundary. A focused rerun is
+appropriate only after aggregate diagnosis, to test one proposed fix on the
+originating case. The changed revision must then pass the affected ability
+class and the complete cohort before another broad iteration or a
+revision-level claim. The only early-stop exception is a hard safety,
+provenance, service-integrity, or safe-idle failure that makes continuation
+invalid; collect one bundle at the stop and report the cohort as incomplete.
+
+### 7.3 Daily-life generated-voice repair loop
 
 Use the maintained daily-life voice cohort when qualifying ordinary household,
 school, routine, shared-space, uncertainty, and continuity behavior:
