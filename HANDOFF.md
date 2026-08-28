@@ -9,11 +9,10 @@ checkpoint remain authoritative.
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Branch at start: `main`
-- Starting commit: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
-- Starting subject: `Add external architecture audit`
-- Scope: close GI/GA/Planner same-authority review chains, remove the premature DBOS
-  experiment, migrate general-ability acceptance to one scenario per file, and retain
-  one post-change must-pass cohort
+- Base commit: `7738651a2fe56daf850a7b088c12594e976796f9`
+- Base subject: `Close cognition authority chains and rebuild acceptance suite`
+- Scope: preserve semantic-authority closure, make `qwen3.5:4b` the RTX 4090 Laptop GI
+  default without changing another model role, and retain root-cause evidence
 - Expected resume revision: the latest commit containing this handoff
 
 Bootstrap on another machine:
@@ -80,6 +79,16 @@ must-pass case and reports all failures before the stage gate can block core/cha
 This layout is directly shardable and can later be imported into a database without
 changing scenario identity or maintaining a second registry.
 
+The current worktree fixes the first wrong post-Fast-response boundary. The Host
+previously queued optional Social Attention and dispatched GPU-backed first-speech TTS
+before starting Fast Advance or Goal Association. It now creates both critical tasks,
+yields them to their Agent-call boundaries, and then starts first speech; Goal
+Association and Fast Advance remain concurrent, and speech need not wait for GA to
+finish. Per-activity pre-resolution Social Attention calls are removed; the existing
+post-resolution bridge queues decoration only after canonical planning and mechanically
+retains committed Fast speech omitted from the terminal response. No model, semantic
+authority, runtime flag, architecture layer, or first-class term was added.
+
 ## Evidence ledger
 
 Current automated evidence:
@@ -128,6 +137,49 @@ rejects `capability_inventory_truthful` because it does not actually list a capa
 Independent multi-model semantic review, physical microphone/speaker evidence,
 simulator execution, and physical robot evidence remain absent.
 
+The current post-admission cohort is retained at
+`.chromie/acceptance/general-ability/20260828T153643Z-live-text`: 0/50 hard-pass on dirty
+RTX 4090 Laptop/Qwen3 4B C-preview identity
+`86a04a8da490c02918545d2dfe01674800b516e5cf0b80e838b34a06c9906546`.
+The mutually exclusive earliest clusters are 24 GI source-span overlap rejections, eight
+GI `ReadTimeout`s, one GI whole-turn binding rejection, six GA timeouts, three foreground
+deadlines, four other Runtime timeouts, two preview-only reflex cases, one canonical Fast
+timeout, and one speech-only semantic miss. Its exactly one post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260828_234314.tar.gz`. Raw GI output proves
+the dominant 4B failures duplicate effects, invent relation Responsibilities, cite
+overlapping spans, and mislabel body actions as speech. Trusted validation is the correct
+fail-closed boundary and must not be weakened or followed by semantic repair.
+
+The GI-only model comparison is retained at
+`.chromie/acceptance/general-ability/20260828T155554Z-live-text`: `qwen3.5:4b`
+hard-passed 2/50 cases. Of 48 GI-invoked cases, 18 reached an accepted interpretation,
+25 timed out, and five failed closed semantic/authority validation. Sixteen of the 18
+accepted results still contained spurious unresolved meaning. The exactly one comparison
+bundle is `/home/chromie/Downloads/chromie_debug_bundle_20260829_000338.tar.gz`.
+
+The current profile change keeps `qwen3.5:4b` in a bounded 16K/512 GI runner beside the
+unchanged 32K `qwen3:4b-instruct-2507-q4_K_M` downstream runner and allows both models to
+remain resident. A focused residency experiment proved that this removes the alternating
+post-downstream GI eviction pattern. A two-request Ollama experiment was rejected: it
+expanded the 32K Qwen3 runner to 65,536 tokens, exceeded the shared 16GB envelope, evicted
+GI, and still could not admit the maintained Fast prompt at a smaller context. No
+non-GI model identity changed. Prompt/schema attempts to suppress qwen3.5's false
+ambiguity did not change its output and were removed rather than retained as tuning.
+
+The complete post-change cohort is retained at
+`.chromie/acceptance/general-ability/gi-qwen35-default-fixed`, bound to runtime identity
+`78847784d3ff08df8b606fb921eb28010a0e87f34b146da41c4fabe1cc9341b8` and source-tree
+SHA-256 `faa4f665b33d63ad2c45347f36dff85afd47b7623d65297bdd1f200d0733043d`.
+It mechanically hard-passed 2/50, but both passes retained invented unresolved meaning;
+strict manual semantic judgment is therefore 0/50. Compared with the pre-default cohort,
+top-level retained GI results rose from 17 to 29 and explicit GI `ReadTimeout` cases fell
+from 25 to six. Twenty-six of 29 retained results still carried false unresolved meaning.
+The 48 mechanical failures cluster into 13 GI availability/outer-deadline cases, three GI
+numeric-binding authority rejections, 30 downstream failures (including multi-turn
+predecessor failures), and two preview-only reflex limitations. The exactly one
+post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260829_063447.tar.gz`.
+
 ## Resume commands
 
 Run local closure first:
@@ -138,13 +190,12 @@ python scripts/check_repository_policies.py
 python scripts/check_docs.py
 ```
 
-Do not rerun isolated live cases before aggregate diagnosis. First close the reproduced
-priority/resource-admission boundary inside existing owners: optional Social Attention
-and TTS preparation must not compete ahead of GA/Fast/Deep critical-path work on the
-single-parallel Ollama/GPU profile. Preserve GA and Fast Advance concurrency and avoid a
-new merge barrier or semantic manager. After the focused source fix and local gates,
-deploy one unchanged identity and rerun the complete 50-case must-pass stage once; do
-not start core/challenges after a hard must-pass failure.
+Do not rerun or append to `.chromie/acceptance/general-ability/gi-qwen35-default-fixed`;
+the complete 50-case must-pass stage and its one debug bundle are retained. Start from the
+two independently reproduced blockers: qwen3.5 emits false unresolved meaning that invokes
+Deep GI and consumes the outer deadline, while the unchanged single Ollama request slot
+serializes concurrent GA/Fast work. Do not repair either by weakening GI validation,
+Host resegmentation, another same-authority model call, or changing a non-GI model role.
 
 Typical deployment inspection commands remain:
 
@@ -156,15 +207,17 @@ ss -ltn '( sport = :8000 or sport = :5555 )'
 ```
 
 The exact live profile/manifest commands are owned by `docs/ACCEPTANCE.md` and
-`config/evidence_profiles.json`; do not copy a historical command if those authorities
-have changed.
+`benchmarks/manifests/e2e_evidence_profiles.json`; do not copy a historical command if
+those authorities have changed.
 
 ## Next evidence boundary
 
-GI, GA, and Planner single-authority source closure is implemented. The aggregate now
-identifies the next shared boundary as critical-path resource admission and foreground
-latency, not another semantic reviewer and not yet model selection. Do not restore or
-extend the removed GI, GA, or Planner same-authority review chains.
+GI, GA, and Planner single-authority closure remains implemented. The complete post-change
+cohort proves the GI default/residency change reduced transport loss, but qwen3.5 semantic
+qualification and the unchanged single-slot downstream latency boundary remain open. The
+next fix must address one of those reproduced boundaries without validator weakening, Host
+resegmentation, another semantic reviewer, a non-GI model substitution, or Social Attention
+as Goal completion.
 
 ## Claim boundary
 

@@ -291,11 +291,15 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
-        single_model = "qwen3:4b-instruct-2507-q4_K_M"
+        shared_model = "qwen3:4b-instruct-2507-q4_K_M"
+        goal_interpreter_model = "qwen3.5:4b"
+        self.assertEqual(
+            values["AGENT_GOAL_INTERPRETER_MODEL"],
+            goal_interpreter_model,
+        )
         for key in (
             "AGENT_MODEL",
             "OLLAMA_MODEL",
-            "AGENT_GOAL_INTERPRETER_MODEL",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
             "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_FAST_PLANNER_MODEL",
@@ -306,22 +310,22 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_SKILL_SELECTION_MODEL",
             "TTS_COSYVOICE_OLLAMA_MODEL",
         ):
-            self.assertEqual(values[key], single_model, key)
-        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "1")
+            self.assertEqual(values[key], shared_model, key)
+        self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
-        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
+        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", values)
         self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
         self.assertEqual(values["OLLAMA_KV_CACHE_TYPE"], "q8_0")
         self.assertEqual(
             manifest["active_ollama_models"],
-            [single_model],
+            [goal_interpreter_model, shared_model],
         )
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "16384")
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
             "OLLAMA_NUM_CTX",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
-            "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",

@@ -151,7 +151,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `1` and uses one 32K `qwen3:4b-instruct-2507-q4_K_M` runner for every cognitive role; Flash Attention and a q8 KV cache leave enough VRAM for overlapping CosyVoice synthesis. The maintained RTX 5090 profile sets `0` and uses its declared Qwen/Gemma role split. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0`, keeps `qwen3.5:4b` resident for Goal Interpretation beside the unchanged 32K `qwen3:4b-instruct-2507-q4_K_M` downstream runner, and retains one provider request slot because two 32K Qwen3 slots exceed the shared CosyVoice GPU envelope. The maintained RTX 5090 profile also sets `0` and uses its declared Qwen/Gemma role split. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -257,11 +257,11 @@ Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3:4b-instruct-2507-q4_K_M`, and RTX 5090 uses the already-resident `gemma4:12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
+| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `gemma4:12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for WHAT-only Fast interpretation, its optional mechanical DTO repair, or one allowed source-based Deep GI interpretation. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `4096`; bounded context budget for user meaning plus semantic continuity. Capability catalog entries and canonical lifecycle IDs are excluded. |
+| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained GI request still excludes Capability catalog entries and canonical lifecycle IDs. |
 | `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
 | `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
 | `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; warm the Goal Interpreter model during Agent startup. |

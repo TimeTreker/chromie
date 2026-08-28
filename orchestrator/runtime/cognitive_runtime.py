@@ -4374,10 +4374,65 @@ class GoalDrivenRuntimeCoordinator:
                 if turn_envelope is not None
                 else self._context_turn_id(context, sid)
             )
-            activities = self._resolution_social_activities(
-                resolution,
-                turn_id=resolved_turn_id,
-                context=context,
+            activities: list[SocialAttentionActivityAnchor] = []
+            resolution_metadata = (
+                resolution.metadata if isinstance(resolution.metadata, dict) else {}
+            )
+            committed_fast_activity_ids = {
+                str(item).strip()
+                for item in resolution_metadata.get("fast_vocal_activity_ids", [])
+                if str(item).strip()
+            }
+            retained_fast_activity_ids: set[str] = set()
+
+            def retain_committed_fast_activity(
+                activity: FastPlannerCommunicativeAct | None,
+            ) -> None:
+                if (
+                    activity is None
+                    or activity.activity_id not in committed_fast_activity_ids
+                    or activity.activity_id in retained_fast_activity_ids
+                ):
+                    return
+                activities.append(
+                    self._fast_planner_communicative_social_activity(activity)
+                )
+                retained_fast_activity_ids.add(activity.activity_id)
+
+            first_response_payload = resolution_metadata.get(
+                "fast_planner_first_response"
+            )
+            if isinstance(first_response_payload, dict):
+                try:
+                    first_response = FastPlannerFirstResponse.model_validate(
+                        first_response_payload
+                    )
+                except ValidationError:
+                    first_response = None
+                first_activity = (
+                    first_response.activity if first_response is not None else None
+                )
+                retain_committed_fast_activity(first_activity)
+            advance_payload = resolution_metadata.get("fast_planner_advance")
+            if isinstance(advance_payload, dict):
+                try:
+                    fast_advance = FastPlannerAdvance.model_validate(advance_payload)
+                except ValidationError:
+                    fast_advance = None
+                for activity in fast_advance.activities if fast_advance else []:
+                    if isinstance(activity, FastPlannerCapabilityActivity):
+                        continue
+                    retain_committed_fast_activity(activity)
+            # Complete Fast responses are deliberately omitted from the terminal
+            # InteractionResponse after speech is committed. Preserve every
+            # already-validated, committed Planner Activity as an optional
+            # presentation anchor once canonical resolution ends.
+            activities.extend(
+                self._resolution_social_activities(
+                    resolution,
+                    turn_id=resolved_turn_id,
+                    context=context,
+                )
             )
             social_context = dict(context)
             if resolution.goal_association is not None:
@@ -4516,7 +4571,6 @@ class GoalDrivenRuntimeCoordinator:
         ready_capability_execution: Any | None = progress.ready_capability_execution
         ready_capability_status = progress.ready_capability_status
         communicative_realization_status = "not_started"
-        social_attention_opportunity_delta = 0
         ready_communicative_executions: list[Any] = []
         vocal_activity_ids: list[str] = []
 
@@ -4575,18 +4629,6 @@ class GoalDrivenRuntimeCoordinator:
                 # answer+Capability wording remains with final Plan coordination.
                 if activity.role == "complete_response" and has_capability:
                     continue
-                self._queue_social_attention_for_activity(
-                    session,
-                    activity=self._fast_planner_communicative_social_activity(activity),
-                    text=text,
-                    sid=sid,
-                    turn_id=turn_id,
-                    language=work_request.language or "auto",
-                    context=context,
-                    history=history,
-                )
-                if self.adapter.social_attention_mode != "off":
-                    social_attention_opportunity_delta += 1
                 ready_execution = (
                     await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
                         activity,
@@ -4605,7 +4647,7 @@ class GoalDrivenRuntimeCoordinator:
             ready_capability_execution=ready_capability_execution,
             ready_capability_status=ready_capability_status,
             communicative_realization_status=communicative_realization_status,
-            social_attention_opportunity_delta=social_attention_opportunity_delta,
+            social_attention_opportunity_delta=0,
             ready_communicative_executions=tuple(ready_communicative_executions),
             vocal_activity_ids=tuple(vocal_activity_ids),
         )
@@ -4640,6 +4682,7 @@ class GoalDrivenRuntimeCoordinator:
         deep_planner_invocation_reasons: list[str] = []
         needs_deep_planner = False
         fast_advance_task: asyncio.Task[_FastAdvanceStageResult] | None = None
+        association_task: asyncio.Task[_GoalAssociationStageResult] | None = None
         fast_vocal_activity_ids: list[str] = []
         ready_fast_communicative_executions: list[Any] = []
         fast_communicative_realization_status = "not_started"
@@ -4729,9 +4772,12 @@ class GoalDrivenRuntimeCoordinator:
             }
 
         async def cancel_uncommitted_fast_work(reason: str) -> None:
-            """Stop only Fast work that never received a canonical Plan binding."""
+            """Stop unfinished turn fan-out and unbound provisional Fast work."""
 
             nonlocal ready_fast_capability_status
+            if association_task is not None and not association_task.done():
+                association_task.cancel()
+                await asyncio.gather(association_task, return_exceptions=True)
             if fast_advance_task is not None and not fast_advance_task.done():
                 fast_advance_task.cancel()
                 await asyncio.gather(fast_advance_task, return_exceptions=True)
@@ -4821,36 +4867,6 @@ class GoalDrivenRuntimeCoordinator:
                 if first_activity is not None:
                     committed_fast_activity_ids.add(first_activity.activity_id)
                     fast_communicative_realization_status = "planner_owned"
-                    if (
-                        self.policy.mode == "apply"
-                    ):
-                        self._queue_social_attention_for_activity(
-                            session,
-                            activity=self._fast_planner_communicative_social_activity(
-                                first_activity,
-                            ),
-                            text=text,
-                            sid=sid,
-                            turn_id=turn_id,
-                            language=language,
-                            context=context,
-                            history=history,
-                        )
-                        if self.adapter.social_attention_mode != "off":
-                            social_attention_opportunity_count += 1
-                        ready_execution = (
-                            await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
-                                first_activity,
-                                session_id=sid,
-                                turn_id=turn_id,
-                                language=language,
-                            )
-                        )
-                        if first_activity.role == "complete_response":
-                            ready_fast_communicative_executions.append(ready_execution)
-                        fast_vocal_activity_ids.append(
-                            first_activity.activity_id
-                        )
 
                 fast_advance_task = asyncio.create_task(
                     self._resolve_fast_activity_plan_stage(
@@ -4867,33 +4883,50 @@ class GoalDrivenRuntimeCoordinator:
                         progress=fast_advance_progress,
                     )
                 )
-                # Establish the GI fan-out before entering GA's serialized commit
-                # section. A fail-fast GA result must not prevent Fast Planner from
-                # receiving the same authoritative GI result.
+                association_task = asyncio.create_task(
+                    self._resolve_and_commit_goal_association(
+                        session,
+                        work_request=work_request,
+                        sid=sid,
+                        text=text,
+                        turn_id=turn_id,
+                        context=context,
+                        history=history,
+                        timings=timings,
+                    )
+                )
+                # Admit both critical consumers of the immutable GI result before
+                # starting GPU-backed presentation work. This preserves the
+                # concurrent GA/Fast fan-out while keeping optional Social Attention
+                # and TTS preparation from taking the single-parallel serving slot
+                # ahead of either semantic consumer.
                 await asyncio.sleep(0)
+                if first_activity is not None and self.policy.mode == "apply":
+                    ready_execution = (
+                        await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
+                            first_activity,
+                            session_id=sid,
+                            turn_id=turn_id,
+                            language=language,
+                        )
+                    )
+                    if first_activity.role == "complete_response":
+                        ready_fast_communicative_executions.append(ready_execution)
+                    fast_vocal_activity_ids.append(first_activity.activity_id)
 
-            self._queue_social_attention_for_activity(
-                session,
-                activity=self._scheduled_speech_social_activity(
-                    context, turn_id=turn_id
-                ),
-                text=text,
-                sid=sid,
-                turn_id=turn_id,
-                language=language,
-                context=context,
-                history=history,
-            )
-            association_stage = await self._resolve_and_commit_goal_association(
-                session,
-                work_request=work_request,
-                sid=sid,
-                text=text,
-                turn_id=turn_id,
-                context=context,
-                history=history,
-                timings=timings,
-            )
+            if association_task is None:
+                association_stage = await self._resolve_and_commit_goal_association(
+                    session,
+                    work_request=work_request,
+                    sid=sid,
+                    text=text,
+                    turn_id=turn_id,
+                    context=context,
+                    history=history,
+                    timings=timings,
+                )
+            else:
+                association_stage = await association_task
             association = association_stage.association
             context = association_stage.context
             history = association_stage.history

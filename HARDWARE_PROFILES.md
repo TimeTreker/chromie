@@ -97,16 +97,16 @@ that Goal Interpretation and the Cognitive Core received the same profile and fi
 
 The maintained RTX 5090 and RTX 4090 Laptop hardware profiles own model,
 context-window, output-budget, and residency topology; they do **not** own
-human-facing interaction deadlines. Both profiles keep a 32768-token cognitive
-runner topology, reserve each stage's complete declared output budget plus a
-2048-token safety margin before inference, and reject prompt or completion
-truncation as an LLM-budget failure. RTX 5090 retains the `qwen3:4b` fast model
-plus `gemma4:12b` quality model while CosyVoice is active. RTX 4090 Laptop uses
-`qwen3:8b` for Goal Interpretation and Deep Planning, `gemma4:e4b` for Goal
-Association and the general Agent, and `qwen3:4b` for latency-sensitive roles;
-only one 32K Ollama runner may remain resident at a time while CosyVoice shares
-the 16 GB GPU. The supervised launcher clears stale Ollama runners before the
-first TTS synthesis probe.
+human-facing interaction deadlines. Both profiles reserve each stage's complete
+declared output budget plus a 2048-token safety margin before inference and
+reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
+its declared Qwen/Gemma role split. RTX 4090 Laptop keeps `qwen3.5:4b` in a
+16K/512 Goal Interpretation runner beside the unchanged 32K
+`qwen3:4b-instruct-2507-q4_K_M` runner used by every other cognition role.
+Both runners may remain resident, but provider parallelism remains one because
+two 32K downstream slots exceed the 16GB shared CosyVoice envelope. The
+supervised launcher clears stale Ollama runners before the first TTS synthesis
+probe.
 
 Foreground latency is owned by `env/modes/*.env`. The maintained `speech`,
 `services`, and `voice_mujoco` modes use interactive stage budgets, a 15-second

@@ -1,7 +1,7 @@
 # Chromie Development Checkpoint
 
-Status: GI/GA/Planner primary-result source closure retained; interactive resource admission blocks must-pass
-Updated: 2026-08-28
+Status: qwen3.5:4b is the default GI; residency is fixed but semantic and downstream latency gaps remain
+Updated: 2026-08-29
 Starting baseline: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
 (`Add external architecture audit`)
 Resume branch: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
@@ -69,36 +69,23 @@ reviewer, or audit model call.
 
 ## Implemented in the current worktree
 
-- Added `ResponsibilitySourceEvidence` with inclusive source-token refs to the
-  shared Responsibility proposal and made the live GI schema require it.
-- Primary and Deep GI prompts now own completeness, atomic decomposition, modality,
-  material bindings, sibling relations, and source evidence in one result.
-- Trusted validation checks only source-ref membership/order/non-overlap and the
-  existing closed DTO/provenance/authority mechanics.
-- Removed the GI coverage-certificate DTOs, projection/resegmentation machinery,
-  coverage repair, and the `goal_interpretation_responsibility_coverage` stage.
-- Resolved valid GI now uses one model call. Mechanical primary shape failure has
-  one DTO repair; genuine unresolved meaning has one Deep delegation; semantic or
-  authority rejection fails closed.
-- Migrated retained GI/dialogue scenarios to primary evidence and logical call
-  budgets. Noncanonical `pace` fixtures now return canonical `speed` in the primary
-  DTO rather than relying on a semantic repair call.
-- Added a repository-policy guard against reintroducing the removed GI stage,
-  certificate, payload builder, or acceptance wrapper.
-- Removed the GA responsibility-coverage DTO/schema/prompt/validation lifecycle and
-  its coverage, fresh-interpretation, and final-audit model calls.
-- Limited GA to one valid primary invocation plus at most one mechanical DTO repair;
-  semantic/grounding/conservation validation runs after parsing and cannot enter repair.
-- Migrated GA regressions to primary-result conservation and exact one/two-call budgets.
-- Removed the Planner truth-qualification, retained-response review, and coordinated
-  Goal-coverage review calls together with their DTOs, schemas, prompts, audit module,
-  dedicated model client, runtime health field, environment key, and warm-model role.
-- Strengthened Fast first-response, Fast Advance, canonical Fast Plan, and Deep Plan
-  primary prompts so each result owns complete Goal/Evidence truth, exact wording,
-  step ownership, satisfaction, and unresolved decisions before trusted validation.
-- Migrated Fast/Deep Planner regressions to primary-result contracts and exact one-call
-  logical budgets, while preserving only existing bounded mechanical DTO repair and
-  distinct Fast-to-Deep escalation paths.
+- GI now requires per-Responsibility source evidence in its primary result. Trusted
+  code validates closed mechanics; the former coverage/resegmentation model chain is
+  removed, and only one DTO repair or one genuine Deep delegation remains eligible.
+- GA now owns continuity in one primary result plus at most one mechanical DTO repair.
+  Its coverage, fresh-interpretation, final-audit, and semantic-repair calls are gone.
+- Fast/Deep Planner primary results now own Goal/Evidence truth, exact wording, step
+  ownership, and satisfaction. Same-owner truth/coverage reviewers and their dedicated
+  model/runtime surfaces are removed; existing DTO repair and Fast-to-Deep escalation
+  retain their narrower contracts.
+- The Host now starts and yields both critical GI consumers—Fast Advance and Goal
+  Association—before dispatching the first Planner-authored speech to TTS. First speech
+  may still start before Goal Association finishes; there is no merge barrier.
+- Pre-resolution Social Attention calls are removed. The post-resolution presentation
+  bridge retains every committed Fast Communicative Activity, including complete speech
+  intentionally omitted from the terminal `InteractionResponse`.
+- A fail-first ordering regression covers critical fan-out before TTS and canonical Fast
+  completion before Social Attention. No model, semantic owner, flag, or term was added.
 
 ## Other owner-authorized closure in this checkpoint
 
@@ -124,6 +111,7 @@ reviewer, or audit model call.
 | Current focused GI matrix | 38 passed | Automated module/contract evidence |
 | Current retained GI + dialogue scenarios | 31/31 passed | Automated scripted module/dialogue evidence |
 | Current focused Planner matrix | 308 passed, 9 subtests passed | Automated primary-result/call-budget evidence |
+| Resource-admission regression | 147 cognitive/runtime/interaction/TTS/Social tests passed | Automated invocation-order evidence only |
 | Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
 | Canonical full local gate | 2,023 maintained tests plus 20 legacy Agent tests passed | Automated source/integration evidence |
 | Level A general abilities | 12/12 passed: robust intent 8/8; Planner/Goal semantic quality 4/4 | Deterministic Level A only |
@@ -131,31 +119,37 @@ reviewer, or audit model call.
 | Pre-fix live iteration 50, RTX 4090/Qwen3 4B | 32/36 contract-valid; four legacy coverage HTTP 503 failures; about 25/36 strict semantic passes | Diagnostic baseline only; different implementation |
 | Pre-Planner-fix 50-case must-pass aggregate | 1/50 machine passes; 29/29 first-response truth-review calls timed out; GA primary accepted 18/45 | Diagnostic comparison only |
 | Post-Planner-fix 50-case must-pass aggregate | 8/50 machine passes; zero retired review calls; GA primary accepted 43/44; 16 foreground-deadline, 7 Runtime-timeout, 4 GA-stage failures | Dirty source-tree-bound C-preview identity; not target qualification |
+| Post-admission-fix 50-case must-pass aggregate | 0/50 hard-pass; 24 GI overlap rejections, 8 GI transport timeouts, 1 GI whole-turn binding rejection, 6 GA timeouts, 7 Runtime/foreground timeouts | RTX 4090 Laptop/Qwen3 4B dirty C-preview diagnosis only |
+| Pre-default qwen3.5:4b comparison cohort | 2/50 hard-pass; 18/48 GI turns accepted, 25 timed out, 5 failed closed validation; 16/18 accepted results retained spurious unresolved meaning | GI-only model override with one resident Ollama model; diagnostic C-preview only |
+| Post-default qwen3.5:4b residency cohort | 2/50 mechanical hard-pass, 0/50 after manual semantic review; top-level retained GI results increased 17 -> 29 and explicit GI `ReadTimeout` cases fell 25 -> 6; 26/29 retained results carried false unresolved meaning | Dirty source-tree-bound C-preview identity; proves the residency fix but not semantic or end-to-end qualification |
 
-The post-change aggregate is retained under
-`.chromie/acceptance/general-ability/20260828T101824Z-live-text` with runtime identity
-SHA-256 `c8b3fc0991b72d38dade6c7b38020353199c04cc3126eaae735bd42c5e53c9cc`.
-Its one valid post-cohort bundle is
-`/home/chromie/Downloads/chromie_debug_bundle_20260828_183021.tar.gz`. It is
-headless C-preview evidence from a dirty source tree, not physical microphone/speaker,
-simulator execution, physical robot, or release evidence. All 42 machine hard failures
-remain failures; manual semantic inspection of the eight mechanical passes additionally
-finds `capability_inventory_truthful` incomplete because it promises an introduction
-without naming any capability. Independent multi-model semantic review remains pending.
+The earlier post-admission aggregate is retained under
+`.chromie/acceptance/general-ability/20260828T153643Z-live-text`, bound to runtime identity
+SHA-256 `86a04a8da490c02918545d2dfe01674800b516e5cf0b80e838b34a06c9906546`.
+Its one post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260828_234314.tar.gz`. All 50 cases are
+hard failures, so core/challenge correctly did not start. Dominant raw primary outputs
+duplicate atomic effects, cite overlapping spans, invent relation Responsibilities, and
+label embodied requests as speech despite the explicit prompt/schema. Validation is
+correctly fail-closed; this is not justification for resegmentation, a semantic repair
+call, or optional Social Attention satisfying a requested effect.
 
 ## Exact resume point
 
-1. Keep the removed GI/GA/Planner review chains absent. The next implementation boundary
-   is priority/resource admission inside existing owners: optional Social Attention and
-   TTS preparation must not consume the only runnable GPU slot ahead of GA/Fast/Deep
-   critical-path work. Do not add a new semantic owner or use a model swap to conceal
-   this scheduling defect.
-2. Reconstruct the failing critical path against the retained aggregate: GI commonly
-   consumed 2.5–5.4 seconds, concurrent GA/Fast Advance about 5–7 seconds, and required
-   canonical Fast planning another 6–8 seconds under the 15-second foreground deadline.
-   Preserve GA and Fast Advance as concurrent consumers; do not introduce a merge barrier.
-3. After a focused source fix and local gates, run one complete must-pass aggregate on
-   one unchanged identity. Only a hard-pass must-pass stage may permit core/challenge.
+1. Keep the removed review chains absent and keep atomicity, mode, non-overlap, and
+   source-provenance validation fail-closed.
+2. The RTX 4090 Laptop profile now uses `qwen3.5:4b` only for GI, with a bounded 16K/512
+   runner and two-model residency. Every other cognition model remains unchanged. This
+   removes the reproduced GI eviction boundary; it does not qualify qwen3.5 semantics.
+3. The complete post-change must-pass cohort is retained under
+   `.chromie/acceptance/general-ability/gi-qwen35-default-fixed`, bound to runtime identity
+   `78847784d3ff08df8b606fb921eb28010a0e87f34b146da41c4fabe1cc9341b8`.
+   Its exactly one post-cohort bundle is
+   `/home/chromie/Downloads/chromie_debug_bundle_20260829_063447.tar.gz`. Mechanical
+   scoring reported 2/50, but both passes carried invented unresolved meaning, so manual
+   semantic review is 0/50. The remaining gaps are qwen3.5 false ambiguity/Deep-GI
+   amplification and single-slot GA/Fast contention; do not weaken validation, resegment
+   in Host, or add a same-authority repair call.
 
 ## Claim boundary
 
