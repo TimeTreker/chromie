@@ -209,5 +209,23 @@
       "goal_association",
       "fast_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "The same ownership and sequencing contract holds for normal English phrasing.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Planner contract",
+          "Fast Planner communication",
+          "Trusted runtime adapter",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

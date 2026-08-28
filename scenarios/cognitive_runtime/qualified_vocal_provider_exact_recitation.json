@@ -202,5 +202,33 @@
       "fast_plan",
       "deep_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "Planner and Runtime retain an exact qualified Vocal provider contract.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "speech_identity_latency",
+        "title": "Speech Identity and Warm Response Latency",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "rationale": "Vocal realization preserves exact Planner/provider authority rather than backend narration.",
+        "root_cause_boundaries": [
+          "Mind profile",
+          "Planner communication",
+          "Playback delivery",
+          "Latency evidence"
+        ]
+      }
+    ]
   }
 }

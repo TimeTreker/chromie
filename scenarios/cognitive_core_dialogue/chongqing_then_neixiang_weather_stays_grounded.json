@@ -41,7 +41,11 @@
                   "confidence": 0.96,
                   "relationship": "new",
                   "target_goal_ids": [],
-                  "output_mode": "information"
+                  "output_mode": "information",
+                  "source_evidence": {
+                    "source_start_token_ref": "t0",
+                    "source_end_token_ref": "t20"
+                  }
                 }
               ],
               "unresolved": []
@@ -95,7 +99,11 @@
                   "confidence": 0.97,
                   "relationship": "new",
                   "target_goal_ids": [],
-                  "output_mode": "information"
+                  "output_mode": "information",
+                  "source_evidence": {
+                    "source_start_token_ref": "t0",
+                    "source_end_token_ref": "t15"
+                  }
                 }
               ],
               "unresolved": []
@@ -129,5 +137,21 @@
   ],
   "expect": {
     "llm_stages": []
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "A new explicit place replaces stale location context.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

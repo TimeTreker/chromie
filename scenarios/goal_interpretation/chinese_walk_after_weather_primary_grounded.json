@@ -29,65 +29,28 @@
               "bindings": {
                 "direction": "forward",
                 "duration_text": "十来秒",
-                "pace": "faster"
-              },
-              "confidence": 0.97,
-              "relationship": "new",
-              "target_goal_ids": [],
-              "output_mode": "body_action"
-            }
-          ],
-          "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_deep",
-        "decision": {
-          "confidence": 0.97,
-          "responsibilities": [
-            {
-              "local_ref": "r1",
-              "outcome": "快速向前移动十来秒",
-              "bindings": {
-                "direction": "forward",
-                "duration_text": "十来秒",
                 "speed": "速度点"
               },
               "confidence": 0.97,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t11"
+              }
             }
           ],
           "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_responsibility_coverage",
-        "decision": {
-          "responsibility_items": [
-            {
-              "source_excerpt": "往前跑个十来秒，速度点",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r1"],
-              "required_output_mode": "body_action"
-            }
-          ],
-          "supporting_items": [],
-          "reason_summary": "The movement and its modifiers have one owner."
         }
       }
     ]
   },
   "expect": {
     "confidence": 0.97,
-    "llm_calls": 3,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_deep",
-      "goal_interpretation_responsibility_coverage"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [
@@ -103,6 +66,34 @@
         "relationship": "new",
         "target_goal_ids": [],
         "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "The Chinese walking request remains grounded without inheriting stale weather meaning.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "Chinese walking meaning stays stable across contexts.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
       }
     ]
   }

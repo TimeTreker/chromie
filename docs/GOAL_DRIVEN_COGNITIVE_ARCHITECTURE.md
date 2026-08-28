@@ -300,9 +300,9 @@ knowledge that is not represented as an acquisition resource may remain directly
 Local/private/device/sensor state without a supplied trusted observation or Provider remains
 epistemically unknown; a generic web or weather source is not silently promoted into authority.
 
-Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
+Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, the primary first-response truth/progress contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
 
-The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast qualification/reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. Legacy model-assisted same-owner communication/coverage confirmation in `planner_audit.py` is not a distinct planning authority and must be folded into the primary Planner result or removed under Charter principles 30–31; deterministic audit helpers may remain. The former `planner_contract.py` compatibility surface is removed. Fast/Deep Resolvers retain model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
+The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep mechanical-repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. Fast/Deep Resolvers retain the primary model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
 
 ### Planner owns how Chromie says established meaning
 
@@ -329,11 +329,11 @@ request's exact canonical Goal IDs, updates Goal/task state, and reactivates
 Fast Planner first. Planner selects relevant facts and decides answer, follow-up
 Work, clarification, retry Plan, or silence. Fast may make the terminal decision
 or escalate genuinely complex HOW to Deep under the existing Planner contract; the
-terminal response from either tier receives the same bounded Planner-owned
-post-Evidence Epistemic Qualification. Escalation cannot bypass evidence scope,
-probability strength, or execution-status truth. The qualification only accepts or
-rejects immutable model-authored wording and cannot rewrite it. Planner may not widen
-the supplied Goal set or duplicate the completed execution.
+terminal response from either tier must preserve evidence scope, probability strength,
+execution-status truth, and exact Goal boundaries in that tier's primary result.
+Escalation cannot bypass those contracts. No second model qualifies, reviews, or repairs
+the primary wording. Planner may not widen the supplied Goal set or duplicate the
+completed execution.
 
 Result content, place names, provider fields, recency, or text similarity never
 infer Goal ownership. Missing or stale request/Goal provenance fails closed. A
@@ -1746,8 +1746,7 @@ Admitted Observation / User Turn + bounded Session Context
   -> Goal Interpretation (GI)
        Responsibility + Goal relation + bounded unresolved meaning
   -> Fast Planner -> author first Communicative Activity
-       -> one same-owner Epistemic Qualification -> accept or reject only
-       -> accepted Activity or silence
+       -> one primary truth/provenance result -> validated Activity or silence
   -> concurrent continuation from the same GI result
        |-> same Fast Planner -> remaining Activity Plan + input resolution
        |     |-> ready Capability and still-needed speaking Activities
@@ -1789,7 +1788,7 @@ necessary.
 
 ### 5.1 Model-facing Goal Association boundary
 
-The source implementation may separate representation and prompt mechanics without creating another authority. `agent/app/goal_association_contract.py` contains Pydantic model-facing DTO/typed representation; `agent/app/goal_association_schema.py` contains constrained-decoder schema construction; `agent/app/goal_association_validation.py` contains deterministic normalization, grounding/conflict, and coverage checks; `agent/app/goal_association_prompt.py` contains bounded prompt projections and system-prompt text. `GoalAssociationResolver` remains the single model-invocation/continuity transaction and canonical Goal writer. None of these extracted mechanical modules may acquire a model client, runtime state, Goal commit, tracing, or an independent repair/decision lifecycle.
+The source implementation may separate representation and prompt mechanics without creating another authority. `agent/app/goal_association_contract.py` contains Pydantic model-facing DTO/typed representation; `agent/app/goal_association_schema.py` contains constrained-decoder schema construction; `agent/app/goal_association_validation.py` contains deterministic normalization, grounding/conflict, and Responsibility-conservation checks; `agent/app/goal_association_prompt.py` contains bounded prompt projections and system-prompt text. `GoalAssociationResolver` remains the single model-invocation/continuity transaction and canonical Goal writer. None of these extracted mechanical modules may acquire a model client, runtime state, Goal commit, tracing, or an independent repair/decision lifecycle.
 
 Goal Association must not expose Chromie's persistence and lifecycle objects
 directly to the language model. Its model-facing output is intentionally small
@@ -1851,13 +1850,11 @@ rather than translated, transliterated, or provider-canonicalized inside WHAT.
 For locations, Goal Interpretation rejects a model-authored spelling that has
 neither a current-turn surface nor bounded semantic-context provenance; the one
 canonical semantic binding name is `location`, so renaming that dimension cannot
-bypass the same provenance contract. The one existing same-stage DTO repair may
-regenerate from the authoritative turn. When
+bypass the same provenance contract. When
 Goal Association declares a new directly named location binding without a
 supplied referent, its value must likewise remain a contiguous verbatim span of
 the authoritative current user turn in the user's language. An ungrounded value
-is rejected and may receive the same single schema-constrained model repair as
-other invalid Goal Association output. Indirect references instead retain the
+is rejected terminally and cannot enter the mechanical DTO repair. Indirect references instead retain the
 canonical value and referent ID selected from supplied bounded discourse state.
 Deterministic code checks provenance shape; it does not extract a place name,
 choose a referent, translate an entity, or decide the user's meaning.
@@ -2265,10 +2262,10 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 The Fast Planner is the low-latency first HOW owner once Goal Interpretation has
 produced contextual Responsibility evidence. It authors one Activity Plan while GA
 independently establishes canonical Goal identity. Its first-response phase includes
-one bounded same-owner Epistemic Qualification before speech commitment. That check
-may only accept or reject the immutable act against available truth/Evidence; it cannot
-rewrite, repair, retry, plan Work, or become another response owner. This remains one
-planner role with phased readiness, not a second planner or response-composition module.
+one primary invocation that owns the exact act, prospective/context-grounded truth,
+and Responsibility provenance before speech commitment. Typed code validates shape,
+closed references, and mechanical provenance without asking another model to confirm
+the same semantics. This remains one planner role with phased readiness.
 Fast Planner may use:
 
 - the complete current canonical Goal;
@@ -2389,9 +2386,9 @@ before planning; Deep Planner cannot reinterpret it. A Responsibility that is al
 completely and safely resolved by Fast does not enter Deep in parallel for reassurance.
 Deep Planner receives the original Goal truth, the Fast planning-escalation evidence,
 and the full planning boundary. When Deep becomes the terminal response author for a
-post-Evidence re-entry, its immutable response is subject to the same bounded
-Planner-owned truth qualification as a terminal Fast response; a rejection fails
-closed rather than falling through to Host wording.
+post-Evidence re-entry, its primary result owns the same evidence-scope, epistemic-
+strength, execution-status, and Goal-scope truth as a terminal Fast result; Host never
+adds or invokes a later wording authority.
 It may regenerate once only when its structured DTO is mechanically malformed;
 semantic grounding, coverage, confidence/satisfaction, capability, or safety
 rejection is terminal and fails closed. Model confidence alone neither grants a direct/Fast
@@ -2943,21 +2940,10 @@ accepted by the Runtime but become provider-runnable only when their trusted pre
 conditions are satisfied. The Runtime therefore separates **dispatch acceptance** from
 **provider start** and both from **terminal completion**.
 
-The Runtime is transport- and durability-backend independent. MCP, HTTP, gRPC, ROS 2
-Action, local Python, and future provider protocols sit behind provider adapters. Submission
-liveness is isolated behind the small `CapabilityRuntimeBackend` SPI; the maintained default is
-`InProcessAsyncioBackend`. Backend handles are opaque Runtime-internal references and are never
-projected into dispatch receipts, lifecycle events, provider contracts, Goal/Plan/request identity,
-or cognitive context. The DBOS qualification boundary now accepts only a serializable durable
-submission and only when the canonical Capability explicitly opts in while remaining idempotent,
-side-effect-free, and safe-read. Weather is the first such qualification target. The DBOS workflow
-ID remains backend-local and never becomes a Goal, Plan, request, or Capability identity. Source
-qualification deliberately does **not** enable DBOS as the production Runtime backend yet: process
-restart also requires Host startup to rehydrate Runtime request ownership and restart terminal-event
-consumers before recovered results may re-enter cognition. Temporal remains a useful durable-execution
-reference, not a required Chromie dependency. Durable retry never grants physical-effect authority: effectful or
-non-idempotent work must revalidate current Goal/Plan/provider state and trusted evidence
-before any redispatch.
+The Runtime is transport-independent. MCP, HTTP, gRPC, ROS 2 Action, local Python,
+and future provider protocols sit behind provider adapters. Provider-local transport and
+session identities remain adapter state and are never projected into dispatch receipts,
+lifecycle events, Goal/Plan/request identity, or cognitive context.
 
 Interaction lifetime and Capability lifetime are intentionally different. Every maintained
 foreground interaction path calls `submit_response(...)` and ends the foreground interaction
@@ -3169,13 +3155,12 @@ new follow-up, retry, alternative, cancellation, replacement, or clarification W
 the still-open Responsibility and trusted Evidence justify it. Any new effect still crosses
 ordinary Runtime validation, confirmation, authorization, and provider-safety boundaries.
 
-Before Runtime commits a post-Evidence answer, one bounded same-owner Epistemic
-Qualification accepts or rejects its immutable wording. It cannot rewrite or replace
-the answer. Rejection or qualification unavailability uses the existing single
-Deep-Planner escalation or fails closed; it does not introduce a final composer,
-reviewer chain, or semantic retry. A probability below 100% remains uncertain, and the
-typed qualification certificate must report epistemic-strength contradiction explicitly
-rather than folding it into a generic world-claim flag.
+The Fast or Deep primary Planner result owns post-Evidence wording and its complete
+Goal/Evidence interpretation in one invocation. A probability below 100% remains
+uncertain; execution tense must match trusted outcome state; and excluded sibling Goals
+must remain excluded. The constrained schema, per-Goal outcome/satisfaction fields, and
+deterministic evidence/provenance checks validate closed mechanics without introducing a
+final composer, reviewer call, or semantic retry.
 
 The host validates that:
 
@@ -3186,7 +3171,7 @@ The host validates that:
   cancelled, or `not_run` outcomes;
 - a stale or preempted interaction cannot emit final speech.
 
-If outcome-response validation or qualification fails, the Host retains the trusted
+If outcome-response validation fails, the Host retains the trusted
 outcome bundle and emits no unvalidated completion claim from that candidate.
 
 ### 15.3 Recoverable body failure
@@ -3497,7 +3482,7 @@ Exit criteria:
 - GI owns WHAT without route/intent/Capability/Activity leakage;
 - Planner owns HOW and exact Communicative Activities;
 - model-facing Goal Association values are schema constrained and receive at
-  most one mechanical DTO repair before the bounded coverage transaction;
+  most one mechanical DTO repair before deterministic conservation validation;
 - contract exhaustion fails closed;
 - automated authority and schema-boundary checks pass;
 - retained live-text and MuJoCo evidence is reviewed before target behavior is claimed.

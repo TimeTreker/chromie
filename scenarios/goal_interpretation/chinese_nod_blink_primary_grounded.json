@@ -34,7 +34,11 @@
               "confidence": 0.98,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t3"
+              }
             },
             {
               "local_ref": "r2",
@@ -46,45 +50,23 @@
               "confidence": 0.98,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t5",
+                "source_end_token_ref": "t9"
+              }
             }
           ],
           "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_responsibility_coverage",
-        "decision": {
-          "responsibility_items": [
-            {
-              "source_excerpt": "点点头",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r1"],
-              "required_output_mode": "body_action"
-            },
-            {
-              "source_excerpt": "眨两下眼睛",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r2"],
-              "required_output_mode": "body_action"
-            }
-          ],
-          "supporting_items": [],
-          "reason_summary": "The two ordered body effects have distinct owners."
         }
       }
     ]
   },
   "expect": {
     "confidence": 0.97,
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_responsibility_coverage"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [
@@ -111,6 +93,22 @@
         "relationship": "new",
         "target_goal_ids": [],
         "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "GI preserves ordered nod and blink Responsibilities.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
       }
     ]
   }

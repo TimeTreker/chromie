@@ -32,7 +32,11 @@
               "confidence": 0.72,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              }
             },
             {
               "local_ref": "r2",
@@ -43,7 +47,11 @@
               "confidence": 0.31,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "speech"
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t7",
+                "source_end_token_ref": "t9"
+              }
             },
             {
               "local_ref": "r3",
@@ -55,53 +63,23 @@
               "confidence": 0.7,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t12",
+                "source_end_token_ref": "t17"
+              }
             }
           ],
           "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_responsibility_coverage",
-        "decision": {
-          "responsibility_items": [
-            {
-              "source_excerpt": "walk forward for 20 seconds",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r1"],
-              "required_output_mode": "body_action"
-            },
-            {
-              "source_excerpt": "blink six times",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r3"],
-              "required_output_mode": "body_action"
-            },
-            {
-              "source_excerpt": "tell me a joke while walking",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r2"],
-              "required_output_mode": "speech"
-            }
-          ],
-          "supporting_items": [],
-          "reason_summary": "All three requested effects have distinct owners."
         }
       }
     ]
   },
   "expect": {
     "confidence": 0.31,
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_responsibility_coverage"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [

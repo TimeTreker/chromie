@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "chongqing_afternoon_heavy_rain_fresh_evidence",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "rationale": "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "truthfulness",
+      "evidence_grounding",
+      "naturalness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "truthfulness",
+      "evidence_grounding",
+      "naturalness"
+    ],
+    "primary_outcomes": [
+      "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "State a current fact, forecast, action, or completion without matching evidence.",
+      "Present a proposal or prediction as an observation."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "重庆下午会下大雨吗？",
+  "language": "zh-CN",
+  "expected_capabilities": [
+    "chromie.weather.lookup"
+  ],
+  "expected_args": [
+    "0:location=重庆",
+    "0:period=afternoon"
+  ],
+  "require_speech": true,
+  "min_new_goal_count": 1,
+  "min_goal_outcome_count": 1,
+  "description": "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "truthful_embodied_speech",
+        "title": "Truthful Embodied Speech",
+        "general_rule": "Chromie speech should reflect proposal, confirmation, execution, refusal, cancellation, and provider evidence without claiming uncommitted or impossible work.",
+        "rationale": "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier.",
+        "root_cause_boundaries": [
+          "Agent contract",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

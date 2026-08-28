@@ -29,7 +29,11 @@
               "relationship": "new",
               "target_goal_ids": [],
               "confidence": 0.78,
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t7"
+              }
             }
           ],
           "unresolved": [
@@ -52,40 +56,26 @@
               "relationship": "new",
               "target_goal_ids": [],
               "confidence": 0.78,
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t7"
+              }
             }
           ],
           "unresolved": [
             "The intended destination is not identified."
           ]
         }
-      },
-      {
-        "stage": "goal_interpretation_responsibility_coverage",
-        "decision": {
-          "responsibility_items": [
-            {
-              "source_excerpt": "move over there a little",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r1"],
-              "required_output_mode": "body_action"
-            }
-          ],
-          "supporting_items": [],
-          "reason_summary": "One unresolved movement outcome is preserved."
-        }
       }
     ]
   },
   "expect": {
     "confidence": 0.78,
-    "llm_calls": 3,
+    "llm_calls": 2,
     "llm_stages": [
       "goal_interpretation",
-      "goal_interpretation_deep",
-      "goal_interpretation_responsibility_coverage"
+      "goal_interpretation_deep"
     ],
     "unresolved": [
       "The intended destination is not identified."
@@ -102,6 +92,35 @@
         "target_goal_ids": [],
         "confidence": 0.78,
         "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "GI retains the unidentified destination only as unresolved meaning; it does not create a planning gap or choose to ask.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "planner_goal_semantic_quality",
+        "title": "Planner and Goal Semantic Quality",
+        "general_rule": "Goal Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+        "rationale": "Real semantic ambiguity remains explicit and is not guessed into an executable destination.",
+        "root_cause_boundaries": [
+          "Goal Interpretation",
+          "Goal Association",
+          "Planner",
+          "Capability catalog",
+          "Evidence boundary"
+        ]
       }
     ]
   }

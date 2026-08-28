@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "compound_walk_nod_turn",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "rationale": "Canonical live compound body request should preserve all ordered skills.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "primary_outcomes": [
+      "Canonical live compound body request should preserve all ordered skills."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Omit, merge, or reorder an independent requested outcome.",
+      "Carry stale context into an unrelated task."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
+  "expected_capabilities": [
+    "soridormi.walk_velocity",
+    "soridormi.nod_yes",
+    "soridormi.turn_in_place"
+  ],
+  "expected_args": [
+    "0:vx_mps=0.2",
+    "0:duration_s=10.0",
+    "1:count=2",
+    "2:yaw_radps=0.12"
+  ],
+  "expected_observations": [
+    {
+      "type": "locomotion.velocity",
+      "args": {
+        "vx_mps": 0.2,
+        "duration_s": 10.0
+      }
+    },
+    {
+      "type": "social_attention.nod",
+      "args": {
+        "count": 2
+      }
+    },
+    {
+      "type": "locomotion.turn",
+      "arg_ranges": {
+        "yaw_radps": {
+          "min": 1e-06
+        }
+      }
+    }
+  ],
+  "expected_observation_sequence": [
+    "locomotion.velocity",
+    "social_attention.nod",
+    "locomotion.turn"
+  ],
+  "description": "Canonical live compound body request should preserve all ordered skills.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "Canonical live compound body request should preserve all ordered skills.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

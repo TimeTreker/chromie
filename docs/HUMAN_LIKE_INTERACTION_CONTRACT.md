@@ -75,7 +75,7 @@ state coordination, capability grounding, confirmation, execution evidence, or
 test coverage.
 
 For a newly changed revision or a set of due live cases, establish that state
-from one immutable manifest-owned cohort before editing source: run every case,
+from one immutable directory-discovered cohort before editing source: run every case,
 collect one post-cohort debug bundle, judge mechanical passes as well as
 failures, and cluster shared earliest boundaries. Do not alternate isolated
 case runs and source edits before this aggregate baseline. After diagnosis, use
@@ -214,22 +214,17 @@ content. A `prior_assistant_utterance` binding is available only when the same b
 request supplies a real accepted assistant utterance, and its value must equal the
 exact projected text. New item and repetition quantities cross GI under the single
 canonical positive-integer binding `count`.
-Before an effectful or multi-Responsibility GI result is accepted, an independent
-source-based coverage certificate must account for the authoritative turn and prove
-one candidate owner per independently satisfiable outcome. Trusted code validates
-the certificate's source-token references, mechanically materializes their exact
-contiguous source spans, and validates candidate references, cardinality, and
-output-mode agreement; the independent audit does not receive the candidate
-`output_mode` it is checking and cannot retype or silently correct user spelling.
-For an ordered or parallel supporting constraint the certificate also lists the
-participating candidate refs. Trusted code verifies that the candidate actually
-encodes material order as `before`/`after` sibling-Responsibility references or
-requested concurrency as `parallel_with` sibling references. These
-typed semantic relations let Planner author timing and let the Host reject a
-contradiction without interpreting the user's words. Trusted code never uses
-conjunction/action phrase rules to invent missing WHAT. One
-failed certificate may cause one fresh source resegmentation and final certificate;
-there is no recursive semantic repair.
+The primary GI result owns its complete Responsibility inventory and cites the
+authoritative admitted turn directly. Each Responsibility carries the inclusive
+source-token span grounding its complete positive predicate, its provider-neutral
+`output_mode`, material bindings, Goal relationship, and typed sibling relations.
+Trusted code checks only closed references, source membership and ordering,
+non-overlap, explicit-value provenance, and DTO shape. It does not use
+conjunction/action phrase rules, a second model auditor, or source resegmentation to
+reinterpret WHAT. A mechanically malformed primary DTO may receive one same-stage
+shape regeneration. A semantic/authority contradiction fails closed; only genuine
+unresolved outcome, scope, Goal-relationship, or referent meaning may delegate once
+to source-based Deep GI under the same WHAT-only contract.
 
 Fast Planner is the first stage that compares understood Responsibility with concrete
 Plan, Agent-Skill, Capability, safety, and provider contracts. It therefore owns
@@ -647,8 +642,8 @@ and trusted code preserves the exact technical cause for debugging.
 The Cognitive Gateway admits a turn but does not author semantic speech. Fast Planner
 owns the first possible **Goal Progress Communication** milestone. It first uses a
 bounded, small-output phase to author the exact immediately realizable Communicative
-Activity. As soon as the bounded accept/reject qualification finishes, the same Planner continues Capability,
-input-completeness, and clarification planning while GA begins concurrently from the
+Activity. As soon as that primary result is validated, the same Planner continues Capability,
+input-completeness, and clarification planning while GA proceeds concurrently from the
 same immutable GI result. This is one Fast Planner with phased readiness, not a
 second response-authoring stage or a Host acknowledgement template. Once a nontrivial
 Goal is sufficiently understood and still requires downstream work before a substantive
@@ -663,14 +658,13 @@ prospective wording. A pre-evidence progress Activity carries
 `truth_stage=pre_evidence`, no Evidence references, and wording that can acknowledge
 or prospectively describe the check but cannot state its result. Goal Interpretation
 has no response-authoring contract.
-Before Runtime commits that immutable Activity, Fast Planner performs one bounded
-same-owner Epistemic Qualification over its wording, truth stage, Responsibility facts,
-and admitted Evidence. The check returns accept or reject only. It cannot rewrite,
-repair, retry, choose another act, select Work, or change Goal meaning. Rejection,
-timeout, malformed output, or model unavailability produces no first speech and lets
-the remaining Fast/GA work continue. Fast Advance cannot then salvage or author another
-progress Activity as a replacement for that completed first-response decision. No independent production LLM reviews, repairs,
-or re-decides ordinary progress wording, and no reviewer chain is permitted.
+The first-response primary prompt and schema carry the complete wording, truth-stage,
+Responsibility provenance, and admitted-context contract in one model invocation.
+Trusted code validates only the typed shape, closed references, truth stage, and
+mechanical provenance; it does not call a second model to confirm or reinterpret the
+same sentence. Malformed or unavailable primary output produces no first speech and
+lets remaining Fast/GA work continue. Fast Advance cannot then salvage or author a
+replacement progress Activity for that completed first-response decision.
 Interaction Context remains the authority for whether any speech was actually heard or
 is still pending. A Planner `CommunicativeAct.activity_id` is the semantic speech
 identity for that turn. Requeueing the same Activity under a new playback generation
@@ -826,22 +820,19 @@ and reactivates Fast Planner with bounded Goal, Evidence, and Interaction Contex
 Planner speaks only the new grounded result/failure delta rather than replaying the
 pre-action acknowledgement. Host code validates capability safety, arguments,
 truth state, concurrency, evidence binding, and any required effect/delivery
-barrier. Before Runtime commits a post-Evidence answer, the same Fast Planner performs
-one bounded accept/reject Epistemic Qualification over the immutable wording and exact
-Goal/Evidence snapshot. The qualifier cannot rewrite or replace the answer. Rejection
-or qualifier failure uses the existing single Deep-Planner escalation or fails closed;
-there is no later wording owner or semantic repair chain. The six required audit flags
-are the model-owned semantic judgment; the required decision is their redundant closed
-aggregate and trusted code may only project that aggregate after all six exact boolean
-flags are present. When the resulting advisory Plan explicitly sets
+barrier. The Fast or Deep Planner primary result must itself preserve the exact
+Goal/Evidence scope, probability strength, execution status, perspective, and sibling-
+Goal boundaries in its response wording. Its primary prompt, per-Goal outcomes,
+satisfaction fields, constrained schema, and deterministic provenance validation form
+that single-authority boundary; no post-response LLM qualifier, reviewer, or semantic
+repair is invoked. When the resulting advisory Plan explicitly sets
 `execution_allowed=false` and authorizes neither Work nor Communicative Activity, the
 Host consumes it as a silent handled result rather than inventing speech, throwing a
 presentation error, or reopening the same Evidence for another semantic attempt. In
-particular, a forecast
-probability below 100% must remain a probability/possibility rather than becoming a
-claim of certainty. The certificate records epistemic-strength contradiction separately
-from world-grounding, execution-status, perspective, and Goal-scope contradictions so a
-generic false flag cannot conceal a probability-to-certainty upgrade.
+particular, a forecast probability below 100% must remain a probability/possibility
+rather than becoming a claim of certainty. Violations are primary Planner quality
+failures to retain in scenario evidence and fix at the primary prompt/schema/model
+boundary, never a reason to recreate a same-owner audit chain.
 
 Natural:
 
@@ -1103,11 +1094,12 @@ claim robot behavior is fixed. Examples of weak evidence:
 - verifying `skills=0` but not forbidding speech that claims execution;
 - using English-only examples for a bug reported in Chinese ASR text.
 
-Use
-[`general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json)
+Use the self-describing files under
+[`scenarios/general_ability/`](../scenarios/general_ability/)
 and `python scripts/general_ability_acceptance.py` when a fix is meant to
-protect a broad ability class. A single new fixture should either join an
-existing ability class or justify a new class in the manifest.
+protect a broad ability class. A single new fixture should either declare an
+existing ability membership or justify a new class in its own metadata and the
+governing interaction documentation.
 
 ## Mandatory smoke cases
 

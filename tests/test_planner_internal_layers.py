@@ -5,7 +5,6 @@ import importlib.util
 from agent.app import (
     deep_planner,
     fast_planner,
-    planner_audit,
     planner_context,
     planner_fallback,
     planner_fast_validation,
@@ -131,23 +130,6 @@ def test_fast_repair_schema_preserves_initial_escalation_semantics() -> None:
     }.issubset(goal_schema["required"])
 
 
-def test_planner_audit_is_planner_owned_bounded_audit_not_runtime_authority() -> None:
-    namespace = vars(planner_audit)
-    for forbidden in (
-        "runtime_tracer",
-        "CapabilityRuntime",
-        "ConversationState",
-        "GoalAssociationResolution",
-    ):
-        assert forbidden not in namespace
-    assert planner_audit.review_coordinated_action_plan_coverage.__module__ == (
-        "agent.app.planner_audit"
-    )
-    assert planner_audit.qualify_evidence_response_truth.__module__ == (
-        "agent.app.planner_audit"
-    )
-
-
 def test_planner_fallback_is_mechanical_materialization_only() -> None:
     namespace = vars(planner_fallback)
     for forbidden in (
@@ -227,8 +209,6 @@ def test_resolvers_contain_only_planner_lifecycle_methods() -> None:
     assert fast_methods == {
         "__init__",
         "resolve_first_response",
-        "_qualify_first_response_truth",
-        "_qualify_evidence_response_truth",
         "resolve_advance",
         "resolve",
         "_resolve",

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "shanghai_tomorrow_temperature",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "A common next-day temperature question must bind Shanghai and tomorrow to weather lookup and wait for fresh evidence before answering.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["intent_understanding", "tool_grounding", "truthfulness"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "tool_grounding", "truthfulness"],
+    "primary_outcomes": ["Look up Shanghai weather for tomorrow and answer the user's temperature concern only from returned Evidence."],
+    "acceptable_auxiliary": ["Chromie may acknowledge the lookup before the result without predicting whether it will be cold."],
+    "forbidden_semantic_outcomes": [
+      "Use today's date, another city, or a generic climate guess.",
+      "Claim a temperature or cold/warm judgment before trusted weather Evidence returns.",
+      "Ask the user to provide the weather result."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "明天上海冷不冷？",
+  "language": "zh-CN",
+  "expected_capabilities": ["chromie.weather.lookup"],
+  "expected_args": ["0:location=上海", "0:date=tomorrow"],
+  "require_speech": true,
+  "require_fast_communicative_act": true,
+  "expected_fast_communicative_speech_acts": ["acknowledge_and_check"],
+  "require_fast_planner_evidence_reentry": true,
+  "description": "A next-day weather request exercises place, time scope, progress speech, and evidence-bound completion.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "A common next-day temperature question must bind Shanghai and tomorrow to weather lookup and wait for fresh evidence before answering.",
+        "root_cause_boundaries": ["Cognitive Core/goal interpretation", "Agent contract", "Prompt wording", "Test evidence"]
+      }
+    ]
+  }
+}

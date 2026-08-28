@@ -28,65 +28,28 @@
               "bindings": {
                 "direction": "forward",
                 "duration_s": 15,
-                "pace": "quickly"
-              },
-              "confidence": 0.97,
-              "relationship": "new",
-              "target_goal_ids": [],
-              "output_mode": "body_action"
-            }
-          ],
-          "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_deep",
-        "decision": {
-          "confidence": 0.97,
-          "responsibilities": [
-            {
-              "local_ref": "r1",
-              "outcome": "walk forward quickly for 15 seconds",
-              "bindings": {
-                "direction": "forward",
-                "duration_s": 15,
                 "speed": "quickly"
               },
               "confidence": 0.97,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              }
             }
           ],
           "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_responsibility_coverage",
-        "decision": {
-          "responsibility_items": [
-            {
-              "source_excerpt": "walk forward for 15 seconds quickly",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r1"],
-              "required_output_mode": "body_action"
-            }
-          ],
-          "supporting_items": [],
-          "reason_summary": "The requested motion and modifiers have one owner."
         }
       }
     ]
   },
   "expect": {
     "confidence": 0.97,
-    "llm_calls": 3,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_deep",
-      "goal_interpretation_responsibility_coverage"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [
@@ -102,6 +65,22 @@
         "relationship": "new",
         "target_goal_ids": [],
         "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "Walking meaning is provider-neutral and unaffected by stale tool context.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
       }
     ]
   }

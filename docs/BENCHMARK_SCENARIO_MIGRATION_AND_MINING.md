@@ -12,7 +12,7 @@ work does not change production cognition or Social Attention behavior.
 
 `benchmarks/manifests/scenario_migration_v1.json` is the authoritative source
 classification. Existing deterministic files remain referenced in place so Git
-history, stable scenario IDs, general-ability manifests, and retained evidence
+history, stable scenario IDs, general-ability metadata, and retained evidence
 remain comparable.
 
 `benchmarks/manifests/suites.json` is only a compatibility redirect. It no

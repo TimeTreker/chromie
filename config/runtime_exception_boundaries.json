@@ -117,63 +117,11 @@
     {
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Fail closed when a whole-turn transport echo cannot be safely removed from the non-authoritative atomic-audit copy or certificate-bound fresh resegmentation cannot restore the complete source meaning; never accept the sanitized audit candidate directly.",
+      "contract": "Fail closed after one mechanically invalid primary Goal Interpretation DTO repair; never accept malformed output or add another semantic reviewer.",
       "review_status": "reviewed",
       "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
       "symbol": "OllamaGoalInterpreter.interpret_goal",
       "ordinal": 2,
-      "body_sha256": "4d26032fd2e3ca9840c728b7df046facff7929188258ef28ff8486596f7018e4",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Fail closed when the independent atomic audit cannot safely recover a candidate whose provisional coordination binding contained free-form effect wording; never accept or execute the malformed relation.",
-      "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 3,
-      "body_sha256": "5aa3bf30ed74742029bbe1b51379b249ae8b341464a11f9766a64dc398e3e05f",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Fail closed when one source-based Deep Goal Interpretation cannot restore atomic compound-responsibility structure; never accept the lossy preliminary meaning.",
-      "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 4,
-      "body_sha256": "9b8b03863002c11b7604dcd38e5c1109a5c7de8cb0cb59fe85c6fe89d0be5a82",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Fail closed when one fresh source-based Deep Goal Interpretation cannot restore semantic provenance or authority; never repair rejected meaning in place.",
-      "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 5,
-      "body_sha256": "064662502353418459fe11753a482e6dd6af5e9bb05f6325e7a8e95ec704e684",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Fail closed after one mechanically invalid Goal Interpretation DTO repair; never accept malformed output.",
-      "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 6,
       "body_sha256": "26fdefcac95c3cebfc18d38a28f735638bf203cbdfa90483ac8dbf29dfe15f77",
       "failure_signals": [
         "raise"
@@ -225,34 +173,6 @@
     },
     {
       "path": "agent/app/deep_planner.py",
-      "symbol": "DeepPlannerResolver._resolve",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Fail closed when the bounded post-Evidence truth model or certificate is unavailable; never emit or execute unqualified Deep Planner wording.",
-      "review_status": "reviewed",
-      "body_sha256": "082e8285456ab9fe3df40defd887ee869c6e8d4cff9930b018934664b0b4cfd3",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/deep_planner.py",
-      "symbol": "DeepPlannerResolver._resolve",
-      "ordinal": 3,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "e50a0174e0bb51697e19b27408e499c4c218b0e318f646e2e2f72de0dd4469ec",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/deep_planner.py",
       "symbol": "DeepPlannerResolver.resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -278,34 +198,6 @@
         "diagnostic",
         "return",
         "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver._resolve",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "agent.fast_planner",
-      "contract": "Reject unqualified post-Evidence wording and return one observable semantic escalation without emitting or repairing the candidate answer.",
-      "review_status": "reviewed",
-      "body_sha256": "8703e4c715d505dad5ac740f6d350a30b2f66f83a77264387099295c7dfb4128",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver._resolve",
-      "ordinal": 3,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "5741c3548d7b86425682d26f0636ac4a062bb642547c2e5e3565249ea4ffb747",
-      "failure_signals": [
-        "diagnostic",
-        "return"
       ]
     },
     {
@@ -359,7 +251,7 @@
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "94b142bdcd9fc051f11405affdbe3e51de9aa70ad9c5221318fa092e7048f851",
+      "body_sha256": "9a6b5d99c7c1dfd39b7e441726120a97ea0cf466606685918c887cf748fb3904",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -1136,7 +1028,7 @@
       "owner": "orchestrator",
       "contract": "Roll back canonical scheduling/execution ownership if Runtime dispatch task creation or registration fails before a receipt is returned.",
       "review_status": "reviewed",
-      "body_sha256": "2f8a096366c2307189542eb59c4f9410c1245ae546fb7f7629d854464ed675bc",
+      "body_sha256": "332d6012b9dd1f3e32cbee1a200d4514a809d9b2e508bd47eb711db23bd212a1",
       "failure_signals": [
         "bare_reraise"
       ]

@@ -13,7 +13,6 @@ try:
     from chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
         FastPlannerFirstResponseModelOutput,
-        FastPlannerFirstResponseTruthCertificate,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -24,7 +23,6 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
         FastPlannerFirstResponseModelOutput,
-        FastPlannerFirstResponseTruthCertificate,
     )
 
 from .prompt_projection import bounded_json
@@ -37,8 +35,6 @@ from .planner_grounding import (
 )
 from .planner_validation import requires_sequential_safety_revision
 from .planner_model_contract import (
-    PlannerCommunicationReview,
-    PlannerCoverageReview,
     PlannerModelOutput,
     PlannerTier,
     ResourceResponsibilityCapabilityGroundingError,
@@ -328,92 +324,6 @@ def resource_grounding_repair_response_schema(
     )
     if isinstance(parameter_resolutions, dict) and len(goals) == 1:
         parameter_resolutions["maxItems"] = 0
-    return schema
-
-def planner_communication_review_response_schema(
-    response_goal_ids: list[str],
-) -> dict[str, Any]:
-    """Return a decoder-tight schema for bounded response communication review."""
-
-    schema = copy.deepcopy(PlannerCommunicationReview.model_json_schema())
-    schema["required"] = [
-        "decision",
-        "confidence",
-        "response_text",
-        "goal_responses",
-        "reason",
-    ]
-    goal_responses = schema.get("properties", {}).get("goal_responses")
-    if isinstance(goal_responses, dict):
-        goal_responses["minItems"] = len(response_goal_ids)
-        goal_responses["maxItems"] = len(response_goal_ids)
-    goal_response = schema.get("$defs", {}).get("PlannerCommunicationGoalResponse")
-    if isinstance(goal_response, dict):
-        goal_response["required"] = ["goal_id", "response_text"]
-        goal_response_properties = goal_response.get("properties", {})
-        goal_id = goal_response_properties.get("goal_id")
-        if isinstance(goal_id, dict):
-            # llama.cpp's deployed JSON-grammar parser rejects the combination
-            # of nested string-length constraints used by this DTO. Pydantic
-            # still enforces every length immediately after decoding.
-            goal_id.pop("minLength", None)
-            goal_id.pop("maxLength", None)
-            goal_id["enum"] = list(response_goal_ids)
-        goal_response_text = goal_response_properties.get("response_text")
-        if isinstance(goal_response_text, dict):
-            goal_response_text.pop("minLength", None)
-            goal_response_text.pop("maxLength", None)
-    for field_name in ("response_text", "reason"):
-        field = schema.get("properties", {}).get(field_name)
-        if isinstance(field, dict):
-            field.pop("minLength", None)
-            field.pop("maxLength", None)
-    return schema
-
-def planner_coverage_review_response_schema() -> dict[str, Any]:
-    """Return a decoder-tight schema for the bounded coverage auditor."""
-
-    schema = copy.deepcopy(PlannerCoverageReview.model_json_schema())
-    schema["required"] = [
-        "decision",
-        "confidence",
-        "semantic_mismatch_found",
-        "uncovered_requirements",
-        "reason",
-    ]
-    schema.setdefault("allOf", []).append(
-        {
-            "anyOf": [
-                {
-                    "properties": {
-                        "decision": {"type": "string", "enum": ["accept"]},
-                        "semantic_mismatch_found": {"type": "boolean", "const": False},
-                        "uncovered_requirements": {
-                            "type": "array",
-                            "maxItems": 0,
-                        },
-                    }
-                },
-                {
-                    "properties": {
-                        "decision": {"type": "string", "enum": ["reject"]},
-                        "uncovered_requirements": {
-                            "type": "array",
-                            "minItems": 1,
-                        },
-                    }
-                },
-            ]
-        }
-    )
-    uncovered = schema.get("properties", {}).get("uncovered_requirements")
-    if isinstance(uncovered, dict):
-        items = uncovered.get("items")
-        if isinstance(items, dict):
-            items["maxLength"] = 320
-    reason = schema.get("properties", {}).get("reason")
-    if isinstance(reason, dict):
-        reason["maxLength"] = 600
     return schema
 
 def canonical_plan_response_schema(
@@ -1896,29 +1806,6 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
 
 # Fast/Deep Planner pass-specific constrained-decoder schemas. These functions
 # project an already-owned Planner contract; they do not invoke a model or choose HOW.
-
-def fast_truth_certificate_response_schema() -> dict[str, Any]:
-    schema = copy.deepcopy(
-        FastPlannerFirstResponseTruthCertificate.model_json_schema()
-    )
-    audit_fields = [
-        "has_unverified_result_or_completion_claim",
-        "has_ungrounded_method_or_world_claim",
-        "has_semantic_perspective_contradiction",
-        "has_epistemic_strength_contradiction",
-        "has_execution_status_contradiction",
-        "has_out_of_scope_goal_claim",
-    ]
-    schema["required"] = [*audit_fields, "decision"]
-    # Keep the provider-facing grammar flat. Ollama's constrained decoder accepts
-    # JSON-Schema composition keywords here but, with the previous oneOf/anyOf
-    # coupling, repeatedly emitted only the single flag that selected a branch.
-    # The DTO consequently failed closed because the other required fields were
-    # absent. Required-field completeness stays in this decoder schema, while the
-    # decision is mechanically projected from the complete model-authored flag
-    # vector by the typed DTO after decoding. Missing fields are never defaulted
-    # or inferred locally, and trusted code makes no truth judgment of its own.
-    return schema
 
 def fast_first_response_response_schema(
     responsibility_refs: list[str],

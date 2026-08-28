@@ -1,7 +1,7 @@
 # Maintained Scenario Migration
 
 The Benchmark Suite references the existing deterministic scenario files in
-place. This preserves stable IDs, Git provenance, general-ability manifests, and
+place. This preserves stable IDs, Git provenance, general-ability metadata, and
 historical evidence while making the Benchmark migration manifest the sole
 classification authority.
 

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import copy
 import hashlib
-import json
 import logging
 from typing import Any
 
@@ -79,18 +77,12 @@ from .goal_association_contract import (
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
-    GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
 )
-from .goal_association_schema import (
-    coverage_certificate_response_schema,
-    goal_association_response_schema,
-)
+from .goal_association_schema import goal_association_response_schema
 from .goal_association_validation import (
-    _CoverageSourceExcerptViolation,
     action_collection_bindings,
     binding_semantic_contract_conflicts,
-    coverage_verdict,
     drop_ungrounded_resource_query_locations,
     non_verbatim_explicit_location_bindings,
     normalize_grounded_binding_types,
@@ -98,23 +90,18 @@ from .goal_association_validation import (
     normalize_optional_resource_quantity,
     normalize_resource_binding_branches,
     resource_source_binding_contract_conflicts,
-    responsibility_coverage_required,
     responsibility_output_mode_conflicts,
     restore_missing_goal_descriptions,
-    source_grounded_binding_coverage_conflicts,
+    source_grounded_binding_conservation_conflicts,
     validation_error_json,
 )
 
 
 from .goal_association_prompt import (
-    build_fresh_interpretation_prompt,
-    build_responsibility_coverage_prompt,
     discourse_referents,
     layered_prompt,
     layered_repair_prompt,
     repair_system_prompt,
-    responsibility_coverage_system_prompt,
-    semantic_review_system_prompt,
     system_prompt,
 )
 
@@ -220,9 +207,7 @@ class GoalAssociationResolver:
         invocation_families: list[str] = []
         initial_raw: dict[str, Any] | None = None
         accepted_raw: dict[str, Any] | None = None
-        certificate_raw: dict[str, Any] | None = None
         contract_repair_attempted = False
-        semantic_reconsideration_attempted = False
         optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
         invalid_optional_quantity_recovery: list[dict[str, Any]] = []
@@ -238,7 +223,7 @@ class GoalAssociationResolver:
             prompt_family: str,
         ) -> Any:
             nonlocal logical_invocations
-            if logical_invocations >= 5:
+            if logical_invocations >= 2:
                 raise RuntimeError(
                     "goal-association logical invocation budget exhausted"
                 )
@@ -307,14 +292,9 @@ class GoalAssociationResolver:
                 stage="primary",
             )
             try:
-                resolution = await self._validate_contract_output(
-                    initial_raw,
-                    request=request,
-                    turn_id=turn_id,
-                    output_type=output_type,
-                )
+                model_output = output_type.model_validate(initial_raw)
                 accepted_raw = initial_raw
-            except (ValidationError, ValueError) as initial_exc:
+            except ValidationError as initial_exc:
                 contract_repair_attempted = True
                 repaired = normalize_raw(
                     await invoke(
@@ -334,242 +314,44 @@ class GoalAssociationResolver:
                     ),
                     stage="contract repair",
                 )
-                resolution = await self._validate_contract_output(
-                    repaired,
-                    request=request,
-                    turn_id=turn_id,
-                    output_type=output_type,
-                )
+                model_output = output_type.model_validate(repaired)
                 accepted_raw = repaired
 
-            model_output = output_type.model_validate(accepted_raw)
-            coverage_metadata: dict[str, Any] = {
-                "attempted": False,
-                "succeeded": False,
-                "initial_verdict": "not_required",
-                "final_verdict": "not_required",
-                "reconsidered": False,
-            }
-            if responsibility_coverage_required(
+            resolution = await self._materialize_primary_output(
                 model_output,
                 request=request,
-            ):
-                coverage_metadata["attempted"] = True
-                certificate_raw = await invoke(
-                    build_responsibility_coverage_prompt(
-                        request=request,
-                        raw=accepted_raw,
-                    ),
-                    system=responsibility_coverage_system_prompt(),
-                    response_format=coverage_certificate_response_schema(
-                        list(model_output.new_goals),
-                        authoritative_turn=request.text,
-                    ),
-                    prompt_family="goal_association.responsibility_coverage",
-                )
-                certificate: GoalResponsibilityCoverageCertificate | None
-                try:
-                    certificate = self._validate_coverage_certificate(
-                        certificate_raw,
-                        request=request,
-                        goal_count=len(model_output.new_goals),
-                        candidate_goals=list(model_output.new_goals),
-                    )
-                except _CoverageSourceExcerptViolation:
-                    # An ungrounded audit can never certify a candidate. Treat the
-                    # first audit as a rejection and use the existing one-shot fresh
-                    # semantic interpretation from the authoritative turn. This is
-                    # not DTO repair, and the final audit still fails closed on the
-                    # same provenance defect.
-                    certificate = None
-                    verdict = "reject"
-                    problems = ["coverage_source_excerpt_not_authoritative"]
-                    problems.extend(
-                        "missing_source_grounded_binding=" + conflict
-                        for conflict in source_grounded_binding_coverage_conflicts(
-                            model_output,
-                            request=request,
-                        )
-                    )
-                    coverage_metadata["initial_certificate_contract_error"] = (
-                        "source_excerpt_not_authoritative"
-                    )
-                else:
-                    verdict, problems = coverage_verdict(
-                        certificate,
-                        goal_count=len(model_output.new_goals),
-                    )
-                coverage_metadata["initial_verdict"] = verdict
-                if certificate is not None:
-                    coverage_metadata["certificate"] = certificate.model_dump(
-                        mode="json"
-                    )
-                if verdict == "reject":
-                    semantic_reconsideration_attempted = True
-                    coverage_metadata["reconsidered"] = True
-                    clarification_required = bool(
-                        certificate is not None
-                        and any(
-                            item.coverage == "clarification_required"
-                            for item in certificate.items
-                        )
-                    )
-                    reconsidered_raw = normalize_raw(
-                        await invoke(
-                            build_fresh_interpretation_prompt(
-                                request=request,
-                                candidate_goals=candidate_goals,
-                                output_type=output_type,
-                                problems=problems,
-                                preserve_unresolved_meaning=clarification_required,
-                                authoritative_coverage_items=(
-                                    [
-                                        {
-                                            "source_excerpt": item.source_excerpt,
-                                            "role": item.role,
-                                            "required_goal_shape": item.required_goal_shape,
-                                            "required_information_domain": (
-                                                item.required_information_domain
-                                            ),
-                                            "required_output_mode": item.required_output_mode,
-                                        }
-                                        for item in certificate.responsibility_items
-                                    ]
-                                    if certificate is not None
-                                    else []
-                                ),
-                            ),
-                            system=semantic_review_system_prompt(
-                                output_type,
-                                fresh_resegmentation=True,
-                            ),
-                            response_format=response_schema,
-                            prompt_family="goal_association.fresh_interpretation",
-                        ),
-                        stage="fresh interpretation",
-                    )
-                    # Semantic reconsideration is validated as authored. Goal Association
-                    # preserves human temporal meaning and never repairs it into
-                    # Planner/Capability argument vocabulary.
-                    resolution = await self._validate_contract_output(
-                        reconsidered_raw,
-                        request=request,
-                        turn_id=turn_id,
-                        output_type=output_type,
-                    )
-                    accepted_raw = reconsidered_raw
-                    reconsidered_output = output_type.model_validate(accepted_raw)
-                    if responsibility_coverage_required(
-                        reconsidered_output,
-                        request=request,
-                    ):
-                        certificate_raw = await invoke(
-                            build_responsibility_coverage_prompt(
-                                request=request,
-                                raw=accepted_raw,
-                            ),
-                            system=responsibility_coverage_system_prompt(),
-                            response_format=coverage_certificate_response_schema(
-                                list(reconsidered_output.new_goals),
-                                authoritative_turn=request.text,
-                            ),
-                            prompt_family=(
-                                "goal_association.responsibility_coverage_final"
-                            ),
-                        )
-                        final_certificate = self._validate_coverage_certificate(
-                            certificate_raw,
-                            request=request,
-                            goal_count=len(reconsidered_output.new_goals),
-                            candidate_goals=list(reconsidered_output.new_goals),
-                        )
-                        final_verdict, final_problems = coverage_verdict(
-                            final_certificate,
-                            goal_count=len(reconsidered_output.new_goals),
-                        )
-                        coverage_metadata["final_verdict"] = final_verdict
-                        coverage_metadata["certificate"] = (
-                            final_certificate.model_dump(mode="json")
-                        )
-                        if certificate is not None:
-                            def classifications_by_candidate(
-                                coverage_certificate: Any,
-                            ) -> dict[int, set[tuple[str, str, str, str]]]:
-                                classifications: dict[
-                                    int, set[tuple[str, str, str, str]]
-                                ] = {}
-                                for item in coverage_certificate.responsibility_items:
-                                    classification = (
-                                        item.role,
-                                        item.required_goal_shape,
-                                        item.required_information_domain,
-                                        item.required_output_mode,
-                                    )
-                                    for candidate_index in item.candidate_goal_indices:
-                                        classifications.setdefault(
-                                            candidate_index, set()
-                                        ).add(classification)
-                                return classifications
-
-                            # Source excerpts are evidence citations, not durable
-                            # semantic identity. A fresh audit may cite a slightly
-                            # wider or narrower contiguous span while preserving the
-                            # exact candidate-owned classification.
-                            initial_classifications = classifications_by_candidate(
-                                certificate
-                            )
-                            final_classifications = classifications_by_candidate(
-                                final_certificate
-                            )
-                            classification_drift = {
-                                str(candidate_index): {
-                                    "initial": sorted(
-                                        list(item) for item in classifications
-                                    ),
-                                    "final": sorted(
-                                        list(item)
-                                        for item in final_classifications.get(
-                                            candidate_index, set()
-                                        )
-                                    ),
-                                }
-                                for candidate_index, classifications in (
-                                    initial_classifications.items()
-                                )
-                                if final_classifications.get(candidate_index)
-                                != classifications
-                            }
-                            if classification_drift:
-                                raise ValueError(
-                                    "fresh Goal interpretation changed the independent "
-                                    "auditor's source classification: "
-                                    + self._bounded_json(classification_drift, 1800)
-                                )
-                        if final_verdict != "accept":
-                            raise ValueError(
-                                "fresh Goal interpretation failed final responsibility "
-                                "coverage: " + "; ".join(final_problems)
-                            )
-                    else:
-                        coverage_metadata["final_verdict"] = "clarification"
-                else:
-                    coverage_metadata["final_verdict"] = "accept"
-                coverage_metadata["succeeded"] = True
+                turn_id=turn_id,
+            )
 
             metadata = dict(resolution.metadata)
+            expected_responsibility_refs = [
+                item.local_ref for item in request.responsibilities
+            ]
+            mapped_responsibility_refs = [
+                ref
+                for association in getattr(model_output, "associations", [])
+                for ref in association.source_responsibility_refs
+            ] + [
+                ref
+                for goal in model_output.new_goals
+                for ref in goal.source_responsibility_refs
+            ]
             metadata.update(
                 {
                     "goal_semantic_transaction": {
                         "logical_invocation_count": logical_invocations,
-                        "logical_invocation_budget": 5,
+                        "logical_invocation_budget": 2,
                         "prompt_families": invocation_families,
                         "contract_repair_attempted": contract_repair_attempted,
-                        "semantic_reconsideration_attempted": (
-                            semantic_reconsideration_attempted
-                        ),
                         "terminal_state": "commit",
                     },
-                    "responsibility_coverage": coverage_metadata,
+                    "responsibility_conservation": {
+                        "evidence_source": "goal_association.primary",
+                        "expected_refs": expected_responsibility_refs,
+                        "mapped_refs": mapped_responsibility_refs,
+                        "source_grounded_bindings": "validated",
+                        "status": "validated",
+                    },
                 }
             )
             if optional_referent_recovery:
@@ -644,17 +426,13 @@ class GoalAssociationResolver:
                 ),
                 "goal_semantic_transaction": {
                     "logical_invocation_count": logical_invocations,
-                    "logical_invocation_budget": 5,
+                    "logical_invocation_budget": 2,
                     "prompt_families": invocation_families,
                     "contract_repair_attempted": contract_repair_attempted,
-                    "semantic_reconsideration_attempted": (
-                        semantic_reconsideration_attempted
-                    ),
                     "terminal_state": "fail_closed",
                 },
                 "initial_raw_output_ref": cognition_text_reference(initial_raw),
                 "accepted_raw_output_ref": cognition_text_reference(accepted_raw),
-                "coverage_certificate_ref": cognition_text_reference(certificate_raw),
             }
             if isinstance(exc, (ValidationError, ValueError)):
                 metadata.update(
@@ -712,17 +490,13 @@ class GoalAssociationResolver:
             )
 
 
-    async def _validate_contract_output(
+    async def _materialize_primary_output(
         self,
-        raw: dict[str, Any],
+        model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
         *,
         request: CognitiveWorkRequest,
         turn_id: str,
-        output_type: (
-            type[GoalAssociationModelOutput] | type[GoalSegmentationModelOutput]
-        ),
     ) -> GoalAssociationResolution:
-        model_output = output_type.model_validate(raw)
         gaps_by_goal_id = {
             str(goal.get("goal_id") or "").strip(): {
                 str(gap.get("gap_id") or "").strip()
@@ -800,6 +574,18 @@ class GoalAssociationResolver:
                 "surface into resolved_references.surface_form: "
                 + ", ".join(location_bindings)
             )
+        binding_conservation_conflicts = (
+            source_grounded_binding_conservation_conflicts(
+                model_output,
+                request=request,
+            )
+        )
+        if binding_conservation_conflicts:
+            raise ValueError(
+                "Goal Association primary result must conserve every directly "
+                "source-grounded material binding on its canonical Goal surface: "
+                + ", ".join(binding_conservation_conflicts)
+            )
         return self._expand_model_output(
             model_output,
             request=request,
@@ -851,368 +637,6 @@ class GoalAssociationResolver:
     @staticmethod
     def _bounded_json(value: Any, max_chars: int) -> str:
         return bounded_json(value, max_chars)
-
-
-    @classmethod
-    def _validate_coverage_certificate(
-        cls,
-        raw: Any,
-        *,
-        request: CognitiveWorkRequest,
-        goal_count: int,
-        candidate_goals: list[GoalAssociationModelGoal] | None = None,
-    ) -> GoalResponsibilityCoverageCertificate:
-        if not isinstance(raw, dict):
-            raise OllamaGenerationError(
-                "goal-association responsibility coverage is not a JSON object",
-                failure_class="structured_output_invalid",
-                failure_domain="model_contract",
-                architecture_attribution="not_evaluated",
-                retryable=True,
-            )
-        normalized_raw = copy.deepcopy(raw)
-        normalized_items: list[Any] = []
-        recoveries: list[dict[str, Any]] = []
-        for field_name in ("responsibility_items", "supporting_items"):
-            field_items = normalized_raw.get(field_name)
-            if isinstance(field_items, list):
-                unique_items: list[Any] = []
-                seen_items: set[str] = set()
-                for item_index, item in enumerate(field_items):
-                    fingerprint = json.dumps(
-                        item,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    )
-                    if fingerprint in seen_items:
-                        recoveries.append(
-                            {
-                                "field": field_name,
-                                "item_index": item_index,
-                                "recovery": "removed_exact_duplicate",
-                            }
-                        )
-                        continue
-                    seen_items.add(fingerprint)
-                    unique_items.append(item)
-                normalized_raw[field_name] = unique_items
-                normalized_items.extend(unique_items)
-        # A coverage certificate can contradict its own role split: small models
-        # sometimes repeat the same source span as both a non-independent
-        # ``responsibility`` and a supporting constraint.  The non-independent
-        # responsibility branch cannot own a standalone Goal by the auditor's own
-        # fields, so discard only that exact conflicting duplicate.  This is DTO
-        # normalization, not Host interpretation of the user's words.
-        responsibility_items = normalized_raw.get("responsibility_items")
-        supporting_items = normalized_raw.get("supporting_items")
-        self_contradictory_support_spans: set[str] = set()
-        if isinstance(responsibility_items, list) and isinstance(supporting_items, list):
-            supporting_spans = {
-                " ".join(str(item.get("source_excerpt") or "").strip().casefold().split())
-                for item in supporting_items
-                if isinstance(item, dict)
-                and str(item.get("role") or "") in {"constraint", "context", "framing"}
-                and str(item.get("source_excerpt") or "").strip()
-            }
-            retained_responsibilities: list[Any] = []
-            for item_index, item in enumerate(responsibility_items):
-                normalized_excerpt = (
-                    " ".join(str(item.get("source_excerpt") or "").strip().casefold().split())
-                    if isinstance(item, dict)
-                    else ""
-                )
-                if (
-                    isinstance(item, dict)
-                    and str(item.get("role") or "") == "responsibility"
-                    and item.get("independently_satisfiable") is False
-                    and normalized_excerpt
-                    and normalized_excerpt in supporting_spans
-                ):
-                    self_contradictory_support_spans.add(normalized_excerpt)
-                    recoveries.append(
-                        {
-                            "field": "responsibility_items",
-                            "item_index": item_index,
-                            "recovery": "removed_nonindependent_role_duplicate",
-                            "source_excerpt": item.get("source_excerpt"),
-                        }
-                    )
-                    continue
-                retained_responsibilities.append(item)
-            normalized_raw["responsibility_items"] = retained_responsibilities
-            normalized_items = [
-                *retained_responsibilities,
-                *supporting_items,
-            ]
-
-        if normalized_items:
-            for item_index, item in enumerate(normalized_items):
-                if not isinstance(item, dict):
-                    continue
-                required_goal_shape = str(
-                    item.get("required_goal_shape") or "ordinary"
-                )
-                required_information_domain = str(
-                    item.get("required_information_domain") or "none"
-                )
-                role = str(item.get("role") or "")
-                required_output_mode = str(
-                    item.get("required_output_mode") or "none"
-                )
-                if role != "responsibility" and item.get(
-                    "independently_satisfiable"
-                ) is True:
-                    # The auditor already selected the non-responsibility branch.
-                    # Independent satisfiability is structurally impossible there;
-                    # clearing the redundant flag does not change role, ownership,
-                    # coverage, or any candidate mapping judgment.
-                    item["independently_satisfiable"] = False
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "recovery": "cleared_supporting_independence",
-                            "role": role,
-                            "from": True,
-                            "to": False,
-                        }
-                    )
-                if role != "responsibility" and required_goal_shape != "ordinary":
-                    # Goal shape classifies the independently owed result only. A
-                    # supporting item can point at a resource Goal, but cannot own
-                    # or restate that Goal's shape. This projection follows the
-                    # auditor-authored role and changes no coverage judgment.
-                    item["required_goal_shape"] = "ordinary"
-                    item["required_information_domain"] = "none"
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "recovery": "cleared_supporting_goal_shape",
-                            "role": role,
-                            "from": required_goal_shape,
-                            "to": "ordinary",
-                        }
-                    )
-                    required_goal_shape = "ordinary"
-                    required_information_domain = "none"
-                if (
-                    role == "responsibility"
-                    and required_output_mode
-                    not in {"none", "body_action", "information"}
-                    and required_goal_shape != "ordinary"
-                ):
-                    # Resource completion modes are body_action (physical) or
-                    # information. Once the independent auditor
-                    # has explicitly selected any vocal/media/other completion
-                    # mode, a resource shape is mechanically impossible.
-                    item["required_goal_shape"] = "ordinary"
-                    item["required_information_domain"] = "none"
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "recovery": "normalized_output_mode_goal_shape",
-                            "required_output_mode": required_output_mode,
-                            "from": required_goal_shape,
-                            "to": "ordinary",
-                        }
-                    )
-                    required_goal_shape = "ordinary"
-                    required_information_domain = "none"
-                if (
-                    required_goal_shape != "information_resource"
-                    and required_information_domain != "none"
-                ):
-                    # This domain is a redundant refinement of an information
-                    # resource. Decoder-small models can populate it from a physical
-                    # task's likely observational means. Clearing it for every
-                    # non-information shape changes no semantic branch.
-                    item["required_information_domain"] = "none"
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "recovery": "cleared_non_information_domain",
-                            "required_goal_shape": required_goal_shape,
-                            "from": required_information_domain,
-                            "to": "none",
-                        }
-                    )
-                if role != "responsibility" and required_output_mode != "none":
-                    # Completion mode refines the independently satisfiable outcome,
-                    # not a supporting constraint/context item. Removing it from an
-                    # ineligible branch changes no candidate ownership or verdict.
-                    item["required_output_mode"] = "none"
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "recovery": "cleared_supporting_output_mode",
-                            "role": role,
-                            "from": required_output_mode,
-                            "to": "none",
-                        }
-                    )
-                if (
-                    role in {"context", "framing"}
-                    and item.get("coverage") == "covered"
-                    and item.get("candidate_goal_indices")
-                ):
-                    # Context/framing is acknowledged but never owns a Goal. The
-                    # model already classified the role and verdict; clearing an
-                    # ineligible index removes only DTO correlation noise.
-                    previous_indices = list(item.get("candidate_goal_indices") or [])
-                    item["candidate_goal_indices"] = []
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "recovery": "cleared_context_goal_ownership",
-                            "role": role,
-                            "from": previous_indices,
-                            "to": [],
-                        }
-                    )
-                coverage = str(item.get("coverage") or "")
-                indices = item.get("candidate_goal_indices")
-                if not isinstance(indices, list) or not indices:
-                    continue
-                if coverage == "missing":
-                    # "missing" plus a named attempted owner is structurally
-                    # contradictory. Preserve the attempted owner but keep the
-                    # certificate rejecting by normalizing to representation mismatch.
-                    item["coverage"] = "representation_mismatch"
-                    recoveries.append(
-                        {
-                            "item_index": item_index,
-                            "from": "missing",
-                            "to": "representation_mismatch",
-                            "candidate_goal_indices": list(indices),
-                        }
-                    )
-                normalized_source_excerpt = " ".join(
-                    str(item.get("source_excerpt") or "").strip().casefold().split()
-                )
-                if (
-                    item.get("coverage") == "covered"
-                    and candidate_goals is not None
-                    and isinstance(indices, list)
-                    and indices
-                ):
-                    required_goal_shape = str(
-                        item.get("required_goal_shape") or "ordinary"
-                    )
-                    required_information_domain = str(
-                        item.get("required_information_domain") or "none"
-                    )
-                    required_output_mode = str(
-                        item.get("required_output_mode") or "none"
-                    )
-                    mismatch_reasons: list[str] = []
-                    for goal_index in indices:
-                        if not isinstance(goal_index, int) or not (
-                            0 <= goal_index < len(candidate_goals)
-                        ):
-                            continue
-                        candidate = candidate_goals[goal_index]
-                        binding_types = {
-                            binding.entity_type.casefold()
-                            for binding in candidate.semantic_bindings
-                        }
-                        resource = candidate.resource_responsibility
-                        shape_matches = {
-                            "ordinary": (
-                                item.get("role") != "responsibility"
-                                or (
-                                    resource is None
-                                    and candidate.output_mode not in {"information", "stateful_effect"}
-                                )
-                            ),
-                            "information_resource": (
-                                resource is not None
-                                and resource.kind == "information"
-                            ),
-                            "physical_resource": (
-                                resource is not None
-                                and resource.kind == "physical_object"
-                            ),
-                            "persistent_effect": (
-                                resource is None
-                                and candidate.output_mode == "stateful_effect"
-                            ),
-                        }.get(required_goal_shape, False)
-                        if not shape_matches:
-                            mismatch_reasons.append(
-                                "required_goal_shape=" + required_goal_shape
-                            )
-                        if (
-                            required_goal_shape == "information_resource"
-                            and resource is not None
-                            and resource.kind == "information"
-                            and resource.information_domain
-                            != required_information_domain
-                        ):
-                            mismatch_reasons.append(
-                                "required_information_domain="
-                                + required_information_domain
-                            )
-                        if (
-                            required_output_mode != "none"
-                            and candidate.output_mode != required_output_mode
-                        ):
-                            mismatch_reasons.append(
-                                "required_output_mode=" + required_output_mode
-                            )
-                        binding_conflicts = (
-                            source_grounded_binding_coverage_conflicts(
-                                [candidate],
-                                request=request,
-                            )
-                        )
-                        mismatch_reasons.extend(
-                            "missing_source_grounded_binding=" + conflict
-                            for conflict in binding_conflicts
-                        )
-                    if mismatch_reasons:
-                        item["coverage"] = "representation_mismatch"
-                        recoveries.append(
-                            {
-                                "item_index": item_index,
-                                "from": "covered",
-                                "to": "representation_mismatch",
-                                "candidate_goal_indices": list(indices),
-                                "reasons": sorted(set(mismatch_reasons)),
-                            }
-                        )
-        if recoveries:
-            logger.warning(
-                "goal_association_coverage_shape_normalized sid=%s recoveries=%s",
-                request.sid,
-                cls._bounded_json(recoveries, 1800),
-            )
-        certificate = GoalResponsibilityCoverageCertificate.model_validate(normalized_raw)
-        if any(
-            item.coverage == "clarification_required"
-            for item in certificate.items
-        ) and not request.interpretation_unresolved:
-            raise ValueError(
-                "clarification_required coverage needs exact GI unresolved-meaning evidence"
-            )
-        authoritative_turn = " ".join(request.text.strip().split()).casefold()
-        for index, item in enumerate(certificate.items):
-            excerpt = " ".join(item.source_excerpt.strip().split()).casefold()
-            if excerpt not in authoritative_turn:
-                raise _CoverageSourceExcerptViolation(
-                    "coverage source_excerpt must be a verbatim current-turn span: "
-                    f"items[{index}]={item.source_excerpt!r}"
-                )
-            invalid_indices = [
-                goal_index
-                for goal_index in item.candidate_goal_indices
-                if goal_index < 0 or goal_index >= goal_count
-            ]
-            if invalid_indices:
-                raise ValueError(
-                    "coverage references unknown Goal candidate indices: "
-                    + ",".join(str(value) for value in invalid_indices)
-                )
-        return certificate
 
 
     def _expand_model_output(

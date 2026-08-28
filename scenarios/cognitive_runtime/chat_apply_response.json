@@ -76,5 +76,21 @@
       "goal_association",
       "fast_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "speech_identity_latency",
+        "title": "Speech Identity and Warm Response Latency",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "rationale": "Grounded conversational response traverses the maintained cognitive runtime without tool impersonation.",
+        "root_cause_boundaries": [
+          "Mind profile",
+          "Planner communication",
+          "Playback delivery",
+          "Latency evidence"
+        ]
+      }
+    ]
   }
 }

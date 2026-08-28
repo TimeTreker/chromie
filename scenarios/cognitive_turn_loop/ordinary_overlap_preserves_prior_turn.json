@@ -4,7 +4,12 @@
   "suite": "cognitive_turn_loop",
   "level": "integration",
   "description": "A second ordinary request starts without cancelling an independent earlier routed turn; only an explicit protective control or Core-authorized interruption may cancel prior work.",
-  "tags": ["level-a", "multi-turn", "overlap", "goal-preservation"],
+  "tags": [
+    "level-a",
+    "multi-turn",
+    "overlap",
+    "goal-preservation"
+  ],
   "input": {
     "text": "One person asks for a check, then another person makes an independent request while the first is still running.",
     "language": "en-US"
@@ -19,5 +24,47 @@
     "first_completed": true,
     "second_completed": true,
     "active_turn_count": 0
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "evidence_coverage_and_claim_discipline",
+        "title": "Evidence Coverage And Claim Discipline",
+        "general_rule": "Tests should prove the user-visible boundary being claimed and should retain enough trace detail to locate the earliest wrong component.",
+        "rationale": "Overlapping ordinary turns preserve each independent outcome.",
+        "root_cause_boundaries": [
+          "Test evidence",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "evidence_bound_cognitive_turn_closure",
+        "title": "Evidence-Bound Cognitive Turn Closure",
+        "general_rule": "Every admitted turn should preserve its identity and independent work across overlapping ordinary requests; only explicit protective control or Core-authorized interruption may cancel it. Effectful turns retain completed, missing, failed, and cancelled outcomes, commit goal state, suppress stale speech, and emit at most one evidence-bound speech-only final while the turn remains current.",
+        "rationale": "An independent ordinary request must not implicitly cancel an earlier in-flight turn; cancellation remains explicit and attributable.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway/ingress",
+          "Goal-Driven Cognitive Core",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider",
+          "Execution outcome evidence"
+        ]
+      },
+      {
+        "id": "human_like_cognitive_continuity",
+        "title": "Human-like Cognitive Continuity",
+        "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+        "rationale": "A newer conversational turn does not erase valid unfinished work from the prior turn.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "Goal Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

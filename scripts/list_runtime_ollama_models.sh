@@ -45,7 +45,6 @@ fi
 if is_enabled "${AGENT_FAST_PLANNER_ENABLED:-1}"; then
   append_model "${AGENT_FAST_PLANNER_MODEL:-}"
   append_model "${AGENT_FAST_FIRST_RESPONSE_MODEL:-}"
-  append_model "${AGENT_FAST_TRUTH_MODEL:-}"
 fi
 if is_enabled "${AGENT_DEEP_PLANNER_ENABLED:-1}"; then
   append_model "${AGENT_DEEP_PLANNER_MODEL:-}"

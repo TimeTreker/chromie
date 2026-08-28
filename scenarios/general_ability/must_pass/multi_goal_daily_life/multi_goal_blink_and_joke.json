@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "multi_goal_blink_and_joke",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "rationale": "A live mixed request should execute the body goal while also answering the conversational goal.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "plan_completeness",
+      "intent_understanding"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "plan_completeness",
+      "intent_understanding"
+    ],
+    "primary_outcomes": [
+      "A live mixed request should execute the body goal while also answering the conversational goal."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Collapse or omit an independent Goal.",
+      "Replay already completed physical work during a later revision."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "Blink twice and tell me a short joke.",
+  "expected_capabilities": [
+    "soridormi.blink_eyes"
+  ],
+  "expected_args": [
+    "0:count=2"
+  ],
+  "description": "A live mixed request should execute the body goal while also answering the conversational goal.",
+  "expected_terminal_planner_tier": "fast",
+  "expected_fast_planner_path": "terminal",
+  "expect_deep_planner_invoked": false,
+  "expect_no_fast_contract_failure": true,
+  "expected_observations": [
+    {
+      "type": "social_attention.blink",
+      "args": {
+        "count": 2
+      },
+      "max_occurrences": 1
+    },
+    {
+      "type": "speech.output",
+      "max_occurrences": 1
+    }
+  ],
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "A live mixed request should execute the body goal while also answering the conversational goal.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Planner contract",
+          "Fast Planner communication",
+          "Trusted runtime adapter",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

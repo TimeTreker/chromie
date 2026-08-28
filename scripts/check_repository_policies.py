@@ -676,6 +676,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "orchestrator/runtime/deepthinking_policy.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "orchestrator/runtime/outcome_response.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "orchestrator/runtime/body_recovery.py": RULE_HOST_SEMANTIC_AUTHORITY,
+        "agent/app/planner_audit.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "agent/app/agents/motion_planner.py": RULE_LEGACY_PHRASE_AGENTS,
         "agent/app/agents/robot_pose_controller.py": RULE_LEGACY_PHRASE_AGENTS,
     }
@@ -761,8 +762,120 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "Use tool for changing external facts, including current weather",
                 "direct_question_form",
                 "missing_aliases",
+                "goal_interpretation_responsibility_coverage",
+                "GoalInterpretationCoverageCertificate",
+                "build_responsibility_coverage_payload",
+                "_ensure_atomic_responsibility_coverage",
             ),
-            "Goal Interpretation may not contain domain routing or punctuation/alias semantic fallbacks",
+            "Goal Interpretation may not contain domain routing, punctuation/alias semantic fallbacks, or a second same-authority coverage/resegmentation call",
+        ),
+        "agent/app/goal_association.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "goal_association.responsibility_coverage",
+                "goal_association.fresh_interpretation",
+                "goal_association.responsibility_coverage_final",
+                "_validate_coverage_certificate",
+            ),
+            "Goal Association may not restore a same-authority coverage, reviewer, resegmentation, or final-audit model call",
+        ),
+        "agent/app/goal_association_contract.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "GoalResponsibilityCoverageItem",
+                "GoalResponsibilityCoverageCertificate",
+            ),
+            "Goal Association may not restore the retired model-authored coverage certificate",
+        ),
+        "agent/app/goal_association_schema.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("coverage_certificate_response_schema",),
+            "Goal Association may not restore a decoder contract for an independent coverage authority",
+        ),
+        "agent/app/goal_association_prompt.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "build_fresh_interpretation_prompt",
+                "build_responsibility_coverage_prompt",
+                "responsibility_coverage_system_prompt",
+                "semantic_review_system_prompt",
+            ),
+            "Goal Association may not restore reviewer or semantic-reinterpretation prompts",
+        ),
+        "agent/app/goal_association_validation.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "responsibility_coverage_required",
+                "coverage_verdict",
+            ),
+            "Goal Association trusted validation must conserve the primary result rather than trigger another semantic authority",
+        ),
+        "agent/app/fast_planner.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "fast_planner.first_response.truth_check",
+                "fast_planner.evidence_response.truth_check",
+                "_qualify_first_response_truth",
+                "_qualify_evidence_response_truth",
+                "review_coordinated_action_plan_coverage",
+                "truth_ollama",
+                "truth_num_ctx",
+            ),
+            "Fast Planner must close truth and Goal coverage in its primary result rather than invoke a same-owner reviewer",
+        ),
+        "agent/app/deep_planner.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "deep_planner.evidence_response.truth_check",
+                "_qualify_evidence_response_truth",
+                "review_coordinated_action_plan_coverage",
+                "truth_ollama",
+                "truth_num_ctx",
+            ),
+            "Deep Planner must close truth and Goal coverage in its primary result rather than invoke a same-owner reviewer",
+        ),
+        "agent/app/planner_model_contract.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "PlannerCoverageReview",
+                "PlannerCommunicationGoalResponse",
+                "PlannerCommunicationReview",
+            ),
+            "Planner may not restore retired model-authored communication or coverage review DTOs",
+        ),
+        "agent/app/planner_schema.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "planner_communication_review_response_schema",
+                "planner_coverage_review_response_schema",
+                "fast_truth_certificate_response_schema",
+            ),
+            "Planner may not restore decoder contracts for a second same-owner reviewer",
+        ),
+        "agent/app/planner_prompt.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            (
+                "fast_first_response_truth_system_prompt",
+                "build_fast_first_response_truth_prompt",
+                "evidence_response_truth_system_prompt",
+                "build_evidence_response_truth_prompt",
+            ),
+            "Planner truth and coverage requirements belong in the primary prompt, not a reviewer prompt",
+        ),
+        "shared/chromie_contracts/plan.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("FastPlannerFirstResponseTruthCertificate",),
+            "Planner may not restore the retired first-response truth certificate",
+        ),
+        "agent/app/settings.py": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("fast_truth_model", "AGENT_FAST_TRUTH_MODEL"),
+            "Planner may not restore a dedicated same-owner truth-review model role",
+        ),
+        "docker-compose.yml": (
+            RULE_HOST_SEMANTIC_AUTHORITY,
+            ("AGENT_FAST_TRUTH_MODEL",),
+            "runtime composition may not restore a dedicated same-owner truth-review model role",
         ),
         "orchestrator/runtime/interaction_coordinator.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,

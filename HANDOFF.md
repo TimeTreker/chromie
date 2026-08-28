@@ -1,30 +1,22 @@
 # Chromie Latest Handoff
 
-Audience: a coding agent or project operator resuming this exact GI iteration from another
-checkout or machine.
-Owner: the project owner; update or replace this snapshot whenever
-`DEVELOPMENT_CHECKPOINT.md` advances.
-Authority: operational snapshot only. `DEVELOPMENT_CHECKPOINT.md` remains the current
-resume authority, while source/tests/evidence remain technical truth.
-
-This separate handoff exists because cross-machine commands, runtime identities, private
-evidence locations, interrupted-process state, and negative claim boundaries are too
-operational and volatile for the short authoritative checkpoint. It adds one current
-document surface; no prior handoff document existed, and this file must be overwritten or
-removed rather than accumulated into dated handoff files.
+Audience: a coding agent or operator resuming the current semantic-authority closure.
+Owner: project owner. Replace this snapshot when `DEVELOPMENT_CHECKPOINT.md` advances.
+Authority: operational snapshot only; source, tests, retained evidence, and the
+checkpoint remain authoritative.
 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Branch: `main`
-- Implementation commit: `6a5619ab8552d733c20f11788b9b0639f452f3ee`
-- Implementation subject: `Harden goal interpretation contracts and live test workflow`
-- Resume commit: the latest `origin/main` commit containing this handoff
-- Expected remote: `origin/main` contains the implementation commit and `HANDOFF.md`
-- Expected worktree at handoff: clean
-- Current scope: GI and its contract validator only; GA/Planner return later
+- Branch at start: `main`
+- Starting commit: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
+- Starting subject: `Add external architecture audit`
+- Scope: close GI/GA/Planner same-authority review chains, remove the premature DBOS
+  experiment, migrate general-ability acceptance to one scenario per file, and retain
+  one post-change must-pass cohort
+- Expected resume revision: the latest commit containing this handoff
 
-Bootstrap:
+Bootstrap on another machine:
 
 ```bash
 git clone https://github.com/TimeTreker/chromie.git
@@ -36,71 +28,125 @@ git status --short --branch
 
 ## What changed
 
-The committed patch strengthens GI without moving WHAT/HOW authority:
+GI no longer calls a second coverage model or performs certificate-driven source
+resegmentation. The primary result now carries each Responsibility's inclusive source
+token span together with its mode, bindings, Goal relationship, and sibling relations.
+Trusted code checks only closed mechanics and provenance.
 
-- equivalent system-prompt compression: 17,325 -> 10,772 bytes;
-- request-specific dynamic schemas and deterministic provenance/atomicity validation;
-- one certificate-bound deep recovery pass with closed bindings and conservative count floor;
-- preservation of validated consequential-effect siblings against a smaller stochastic audit;
-- explicit dynamic-schema distinction between Chromie's own vocal performance (`singing`)
-  and control of existing recorded media (`media_playback`);
-- aggregate-first live test and one-bundle-per-cohort documentation.
+Logical call budgets are:
 
-No GA or Planner source was changed to hide downstream failures.
+- resolved valid primary meaning: one `goal_interpretation` call;
+- mechanically malformed primary DTO: one optional
+  `goal_interpretation_contract_repair` call;
+- genuinely unresolved meaning: one optional `goal_interpretation_deep` call;
+- semantic or authority contradiction: fail closed without a reviewer;
+- one mechanically malformed Deep location citation may use the one constrained
+  `goal_interpretation_deep_contract_repair` allowed at that stage.
+
+Repository policy now rejects the retired GI coverage stage/certificate/payload and
+acceptance-wrapper names. Scenario fixtures contain explicit primary source evidence
+and no longer expect semantic repair of noncanonical pace bindings.
+
+GA now uses one `goal_association.primary` call for a valid result. Only a
+Pydantic-invalid primary DTO may receive one `goal_association.contract_repair`; that
+prompt receives the malformed object and exact validation errors, but no user turn,
+candidate Goal projection, or identity context, and may not change semantics. The old
+responsibility-coverage certificate, fresh interpretation, and final-audit model calls
+and their DTO/schema/prompt/validation surfaces are removed. Grounding, Responsibility
+conservation, binding, and continuity validation run deterministically after parsing and
+fail closed without another model call.
+
+Fast first response, Fast Advance, canonical Fast Plan, and Deep Plan now each require
+their complete Goal/Evidence truth, exact wording, provenance, step ownership, and
+satisfaction decision in the primary result. The separate truth qualifier, retained
+response review, and coordinated Goal-coverage review calls are removed together with
+their DTO/schema/prompt surfaces, `planner_audit.py`, dedicated truth-model client,
+runtime health field, environment key, and warm-model role. Trusted validation remains
+mechanical; one existing semantics-preserving DTO repair or a distinct Fast-to-Deep
+escalation is not a second same-owner semantic review.
+
+The DBOS misunderstanding is removed rather than preserved as a dormant compatibility
+path. `CapabilityRuntime` directly tracks in-process `asyncio.Task` submissions; the
+optional DBOS dependency, runtime-backend interface, DBOS adapter, model-facing
+durability flag, and their tests are deleted. A future inter-process event transport
+must start from a proven domain message contract instead of reviving this speculative
+backend surface.
+
+General-ability live acceptance no longer uses a central index. The former
+`scenarios/general_ability_acceptance.json` is deleted and every scenario now owns its
+metadata in one file beneath `scenarios/general_ability/`. Directory discovery currently
+finds 50 must-pass, 15 core, and 8 challenge cases. The runner completes every selected
+must-pass case and reports all failures before the stage gate can block core/challenge.
+This layout is directly shardable and can later be imported into a database without
+changing scenario identity or maintaining a second registry.
 
 ## Evidence ledger
 
-### Current-content automated evidence
-
-Before the commit request, the final dynamic-mode schema content passed:
+Current automated evidence:
 
 ```text
-python -m unittest tests.test_goal_interpreter_llm_prompt tests.test_semantic_task_continuity
-Ran 113 tests ... OK
+python scripts/test_matrix.py goal-interpretation
+Ran 38 tests ... OK
+
+python scripts/scenario_runner.py \
+  --suite goal_interpretation --suite cognitive_core_dialogue
+Behavior scenarios: 31/31 passed
+
+python scripts/check_repository_policies.py
+Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
+
+./scripts/run_tests.sh
+Ran 2023 tests ... OK
+20 legacy Agent tests passed
+
+python scripts/general_ability_acceptance.py --mode level-a \
+  --ability-class robust_intent_understanding \
+  --ability-class planner_goal_semantic_quality --no-write
+General ability acceptance: 12/12 passed mode=level-a evidence=A
+
+python scripts/check_docs.py
+Documentation checks passed: 96 Markdown files
 ```
 
-No additional tests were run after the owner asked for an immediate commit/push. The prior
-full local gate (2,123 tests, 20 legacy Agent tests, Level A 45/45) predates the last
-dynamic-mode schema edit and must not qualify the current commit by itself.
+Pre-fix live iteration 50 on RTX 4090/Qwen3 4B remains diagnostic evidence only:
+32/36 cases were contract-valid, four legacy coverage-stage calls returned HTTP 503,
+and approximately 25/36 passed strict semantic judgment. It does not exercise or
+qualify the new source.
 
-### Last complete live aggregate
+The post-Planner-change 50-case must-pass aggregate is retained at
+`.chromie/acceptance/general-ability/20260828T101824Z-live-text`: 8/50 machine passes,
+42 hard failures, and no core/challenge start. Runtime identity SHA-256 is
+`c8b3fc0991b72d38dade6c7b38020353199c04cc3126eaae735bd42c5e53c9cc`; the source tree
+was dirty, so this is diagnostic C-preview evidence only. The valid post-cohort debug
+bundle is `/home/chromie/Downloads/chromie_debug_bundle_20260828_183021.tar.gz`.
+The retired Planner review families were absent; GA primary acceptance improved from
+18/45 to 43/44 relative to the immediately preceding aggregate. Remaining clusters are
+16 foreground-deadline failures, seven Runtime timeouts, four GA-stage failures, four
+GI transport timeouts, and 26 fail-soft Social Attention timeouts. All 42 hard failures
+were judged failed; manual semantic inspection of the eight mechanical passes also
+rejects `capability_inventory_truthful` because it does not actually list a capability.
+Independent multi-model semantic review, physical microphone/speaker evidence,
+simulator execution, and physical robot evidence remain absent.
 
-- Evidence directory:
-  `.chromie/acceptance/full-live-e2e-iteration-34`
-- Runtime identity:
-  `.chromie/evidence/runtime-identity-full-live-iteration-34.json`
-- Dirty source tree SHA-256:
-  `ec90c7b790cd31102cd79e2c519edd29c5940963cd173e18515bc12ab68f4496`
-- Runtime identity SHA-256:
-  `9133e934580b655db19aa7f8d8808e34d95bff46ed67955a7e3dd1bc674a7e2a`
-- Agent image:
-  `sha256:c65d198fb5d63d843170d752df0c4e03dd2847273c4c6aa9d0cf8c6228de92a4`
-- Result: Level C, 25/36 passed, 11 failed
-- Exactly one bundle:
-  `/home/chromie/Downloads/chromie_debug_bundle_20260827_212141.tar.gz`
+## Resume commands
 
-GI judgment from iteration 34:
+Run local closure first:
 
-- no retained GI 503/contract hard failure;
-- both prior three-effect omission cases emitted three Responsibilities in the complete
-  aggregate;
-- `debug_bundle_run_15_while_singing` exposed a new GI modality error:
-  `sing while running forward` was labeled `media_playback`;
-- the remaining cohort failures were attributed to GA/Planner, capability timeout,
-  response/user-outcome, WorkDAG/harness, or latency boundaries and remain deferred.
+```bash
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+```
 
-### Interrupted current-code focused run
+Do not rerun isolated live cases before aggregate diagnosis. First close the reproduced
+priority/resource-admission boundary inside existing owners: optional Social Attention
+and TTS preparation must not compete ahead of GA/Fast/Deep critical-path work on the
+single-parallel Ollama/GPU profile. Preserve GA and Fast Advance concurrency and avoid a
+new merge barrier or semantic manager. After the focused source fix and local gates,
+deploy one unchanged identity and rerun the complete 50-case must-pass stage once; do
+not start core/challenges after a hard must-pass failure.
 
-Iteration 35 used current file contents and Agent image
-`sha256:0b5f59a2110b691570410c53b4d05a5c6abb0aeb3b7fd647d762de7c4c9fc787`,
-but its identity was captured before committing and therefore says revision `d0b94def`,
-dirty source tree `f31daccde8b9...`, identity `1e9049b79eaf...`. The three-case focused
-cohort was interrupted during case 1/3. Do not reuse that identity, do not collect a bundle
-for that incomplete run, and do not count it as evidence.
-
-## Resume procedure
-
-### 1. Build and verify runtime
+Typical deployment inspection commands remain:
 
 ```bash
 docker compose build chromie-agent
@@ -109,115 +155,19 @@ docker compose ps chromie-agent
 ss -ltn '( sport = :8000 or sport = :5555 )'
 ```
 
-If Soridormi is not listening, follow `CHROMIE_RUNBOOK.md`; on the original sibling-repo
-layout the simulator was started with:
+The exact live profile/manifest commands are owned by `docs/ACCEPTANCE.md` and
+`config/evidence_profiles.json`; do not copy a historical command if those authorities
+have changed.
 
-```bash
-../soridormi/scripts/start_soridormi_mujoco.sh --no-viewer --keep-running
-```
+## Next evidence boundary
 
-### 2. Capture clean current-commit identity
-
-Use the next unused iteration number; `36` is suggested:
-
-```bash
-python scripts/capture_runtime_identity.py \
-  --orchestrator-env .env.runtime \
-  --output .chromie/evidence/runtime-identity-full-live-iteration-36.json
-```
-
-The identity must report the currently checked-out `origin/main` handoff commit,
-`dirty=false`, deployment complete, and the newly built Agent image. It must contain
-implementation commit `6a5619ab8552...` in its history. Do not add `--allow-dirty` for
-qualification evidence.
-
-### 3. Run one focused vocal/compound cohort
-
-```bash
-python scripts/general_ability_acceptance.py \
-  --mode live-text \
-  --only-case user_probe_walk_while_singing \
-  --only-case debug_bundle_run_15_while_singing \
-  --only-case user_probe_walk_sing_blink_simultaneously \
-  --execute \
-  --grant-confirmation \
-  --assertion-scope user-outcome \
-  --runtime-identity .chromie/evidence/runtime-identity-full-live-iteration-36.json \
-  --evidence-dir .chromie/acceptance/full-live-e2e-iteration-36-focused \
-  --case-timeout-s 900
-```
-
-Judge GI even when a later GA/Planner assertion fails. The retained
-`core_interpretation.json` files must show:
-
-| Case | Required GI Responsibilities |
-|---|---|
-| `user_probe_walk_while_singing` | two: `body_action`, `singing` |
-| `debug_bundle_run_15_while_singing` | two: `body_action`, `singing`; never `media_playback` |
-| `user_probe_walk_sing_blink_simultaneously` | three: `body_action`, `singing`, `body_action` |
-
-Any GI 503, responsibility omission, hidden effect binding, or vocal-mode substitution means
-the GI iteration is not closed. Do not fix GA/Planner symptoms in this scope.
-
-### 4. Run the complete cohort on the same identity
-
-Only after focused GI passes:
-
-```bash
-python scripts/general_ability_acceptance.py \
-  --mode live-text \
-  --execute \
-  --grant-confirmation \
-  --assertion-scope user-outcome \
-  --runtime-identity .chromie/evidence/runtime-identity-full-live-iteration-36.json \
-  --evidence-dir .chromie/acceptance/full-live-e2e-iteration-36 \
-  --case-timeout-s 900
-```
-
-Do not edit source, rebuild, restart, or substitute isolated cases during the 36-case run.
-After it ends, collect exactly one bundle:
-
-```bash
-./scripts/collect_debug_bundle.sh
-```
-
-Then inspect all cases, including mechanical passes:
-
-```bash
-jq '{passed,failed,evidence_level,provenance,failures:[.ability_classes[].cases[] | select(.ok==false) | {case_id,earliest_suspect_boundary,errors}]}' \
-  .chromie/acceptance/full-live-e2e-iteration-36/summary.json
-
-while IFS= read -r file; do
-  jq -r --arg file "$file" \
-    '[($file | split("/")[-2]), (.responsibilities | length | tostring), ([.responsibilities[] | (.local_ref + ":" + .output_mode + ":" + .outcome)] | join(" | "))] | @tsv' \
-    "$file"
-done < <(find .chromie/acceptance/full-live-e2e-iteration-36 \
-  -name core_interpretation.json -type f | sort -V)
-```
-
-### 5. Finish documentation and canonical gates
-
-Update `DEVELOPMENT_CHECKPOINT.md`, this file, and `docs/STATUS.md` with the final identity,
-cohort result, GI judgment, and one bundle path. Then run:
-
-```bash
-python scripts/check_repository_policies.py
-./scripts/run_tests.sh
-python scripts/check_docs.py
-```
-
-Commit and push only after reporting any remaining evidence gaps honestly.
-
-## Deferred failures
-
-Iteration 34's 11 aggregate failures include downstream response wording, GA structured
-output, deep-planner numeric realization, weather timeout/evidence observation, WorkDAG goal
-revision, and warm-latency failures. They are real, but they are intentionally outside this
-GI-only iteration. Do not broaden the patch to make the aggregate score look better.
+GI, GA, and Planner single-authority source closure is implemented. The aggregate now
+identifies the next shared boundary as critical-path resource admission and foreground
+latency, not another semantic reviewer and not yet model selection. Do not restore or
+extend the removed GI, GA, or Planner same-authority review chains.
 
 ## Claim boundary
 
-The retained live evidence is Level C injected text through live services and the Soridormi
-simulator. It is not physical microphone, audible speaker, or physical robot evidence. The
-current clean commit has not yet completed focused live proof, a complete live aggregate, or
-the final canonical gates. Release qualification remains false.
+This is development-only. Automated tests prove the local contract, not current-model
+semantic quality or live robot behavior. Historical live evidence may diagnose the old
+chain but cannot qualify the new one.

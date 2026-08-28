@@ -384,14 +384,34 @@ python scripts/general_ability_acceptance.py --mode level-a \
   --ability-class deterministic_safety_controls
 ```
 
-The manifest lives at
-[`../scenarios/general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json).
-It groups representative scenario files by the general ability class they
-protect: robust intent understanding, stable capability grounding, natural
+There is no central general-ability index or manifest. Every live probe owns
+one self-describing file under
+`scenarios/general_ability/<stage>/<ability-class>/`; Level-A behavior files
+declare their own `general_ability.memberships`. The runner discovers files
+from the directories, derives counts from directory contents, and rebuilds
+ability-class groupings from per-file metadata. An external scheduler can
+therefore shard cases across isolated deployments without splitting or updating
+a shared registry. The discovered metadata groups scenarios by the general
+ability class they protect: robust intent understanding, stable capability grounding, natural
 uncertainty handling, composable action planning, truthful embodied speech,
 tool/conversation lane discipline, deterministic safety controls, and evidence
 claim discipline, plus multi-goal daily-life planning. The runner writes evidence summaries under
 `.chromie/acceptance/general-ability/` unless `--no-write` is supplied.
+
+The live cohort has three ordered stages: 50 `must_pass`, 15 `core`, and 8
+`challenge` cases. The 50-case first stage contains the retained 25-case
+regression cohort plus 25 independently generated common-scene probes. The new
+batch declares scenario-local `provenance` with its origin, batch id, and whether
+it was derived from an existing scenario; this metadata is retained in live-run
+summaries and semantic-review bundles. Stage and difficulty are separate metadata: the directory
+controls promotion order, while each file declares `difficulty=easy|medium|hard`.
+Scenario-local `require_safe_idle=true` makes an executed final safe-idle state
+a non-overridable mechanical assertion; preview output cannot satisfy it.
+Use `--stage must_pass` for the cheapest broad-change gate. In a full run the
+runner always executes every selected case in the current stage and reports all
+of its failures. Only after that stage is complete does a hard deterministic
+failure in `must_pass` prevent `core` and `challenge` from starting; one failed
+case never aborts the remainder of its own stage.
 
 A passing `--mode level-a` run is still Level A deterministic evidence only. It
 does not prove live services, microphone/speaker behavior, simulator execution,
@@ -417,7 +437,7 @@ a second `VoiceAssistant`; it must not create hidden TTS/provider contention and
 then attribute that queue delay to the product path. A resource-contention test is
 a separate declared profile and must retain its competing workload explicitly.
 
-Against deployed services, the same manifest can run live text probes:
+Against deployed services, the same discovered library can run live text probes:
 
 ```bash
 conda run -n Chromie python scripts/general_ability_acceptance.py \
@@ -445,10 +465,20 @@ metrics, and the earliest suspect boundary. The score never overrides a hard
 failure. Use `--only-case CASE_ID` for the originating defect, then run the full
 ability class after the fix.
 
+Live scenario files declare a `hybrid` oracle. Schema, safety, authorization,
+capability arguments, execution truth, provenance, timing, and LLM-integrity
+checks remain deterministic and non-overridable. Natural meaning and response
+quality are declared as semantic dimensions and acceptable outcome regions,
+not exact answer strings. Each retained run writes
+`semantic-review-bundle.json` for the existing `python -m benchmarks.review
+judge` workflow. A mechanically clean run with pending semantic review is
+explicitly marked `qualification_complete=false`; successful evidence
+collection is not a completed semantic qualification.
+
 When the evaluated revision contains unqualified behavior changes, or more than
 one live case is due, do not begin with repeated `--only-case` runs. Bind one
 clean deployed revision and runtime identity, run the complete authoritative
-manifest in one invocation, and keep source and services unchanged between
+directory-discovered cohort in one invocation, and keep source and services unchanged between
 cases. After the cohort exits, collect exactly one correlated bundle before any
 source edit:
 
@@ -456,13 +486,16 @@ source edit:
 ./scripts/collect_debug_bundle.sh
 ```
 
-Judge every case, including mechanical passes, from the aggregate summary and
-bundle; then group failures by the earliest shared boundary. Use
+Judge every executed case, including mechanical passes, from the aggregate
+summary and semantic-review bundle; then group failures by the earliest shared
+boundary. Use
 `--only-case` only after that diagnosis to validate one proposed fix, followed
-by the affected ability class and the complete manifest on the changed
-revision. A hard safety, provenance, service-integrity, or safe-idle failure may
-stop the cohort, but the result is incomplete and cannot support a passing
-claim. See [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
+by the affected ability class and the complete directory-discovered cohort on the changed
+revision. Within `must_pass`, a hard safety, provenance, service-integrity, or
+safe-idle failure is retained and reported alongside the remaining must-pass
+cases, then blocks both later stages. An infrastructure failure that makes
+further cases impossible still leaves the cohort incomplete and cannot support
+a passing claim. See [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
 
 Warm fast-response cases use two non-overlapping contract intervals. The Planner
 budget is measured from the retained `fast_planner_first_response.started_elapsed_ms`
@@ -712,9 +745,8 @@ evidence. Use the general ability runner for behavior claims and
 
 The old standalone text skill sweep has been removed because it can overstate
 coverage and has been observed to fail unclearly when live inventory or service
-calls hang. Add representative live text probes to
-[`../scenarios/general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json)
-instead.
+calls hang. Add one self-describing live text file under the appropriate
+`scenarios/general_ability/<stage>/<ability-class>/` directory instead.
 
 For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
 Goal Interpretation, the goal-driven runtime, the host Trusted Capability Runtime, live Soridormi
@@ -913,7 +945,7 @@ to validate the current goal-driven path. Produce a new clean goal-driven bundle
 when the claim includes the current semantic-authority boundary.
 
 The old standalone text scenario suite has been removed for behavior claims.
-Its useful cases are represented by the general ability manifest so failures
+Its useful cases are represented by the self-describing general-ability scenario library so failures
 are reported by ability class rather than as a flat list of examples. Use:
 
 ```bash

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Model-facing Goal Association DTOs and typed representation only.
 
-Schema construction and deterministic normalization/coverage mechanics live in sibling
+Schema construction and deterministic normalization/conservation mechanics live in sibling
 modules; GoalAssociationResolver remains the sole semantic continuity transaction.
 """
 
@@ -176,8 +176,6 @@ class GoalAssociationModelAssociation(BaseModel):
                 "or resolved_gap_ids"
             )
         return self
-
-
 class GoalAssociationModelBinding(BaseModel):
     """Model-facing semantic binding resolved before planning."""
 
@@ -709,7 +707,6 @@ class GoalSegmentationModelOutput(BaseModel):
             raise ValueError("decision=create_goals requires new_goals")
         return self
 
-
 class GoalAssociationModelOutput(BaseModel):
     """Small discriminated semantic DTO returned by Goal Association."""
 
@@ -776,158 +773,4 @@ class GoalAssociationModelOutput(BaseModel):
             raise ValueError("decision=associate requires associations")
         if self.decision == "create_goals" and not self.new_goals:
             raise ValueError("decision=create_goals requires new_goals")
-        return self
-
-
-class GoalResponsibilityCoverageItem(BaseModel):
-    """One independently audited semantic fragment from the authoritative turn.
-
-    The audit does not create Goals.  It explains how current user meaning is
-    accounted for by already proposed Goal candidates so the Host can reject a
-    structurally incomplete or over-merged segmentation without interpreting the
-    user's words itself.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    source_excerpt: str = Field(min_length=1, max_length=500)
-    role: Literal["responsibility", "constraint", "context", "framing"]
-    coverage: Literal["covered", "missing", "clarification_required", "representation_mismatch"]
-    independently_satisfiable: bool = False
-    candidate_goal_indices: list[int] = Field(default_factory=list, max_length=8)
-    required_goal_shape: Literal[
-        "ordinary",
-        "information_resource",
-        "physical_resource",
-        "persistent_effect",
-    ] = "ordinary"
-    required_information_domain: Literal[
-        "none",
-        "local_clock",
-        "weather_forecast",
-        "external_grounded_information",
-        "direct_environment_perception",
-        "private_runtime_information",
-    ] = "none"
-    required_output_mode: Literal[
-        "none",
-        "speech",
-        "styled_speech",
-        "recitation",
-        "singing",
-        "humming",
-        "nonverbal_vocalization",
-        "body_action",
-        "media_playback",
-        "information",
-        "stateful_effect",
-        "other",
-    ] = "none"
-
-    @field_validator("source_excerpt", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
-
-    @field_validator("candidate_goal_indices")
-    @classmethod
-    def unique_goal_indices(cls, value: list[int]) -> list[int]:
-        if len(value) != len(set(value)):
-            raise ValueError("candidate_goal_indices must be unique")
-        return value
-
-
-    @model_validator(mode="after")
-    def validate_shape(self) -> "GoalResponsibilityCoverageItem":
-        if self.required_goal_shape != "ordinary" and self.role != "responsibility":
-            raise ValueError(
-                "required_goal_shape is valid only on responsibility coverage items"
-            )
-        if self.required_goal_shape == "information_resource":
-            if self.required_information_domain == "none":
-                raise ValueError(
-                    "information_resource coverage requires an information domain"
-                )
-        elif self.required_information_domain != "none":
-            raise ValueError(
-                "required_information_domain is valid only for an information resource"
-            )
-        if self.role != "responsibility" and self.independently_satisfiable:
-            raise ValueError(
-                "only a responsibility may be independently_satisfiable"
-            )
-        if self.role != "responsibility" and self.required_output_mode != "none":
-            raise ValueError(
-                "required_output_mode is valid only on responsibility coverage items"
-            )
-        if self.role in {"context", "framing"}:
-            if self.coverage != "covered" or self.candidate_goal_indices:
-                raise ValueError(
-                    "context and framing are acknowledged without Goal ownership"
-                )
-            return self
-        if self.coverage in {"covered", "clarification_required"}:
-            if not self.candidate_goal_indices:
-                raise ValueError(
-                    "covered or clarification-required responsibility/constraint "
-                    "requires provisional Goal ownership"
-                )
-            if self.role == "responsibility" and len(self.candidate_goal_indices) != 1:
-                raise ValueError(
-                    "one responsibility must map to exactly one Goal candidate"
-                )
-        elif self.coverage == "representation_mismatch":
-            if not self.candidate_goal_indices:
-                raise ValueError(
-                    "representation_mismatch requires the mismatched Goal candidate"
-                )
-            if self.role == "responsibility" and len(self.candidate_goal_indices) != 1:
-                raise ValueError(
-                    "one mismatched responsibility must identify exactly one Goal candidate"
-                )
-        elif self.candidate_goal_indices:
-            raise ValueError(
-                "missing meaning cannot claim Goal ownership"
-            )
-        return self
-
-
-class GoalResponsibilityCoverageCertificate(BaseModel):
-    """Authority-ephemeral proof over one candidate Goal set.
-
-    The model authors only source-grounded item judgments.  The Host derives the
-    verdict and every unjustified candidate index, so neither can drift or need a
-    repair call.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    responsibility_items: list[GoalResponsibilityCoverageItem] = Field(
-        min_length=1,
-        max_length=8,
-    )
-    supporting_items: list[GoalResponsibilityCoverageItem] = Field(
-        max_length=16,
-    )
-    reason_summary: str = Field(min_length=1, max_length=1200)
-
-    @property
-    def items(self) -> list[GoalResponsibilityCoverageItem]:
-        return [*self.responsibility_items, *self.supporting_items]
-
-    @field_validator("reason_summary", mode="before")
-    @classmethod
-    def normalize_reason_summary(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
-
-    @model_validator(mode="after")
-    def validate_material_evidence(self) -> "GoalResponsibilityCoverageCertificate":
-        if any(item.role != "responsibility" for item in self.responsibility_items):
-            raise ValueError(
-                "responsibility_items accepts only role=responsibility"
-            )
-        if any(item.role == "responsibility" for item in self.supporting_items):
-            raise ValueError(
-                "supporting_items accepts only constraint, context, or framing roles"
-            )
         return self

@@ -131,5 +131,48 @@
       "goal_association",
       "fast_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "Conversation cannot inherit stale physical authority.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "A stale multi-goal projection left by completed motion cannot cross-authorize new physical effects on a social turn.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Planner contract",
+          "Fast Planner communication",
+          "Trusted runtime adapter",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "continuous_cognition_recovery",
+        "title": "Continuous Cognition and Recovery",
+        "general_rule": "Meaningful runtime Evidence or provider-state change may reactivate the same Planner without fabricating a user turn, replaying completed work, or letting stale request/Plan provenance regain authority.",
+        "rationale": "Later conversational cognition cannot redispatch already completed physical work.",
+        "root_cause_boundaries": [
+          "Runtime Evidence",
+          "CognitiveOpportunity",
+          "Planner re-entry",
+          "Conversation state",
+          "Trusted Capability Runtime"
+        ]
+      }
+    ]
   }
 }

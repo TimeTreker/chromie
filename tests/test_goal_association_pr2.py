@@ -20,7 +20,6 @@ from agent.app.goal_association_contract import (
     GoalAssociationModelInformationResourceResponsibility,
     GoalAssociationModelOutput,
     GoalAssociationModelPhysicalResourceResponsibility,
-    GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
@@ -151,60 +150,6 @@ def create_goals(*goals: dict) -> dict:
         "confidence": 1.0,
         "reason_summary": "The candidate set represents the current responsibility.",
     }
-
-
-def coverage_item(
-    source_excerpt: str,
-    *goal_indices: int,
-    role: str = "responsibility",
-    coverage: str = "covered",
-    independently_satisfiable: bool = True,
-    temporal_dimensions: list[str] | None = None,
-    required_goal_shape: str = "ordinary",
-    required_information_domain: str | None = None,
-    required_output_mode: str | None = None,
-) -> dict:
-    return {
-        "source_excerpt": source_excerpt,
-        "role": role,
-        "coverage": coverage,
-        "independently_satisfiable": (
-            independently_satisfiable if role == "responsibility" else False
-        ),
-        "candidate_goal_indices": list(goal_indices),
-        "required_goal_shape": required_goal_shape,
-        "required_information_domain": (
-            required_information_domain
-            if required_information_domain is not None
-            else "weather_forecast"
-            if required_goal_shape == "information_resource"
-            else "none"
-        ),
-        "required_output_mode": (
-            required_output_mode
-            if required_output_mode is not None
-            else "information"
-            if required_goal_shape == "information_resource"
-            else "stateful_effect"
-            if required_goal_shape == "persistent_effect"
-            else "body_action"
-            if required_goal_shape == "physical_resource"
-            else "none"
-        ),
-    }
-
-
-def certificate(*items: dict) -> dict:
-    return {
-        "responsibility_items": [
-            item for item in items if item.get("role") == "responsibility"
-        ],
-        "supporting_items": [
-            item for item in items if item.get("role") != "responsibility"
-        ],
-        "reason_summary": "The item judgments prove candidate responsibility coverage.",
-    }
-
 
 
 def typed_responsibilities(*items: dict) -> list[CognitiveResponsibilityProposal]:
@@ -503,7 +448,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             physical_schema["properties"]["delivery_mode"],
         )
 
-    def test_resource_and_coverage_invariants_are_in_decoder_schemas(self):
+    def test_resource_and_responsibility_conservation_invariants_are_in_decoder_schema(self):
         goal_schema = ga_schema.goal_association_response_schema(
             GoalSegmentationModelOutput,
             [],
@@ -744,124 +689,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             ],
         )
 
-        coverage_schema = ga_schema.coverage_certificate_response_schema(
-            [
-                GoalAssociationModelGoal.model_validate(
-                    goal("Walk forward.", "body_action")
-                )
-            ]
-        )
-        Draft202012Validator.check_schema(coverage_schema)
-        coverage_validator = Draft202012Validator(coverage_schema)
-        coverage_items_schema = coverage_schema["properties"]["responsibility_items"]
-        self.assertEqual(coverage_items_schema["minItems"], 1)
-        covered_responsibility_branch = coverage_items_schema["items"]["oneOf"][0]
-        self.assertEqual(
-            covered_responsibility_branch["properties"]["role"]["const"],
-            "responsibility",
-        )
-        self.assertEqual(
-            covered_responsibility_branch["properties"]["required_goal_shape"][
-                "const"
-            ],
-            "ordinary",
-        )
-        self.assertEqual(
-            covered_responsibility_branch["properties"]["required_output_mode"][
-                "const"
-            ],
-            "body_action",
-        )
-        self.assertIs(
-            covered_responsibility_branch["properties"][
-                "independently_satisfiable"
-            ]["const"],
-            True,
-        )
-        supporting_items_schema = coverage_schema["properties"]["supporting_items"]
-        self.assertNotIn(
-            "temporal_dimensions",
-            supporting_items_schema["items"]["properties"],
-        )
-        self.assertIn(
-            "required_information_domain",
-            covered_responsibility_branch["required"],
-        )
-        self.assertIn(
-            "required_output_mode",
-            covered_responsibility_branch["required"],
-        )
-        constraint_only = certificate(
-            coverage_item(
-                "tonight",
-                role="constraint",
-            )
-        )
-        self.assertTrue(list(coverage_validator.iter_errors(constraint_only)))
-        invalid_context = certificate(
-            {
-                "source_excerpt": "I am a little tired",
-                "role": "context",
-                "coverage": "missing",
-                "independently_satisfiable": True,
-                "candidate_goal_indices": [],
-            }
-        )
-        self.assertTrue(list(coverage_validator.iter_errors(invalid_context)))
-        valid_context = certificate(
-            coverage_item(
-                "help me decide",
-                0,
-                required_output_mode="body_action",
-            ),
-            coverage_item(
-                "I am a little tired",
-                role="context",
-                independently_satisfiable=False,
-            )
-        )
-        self.assertEqual(list(coverage_validator.iter_errors(valid_context)), [])
-        recovered_context = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item("Walk forward", 0),
-                {
-                    "source_excerpt": "I am a little tired",
-                    "role": "context",
-                    "coverage": "covered",
-                    "independently_satisfiable": True,
-                    "candidate_goal_indices": [],
-                    "required_goal_shape": "ordinary",
-                    "required_information_domain": "none",
-                    "required_output_mode": "none",
-                },
-            ),
-            request=request("Walk forward. I am a little tired.", language="en-US"),
-            goal_count=1,
-            candidate_goals=[
-                GoalAssociationModelGoal.model_validate(
-                    goal("Walk forward.", "body_action")
-                )
-            ],
-        )
-        self.assertFalse(recovered_context.supporting_items[0].independently_satisfiable)
-
-        source_bound_coverage_schema = (
-            ga_schema.coverage_certificate_response_schema(
-                [
-                    GoalAssociationModelGoal.model_validate(
-                        goal("Walk forward.", "body_action")
-                    )
-                ],
-                authoritative_turn="边跑边唱歌。",
-            )
-        )
-        excerpt_contract = source_bound_coverage_schema["$defs"][
-            "GoalResponsibilityCoverageItem"
-        ]["properties"]["source_excerpt"]
-        self.assertIn("边跑边唱歌", excerpt_contract["enum"])
-        self.assertNotIn("边跑的唱歌", excerpt_contract["enum"])
-
-    def test_resource_and_coverage_prompts_share_information_ownership(self):
+    def test_primary_prompt_owns_information_and_effect_semantics(self):
         req = request(
             "I am in chongqing now, please help me check whether it will rain "
             "tonight and whether it it cold",
@@ -888,58 +716,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn(
             "never decompose one GI-owned composite binding",
             interpretation_prompt,
-        )
-
-        coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
-            request=req,
-            raw=create_goals(
-                goal(
-                    "Check Chongqing weather tonight.",
-                    "information",
-                    resource=resource_responsibility(
-                        kind="information",
-                        description="Chongqing weather tonight",
-                        quantity="",
-                        attributes=[
-                            binding("location", "location", "chongqing"),
-                            binding("time", "time", "tonight"),
-                            binding("aspects", "list", "rain, temperature"),
-                        ],
-                        source_status="provider_resolved",
-                    ),
-                )
-            ),
-        )
-        self.assertIn(
-            "Multiple aspects requested from one information result likewise remain "
-            "one responsibility",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "requested location, time, and result aspects are covered only by "
-            "resource_responsibility.query_scope",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "keep that complete value byte-for-byte in one acquisition binding",
-            coverage_prompt,
-        )
-        coverage_system = ga_prompt.responsibility_coverage_system_prompt()
-        self.assertIn("source-grounded human scope", coverage_system)
-        self.assertIn("do not require date/period fields", coverage_prompt)
-        self.assertNotIn("temporal_dimensions", coverage_system)
-        self.assertNotIn("date_and_day_part", coverage_prompt)
-        self.assertIn(
-            "Never return only constraints",
-            coverage_prompt,
-        )
-        self.assertIn("required_goal_shape", coverage_prompt)
-        self.assertIn("Reference grounding is part of responsibility coverage", coverage_prompt)
-        self.assertIn("silently invents a generic object", coverage_prompt)
-        self.assertIn("multiple scene candidates remain plausible", coverage_prompt)
-        self.assertIn(
-            "if the reason says a candidate preserves or validly represents a fragment",
-            coverage_prompt,
         )
 
         execution_contract = ga_prompt.build_prompt(
@@ -1001,209 +777,16 @@ class GoalExecutionContractTests(unittest.TestCase):
             "重庆",
         )
 
-    def test_certificate_has_no_model_authored_verdict(self):
-        parsed = GoalResponsibilityCoverageCertificate.model_validate(
-            certificate(coverage_item("Blink twice.", 0))
-        )
-        self.assertEqual(len(parsed.items), 1)
-        with self.assertRaises(ValidationError):
-            GoalResponsibilityCoverageCertificate.model_validate(
-                {
-                    **certificate(coverage_item("Blink twice.", 0)),
-                    "decision": "accept",
-                }
-            )
-
-    def test_coverage_certificate_tolerates_redundant_overlapping_excerpt_evidence(self):
-        parsed = GoalResponsibilityCoverageCertificate.model_validate(
-            certificate(
-                coverage_item("帮我们选一个", 0),
-                coverage_item(
-                    "帮我们选一个",
-                    0,
-                    role="constraint",
-                    independently_satisfiable=False,
-                ),
-            )
-        )
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed, goal_count=1
-        )
-        self.assertEqual(verdict, "accept")
-        self.assertEqual(problems, [])
-
-    def test_representation_mismatch_rejects_state_change_as_information_resource(self):
-        parsed = GoalResponsibilityCoverageCertificate.model_validate(
-            certificate(
-                coverage_item(
-                    "Set a reminder for tomorrow morning",
-                    0,
-                    role="responsibility",
-                    coverage="representation_mismatch",
-                    independently_satisfiable=True,
-                )
-            )
-        )
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed, goal_count=1
-        )
-        self.assertEqual(verdict, "reject")
-        self.assertIn(
-            "representation_mismatch:responsibility:Set a reminder for tomorrow morning",
-            problems,
-        )
-
-    def test_representation_mismatch_must_identify_the_mismatched_candidate(self):
-        with self.assertRaises(ValidationError):
-            GoalResponsibilityCoverageCertificate.model_validate(
-                certificate(
-                    coverage_item(
-                        "帮我拿杯水",
-                        role="responsibility",
-                        coverage="representation_mismatch",
-                        independently_satisfiable=True,
-                    )
-                )
-            )
-
-    def test_coverage_normalizes_missing_with_named_candidate_to_representation_mismatch(self):
-        req = request("今天晚上有大雨吗？")
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "今天晚上有大雨吗？",
-                    0,
-                    coverage="missing",
-                    independently_satisfiable=True,
-                )
-            ),
-            request=req,
-            goal_count=1,
-        )
-
-        self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
-        self.assertEqual(parsed.items[0].candidate_goal_indices, [0])
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed, goal_count=1
-        )
-        self.assertEqual(verdict, "reject")
-        self.assertIn(
-            "representation_mismatch:responsibility:今天晚上有大雨吗？",
-            problems,
-        )
-
-    def test_coverage_removes_only_exact_duplicate_item_noise(self):
-        req = request("帮我看看现在几点。")
-        item = coverage_item(
-            "帮我看看现在几点。",
-            0,
-            required_goal_shape="information_resource",
-        )
-        raw = certificate(item, dict(item))
-
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            raw,
-            request=req,
-            goal_count=1,
-        )
-
-        self.assertEqual(len(parsed.responsibility_items), 1)
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed,
-            goal_count=1,
-        )
-        self.assertEqual(verdict, "accept")
-        self.assertEqual(problems, [])
-
-    def test_non_information_coverage_clears_redundant_information_domain(self):
-        req = request("bring the bottle to me", language="en-US")
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "bring the bottle to me",
-                    0,
-                    required_goal_shape="physical_resource",
-                    required_information_domain="direct_environment_perception",
-                )
-            ),
-            request=req,
-            goal_count=1,
-        )
-
-        self.assertEqual(parsed.items[0].required_goal_shape, "physical_resource")
-        self.assertEqual(parsed.items[0].required_information_domain, "none")
-
-    def test_supporting_coverage_clears_ineligible_output_mode(self):
-        req = request("singing while blinking", language="en-US")
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item("singing", 0),
-                coverage_item(
-                    "while blinking",
-                    0,
-                    role="constraint",
-                    required_output_mode="body_action",
-                ),
-            ),
-            request=req,
-            goal_count=1,
-        )
-
-        self.assertEqual(parsed.supporting_items[0].required_output_mode, "none")
 
 
-    def test_context_coverage_clears_ineligible_goal_ownership(self):
-        req = request("there is a bottle ahead; bring it", language="en-US")
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item("bring it", 0),
-                coverage_item(
-                    "there is a bottle ahead",
-                    0,
-                    role="context",
-                    required_output_mode="body_action",
-                ),
-            ),
-            request=req,
-            goal_count=1,
-        )
 
-        context_item = parsed.supporting_items[0]
-        self.assertEqual(context_item.candidate_goal_indices, [])
-        self.assertEqual(context_item.required_output_mode, "none")
 
-    def test_coverage_rejects_wrong_requested_output_mode(self):
-        req = request("sing while moving", language="en-US")
-        candidate = GoalAssociationModelGoal.model_validate(
-            goal(
-                "sing while moving",
-                "body_action",
-                bindings=[binding("activity", "activity", "singing")],
-            )
-        )
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "sing",
-                    0,
-                    required_output_mode="singing",
-                )
-            ),
-            request=req,
-            goal_count=1,
-            candidate_goals=[candidate],
-        )
 
-        self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed,
-            goal_count=1,
-        )
-        self.assertEqual(verdict, "reject")
-        self.assertIn(
-            "required_output_mode:singing:responsibility:sing",
-            problems,
-        )
+
+
+
+
+
 
     def test_goal_candidate_must_conserve_interpreted_output_mode(self):
         req = request("sing a song", language="en-US").model_copy(
@@ -1267,7 +850,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
         )
 
-        conflicts = ga_validation.source_grounded_binding_coverage_conflicts(
+        conflicts = ga_validation.source_grounded_binding_conservation_conflicts(
             missing_source,
             request=req,
         )
@@ -1293,7 +876,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            ga_validation.source_grounded_binding_coverage_conflicts(
+            ga_validation.source_grounded_binding_conservation_conflicts(
                 grounded_source,
                 request=req,
             ),
@@ -1340,7 +923,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ga_validation.source_grounded_binding_coverage_conflicts(
+            ga_validation.source_grounded_binding_conservation_conflicts(
                 output,
                 request=req,
             ),
@@ -1393,7 +976,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ga_validation.source_grounded_binding_coverage_conflicts(
+            ga_validation.source_grounded_binding_conservation_conflicts(
                 output,
                 request=req,
             ),
@@ -1438,7 +1021,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ga_validation.source_grounded_binding_coverage_conflicts(
+            ga_validation.source_grounded_binding_conservation_conflicts(
                 output,
                 request=req,
             ),
@@ -1484,7 +1067,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ga_validation.source_grounded_binding_coverage_conflicts(
+            ga_validation.source_grounded_binding_conservation_conflicts(
                 output,
                 request=req,
             ),
@@ -1541,7 +1124,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            ga_validation.source_grounded_binding_coverage_conflicts(
+            ga_validation.source_grounded_binding_conservation_conflicts(
                 output,
                 request=req,
             ),
@@ -1885,108 +1468,22 @@ class GoalExecutionContractTests(unittest.TestCase):
 
 
 
-    def test_coverage_rejects_wrong_information_domain(self):
-        req = request("你觉得外面有人吗？")
-        candidate = GoalAssociationModelGoal.model_validate(
-            goal(
-                "Determine whether someone is outside.",
-                "information",
-                resource=resource_responsibility(
-                    kind="information",
-                    information_domain="weather_forecast",
-                    description="whether someone is outside",
-                    attributes=[binding("location", "place", "外面")],
-                ),
-            )
-        )
 
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "外面有人吗",
-                    0,
-                    required_goal_shape="information_resource",
-                    required_information_domain="direct_environment_perception",
-                )
-            ),
-            request=req,
-            goal_count=1,
-            candidate_goals=[candidate],
-        )
 
-        self.assertEqual(parsed.items[0].coverage, "representation_mismatch")
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed,
-            goal_count=1,
-        )
-        self.assertEqual(verdict, "reject")
-        self.assertIn(
-            "required_information_domain:direct_environment_perception:"
-            "responsibility:外面有人吗",
-            problems,
-        )
-
-    def test_information_coverage_decoder_does_not_self_certify_candidate_domain(self):
-        candidate = GoalAssociationModelGoal.model_validate(
-            goal(
-                "Determine whether it will rain.",
-                "information",
-                resource=resource_responsibility(
-                    kind="information",
-                    information_domain="external_grounded_information",
-                    description="whether it will rain",
-                    attributes=[binding("location", "place", "outside")],
-                ),
-            )
-        )
-        schema = ga_schema.coverage_certificate_response_schema(
-            [candidate], authoritative_turn="Will it rain?"
-        )
-        branches = schema["properties"]["responsibility_items"]["items"][
-            "oneOf"
-        ]
-        covered = next(
-            branch
-            for branch in branches
-            if branch["properties"]["coverage"].get("const") == "covered"
-            and branch["properties"]["candidate_goal_indices"].get("const")
-            == [0]
-        )
-        domain = covered["properties"]["required_information_domain"]
-
-        self.assertNotIn("const", domain)
-        self.assertIn("weather_forecast", domain["enum"])
-        self.assertIn("external_grounded_information", domain["enum"])
-
-    def test_fresh_audit_may_restate_span_without_changing_candidate_classification(self):
+    def test_primary_result_preserves_two_responsibilities_without_a_reviewer(self):
         candidates = create_goals(
             goal("Look at me", "body_action", source_responsibility_refs=["r1"]),
-            goal("blink twice", "body_action", source_responsibility_refs=["r2"]),
-        )
-        initial_coverage = certificate(
-            coverage_item(
-                "Look at me", 0, required_output_mode="body_action"
-            ),
-            coverage_item(
-                "blink twice", 1, required_output_mode="body_action"
-            ),
-            coverage_item(
-                "Look at me, then blink twice.",
-                0,
-                required_output_mode="body_action",
+            goal(
+                "blink twice",
+                "body_action",
+                source_responsibility_refs=["r2"],
+                bindings=[
+                    binding("after", "sequence_ref", "r1"),
+                    binding("count", "count", "2"),
+                ],
             ),
         )
-        final_coverage = certificate(
-            coverage_item(
-                "Look at me", 0, required_output_mode="body_action"
-            ),
-            coverage_item(
-                "then blink twice", 1, required_output_mode="body_action"
-            ),
-        )
-        ollama = ScriptedOllama(
-            [candidates, initial_coverage, candidates, final_coverage]
-        )
+        ollama = ScriptedOllama([candidates])
         req = request("Look at me, then blink twice.", language="en-US")
         req = req.model_copy(
             update={
@@ -2013,139 +1510,13 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(result.resolution_status, "resolved")
         self.assertEqual(len(result.new_goals), 2)
-
-    def test_typed_coverage_feedback_repairs_bundle_goal_shape_once(self):
-        initial = create_goals(
-            goal(
-                "determine whether it will rain in Chongqing tonight",
-                "information",
-                bindings=[
-                    binding("location", "location", "重庆"),
-                    binding("time", "day_part", "night"),
-                ],
-            )
-        )
-        rejected_coverage = certificate(
-            coverage_item(
-                "今晚",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-            ),
-            coverage_item(
-                "重庆",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-            ),
-            coverage_item(
-                "会不会下雨",
-                0,
-                required_goal_shape="information_resource",
-            ),
-            coverage_item("哦", role="framing", independently_satisfiable=False),
-        )
-        corrected = create_goals(
-            goal(
-                "determine whether it will rain in Chongqing tonight",
-                "information",
-                resource=resource_responsibility(
-                    kind="information",
-                    description="重庆今晚降雨情况",
-                    attributes=[
-                        binding("location", "location", "重庆"),
-                        binding("temporal_scope", "temporal_scope", "今晚"),
-                        binding("requested_aspect", "weather_aspect", "rain"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        accepted_coverage = certificate(
-            coverage_item(
-                "今晚",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-            ),
-            coverage_item(
-                "重庆",
-                0,
-                role="constraint",
-                independently_satisfiable=False,
-            ),
-            coverage_item(
-                "会不会下雨",
-                0,
-                required_goal_shape="information_resource",
-            ),
-            coverage_item("哦", role="framing", independently_satisfiable=False),
-        )
-        ollama = ScriptedOllama(
-            [initial, rejected_coverage, corrected, accepted_coverage]
-        )
-        req = request("今晚重庆会不会下雨哦？")
-        req = req.model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "r1",
-                        "outcome": "determine whether it will rain in Chongqing tonight",
-                        "bindings": {"location": "重庆", "time": "tonight"},
-                        "confidence": 0.95,
-                    }
-                )
-            }
-        )
-
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(req))
-
-        self.assertEqual(result.resolution_status, "resolved")
-        resource = result.new_goals[0].resource_responsibility.resource
-        self.assertEqual(resource.attributes["temporal_scope"]["value"], "今晚")
-        fresh_prompt = str(ollama.prompts[2][0])
-        self.assertIn(
-            "required_goal_shape:information_resource:responsibility:会不会下雨",
-            fresh_prompt,
-        )
-        self.assertIn("source-grounded WHAT", fresh_prompt)
-        self.assertNotIn("temporal_dimensions", fresh_prompt)
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(
-            [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
+            result.metadata["responsibility_conservation"]["mapped_refs"],
+            ["r1", "r2"],
         )
 
-    def test_coverage_keeps_provisional_owner_for_gi_unresolved_meaning(self):
-        req = request(
-            "把那个拿过来",
-            interpretation_unresolved=["那个 refers to more than one object"],
-        )
-        parsed = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(
-                coverage_item(
-                    "那个",
-                    0,
-                    coverage="clarification_required",
-                    independently_satisfiable=True,
-                )
-            ),
-            request=req,
-            goal_count=1,
-        )
 
-        self.assertEqual(parsed.items[0].coverage, "clarification_required")
-        self.assertEqual(parsed.items[0].candidate_goal_indices, [0])
-        verdict, problems = ga_validation.coverage_verdict(
-            parsed,
-            goal_count=1,
-        )
-        self.assertEqual(verdict, "accept")
-        self.assertEqual(problems, [])
 
     def test_goal_association_projection_omits_fast_planner_response_wording(self):
         req = request("今天晚上有大雨吗？")
@@ -2187,47 +1558,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("authored concurrently", prompt)
         self.assertIn("must never become, justify, or be copied", prompt)
 
-    def test_fresh_reinterpretation_keeps_fast_responsibility_evidence(self):
-        req = request("你能往前走个100米，那边有个水瓶，帮我拿杯水可以吗？")
-        req = req.model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-{
-                        "local_ref": "responsibility-1",
-                        "outcome": "拿一杯水",
-                        "bindings": {
-                            "resource": "水",
-                            "source": "水瓶",
-                            "recipient": "我",
-                        },
-                        "confidence": 0.95,
-                    }
-                ),
-                "context": dict(req.context),
-            }
-        )
-        prompt = ga_prompt.build_fresh_interpretation_prompt(
-            request=req,
-            candidate_goals=[],
-            output_type=GoalSegmentationModelOutput,
-            problems=["unjustified_goal_indices:1"],
-        )
-        self.assertIn('"outcome":"拿一杯水"', prompt)
-        self.assertIn("Do not discard independently supported current-turn Responsibility evidence", prompt)
-        self.assertIn("Removing an unjustified sibling Goal never permits dropping", prompt)
 
-    def test_coverage_prompt_distinguishes_preferences_state_changes_and_information(self):
-        prompt = ga_prompt.build_responsibility_coverage_prompt(
-            request=request("I want noodles, my sister wants rice; help us choose one.", language="en-US"),
-            raw=create_goals(goal("Choose lunch fairly.", "speech")),
-        )
-        self.assertIn("Stated preferences", prompt)
-        self.assertIn("changes what counts as a valid decision", prompt)
-        self.assertIn("must be role=constraint", prompt)
-        self.assertIn("state mutation or deferred effect", prompt)
-        self.assertIn("representation_mismatch", prompt)
-        self.assertIn("drops or generalizes a material qualifier", prompt)
-        self.assertIn("candidate_goal_indices must be empty", prompt)
 
     def test_resource_binding_duplicates_are_mechanically_dropped(self):
         resource = resource_responsibility(
@@ -2379,36 +1710,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertNotIn("description", unchanged["new_goals"][0])
         self.assertEqual(recovered, [])
 
-    def test_fresh_interpretation_explains_ordinary_effect_shape(self):
-        prompt = ga_prompt.build_fresh_interpretation_prompt(
-            request=request("你往前走 10 秒。"),
-            candidate_goals=[],
-            output_type=GoalSegmentationModelOutput,
-            problems=["required_goal_shape:ordinary:responsibility:你往前走 10 秒"],
-        )
 
-        self.assertIn("required_goal_shape:ordinary", prompt)
-        self.assertIn("must have no resource_responsibility", prompt)
-        self.assertIn("body motion, locomotion", prompt)
-        self.assertIn("top-level semantic bindings", prompt)
-
-    def test_fresh_interpretation_requires_known_physical_source_grounding(self):
-        prompt = ga_prompt.build_fresh_interpretation_prompt(
-            request=request(
-                "bring the bottle from 50 meters ahead",
-                language="en-US",
-            ),
-            candidate_goals=[],
-            output_type=GoalSegmentationModelOutput,
-            problems=[
-                "missing_source_grounded_binding=new_goals[0] missing='50 meters'",
-                "missing_source_grounded_binding=new_goals[0] missing='ahead'",
-            ],
-        )
-
-        self.assertIn("source.status=known", prompt)
-        self.assertIn("source.acquisition_bindings", prompt)
-        self.assertIn("unknown is not a placeholder", prompt)
 
     def test_unentailed_resource_query_location_is_dropped_without_replacement(self):
         raw = create_goals(
@@ -2515,7 +1817,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             prompt,
         )
 
-    def test_goal_prompts_distinguish_body_action_from_physical_resource(self):
+    def test_primary_goal_prompt_distinguishes_body_action_from_physical_resource(self):
         req = request(
             "Run forward for 15 seconds while singing.",
             language="en-US",
@@ -2529,49 +1831,9 @@ class GoalExecutionContractTests(unittest.TestCase):
             [],
             output_type=GoalSegmentationModelOutput,
         )
-        coverage_system = ga_prompt.responsibility_coverage_system_prompt()
-
         self.assertIn("distinct concrete object", primary_prompt)
         self.assertIn("non-resource body_action Goals", primary_prompt)
         self.assertIn("Responsibility conservation is strict", primary_prompt)
-        self.assertIn("physical resource", coverage_system)
-        self.assertIn("coverage=representation_mismatch", coverage_system)
-        self.assertIn(
-            "Coordination grammar never demotes a positive effect to a constraint",
-            coverage_system,
-        )
-        self.assertIn(
-            "cross-check the JSON against reason_summary",
-            coverage_system,
-        )
-
-        coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
-            request=req,
-            raw=create_goals(
-                goal("run forward for 15 seconds", "body_action"),
-                goal(
-                    "sing while running",
-                    "singing",
-                    source_responsibility_refs=["r2"],
-                ),
-            ),
-        )
-        self.assertIn(
-            "each positive effect remains in responsibility_items",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "each positive effect entailed by the final turn needs a "
-            "role=responsibility owner",
-            coverage_prompt,
-        )
-        self.assertIn("Authoritative Responsibility cross-check list", coverage_prompt)
-        self.assertIn('"local_ref":"r2"', coverage_prompt)
-        self.assertIn(
-            "The structured arrays, role, and coverage must express the same "
-            "conclusion as reason_summary",
-            coverage_prompt,
-        )
 
     def test_no_candidate_segmentation_prompt_fits_qualified_8k_preflight(self):
         req = request("你往前走 10 秒。")
@@ -2594,36 +1856,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("distinct concrete object", prompt)
         self.assertIn("non-resource body_action Goals", prompt)
         self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
-
-        coverage_prompt = ga_prompt.build_responsibility_coverage_prompt(
-            request=req,
-            raw=create_goals(
-                goal(
-                    "move forward for 10 seconds",
-                    "body_action",
-                    bindings=[
-                        binding("distance_duration", "duration", "10 秒")
-                    ],
-                )
-            ),
-        )
-        coverage_input_chars = len(coverage_prompt) + len(
-            ga_prompt.responsibility_coverage_system_prompt()
-        )
-        self.assertLessEqual(coverage_input_chars, 11_264)
-        self.assertIn("Duration is never a second outcome", coverage_prompt)
-        self.assertIn(
-            "a constraint belongs on the same candidate as the responsibility",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "typed bindings as authoritative candidate evidence",
-            coverage_prompt,
-        )
-        self.assertIn(
-            "do not call it a representation mismatch merely because the modifier",
-            ga_prompt.responsibility_coverage_system_prompt(),
-        )
 
     def test_existing_goal_association_prompt_fits_qualified_8k_preflight(self):
         resolver = GoalAssociationResolver(FakeOllama({}))
@@ -2710,12 +1942,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(value.value, "今晚")
 
-    def test_coverage_contract_has_no_provider_temporal_realization_fields(self):
-        schema = ga_schema.coverage_certificate_response_schema(
-            [GoalAssociationModelGoal.model_validate(goal("Check weather.", "information", resource=resource_responsibility(kind="information", description="weather", attributes=[binding("temporal_scope", "temporal_scope", "今晚")], source_status="provider_resolved")))]
-        )
-        properties = schema["$defs"]["GoalResponsibilityCoverageItem"]["properties"]
-        self.assertNotIn("temporal_dimensions", properties)
 
 
 class GoalAssociationTransactionTests(unittest.TestCase):
@@ -2734,326 +1960,28 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         self.assertEqual(result.resolution_status, terminal)
         self.assertEqual(transaction["terminal_state"], terminal if terminal == "fail_closed" else "commit")
         self.assertEqual(transaction["logical_invocation_count"], len(families))
-        self.assertEqual(transaction["logical_invocation_budget"], 5)
+        self.assertEqual(transaction["logical_invocation_budget"], 2)
         self.assertEqual(transaction["prompt_families"], families)
         self.assertEqual(
             [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
             families,
         )
 
-    def test_weather_material_modifier_and_planner_progress_recover_to_one_goal(self):
-        req = request("你好，我在重庆，今天晚上有大雨吗？")
-        req = req.model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-{
-                        "local_ref": "weather_1",
-                        # Simulate the retained live GI defect: the fast proposal
-                        # generalized 大雨 to rain. GA coverage must not commit it.
-                        "outcome": "确认重庆今晚是否下雨",
-                        "bindings": {"location": "重庆", "time": "今天晚上"},
-                        "confidence": 0.95,
-                    }
-                ),
-                "context": {
-                    **req.context,
-                    "fast_planner_advance": {
-                        "covered_responsibility_refs": ["weather_1"],
-                        "continuations": ["goal_association"],
-                        "immediate_vocal_activity": {
-                            "activity_id": "vocal_1",
-                            "role": "progress",
-                            "response_text": "我看看今晚会不会有大雨～",
-                            "source_responsibility_refs": ["weather_1"],
-                        },
-                        "confidence": 0.95,
-                    },
-                }
-            }
-        )
-        initial = create_goals(
-            goal(
-                "Confirm whether it rains in Chongqing tonight.",
-                "information",
-                source_responsibility_refs=["weather_1"],
-                resource=resource_responsibility(
-                    kind="information",
-                    description="Chongqing rain tonight",
-                    attributes=[
-                        binding("location", "place", "重庆"),
-                        binding("temporal_scope", "temporal_scope", "今天晚上"),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            ),
-        )
-        rejected_coverage = certificate(
-            coverage_item(
-                "你好", role="framing", independently_satisfiable=False
-            ),
-            coverage_item(
-                "我在重庆", role="context", independently_satisfiable=False
-            ),
-            # Retained live malformed shape: missing plus candidate index.
-            coverage_item(
-                "今天晚上有大雨吗？",
-                0,
-                coverage="missing",
-                independently_satisfiable=True,
-                required_goal_shape="information_resource",
-            ),
-        )
-        corrected = create_goals(
-            goal(
-                "确认重庆今天晚上是否有大雨。",
-                "information",
-                source_responsibility_refs=["weather_1"],
-                resource=resource_responsibility(
-                    kind="information",
-                    description="重庆今晚大雨情况",
-                    attributes=[
-                        binding("location", "place", "重庆"),
-                        binding("temporal_scope", "temporal_scope", "今天晚上"),
-                        binding(
-                            "precipitation_severity",
-                            "severity",
-                            "heavy",
-                        ),
-                    ],
-                    source_status="provider_resolved",
-                ),
-            )
-        )
-        final_coverage = certificate(
-            coverage_item(
-                "你好", role="framing", independently_satisfiable=False
-            ),
-            coverage_item(
-                "我在重庆", role="context", independently_satisfiable=False
-            ),
-            coverage_item(
-                "今天晚上有大雨吗？",
-                0,
-                required_goal_shape="information_resource",
-            ),
-        )
-        ollama = ScriptedOllama(
-            [initial, rejected_coverage, corrected, final_coverage]
-        )
-
-        result = self._resolve(ollama, req)
-
-        self.assertEqual(result.resolution_status, "resolved")
-        self.assertEqual(len(result.new_goals), 1)
-        resource = result.new_goals[0].resource_responsibility.resource
-        self.assertEqual(
-            resource.attributes["precipitation_severity"]["value"],
-            "heavy",
-        )
-        self.assertEqual(resource.attributes["temporal_scope"]["value"], "今天晚上")
-        families = [kwargs["prompt_family"] for _, kwargs in ollama.prompts]
-        self.assertEqual(
-            families,
-            [
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
-        primary_prompt = str(ollama.prompts[0][0])
-        self.assertNotIn("我看看今晚会不会有大雨～", primary_prompt)
-        self.assertIn("compound natural", primary_prompt)
-        coverage_prompt = str(ollama.prompts[1][0])
-        self.assertIn("source-grounded human scope", coverage_prompt)
-        self.assertNotIn("date_and_day_part", coverage_prompt)
-        fresh_prompt = str(ollama.prompts[2][0])
-        self.assertIn("restore that source-grounded WHAT", fresh_prompt)
-        self.assertIn("Planner Activity metadata is never a Responsibility source", fresh_prompt)
 
 
-    def test_ordinary_conversation_commits_after_required_coverage(self):
-        ollama = ScriptedOllama(
-            [
-                create_goals(goal("Acknowledge the greeting.", "speech")),
-                certificate(coverage_item("Hello", 0)),
-            ]
-        )
-        result = self._resolve(ollama, request("Hello", language="en-US"))
 
-        self.assertEqual(len(result.new_goals), 1)
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-            ],
-        )
 
-    def test_effectful_goal_requires_one_immutable_coverage_certificate(self):
-        ollama = ScriptedOllama(
-            [
-                create_goals(goal("Blink twice.", "body_action")),
-                certificate(coverage_item("Blink twice.", 0)),
-            ]
-        )
-        result = self._resolve(
-            ollama,
-            request(
-                "Blink twice.",
-                language="en-US",
-            ),
-        )
 
-        self.assertEqual(len(result.new_goals), 1)
-        self.assertNotIn("decision", result.metadata["responsibility_coverage"]["certificate"])
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-            ],
-        )
-
-    def test_body_actions_miscast_as_physical_resources_are_reconsidered(self):
-        req = request(
-            "Run forward for 15 seconds, then blink.",
-            language="en-US",
-        )
-        req = req.model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "r1",
-                        "outcome": "Run forward for 15 seconds.",
-                        "bindings": {
-                            "direction": "forward",
-                            "duration": "15 seconds",
-                        },
-                        "confidence": 0.95,
-                    },
-                    {
-                        "local_ref": "r2",
-                        "outcome": "Blink.",
-                        "bindings": {"action": "blink"},
-                        "confidence": 0.95,
-                    },
-                ),
-            }
-        )
-        mistaken = create_goals(
-            goal(
-                "Run forward for 15 seconds.",
-                "body_action",
-                resource=resource_responsibility(
-                    description="forward running motion",
-                    quantity="",
-                ),
-            ),
-            goal(
-                "Blink.",
-                "body_action",
-                source_responsibility_refs=["r2"],
-                resource=resource_responsibility(
-                    description="eye blinking motion",
-                    quantity="",
-                ),
-            ),
-        )
-        rejected = certificate(
-            coverage_item(
-                "Run forward for 15 seconds",
-                0,
-                coverage="representation_mismatch",
-            ),
-            coverage_item(
-                "blink",
-                1,
-                coverage="representation_mismatch",
-            ),
-        )
-        corrected = create_goals(
-            goal(
-                "Run forward for 15 seconds.",
-                "body_action",
-                bindings=[
-                    binding("direction", "direction", "forward"),
-                    binding("duration", "duration", "15 seconds"),
-                ],
-            ),
-            goal(
-                "Blink.",
-                "body_action",
-                source_responsibility_refs=["r2"],
-                bindings=[binding("action", "action", "blink")],
-            ),
-        )
-        accepted = certificate(
-            coverage_item("Run forward for 15 seconds", 0),
-            coverage_item("blink", 1),
-        )
-        ollama = ScriptedOllama([mistaken, rejected, corrected, accepted])
-
-        result = self._resolve(ollama, req)
-
-        self.assertEqual(len(result.new_goals), 2)
-        self.assertEqual(
-            [item.metadata["output_mode"] for item in result.new_goals],
-            ["body_action", "body_action"],
-        )
-        self.assertTrue(
-            all(item.resource_responsibility is None for item in result.new_goals)
-        )
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
-
-    def test_ordinary_coverage_cannot_certify_a_physical_resource_wrapper(self):
-        req = request("Walk forward.", language="en-US")
-        mistaken = GoalAssociationModelGoal.model_validate(
-            goal(
-                "Walk forward.",
-                "body_action",
-                resource=resource_responsibility(
-                    description="walking motion",
-                    quantity="",
-                ),
-            )
-        )
-
-        result = GoalAssociationResolver._validate_coverage_certificate(
-            certificate(coverage_item("Walk forward.", 0)),
-            request=req,
-            goal_count=1,
-            candidate_goals=[mistaken],
-        )
-
-        self.assertEqual(
-            result.responsibility_items[0].coverage,
-            "representation_mismatch",
-        )
 
     def test_primary_dto_gets_exactly_one_contract_repair(self):
-        invalid = create_goals(goal("Blink twice.", "invalid_mode"))
         valid = create_goals(goal("Blink twice.", "body_action"))
-        ollama = ScriptedOllama(
-            [invalid, valid, certificate(coverage_item("Blink twice.", 0))]
-        )
+        invalid = copy.deepcopy(valid)
+        invalid["unexpected_transport_field"] = "must be removed"
+        ollama = ScriptedOllama([invalid, valid])
+        req = request("Please blink exactly twice.", language="en-US")
         result = self._resolve(
             ollama,
-            request("Blink twice.", language="en-US"),
+            req,
         )
 
         self.assertTrue(
@@ -3066,26 +1994,17 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             families=[
                 "goal_association.primary",
                 "goal_association.contract_repair",
-                "goal_association.responsibility_coverage",
             ],
         )
+        repair_prompt = str(ollama.prompts[1][0])
+        self.assertIn("mechanical", repair_prompt)
+        self.assertNotIn(req.original_user_text, repair_prompt)
 
-    def test_primary_cannot_drop_direct_gi_binding_into_goal_prose(self):
+    def test_primary_binding_conservation_failure_is_terminal_without_repair(self):
         missing = create_goals(
             goal("Move forward for 10 seconds.", "body_action")
         )
-        rejected = certificate(
-            coverage_item("Move forward for 10 seconds", 0)
-        )
-        reconsidered = create_goals(
-            goal(
-                "Move forward for 10 seconds.",
-                "body_action",
-                bindings=[binding("duration", "duration", "10 seconds")],
-            )
-        )
-        accepted = certificate(coverage_item("Move forward for 10 seconds", 0))
-        ollama = ScriptedOllama([missing, rejected, reconsidered, accepted])
+        ollama = ScriptedOllama([missing])
         req = request("Move forward for 10 seconds.", language="en-US").model_copy(
             update={
                 "responsibilities": typed_responsibilities(
@@ -3102,137 +2021,20 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
         result = self._resolve(ollama, req)
 
-        self.assertEqual(result.resolution_status, "resolved")
-        self.assertEqual(
-            result.new_goals[0].object["bindings"]["duration"]["value"],
-            "10 seconds",
-        )
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(result.new_goals, [])
         self.assert_transaction(
             result,
             ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
+            terminal="fail_closed",
+            families=["goal_association.primary"],
         )
         self.assertFalse(
             result.metadata["goal_semantic_transaction"]
             ["contract_repair_attempted"]
         )
-        self.assertTrue(
-            result.metadata["goal_semantic_transaction"]
-            ["semantic_reconsideration_attempted"]
-        )
 
-    def test_ungrounded_initial_coverage_excerpt_triggers_fresh_interpretation(self):
-        req = request("你往前走 10 秒。").model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "r1",
-                        "outcome": "move forward for ten seconds",
-                        "bindings": {
-                            "direction": "往前",
-                            "duration": "10 秒",
-                        },
-                        "output_mode": "body_action",
-                        "confidence": 0.95,
-                    }
-                )
-            }
-        )
-        mistaken = create_goals(
-            goal(
-                "Move forward for ten seconds.",
-                "body_action",
-                resource=resource_responsibility(
-                    description="forward motion",
-                    quantity="",
-                ),
-            )
-        )
-        ungrounded_audit = certificate(
-            coverage_item("move forward for ten seconds", 0)
-        )
-        corrected = create_goals(
-            goal(
-                "你往前走 10 秒。",
-                "body_action",
-                bindings=[
-                    binding("direction", "direction", "往前"),
-                    binding("duration", "duration", "10 秒"),
-                ],
-            )
-        )
-        final_audit = certificate(coverage_item("往前走 10 秒", 0))
-        ollama = ScriptedOllama(
-            [mistaken, ungrounded_audit, corrected, final_audit]
-        )
 
-        result = self._resolve(ollama, req)
-
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
-        coverage = result.metadata["responsibility_coverage"]
-        self.assertEqual(
-            coverage["initial_certificate_contract_error"],
-            "source_excerpt_not_authoritative",
-        )
-        self.assertEqual(coverage["final_verdict"], "accept")
-
-    def test_ungrounded_final_coverage_excerpt_still_fails_closed(self):
-        req = request("你往前走 10 秒。").model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "r1",
-                        "outcome": "move forward for ten seconds",
-                        "bindings": {"duration": "10 秒"},
-                        "output_mode": "body_action",
-                        "confidence": 0.95,
-                    }
-                )
-            }
-        )
-        corrected = create_goals(
-            goal(
-                "你往前走 10 秒。",
-                "body_action",
-                bindings=[binding("duration", "duration", "10 秒")],
-            )
-        )
-        ungrounded_audit = certificate(
-            coverage_item("move forward for ten seconds", 0)
-        )
-        ollama = ScriptedOllama(
-            [corrected, ungrounded_audit, corrected, ungrounded_audit]
-        )
-
-        result = self._resolve(ollama, req)
-
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="fail_closed",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
 
     def test_response_schema_keeps_unsupplied_recipient_pronoun_out_of_referent_id(self):
         schema = ga_schema.goal_association_response_schema(
@@ -3460,9 +2262,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                 ],
             )
         )
-        ollama = ScriptedOllama(
-            [candidate, certificate(coverage_item("往前走 10 秒", 0))]
-        )
+        ollama = ScriptedOllama([candidate])
 
         result = self._resolve(ollama, req)
 
@@ -3478,7 +2278,8 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         self.assertEqual(required_values, {"前", "10"})
 
     def test_invalid_contract_repair_fails_closed_without_third_call(self):
-        invalid = create_goals(goal("Blink twice.", "invalid_mode"))
+        invalid = create_goals(goal("Blink twice.", "body_action"))
+        invalid["unexpected_transport_field"] = "must be removed"
         ollama = ScriptedOllama([invalid, invalid])
         result = self._resolve(
             ollama,
@@ -3497,92 +2298,13 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             ],
         )
 
-    def test_invalid_coverage_certificate_fails_closed_without_repair(self):
-        ollama = ScriptedOllama(
-            [
-                create_goals(goal("Blink twice.", "body_action")),
-                {"decision": "accept", "items": []},
-            ]
-        )
-        result = self._resolve(
-            ollama,
-            request("Blink twice.", language="en-US"),
-        )
 
-        self.assertEqual(result.new_goals, [])
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="fail_closed",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-            ],
-        )
-
-    def test_semantic_reject_allows_one_fresh_interpretation_and_final_audit(self):
-        collapsed = create_goals(
-            goal(
-                "Walk, blink, and sing.",
-                "body_action",
-                source_responsibility_refs=["r1", "r2", "r3"],
-            )
-        )
-        rejected = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("blink", 0),
-            coverage_item("sing", 0),
-        )
-        corrected = create_goals(
-            goal("Walk.", "body_action"),
-            goal("Blink.", "body_action", source_responsibility_refs=["r2"]),
-            goal("Sing.", "singing", source_responsibility_refs=["r3"]),
-        )
-        accepted = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("blink", 1),
-            coverage_item("sing", 2),
-        )
-        ollama = ScriptedOllama([collapsed, rejected, corrected, accepted])
-        result = self._resolve(
-            ollama,
-            request(
-                "Walk, blink, and sing.",
-                language="en-US",
-                responsibility_outcomes=["Walk.", "Blink.", "Sing."],
-            ),
-        )
-
-        self.assertEqual(
-            [item.metadata["output_mode"] for item in result.new_goals],
-            ["body_action", "body_action", "singing"],
-        )
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
 
     def test_ungrounded_reference_commits_provisional_goal_for_planner(self):
         initial = create_goals(
             goal("Turn off the unresolved referenced device.", "body_action")
         )
-        provisional = certificate(
-            coverage_item(
-                "Turn it off",
-                0,
-                role="responsibility",
-                coverage="clarification_required",
-                independently_satisfiable=False,
-            )
-        )
-        ollama = ScriptedOllama([initial, provisional])
+        ollama = ScriptedOllama([initial])
         result = self._resolve(
             ollama,
             request(
@@ -3595,149 +2317,20 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         self.assertEqual(result.resolution_status, "resolved")
         self.assertEqual(len(result.new_goals), 1)
         self.assertEqual(
-            result.metadata["responsibility_coverage"]["final_verdict"],
-            "accept",
+            result.metadata["responsibility_conservation"]["status"],
+            "validated",
         )
         self.assert_transaction(
             result,
             ollama,
             terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-            ],
-        )
-
-    def test_maximum_semantic_dag_is_five_calls(self):
-        invalid = create_goals(
-            goal(
-                "Walk and sing.",
-                "invalid_mode",
-                source_responsibility_refs=["r1", "r2"],
-            )
-        )
-        collapsed = create_goals(
-            goal(
-                "Walk and sing.",
-                "body_action",
-                source_responsibility_refs=["r1", "r2"],
-            )
-        )
-        rejected = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("sing", 0),
-        )
-        corrected = create_goals(
-            goal("Walk.", "body_action"),
-            goal("sing.", "singing", source_responsibility_refs=["r2"]),
-        )
-        accepted = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("sing", 1),
-        )
-        ollama = ScriptedOllama(
-            [invalid, collapsed, rejected, corrected, accepted]
-        )
-        result = self._resolve(
-            ollama,
-            request(
-                "Walk and sing.",
-                language="en-US",
-                responsibility_outcomes=["Walk.", "Sing."],
-            ),
-        )
-
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="resolved",
-            families=[
-                "goal_association.primary",
-                "goal_association.contract_repair",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
-
-    def test_fresh_interpretation_has_no_semantic_dto_repair(self):
-        first = create_goals(
-            goal(
-                "Walk and sing.",
-                "body_action",
-                source_responsibility_refs=["r1", "r2"],
-            )
-        )
-        rejected = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("sing", 0),
-        )
-        invalid_fresh = create_goals(goal("Walk.", "invalid_mode"))
-        ollama = ScriptedOllama([first, rejected, invalid_fresh])
-        result = self._resolve(
-            ollama,
-            request(
-                "Walk and sing.",
-                language="en-US",
-                responsibility_outcomes=["Walk.", "Sing."],
-            ),
-        )
-
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="fail_closed",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-            ],
+            families=["goal_association.primary"],
         )
 
 
 
-    def test_final_coverage_reject_fails_closed(self):
-        first = create_goals(
-            goal(
-                "Walk and sing.",
-                "body_action",
-                source_responsibility_refs=["r1", "r2"],
-            )
-        )
-        rejected = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("sing", 0),
-        )
-        corrected = create_goals(
-            goal("Walk.", "body_action"),
-            goal("Sing.", "singing", source_responsibility_refs=["r2"]),
-        )
-        still_rejected = certificate(
-            coverage_item("Walk", 0),
-            coverage_item("sing", 0),
-        )
-        ollama = ScriptedOllama([first, rejected, corrected, still_rejected])
-        result = self._resolve(
-            ollama,
-            request(
-                "Walk and sing.",
-                language="en-US",
-                responsibility_outcomes=["Walk.", "Sing."],
-            ),
-        )
 
-        self.assertEqual(result.new_goals, [])
-        self.assert_transaction(
-            result,
-            ollama,
-            terminal="fail_closed",
-            families=[
-                "goal_association.primary",
-                "goal_association.responsibility_coverage",
-                "goal_association.fresh_interpretation",
-                "goal_association.responsibility_coverage_final",
-            ],
-        )
+
 
     def test_model_transport_failure_is_formal_fail_closed(self):
         ollama = FakeOllama(
@@ -3759,14 +2352,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             [
                 create_goals(
                     goal("Bring the unresolved referenced cup.", "body_action")
-                ),
-                certificate(
-                    coverage_item(
-                        "Bring me that cup",
-                        0,
-                        coverage="clarification_required",
-                    )
-                ),
+                )
             ]
         )
         result = self._resolve(
@@ -3780,7 +2366,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
         self.assertEqual(result.resolution_status, "resolved")
         self.assertEqual(len(result.new_goals), 1)
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
 
 
 class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
@@ -3808,15 +2394,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                         "body_action",
                         resource=resource,
                     )
-                ),
-                certificate(
-                    coverage_item("去往前走个100米", 0, role="constraint"),
-                    coverage_item(
-                        "帮我拿杯水过来",
-                        0,
-                        required_goal_shape="physical_resource",
-                    ),
-                ),
+                )
             ],
             request(
                 "去往前走个100米，帮我拿杯水过来。",
@@ -3834,68 +2412,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         )
         self.assertNotIn("resource_grounding_projection", semantic.metadata)
 
-    def test_fresh_audit_cannot_downgrade_initial_physical_resource_shape(self):
-        req = request(
-            "Bring me the milk from ahead.",
-            language="en-US",
-        ).model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "r1",
-                        "outcome": "bring the milk to me",
-                        "bindings": {
-                            "object": "milk",
-                            "location": "ahead",
-                        },
-                        "output_mode": "body_action",
-                        "confidence": 0.95,
-                    }
-                )
-            }
-        )
-        ordinary = create_goals(
-            goal(
-                "Bring the milk from ahead.",
-                "body_action",
-                bindings=[
-                    binding("object", "physical_object", "milk"),
-                    binding("location", "relative_location", "ahead"),
-                ],
-            )
-        )
-        initial_certificate = certificate(
-            coverage_item(
-                "Bring me the milk from ahead",
-                0,
-                required_goal_shape="physical_resource",
-            )
-        )
-        downgraded_final_certificate = certificate(
-            coverage_item(
-                "Bring me the milk from ahead",
-                0,
-                required_goal_shape="ordinary",
-                required_output_mode="body_action",
-            )
-        )
-        ollama = ScriptedOllama(
-            [
-                ordinary,
-                initial_certificate,
-                ordinary,
-                downgraded_final_certificate,
-            ]
-        )
-
-        result = asyncio.run(GoalAssociationResolver(ollama).resolve(req))
-
-        self.assertEqual(result.resolution_status, "fail_closed")
-        self.assertEqual(result.new_goals, [])
-        self.assertIn(
-            "initial independent auditor's positive source classifications",
-            str(ollama.prompts[2][0]),
-        )
 
     def test_user_water_probe_preserves_one_resource_goal_and_source_constraint(self):
         resource = resource_responsibility(
@@ -3916,19 +2432,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                         "body_action",
                         resource=resource,
                     )
-                ),
-                certificate(
-                    coverage_item(
-                        "bring me a bottle of water",
-                        0,
-                        required_goal_shape="physical_resource",
-                    ),
-                    coverage_item(
-                        "the water is 100 meters ahead of you",
-                        0,
-                        role="constraint",
-                    ),
-                ),
+                )
             ],
             request(
                 "bring me a bottle of water, the water is 100 meters ahead of you",
@@ -3967,15 +2471,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                             ],
                         ),
                     ),
-                ),
-                certificate(
-                    coverage_item("Walk 100 meters for exercise", 0),
-                    coverage_item(
-                        "bring the bottle from the table to me",
-                        1,
-                        required_goal_shape="physical_resource",
-                    ),
-                ),
+                )
             ],
             request(
                 "Walk 100 meters for exercise, then bring the bottle from the table to me.",
@@ -4006,14 +2502,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             [
                 create_goals(
                     goal("查询并解释重庆明天的天气。", "information", resource=weather)
-                ),
-                certificate(
-                    coverage_item(
-                        "查重庆明天天气",
-                        0,
-                        required_goal_shape="information_resource",
-                    )
-                ),
+                )
             ],
             request(
                 "帮我查重庆明天天气。",
@@ -4054,16 +2543,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                         "information",
                         resource=weather,
                     )
-                ),
-                certificate(
-                    coverage_item("I am in chongqing now", role="context"),
-                    coverage_item(
-                        "please help me check whether it will rain tonight and whether it it cold",
-                        0,
-                        independently_satisfiable=False,
-                        required_goal_shape="information_resource",
-                    ),
-                ),
+                )
             ],
             request(
                 "I am in chongqing now, please help me check whether it will rain tonight and whether it it cold",
@@ -4084,15 +2564,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
     def test_user_joke_probe_acknowledges_tired_context_without_goal_ownership(self):
         result = self._resolve(
             [
-                create_goals(goal("Tell the user a joke.", "speech")),
-                certificate(
-                    coverage_item(
-                        "I am a litlle tired",
-                        role="context",
-                        independently_satisfiable=False,
-                    ),
-                    coverage_item("can you tell me a joke", 0),
-                ),
+                create_goals(goal("Tell the user a joke.", "speech"))
             ],
             request(
                 "I am a litlle tired, can you tell me a joke?",
@@ -4192,14 +2664,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         ]
         result = self._resolve(
             [
-                payload,
-                certificate(
-                    coverage_item(
-                        "Check 重庆 weather",
-                        0,
-                        required_goal_shape="information_resource",
-                    )
-                ),
+                payload
             ],
             request("Check 重庆 weather.", language="en-US"),
         )

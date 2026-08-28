@@ -3187,11 +3187,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             goal_summary="Check whether it will rain.",
             response_text="",
             steps=[],
-            unresolved=["Post-Evidence wording failed truth qualification."],
+            unresolved=["Post-Evidence primary semantic validation failed."],
             metadata={
                 "authority": "advisory",
                 "status": "clarify",
-                "reason": "deep_planner_evidence_response_truth_rejected",
+                "reason": "deep_planner_primary_semantic_validation_failed",
                 "execution_allowed": False,
             },
         )

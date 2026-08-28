@@ -206,7 +206,7 @@ def test_fast_fail_safe_cannot_widen_typed_reentry_scope() -> None:
     fallback = materialize_fast_escalation(
         "plan-fallback",
         request,
-        "truth_qualification_rejected",
+        "primary_semantic_validation_failed",
     )
 
     assert fallback.goal_ids == ["goal-blink"]

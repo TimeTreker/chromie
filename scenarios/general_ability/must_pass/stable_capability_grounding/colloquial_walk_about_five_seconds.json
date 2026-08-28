@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "colloquial_walk_about_five_seconds",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Colloquial approximation should remain a forward walk with an approximately five-second requested duration rather than losing the quantity.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["intent_understanding", "capability_grounding", "constraint_preservation"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "capability_grounding", "constraint_preservation"],
+    "primary_outcomes": ["Preserve a forward walk and realize the user's approximate five-second duration as five seconds."],
+    "acceptable_auxiliary": ["A safe provider may apply its normal bounded motion policy."],
+    "forbidden_semantic_outcomes": [
+      "Ignore the duration because it is expressed approximately.",
+      "Interpret the utterance as an unspecified indefinite walk.",
+      "Select a non-walking action."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "往前走个五秒左右。",
+  "language": "zh-CN",
+  "expected_capabilities": ["soridormi.walk_forward"],
+  "expected_args": ["0:duration_s=5.0"],
+  "require_speech": false,
+  "description": "Everyday approximate phrasing should still produce a bounded walk.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "Colloquial approximation should remain a forward walk with an approximately five-second requested duration rather than losing the quantity.",
+        "root_cause_boundaries": ["Cognitive Core/goal interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+      }
+    ]
+  }
+}

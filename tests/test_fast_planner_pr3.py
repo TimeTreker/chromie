@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app import planner_fast_validation
 from agent.app.planner_model_contract import (
-    PlannerCoverageReview,
     PlannerDTOContractError,
     PlannerModelOutput,
     is_planner_step_capability,
@@ -676,26 +675,6 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
-    def test_coverage_review_cannot_accept_a_reported_semantic_mismatch(self):
-        with self.assertRaisesRegex(
-            ValidationError,
-            "accepted coverage cannot report a semantic mismatch",
-        ):
-            PlannerCoverageReview.model_validate(
-                {
-                    "decision": "accept",
-                    "confidence": 1.0,
-                    "semantic_mismatch_found": True,
-                    "uncovered_requirements": [],
-                    "reason": "The selected effect is only an approximation.",
-                }
-            )
-
-        schema = planner_schema.planner_coverage_review_response_schema()
-        self.assertIn("semantic_mismatch_found", schema["required"])
-        accepted_branch = schema["allOf"][-1]["anyOf"][0]["properties"]
-        self.assertFalse(accepted_branch["semantic_mismatch_found"]["const"])
-
     def test_single_goal_fast_escalation_uses_advertised_per_goal_contract(self):
         goal_id = "goal-weather"
         raw = multi_goal_plan(
@@ -1608,7 +1587,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         planner_request = planner_request.model_copy(update={"context": context})
 
-        ollama = ScriptedOllama([raw, _truth_certificate()])
+        ollama = ScriptedOllama([raw])
         plan = asyncio.run(
             FastPlannerResolver(ollama, WeatherCatalog()).resolve(planner_request)
         )
@@ -1637,100 +1616,8 @@ class FastPlannerResolverTests(unittest.TestCase):
             "a probability below 100% remains a possibility/probability",
             response_schema["properties"]["response_text"]["description"],
         )
-        self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
-            "fast_planner.evidence_response.truth_check",
-        )
-        truth_prompt = str(ollama.prompts[1][0])
-        self.assertIn("Trusted execution outcome JSON", truth_prompt)
-        self.assertIn("Critical claim-type boundary", truth_prompt)
-        self.assertIn("Minimal authoritative source-Plan projection", truth_prompt)
-        self.assertNotIn("selected_agent_skills", truth_prompt)
-        self.assertIn('"goal_id":"goal-weather"', truth_prompt)
-        self.assertIn(
-            "Do not set that flag when the candidate makes no probability",
-            truth_prompt,
-        )
-        self.assertIn("completion qualification", truth_prompt)
-        self.assertEqual(ollama.prompts[1][1]["options"]["num_predict"], 128)
-        self.assertEqual(
-            plan.metadata["evidence_response_truth_qualification"],
-            _truth_certificate(),
-        )
-
-    def test_terminal_evidence_wording_that_upgrades_probability_is_rejected(self):
-        response_text = "重庆今晚降雨概率76%，所以会下雨。"
-        raw = multi_goal_plan(
-            disposition="respond",
-            coverage="complete",
-            goal_summary="Answer the weather question from trusted evidence.",
-            response_text=response_text,
-            steps=[],
-            goal_outcomes={
-                "goal-weather": respond_outcome(
-                    "goal-weather",
-                    response_text,
-                    "Trusted weather evidence answers the Goal.",
-                )
-            },
-            goal_satisfaction=exact_satisfaction(["goal-weather"]),
-        )
-        data = {
-            "location": "重庆",
-            "forecast_period": {
-                "scope": "night",
-                "precipitation_probability_max": 76.0,
-            },
-        }
-        planner_request = request(
-            "今晚重庆会不会下雨？",
-            goal_ids=["goal-weather"],
-            goal_metadata={"output_mode": "information"},
-        )
-        context = dict(planner_request.context)
-        context.update(
-            {
-                "result_evidence_reentry": {
-                    "source_goal_ids": ["goal-weather"],
-                    "evidence_refs": ["evidence-weather"],
-                },
-                "trusted_terminal_evidence": [
-                    {
-                        "evidence_id": "evidence-weather",
-                        "tool_id": "chromie.weather.lookup",
-                        "status": "completed",
-                        "data": data,
-                        "output_sha256": canonical_value_sha256(data),
-                    }
-                ],
-            }
-        )
-        planner_request = planner_request.model_copy(update={"context": context})
-        ollama = ScriptedOllama(
-            [
-                raw,
-                _truth_certificate(
-                    "reject", has_unverified_result_or_completion_claim=True
-                ),
-            ]
-        )
-
-        plan = asyncio.run(
-            FastPlannerResolver(ollama, WeatherCatalog()).resolve(planner_request)
-        )
-
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(
-            plan.escalation_reason,
-            "fast_planner_evidence_response_truth_rejected",
-        )
-        self.assertEqual(plan.response_text, "")
-        self.assertEqual(
-            plan.metadata["evidence_response_truth_qualification"],
-            _truth_certificate(
-                "reject", has_unverified_result_or_completion_claim=True
-            ),
-        )
+        self.assertIn("no later model will audit or repair its semantics", planning_prompt)
+        self.assertEqual(len(ollama.prompts), 1)
 
     def test_first_response_is_planner_authored_in_a_small_language_bound_contract(self):
         ollama = ScriptedOllama(
@@ -1740,8 +1627,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "text": "我先查一下重庆今天上午的天气。",
                         "progress_kind": "check_information",
                     },
-                },
-                _truth_certificate(),
+                }
             ]
         )
         request = _work_request(
@@ -1805,16 +1691,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["options"]["num_predict"], 256)
         self.assertEqual(kwargs["options"]["num_ctx"], 6144)
-        _, truth_kwargs = ollama.prompts[1]
-        self.assertEqual(
-            truth_kwargs["prompt_family"],
-            "fast_planner.first_response.truth_check",
-        )
-        self.assertEqual(truth_kwargs["options"]["num_predict"], 128)
-        self.assertEqual(truth_kwargs["options"]["num_ctx"], 8192)
-        self.assertEqual(result.metadata["truth_qualification_call_count"], 1)
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(result.metadata["semantic_result_call_count"], 1)
+        self.assertIn("no later model will review or repair its meaning", rendered)
 
-    def test_gateway_qualified_greeting_skips_redundant_truth_llm(self):
+    def test_greeting_uses_one_primary_first_response_call(self):
         ollama = ScriptedOllama(
             [
                 {
@@ -1856,13 +1737,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIsNotNone(result.activity)
         self.assertEqual(result.activity.text, "你好呀！")
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(result.metadata["truth_qualification_call_count"], 0)
         self.assertEqual(
-            result.metadata["truth_qualification_owner"],
-            "trusted_gateway_greeting_contract",
-        )
-        self.assertEqual(
-            result.metadata["truth_qualification"], _truth_certificate()
+            result.metadata["truth_contract"],
+            "primary_prompt_schema_and_typed_provenance",
         )
 
     def test_first_response_receives_resolved_target_goal_meaning_for_continuation(self):
@@ -1935,25 +1812,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("never use an onset or progressive predicate", text_contract)
         self.assertIn('"relationship":"continue"', text_contract)
         self.assertIn("continue the previous action", text_contract)
-        truth_prompt = str(
-            planner_prompt.fast_first_response_truth_prompt(
-                request,
-                activity=FastPlannerProgressAct.model_validate(
-                    {
-                        "activity_id": "continue-progress",
-                        "role": "progress",
-                        "text": "好，我这就往前走十秒。",
-                        "progress_kind": "perform_action",
-                        "source_responsibility_refs": ["walk"],
-                    }
-                ),
-                responsibilities=[responsibility],
-                trusted_evidence=[],
-            )
-        )
-        self.assertIn("semantic relationship reversal", truth_prompt)
-        self.assertIn("relationship=continue", truth_prompt)
-        self.assertIn("claim a later truth stage", truth_prompt)
+        self.assertIn("relationship=continue", prompt)
+        self.assertIn("no later model will review or repair its meaning", prompt)
 
     def test_first_response_model_specialization_does_not_change_fast_planner_authority(self):
         first_response_ollama = ScriptedOllama(
@@ -1968,7 +1828,6 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         planning_ollama = ScriptedOllama(
             [
-                _truth_certificate(),
                 {
                     "disposition": "execute",
                     "coverage": "complete",
@@ -2034,7 +1893,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.metadata["semantic_authority"], "fast_planner_model")
         self.assertEqual(len(first_response_ollama.prompts), 1)
         self.assertEqual(first_response_ollama.prompts[0][1]["options"]["num_ctx"], 32768)
-        self.assertEqual(len(planning_ollama.prompts), 2)
+        self.assertEqual(len(planning_ollama.prompts), 1)
         self.assertEqual(planning_ollama.prompts[0][1]["options"]["num_ctx"], 8192)
         self.assertEqual(
             first_response_ollama.prompts[0][1]["prompt_family"],
@@ -2042,14 +1901,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(
             planning_ollama.prompts[0][1]["prompt_family"],
-            "fast_planner.first_response.truth_check",
-        )
-        self.assertEqual(
-            planning_ollama.prompts[1][1]["prompt_family"],
             "fast_planner.advance",
         )
 
-    def test_shared_fast_model_keeps_truth_check_in_bounded_first_response_context(self):
+    def test_shared_fast_model_keeps_primary_first_response_context_bounded(self):
         ollama = ScriptedOllama(
             [
                 {
@@ -2057,8 +1912,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "text": "好，我这就继续往前走 10 秒。",
                         "progress_kind": "perform_action",
                     }
-                },
-                _truth_certificate(),
+                }
             ]
         )
         request = _work_request(
@@ -2079,18 +1933,16 @@ class FastPlannerResolverTests(unittest.TestCase):
             ollama,
             WeatherCatalog(),
             first_response_num_ctx=6144,
-            truth_num_ctx=6144,
             num_ctx=24576,
         )
 
         first_response = asyncio.run(resolver.resolve_first_response(request))
 
         self.assertIsNotNone(first_response.activity)
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(ollama.prompts[0][1]["options"]["num_ctx"], 6144)
-        self.assertEqual(ollama.prompts[1][1]["options"]["num_ctx"], 6144)
 
-    def test_bounded_truth_model_specialization_keeps_fast_planning_authority(self):
+    def test_first_response_model_specialization_keeps_one_fast_planner_authority(self):
         planning_ollama = ScriptedOllama([])
         author_ollama = ScriptedOllama(
             [
@@ -2102,7 +1954,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 }
             ]
         )
-        truth_ollama = ScriptedOllama([_truth_certificate()])
         request = _work_request(
             sid="turn-specialized-fast-truth",
             text="刚才那个事情继续。",
@@ -2122,8 +1973,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             WeatherCatalog(),
             first_response_ollama=author_ollama,
             first_response_num_ctx=6144,
-            truth_ollama=truth_ollama,
-            truth_num_ctx=6144,
             num_ctx=32768,
         )
 
@@ -2132,29 +1981,20 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIsNotNone(first_response.activity)
         self.assertEqual(first_response.metadata["semantic_authority"], "fast_planner_model")
         self.assertEqual(len(author_ollama.prompts), 1)
-        self.assertEqual(len(truth_ollama.prompts), 1)
         self.assertEqual(len(planning_ollama.prompts), 0)
-        self.assertEqual(
-            truth_ollama.prompts[0][1]["prompt_family"],
-            "fast_planner.first_response.truth_check",
-        )
-        self.assertEqual(truth_ollama.prompts[0][1]["options"]["num_ctx"], 6144)
 
-    def test_bundle_false_weather_result_is_rejected_without_rewriting_or_retry(self):
+    def test_first_response_primary_contract_keeps_weather_progress_prospective(self):
         ollama = ScriptedOllama(
             [
                 {
                     "activity": {
                         "activity_id": "weather_ack",
                         "role": "progress",
-                        "text": "我刚刚查了天气，重庆今晚应该会下雨哦！",
+                        "text": "我来查一下重庆今晚的天气。",
                         "progress_kind": "check_information",
                         "source_responsibility_refs": ["weather"],
                     }
-                },
-                _truth_certificate(
-                    "reject", has_unverified_result_or_completion_claim=True
-                ),
+                }
             ]
         )
         request = _work_request(
@@ -2181,28 +2021,8 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertIsNone(result.activity)
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            result.metadata["semantic_authority"],
-            "fast_planner_truth_rejection",
-        )
-        self.assertEqual(
-            result.metadata["truth_qualification"],
-            _truth_certificate(
-                "reject", has_unverified_result_or_completion_claim=True
-            ),
-        )
-        truth_prompt = str(ollama.prompts[1][0])
-        self.assertIn("immutable activity.text", truth_prompt)
-        self.assertIn(
-            "future-oriented grammar may announce intended checking or action",
-            truth_prompt,
-        )
-        self.assertIn(
-            "Set each of the audit flags explicitly",
-            truth_prompt,
-        )
+        self.assertIsNotNone(result.activity)
+        self.assertEqual(len(ollama.prompts), 1)
         author_prompt = str(ollama.prompts[0][0])
         self.assertIn(
             "no check, execution, or fresh Evidence has happened",
@@ -2213,23 +2033,14 @@ class FastPlannerResolverTests(unittest.TestCase):
         progress_schema = author_schema["$defs"]["FastPlannerProgressAct"]
         self.assertIn("before any work or Evidence exists", progress_schema["properties"]["text"]["description"])
 
-    def test_first_response_truth_qualification_failure_fails_closed_once(self):
+    def test_first_response_primary_dto_failure_fails_closed_once(self):
         ollama = ScriptedOllama(
             [
                 {
                     "activity": {
-                        "activity_id": "weather_ack",
-                        "role": "progress",
-                        "text": "我先查一下。",
                         "progress_kind": "check_information",
-                        "source_responsibility_refs": ["weather"],
                     }
-                },
-                {
-                    "decision": "accept",
-                    "violations": [],
-                    "confidence": 0.4,
-                },
+                }
             ]
         )
         request = _work_request(
@@ -2253,7 +2064,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertIsNone(result.activity)
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(result.metadata["execution_authority"], "none")
         self.assertEqual(
             result.metadata["failure_class"],
@@ -2937,7 +2748,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             advance.metadata["error"],
         )
 
-    def test_first_response_truth_contract_rejects_invented_instrument(self):
+    def test_first_response_primary_contract_forbids_invented_instrument(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
             {
                 "local_ref": "clock",
@@ -2952,43 +2763,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             language="zh-CN",
             responsibilities=[responsibility.model_dump(mode="json")],
         )
-        activity = FastPlannerProgressAct.model_validate(
-            {
-                "activity_id": "clock-progress",
-                "role": "progress",
-                "text": "我得先看看手机屏幕，现在几点呢？",
-                "progress_kind": "check_information",
-                "source_responsibility_refs": ["clock"],
-            }
-        )
-
-        prompt = str(
-            planner_prompt.fast_first_response_truth_prompt(
-                run_request,
-                activity=activity,
-                responsibilities=[responsibility],
-                trusted_evidence=[],
-            )
-        )
-
-        self.assertIn("invents a physical instrument", prompt)
-        self.assertIn("never say Chromie will look at a phone", prompt)
-        self.assertIn("assigns Chromie's owed action to the human", prompt)
-        self.assertIn("unrequested joint-participation wording", prompt)
-        self.assertIn("look outside or use direct perception", prompt)
-        self.assertIn("concrete method claim", planner_prompt.fast_first_response_truth_system_prompt())
-        self.assertIn(
-            "in a human command addressed to Chromie, Chromie is the commanded actor",
-            planner_prompt.fast_first_response_truth_system_prompt(),
-        )
-        self.assertIn(
-            "first-person subject is the correct actor",
-            planner_prompt.fast_first_response_truth_system_prompt(),
-        )
-        self.assertIn(
-            "makes the human a co-participant",
-            planner_prompt.fast_first_response_truth_system_prompt(),
-        )
         author_prompt = str(
             planner_prompt.fast_first_response_prompt(
                 run_request,
@@ -2999,56 +2773,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("Chromie's first-person intention", author_prompt)
         self.assertIn("invitation, accompaniment, or joint activity", author_prompt)
         self.assertIn("preliminary promise would be duplicative", author_prompt)
-        self.assertIn("prospective intention", prompt)
-        self.assertIn("I checked", prompt)
-        self.assertIn("我查过/我查了一下", prompt)
-        self.assertIn(
-            "has_unverified_result_or_completion_claim=true",
-            planner_prompt.fast_first_response_truth_system_prompt(),
-        )
-
-        ollama = ScriptedOllama(
-            [
-                {
-                    "activity": {
-                        "progress_kind": "check_information",
-                        "text": activity.text,
-                    }
-                },
-                _truth_certificate(
-                    "reject", has_ungrounded_method_or_world_claim=True
-                ),
-            ]
-        )
-        result = asyncio.run(
-            FastPlannerResolver(ollama, WeatherCatalog()).resolve_first_response(
-                run_request
-            )
-        )
-
-        self.assertIsNone(result.activity)
-        self.assertEqual(
-            result.metadata["semantic_authority"],
-            "fast_planner_truth_rejection",
-        )
-        truth_schema = ollama.prompts[1][1]["response_format"]
-        self.assertEqual(
-            truth_schema["required"],
-            [
-                "has_unverified_result_or_completion_claim",
-                "has_ungrounded_method_or_world_claim",
-                "has_semantic_perspective_contradiction",
-                "has_epistemic_strength_contradiction",
-                "has_execution_status_contradiction",
-                "has_out_of_scope_goal_claim",
-                "decision",
-            ],
-        )
-        self.assertIn("has_semantic_perspective_contradiction", truth_schema["properties"])
-        self.assertIn("has_execution_status_contradiction", truth_schema["properties"])
-        self.assertIn("has_epistemic_strength_contradiction", truth_schema["properties"])
-        self.assertIn("has_out_of_scope_goal_claim", truth_schema["properties"])
-        self.assertIn("has_out_of_scope_goal_claim", truth_schema["required"])
+        self.assertIn("never claim or predict a result, completion, method, instrument", author_prompt)
+        self.assertIn("method-blind", planner_prompt.fast_first_response_system_prompt())
+        self.assertIn("I checked", author_prompt)
+        self.assertIn("我查过/我查了一下", author_prompt)
+        self.assertIn("no later model will review or repair its meaning", author_prompt)
 
     def test_first_response_schema_avoids_provider_think_control_token(self):
         schema = planner_schema.fast_first_response_response_schema(
@@ -3205,21 +2934,18 @@ class FastPlannerResolverTests(unittest.TestCase):
             {"#/$defs/FastPlannerCompleteResponseAct"},
         )
 
-    def test_first_response_rejects_reversing_the_humans_feeling(self):
+    def test_first_response_primary_preserves_the_humans_feeling(self):
         ollama = ScriptedOllama(
             [
                 {
                     "activity": {
                         "activity_id": "tired-response",
                         "role": "complete_response",
-                        "text": "我有点累，那我们先休息一下吧？",
-                        "speech_act": "inform",
+                        "text": "听起来你有点累，要不要先休息一下？",
+                        "speech_act": "support",
                         "source_responsibility_refs": ["tired"],
                     }
-                },
-                _truth_certificate(
-                    "reject", has_semantic_perspective_contradiction=True
-                ),
+                }
             ]
         )
         run_request = _work_request(
@@ -3242,13 +2968,9 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertIsNone(result.activity)
-        self.assertEqual(
-            result.metadata["truth_qualification"],
-            _truth_certificate(
-                "reject", has_semantic_perspective_contradiction=True
-            ),
-        )
+        self.assertIsNotNone(result.activity)
+        self.assertIn("你有点累", result.activity.text)
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertIn(
             "human's first person never becomes Chromie's first person",
             str(ollama.prompts[0][0]),
@@ -5273,12 +4995,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             goal_satisfaction=exact_satisfaction([goal_id], reason),
             parameter_resolutions=[],
         )
-        coverage_review = {
-            "decision": "accept",
-            "confidence": 1.0,
-            "uncovered_requirements": [],
-            "reason": "The complete resource capability preserves the one responsibility.",
-        }
         run_request = request(
             "去往前走个100米，帮我拿杯水过来。",
             goal_ids=[goal_id],
@@ -5310,7 +5026,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 }
             ],
         }
-        ollama = ScriptedOllama([raw, coverage_review])
+        ollama = ScriptedOllama([raw])
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, CompleteResourceCatalog()).resolve(
@@ -5442,13 +5158,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        coverage_review = {
-            "decision": "accept",
-            "confidence": 1.0,
-            "uncovered_requirements": [],
-            "reason": "The exact blink capability completely covers the canonical body Goal.",
-        }
-        ollama = ScriptedOllama([raw, coverage_review])
+        ollama = ScriptedOllama([raw])
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
                 request(
@@ -5468,21 +5178,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("soridormi.blink_eyes", ollama.prompts[0][0])
         self.assertNotIn("Goal Interpretation advisory JSON", ollama.prompts[0][0])
         self.assertNotIn("authoritative source route", ollama.prompts[0][0].casefold())
-        coverage_payload = json.loads(str(ollama.prompts[1][0]))
-        self.assertEqual(
-            [
-                item["capability_id"]
-                for item in coverage_payload["executable_capabilities"]
-            ],
-            ["soridormi.blink_eyes"],
-        )
-        self.assertNotIn(
-            "soridormi.walk_velocity",
-            json.dumps(coverage_payload, sort_keys=True),
-        )
+        self.assertEqual(len(ollama.prompts), 1)
         self.assertIn(
-            "Runtime owns confirmation",
-            coverage_payload["responsibility"],
+            "no later model will audit or repair its semantics",
+            str(ollama.prompts[0][0]),
         )
 
     def test_simple_chat_produces_complete_response(self):
@@ -5824,7 +5523,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
 
-    def test_coordinated_action_review_blocks_single_step_overclaim(self):
+    def test_coordinated_action_primary_plan_has_one_model_call_budget(self):
         raw = {
             "disposition": "execute",
             "coverage": "complete",
@@ -5866,17 +5565,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 }
             ],
         }
-        ollama = ScriptedOllama(
-            [
-                raw,
-                {
-                    "decision": "reject",
-                    "confidence": 1.0,
-                    "uncovered_requirements": ["blinking", "singing"],
-                    "reason": "The proposed Plan contains only walking.",
-                },
-            ]
-        )
+        ollama = ScriptedOllama([raw])
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
@@ -5884,19 +5573,13 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.steps, [])
-        self.assertEqual(
-            plan.escalation_reason,
-            "coordinated_action_coverage_incomplete",
-        )
-        self.assertEqual(plan.unresolved, ["blinking", "singing"])
-        self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertIn("ordinary world knowledge", ollama.prompts[1][0])
-        self.assertIn("supplied Capability contracts", ollama.prompts[1][0])
-        self.assertNotIn("walking is not running", ollama.prompts[1][0])
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(len(ollama.prompts), 1)
+        primary_prompt = str(ollama.prompts[0][0])
+        self.assertIn("Finding one matching capability is not complete coverage", primary_prompt)
+        self.assertIn("no later model will audit or repair its semantics", primary_prompt)
 
-    def test_embodied_coverage_review_rejects_walk_step_as_fetch_and_return(self):
+    def test_multi_goal_primary_plan_has_one_model_call_budget(self):
         goal_ids = ["goal-distance", "goal-water", "goal-return"]
         raw = multi_goal_plan(
             disposition="execute",
@@ -5972,24 +5655,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 },
             ],
         }
-        ollama = ScriptedOllama(
-            [
-                raw,
-                {
-                    "decision": "reject",
-                    "confidence": 1.0,
-                    "uncovered_requirements": [
-                        "exact 50-metre distance",
-                        "fetching water",
-                        "returning",
-                    ],
-                    "reason": (
-                        "walk_forward is duration-based movement and does not "
-                        "implement distance measurement, object pickup, or return."
-                    ),
-                },
-            ]
-        )
+        ollama = ScriptedOllama([raw])
 
         resolved = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(
@@ -5997,22 +5663,11 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(resolved.disposition, "escalate")
-        self.assertEqual(resolved.steps, [])
-        self.assertEqual(
-            resolved.escalation_reason,
-            "coordinated_action_coverage_incomplete",
-        )
-        self.assertEqual(
-            resolved.unresolved,
-            ["exact 50-metre distance", "fetching water", "returning"],
-        )
-        review_prompt = ollama.prompts[1][0]
-        self.assertIn("ordinary world knowledge", review_prompt)
-        self.assertIn("supplied Capability contracts", review_prompt)
-        self.assertIn("Do not infer undeclared effects", review_prompt)
-        self.assertNotIn("object acquisition", review_prompt)
-        self.assertNotIn("walking is not running", review_prompt)
+        self.assertEqual(resolved.disposition, "execute")
+        self.assertEqual(len(ollama.prompts), 1)
+        primary_prompt = str(ollama.prompts[0][0])
+        self.assertIn("every per-goal outcome", primary_prompt)
+        self.assertIn("no later model will audit or repair its semantics", primary_prompt)
 
     def test_parallel_plan_without_declared_provider_support_escalates(self):
         goal_ids = ["goal-walk", "goal-blink"]
@@ -6438,20 +6093,14 @@ class FastPlannerResolverTests(unittest.TestCase):
                 },
             }
         )
-        coverage_review = {
-            "decision": "accept",
-            "confidence": 1.0,
-            "uncovered_requirements": [],
-            "reason": "The repaired lookup preserves the source-grounded temporal scope.",
-        }
-        ollama = ScriptedOllama([initial, repaired, coverage_review])
+        ollama = ScriptedOllama([initial, repaired])
 
         plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.steps[0].args["date"], "today")
         self.assertEqual(plan.steps[0].args["period"], "night")
-        self.assertEqual(len(ollama.prompts), 3)
+        self.assertEqual(len(ollama.prompts), 2)
         self.assertTrue(plan.metadata["contract_repair_succeeded"])
         self.assertIn(
             "did not realize authoritative semantic scope",
@@ -6579,22 +6228,12 @@ class FastPlannerResolverTests(unittest.TestCase):
                 },
             }
         )
-        ollama = ScriptedOllama(
-            [
-                raw,
-                {
-                    "decision": "accept",
-                    "confidence": 1.0,
-                    "uncovered_requirements": [],
-                    "reason": "The declared realization preserves the temporal scope.",
-                },
-            ]
-        )
+        ollama = ScriptedOllama([raw])
 
         plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
 
         self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
         by_parameter = {item.parameter: item for item in plan.parameter_resolutions}
         self.assertEqual(by_parameter["date"].strategy, "semantic_realization")
         self.assertEqual(by_parameter["period"].strategy, "semantic_realization")
@@ -7395,7 +7034,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             plan.goal_outcomes[0].response_text,
             primary["goal_outcomes"][goal_id]["response_text"],
         )
-        self.assertNotIn("communication_review", plan.metadata)
+        self.assertNotIn("same_authority_review", plan.metadata)
         self.assertEqual(len(ollama.prompts), 1)
 
     def test_multi_goal_prompt_preserves_explicit_in_range_arguments(self):

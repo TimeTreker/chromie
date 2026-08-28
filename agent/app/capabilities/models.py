@@ -65,7 +65,6 @@ class ExecutionPolicy(BaseModel):
     timeout_s: float | None = Field(default=None, gt=0)
     idempotent: bool = True
     side_effect_free: bool = True
-    durable_runtime_eligible: bool = False
 
 
 class ConfirmationPolicy(BaseModel):

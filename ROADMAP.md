@@ -250,8 +250,8 @@ available.
    and serial waits inside existing owners. A provider-free answer may close its canonical
    conversational Goal immediately without making that closed Goal durable; a pending-work
    acknowledgement must add truthful common ground
-   and must not claim execution. Preserve Epistemic Qualification and every existing
-   truth/safety validator.
+   and must not claim execution. Preserve claim-specific evidence qualification,
+   primary-result truth contracts, and every deterministic truth/safety validator.
 2. **Keep conversation available while Work continues.** Exercise a follow-up or
    correction while safe read-only or embodied Work is queued/running. Gateway keeps
    accepting input, GI/GA preserve responsibility continuity, Planner revises only
@@ -299,7 +299,7 @@ and submission-task creation; provider terminal completion is an explicit
 progress, and terminal events are published per exact Runtime-owned request without waiting
 for sibling completion. Incremental terminal Evidence reconciliation and detached cognitive
 re-entry are now maintained without creating a second Work/Result/Event manager or semantic
-agent. Provider transport and durable-execution backend remain below the Capability contract.
+agent. Provider transport remains below the Capability contract.
 
 Implement this line as separate focused Issues and separate patches:
 
@@ -355,21 +355,6 @@ Implement this line as separate focused Issues and separate patches:
   cancellation, Goal supersession, replanning, or request rebinding therefore suppress obsolete
   result speech/action without discarding the terminal Evidence. Existing exact cancellation receipts
   continue to own provider stop truth; a late provider completion cannot reopen terminal Goal state.
-- **Issue — Introduce a Capability Runtime backend boundary — source implementation complete.**
-  `CapabilityRuntimeBackend` now isolates submission-liveness mechanics from canonical Runtime
-  semantics. `InProcessAsyncioBackend` is the maintained default. Backend handles are opaque
-  Runtime-internal references: they are absent from `CapabilityDispatchReceipt`, lifecycle events,
-  provider contracts, Goal/Plan/request identity, and cognitive context. Validation, scheduling,
-  cancellation scope, event publication, and terminal truth remain owned by `CapabilityRuntime`.
-- **Issue — Qualify a DBOS durable backend with read-only/idempotent work — source qualification complete; production activation intentionally gated.**
-  `DBOSCapabilityRuntimeBackend` now defines a serializable durable carrier and a lazy optional
-  DBOS adapter. Durable execution requires explicit `durable_runtime_eligible` opt-in plus
-  canonical idempotence and side-effect-free/safe-read metadata; the weather lookup is the first
-  opted-in Capability. Physical/effectful work fails closed. Repository tests prove durable-ID
-  retrieval across fresh backend instances and backend cancellation without leaking workflow IDs
-  into Chromie identity. Real DBOS crash/restart qualification is not claimed in this source tree:
-  production activation additionally needs startup rehydration of CapabilityRuntime ownership and
-  terminal-result consumers, and must be exercised with the optional DBOS dependency before enablement.
 - **Issue — Migrate long-running Soridormi work to asynchronous provider lifecycle — source implementation complete for provider activities.**
   Soridormi body-activity execution may now acknowledge `running`/non-terminal state; the adapter
   retains the provider-owned `compiled_activity_id`, polls `soridormi.activity.status`, and projects
@@ -478,7 +463,7 @@ authority behind a new manager.
    authority, focused audit-remediation regressions, retained Level-A general ability, and
    the deterministic provider fault matrix; target-evidence closure adds a
    `current_revision_qualification` profile requiring the same clean revision across source,
-   Gateway/Core, Agent Skill/weather, manifest-owned live interaction behavior, live provider
+   Gateway/Core, Agent Skill/weather, directory-discovered live interaction behavior, live provider
    faults, Social Attention, and LAN tracks. The interaction track now requires explicit
    passing coverage for human-like continuity, Planner/Goal semantic quality, WorkDAG
    multi-Goal revision/cardinality, and continuous-cognition recovery in addition to the
@@ -602,9 +587,11 @@ Exit criteria:
 - Keep semantic reconsideration source-based. Do not restore intent reviewers,
   generic-chat critics, capability-grounding reviewers, contract-loss recovery,
   or repair-of-repair around previous model output.
-- Preserve Goal Association's independent evidence-bearing coverage certificate
-  and one fresh source-based interpretation after rejection; the certificate is
-  immutable evidence, not a second Goal authority.
+- Preserve the implemented Goal Association primary-only transaction: one normal
+  primary call, at most one semantics-preserving repair for a Pydantic-invalid DTO,
+  then trusted closed-reference, provenance, cardinality, binding-conservation, and
+  continuity validation. Do not restore the removed coverage/resegmentation calls or
+  allow semantic rejection to enter repair.
 - Revalidate capability IDs, argument schemas, confidence, confirmation policy,
   resources, and effect envelopes at trusted boundaries. Fast may escalate once
   to Deep Planner; same-tier regeneration is reserved for one mechanically malformed
@@ -726,11 +713,11 @@ module boundaries, lowering the composition root from 150 to 142 methods. Statel
 slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
-**Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and coverage mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
+**Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and Responsibility-conservation mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
 
-**Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain model invocation, same-tier repair/escalation decisions, audit invocation, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners.
+**Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain the primary model invocation, bounded mechanical repair/escalation decisions, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners. Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
 
-**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained decoder schemas, including Fast/Deep pass-specific schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (Fast qualification/reuse/fail-safe validation mechanics), `planner_deep_validation.py` (Deep repair/safety/diagnostic validation mechanics), `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only), and `planner_audit.py` (the pre-existing bounded model-assisted coverage/communication audits). Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 7 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
+**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained-decoder schemas, including pass-specific Fast/Deep schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (Fast primary-result/reuse/fail-safe validation mechanics), `planner_deep_validation.py` (Deep mechanical-repair/safety/diagnostic validation mechanics), and `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only). The former model-assisted coverage/communication audit module and its dedicated truth-model configuration are removed under Charter principles 30–31. Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 5 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
 
 - Decompose the Orchestrator composition root without raising existing method,
   property, initializer, exception-boundary, or direct-model-call ratchets.

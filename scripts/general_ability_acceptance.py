@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run claim-oriented general ability acceptance checks.
 
-The manifest behind this runner groups representative scenarios by the general
-robot ability they protect. A passing run is evidence for the selected claim
-scope only; it is not a blanket statement that Chromie behaves correctly in all
-live voice or robot conditions.
+The runner discovers self-describing scenario files and groups them by the
+general robot abilities they protect. A passing run is evidence for the selected
+claim scope only; it is not a blanket statement that Chromie behaves correctly
+in all live voice or robot conditions.
 """
 
 from __future__ import annotations
@@ -38,8 +38,17 @@ from scripts.outcome_observations import (  # noqa: E402
     observation_type_for_capability,
     validate_expected_observations,
 )
-DEFAULT_MANIFEST = ROOT / "scenarios" / "general_ability_acceptance.json"
+from benchmarks.contracts.models import OraclePolicy  # noqa: E402
+from benchmarks.review.bundle import build_review_bundle  # noqa: E402
+
+DEFAULT_LIVE_SCENARIO_ROOT = ROOT / "scenarios" / "general_ability"
+DEFAULT_LEVEL_A_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "general-ability"
+STAGE_CONTRACTS = (
+    ("must_pass", "Must Pass", True),
+    ("core", "Core", False),
+    ("challenge", "Challenge", False),
+)
 LEVEL_A_CLAIM = (
     "Level A deterministic file-backed evidence only. This does not prove live "
     "services, microphone, speaker, simulator execution, or robot behavior."
@@ -91,6 +100,7 @@ class TextScenarioCase:
     min_goal_outcome_count: int = 0
     forbidden_plan_agent_skills: tuple[str, ...] = field(default_factory=tuple)
     require_llm_integrity: bool = True
+    require_safe_idle: bool = False
     expected_repeat_of_previous_speech: bool = False
     forbid_repeat_of_previous_speech: bool = False
     description: str = ""
@@ -101,12 +111,28 @@ class TextScenarioCase:
 class ScenarioRef:
     key: str
     rationale: str = ""
+    source_path: Path | None = None
 
 
 @dataclass(frozen=True)
 class LiveCaseRef:
     case: TextScenarioCase
     rationale: str = ""
+    source_path: Path | None = None
+    stage: str = "core"
+    difficulty: str = "medium"
+    oracle_policy: dict[str, Any] = field(default_factory=dict)
+    review_rubric: dict[str, Any] = field(default_factory=dict)
+    provenance: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class AcceptanceStage:
+    stage_id: str
+    title: str
+    order: int
+    stop_later_stages_on_hard_failure: bool
+    scenario_paths: tuple[Path, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -114,17 +140,16 @@ class AbilityClass:
     ability_id: str
     title: str
     general_rule: str
-    minimum_level_a_cases: int
     root_cause_boundaries: tuple[str, ...] = field(default_factory=tuple)
     level_a_scenarios: tuple[ScenarioRef, ...] = field(default_factory=tuple)
     live_text_cases: tuple[LiveCaseRef, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
-class GeneralAbilityManifest:
-    path: Path
-    title: str
-    claim_policy: dict[str, Any]
+class GeneralAbilityLibrary:
+    live_root: Path
+    level_a_root: Path
+    stages: tuple[AcceptanceStage, ...]
     ability_classes: tuple[AbilityClass, ...]
 
 
@@ -839,6 +864,15 @@ def validate_live_text_result(
                 f"{case.max_warm_fast_commit_to_playback_start_ms:.1f}ms"
             )
     structured_metrics = _structured_case_metrics(case, summary)
+    if case.require_safe_idle and structured_metrics["safe_idle"] is not True:
+        if bool(summary.get("preview_only")):
+            errors.append(
+                "turn requires executed safe-idle evidence; preview output is insufficient"
+            )
+        else:
+            errors.append(
+                "turn did not retain a safe-idle final state after deterministic control"
+            )
     if structured_metrics["runtime_integrity_failed"]:
         detail = ":".join(
             item
@@ -925,17 +959,6 @@ def validate_live_text_result(
         errors,
     )
     return errors
-
-
-def _scenario_ref(raw: Any) -> ScenarioRef:
-    if isinstance(raw, str):
-        return ScenarioRef(key=raw.strip())
-    if not isinstance(raw, dict):
-        raise ValueError("level_a_scenarios entries must be strings or objects")
-    key = str(raw.get("key") or "").strip()
-    if not key:
-        raise ValueError("level_a_scenarios entry is missing key")
-    return ScenarioRef(key=key, rationale=str(raw.get("rationale") or ""))
 
 
 def _text_scenario_case(
@@ -1042,6 +1065,7 @@ def _text_scenario_case(
             raw.get("forbidden_plan_agent_skills")
         ),
         require_llm_integrity=bool(raw.get("require_llm_integrity", True)),
+        require_safe_idle=bool(raw.get("require_safe_idle", False)),
         expected_repeat_of_previous_speech=bool(
             raw.get("expected_repeat_of_previous_speech", False)
         ),
@@ -1052,15 +1076,19 @@ def _text_scenario_case(
     )
 
 
-def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
+def _live_case(
+    raw: dict[str, Any],
+    *,
+    source_path: Path | None = None,
+) -> LiveCaseRef:
     case_id = str(raw.get("id") or raw.get("case_id") or "").strip()
     if not case_id:
-        raise ValueError("live_text_cases entry is missing id")
+        raise ValueError("live text scenario is missing id")
     raw_turns = raw.get("turns")
     if raw_turns is not None:
         if not isinstance(raw_turns, list) or not raw_turns:
             raise ValueError(
-                f"live_text_cases entry {case_id!r} turns must be a non-empty array"
+                f"live text scenario {case_id!r} turns must be a non-empty array"
             )
         turns = tuple(
             _text_scenario_case(
@@ -1072,7 +1100,7 @@ def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
         )
         if len(turns) != len(raw_turns):
             raise ValueError(
-                f"live_text_cases entry {case_id!r} contains a non-object turn"
+                f"live text scenario {case_id!r} contains a non-object turn"
             )
         case = TextScenarioCase(
             case_id=case_id,
@@ -1083,45 +1111,227 @@ def _live_case(raw: dict[str, Any]) -> LiveCaseRef:
         )
     else:
         case = _text_scenario_case(raw)
-    return LiveCaseRef(case=case, rationale=str(raw.get("rationale") or ""))
-
-
-def _ability_class(raw: dict[str, Any]) -> AbilityClass:
-    ability_id = str(raw.get("id") or "").strip()
-    if not ability_id:
-        raise ValueError("ability class is missing id")
-    level_a = tuple(_scenario_ref(item) for item in raw.get("level_a_scenarios", []))
-    live = tuple(
-        _live_case(item)
-        for item in raw.get("live_text_cases", [])
-        if isinstance(item, dict)
+    oracle_policy = raw.get("oracle_policy") or {}
+    review_rubric = raw.get("review_rubric") or {}
+    provenance = raw.get("provenance") or {}
+    if not isinstance(oracle_policy, dict):
+        raise ValueError(f"live text scenario {case_id!r} oracle_policy must be an object")
+    if not isinstance(review_rubric, dict):
+        raise ValueError(f"live text scenario {case_id!r} review_rubric must be an object")
+    if not isinstance(provenance, dict):
+        raise ValueError(f"live text scenario {case_id!r} provenance must be an object")
+    if provenance:
+        origin = str(provenance.get("origin") or "").strip()
+        batch_id = str(provenance.get("batch_id") or "").strip()
+        derived = provenance.get("derived_from_existing_scenario")
+        if not origin or not batch_id or not isinstance(derived, bool):
+            raise ValueError(
+                f"live text scenario {case_id!r} provenance requires non-empty "
+                "origin and batch_id plus boolean derived_from_existing_scenario"
+            )
+    return LiveCaseRef(
+        case=case,
+        rationale=str(raw.get("rationale") or ""),
+        source_path=source_path,
+        stage=str(raw.get("stage") or "").strip(),
+        difficulty=str(raw.get("difficulty") or "").strip(),
+        oracle_policy=dict(oracle_policy),
+        review_rubric=dict(review_rubric),
+        provenance=dict(provenance),
     )
-    return AbilityClass(
-        ability_id=ability_id,
-        title=str(raw.get("title") or ability_id),
-        general_rule=str(raw.get("general_rule") or ""),
-        minimum_level_a_cases=int(raw.get("minimum_level_a_cases", 1)),
-        root_cause_boundaries=_tuple_of_strings(raw.get("root_cause_boundaries")),
-        level_a_scenarios=level_a,
-        live_text_cases=live,
+
+
+def _scenario_memberships(
+    raw: dict[str, Any],
+    *,
+    source_path: Path,
+    required: bool,
+) -> tuple[dict[str, Any], ...]:
+    metadata = raw.get("general_ability")
+    if metadata is None and not required:
+        return ()
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{source_path}: general_ability must be an object")
+    memberships = metadata.get("memberships")
+    if not isinstance(memberships, list) or not memberships:
+        raise ValueError(
+            f"{source_path}: general_ability.memberships must be a non-empty array"
+        )
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(memberships):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"{source_path}: general_ability.memberships[{index}] must be an object"
+            )
+        ability_id = str(item.get("id") or "").strip()
+        title = str(item.get("title") or "").strip()
+        general_rule = str(item.get("general_rule") or "").strip()
+        rationale = str(item.get("rationale") or "").strip()
+        boundaries = _tuple_of_strings(item.get("root_cause_boundaries"))
+        if not ability_id or not title or not general_rule or not rationale or not boundaries:
+            raise ValueError(
+                f"{source_path}: membership {ability_id or index!r} requires id, "
+                "title, general_rule, rationale, and root_cause_boundaries"
+            )
+        if ability_id in seen:
+            raise ValueError(
+                f"{source_path}: duplicate general ability membership {ability_id!r}"
+            )
+        seen.add(ability_id)
+        normalized.append(
+            {
+                "id": ability_id,
+                "title": title,
+                "general_rule": general_rule,
+                "rationale": rationale,
+                "root_cause_boundaries": boundaries,
+            }
+        )
+    return tuple(normalized)
+
+
+def load_scenario_library(
+    live_root: Path = DEFAULT_LIVE_SCENARIO_ROOT,
+    level_a_root: Path = DEFAULT_LEVEL_A_SCENARIO_ROOT,
+) -> GeneralAbilityLibrary:
+    resolved_live_root = live_root.expanduser().resolve()
+    resolved_level_a_root = level_a_root.expanduser().resolve()
+    if not resolved_live_root.is_dir():
+        raise ValueError(
+            f"general ability live scenario root does not exist: {resolved_live_root}"
+        )
+    stage_contracts = {
+        stage_id: (title, stop_later)
+        for stage_id, title, stop_later in STAGE_CONTRACTS
+    }
+    stage_paths: dict[str, list[Path]] = {
+        stage_id: [] for stage_id, _title, _stop in STAGE_CONTRACTS
+    }
+    ability_meta: dict[str, dict[str, Any]] = {}
+    live_by_class: dict[str, list[LiveCaseRef]] = {}
+    level_a_by_class: dict[str, list[ScenarioRef]] = {}
+    seen_live_ids: set[str] = set()
+
+    def record_membership(item: dict[str, Any], *, source_path: Path) -> None:
+        ability_id = str(item["id"])
+        canonical = {
+            "title": item["title"],
+            "general_rule": item["general_rule"],
+            "root_cause_boundaries": item["root_cause_boundaries"],
+        }
+        previous = ability_meta.get(ability_id)
+        if previous is not None and previous != canonical:
+            raise ValueError(
+                f"{source_path}: general ability metadata for {ability_id!r} "
+                "does not match other scenario files"
+            )
+        ability_meta[ability_id] = canonical
+
+    for scenario_path in sorted(resolved_live_root.rglob("*.json")):
+        relative = scenario_path.relative_to(resolved_live_root)
+        if len(relative.parts) < 3:
+            raise ValueError(
+                f"{scenario_path}: expected <stage>/<ability-class>/<scenario>.json"
+            )
+        stage_id, directory_ability = relative.parts[0], relative.parts[1]
+        if stage_id not in stage_contracts:
+            raise ValueError(f"{scenario_path}: unknown stage directory {stage_id!r}")
+        try:
+            scenario_raw = json.loads(scenario_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"cannot load live scenario {scenario_path}: {exc}") from exc
+        if not isinstance(scenario_raw, dict):
+            raise ValueError(f"{scenario_path}: scenario must contain one JSON object")
+        if scenario_raw.get("schema_version") != 1:
+            raise ValueError(
+                f"{scenario_path}: unsupported schema_version "
+                f"{scenario_raw.get('schema_version')!r}"
+            )
+        if scenario_raw.get("kind") != "chromie_general_ability_live_text":
+            raise ValueError(f"{scenario_path}: unsupported live scenario kind")
+        if scenario_path.stem != str(scenario_raw.get("id") or "").strip():
+            raise ValueError(f"{scenario_path}: file stem must match scenario id")
+        if str(scenario_raw.get("stage") or "").strip() != stage_id:
+            raise ValueError(f"{scenario_path}: stage metadata must match its directory")
+        memberships = _scenario_memberships(
+            scenario_raw,
+            source_path=scenario_path,
+            required=True,
+        )
+        if len(memberships) != 1:
+            raise ValueError(f"{scenario_path}: live scenario requires one ability membership")
+        membership = memberships[0]
+        ability_id = str(membership["id"])
+        if ability_id != directory_ability:
+            raise ValueError(
+                f"{scenario_path}: ability membership must match directory "
+                f"{directory_ability!r}"
+            )
+        record_membership(membership, source_path=scenario_path)
+        ref = _live_case(scenario_raw, source_path=scenario_path)
+        if ref.case.case_id in seen_live_ids:
+            raise ValueError(f"duplicate live scenario id {ref.case.case_id!r}")
+        seen_live_ids.add(ref.case.case_id)
+        live_by_class.setdefault(ability_id, []).append(ref)
+        stage_paths[stage_id].append(scenario_path)
+
+    if not seen_live_ids:
+        raise ValueError(
+            f"general ability live scenario root contains no JSON scenarios: "
+            f"{resolved_live_root}"
+        )
+
+    from scripts.behavior_scenarios import discover_scenario_files  # noqa: PLC0415
+
+    for scenario_path in discover_scenario_files(resolved_level_a_root):
+        raw = json.loads(scenario_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError(f"{scenario_path}: scenario must contain one JSON object")
+        memberships = _scenario_memberships(
+            raw,
+            source_path=scenario_path,
+            required=False,
+        )
+        if not memberships:
+            continue
+        key = f"{raw.get('suite')}/{raw.get('id')}"
+        for membership in memberships:
+            record_membership(membership, source_path=scenario_path)
+            level_a_by_class.setdefault(str(membership["id"]), []).append(
+                ScenarioRef(
+                    key=key,
+                    rationale=str(membership["rationale"]),
+                    source_path=scenario_path,
+                )
+            )
+
+    ability_classes = tuple(
+        AbilityClass(
+            ability_id=ability_id,
+            title=str(metadata["title"]),
+            general_rule=str(metadata["general_rule"]),
+            root_cause_boundaries=tuple(metadata["root_cause_boundaries"]),
+            level_a_scenarios=tuple(level_a_by_class.get(ability_id, [])),
+            live_text_cases=tuple(live_by_class.get(ability_id, [])),
+        )
+        for ability_id, metadata in sorted(ability_meta.items())
     )
-
-
-def load_manifest(path: Path = DEFAULT_MANIFEST) -> GeneralAbilityManifest:
-    resolved = path.expanduser().resolve()
-    raw = json.loads(resolved.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError("general ability manifest must contain one JSON object")
-    if raw.get("schema_version") != 1:
-        raise ValueError(f"unsupported schema_version {raw.get('schema_version')!r}")
-    raw_classes = raw.get("ability_classes")
-    if not isinstance(raw_classes, list) or not raw_classes:
-        raise ValueError("manifest must contain a non-empty ability_classes list")
-    return GeneralAbilityManifest(
-        path=resolved,
-        title=str(raw.get("title") or "General ability acceptance"),
-        claim_policy=dict(raw.get("claim_policy") or {}),
-        ability_classes=tuple(_ability_class(item) for item in raw_classes),
+    stages = tuple(
+        AcceptanceStage(
+            stage_id=stage_id,
+            title=title,
+            order=order,
+            stop_later_stages_on_hard_failure=stop_later,
+            scenario_paths=tuple(stage_paths[stage_id]),
+        )
+        for order, (stage_id, title, stop_later) in enumerate(STAGE_CONTRACTS)
+    )
+    return GeneralAbilityLibrary(
+        live_root=resolved_live_root,
+        level_a_root=resolved_level_a_root,
+        stages=stages,
+        ability_classes=ability_classes,
     )
 
 
@@ -1148,10 +1358,10 @@ def live_case_ids(classes: list[AbilityClass] | tuple[AbilityClass, ...]) -> lis
 
 
 def select_ability_classes(
-    manifest: GeneralAbilityManifest,
+    library: GeneralAbilityLibrary,
     selected: list[str] | tuple[str, ...],
 ) -> list[AbilityClass]:
-    classes = list(manifest.ability_classes)
+    classes = list(library.ability_classes)
     if not selected:
         return classes
     wanted = set(selected)
@@ -1162,27 +1372,68 @@ def select_ability_classes(
     return out
 
 
-def validate_manifest(
-    manifest: GeneralAbilityManifest,
+def validate_library(
+    library: GeneralAbilityLibrary,
     *,
     validate_level_a_sources: bool = True,
 ) -> list[str]:
     errors: list[str] = []
+    stage_ids = {stage.stage_id for stage in library.stages}
+    stage_orders: set[int] = set()
+    for stage in library.stages:
+        if stage.order in stage_orders:
+            errors.append(f"duplicate stage order {stage.order}")
+        stage_orders.add(stage.order)
     seen: set[str] = set()
-    for ability in manifest.ability_classes:
+    seen_live_ids: set[str] = set()
+    for ability in library.ability_classes:
         if ability.ability_id in seen:
             errors.append(f"duplicate ability class id {ability.ability_id!r}")
         seen.add(ability.ability_id)
         if not ability.general_rule.strip():
             errors.append(f"{ability.ability_id}: general_rule is required")
-        if len(ability.level_a_scenarios) < ability.minimum_level_a_cases:
-            errors.append(
-                f"{ability.ability_id}: has {len(ability.level_a_scenarios)} "
-                f"Level A scenario(s), expected at least {ability.minimum_level_a_cases}"
-            )
         if not ability.level_a_scenarios and not ability.live_text_cases:
             errors.append(f"{ability.ability_id}: no acceptance cases declared")
         for ref in ability.live_text_cases:
+            case_id = ref.case.case_id
+            if case_id in seen_live_ids:
+                errors.append(f"duplicate live scenario id {case_id!r}")
+            seen_live_ids.add(case_id)
+            if ref.source_path is None:
+                errors.append(f"{ability.ability_id}/{case_id}: source_path is required")
+            elif not ref.source_path.is_file():
+                errors.append(
+                    f"{ability.ability_id}/{case_id}: source file is missing: "
+                    f"{ref.source_path}"
+                )
+            if ref.stage not in stage_ids:
+                errors.append(
+                    f"{ability.ability_id}/{case_id}: unknown stage {ref.stage!r}"
+                )
+            if ref.difficulty not in {"easy", "medium", "hard"}:
+                errors.append(
+                    f"{ability.ability_id}/{case_id}: unknown difficulty "
+                    f"{ref.difficulty!r}"
+                )
+            try:
+                policy = OraclePolicy.from_mapping(ref.oracle_policy)
+            except ValueError as exc:
+                errors.append(f"{ability.ability_id}/{case_id}: {exc}")
+            else:
+                dimensions = _tuple_of_strings(ref.review_rubric.get("dimensions"))
+                if tuple(policy.semantic_dimensions) != dimensions:
+                    errors.append(
+                        f"{ability.ability_id}/{case_id}: review_rubric dimensions "
+                        "must match oracle_policy semantic_dimensions"
+                    )
+                primary_outcomes = _tuple_of_strings(
+                    ref.review_rubric.get("primary_outcomes")
+                )
+                if policy.mode in {"semantic_review", "hybrid"} and not primary_outcomes:
+                    errors.append(
+                        f"{ability.ability_id}/{case_id}: semantic review requires "
+                        "review_rubric primary_outcomes"
+                    )
             for turn_index, turn in enumerate(ref.case.turns):
                 if (
                     turn.expected_repeat_of_previous_speech
@@ -1223,12 +1474,12 @@ def validate_manifest(
                         "speech cannot declare expected purposes"
                     )
 
-    keys = level_a_keys(manifest.ability_classes)
+    keys = level_a_keys(library.ability_classes)
     if keys and validate_level_a_sources:
         try:
             from scripts.behavior_scenarios import load_scenarios  # noqa: PLC0415
 
-            load_scenarios(only=set(keys))
+            load_scenarios(library.level_a_root, only=set(keys))
         except Exception as exc:
             errors.append(f"Level A scenario reference check failed: {exc}")
     return errors
@@ -1486,28 +1737,39 @@ def _maybe_write_summary(
     return summary
 
 
-def manifest_summary(manifest: GeneralAbilityManifest) -> dict[str, Any]:
-    errors = validate_manifest(manifest)
+def library_summary(library: GeneralAbilityLibrary) -> dict[str, Any]:
+    errors = validate_library(library)
     return {
         "ok": not errors,
         "mode": "check",
-        "manifest": str(manifest.path),
-        "title": manifest.title,
+        "live_scenario_root": str(library.live_root),
+        "level_a_scenario_root": str(library.level_a_root),
         "errors": errors,
-        "ability_class_count": len(manifest.ability_classes),
-        "level_a_case_count": len(level_a_keys(manifest.ability_classes)),
-        "live_text_case_count": len(live_case_ids(manifest.ability_classes)),
+        "ability_class_count": len(library.ability_classes),
+        "level_a_case_count": len(level_a_keys(library.ability_classes)),
+        "live_text_case_count": len(live_case_ids(library.ability_classes)),
+        "stages": [
+            {
+                "id": stage.stage_id,
+                "title": stage.title,
+                "order": stage.order,
+                "stop_later_stages_on_hard_failure": (
+                    stage.stop_later_stages_on_hard_failure
+                ),
+                "case_count": len(stage.scenario_paths),
+            }
+            for stage in library.stages
+        ],
         "ability_classes": [
             {
                 "id": ability.ability_id,
                 "title": ability.title,
                 "general_rule": ability.general_rule,
                 "root_cause_boundaries": list(ability.root_cause_boundaries),
-                "minimum_level_a_cases": ability.minimum_level_a_cases,
                 "level_a_scenarios": [ref.key for ref in ability.level_a_scenarios],
                 "live_text_cases": [ref.case.case_id for ref in ability.live_text_cases],
             }
-            for ability in manifest.ability_classes
+            for ability in library.ability_classes
         ],
     }
 
@@ -1518,14 +1780,14 @@ def run_level_a(args: argparse.Namespace) -> dict[str, Any]:
         run_scenarios_sync,
     )
 
-    manifest = load_manifest(args.ability_manifest)
-    manifest_errors = validate_manifest(manifest)
-    selected_classes = select_ability_classes(manifest, args.ability_class)
+    library = load_scenario_library(args.scenario_root, args.level_a_scenario_root)
+    library_errors = validate_library(library)
+    selected_classes = select_ability_classes(library, args.ability_class)
     selected_keys = _selected_level_a_keys(selected_classes, set(args.only_case))
     if not selected_keys:
         raise ValueError("no Level A cases selected")
 
-    scenarios = load_scenarios(only=set(selected_keys))
+    scenarios = load_scenarios(library.level_a_root, only=set(selected_keys))
     report = run_scenarios_sync(scenarios)
     result_by_key = {
         str(item.get("key")): item
@@ -1562,7 +1824,7 @@ def run_level_a(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
-    errors = list(manifest_errors)
+    errors = list(library_errors)
     errors.extend(
         f"{ability['id']} failed {ability['failed']} Level A case(s)"
         for ability in ability_results
@@ -1573,7 +1835,8 @@ def run_level_a(args: argparse.Namespace) -> dict[str, Any]:
         "mode": "level-a",
         "evidence_level": "A",
         "claim_scope": LEVEL_A_CLAIM,
-        "manifest": str(manifest.path),
+        "live_scenario_root": str(library.live_root),
+        "level_a_scenario_root": str(library.level_a_root),
         "errors": errors,
         "root_cause_report_required": any(item["failed"] for item in ability_results),
         "ability_class_count": len(ability_results),
@@ -1601,13 +1864,36 @@ def _filter_live_refs(
 
 
 def _selected_live_refs(
+    library: GeneralAbilityLibrary,
     classes: list[AbilityClass],
     only_cases: set[str],
+    selected_stages: set[str],
 ) -> list[tuple[AbilityClass, LiveCaseRef]]:
+    known_stages = {stage.stage_id for stage in library.stages}
+    unknown_stages = selected_stages - known_stages
+    if unknown_stages:
+        raise ValueError(f"unknown stage(s): {', '.join(sorted(unknown_stages))}")
+    selected_class_ids = {ability.ability_id for ability in classes}
+    refs_by_path = {
+        ref.source_path: (ability, ref)
+        for ability in classes
+        for ref in ability.live_text_cases
+        if ref.source_path is not None
+    }
     refs: list[tuple[AbilityClass, LiveCaseRef]] = []
     seen: set[str] = set()
-    for ability in classes:
-        for ref in _filter_live_refs(ability, only_cases):
+    for stage in library.stages:
+        if selected_stages and stage.stage_id not in selected_stages:
+            continue
+        for source_path in stage.scenario_paths:
+            match = refs_by_path.get(source_path)
+            if match is None:
+                continue
+            ability, ref = match
+            if ability.ability_id not in selected_class_ids:
+                continue
+            if only_cases and ref.case.case_id not in only_cases:
+                continue
             if ref.case.case_id not in seen:
                 refs.append((ability, ref))
                 seen.add(ref.case.case_id)
@@ -1859,14 +2145,138 @@ async def _run_live_case(
     }
 
 
+def _semantic_review_bundle(
+    *,
+    library: GeneralAbilityLibrary,
+    selected_refs: list[tuple[AbilityClass, LiveCaseRef]],
+    case_results: list[dict[str, Any]],
+    run_summary: dict[str, Any],
+) -> dict[str, Any]:
+    refs_by_id = {ref.case.case_id: (ability, ref) for ability, ref in selected_refs}
+    normalized_cases: list[dict[str, Any]] = []
+    suite_results: list[dict[str, Any]] = []
+    for result in case_results:
+        case_id = str(result.get("case_id") or "")
+        ability, ref = refs_by_id[case_id]
+        case = ref.case
+        source_path = ref.source_path or library.live_root
+        try:
+            source = source_path.relative_to(library.live_root).as_posix()
+        except ValueError:
+            source = str(source_path)
+        inputs: dict[str, Any]
+        if case.turns:
+            inputs = {
+                "turns": [
+                    {"text": turn.text, "language": turn.language}
+                    for turn in case.turns
+                ]
+            }
+        else:
+            inputs = {"text": case.text, "language": case.language}
+        rubric = dict(ref.review_rubric)
+        primary_outcomes = list(rubric.pop("primary_outcomes", []))
+        acceptable_auxiliary = list(rubric.pop("acceptable_auxiliary", []))
+        forbidden_behaviors = list(
+            rubric.pop("forbidden_semantic_outcomes", [])
+        )
+        normalized_cases.append(
+            {
+                "id": case_id,
+                "layer": "integration",
+                "datasets": ["general_ability", ref.stage],
+                "source": {
+                    "path": source,
+                    "adapter": "general_ability_live_text_v2",
+                    "source_id": case_id,
+                    "scenario_provenance": dict(ref.provenance),
+                },
+                "inputs": inputs,
+                "context": {
+                    "ability_class": ability.ability_id,
+                    "stage": ref.stage,
+                    "difficulty": ref.difficulty,
+                },
+                "capabilities": list(case.expected_capabilities),
+                "expectations": {
+                    "primary_outcomes": primary_outcomes,
+                    "acceptable_auxiliary": acceptable_auxiliary,
+                    "forbidden_behaviors": forbidden_behaviors,
+                    "invariants": [
+                        "Deterministic safety, authorization, capability, execution, "
+                        "provenance, and LLM-integrity failures are non-overridable."
+                    ],
+                    "distribution_observations": [],
+                },
+                "evidence_requirements": [
+                    "live_service" if run_summary.get("execute") else "live_model"
+                ],
+                "review_rubric": rubric,
+                "legacy_expectations": {},
+                "oracle_policy": dict(ref.oracle_policy),
+            }
+        )
+        policy = OraclePolicy.from_mapping(ref.oracle_policy)
+        suite_results.append(
+            {
+                "scenario_id": case_id,
+                "status": "review" if result.get("ok") else "fail",
+                "output": result,
+                "artifacts": [str(result.get("evidence_dir") or "")],
+                "evaluation": {
+                    "deterministic_status": (
+                        "pass" if result.get("ok") else "fail"
+                    ),
+                    "semantic_review_required": policy.mode
+                    in {"semantic_review", "hybrid"},
+                    "semantic_review_status": (
+                        "pending"
+                        if policy.mode in {"semantic_review", "hybrid"}
+                        else "not_required"
+                    ),
+                    "semantic_blocking": policy.semantic_blocking,
+                },
+            }
+        )
+    return build_review_bundle(
+        {"schema_version": 1, "cases": normalized_cases},
+        {
+            "schema_version": 1,
+            "run": {
+                "mode": run_summary.get("mode"),
+                "evidence_level": run_summary.get("evidence_level"),
+                "live_scenario_root": str(library.live_root),
+                "provenance": run_summary.get("provenance") or {},
+            },
+            "summary": {
+                "deterministic_ok": run_summary.get("deterministic_ok"),
+                "semantic_review_status": run_summary.get(
+                    "semantic_review_status"
+                ),
+                "stage_results": run_summary.get("stage_results") or [],
+            },
+            "results": suite_results,
+        },
+    )
+
+
 async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
-    manifest = load_manifest(args.ability_manifest)
-    manifest_errors = validate_manifest(
-        manifest,
+    library = load_scenario_library(args.scenario_root, args.level_a_scenario_root)
+    library_errors = validate_library(
+        library,
         validate_level_a_sources=False,
     )
-    selected_classes = select_ability_classes(manifest, args.ability_class)
-    selected_refs = _selected_live_refs(selected_classes, set(args.only_case))
+    if library_errors:
+        raise ValueError(
+            "invalid general ability scenario library: " + "; ".join(library_errors)
+        )
+    selected_classes = select_ability_classes(library, args.ability_class)
+    selected_refs = _selected_live_refs(
+        library,
+        selected_classes,
+        set(args.only_case),
+        set(args.stage),
+    )
     if not selected_refs:
         raise ValueError("no live text cases selected")
 
@@ -1875,51 +2285,124 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         root.mkdir(parents=True, exist_ok=True)
 
     case_results: list[dict[str, Any]] = []
-    for index, (ability, ref) in enumerate(selected_refs, 1):
-        case = ref.case
-        case_dir = root / f"{index:02d}-{ability.ability_id}-{case.case_id}"
-        print(
-            f"[general-ability][live-text] {index}/{len(selected_refs)} "
-            f"{ability.ability_id}/{case.case_id}",
-            file=sys.stderr,
-            flush=True,
-        )
-        try:
-            result = await asyncio.wait_for(
-                _run_live_case(args, case, case_dir),
-                timeout=args.case_timeout_s,
+    stage_results: list[dict[str, Any]] = []
+    skipped_cases: list[dict[str, str]] = []
+    stopped_after_stage: str | None = None
+    refs_by_stage: dict[str, list[tuple[AbilityClass, LiveCaseRef]]] = {}
+    for ability, ref in selected_refs:
+        refs_by_stage.setdefault(ref.stage, []).append((ability, ref))
+
+    executed_count = 0
+    for stage in library.stages:
+        stage_refs = refs_by_stage.get(stage.stage_id, [])
+        if not stage_refs:
+            continue
+        stage_case_results: list[dict[str, Any]] = []
+        for ability, ref in stage_refs:
+            executed_count += 1
+            case = ref.case
+            case_dir = root / (
+                f"{executed_count:02d}-{ref.stage}-{ability.ability_id}-{case.case_id}"
             )
-        except Exception as exc:
-            result = {
-                "ok": False,
-                "case_id": case.case_id,
-                "text": (
-                    [turn.text for turn in case.turns]
-                    if case.turns
-                    else case.text
+            print(
+                f"[general-ability][live-text][{ref.stage}] "
+                f"{executed_count}/{len(selected_refs)} "
+                f"{ability.ability_id}/{case.case_id}",
+                file=sys.stderr,
+                flush=True,
+            )
+            try:
+                result = await asyncio.wait_for(
+                    _run_live_case(args, case, case_dir),
+                    timeout=args.case_timeout_s,
+                )
+            except Exception as exc:
+                error = f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"
+                result = {
+                    "ok": False,
+                    "case_id": case.case_id,
+                    "text": (
+                        [turn.text for turn in case.turns]
+                        if case.turns
+                        else case.text
+                    ),
+                    "evidence_dir": str(case_dir),
+                    "errors": [error],
+                    "diagnostic_evaluation": {
+                        "passed": False,
+                        "overall_score": 0,
+                        "hard_gate_failures": [error],
+                        "earliest_suspect_boundary": "live_acceptance_harness",
+                        "root_cause_report_required": True,
+                        "scoring_authority": "acceptance_only_not_runtime_policy",
+                    },
+                }
+            result["ability_class"] = ability.ability_id
+            result["general_rule"] = ability.general_rule
+            result["case_id"] = case.case_id
+            result["description"] = case.description
+            result["rationale"] = ref.rationale
+            result["source_path"] = str(ref.source_path or "")
+            result["stage"] = ref.stage
+            result["difficulty"] = ref.difficulty
+            result["oracle_policy"] = dict(ref.oracle_policy)
+            result["review_rubric"] = dict(ref.review_rubric)
+            result["scenario_provenance"] = dict(ref.provenance)
+            result["root_cause_boundaries"] = list(ability.root_cause_boundaries)
+            if not args.no_write:
+                _write_json(case_dir / "summary.json", result)
+            case_results.append(result)
+            stage_case_results.append(result)
+
+        hard_failed = sum(1 for item in stage_case_results if not item.get("ok"))
+        stage_results.append(
+            {
+                "id": stage.stage_id,
+                "title": stage.title,
+                "status": "hard_fail" if hard_failed else "hard_pass",
+                "case_count": len(stage_case_results),
+                "passed": len(stage_case_results) - hard_failed,
+                "hard_failed": hard_failed,
+                "semantic_review_status": "pending",
+                "stop_later_stages_on_hard_failure": (
+                    stage.stop_later_stages_on_hard_failure
                 ),
-                "evidence_dir": str(case_dir),
-                "errors": [f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"],
-                "diagnostic_evaluation": {
-                    "passed": False,
-                    "overall_score": 0,
-                    "hard_gate_failures": [
-                        f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"
-                    ],
-                    "earliest_suspect_boundary": "live_acceptance_harness",
-                    "root_cause_report_required": True,
-                    "scoring_authority": "acceptance_only_not_runtime_policy",
-                },
             }
-        result["ability_class"] = ability.ability_id
-        result["general_rule"] = ability.general_rule
-        result["case_id"] = case.case_id
-        result["description"] = case.description
-        result["rationale"] = ref.rationale
-        result["root_cause_boundaries"] = list(ability.root_cause_boundaries)
-        if not args.no_write:
-            _write_json(case_dir / "summary.json", result)
-        case_results.append(result)
+        )
+        if hard_failed and stage.stop_later_stages_on_hard_failure:
+            stopped_after_stage = stage.stage_id
+            later_stage_ids = {
+                item.stage_id for item in library.stages if item.order > stage.order
+            }
+            for ability, ref in selected_refs:
+                if ref.stage in later_stage_ids:
+                    skipped_cases.append(
+                        {
+                            "case_id": ref.case.case_id,
+                            "ability_class": ability.ability_id,
+                            "stage": ref.stage,
+                            "reason": f"blocked_by_hard_failure_in_{stage.stage_id}",
+                        }
+                    )
+            for later_stage in library.stages:
+                later_refs = refs_by_stage.get(later_stage.stage_id, [])
+                if later_refs and later_stage.order > stage.order:
+                    stage_results.append(
+                        {
+                            "id": later_stage.stage_id,
+                            "title": later_stage.title,
+                            "status": "skipped",
+                            "case_count": len(later_refs),
+                            "passed": 0,
+                            "hard_failed": 0,
+                            "semantic_review_status": "not_started",
+                            "reason": f"blocked_by_hard_failure_in_{stage.stage_id}",
+                            "stop_later_stages_on_hard_failure": (
+                                later_stage.stop_later_stages_on_hard_failure
+                            ),
+                        }
+                    )
+            break
 
     ability_results: list[dict[str, Any]] = []
     for ability in selected_classes:
@@ -1954,29 +2437,52 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
-    errors = list(manifest_errors)
+    errors: list[str] = []
     errors.extend(
         f"{ability['id']} failed {ability['failed']} live text case(s)"
         for ability in ability_results
         if ability["failed"]
     )
+    semantic_review_pending = sum(
+        1
+        for item in case_results
+        if str((item.get("oracle_policy") or {}).get("mode"))
+        in {"semantic_review", "hybrid"}
+    )
+    deterministic_ok = not errors
     summary = {
-        "ok": not errors,
+        "ok": deterministic_ok,
+        "deterministic_ok": deterministic_ok,
+        "qualification_complete": deterministic_ok
+        and semantic_review_pending == 0
+        and not skipped_cases,
+        "semantic_review_status": (
+            "pending" if semantic_review_pending else "not_required"
+        ),
+        "semantic_review_pending": semantic_review_pending,
         "mode": "live-text",
         "evidence_level": "C" if args.execute else "C-preview",
         "provenance": _runtime_provenance(Path(args.runtime_identity)),
         "claim_scope": LIVE_TEXT_EXECUTE_CLAIM if args.execute else LIVE_TEXT_PREVIEW_CLAIM,
         "input_channel": "injected_text",
         "exclusive_host_lock": True,
-        "manifest": str(manifest.path),
+        "live_scenario_root": str(library.live_root),
+        "level_a_scenario_root": str(library.level_a_root),
         "goal_driven_runtime": args.goal_driven_runtime,
         "assertion_scope": args.assertion_scope,
         "execute": args.execute,
         "speaker": args.speaker,
         "errors": errors,
+        "stage_policy": "finish_current_stage_then_gate_later_stages",
+        "selected_stages": list(args.stage),
+        "stage_results": stage_results,
+        "stopped_after_stage": stopped_after_stage,
+        "skipped_case_count": len(skipped_cases),
+        "skipped_cases": skipped_cases,
         "root_cause_report_required": any(item["failed"] for item in ability_results),
         "ability_class_count": len(ability_results),
         "case_count": len(case_results),
+        "planned_case_count": len(selected_refs),
         "passed": sum(1 for item in case_results if item.get("ok")),
         "failed": sum(1 for item in case_results if not item.get("ok")),
         "ability_classes": ability_results,
@@ -1985,6 +2491,15 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     if args.no_write:
         return summary
     summary = {**summary, "evidence_dir": str(root)}
+    review_bundle = _semantic_review_bundle(
+        library=library,
+        selected_refs=selected_refs,
+        case_results=case_results,
+        run_summary=summary,
+    )
+    review_bundle_path = root / "semantic-review-bundle.json"
+    _write_json(review_bundle_path, review_bundle)
+    summary["semantic_review_bundle"] = str(review_bundle_path)
     summary["reviewer_packet"] = _write_reviewer_packet(
         root=root,
         run_summary=summary,
@@ -1994,9 +2509,14 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
-def print_list(manifest: GeneralAbilityManifest) -> None:
-    print(manifest.title)
-    for ability in manifest.ability_classes:
+def print_list(library: GeneralAbilityLibrary) -> None:
+    print(f"General ability scenarios: {library.live_root}")
+    for stage in library.stages:
+        print(
+            f"stage {stage.stage_id}: {len(stage.scenario_paths)} live text "
+            f"(order={stage.order}, gate={stage.stop_later_stages_on_hard_failure})"
+        )
+    for ability in library.ability_classes:
         print(
             f"{ability.ability_id}: "
             f"{len(ability.level_a_scenarios)} Level A, "
@@ -2009,7 +2529,7 @@ def print_summary(summary: dict[str, Any]) -> None:
     if summary.get("mode") == "check":
         status = "passed" if summary.get("ok") else "failed"
         print(
-            "General ability manifest check "
+            "General ability scenario-library check "
             f"{status}: {summary.get('ability_class_count', 0)} ability classes, "
             f"{summary.get('level_a_case_count', 0)} Level A cases, "
             f"{summary.get('live_text_case_count', 0)} live text cases"
@@ -2025,8 +2545,16 @@ def print_summary(summary: dict[str, Any]) -> None:
     print(
         "General ability acceptance: "
         f"{summary.get('passed', 0)}/{summary.get('case_count', 0)} passed "
-        f"mode={summary.get('mode')} evidence={summary.get('evidence_level', 'manifest')}"
+        f"mode={summary.get('mode')} evidence={summary.get('evidence_level', 'library')}"
     )
+    for stage in summary.get("stage_results", []):
+        if not isinstance(stage, dict):
+            continue
+        print(
+            f"  STAGE {str(stage.get('status') or '').upper()} "
+            f"{stage.get('id')}: {stage.get('passed', 0)}/"
+            f"{stage.get('case_count', 0)} hard-pass"
+        )
     for ability in summary.get("ability_classes", []):
         if not isinstance(ability, dict):
             continue
@@ -2053,19 +2581,35 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=("check", "level-a", "live-text"),
         default="check",
-        help="check validates the manifest; level-a runs deterministic scenarios; live-text uses deployed services.",
+        help="check validates discovered scenarios; level-a runs deterministic scenarios; live-text uses deployed services.",
     )
     parser.add_argument(
-        "--ability-manifest",
+        "--scenario-root",
         type=Path,
-        default=DEFAULT_MANIFEST,
-        help="General ability manifest JSON.",
+        default=DEFAULT_LIVE_SCENARIO_ROOT,
+        help="Directory discovered recursively for general-ability live scenarios.",
+    )
+    parser.add_argument(
+        "--level-a-scenario-root",
+        type=Path,
+        default=DEFAULT_LEVEL_A_SCENARIO_ROOT,
+        help="Behavior scenario root discovered for self-declared Level-A memberships.",
     )
     parser.add_argument(
         "--ability-class",
         action="append",
         default=[],
         help="Run one ability class id. Repeatable. Defaults to all classes.",
+    )
+    parser.add_argument(
+        "--stage",
+        action="append",
+        choices=("must_pass", "core", "challenge"),
+        default=[],
+        help=(
+            "Run one live-text stage. Repeatable. By default stages run in contract "
+            "order; each stage finishes before its gate can block later stages."
+        ),
     )
     parser.add_argument(
         "--only-case",
@@ -2167,12 +2711,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        manifest = load_manifest(args.ability_manifest)
+        library = load_scenario_library(args.scenario_root, args.level_a_scenario_root)
         if args.list:
-            print_list(manifest)
+            print_list(library)
             return 0
         if args.mode == "check":
-            summary = manifest_summary(manifest)
+            summary = library_summary(library)
             summary = _maybe_write_summary(args, "check", summary)
         elif args.mode == "level-a":
             summary = run_level_a(args)

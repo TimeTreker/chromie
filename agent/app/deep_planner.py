@@ -44,7 +44,6 @@ from .planner_context import (
     planner_provider_vocal_goal_ids,
 )
 from .planner_validation import (
-    coordinated_action_goal_ids,
     explicit_numeric_goal_values,
     information_goal_ids_without_declared_provider,
     normalize_common_planner_output,
@@ -72,11 +71,6 @@ from .planner_fallback import (
     materialize_deep_clarify,
     materialize_deep_unavailable,
 )
-from .planner_audit import (
-    qualify_evidence_response_truth,
-    review_coordinated_action_plan_coverage,
-)
-
 try:
     from chromie_contracts.plan import CanonicalPlan
 except ImportError:  # pragma: no cover
@@ -107,8 +101,6 @@ class DeepPlannerResolver:
         ollama: OllamaClient,
         catalog: CapabilityCatalog,
         *,
-        truth_ollama: OllamaClient | None = None,
-        truth_num_ctx: int | None = None,
         num_ctx: int = 8192,
         num_predict: int = 1024,
         max_capabilities: int = 96,
@@ -116,11 +108,6 @@ class DeepPlannerResolver:
         min_goal_satisfaction: float = 0.75,
     ) -> None:
         self.ollama = ollama
-        self.truth_ollama = truth_ollama or ollama
-        self.truth_num_ctx = max(
-            2048,
-            int(truth_num_ctx if truth_num_ctx is not None else num_ctx),
-        )
         self.catalog = catalog
         self.num_ctx = max(4096, int(num_ctx))
         self.num_predict = max(256, int(num_predict))
@@ -547,146 +534,6 @@ class DeepPlannerResolver:
                 *errors,
             ]
             if not errors:
-                coverage_review_metadata: dict[str, Any] = {}
-                if (
-                    goal_context.result_reentry_goal_ids
-                    and plan.disposition == "respond"
-                    and plan.response_text
-                ):
-                    try:
-                        evidence_truth = await qualify_evidence_response_truth(
-                            self.truth_ollama,
-                            request=request,
-                            plan=plan,
-                            num_ctx=self.truth_num_ctx,
-                            num_predict=min(self.num_predict, 256),
-                            prompt_family=(
-                                "deep_planner.evidence_response.truth_check"
-                            ),
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "deep_planner_evidence_response_truth_unavailable "
-                            "sid=%s error_type=%s error=%s",
-                            request.sid,
-                            type(exc).__name__,
-                            exc,
-                        )
-                        return materialize_deep_clarify(
-                            plan_id,
-                            request,
-                            "deep_planner_evidence_response_truth_unavailable",
-                            unresolved=[
-                                "Post-Evidence wording could not be truth-qualified."
-                            ],
-                            error=exc,
-                            attempts=attempt + 1,
-                            metadata={"execution_allowed": False},
-                            max_contract_repairs=self.max_contract_repairs,
-                        )
-                    evidence_truth_metadata = evidence_truth.model_dump(
-                        mode="json",
-                        exclude_none=True,
-                        exclude_defaults=True,
-                    )
-                    if evidence_truth.decision != "accept":
-                        logger.warning(
-                            "deep_planner_evidence_response_truth_rejected sid=%s",
-                            request.sid,
-                        )
-                        return materialize_deep_clarify(
-                            plan_id,
-                            request,
-                            "deep_planner_evidence_response_truth_rejected",
-                            unresolved=[
-                                "Post-Evidence wording contradicted trusted terminal "
-                                "Evidence or execution outcome."
-                            ],
-                            attempts=attempt + 1,
-                            metadata={
-                                "evidence_response_truth_qualification": (
-                                    evidence_truth_metadata
-                                ),
-                                "execution_allowed": False,
-                            },
-                            max_contract_repairs=self.max_contract_repairs,
-                        )
-                    coverage_review_metadata[
-                        "evidence_response_truth_qualification"
-                    ] = evidence_truth_metadata
-                coordinated_goal_ids = coordinated_action_goal_ids(
-                    authoritative_goals
-                )
-                if (
-                    coordinated_goal_ids.intersection(plan.goal_ids)
-                    and plan.disposition in {"execute", "mixed"}
-                    and plan.steps
-                ):
-                    try:
-                        coverage_review = await review_coordinated_action_plan_coverage(
-                            self.ollama,
-                            request_text=request.text,
-                            language=str(request.language or "und"),
-                            authoritative_goals=authoritative_goals,
-                            plan=plan,
-                            capabilities=payload,
-                            num_ctx=self.num_ctx,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "deep_planner_coverage_review_unavailable sid=%s "
-                            "error_type=%s error=%s",
-                            request.sid,
-                            type(exc).__name__,
-                            exc,
-                        )
-                        return materialize_deep_clarify(
-                            plan_id,
-                            request,
-                            "coordinated_action_coverage_review_unavailable",
-                            unresolved=["coordinated_action_coverage"],
-                            error=exc,
-                            attempts=attempt + 1,
-                            metadata={
-                                "coordinated_goal_ids": sorted(coordinated_goal_ids),
-                                "execution_allowed": False,
-                            },
-                            max_contract_repairs=self.max_contract_repairs,
-                        )
-                    if coverage_review.decision != "accept":
-                        review_error = {
-                            "type": "coordinated_action_coverage_incomplete",
-                            "uncovered_requirements": list(coverage_review.uncovered_requirements),
-                            "reason": coverage_review.reason,
-                            "confidence": coverage_review.confidence,
-                        }
-                        logger.warning(
-                            "deep_planner_coverage_review_rejected sid=%s "
-                            "attempt=%s uncovered=%s reason=%s",
-                            request.sid,
-                            attempt + 1,
-                            coverage_review.uncovered_requirements,
-                            coverage_review.reason,
-                        )
-                        return materialize_deep_clarify(
-                            plan_id,
-                            request,
-                            "coordinated_action_coverage_incomplete",
-                            unresolved=coverage_review.uncovered_requirements,
-                            metadata={
-                                "validation_feedback": [review_error],
-                                "coordinated_goal_ids": sorted(coordinated_goal_ids),
-                                "execution_allowed": False,
-                            },
-                            attempts=attempt + 1,
-                            max_contract_repairs=self.max_contract_repairs,
-                        )
-                    coverage_review_metadata["coverage_review"] = {
-                        "status": "accepted",
-                        "confidence": coverage_review.confidence,
-                        "reason": coverage_review.reason,
-                        "execution_authority": "none",
-                    }
                 metadata = dict(plan.metadata)
                 metadata.update(
                     {
@@ -703,7 +550,6 @@ class DeepPlannerResolver:
                         "contract_repair_succeeded": contract_repair_attempted,
                     }
                 )
-                metadata.update(coverage_review_metadata)
                 if parameter_provenance_repairs:
                     metadata["parameter_provenance_normalization"] = {
                         "strategy": "project_mechanically_derivable_provenance",

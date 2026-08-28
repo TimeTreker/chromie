@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "multi_goal_walk_then_blink",
+  "stage": "core",
+  "difficulty": "medium",
+  "rationale": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "plan_completeness",
+      "intent_understanding"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "plan_completeness",
+      "intent_understanding"
+    ],
+    "primary_outcomes": [
+      "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Collapse or omit an independent Goal.",
+      "Replay already completed physical work during a later revision."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "Walk forward for one second, then blink twice.",
+  "expected_capabilities": [
+    "soridormi.walk_forward",
+    "soridormi.blink_eyes"
+  ],
+  "expected_args": [
+    "0:duration_s=1.0",
+    "1:count=2"
+  ],
+  "description": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed.",
+  "expected_terminal_planner_tier": "fast",
+  "expected_fast_planner_path": "terminal",
+  "expect_deep_planner_invoked": false,
+  "expect_no_fast_contract_failure": true,
+  "expected_observations": [
+    {
+      "type": "locomotion.walk_forward",
+      "args": {
+        "duration_s": 1.0
+      },
+      "max_occurrences": 1
+    },
+    {
+      "type": "social_attention.blink",
+      "args": {
+        "count": 2
+      },
+      "max_occurrences": 1
+    }
+  ],
+  "expected_observation_sequence": [
+    "locomotion.walk_forward",
+    "social_attention.blink"
+  ],
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Planner contract",
+          "Fast Planner communication",
+          "Trusted runtime adapter",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

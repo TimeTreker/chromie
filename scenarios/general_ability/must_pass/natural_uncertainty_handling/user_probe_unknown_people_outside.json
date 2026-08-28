@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "user_probe_unknown_people_outside",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "rationale": "Without trusted local perception Evidence, Chromie must preserve uncertainty instead of inventing a person outside.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "uncertainty_handling",
+      "naturalness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "uncertainty_handling",
+      "naturalness"
+    ],
+    "primary_outcomes": [
+      "Without trusted local perception Evidence, Chromie must preserve uncertainty instead of inventing a person outside."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Fabricate a resolution for material ambiguity.",
+      "Replace a real clarification with generic missing-skill or internal fallback language."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "你觉得外面有人吗？",
+  "language": "zh-CN",
+  "expect_no_capabilities": true,
+  "min_new_goal_count": 1,
+  "min_goal_outcome_count": 1,
+  "description": "Without trusted local perception Evidence, Chromie must preserve uncertainty instead of inventing a person outside.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "Without trusted local perception Evidence, Chromie must preserve uncertainty instead of inventing a person outside.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      }
+    ]
+  }
+}

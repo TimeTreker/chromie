@@ -27,7 +27,11 @@
               "relationship": "new",
               "target_goal_ids": [],
               "confidence": 0.35,
-              "output_mode": "speech"
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t3"
+              }
             }
           ],
           "unresolved": [
@@ -48,7 +52,11 @@
               "relationship": "new",
               "target_goal_ids": [],
               "confidence": 0.35,
-              "output_mode": "speech"
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t3"
+              }
             }
           ],
           "unresolved": [
@@ -78,6 +86,22 @@
         "target_goal_ids": [],
         "confidence": 0.35,
         "output_mode": "speech"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "An unresolved pronoun remains explicit instead of being guessed.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
       }
     ]
   }

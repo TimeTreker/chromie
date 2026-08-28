@@ -266,7 +266,7 @@ or when multiple live cases are due:
 
 ```text
 clean deployed revision and runtime identity
-  -> complete manifest-owned live cohort
+  -> complete directory-discovered live cohort
   -> one post-cohort debug bundle
   -> deterministic plus semantic judgment of every case
   -> shared-boundary root-cause clusters
@@ -275,7 +275,7 @@ clean deployed revision and runtime identity
   -> complete cohort again
 ```
 
-Invoke the whole authoritative manifest once. Do not edit source, prompts,
+Invoke the whole directory-discovered cohort once. Do not edit source, prompts,
 profiles, tests, or documentation; rebuild or restart services; or replace the
 remaining cohort with `--only-case`/`--case` runs after an individual failure.
 Per-case isolation belongs inside the runner and does not authorize a different
@@ -477,3 +477,13 @@ bounded conversation. This is the required form for failures caused by stale
 Goals, earlier tools, clarification state, confirmation state, or dialogue
 continuity. Use `--only-case` to rerun the originating episode while debugging;
 then run its complete ability class before the canonical repository gate.
+
+Every maintained general-ability live episode owns one file under
+`scenarios/general_ability/<must_pass|core|challenge>/` and declares its own
+ability and oracle metadata; there is no central scenario index. For broad changes, finish the
+complete `must_pass` stage before evaluating its gate. Retain and report every
+must-pass result even when an earlier case fails, then block `core` and
+`challenge` if any non-overridable hard gate failed. Natural-language outcomes
+use the declared hybrid semantic-review contract rather than exact response
+strings; deterministic safety, authorization, capability, execution,
+provenance, and LLM-integrity failures remain final.

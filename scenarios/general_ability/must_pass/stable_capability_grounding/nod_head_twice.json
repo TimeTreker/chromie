@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "nod_head_twice",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "rationale": "Exact head nod request should ground to the catalog-backed nod skill.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "capability_grounding"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "intent_understanding",
+      "capability_grounding"
+    ],
+    "primary_outcomes": [
+      "Exact head nod request should ground to the catalog-backed nod skill."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Deny an exactly supported high-level ability.",
+      "Claim execution without matching provider evidence."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "nod your head twice",
+  "expected_capabilities": [
+    "soridormi.nod_yes"
+  ],
+  "expected_args": [
+    "0:count=2"
+  ],
+  "description": "Exact head nod request should ground to the catalog-backed nod skill.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "Exact head nod request should ground to the catalog-backed nod skill.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "contextless_turn_it_up",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "With no active media, speech, display, or other adjustable target, turn it up has no grounded object and requires clarification.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["uncertainty_handling", "referent_grounding", "tool_grounding"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["uncertainty_handling", "referent_grounding", "tool_grounding"],
+    "primary_outcomes": ["Ask what the user wants increased and do not choose an adjustment target without context."],
+    "acceptable_auxiliary": ["The clarification may offer likely categories such as media volume or speech volume without assuming one."],
+    "forbidden_semantic_outcomes": [
+      "Adjust media, speech, body speed, or another setting without a grounded target.",
+      "Claim that a volume or setting was changed.",
+      "Invent an active playback session."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "调大一点。",
+  "language": "zh-CN",
+  "expect_no_capabilities": true,
+  "require_speech": true,
+  "description": "A context-free scalar adjustment must clarify its missing object.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "With no active media, speech, display, or other adjustable target, turn it up has no grounded object and requires clarification.",
+        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/goal interpretation", "Agent contract", "Orchestrator policy"]
+      }
+    ]
+  }
+}

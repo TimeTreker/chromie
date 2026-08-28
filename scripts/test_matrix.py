@@ -80,7 +80,7 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "general-ability": TestGroup(
-        "Claim-oriented ability-class acceptance manifest and Level A coverage.",
+        "Directory-discovered ability-class scenarios and Level A coverage.",
         (
             _unittest("tests.test_general_ability_acceptance"),
             (

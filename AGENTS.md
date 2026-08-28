@@ -125,7 +125,7 @@ semantics become clearer.
 - When an evaluated revision contains externally made or otherwise unqualified
   behavior changes, or when more than one live case is due, establish the live
   baseline as one aggregate iteration before changing source. Bind one deployed
-  revision and runtime identity, run the complete manifest-owned cohort in one
+  revision and runtime identity, run the complete directory-discovered cohort in one
   invocation, and do not edit source, rebuild, restart, or substitute isolated
   cases between cohort cases. After the cohort ends, run
   `./scripts/collect_debug_bundle.sh` exactly once, judge every case (including

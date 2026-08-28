@@ -704,8 +704,8 @@ The matrix must demonstrate that:
 ## 9. Existing scenario classification and migration
 
 Existing scenarios remain valid evidence under the completed Benchmark migration.
-They are referenced through one authoritative manifest without changing their
-semantic IDs, source paths, Git provenance, or evidence claims.
+They are discovered in place without changing their semantic IDs, source paths,
+Git provenance, or evidence claims.
 
 | Current location | Initial benchmark classification |
 |---|---|
@@ -714,7 +714,7 @@ semantic IDs, source paths, Git provenance, or evidence claims.
 | `scenarios/cognitive_runtime/` | `integration/goal_driven_runtime` |
 | `scenarios/cognitive_core_dialogue/` | `integration/cognitive_core_dialogue` |
 | `tests/scenarios/` | module, integration, or historical-regression datasets according to behavior |
-| `scripts/general_ability_acceptance.py` manifests | E2E ability cohorts and evidence qualification |
+| `scenarios/general_ability/` self-describing files | E2E ability cohorts and evidence qualification |
 | voice-milestone and MuJoCo acceptance paths | E2E audio/simulator cohorts |
 | Social Attention closure scenarios | `social_attention`, `style_matrix`, `user_preferences`, and regression cohorts |
 

@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "daily_sad_no_advice",
+  "stage": "core",
+  "difficulty": "medium",
+  "rationale": "Stay with the feeling and respect the no-advice boundary rather than immediately solving it.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_contract_validation",
+      "safety_authorization_capability_and_evidence_boundaries"
+    ],
+    "semantic_dimensions": [
+      "emotional_attunement",
+      "boundary_respect",
+      "naturalness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "chromie_specific": true,
+    "dimensions": [
+      "emotional_attunement",
+      "boundary_respect",
+      "naturalness"
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ],
+    "primary_outcomes": [
+      "Stay with the feeling and respect the no-advice boundary rather than immediately solving it."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording may vary while preserving the declared meaning.",
+      "A narrow clarification is acceptable when material meaning remains unresolved.",
+      "Optional social attention may be none and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "invented_user_environment_or_memory_fact",
+      "unsupported_tool_action_or_completion_claim",
+      "internal_workflow_contract_or_model_language_in_speech",
+      "phrase_specific_runtime_behavior_required_by_the_scenario"
+    ]
+  },
+  "language": "en-US",
+  "expect_no_capabilities": true,
+  "require_speech": true,
+  "description": "Stay with the feeling and respect the no-advice boundary rather than immediately solving it.",
+  "derived_from": "benchmarks/datasets/daily_conversation/scenarios/feelings_support/sad_no_advice.json",
+  "text": "I'm sad. Please don't give me advice yet.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "human_like_cognitive_continuity",
+        "title": "Human-like Cognitive Continuity",
+        "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+        "rationale": "Stay with the feeling and respect the no-advice boundary rather than immediately solving it.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "Goal Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

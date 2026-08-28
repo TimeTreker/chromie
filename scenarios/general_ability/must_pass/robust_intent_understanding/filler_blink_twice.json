@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "filler_blink_twice",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Ordinary hesitation and filler words must not obscure the requested blink action or count.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["intent_understanding", "language_robustness"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "language_robustness"],
+    "primary_outcomes": [
+      "Ignore harmless hesitation while preserving exactly two requested blinks."
+    ],
+    "acceptable_auxiliary": ["A brief natural acknowledgement is optional."],
+    "forbidden_semantic_outcomes": [
+      "Treat the utterance as unusable input because it contains fillers.",
+      "Drop or change the blink count.",
+      "Select a different gesture."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "嗯，那个……先眨两下眼睛吧。",
+  "language": "zh-CN",
+  "expected_capabilities": ["soridormi.blink_eyes"],
+  "expected_args": ["0:count=2"],
+  "require_speech": false,
+  "description": "Common spoken fillers should not damage a simple gesture command.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "Ordinary hesitation and filler words must not obscure the requested blink action or count.",
+        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/goal interpretation", "Agent contract", "Test evidence"]
+      }
+    ]
+  }
+}

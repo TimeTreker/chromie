@@ -33,7 +33,11 @@
               "confidence": 0.95,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "information"
+              "output_mode": "information",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t9"
+              }
             }
           ],
           "unresolved": []
@@ -61,6 +65,22 @@
         "relationship": "new",
         "target_goal_ids": [],
         "output_mode": "information"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "Weather remains pending fresh Evidence at the GI boundary.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
       }
     ]
   }

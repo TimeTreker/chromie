@@ -82,5 +82,21 @@
         "output_mode": "body_action"
       }
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "Compound meaning crosses to planning without an invented combined Capability.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

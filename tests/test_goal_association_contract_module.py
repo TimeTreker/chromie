@@ -19,10 +19,6 @@ def test_goal_association_model_contract_has_one_definition_owner() -> None:
         goal_association.GoalSegmentationModelOutput
         is goal_association_contract.GoalSegmentationModelOutput
     )
-    assert (
-        goal_association.GoalResponsibilityCoverageCertificate
-        is goal_association_contract.GoalResponsibilityCoverageCertificate
-    )
     assert goal_association_contract.GoalAssociationModelGoal.__module__ == (
         "agent.app.goal_association_contract"
     )
@@ -60,11 +56,11 @@ def test_goal_association_schema_and_validation_are_mechanical_layers_only() -> 
     assert goal_association_schema.goal_association_response_schema.__module__ == (
         "agent.app.goal_association_schema"
     )
-    assert goal_association_validation.source_grounded_binding_coverage_conflicts.__module__ == (
+    assert goal_association_validation.source_grounded_binding_conservation_conflicts.__module__ == (
         "agent.app.goal_association_validation"
     )
     assert not hasattr(goal_association_contract, "goal_association_response_schema")
-    assert not hasattr(goal_association_contract, "source_grounded_binding_coverage_conflicts")
+    assert not hasattr(goal_association_contract, "source_grounded_binding_conservation_conflicts")
 
 def test_goal_association_identity_contract_preserves_current_truth_boundary() -> None:
     text = goal_association_contract._GOAL_SEGMENTATION_IDENTITY_CONTRACT
@@ -93,6 +89,32 @@ def test_goal_association_prompt_module_stays_projection_only() -> None:
     assert goal_association_prompt.layered_prompt.__module__ == (
         "agent.app.goal_association_prompt"
     )
+    for removed_surface in (
+        "build_fresh_interpretation_prompt",
+        "build_responsibility_coverage_prompt",
+        "responsibility_coverage_system_prompt",
+        "semantic_review_system_prompt",
+    ):
+        assert not hasattr(goal_association_prompt, removed_surface)
+
+
+def test_goal_association_has_no_same_authority_review_contract() -> None:
+    for module, removed_surfaces in (
+        (
+            goal_association_contract,
+            (
+                "GoalResponsibilityCoverageItem",
+                "GoalResponsibilityCoverageCertificate",
+            ),
+        ),
+        (goal_association_schema, ("coverage_certificate_response_schema",)),
+        (
+            goal_association_validation,
+            ("responsibility_coverage_required", "coverage_verdict"),
+        ),
+    ):
+        for removed_surface in removed_surfaces:
+            assert not hasattr(module, removed_surface)
 
 
 def test_goal_association_resolver_does_not_reown_contract_or_prompt_mechanics() -> None:
@@ -101,12 +123,10 @@ def test_goal_association_resolver_does_not_reown_contract_or_prompt_mechanics()
         "_coverage_certificate_response_schema",
         "_coverage_verdict",
         "_drop_inactive_resource_bindings",
-        "_source_grounded_binding_coverage_conflicts",
+        "_source_grounded_binding_conservation_conflicts",
         "_build_prompt",
         "_build_repair_prompt",
         "_layered_prompt",
-        "_responsibility_coverage_system_prompt",
-        "_build_responsibility_coverage_prompt",
         "_system_prompt",
     ):
         assert not hasattr(goal_association.GoalAssociationResolver, removed_surface)

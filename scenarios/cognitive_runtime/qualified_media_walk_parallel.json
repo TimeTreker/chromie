@@ -296,5 +296,46 @@
       "fast_plan",
       "deep_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "Media and body Activities retain distinct exact provider grounding.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "Independent body and media Activities can remain parallel under resources.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "workdag_multi_goal_revision_integrity",
+        "title": "WorkDAG Multi-Goal Revision Integrity",
+        "general_rule": "Planner-authored WorkDAG topology must preserve independent Goals, execute mechanically ready work once, retain completed-node immutability, and revise only affected unfinished work without duplicate physical effects.",
+        "rationale": "Independent media and locomotion work preserve parallel-capable topology and exact provider grounding.",
+        "root_cause_boundaries": [
+          "Planner",
+          "WorkDAG",
+          "DAGEngine",
+          "Trusted Capability Runtime",
+          "Execution observations"
+        ]
+      }
+    ]
   }
 }

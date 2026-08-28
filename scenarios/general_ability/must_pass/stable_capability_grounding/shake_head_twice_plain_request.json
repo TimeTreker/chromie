@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "shake_head_twice_plain_request",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "A common head-shake request must ground to the head-shake skill rather than nodding or conversational disagreement.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["intent_understanding", "capability_grounding"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "capability_grounding"],
+    "primary_outcomes": ["Execute exactly two head shakes using the catalog-backed gesture."],
+    "acceptable_auxiliary": ["Speech is optional."],
+    "forbidden_semantic_outcomes": [
+      "Select nodding instead of head shaking.",
+      "Treat the gesture request as a request to verbally disagree.",
+      "Claim execution without matching provider evidence."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "摇两下头。",
+  "language": "zh-CN",
+  "expected_capabilities": ["soridormi.shake_no"],
+  "expected_args": ["0:count=2"],
+  "require_speech": false,
+  "description": "A plain negative head gesture should map to the exact supported skill.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "A common head-shake request must ground to the head-shake skill rather than nodding or conversational disagreement.",
+        "root_cause_boundaries": ["Cognitive Core/goal interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+      }
+    ]
+  }
+}

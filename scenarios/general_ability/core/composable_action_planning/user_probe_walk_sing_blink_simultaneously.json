@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "user_probe_walk_sing_blink_simultaneously",
+  "stage": "core",
+  "difficulty": "medium",
+  "rationale": "The ASR-style simultaneous request must retain fast walking, blinking, and vocal performance as three complete outcomes and must not silently serialize or omit one.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "primary_outcomes": [
+      "The ASR-style simultaneous request must retain fast walking, blinking, and vocal performance as three complete outcomes and must not silently serialize or omit one."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Omit, merge, or reorder an independent requested outcome.",
+      "Carry stale context into an unrelated task."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "walk ahead for 15 seconds quickly, singing and blinking eyes simulatiously",
+  "language": "en-US",
+  "expected_capabilities": [
+    "soridormi.walk_forward",
+    "soridormi.blink_eyes"
+  ],
+  "expected_args": [
+    "0:duration_s=15.0",
+    "0:speed=quick"
+  ],
+  "expected_observations": [
+    {
+      "type": "locomotion.walk_forward",
+      "args": {
+        "duration_s": 15.0,
+        "speed": "quick"
+      }
+    },
+    {
+      "type": "social_attention.blink"
+    },
+    {
+      "type": "speech.output"
+    }
+  ],
+  "min_new_goal_count": 3,
+  "min_goal_outcome_count": 3,
+  "description": "The ASR-style simultaneous request must retain fast walking, blinking, and vocal performance as three complete outcomes and must not silently serialize or omit one.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "The ASR-style simultaneous request must retain fast walking, blinking, and vocal performance as three complete outcomes and must not silently serialize or omit one.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

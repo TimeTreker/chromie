@@ -238,5 +238,35 @@
       "goal_association",
       "fast_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "A high-level embodied request remains resource- and Goal-bound.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "Instrumental navigation, pickup, return, and handoff remain one daily-life resource responsibility instead of fragmenting into incomplete sibling Goals.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Planner contract",
+          "Fast Planner communication",
+          "Trusted runtime adapter",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

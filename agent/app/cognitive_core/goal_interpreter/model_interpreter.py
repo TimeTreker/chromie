@@ -5,7 +5,6 @@ import json
 import logging
 import re
 import time
-import unicodedata
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -44,7 +43,6 @@ except ImportError:  # pragma: no cover - repository development path
 from ...prompt_projection import bounded_json
 from .errors import InterpretationUnavailableError
 from .schema import (
-    GoalInterpretationCoverageCertificate,
     GoalInterpretationDecision,
     GoalInterpretationRequest,
 )
@@ -367,64 +365,6 @@ def _is_hidden_effect_or_how_binding_name(raw_name: Any) -> bool:
     return bool(tokens & _HIDDEN_EFFECT_OR_HOW_BINDING_TOKENS)
 
 
-def _hidden_effect_responsibility_count_floor(parsed: dict[str, Any]) -> int | None:
-    """Derive a conservative atomic-count floor from an invalid DTO structure.
-
-    This does not interpret user words. A candidate field that explicitly claims
-    a concurrent/secondary/parallel/simultaneous action or an action sequence/list
-    proves that the candidate attempted to store another observable effect outside
-    a sibling Responsibility. Each affected candidate therefore raises the fresh
-    source pass floor by one. Pure HOW fields such as Capability do not.
-    """
-
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list) or not responsibilities:
-        return None
-    structural_markers = {
-        "concurrent",
-        "secondary",
-        "parallel",
-        "simultaneous",
-        "sequence",
-        "list",
-        "steps",
-    }
-    affected_candidates = 0
-    for item in responsibilities:
-        bindings = item.get("bindings") if isinstance(item, dict) else None
-        if not isinstance(bindings, dict):
-            continue
-        has_hidden_effect = False
-        for raw_name in bindings:
-            normalized = "_".join(
-                str(raw_name).strip().casefold().replace("-", "_").split()
-            )
-            if normalized in _RETAINED_CONTEXT_EFFECT_BINDING_NAMES:
-                continue
-            tokens = {token for token in normalized.split("_") if token}
-            effect_tokens = tokens & {
-                "action",
-                "actions",
-                "activity",
-                "activities",
-                "effect",
-                "effects",
-                "outcome",
-                "outcomes",
-            }
-            if effect_tokens and (
-                tokens & structural_markers
-                or effect_tokens & {"actions", "activities", "effects", "outcomes"}
-            ):
-                has_hidden_effect = True
-                break
-        if has_hidden_effect:
-            affected_candidates += 1
-    if not affected_candidates:
-        return None
-    return min(12, len(responsibilities) + affected_candidates)
-
-
 def _reject_hidden_effect_or_how_bindings(parsed: dict[str, Any]) -> None:
     """Reject binding dimensions that conceal another effect or downstream HOW.
 
@@ -449,48 +389,6 @@ def _reject_hidden_effect_or_how_bindings(parsed: dict[str, Any]) -> None:
                     "downstream HOW field: "
                     f"responsibilities[{responsibility_index}].bindings.{raw_name}"
                 )
-
-
-def _strip_certificate_owned_coordination_bindings(parsed: dict[str, Any]) -> None:
-    """Discard provisional relation fields before audited certificate projection.
-
-    This helper is used only for a fresh resegmentation whose independent atomic
-    certificate already owns ordering/concurrency. Provider-written free-form
-    sibling wording is therefore neither semantic authority nor useful input;
-    ``_project_audited_atomic_contract`` restores the exact typed local refs before
-    the result is accepted and revalidated.
-    """
-
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return
-    for item in responsibilities:
-        if not isinstance(item, dict):
-            continue
-        bindings = item.get("bindings")
-        if not isinstance(bindings, dict):
-            continue
-        for raw_name in list(bindings):
-            name = "_".join(
-                str(raw_name).strip().casefold().replace("-", "_").split()
-            )
-            if (
-                "coordinat" in name
-                or "combin" in name
-                or "simultan" in name
-                or name
-                in {
-                    "after",
-                    "alongside",
-                    "before",
-                    "concurrent_with",
-                    "follows",
-                    "parallel_with",
-                    "precedes",
-                    "with",
-                }
-            ):
-                bindings.pop(raw_name, None)
 
 
 _MALFORMED_BINDING_NAME = re.compile(r"[{}\[\]\"'“”‘’,:;/\\]")
@@ -653,8 +551,8 @@ def _short_exact_surface_substrings(text: str) -> list[str]:
     return sorted(values, key=lambda value: (len(value), value))
 
 
-def _coverage_source_tokens(text: str) -> list[dict[str, Any]]:
-    """Expose bounded exact source units without asking a model to retype them.
+def _source_tokens(text: str) -> list[dict[str, Any]]:
+    """Expose bounded exact source units for primary-result provenance.
 
     Latin/digit runs stay readable as words, CJK characters remain independently
     citable, and punctuation is retained. Whitespace is recovered from the source
@@ -703,586 +601,100 @@ def _coverage_source_tokens(text: str) -> list[dict[str, Any]]:
     return tokens
 
 
-def _materialize_coverage_source_excerpts(
-    request: GoalInterpretationRequest,
-    raw: dict[str, Any],
+def _source_token_span_surfaces(
+    text: str,
     *,
-    decision: GoalInterpretationDecision | None = None,
-) -> dict[str, Any]:
-    """Derive exact audit excerpts from contiguous model-cited source tokens."""
-
-    raw_responsibility_items = raw.get("responsibility_items")
-    if isinstance(raw_responsibility_items, list):
-        unique_items: list[Any] = []
-        retained_ref_by_signature: dict[str, str] = {}
-        duplicate_ref_aliases: dict[str, str] = {}
-        for item in raw_responsibility_items:
-            if not isinstance(item, dict):
-                unique_items.append(item)
-                continue
-            signature_payload = {
-                key: value for key, value in item.items() if key != "audit_ref"
-            }
-            signature = json.dumps(
-                signature_payload,
-                ensure_ascii=False,
-                sort_keys=True,
-                default=str,
-            )
-            audit_ref = str(item.get("audit_ref") or "").strip()
-            retained_ref = retained_ref_by_signature.get(signature)
-            if retained_ref is not None:
-                if audit_ref:
-                    duplicate_ref_aliases[audit_ref] = retained_ref
-                continue
-            retained_ref_by_signature[signature] = audit_ref
-            unique_items.append(item)
-        if len(unique_items) != len(raw_responsibility_items):
-            raw["responsibility_items"] = unique_items
-            supporting_items = raw.get("supporting_items")
-            if isinstance(supporting_items, list):
-                for item in supporting_items:
-                    if not isinstance(item, dict):
-                        continue
-                    related_refs = item.get("related_audit_refs")
-                    if isinstance(related_refs, list):
-                        item["related_audit_refs"] = list(
-                            dict.fromkeys(
-                                duplicate_ref_aliases.get(str(ref), str(ref))
-                                for ref in related_refs
-                            )
-                        )
-
-    source = " ".join(str(request.text or "").strip().split())
-    tokens = _coverage_source_tokens(source)
-    by_ref = {str(item["ref"]): item for item in tokens}
-    index_by_ref = {str(item["ref"]): index for index, item in enumerate(tokens)}
-    exact_candidate_spans: dict[str, tuple[int, int]] = {}
-    if decision is not None:
-        folded_source = source.casefold()
-        for responsibility in decision.responsibilities:
-            candidate = " ".join(responsibility.outcome.strip().split())
-            if not candidate:
-                continue
-            folded_candidate = candidate.casefold()
-            starts: list[int] = []
-            offset = 0
-            while True:
-                found = folded_source.find(folded_candidate, offset)
-                if found < 0:
-                    break
-                starts.append(found)
-                offset = found + 1
-            if len(starts) != 1:
-                continue
-            start_char = starts[0]
-            end_char = start_char + len(candidate)
-            matching_tokens = [
-                (start_index, end_index)
-                for start_index, first in enumerate(tokens)
-                for end_index, last in enumerate(tokens[start_index:], start_index)
-                if int(first["start"]) == start_char
-                and int(last["end"]) == end_char
-            ]
-            if len(matching_tokens) == 1:
-                exact_candidate_spans[responsibility.local_ref] = matching_tokens[0]
-    candidate_audit_owner_counts: dict[str, int] = {}
-    for item in raw.get("responsibility_items") or []:
-        if not isinstance(item, dict):
-            continue
-        candidate_refs = item.get("responsibility_refs")
-        if not isinstance(candidate_refs, list):
-            continue
-        for candidate_ref in {
-            str(value).strip() for value in candidate_refs if str(value).strip()
-        }:
-            candidate_audit_owner_counts[candidate_ref] = (
-                candidate_audit_owner_counts.get(candidate_ref, 0) + 1
-            )
-    responsibility_span_items: list[tuple[dict[str, Any], int, int]] = []
-    for collection_name in ("responsibility_items", "supporting_items"):
-        items = raw.get(collection_name)
-        if not isinstance(items, list):
-            continue
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            # Source-excerpt input remains accepted by direct unit tests and old
-            # retained evidence, but the live response schema below never exposes
-            # this free-form field to the model.
-            if isinstance(item.get("source_excerpt"), str):
-                continue
-            start_ref = str(item.pop("source_start_token_ref", "") or "").strip()
-            end_ref = str(item.pop("source_end_token_ref", "") or "").strip()
-            if not start_ref or not end_ref:
-                # Compatibility for retained iteration-5 evidence and direct tests;
-                # the live schema no longer exposes variable-length token lists.
-                refs = item.pop("source_token_refs", None)
-                if not isinstance(refs, list) or not refs:
-                    raise _GoalInterpretationSemanticStructureViolation(
-                        "Responsibility coverage must cite a source token span"
-                    )
-                start_ref = str(refs[0]).strip()
-                end_ref = str(refs[-1]).strip()
-            if start_ref not in by_ref or end_ref not in by_ref:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Responsibility coverage cited unknown source token refs"
-                )
-            if index_by_ref[start_ref] > index_by_ref[end_ref]:
-                # The model selected two exact authoritative endpoints but emitted
-                # their mechanically typed order backwards. Reordering those cited
-                # endpoints recovers the same unique source span without inventing,
-                # translating, or reclassifying any semantic material.
-                start_ref, end_ref = end_ref, start_ref
-            if collection_name == "responsibility_items":
-                candidate_refs = item.get("responsibility_refs")
-                if isinstance(candidate_refs, list) and len(candidate_refs) == 1:
-                    candidate_ref = str(candidate_refs[0]).strip()
-                    exact_span = (
-                        exact_candidate_spans.get(candidate_ref)
-                        if candidate_audit_owner_counts.get(candidate_ref) == 1
-                        else None
-                    )
-                    if exact_span is not None:
-                        # The candidate's model-owned outcome is itself one unique,
-                        # token-aligned verbatim source slice. Prefer that exact
-                        # provenance over a decoder citation that swallowed a
-                        # sibling predicate. This changes neither candidate owner,
-                        # coverage, modality, nor relation. When several independent
-                        # audit items cite one overmerged candidate, keep their
-                        # model-cited disjoint source spans: replacing every item with
-                        # the candidate's whole span would erase the very evidence
-                        # needed for source-grounded resegmentation.
-                        start_ref = str(tokens[exact_span[0]]["ref"])
-                        end_ref = str(tokens[exact_span[1]]["ref"])
-            first = by_ref[start_ref]
-            last = by_ref[end_ref]
-            item["source_excerpt"] = source[int(first["start"]):int(last["end"])]
-            if collection_name == "responsibility_items":
-                responsibility_span_items.append(
-                    (item, index_by_ref[start_ref], index_by_ref[end_ref])
-                )
-    ordered_span_items = sorted(
-        responsibility_span_items,
-        key=lambda value: (value[1], value[2]),
-    )
-    # A coverage decoder occasionally includes the coordination token in both
-    # adjacent positive spans (for example ``Nod twice, then`` and ``then blink
-    # once``).  When both spans retain a non-empty exclusive source region, the
-    # overlap has one mechanically unique source-order normalization: keep the
-    # later span and end the earlier span immediately before it.  Containment or
-    # identical spans remain invalid because trimming those would require a
-    # semantic judgment about whether the model invented a second outcome.
-    normalized_span_items: list[tuple[dict[str, Any], int, int]] = []
-    for item, start, end in ordered_span_items:
-        if normalized_span_items:
-            previous_item, previous_start, previous_end = normalized_span_items[-1]
-            if start <= previous_end:
-                if previous_start < start and previous_end < end:
-                    previous_end = start - 1
-                    normalized_span_items[-1] = (
-                        previous_item,
-                        previous_start,
-                        previous_end,
-                    )
-                else:
-                    raise _GoalInterpretationSemanticStructureViolation(
-                        "Independent Responsibility coverage source spans must not overlap"
-                    )
-        normalized_span_items.append((item, start, end))
-    ordered_span_items = normalized_span_items
-    for item, start, end in ordered_span_items:
-        first = tokens[start]
-        last = tokens[end]
-        item["source_excerpt"] = source[int(first["start"]):int(last["end"])]
-    for index, (_, left_start, left_end) in enumerate(ordered_span_items):
-        for _, right_start, right_end in ordered_span_items[index + 1 :]:
-            if max(left_start, right_start) <= min(left_end, right_end):
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Independent Responsibility coverage source spans must not overlap"
-                )
-    responsibility_items = raw.get("responsibility_items")
-    responsibility_items = (
-        responsibility_items if isinstance(responsibility_items, list) else []
-    )
-    if ordered_span_items:
-        # Source position is already an authoritative mechanical property of each
-        # model-cited span. Canonicalize array order and audit identity from those
-        # positions instead of spending the single DTO repair on an otherwise
-        # unchanged citation set. Remapping relation endpoints preserves the
-        # model-authored relation; it does not infer or reclassify source meaning.
-        prior_refs = [
-            str(item.get("audit_ref") or "").strip()
-            for item, _, _ in ordered_span_items
-        ]
-        ref_mapping = (
-            {
-                prior_ref: f"a{index + 1}"
-                for index, prior_ref in enumerate(prior_refs)
-            }
-            if all(prior_refs) and len(set(prior_refs)) == len(prior_refs)
-            else {}
-        )
-        responsibility_items[:] = [item for item, _, _ in ordered_span_items]
-        for index, item in enumerate(responsibility_items):
-            item["audit_ref"] = f"a{index + 1}"
-        if ref_mapping:
-            supporting_items = raw.get("supporting_items")
-            for item in supporting_items if isinstance(supporting_items, list) else []:
-                if not isinstance(item, dict):
-                    continue
-                related_refs = item.get("related_audit_refs")
-                if isinstance(related_refs, list):
-                    item["related_audit_refs"] = [
-                        ref_mapping.get(str(value).strip(), str(value).strip())
-                        for value in related_refs
-                    ]
-    for index, item in enumerate(responsibility_items):
-        if isinstance(item, dict) and not str(item.get("audit_ref") or "").strip():
-            item["audit_ref"] = f"a{index + 1}"
-        if (
-            isinstance(item, dict)
-            and str(item.get("coverage") or "") == "missing"
-            and item.get("responsibility_refs")
-        ):
-            # ``missing`` definitionally means that no candidate owns the source
-            # outcome. Some Ollama grammars do not enforce the schema's nested
-            # oneOf and emit both missing and an explicit candidate ref. Preserve
-            # the typed ownership evidence and classify the contradiction as a
-            # representation mismatch so the normal audited resegmentation path
-            # repairs the candidate; do not accept it as covered or discard its
-            # source-based mismatch claim.
-            item["coverage"] = "representation_mismatch"
-    supporting_items = raw.get("supporting_items")
-    for item in supporting_items if isinstance(supporting_items, list) else []:
-        if not isinstance(item, dict):
-            continue
-        relation_kind = str(item.get("relation_kind") or "none")
-        related_audit_refs = item.get("related_audit_refs")
-        if not isinstance(related_audit_refs, list):
-            item["related_audit_refs"] = []
-        candidate_refs = item.get("responsibility_refs")
-        candidate_refs = candidate_refs if isinstance(candidate_refs, list) else []
-        candidate_audit_refs: set[str] = set()
-        for candidate_ref in candidate_refs:
-            matching_audit_refs = {
-                str(responsibility_item.get("audit_ref") or "").strip()
-                for responsibility_item in responsibility_items
-                if isinstance(responsibility_item, dict)
-                and str(candidate_ref).strip()
-                in {
-                    str(value).strip()
-                    for value in responsibility_item.get("responsibility_refs") or []
-                }
-                and str(responsibility_item.get("audit_ref") or "").strip()
-            }
-            if len(matching_audit_refs) == 1:
-                candidate_audit_refs.update(matching_audit_refs)
-        if relation_kind != "none":
-            # Both fields are typed references emitted by the same audit.  Some
-            # constrained decoders put the earlier endpoint in candidate-owner
-            # form and only the later endpoint in related_audit_refs.  Merge the
-            # two explicit endpoint sets in authoritative source order; no
-            # relation or endpoint is inferred from natural language here.
-            cited_audit_refs = set(item["related_audit_refs"]) | candidate_audit_refs
-            item["related_audit_refs"] = [
-                str(responsibility_item.get("audit_ref") or "").strip()
-                for responsibility_item in responsibility_items
-                if str(responsibility_item.get("audit_ref") or "").strip()
-                in cited_audit_refs
-            ]
-        if str(item.get("role") or "") in {"context", "framing"}:
-            if relation_kind in {"ordered", "parallel"}:
-                # The model already emitted a closed typed relation and its
-                # positive audit endpoints. ``context``/``framing`` is therefore
-                # only a mechanically wrong DTO role: typed relations are
-                # constraints by schema definition. Preserve the semantic claim
-                # and repair only its closed role token.
-                item["role"] = "constraint"
-                item["coverage"] = "covered"
-            else:
-                # Ordinary context/framing is acknowledged without owning a
-                # candidate Responsibility.
-                item["coverage"] = "covered"
-                item["responsibility_refs"] = []
-                item["relation_kind"] = "none"
-                item["related_audit_refs"] = []
-        if (
-            str(item.get("role") or "") == "constraint"
-            and str(item.get("coverage") or "") != "covered"
-            and not item["related_audit_refs"]
-        ):
-            support_excerpt = str(item.get("source_excerpt") or "")
-            overlapping_audit_refs = [
-                str(responsibility_item.get("audit_ref") or "").strip()
-                for responsibility_item in responsibility_items
-                if support_excerpt
-                and (
-                    support_excerpt
-                    in str(responsibility_item.get("source_excerpt") or "")
-                    or str(responsibility_item.get("source_excerpt") or "")
-                    in support_excerpt
-                )
-            ]
-            if len(overlapping_audit_refs) == 1:
-                # An uncovered supporting copy of exactly one positive span has
-                # one mechanically unique positive audit owner.  Attaching that
-                # already-emitted owner makes the DTO valid without changing its
-                # coverage judgment or choosing a new semantic relation.
-                item["related_audit_refs"] = overlapping_audit_refs
-        responsibility_items_by_ref = {
-            str(responsibility_item.get("audit_ref") or "").strip(): responsibility_item
-            for responsibility_item in responsibility_items
-            if isinstance(responsibility_item, dict)
-            and str(responsibility_item.get("audit_ref") or "").strip()
-        }
-        if str(item.get("coverage") or "") == "missing":
-            # Missing constraint coverage may cite its positive audit owner but,
-            # like missing positive coverage, cannot simultaneously claim a
-            # candidate owner. Keep the typed audit link and clear only the
-            # contradictory candidate-owner projection.
-            item["responsibility_refs"] = []
-        elif set(item["related_audit_refs"]).issubset(
-            responsibility_items_by_ref
-        ):
-            # Candidate ownership is redundant with typed atomic audit refs.
-            # Project it mechanically so resegmentation receives one owner for an
-            # ordinary modifier and the exact endpoints for a typed relation.
-            item["responsibility_refs"] = list(
-                dict.fromkeys(
-                    str(candidate_ref).strip()
-                    for audit_ref in item["related_audit_refs"]
-                    for candidate_ref in responsibility_items_by_ref[audit_ref].get(
-                        "responsibility_refs", []
-                    )
-                    if str(candidate_ref).strip()
-                )
-            )
-    return raw
-
-
-def _project_audited_atomic_contract(
-    decision: GoalInterpretationDecision,
-    certificate: GoalInterpretationCoverageCertificate,
-) -> GoalInterpretationDecision:
-    """Project independently audited modality and coordination into fresh DTOs.
-
-    The coverage model has already classified these source semantics and assigned
-    stable audit refs. This projection performs no source-language interpretation:
-    it only carries those typed claims across the fresh-resegmentation decoder
-    boundary, whose nested conditional JSON-schema constraints are not reliably
-    enforced by every supported Ollama grammar implementation.
-    """
-
-    modes_by_ref = {
-        str(item.audit_ref).strip(): item.required_output_mode
-        for item in certificate.responsibility_items
-        if str(item.audit_ref).strip()
-    }
-    bindings_by_ref: dict[str, dict[str, Any]] = {
-        audit_ref: {} for audit_ref in modes_by_ref
-    }
-    for relation in certificate.supporting_items:
-        refs = [
-            ref
-            for ref in relation.related_audit_refs
-            if ref in modes_by_ref
-        ]
-        if relation.relation_kind == "ordered" and len(refs) >= 2:
-            for earlier_ref, later_ref in zip(refs, refs[1:], strict=False):
-                bindings_by_ref[later_ref]["after"] = earlier_ref
-        elif relation.relation_kind == "parallel" and len(refs) >= 2:
-            for source_ref in refs:
-                bindings_by_ref[source_ref]["parallel_with"] = [
-                    ref for ref in refs if ref != source_ref
-                ]
-
-    payload = decision.model_dump(mode="python")
-    for responsibility in payload["responsibilities"]:
-        local_ref = str(responsibility.get("local_ref") or "").strip()
-        if local_ref not in modes_by_ref:
-            continue
-        bindings = dict(responsibility.get("bindings") or {})
-        for field in ("before", "after", "parallel_with"):
-            bindings.pop(field, None)
-        bindings.update(bindings_by_ref[local_ref])
-        responsibility["bindings"] = bindings
-        responsibility["output_mode"] = modes_by_ref[local_ref]
-    return GoalInterpretationDecision.model_validate(payload)
-
-
-def _project_audited_contract_onto_covered_candidates(
-    decision: GoalInterpretationDecision,
-    certificate: GoalInterpretationCoverageCertificate,
-    *,
-    preserve_unowned_consequential_effects: bool = False,
-) -> GoalInterpretationDecision | None:
-    """Project a bijective audit onto existing candidates without reinterpreting.
-
-    When the independent audit already maps every atomic source outcome to one
-    unique existing candidate, a missing typed relation or corrected output mode
-    does not require a fresh semantic generation. The model-owned audit supplies
-    those exact types; Host only copies its references into the corresponding
-    candidate DTO. A non-bijective audit still requires source resegmentation.
-    """
-
-    candidate_refs = {item.local_ref for item in decision.responsibilities}
-    audit_to_candidate: dict[str, str] = {}
-    candidate_owners: set[str] = set()
-    for item in certificate.responsibility_items:
-        if (
-            not item.independently_satisfiable
-            or len(item.responsibility_refs) != 1
-            or not item.audit_ref
-        ):
-            return None
-        candidate_ref = item.responsibility_refs[0]
-        if candidate_ref not in candidate_refs or candidate_ref in candidate_owners:
-            return None
-        audit_to_candidate[item.audit_ref] = candidate_ref
-        candidate_owners.add(candidate_ref)
-    unowned_candidate_refs = candidate_refs - candidate_owners
-    if unowned_candidate_refs:
-        if not preserve_unowned_consequential_effects:
-            return None
-        by_candidate_ref = {
-            item.local_ref: item for item in decision.responsibilities
-        }
-        if any(
-            by_candidate_ref[candidate_ref].output_mode
-            not in _CONSEQUENTIAL_EFFECT_OUTPUT_MODES
-            for candidate_ref in unowned_candidate_refs
-        ):
-            return None
-
-    payload = decision.model_dump(mode="python")
-    by_ref = {
-        str(item.get("local_ref") or ""): item
-        for item in payload.get("responsibilities") or []
-        if isinstance(item, dict)
-    }
-    for item in certificate.responsibility_items:
-        by_ref[audit_to_candidate[item.audit_ref]]["output_mode"] = (
-            item.required_output_mode
-        )
-    for item in by_ref.values():
-        bindings = dict(item.get("bindings") or {})
-        for field in ("before", "after", "parallel_with"):
-            bindings.pop(field, None)
-        item["bindings"] = bindings
-    for relation in certificate.supporting_items:
-        refs = [
-            audit_to_candidate[audit_ref]
-            for audit_ref in relation.related_audit_refs
-            if audit_ref in audit_to_candidate
-        ]
-        if relation.relation_kind == "ordered" and len(refs) >= 2:
-            for earlier_ref, later_ref in zip(refs, refs[1:], strict=False):
-                by_ref[later_ref]["bindings"]["after"] = earlier_ref
-        elif relation.relation_kind == "parallel" and len(refs) >= 2:
-            for candidate_ref in refs:
-                by_ref[candidate_ref]["bindings"]["parallel_with"] = [
-                    sibling_ref
-                    for sibling_ref in refs
-                    if sibling_ref != candidate_ref
-                ]
-    return GoalInterpretationDecision.model_validate(payload)
-
-
-_CONSEQUENTIAL_EFFECT_OUTPUT_MODES = {
-    "styled_speech",
-    "recitation",
-    "singing",
-    "humming",
-    "nonverbal_vocalization",
-    "body_action",
-    "media_playback",
-    "stateful_effect",
-}
-
-
-def _unowned_consequential_effect_refs(
-    decision: GoalInterpretationDecision,
-    certificate: GoalInterpretationCoverageCertificate,
+    max_span_tokens: int = 8,
+    max_values: int = 384,
 ) -> list[str]:
-    """Return model-authored effects that one smaller audit did not account for.
+    """Return bounded exact token-aligned source slices for decoder constraints.
 
-    The source audit may remove an invented conversational or information claim,
-    but a single stochastic count must not silently erase an already validated
-    embodied, vocal-performance, media, or state-changing effect. The caller
-    still requires every audited item to validate and either projects the audit
-    onto a bijective candidate subset or performs source-based resegmentation.
+    The model still decides whether a slice has semantic meaning and which typed
+    binding owns it. This helper only prevents source-bound string fields from
+    emitting transport identifiers, translations, or invented paraphrases that
+    trusted validation must reject after generation.
     """
 
-    owned_refs = {
-        candidate_ref
-        for item in certificate.responsibility_items
-        for candidate_ref in item.responsibility_refs
+    surface = " ".join(str(text or "").strip().split())
+    tokens = _source_tokens(surface)
+    if not surface or not tokens:
+        return []
+    normalized_surface = _normalized_turn_echo(surface)
+    values: list[str] = []
+    seen: set[str] = set()
+    for span_length in range(1, min(max_span_tokens, len(tokens)) + 1):
+        for start in range(0, len(tokens) - span_length + 1):
+            end = start + span_length - 1
+            candidate = surface[
+                int(tokens[start]["start"]) : int(tokens[end]["end"])
+            ].strip()
+            if (
+                not candidate
+                or _normalized_turn_echo(candidate) == normalized_surface
+                or not any(char.isalnum() for char in candidate)
+                or candidate in seen
+            ):
+                continue
+            seen.add(candidate)
+            values.append(candidate)
+            if len(values) >= max_values:
+                return values
+    return values
+
+
+def _validate_primary_source_evidence(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Validate primary GI citations without interpreting or repairing WHAT."""
+
+    tokens = _source_tokens(request.text)
+    by_ref = {str(item["ref"]): item for item in tokens}
+    index_by_ref = {
+        str(item["ref"]): index for index, item in enumerate(tokens)
     }
-    return [
-        item.local_ref
-        for item in decision.responsibilities
-        if item.local_ref not in owned_refs
-        and item.output_mode in _CONSEQUENTIAL_EFFECT_OUTPUT_MODES
-    ]
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
 
+    cited_spans: list[tuple[int, int, str]] = []
+    for index, item in enumerate(responsibilities):
+        if not isinstance(item, dict):
+            continue
+        local_ref = str(item.get("local_ref") or f"index:{index}").strip()
+        evidence = item.get("source_evidence")
+        if not isinstance(evidence, dict):
+            raise ValueError(
+                "primary Goal Interpretation Responsibility lacks source_evidence: "
+                f"{local_ref}"
+            )
+        start_ref = str(evidence.get("source_start_token_ref") or "").strip()
+        end_ref = str(evidence.get("source_end_token_ref") or "").strip()
+        if start_ref not in by_ref or end_ref not in by_ref:
+            raise ValueError(
+                "primary Goal Interpretation source_evidence cited an unknown "
+                f"authoritative token ref: {local_ref}:{start_ref}:{end_ref}"
+            )
+        start = index_by_ref[start_ref]
+        end = index_by_ref[end_ref]
+        if start > end:
+            raise ValueError(
+                "primary Goal Interpretation source_evidence token endpoints are "
+                f"reversed: {local_ref}:{start_ref}:{end_ref}"
+            )
+        cited_spans.append((start, end, local_ref))
 
-def _append_preserved_consequential_effects(
-    resegmented: GoalInterpretationDecision,
-    original: GoalInterpretationDecision,
-    preserved_refs: list[str],
-) -> GoalInterpretationDecision:
-    """Compose audited splits with independently model-authored effect siblings.
-
-    This is used only when the audit proved that another candidate was
-    overmerged. Coordination belongs to the audit during resegmentation, so
-    provisional sibling refs are removed from the retained candidates instead of
-    being guessed across the new audit identities.
-    """
-
-    if not preserved_refs:
-        return resegmented
-    payload = resegmented.model_dump(mode="python")
-    used_refs = {
-        str(item.get("local_ref") or "").strip()
-        for item in payload.get("responsibilities") or []
-        if isinstance(item, dict)
-    }
-    original_by_ref = {
-        item.local_ref: item for item in original.responsibilities
-    }
-    for preserved_ref in preserved_refs:
-        if len(payload["responsibilities"]) >= 12:
+    cited_spans.sort()
+    for (_, previous_end, previous_ref), (start, _, current_ref) in zip(
+        cited_spans,
+        cited_spans[1:],
+        strict=False,
+    ):
+        if start <= previous_end:
             raise _GoalInterpretationSemanticStructureViolation(
-                "preserved consequential effects exceed the Responsibility limit"
+                "primary Goal Interpretation independent Responsibility source spans "
+                f"overlap: {previous_ref}:{current_ref}"
             )
-        item = original_by_ref[preserved_ref].model_dump(mode="python")
-        local_ref = preserved_ref
-        if local_ref in used_refs:
-            local_ref = next(
-                (
-                    f"r{index}"
-                    for index in range(1, 13)
-                    if f"r{index}" not in used_refs
-                ),
-                "",
-            )
-        if not local_ref:
-            raise _GoalInterpretationSemanticStructureViolation(
-                "no local_ref remains for a preserved consequential effect"
-            )
-        bindings = dict(item.get("bindings") or {})
-        for field in ("before", "after", "parallel_with"):
-            bindings.pop(field, None)
-        item["local_ref"] = local_ref
-        item["bindings"] = bindings
-        payload["responsibilities"].append(item)
-        used_refs.add(local_ref)
-    payload["confidence"] = min(
-        float(payload.get("confidence") or 0.0),
-        float(original.confidence),
-    )
-    return GoalInterpretationDecision.model_validate(payload)
 
 
 def _reject_dropped_explicit_numeric_bindings(
@@ -1563,6 +975,32 @@ def _semantic_context_string_values(context: dict[str, Any]) -> set[str]:
     return values
 
 
+def _semantic_context_location_surfaces(context: dict[str, Any]) -> tuple[str, ...]:
+    """Project only explicitly typed location values from bounded GI context."""
+
+    values: set[str] = set()
+
+    def collect(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, item in node.items():
+                normalized_key = "_".join(
+                    str(key).strip().casefold().replace("-", "_").split()
+                )
+                if normalized_key == "location" and isinstance(item, str):
+                    value = " ".join(item.strip().split())
+                    if value:
+                        values.add(value)
+                else:
+                    collect(item)
+        elif isinstance(node, (list, tuple, set)):
+            for item in node:
+                collect(item)
+
+    for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS:
+        collect(context.get(key))
+    return tuple(sorted(values, key=lambda value: (len(value), value)))
+
+
 def _reject_unprovenanced_location_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -1665,28 +1103,6 @@ def _is_noncanonical_speed_binding_name(raw_name: str) -> bool:
         name_tokens & speed_dimension_tokens
         and name_tokens - speed_dimension_tokens <= speed_alias_qualifiers
     )
-
-
-def _goal_interpretation_binding_names(parsed: dict[str, Any]) -> list[str]:
-    """Return validated candidate DTO field names without retaining its values."""
-
-    names: list[str] = []
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return names
-    for item in responsibilities:
-        bindings = item.get("bindings") if isinstance(item, dict) else None
-        if not isinstance(bindings, dict):
-            continue
-        for raw_name in bindings:
-            name = str(raw_name).strip()
-            if (
-                name
-                and name not in names
-                and not _is_noncanonical_speed_binding_name(name)
-            ):
-                names.append(name)
-    return names
 
 
 def _reject_unprovenanced_speed_bindings(
@@ -2025,49 +1441,6 @@ def _strip_redundant_conversational_turn_echo_bindings(
         elif len(filtered) != len(value):
             bindings[binding_name] = filtered
 
-
-def _strip_transport_echo_bindings_for_atomic_audit(
-    request: GoalInterpretationRequest,
-    parsed: dict[str, Any],
-) -> int:
-    """Remove envelope-equivalent values only from a non-authoritative audit copy.
-
-    A whole-turn binding cannot enter semantic state, but the remaining candidate
-    shape is still useful input to the independent atomic source audit.  The
-    caller must never accept this copy directly: after the audit either a fresh
-    certificate-bound interpretation is produced or the result is run through
-    the complete validator again.
-    """
-
-    turn_echo = _normalized_turn_echo(request.text or "")
-    if not turn_echo:
-        return 0
-    removed = 0
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return 0
-    for item in responsibilities:
-        if not isinstance(item, dict):
-            continue
-        bindings = item.get("bindings")
-        if not isinstance(bindings, dict):
-            continue
-        for binding_name, value in list(bindings.items()):
-            values = value if isinstance(value, list) else [value]
-            filtered = [
-                scalar
-                for scalar in values
-                if not (
-                    isinstance(scalar, str)
-                    and _normalized_turn_echo(scalar) == turn_echo
-                )
-            ]
-            removed += len(values) - len(filtered)
-            if not filtered:
-                bindings.pop(binding_name, None)
-            elif isinstance(value, list) and len(filtered) != len(values):
-                bindings[binding_name] = filtered
-    return removed
 
 
 def _reject_transport_echo_bindings(
@@ -2568,10 +1941,26 @@ class OllamaGoalInterpreter:
             if prior_assistant_utterance is not None
             else ""
         )
+        explicit_numeric_values = sorted(
+            _decimal_values(request.text),
+            key=lambda value: (value, str(value)),
+        )
+        explicit_numeric_context = (
+            "Explicit Arabic numeric values that must remain as typed semantic "
+            "bindings in the primary result under their user-stated dimensions "
+            "(this preservation list is not a repetition count): "
+            f"{json.dumps([int(value) if value == value.to_integral_value() else float(value) for value in explicit_numeric_values])}\n\n"
+            if explicit_numeric_values
+            else ""
+        )
         return (
             "Current Turn:\n"
             f"Latest user input: {request.text}\n"
-            f"language={request.language or 'auto'} sid={request.sid or ''}\n\n"
+            f"language_hint={request.language or 'auto'}\n\n"
+            "Authoritative source tokens (cite inclusive refs in each "
+            "Responsibility.source_evidence):\n"
+            f"{_bounded_json(_source_tokens(request.text), max_chars=5000)}\n\n"
+            f"{explicit_numeric_context}"
             "Bounded Identity Context:\n"
             f"{_goal_interpretation_identity_context(mind)}\n\n"
             "Semantic Continuity Context:\n"
@@ -2588,7 +1977,10 @@ class OllamaGoalInterpreter:
             "Interpret this turn under the system WHAT-only contract. Return the complete "
             "set of independently satisfiable Responsibilities, material semantic bindings, "
             "canonical relationship tokens and supplied target Goal IDs, confidence, and "
-            "only genuine unresolved user meaning. For speech, outcome describes the "
+            "only genuine unresolved user meaning. Each Responsibility must cite the "
+            "smallest complete coherent source span for its own positive predicate; "
+            "independent Responsibility spans must not overlap. Source refs are "
+            "provenance only and never Goal or Activity identity. For speech, outcome describes the "
             "communicative obligation or proposition to convey; Planner alone authors the "
             "exact utterance. Bind prior_assistant_utterance only when a real utterance "
             "object is supplied above and the current turn asks what Chromie said; copy "
@@ -2600,7 +1992,16 @@ class OllamaGoalInterpreter:
             "deictic locations remain exact current-turn surfaces; every such location "
             "binding must occur as one contiguous substring of "
             f"{json.dumps(request.text, ensure_ascii=False)}. Preserve explicit Arabic "
-            "numbers as material typed values. Return JSON only."
+            "numbers as material typed values. Final preflight before JSON: emit one "
+            "sibling per independently acceptable effect and never encode the sibling "
+            "inventory size in bindings.count; duration, speed, direction, distance, "
+            "count, and intensity attached to one predicate are bindings on that one "
+            "Responsibility, never sibling effects; "
+            "each source span contains only its own predicate and does not overlap a "
+            "sibling; Chromie's own singing uses singing; location is omitted unless the "
+            "meaning contains an actual place or spatial target; unresolved must include a "
+            "bare name whose identity or category is not supplied or uniquely resolved "
+            "by bounded Context. Return JSON only."
         )
 
     @staticmethod
@@ -2611,6 +2012,7 @@ class OllamaGoalInterpreter:
         allowed_goal_ids: tuple[str, ...] = (),
         prior_assistant_utterance: str | None = None,
         admitted_turn: str = "",
+        context_location_values: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -2645,6 +2047,7 @@ class OllamaGoalInterpreter:
                 "relationship",
                 "target_goal_ids",
                 "confidence",
+                "source_evidence",
             ]
             if new_relationship_only:
                 properties = responsibility.get("properties")
@@ -2665,6 +2068,9 @@ class OllamaGoalInterpreter:
                     "Never combine coordinated positive effects: each embodied, vocal, "
                     "media, information, or conversational effect that can be accepted "
                     "or rejected on its own requires a sibling Responsibility. For "
+                    "one predicate, duration, speed, direction, distance, count, intensity, "
+                    "and other modifiers belong in bindings and never become sibling "
+                    "outcomes. For "
                     "speech, describe the communicative obligation or proposition; never "
                     "write the exact utterance, which Planner alone authors."
                 )
@@ -2677,6 +2083,51 @@ class OllamaGoalInterpreter:
                     "One turn-local mechanical reference from r1 through r12. "
                     "It is not a Goal, Task, Plan, Activity, or provider identity."
                 )
+            source_tokens = _source_tokens(admitted_turn)
+            source_token_refs = [str(item["ref"]) for item in source_tokens]
+            source_evidence = responsibility.get("properties", {}).get(
+                "source_evidence"
+            )
+            if isinstance(source_evidence, dict):
+                source_evidence.pop("anyOf", None)
+                source_evidence.pop("default", None)
+                source_evidence.clear()
+                source_evidence.update(
+                    {
+                        "$ref": "#/$defs/ResponsibilitySourceEvidence",
+                        "description": (
+                            "Required primary-result citation of the exact inclusive "
+                            "authoritative-turn token span grounding this one outcome."
+                        ),
+                    }
+                )
+            evidence_definition = schema.get("$defs", {}).get(
+                "ResponsibilitySourceEvidence"
+            )
+            if isinstance(evidence_definition, dict):
+                evidence_definition["required"] = [
+                    "source_start_token_ref",
+                    "source_end_token_ref",
+                ]
+                evidence_definition["additionalProperties"] = False
+                for field_name in (
+                    "source_start_token_ref",
+                    "source_end_token_ref",
+                ):
+                    field_schema = evidence_definition.get("properties", {}).get(
+                        field_name
+                    )
+                    if isinstance(field_schema, dict):
+                        field_schema.pop("minLength", None)
+                        field_schema.pop("maxLength", None)
+                        field_schema["enum"] = source_token_refs
+                        field_schema["description"] = (
+                            "First token of only this Responsibility's positive "
+                            "predicate; exclude shared coordination and sibling tokens."
+                            if field_name == "source_start_token_ref"
+                            else "Last token of only this Responsibility's positive "
+                            "predicate; exclude shared coordination and sibling tokens."
+                        )
             bindings = responsibility.get("properties", {}).get("bindings")
             if isinstance(bindings, dict):
                 # Ollama does not reliably enforce propertyNames on an open object.
@@ -2701,25 +2152,55 @@ class OllamaGoalInterpreter:
                     "minimum": 1,
                     "description": (
                         "Canonical positive JSON integer for an item or repetition "
-                        "quantity; never emit aliases, number words, or numeric strings."
+                        "quantity only; never use count for duration, time, distance, "
+                        "speed, or another measured dimension. Never emit aliases, "
+                        "number words, or numeric strings."
                     ),
                 }
                 turn_surface = " ".join(str(admitted_turn or "").strip().split())
+                exact_source_surfaces = _source_token_span_surfaces(admitted_turn)
                 non_turn_string: dict[str, Any] = {
                     "type": "string",
                     "minLength": 1,
                 }
                 if turn_surface:
                     non_turn_string["not"] = {"const": turn_surface}
-                binding_properties["location"] = {
-                    **non_turn_string,
-                    "description": (
-                        "One exact source/context location string, never the complete "
-                        "admitted user turn."
-                    ),
-                }
+                exact_location_values = list(
+                    dict.fromkeys(
+                        [*exact_source_surfaces, *context_location_values]
+                    )
+                )
+                binding_properties["location"] = (
+                    {
+                        "type": "string",
+                        "enum": exact_location_values,
+                        "description": (
+                            "Only an explicitly spatial place/target value: choose one "
+                            "exact token-aligned current-turn surface or one typed "
+                            "location already supplied by semantic context. Never use a "
+                            "runtime identifier, time expression, direction alone, "
+                            "coordination phrase, action, or generic word such as local."
+                        ),
+                    }
+                    if exact_location_values
+                    else {
+                        **non_turn_string,
+                        "description": (
+                            "One exact source/context spatial place or target string, "
+                            "never transport metadata or the complete admitted turn."
+                        ),
+                    }
+                )
+                source_string = (
+                    {
+                        "type": "string",
+                        "enum": exact_source_surfaces,
+                    }
+                    if exact_source_surfaces
+                    else non_turn_string
+                )
                 binding_properties["duration"] = {
-                    "anyOf": [non_turn_string, {"type": "number"}],
+                    "anyOf": [source_string, {"type": "number"}],
                     "description": (
                         "One source-backed elapsed-time scalar. Preserve an explicit "
                         "number as a JSON number or one exact source/context string; "
@@ -2727,7 +2208,7 @@ class OllamaGoalInterpreter:
                     ),
                 }
                 binding_properties["speed"] = {
-                    "anyOf": [non_turn_string, {"type": "number"}],
+                    "anyOf": [source_string, {"type": "number"}],
                     "description": (
                         "A source-backed pace or velocity string/number only. Omit this "
                         "property when no pace or velocity is supplied; never emit null."
@@ -2780,6 +2261,37 @@ class OllamaGoalInterpreter:
                     "attribute",
                 ):
                     binding_properties[semantic_name] = generic_scalar
+                binding_properties = {
+                    name: binding_properties[name]
+                    for name in (
+                        "actor",
+                        "addressee",
+                        "experiencer",
+                        "entity",
+                        "item",
+                        "proposition",
+                        "preference",
+                        "attribute",
+                        "time",
+                        "time_scope",
+                        "duration",
+                        "speed",
+                        "quantity",
+                        "count",
+                        "distance",
+                        "direction",
+                        "location",
+                        "severity",
+                        "intensity",
+                        "magnitude",
+                        "threshold",
+                        "subtype",
+                        "polarity",
+                        "comparison",
+                        "recipient",
+                    )
+                }
+                bindings["properties"] = binding_properties
                 sibling_ref_value = {
                     "anyOf": [
                         {"type": "string", "enum": local_refs},
@@ -3041,6 +2553,9 @@ class OllamaGoalInterpreter:
                     prior["text"] if prior is not None else None
                 ),
                 admitted_turn=request.text,
+                context_location_values=_semantic_context_location_surfaces(
+                    request.context
+                ),
             ),
         }
         if self.keep_alive:
@@ -3070,6 +2585,9 @@ class OllamaGoalInterpreter:
                 prior["text"] if prior is not None else None
             ),
             admitted_turn=request.text,
+            context_location_values=_semantic_context_location_surfaces(
+                request.context
+            ),
         )
         bound_uncertainty_repair = (
             " The rejected DTO copied already-resolved binding values into top-level "
@@ -3126,11 +2644,6 @@ class OllamaGoalInterpreter:
         request: GoalInterpretationRequest,
         *,
         constrain_location_provenance: bool = False,
-        constrain_speed_provenance: bool = False,
-        constrained_binding_names: list[str] | None = None,
-        minimum_responsibility_count: int | None = None,
-        atomic_coverage_certificate: GoalInterpretationCoverageCertificate | None = None,
-        source_structure_violation: str = "",
     ) -> dict[str, Any]:
         """Build one source-based Deep GI escalation with unchanged authority.
 
@@ -3139,132 +2652,14 @@ class OllamaGoalInterpreter:
         reviewing or repairing prior model wording.
         """
 
-        if constrained_binding_names is not None:
-            constrained_binding_names = list(
-                dict.fromkeys(
-                    "count"
-                    if "_".join(
-                        str(name).strip().casefold().replace("-", "_").split()
-                    )
-                    in {"item_count", "repetition_count"}
-                    else str(name)
-                    for name in constrained_binding_names
-                )
-            )
-
         payload = self.build_interpretation_payload(request)
         payload["model"] = self.deep_model
-        if minimum_responsibility_count is not None:
-            responsibilities_schema = payload.get("format", {}).get(
-                "properties", {}
-            ).get("responsibilities")
-            if isinstance(responsibilities_schema, dict):
-                existing_minimum = responsibilities_schema.get("minItems", 1)
-                responsibilities_schema["minItems"] = max(
-                    int(existing_minimum),
-                    min(12, int(minimum_responsibility_count)),
-                )
-                responsibilities_schema["description"] = (
-                    "Complete atomic Responsibility set. The rejected candidate DTO "
-                    "structurally concealed one or more observable effects, so emit at "
-                    "least the schema minimum as sibling Responsibilities."
-                )
         # The deeper source-based pass is a separate semantic invocation, not
         # provider chain-of-thought. Qwen can spend the entire bounded structured-
         # output budget in provider thinking and return no DTO, so keep that
         # transport mode disabled just like every other maintained JSON boundary.
         payload["think"] = False
-        independent_audit_items = [
-            item
-            for item in (
-                atomic_coverage_certificate.responsibility_items
-                if atomic_coverage_certificate is not None
-                else []
-            )
-            if item.role == "responsibility"
-            and item.independently_satisfiable
-        ]
-        supporting_audit_items = [
-            item
-            for item in (
-                atomic_coverage_certificate.supporting_items
-                if atomic_coverage_certificate is not None
-                else []
-            )
-        ]
-        deep_audit_refs = [
-            str(item.audit_ref or f"a{index + 1}").strip()
-            for index, item in enumerate(independent_audit_items)
-        ]
-        audit_payloads = [
-            {
-                **item.model_dump(mode="json"),
-                "audit_ref": deep_audit_refs[index],
-            }
-            for index, item in enumerate(independent_audit_items)
-        ]
-        audit_refs_by_candidate: dict[str, list[str]] = {}
-        for audit_ref, item in zip(
-            deep_audit_refs, independent_audit_items, strict=True
-        ):
-            for candidate_ref in item.responsibility_refs:
-                audit_refs_by_candidate.setdefault(candidate_ref, []).append(audit_ref)
-        supporting_payloads: list[dict[str, Any]] = []
-        related_audit_refs_by_index: list[list[str]] = []
-        for item in supporting_audit_items:
-            related_audit_refs = list(item.related_audit_refs)
-            if item.relation_kind != "none" and not related_audit_refs:
-                related_audit_refs = list(
-                    dict.fromkeys(
-                        audit_ref
-                        for candidate_ref in item.responsibility_refs
-                        for audit_ref in audit_refs_by_candidate.get(candidate_ref, [])
-                    )
-                )
-            related_audit_refs_by_index.append(related_audit_refs)
-            supporting_payloads.append(
-                {
-                    **item.model_dump(mode="json"),
-                    "related_audit_refs": related_audit_refs,
-                }
-            )
-        atomic_audit_contract = (
-            "\n\nAn independent source-based atomic coverage audit has already "
-            "identified the following independently satisfiable source outcomes. "
-            "This is Goal Interpretation evidence, not a candidate plan and not a "
-            "Capability hint. Emit exactly one sibling Responsibility per listed "
-            "item, preserving its exact source span and required output mode. Do "
-            "not merge two listed items into one outcome or binding.\n"
-            + _bounded_json(
-                audit_payloads,
-                max_chars=5000,
-            )
-            + "\nThe same audit identified these non-outcome source constraints and "
-            "context fragments. Preserve material ordering and concurrency in the "
-            "fresh sibling Responsibilities: use before/after sibling-local-ref "
-            "bindings for order and parallel_with sibling-local-ref bindings for "
-            "requested concurrency. Every other constraint carries its exact owning "
-            "positive audit refs; attach its material modifier only to those sibling "
-            "Responsibilities and never copy it to an unlisted sibling. Use each "
-            "positive item's audit_ref as the exact "
-            "fresh Responsibility local_ref; it is turn-local audit identity, not a "
-            "Goal identity.\n"
-            + _bounded_json(
-                supporting_payloads,
-                max_chars=3000,
-            )
-            if independent_audit_items
-            else ""
-        )
-        structure_feedback = (
-            "\n\nThe earlier source-structure validator rejected a candidate before "
-            "it could become semantic state. Re-read the source from scratch and make "
-            "the fresh DTO avoid this general structural defect; do not copy or edit "
-            "the rejected candidate:\n"
-            + source_structure_violation[:1200]
-            if source_structure_violation
-            else ""
-        )
+
         payload["messages"] = [
             {
                 "role": "system",
@@ -3279,14 +2674,15 @@ class OllamaGoalInterpreter:
                     "external answer is not semantic ambiguity. Do not create or resolve "
                     "an InformationGap; do not choose ask_user, context, observation, "
                     "query, default, Work, a Capability, provider, or executable arguments. "
-                    "This source-based pass must complete an atomicity audit before JSON: "
+                    "This source-based pass must complete atomic decomposition and "
+                    "primary source grounding before JSON: "
                     "count every independently observable effect related by coordination "
                     "grammar in any language. If the source "
                     "coordinates N effects that a person could accept or reject separately, "
                     "responsibilities must contain N sibling items. Never hide one effect "
                     "inside another item's outcome or binding. A coordination binding may "
                     "contain only exact sibling local_ref values, not words naming an action. "
-                    "Audit semantic provenance before returning: every explicit current-turn "
+                    "Check semantic provenance before returning: every explicit current-turn "
                     "entity, identity, number, and continuity binding must preserve the exact "
                     "authoritative source or supplied typed Context. Never translate, "
                     "transliterate, infer, or copy a transport/runtime identifier into a "
@@ -3296,7 +2692,7 @@ class OllamaGoalInterpreter:
                     "normal/default speed, and never place a duration phrase, repetition "
                     "word, action verb, or direction under speed. Omit speed when the "
                     "person supplied no pace or velocity meaning. "
-                    "Audit the WHAT modality as one semantic unit: use output_mode=speech "
+                    "Preserve the WHAT modality as one semantic unit: use output_mode=speech "
                     "for ordinary conversation whose answer is already entailed by supplied "
                     "bounded semantic context and needs only authored wording. Use "
                     "output_mode=information for a factual answer not fixed by that semantic "
@@ -3310,7 +2706,7 @@ class OllamaGoalInterpreter:
                     "when their result changes physical state. Never decide here whether "
                     "work, fresh Evidence, a Capability, "
                     "or provider is required. "
-                    "Audit declarative context before counting outcomes: an explanation, "
+                    "Classify declarative context before counting outcomes: an explanation, "
                     "personal situation, or stated future plan is not another "
                     "Responsibility unless the source actually asks Chromie to confirm, "
                     "acknowledge, remember, record, schedule, monitor, or act on it. "
@@ -3321,8 +2717,6 @@ class OllamaGoalInterpreter:
                     "recent work is constraint/context when independent current outcomes "
                     "remain; use supplied lifecycle evidence rather than phrase matching. "
                     "Return one final JSON object only."
-                    + atomic_audit_contract
-                    + structure_feedback
                 ),
             },
             {
@@ -3335,103 +2729,11 @@ class OllamaGoalInterpreter:
                     "responsibilities must equal that count. Before returning, verify that "
                     "every speed binding is backed by explicit pace or velocity meaning; "
                     "duration, count, action, and direction are never speed."
-                    + atomic_audit_contract
-                    + structure_feedback
                 ),
             },
         ]
-        if independent_audit_items:
-            responsibilities_schema = payload.get("format", {}).get(
-                "properties", {}
-            ).get("responsibilities")
-            if isinstance(responsibilities_schema, dict):
-                responsibilities_schema["minItems"] = len(independent_audit_items)
-                responsibilities_schema["maxItems"] = len(independent_audit_items)
-                responsibilities_schema["description"] = (
-                    "Emit exactly one atomic Responsibility for each independent "
-                    "source-audit item supplied in the prompt."
-                )
-            # The independent model-authored audit supplies exact source outcome
-            # modality and typed relations. Project those claims into the one
-            # permitted fresh source interpretation's decoder schema. Host code
-            # neither discovers source semantics nor mutates the returned DTO.
-            responsibility_model = payload.get("format", {}).get(
-                "$defs", {}
-            ).get("CognitiveResponsibilityProposal")
-            if (
-                len(deep_audit_refs) == len(set(deep_audit_refs))
-                and isinstance(responsibility_model, dict)
-            ):
-                local_ref_schema = responsibility_model.get("properties", {}).get(
-                    "local_ref"
-                )
-                if isinstance(local_ref_schema, dict):
-                    local_ref_schema["enum"] = list(deep_audit_refs)
-                required_bindings_by_ref: dict[str, dict[str, Any]] = {}
-                for relation, refs in zip(
-                    supporting_audit_items,
-                    related_audit_refs_by_index,
-                    strict=True,
-                ):
-                    if (
-                        relation.relation_kind == "ordered"
-                        and len(refs) >= 2
-                        and set(refs).issubset(set(deep_audit_refs))
-                    ):
-                        for earlier_ref, later_ref in zip(
-                            refs, refs[1:], strict=False
-                        ):
-                            required_bindings_by_ref.setdefault(later_ref, {})[
-                                "after"
-                            ] = earlier_ref
-                    elif (
-                        relation.relation_kind == "parallel"
-                        and len(refs) >= 2
-                        and set(refs).issubset(set(deep_audit_refs))
-                    ):
-                        for source_ref in refs:
-                            required_bindings_by_ref.setdefault(source_ref, {})[
-                                "parallel_with"
-                            ] = [ref for ref in refs if ref != source_ref]
-                relation_constraints = responsibility_model.setdefault("allOf", [])
-                required_modes_by_ref = {
-                    audit_ref: item.required_output_mode
-                    for audit_ref, item in zip(
-                        deep_audit_refs,
-                        independent_audit_items,
-                        strict=True,
-                    )
-                }
-                for source_ref in deep_audit_refs:
-                    required_bindings = required_bindings_by_ref.get(source_ref, {})
-                    then_properties: dict[str, Any] = {
-                        "output_mode": {
-                            "const": required_modes_by_ref[source_ref]
-                        }
-                    }
-                    if required_bindings:
-                        then_properties["bindings"] = {
-                            "type": "object",
-                            "properties": {
-                                name: {"const": value}
-                                for name, value in required_bindings.items()
-                            },
-                            "required": list(required_bindings),
-                        }
-                    relation_constraints.append(
-                        {
-                            "if": {
-                                "properties": {
-                                    "local_ref": {"const": source_ref}
-                                },
-                                "required": ["local_ref"],
-                            },
-                            "then": {
-                                "properties": then_properties
-                            },
-                        }
-                    )
-        if constrain_location_provenance or constrain_speed_provenance:
+
+        if constrain_location_provenance:
             exact_surfaces = _short_exact_surface_substrings(request.text)
             responsibility_schema = (
                 payload.get("format", {})
@@ -3453,1182 +2755,8 @@ class OllamaGoalInterpreter:
                                 "surface; never translate or transliterate it."
                             ),
                         }
-                    if constrain_speed_provenance:
-                        recovery_binding_names = {
-                            "after",
-                            "before",
-                            "location",
-                            "parallel_with",
-                            *(constrained_binding_names or []),
-                        }
-                        if constrained_binding_names is not None:
-                            for name in list(binding_properties):
-                                if name not in recovery_binding_names:
-                                    binding_properties.pop(name)
-                        for name in sorted(recovery_binding_names):
-                            if not _is_noncanonical_speed_binding_name(name):
-                                binding_properties.setdefault(name, {})
-                        if constrained_binding_names is not None:
-                            binding_schema["additionalProperties"] = False
-                            binding_schema["description"] = (
-                                "During source-based recovery, reuse only mechanically "
-                                "validated candidate dimensions or the existing canonical "
-                                "location and sibling-coordination fields. Count fields "
-                                "remain available only when the validated candidate "
-                                "already contained that exact dimension. "
-                                "Omit a dimension when the source does not support it."
-                            )
-                        if "duration" in binding_properties:
-                            binding_properties["duration"] = {
-                                "anyOf": [
-                                    {"type": "string", "enum": exact_surfaces},
-                                    {"type": "number"},
-                                ],
-                                "description": (
-                                    "If duration is present, preserve one scalar exact "
-                                    "source surface or explicit numeric duration; never "
-                                    "emit a nested value/unit object."
-                                ),
-                            }
-                        if (
-                            constrained_binding_names is None
-                            or "speed" in constrained_binding_names
-                        ):
-                            binding_properties["speed"] = {
-                                "anyOf": [
-                                    {"type": "string", "enum": exact_surfaces},
-                                    {"type": "number"},
-                                ],
-                                "description": (
-                                    "If speed is present, copy one exact contiguous source "
-                                    "pace/velocity surface or explicit numeric velocity; "
-                                    "omit speed when the source supplies no pace or velocity."
-                                ),
-                            }
         return payload
 
-    @staticmethod
-    def _responsibility_coverage_required(
-        request: GoalInterpretationRequest,
-        decision: GoalInterpretationDecision,
-    ) -> bool:
-        """Audit candidates whose structured shape can conceal material effects.
-
-        Multiple candidates and effect-bearing modes require independent source
-        coverage. A single ``speech`` candidate requires it only when it merely
-        copies the admitted turn as its outcome. A non-echo conversational outcome
-        with semantic bindings is already atomic in its structured shape; sending
-        it to a second broad classifier allowed the auditor to relabel a correct
-        empathetic response as a body action. A merged physical/multimodal turn
-        mislabeled as speech still exposes its source echo and remains audited.
-        """
-
-        effect_modes = {
-            "styled_speech",
-            "recitation",
-            "singing",
-            "humming",
-            "nonverbal_vocalization",
-            "body_action",
-            "media_playback",
-            "stateful_effect",
-            "other",
-        }
-        if (
-            len(decision.responsibilities) == 1
-            and decision.responsibilities[0].output_mode == "speech"
-            and set(decision.responsibilities[0].bindings)
-            == {"prior_assistant_utterance"}
-        ):
-            # The exact accepted utterance is already enforced against bounded
-            # dialogue evidence.  Auditing this one conversational obligation as
-            # atomic source coverage asks a second model to rediscover content
-            # that intentionally does not occur in the current question and can
-            # only turn a valid repeat/report Responsibility into a false miss.
-            return False
-        normalized_source = _normalized_turn_echo(request.text)
-        audit_sensitive_dimensions = {
-            "count",
-            "duration",
-            "speed",
-            "distance",
-            "direction",
-            "quantity",
-        }
-
-        def has_structural_audit_signal(item: Any) -> bool:
-            binding_names = {
-                str(name).strip().casefold() for name in item.bindings
-            }
-            physical_dimensions_present = bool(
-                binding_names & audit_sensitive_dimensions
-            )
-            if item.output_mode == "speech":
-                return physical_dimensions_present or (
-                    "location" in binding_names
-                    and bool(binding_names & {"time", "time_scope"})
-                )
-            if item.output_mode == "information":
-                return physical_dimensions_present
-            return False
-
-        return len(decision.responsibilities) > 1 or any(
-            item.output_mode in effect_modes
-            or has_structural_audit_signal(item)
-            or (
-                item.output_mode == "speech"
-                and _normalized_turn_echo(item.outcome) == normalized_source
-            )
-            for item in decision.responsibilities
-        )
-
-    def build_responsibility_coverage_payload(
-        self,
-        request: GoalInterpretationRequest,
-        decision: GoalInterpretationDecision,
-        *,
-        authoritative_atomic_certificate: GoalInterpretationCoverageCertificate
-        | None = None,
-    ) -> dict[str, Any]:
-        """Build one independent, source-based atomic Responsibility audit."""
-
-        candidate_refs = [item.local_ref for item in decision.responsibilities]
-        schema = GoalInterpretationCoverageCertificate.model_json_schema()
-        schema["additionalProperties"] = False
-        # The positive-item array is the authoritative count. Asking a small
-        # structured decoder to repeat that length in a second field created a
-        # contradictory repair authority: observed audits emitted three complete
-        # items with ``independent_outcome_count=2``, and the repair grammar then
-        # forced the incorrect two. Keep the historical DTO field readable, but
-        # remove this mechanically derived value from the model-facing contract.
-        schema.get("properties", {}).pop("independent_outcome_count", None)
-        schema["required"] = [
-            "responsibility_items",
-            "supporting_items",
-            "reason_summary",
-        ]
-        for item_schema_name in (
-            "GoalInterpretationResponsibilityCoverageItem",
-            "GoalInterpretationSupportingCoverageItem",
-        ):
-            item_schema = schema.get("$defs", {}).get(item_schema_name)
-            if not isinstance(item_schema, dict):
-                continue
-            item_schema["required"] = [
-                "source_start_token_ref",
-                "source_end_token_ref",
-                "role",
-                "coverage",
-                "independently_satisfiable",
-                "responsibility_refs",
-                "required_output_mode",
-                *(
-                    ["relation_kind", "related_audit_refs"]
-                    if item_schema_name
-                    == "GoalInterpretationSupportingCoverageItem"
-                    else ["audit_ref"]
-                ),
-            ]
-            source_tokens = _coverage_source_tokens(request.text)
-            properties = item_schema.setdefault("properties", {})
-            properties.pop("source_excerpt", None)
-            properties.pop("source_token_refs", None)
-            token_ref_schema = {
-                "type": "string",
-                "enum": [str(item["ref"]) for item in source_tokens],
-            }
-            properties["source_start_token_ref"] = {
-                **token_ref_schema,
-                "description": "First inclusive token of one exact source span.",
-            }
-            properties["source_end_token_ref"] = {
-                **token_ref_schema,
-                "description": (
-                    "Last inclusive token of the same exact source span; it must "
-                    "not precede source_start_token_ref."
-                ),
-            }
-            audit_refs = [f"a{index}" for index in range(1, 13)]
-            if item_schema_name == "GoalInterpretationResponsibilityCoverageItem":
-                properties["audit_ref"] = {
-                    "type": "string",
-                    "enum": audit_refs,
-                    "description": (
-                        "Unique identity for this positive source item. Use a1, a2, "
-                        "and so on in source order."
-                    ),
-                }
-            else:
-                properties["related_audit_refs"] = {
-                    "type": "array",
-                    "maxItems": 12,
-                    "uniqueItems": True,
-                    "items": {"type": "string", "enum": audit_refs},
-                    "description": (
-                        "Cite the exact positive audit_ref values this constraint "
-                        "modifies. Ordered/parallel relations cite all endpoints; "
-                        "an ordinary duration, count, direction, manner, or style "
-                        "constraint cites only its owning outcome. Context and "
-                        "framing use an empty array."
-                    ),
-                }
-                item_schema.setdefault("allOf", []).append(
-                    {
-                        "if": {
-                            "properties": {
-                                "relation_kind": {
-                                    "enum": ["ordered", "parallel"]
-                                }
-                            },
-                            "required": ["relation_kind"],
-                        },
-                        "then": {
-                            "properties": {
-                                "related_audit_refs": {
-                                    "type": "array",
-                                    "minItems": 2,
-                                    "maxItems": 12,
-                                    "uniqueItems": True,
-                                    "items": {
-                                        "type": "string",
-                                        "enum": audit_refs,
-                                    },
-                                }
-                            }
-                        },
-                    }
-                )
-            refs = item_schema.get("properties", {}).get("responsibility_refs")
-            if isinstance(refs, dict):
-                refs["items"] = {
-                    "type": "string",
-                    "enum": candidate_refs,
-                }
-                refs["uniqueItems"] = True
-            required_output_mode = properties.get("required_output_mode")
-            if (
-                item_schema_name
-                == "GoalInterpretationResponsibilityCoverageItem"
-                and isinstance(required_output_mode, dict)
-            ):
-                required_output_mode.pop("enum", None)
-                required_output_mode["oneOf"] = [
-                    {
-                        "const": "singing",
-                        "description": (
-                            "Chromie is asked to sing or perform a song, with or "
-                            "without lyrics. This is never media playback."
-                        ),
-                    },
-                    {
-                        "const": "body_action",
-                        "description": (
-                            "Locomotion, gaze, blink, gesture, posture, physical "
-                            "manipulation, carrying, or handover."
-                        ),
-                    },
-                    {
-                        "const": "speech",
-                        "description": (
-                            "Ordinary conversational wording such as an answer, joke, "
-                            "story, or explanation without a requested vocal performance."
-                        ),
-                    },
-                    {
-                        "const": "information",
-                        "description": (
-                            "The person wants Chromie to determine or provide factual, "
-                            "observed, private-runtime, or changing information."
-                        ),
-                    },
-                    {
-                        "const": "stateful_effect",
-                        "description": (
-                            "A durable or future non-embodied state change such as "
-                            "recording, scheduling, changing a setting, or sending later."
-                        ),
-                    },
-                    {
-                        "const": "styled_speech",
-                        "description": "Spoken words with requested style but no melody.",
-                    },
-                    {
-                        "const": "recitation",
-                        "description": "Recitation of authored text, not singing.",
-                    },
-                    {
-                        "const": "humming",
-                        "description": "Requested humming without words.",
-                    },
-                    {
-                        "const": "nonverbal_vocalization",
-                        "description": (
-                            "A non-speech voice sound such as laughing, sighing, or "
-                            "coughing; never singing, humming, or media playback."
-                        ),
-                    },
-                    {
-                        "const": "media_playback",
-                        "description": (
-                            "Only control or playback of existing recorded media. Never "
-                            "use this when Chromie is asked to sing, hum, recite, or "
-                            "otherwise perform vocally."
-                        ),
-                    },
-                ]
-                required_output_mode["description"] = (
-                    "Exact provider-neutral WHAT mode of this independently "
-                    "satisfiable source outcome. Select from the per-mode semantic "
-                    "descriptions; audible output alone never implies media_playback."
-                )
-            if item_schema_name == "GoalInterpretationResponsibilityCoverageItem":
-                item_schema.setdefault("allOf", []).append(
-                    {
-                        "oneOf": [
-                            {
-                                "properties": {
-                                    "coverage": {"const": "missing"},
-                                    "responsibility_refs": {"maxItems": 0},
-                                },
-                                "required": ["coverage", "responsibility_refs"],
-                            },
-                            {
-                                "properties": {
-                                    "coverage": {
-                                        "enum": [
-                                            "covered",
-                                            "clarification_required",
-                                            "representation_mismatch",
-                                        ]
-                                    },
-                                    "responsibility_refs": {"minItems": 1},
-                                },
-                                "required": ["coverage", "responsibility_refs"],
-                            },
-                        ],
-                        "description": (
-                            "Missing means no candidate owns the source outcome and "
-                            "therefore requires an empty responsibility_refs array; every "
-                            "other coverage judgment cites at least one candidate owner."
-                        ),
-                    }
-                )
-            else:
-                item_schema.setdefault("allOf", []).append(
-                    {
-                        "if": {
-                            "properties": {"coverage": {"const": "missing"}},
-                            "required": ["coverage"],
-                        },
-                        "then": {
-                            "properties": {
-                                "responsibility_refs": {"maxItems": 0}
-                            }
-                        },
-                    }
-                )
-        candidates = [
-            {
-                "local_ref": item.local_ref,
-                "outcome": item.outcome,
-                "bindings": item.bindings,
-            }
-            for item in decision.responsibilities
-        ]
-        semantic_continuity_context = {
-            "recent_dialogue": _compact_recent_dialogue(request.context),
-            "retained_goals": _compact_active_goal_snapshots(request.context),
-            "active_tasks": _compact_active_task_snapshots(request.context),
-        }
-        retained_atomic_contract = (
-            "\n\nRETAINED AUTHORITATIVE ATOMIC CONTRACT:\n"
-            + _bounded_json(
-                authoritative_atomic_certificate.model_dump(mode="json"),
-                max_chars=6000,
-            )
-            + "\nThis is the accepted independent source audit that caused the fresh "
-            "resegmentation. Keep every positive audit_ref, coherent source span, "
-            "required_output_mode, and typed relation exactly fixed. This final pass "
-            "audits whether the fresh candidate with the matching local_ref now owns "
-            "that retained item; it must not reclassify or renumber the source."
-            if authoritative_atomic_certificate is not None
-            else ""
-        )
-        payload: dict[str, Any] = {
-            "model": self.deep_model,
-            "stream": False,
-            "think": False,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Chromie's independent atomic Responsibility coverage "
-                        "auditor inside Goal Interpretation. Audit only atomic source "
-                        "coverage; do not plan, select Capabilities, or rewrite candidates. "
-                        "The authoritative turn is source evidence. Bounded continuity "
-                        "context may resolve only an actual reference, ellipsis, continuation, "
-                        "or resumption. Candidate DTO prose is a claim to check, never source. "
-                        "Cite complete coherent spans with source_start_token_ref and "
-                        "source_end_token_ref; trusted code materializes their exact text. "
-                        "Do not inventory tokens. A positive predicate outcome goes only in "
-                        "responsibility_items. Its arguments and body parts stay inside that "
-                        "one predicate: a noun, syllable, partial verb phrase, duration, count, "
-                        "distance, direction, location, speed, manner, style, punctuation, or "
-                        "connector is never another outcome. Put every constraint, context, "
-                        "or framing span only in supporting_items with "
-                        "independently_satisfiable=false and required_output_mode=none. "
-                        "Emit one positive item per complete predicate effect the person can "
-                        "accept or reject independently. A shared broad mode never merges "
-                        "effects. Coordination can relate complete effects but cannot create "
-                        "one from a modifier. If a candidate merged multiple effects, cite "
-                        "that same candidate on each positive item. Use coverage=missing only "
-                        "when no candidate attempts the item and then use no candidate refs; "
-                        "use representation_mismatch for an attempted item with wrong shape "
-                        "or mode. clarification_required is only genuine unresolved meaning. "
-                        "Classify required_output_mode from the cited predicate itself: "
-                        "locomotion, gaze, blink, gesture, posture, manipulation, carrying, "
-                        "and handover are body_action; external, changing, observed, or "
-                        "private-runtime facts are information; ordinary conversation fixed "
-                        "by context is speech; singing or a song is singing. Content genre "
-                        "alone never creates a performance mode. A requested musical vocal "
-                        "performance is always singing, while a speed or manner word is never "
-                        "vocal performance. A physical fetch/delivery is one body_action. "
-                        "Assign a1, a2, and so on in source order. Positive spans must be "
-                        "disjoint and each must contain its own complete predicate; never "
-                        "split one predicate into its verb and argument. "
-                        "Ordering and concurrency words are material supporting constraints. "
-                        "Use relation_kind=ordered for explicit before/after/then relations "
-                        "and relation_kind=parallel for explicit overlap, citing all positive "
-                        "audit refs and candidate owners. A typed ordered/parallel item always "
-                        "uses role=constraint, never context or framing. An ordinary constraint uses "
-                        "relation_kind=none and cites only its positive audit owner. Context "
-                        "uses no owner. A comma or plain and/or alone states neither order nor "
-                        "overlap. A negative clause is not automatically a new positive body "
-                        "outcome: use retained Goal lifecycle evidence for real cancel/pause, "
-                        "and treat a no-replay condition on terminal work as constraint/context. "
-                        "Return the compact certificate as JSON only."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "FINAL AUTHORITATIVE USER TURN:\n"
-                        f"{request.text}\n\n"
-                        "AUTHORITATIVE SOURCE TOKENS (cite refs; surfaces are evidence):\n"
-                        f"{_bounded_json(_coverage_source_tokens(request.text), max_chars=5000)}\n\n"
-                        "BOUNDED SEMANTIC CONTINUITY CONTEXT (reference resolution only):\n"
-                        f"{_bounded_json(semantic_continuity_context, max_chars=4200)}\n\n"
-                        "Candidate Responsibility DTOs (ownership claims only; their "
-                        "mode is deliberately omitted):\n"
-                        f"{_bounded_json(candidates, max_chars=5000)}\n\n"
-                        f"{retained_atomic_contract}\n\n"
-                        "Final atomicity check: inventory the source's complete positive "
-                        "predicates and classify their modes before mapping them to candidate "
-                        "ownership. Candidate wording and grouping cannot determine the source "
-                        "inventory or mode. Inspect each candidate outcome and bindings only "
-                        "after that source-first inventory. If one candidate combines effects with different WHAT "
-                        "modes, emit one responsibility item per effect and cite that same "
-                        "candidate ref on each item so the overmerge is rejected. Do not "
-                        "call such a multimodal combination one outcome. The positive-item "
-                        "array itself is the complete outcome count; do not emit a separate "
-                        "count field. Before JSON, scan the source once for explicit "
-                        "before/after/then ordering and once for explicit simultaneous "
-                        "overlap; preserve each found relation in supporting_items with all "
-                        "positive audit endpoints.\n\n"
-                        "Cite only coherent positive-outcome and material-constraint spans; "
-                        "do not inventory the source-token table. Return the coverage "
-                        "certificate."
-                    ),
-                },
-            ],
-            "options": {
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.num_ctx,
-                "num_predict": self.num_predict,
-            },
-            "format": schema,
-        }
-        reason_summary = payload["format"].get("properties", {}).get(
-            "reason_summary"
-        )
-        if isinstance(reason_summary, dict):
-            reason_summary["maxLength"] = 280
-            reason_summary["description"] = (
-                "One short sentence naming only the coverage decision; do not quote "
-                "or translate source text."
-            )
-        if self.keep_alive:
-            payload["keep_alive"] = self.keep_alive
-        return payload
-
-    def build_responsibility_coverage_repair_payload(
-        self,
-        request: GoalInterpretationRequest,
-        decision: GoalInterpretationDecision,
-        *,
-        previous_content: str,
-        validation_error: Exception,
-        authoritative_atomic_certificate: (
-            GoalInterpretationCoverageCertificate | None
-        ) = None,
-    ) -> dict[str, Any]:
-        """Regenerate one mechanically invalid audit from source, at most once."""
-
-        payload = self.build_responsibility_coverage_payload(
-            request,
-            decision,
-            authoritative_atomic_certificate=authoritative_atomic_certificate,
-        )
-        try:
-            previous_raw = _extract_json_object(previous_content)
-        except (ValueError, TypeError):
-            previous_raw = {}
-        previous_items = previous_raw.get("responsibility_items")
-        preserved_modes: dict[str, str] = {}
-        preserved_audit_refs: list[str] = []
-        if isinstance(previous_items, list):
-            for item in previous_items:
-                if not isinstance(item, dict):
-                    continue
-                audit_ref = str(item.get("audit_ref") or "").strip()
-                required_mode = str(
-                    item.get("required_output_mode") or ""
-                ).strip()
-                if audit_ref and required_mode and required_mode != "none":
-                    preserved_modes[audit_ref] = required_mode
-                    preserved_audit_refs.append(audit_ref)
-        responsibility_items_schema = payload.get("format", {}).get(
-            "properties", {}
-        ).get("responsibility_items")
-        if preserved_audit_refs and isinstance(responsibility_items_schema, dict):
-            responsibility_items_schema["minItems"] = len(preserved_audit_refs)
-            responsibility_items_schema["maxItems"] = len(preserved_audit_refs)
-        responsibility_item_schema = (
-            payload.get("format", {})
-            .get("$defs", {})
-            .get("GoalInterpretationResponsibilityCoverageItem")
-        )
-        if isinstance(responsibility_item_schema, dict):
-            audit_ref_schema = responsibility_item_schema.get(
-                "properties", {}
-            ).get("audit_ref")
-            if preserved_audit_refs and isinstance(audit_ref_schema, dict):
-                audit_ref_schema["enum"] = list(dict.fromkeys(preserved_audit_refs))
-            mode_locks = responsibility_item_schema.setdefault("allOf", [])
-            for audit_ref, required_mode in preserved_modes.items():
-                mode_locks.append(
-                    {
-                        "if": {
-                            "properties": {"audit_ref": {"const": audit_ref}},
-                            "required": ["audit_ref"],
-                        },
-                        "then": {
-                            "properties": {
-                                "required_output_mode": {
-                                    "const": required_mode
-                                }
-                            }
-                        },
-                    }
-                )
-        messages = payload.get("messages")
-        if isinstance(messages, list) and len(messages) >= 2:
-            system = messages[0]
-            user = messages[-1]
-            if isinstance(system, dict):
-                system["content"] = (
-                    str(system.get("content") or "")
-                    + "\n\nCertificate DTO repair: regenerate the complete audit from "
-                    "the authoritative source. Correct only the typed certificate "
-                    "structure. Positive spans must be disjoint and numbered in source "
-                    "order. The same endpoint set cannot be both ordered and parallel; "
-                    "select the one source-grounded completion relation that preserves "
-                    "overlap without contradiction. Preserve every schema-locked "
-                    "audit_ref output mode; it is semantic evidence from the same audit, "
-                    "not malformed structure. Do not repair or copy candidate "
-                    "Responsibility wording. Return JSON only."
-                )
-            if isinstance(user, dict):
-                user["content"] = (
-                    str(user.get("content") or "")
-                    + "\n\nThe previous certificate was mechanically invalid: "
-                    + str(validation_error)[:500]
-                    + ". Derive the outcome count only from the complete positive-item "
-                    "array. Regenerate one fresh certificate from the source tokens."
-                )
-        return payload
-
-    @staticmethod
-    def _validate_responsibility_coverage_content(
-        request: GoalInterpretationRequest,
-        decision: GoalInterpretationDecision,
-        content: str,
-        *,
-        normalize_repaired_singleton_relations: bool = False,
-    ) -> tuple[GoalInterpretationCoverageCertificate, list[str]]:
-        raw = _extract_json_object(content)
-        if normalize_repaired_singleton_relations:
-            responsibility_items = raw.get("responsibility_items")
-            supporting_items = raw.get("supporting_items")
-            if (
-                isinstance(responsibility_items, list)
-                and responsibility_items
-                and isinstance(supporting_items, list)
-            ):
-                known_audit_refs = {
-                    str(item.get("audit_ref") or "").strip()
-                    for item in responsibility_items
-                    if isinstance(item, dict)
-                    and str(item.get("audit_ref") or "").strip()
-                }
-                for item in supporting_items:
-                    if not isinstance(item, dict):
-                        continue
-                    relation_kind = str(item.get("relation_kind") or "none")
-                    related_refs = item.get("related_audit_refs")
-                    related_refs = (
-                        list(
-                            dict.fromkeys(
-                                str(ref).strip()
-                                for ref in related_refs
-                                if str(ref).strip()
-                            )
-                        )
-                        if isinstance(related_refs, list)
-                        else []
-                    )
-                    if (
-                        relation_kind in {"ordered", "parallel"}
-                        and len(related_refs) == 1
-                        and set(related_refs).issubset(known_audit_refs)
-                    ):
-                        # This is the single allowed mechanical cleanup after the
-                        # model's one DTO-repair attempt.  Repair is locked to the
-                        # original positive audit identities, so a typed relation
-                        # with only one endpoint cannot express coordination.
-                        # Preserve it as an ordinary owned constraint instead of
-                        # inventing another endpoint or changing source semantics.
-                        item["relation_kind"] = "none"
-        _materialize_coverage_source_excerpts(
-            request,
-            raw,
-            decision=decision,
-        )
-        responsibility_items = raw.get("responsibility_items")
-        if isinstance(responsibility_items, list) and responsibility_items:
-            # Normalize retained/historical certificates mechanically after
-            # source materialization has collapsed any byte-identical rows. The
-            # array is the evidence; its length cannot be contradicted by a
-            # redundant scalar emitted by the same model call.
-            raw["independent_outcome_count"] = len(responsibility_items)
-        certificate = GoalInterpretationCoverageCertificate.model_validate(raw)
-        # Constrained decoding can repeat one byte-equivalent positive audit row
-        # under a fresh audit_ref. Audit identity is mechanical; duplicate rows do
-        # not prove two outcomes. Collapse only rows whose complete source span,
-        # classification, ownership, and modality already agree, and remap any
-        # supporting relation references to the retained identity.
-        unique_responsibility_items: list[Any] = []
-        retained_ref_by_signature: dict[tuple[Any, ...], str] = {}
-        duplicate_ref_aliases: dict[str, str] = {}
-        for index, item in enumerate(certificate.responsibility_items):
-            audit_ref = str(item.audit_ref or f"a{index + 1}").strip()
-            signature = (
-                item.source_excerpt,
-                item.role,
-                item.coverage,
-                item.independently_satisfiable,
-                tuple(item.responsibility_refs),
-                item.required_output_mode,
-            )
-            retained_ref = retained_ref_by_signature.get(signature)
-            if retained_ref is not None:
-                duplicate_ref_aliases[audit_ref] = retained_ref
-                continue
-            retained_ref_by_signature[signature] = audit_ref
-            unique_responsibility_items.append(item)
-        if duplicate_ref_aliases:
-            normalized_supporting_items = []
-            for item in certificate.supporting_items:
-                normalized_refs = list(
-                    dict.fromkeys(
-                        duplicate_ref_aliases.get(ref, ref)
-                        for ref in item.related_audit_refs
-                    )
-                )
-                normalized_supporting_items.append(
-                    item.model_copy(update={"related_audit_refs": normalized_refs})
-                )
-            certificate = certificate.model_copy(
-                update={
-                    "responsibility_items": unique_responsibility_items,
-                    "independent_outcome_count": len(
-                        unique_responsibility_items
-                    ),
-                    "supporting_items": normalized_supporting_items,
-                }
-            )
-            certificate = GoalInterpretationCoverageCertificate.model_validate(
-                certificate.model_dump(mode="python")
-            )
-        by_ref = {item.local_ref: item for item in decision.responsibilities}
-        normalized_turn = " ".join(request.text.strip().split())
-        problems: list[str] = []
-        independent_owner_counts: dict[str, int] = {}
-        positively_owned: set[str] = set()
-        audit_items_by_ref: dict[str, Any] = {}
-        for index, item in enumerate(certificate.responsibility_items):
-            audit_ref = str(item.audit_ref or f"a{index + 1}").strip()
-            if not audit_ref or audit_ref in audit_items_by_ref:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Responsibility coverage audit_ref values must be unique"
-                )
-            audit_items_by_ref[audit_ref] = item
-        relation_kinds_by_audit_set: dict[frozenset[str], str] = {}
-        for relation in certificate.supporting_items:
-            if relation.relation_kind == "none":
-                continue
-            audit_set = frozenset(relation.related_audit_refs)
-            prior_kind = relation_kinds_by_audit_set.setdefault(
-                audit_set, relation.relation_kind
-            )
-            if prior_kind != relation.relation_kind:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Responsibility coverage cannot type the same outcome set as both "
-                    "ordered and parallel"
-                )
-        for item in certificate.responsibility_items + certificate.supporting_items:
-            if item.source_excerpt not in normalized_turn:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Responsibility coverage cited text outside the authoritative turn: "
-                    f"{item.source_excerpt!r}"
-                )
-            unknown_refs = set(item.responsibility_refs) - set(by_ref)
-            if unknown_refs:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Responsibility coverage cited unknown candidate refs: "
-                    + ",".join(sorted(unknown_refs))
-                )
-            punctuation_only = bool(item.source_excerpt) and all(
-                char.isspace() or unicodedata.category(char).startswith("P")
-                for char in item.source_excerpt
-            )
-            if (
-                item.role in {"responsibility", "constraint"}
-                and item.coverage not in {"covered", "clarification_required"}
-                and not punctuation_only
-            ):
-                problems.append(
-                    f"{item.coverage}:{item.role}:{item.source_excerpt}"
-                )
-            if item.role != "responsibility" or item.coverage not in {
-                "covered",
-                "clarification_required",
-            }:
-                continue
-            if item.independently_satisfiable and len(item.responsibility_refs) != 1:
-                problems.append(
-                    "independent_responsibility_requires_one_owner:"
-                    + item.source_excerpt
-                )
-            for candidate_ref in item.responsibility_refs:
-                positively_owned.add(candidate_ref)
-                if item.independently_satisfiable:
-                    independent_owner_counts[candidate_ref] = (
-                        independent_owner_counts.get(candidate_ref, 0) + 1
-                    )
-                if (
-                    item.required_output_mode != "none"
-                    and by_ref[candidate_ref].output_mode
-                    != item.required_output_mode
-                ):
-                    problems.append(
-                        "output_mode_mismatch:"
-                        f"{candidate_ref}:{item.required_output_mode}:"
-                        f"{by_ref[candidate_ref].output_mode}"
-                    )
-        for item in certificate.supporting_items:
-            if item.relation_kind == "none":
-                continue
-            unknown_audit_refs = set(item.related_audit_refs) - set(
-                audit_items_by_ref
-            )
-            if unknown_audit_refs:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "Responsibility coverage relation cited unknown audit refs: "
-                    + ",".join(sorted(unknown_audit_refs))
-                )
-            related_items = [
-                audit_items_by_ref[audit_ref]
-                for audit_ref in item.related_audit_refs
-            ]
-            refs = [
-                related.responsibility_refs[0]
-                for related in related_items
-                if len(related.responsibility_refs) == 1
-            ]
-            if len(item.related_audit_refs) < 2 or len(refs) < 2:
-                problems.append(
-                    f"{item.relation_kind}_relation_requires_two_candidate_refs:"
-                    + item.source_excerpt
-                )
-                continue
-            expected_relation_candidate_refs = list(dict.fromkeys(refs))
-            if set(item.responsibility_refs) != set(
-                expected_relation_candidate_refs
-            ):
-                problems.append(
-                    "relation_candidate_ownership_mismatch:"
-                    + item.source_excerpt
-                )
-            refs = expected_relation_candidate_refs
-            if len(refs) < 2:
-                problems.append(
-                    f"{item.relation_kind}_relation_collapsed_candidate_owners:"
-                    + item.source_excerpt
-                )
-                continue
-
-            def sibling_refs(candidate_ref: str, relation_name: str) -> set[str]:
-                raw_value = by_ref[candidate_ref].bindings.get(relation_name)
-                values = raw_value if isinstance(raw_value, list) else [raw_value]
-                return {
-                    str(value).strip()
-                    for value in values
-                    if str(value or "").strip() in by_ref
-                }
-
-            if item.relation_kind == "ordered":
-                for earlier_ref, later_ref in zip(
-                    refs, refs[1:], strict=False
-                ):
-                    if (
-                        later_ref
-                        not in sibling_refs(earlier_ref, "before")
-                        and earlier_ref
-                        not in sibling_refs(later_ref, "after")
-                    ):
-                        problems.append(
-                            "ordered_relation_not_preserved:"
-                            f"{earlier_ref}:{later_ref}:{item.source_excerpt}"
-                        )
-            elif item.relation_kind == "parallel":
-                for left_index, left_ref in enumerate(refs):
-                    for right_ref in refs[left_index + 1 :]:
-                        if (
-                            right_ref
-                            not in sibling_refs(left_ref, "parallel_with")
-                            and left_ref
-                            not in sibling_refs(right_ref, "parallel_with")
-                        ):
-                            problems.append(
-                                "parallel_relation_not_preserved:"
-                                f"{left_ref}:{right_ref}:{item.source_excerpt}"
-                            )
-        problems.extend(
-            f"overmerged_independent_responsibilities:{candidate_ref}"
-            for candidate_ref, count in sorted(independent_owner_counts.items())
-            if count > 1
-        )
-        problems.extend(
-            f"unjustified_responsibility:{candidate_ref}"
-            for candidate_ref in sorted(set(by_ref) - positively_owned)
-        )
-        return certificate, problems
-
-    async def _ensure_atomic_responsibility_coverage(
-        self,
-        request: GoalInterpretationRequest,
-        decision: GoalInterpretationDecision,
-        *,
-        allow_resegmentation: bool = True,
-    ) -> GoalInterpretationDecision:
-        if not self._responsibility_coverage_required(request, decision):
-            return decision
-
-        problems: list[str]
-        coverage_certificate: GoalInterpretationCoverageCertificate | None = None
-        audit_content = ""
-        try:
-            audit = await self._chat_logged(
-                self.build_responsibility_coverage_payload(request, decision),
-                stage="goal_interpretation_responsibility_coverage",
-                request=request,
-            )
-            audit_content = str(audit.get("message", {}).get("content") or "")
-            coverage_certificate, problems = self._validate_responsibility_coverage_content(
-                request,
-                decision,
-                audit_content,
-            )
-        except (
-            _GoalInterpretationSemanticStructureViolation,
-            ValidationError,
-        ) as exc:
-            try:
-                rejected_raw = _extract_json_object(audit_content)
-            except (ValueError, TypeError):
-                rejected_raw = {}
-            rejected_positive_contract = [
-                (
-                    str(item.get("audit_ref") or "").strip(),
-                    str(item.get("required_output_mode") or "").strip(),
-                )
-                for item in rejected_raw.get("responsibility_items") or []
-                if isinstance(item, dict)
-                and str(item.get("audit_ref") or "").strip()
-                and str(item.get("required_output_mode") or "").strip()
-                not in {"", "none"}
-            ]
-            try:
-                repaired_audit = await self._chat_logged(
-                    self.build_responsibility_coverage_repair_payload(
-                        request,
-                        decision,
-                        previous_content=audit_content,
-                        validation_error=exc,
-                    ),
-                    stage="goal_interpretation_responsibility_coverage_repair",
-                    request=request,
-                )
-                coverage_certificate, problems = (
-                    self._validate_responsibility_coverage_content(
-                        request,
-                        decision,
-                        str(repaired_audit.get("message", {}).get("content") or ""),
-                        normalize_repaired_singleton_relations=True,
-                    )
-                )
-                repaired_positive_contract = [
-                    (
-                        str(item.audit_ref).strip(),
-                        str(item.required_output_mode).strip(),
-                    )
-                    for item in coverage_certificate.responsibility_items
-                ]
-                if (
-                    rejected_positive_contract
-                    and repaired_positive_contract
-                    != rejected_positive_contract
-                ):
-                    raise _GoalInterpretationSemanticStructureViolation(
-                        "coverage DTO repair changed positive audit identity or mode"
-                    )
-            except (
-                httpx.HTTPError,
-                ValueError,
-                TypeError,
-                OllamaGenerationError,
-            ) as repair_exc:
-                coverage_certificate = None
-                problems = [
-                    "coverage_contract_invalid_after_one_dto_repair:"
-                    f"{type(repair_exc).__name__}:{repair_exc}"
-                ]
-        except (
-            httpx.HTTPError,
-            ValueError,
-            TypeError,
-            OllamaGenerationError,
-        ) as exc:
-            problems = [f"coverage_contract_invalid:{type(exc).__name__}:{exc}"]
-        if not problems:
-            return decision
-
-        # An exact, binding-free speech echo is audited only because its flat
-        # shape can conceal multiple coordinated effects. If the independent
-        # source certificate found exactly one Responsibility and the sole
-        # disagreement is its output modality, then the audit found no atomic
-        # loss. Keep the original conversational DTO instead of letting a second
-        # stochastic classifier relabel a simple turn as singing/body action.
-        normalized_source = " ".join(request.text.strip().casefold().split())
-        single_item = (
-            decision.responsibilities[0]
-            if len(decision.responsibilities) == 1
-            else None
-        )
-        conversational_envelope_bindings = bool(single_item) and all(
-            str(name).strip().casefold()
-            in {"input", "message", "text", "user_input", "utterance"}
-            and isinstance(value, str)
-            and _normalized_turn_echo(value) in normalized_source
-            for name, value in (single_item.bindings if single_item else {}).items()
-        )
-        if (
-            single_item is not None
-            and single_item.output_mode == "speech"
-            and conversational_envelope_bindings
-            and (
-                " ".join(single_item.outcome.strip().casefold().split())
-                == normalized_source
-                or bool(single_item.bindings)
-            )
-            and coverage_certificate is not None
-            and len(coverage_certificate.responsibility_items) == 1
-            and all(problem.startswith("output_mode_mismatch:") for problem in problems)
-        ):
-            return decision
-
-        if coverage_certificate is not None:
-            unowned_effect_refs = _unowned_consequential_effect_refs(
-                decision,
-                coverage_certificate,
-            )
-            projected = _project_audited_contract_onto_covered_candidates(
-                decision,
-                coverage_certificate,
-                preserve_unowned_consequential_effects=bool(
-                    unowned_effect_refs
-                ),
-            )
-            if projected is not None:
-                _, projected_problems = self._validate_responsibility_coverage_content(
-                    request,
-                    projected,
-                    json.dumps(
-                        coverage_certificate.model_dump(mode="json"),
-                        ensure_ascii=False,
-                    ),
-                )
-                allowed_unowned_problems = {
-                    f"unjustified_responsibility:{candidate_ref}"
-                    for candidate_ref in unowned_effect_refs
-                }
-                projected_problems = [
-                    problem
-                    for problem in projected_problems
-                    if problem not in allowed_unowned_problems
-                ]
-                if not projected_problems:
-                    return projected
-
-        if not allow_resegmentation:
-            raise InterpretationUnavailableError(
-                "invalid_goal_interpretation_after_atomic_coverage_audit: "
-                + ";".join(problems)
-            )
-
-        logger.warning(
-            "Goal Interpretation atomic coverage rejected sid=%s problems=%s; "
-            "performing one fresh source-based resegmentation",
-            request.sid,
-            problems,
-        )
-        if coverage_certificate is None:
-            # A malformed auxiliary audit has no authority to trigger a fresh
-            # semantic interpretation.  Retrying the source without the typed
-            # certificate only moves the failure downstream and reports the
-            # misleading "missing certificate" symptom.
-            raise InterpretationUnavailableError(
-                "invalid_goal_interpretation_after_atomic_coverage_audit: "
-                + ";".join(problems)
-            )
-        try:
-            unowned_effect_refs = _unowned_consequential_effect_refs(
-                decision,
-                coverage_certificate,
-            )
-            audit_owner_counts: dict[str, int] = {}
-            for item in coverage_certificate.responsibility_items:
-                for candidate_ref in item.responsibility_refs:
-                    audit_owner_counts[candidate_ref] = (
-                        audit_owner_counts.get(candidate_ref, 0) + 1
-                    )
-            preserved_effect_refs = (
-                unowned_effect_refs
-                if any(count > 1 for count in audit_owner_counts.values())
-                else []
-            )
-            recovery_binding_names = list(
-                dict.fromkeys(
-                    name
-                    for responsibility in decision.responsibilities
-                    for name in responsibility.bindings
-                )
-            )
-            if _decimal_values(request.text):
-                # A candidate that already dropped an explicit source number has
-                # not proved which semantic dimension owns it. Closing the deep
-                # recovery grammar to only that candidate's binding names makes
-                # preservation impossible (for example, it cannot add duration).
-                # Keep the normal typed grammar open; the numeric/provenance
-                # validators still reject invention, rewriting, or loss.
-                recovery_binding_names = None
-            deep = await self._chat_logged(
-                self.build_deep_interpretation_payload(
-                    request,
-                    atomic_coverage_certificate=coverage_certificate,
-                    constrain_location_provenance=True,
-                    constrain_speed_provenance=True,
-                    constrained_binding_names=recovery_binding_names,
-                ),
-                stage="goal_interpretation_deep",
-                request=request,
-            )
-            reconsidered = self._validate_interpretation_content(
-                request,
-                str(deep.get("message", {}).get("content") or ""),
-                certificate_owns_coordination=True,
-            )
-            if coverage_certificate is not None:
-                reconsidered = _project_audited_atomic_contract(
-                    reconsidered,
-                    coverage_certificate,
-                )
-            audited_reconsidered = reconsidered
-            # The independent certificate is the semantic authority that caused
-            # resegmentation.  Validate the projected result against that same
-            # certificate; asking a second model audit here allowed a fresh,
-            # contradictory classification to overrule the established owner.
-            # ``source_excerpt`` is already trusted/materialized, so this pass is
-            # deterministic contract validation rather than new interpretation.
-            projected_certificate = coverage_certificate.model_dump(mode="json")
-            for item in projected_certificate["responsibility_items"]:
-                # ``coverage`` describes the rejected pre-resegmentation
-                # candidate set. The fresh decoder is schema-bound to emit one
-                # candidate per retained audit ref, and the projection above
-                # fixes that candidate's mode and typed relations. Keeping the
-                # old ``missing`` value while assigning its new owner creates a
-                # self-contradictory DTO, so record the mechanically established
-                # ownership before final validation.
-                item["coverage"] = "covered"
-                item["responsibility_refs"] = [item["audit_ref"]]
-            for item in projected_certificate["supporting_items"]:
-                # The source audit also owns constraint attachment.  Its DTO now
-                # requires every uncovered constraint to cite the positive audit
-                # owner(s), while the fresh decoder is constrained to use those
-                # audit refs and receives the same modifier/relationship contract.
-                # Record the resulting ownership without interpreting source text.
-                item["coverage"] = "covered"
-                item["responsibility_refs"] = list(
-                    item.get("related_audit_refs") or []
-                )
-            _, final_problems = self._validate_responsibility_coverage_content(
-                request,
-                audited_reconsidered,
-                json.dumps(projected_certificate),
-            )
-            if final_problems:
-                raise _GoalInterpretationSemanticStructureViolation(
-                    "fresh Goal Interpretation failed final atomic coverage: "
-                    + ";".join(final_problems)
-                )
-            reconsidered = _append_preserved_consequential_effects(
-                audited_reconsidered,
-                decision,
-                preserved_effect_refs,
-            )
-            return reconsidered
-        except (
-            httpx.HTTPError,
-            ValueError,
-            TypeError,
-            OllamaGenerationError,
-        ) as exc:
-            raise InterpretationUnavailableError(
-                "invalid_goal_interpretation_after_atomic_coverage_resegmentation: "
-                f"{type(exc).__name__}: {exc}"
-            ) from exc
 
     @staticmethod
     def _requires_deep_semantic_interpretation(
@@ -4648,22 +2776,20 @@ class OllamaGoalInterpreter:
     def _validate_interpretation_content(
         request: GoalInterpretationRequest,
         content: str,
-        *,
-        certificate_owns_coordination: bool = False,
-        allow_dropped_explicit_numbers_for_atomic_audit: bool = False,
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
         _normalize_mechanical_goal_interpretation_dto(parsed)
         _strip_bound_values_from_unresolved(parsed)
         # Planner/route fields are an authority violation rather than a generic
-        # malformed DTO and therefore retain their source-based deep escalation.
+        # malformed DTO and therefore fail closed without a semantic repair call.
         _reject_planner_shaped_goal_interpretation(parsed)
         # Validate the model DTO's closed mechanical shape before semantic
         # provenance checks choose an escalation path.  Otherwise one response
         # containing both an envelope echo and an out-of-range confidence value
-        # enters the transport-echo audit, where the unrelated shape failure is
-        # misreported and cannot use the one permitted same-stage DTO repair.
+        # is misreported as a semantic violation and cannot use the one permitted
+        # same-stage DTO repair.
         GoalInterpretationDecision.model_validate(parsed)
+        _validate_primary_source_evidence(request, parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)
@@ -4681,11 +2807,8 @@ class OllamaGoalInterpreter:
         _reject_malformed_binding_names(parsed)
         _reject_malformed_binding_values(parsed)
         _reject_transport_echo_bindings(request, parsed)
-        if certificate_owns_coordination:
-            _strip_certificate_owned_coordination_bindings(parsed)
         _reject_untyped_coordination_bindings(parsed)
-        if not allow_dropped_explicit_numbers_for_atomic_audit:
-            _reject_dropped_explicit_numeric_bindings(request, parsed)
+        _reject_dropped_explicit_numeric_bindings(request, parsed)
         _reject_noncanonical_count_bindings(parsed)
         return GoalInterpretationDecision.model_validate(parsed)
 
@@ -4693,15 +2816,9 @@ class OllamaGoalInterpreter:
         self,
         request: GoalInterpretationRequest,
         decision: GoalInterpretationDecision,
-        *,
-        allow_coverage_resegmentation: bool = True,
     ) -> GoalInterpretationDecision:
         if not self._requires_deep_semantic_interpretation(decision):
-            return await self._ensure_atomic_responsibility_coverage(
-                request,
-                decision,
-                allow_resegmentation=allow_coverage_resegmentation,
-            )
+            return decision
         logger.info(
             "goal_interpretation_deep_escalation sid=%s reason=%s",
             request.sid,
@@ -4735,11 +2852,7 @@ class OllamaGoalInterpreter:
                     request,
                     str(repaired.get("message", {}).get("content") or ""),
                 )
-            return await self._ensure_atomic_responsibility_coverage(
-                request,
-                decision,
-                allow_resegmentation=False,
-            )
+            return decision
         except Exception as exc:
             raise InterpretationUnavailableError(
                 "invalid_deep_goal_interpretation: "
@@ -4766,171 +2879,28 @@ class OllamaGoalInterpreter:
             return await self._accept_or_deepen_interpretation(request, decision)
         except _GoalInterpretationSemanticStructureViolation as exc:
             logger.warning(
-                "Fast Goal Interpretation lost atomic source structure sid=%s "
-                "error=%s; escalating once from source",
+                "Fast Goal Interpretation lost primary semantic/source structure "
+                "sid=%s error=%s; failing closed",
                 request.sid,
                 exc,
             )
-            audit_candidate = _extract_json_object(content)
-            _normalize_mechanical_goal_interpretation_dto(audit_candidate)
-            removed_transport_echoes = (
-                _strip_transport_echo_bindings_for_atomic_audit(
-                    request,
-                    audit_candidate,
-                )
-            )
-            if removed_transport_echoes:
-                try:
-                    candidate = self._validate_interpretation_content(
-                        request,
-                        json.dumps(audit_candidate, ensure_ascii=False),
-                        allow_dropped_explicit_numbers_for_atomic_audit=True,
-                    )
-                    audited = await self._ensure_atomic_responsibility_coverage(
-                        request,
-                        candidate,
-                        allow_resegmentation=True,
-                    )
-                    # The sanitized candidate was audit input only. The complete
-                    # validator remains the sole acceptance boundary and catches
-                    # any explicit number that existed only inside the rejected
-                    # envelope echo.
-                    return self._validate_interpretation_content(
-                        request,
-                        json.dumps(audited.model_dump(mode="json"), ensure_ascii=False),
-                    )
-                except _GoalInterpretationAuthorityViolation as audit_exc:
-                    if not _decimal_values(request.text):
-                        raise InterpretationUnavailableError(
-                            "invalid_goal_interpretation_after_transport_echo_audit: "
-                            f"{type(audit_exc).__name__}: {audit_exc}"
-                        ) from audit_exc
-                    logger.warning(
-                        "Transport-echo audit retained atomic structure but not all "
-                        "explicit numbers sid=%s; continuing to one fresh source pass",
-                        request.sid,
-                    )
-                except Exception as audit_exc:
-                    raise InterpretationUnavailableError(
-                        "invalid_goal_interpretation_after_transport_echo_audit: "
-                        f"{type(audit_exc).__name__}: {audit_exc}"
-                    ) from audit_exc
-            if "coordination bindings must contain only exact sibling" in str(exc):
-                # The invalid relation field itself carries no trustworthy
-                # semantic authority. Strip it and send the remaining candidate
-                # directly to the independent atomic audit, which is the owner
-                # that can count source effects and trigger one resegmentation.
-                # This avoids spending the single deep delegation on a model
-                # regeneration that can repeat the same malformed relation.
-                try:
-                    decision = self._validate_interpretation_content(
-                        request,
-                        content,
-                        certificate_owns_coordination=True,
-                    )
-                    return await self._ensure_atomic_responsibility_coverage(
-                        request,
-                        decision,
-                        allow_resegmentation=True,
-                    )
-                except Exception as audit_exc:
-                    raise InterpretationUnavailableError(
-                        "invalid_goal_interpretation_after_coordination_audit: "
-                        f"{type(audit_exc).__name__}: {audit_exc}"
-                    ) from audit_exc
-            try:
-                rejected_candidate = _extract_json_object(content)
-                candidate_binding_names = _goal_interpretation_binding_names(
-                    rejected_candidate
-                )
-                hidden_effect_or_how_violation = (
-                    "binding conceals an observable effect or downstream HOW field"
-                    in str(exc)
-                )
-                if hidden_effect_or_how_violation:
-                    candidate_binding_names = [
-                        name
-                        for name in candidate_binding_names
-                        if not _is_hidden_effect_or_how_binding_name(name)
-                    ]
-                minimum_responsibility_count = (
-                    _hidden_effect_responsibility_count_floor(rejected_candidate)
-                    if hidden_effect_or_how_violation
-                    else None
-                )
-                if isinstance(exc, _GoalInterpretationSpeedProvenanceViolation):
-                    # The typed validator has already proved that this candidate
-                    # dimension is not speed.  Retaining it in the closed recovery
-                    # grammar made the deep model reuse the rejected label and, in
-                    # observed turns, move a valid duration scalar into it.  Other
-                    # mechanically valid candidate dimensions remain available.
-                    candidate_binding_names = [
-                        name
-                        for name in candidate_binding_names
-                        if name.strip().casefold() != "speed"
-                    ]
-                if _decimal_values(request.text) and not hidden_effect_or_how_violation:
-                    # The rejected candidate cannot constrain the semantic name
-                    # of an explicit number it omitted. Let the fresh source pass
-                    # use the normal typed binding grammar so it can preserve the
-                    # number under its proper dimension.
-                    candidate_binding_names = None
-                deep = await self._chat_logged(
-                    self.build_deep_interpretation_payload(
-                        request,
-                        constrain_location_provenance=True,
-                        constrain_speed_provenance=True,
-                        constrained_binding_names=candidate_binding_names,
-                        minimum_responsibility_count=minimum_responsibility_count,
-                        source_structure_violation=str(exc),
-                    ),
-                    stage="goal_interpretation_deep",
-                    request=request,
-                )
-                decision = self._validate_interpretation_content(
-                    request,
-                    str(deep.get("message", {}).get("content") or ""),
-                )
-                return await self._ensure_atomic_responsibility_coverage(
-                    request,
-                    decision,
-                    allow_resegmentation=False,
-                )
-            except Exception as deep_exc:
-                raise InterpretationUnavailableError(
-                    "invalid_deep_goal_interpretation_after_source_structure_loss: "
-                    f"{type(deep_exc).__name__}: {deep_exc}"
-                ) from deep_exc
+            raise InterpretationUnavailableError(
+                "invalid_primary_goal_interpretation_semantics: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+
         except _GoalInterpretationAuthorityViolation as exc:
             logger.warning(
                 "Fast Goal Interpretation crossed semantic authority sid=%s "
-                "error=%s; escalating once from source",
+                "error=%s; failing closed",
                 request.sid,
                 exc,
             )
-            try:
-                deep = await self._chat_logged(
-                    self.build_deep_interpretation_payload(
-                        request,
-                        constrain_location_provenance=True,
-                    ),
-                    stage="goal_interpretation_deep",
-                    request=request,
-                )
-                decision = self._validate_interpretation_content(
-                    request,
-                    str(deep.get("message", {}).get("content") or ""),
-                )
-                return await self._accept_or_deepen_interpretation(
-                    request,
-                    decision,
-                    allow_coverage_resegmentation=False,
-                )
-            except Exception as deep_exc:
-                raise InterpretationUnavailableError(
-                    "invalid_deep_goal_interpretation_after_authority_violation: "
-                    f"{type(deep_exc).__name__}: {deep_exc}"
-                ) from deep_exc
+            raise InterpretationUnavailableError(
+                "invalid_primary_goal_interpretation_authority: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+
         except (ValueError, ValidationError) as exc:
             logger.warning(
                 "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s content=%r",

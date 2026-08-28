@@ -211,11 +211,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("Auto-detected hardware profile: rtx5090", result.stdout)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3.5:9b")
         self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_FAST_TRUTH_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3.5:9b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
@@ -247,7 +247,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(manifest["mode_file"], "env/modes/speech.env")
         self.assertEqual(
             manifest["active_ollama_models"],
-            ["qwen3.5:9b", "gemma4:12b"],
+            ["gemma4:12b", "qwen3.5:9b"],
         )
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
@@ -300,7 +300,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_FAST_PLANNER_MODEL",
             "AGENT_FAST_FIRST_RESPONSE_MODEL",
-            "AGENT_FAST_TRUTH_MODEL",
             "AGENT_DEEP_PLANNER_MODEL",
             "AGENT_TASK_CONTINUITY_MODEL",
             "AGENT_SOCIAL_ATTENTION_MODEL",
@@ -574,7 +573,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "CHROMIE_COGNITIVE_BUDGET_PROFILE: ${CHROMIE_COGNITIVE_BUDGET_PROFILE:-interactive}",
             "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
             "AGENT_FAST_FIRST_RESPONSE_MODEL: ${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}",
-            "AGENT_FAST_TRUTH_MODEL: ${AGENT_FAST_TRUTH_MODEL:-${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}}",
             "AGENT_DEEP_PLANNER_MODEL: ${AGENT_DEEP_PLANNER_MODEL:-gemma4:e2b}",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS: ${AGENT_DEEP_PLANNER_TIMEOUT_MS:-9000}",
             "AGENT_DEEP_PLANNER_NUM_CTX: ${AGENT_DEEP_PLANNER_NUM_CTX:-8192}",
@@ -647,7 +645,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("list_runtime_ollama_models.sh", warm)
         self.assertNotIn('WARM_MODELS=("${AGENT_MODEL:-gemma4:e2b}")', orchestrator)
 
-    def test_active_model_inventory_includes_distinct_fast_truth_model(self) -> None:
+    def test_active_model_inventory_deduplicates_shared_fast_models(self) -> None:
         env = {
             **os.environ,
             "CHROMIE_ACTIVE_PROFILE": "test",
@@ -660,7 +658,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_FAST_PLANNER_ENABLED": "1",
             "AGENT_FAST_PLANNER_MODEL": "shared-fast",
             "AGENT_FAST_FIRST_RESPONSE_MODEL": "shared-fast",
-            "AGENT_FAST_TRUTH_MODEL": "distinct-truth",
             "AGENT_DEEP_PLANNER_ENABLED": "0",
             "AGENT_SOCIAL_ATTENTION_MODE": "off",
         }
@@ -674,7 +671,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             text=True,
         )
 
-        self.assertEqual(result.stdout.splitlines(), ["shared-fast", "distinct-truth"])
+        self.assertEqual(result.stdout.splitlines(), ["shared-fast"])
 
 
 if __name__ == "__main__":

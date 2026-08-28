@@ -6,7 +6,7 @@ from scripts.test_matrix import COMBOS, GROUPS, expand
 
 
 class TestMatrixCoverageTests(unittest.TestCase):
-    def test_general_ability_group_runs_complete_level_a_manifest(self) -> None:
+    def test_general_ability_group_runs_complete_level_a_library(self) -> None:
         commands = GROUPS["general-ability"].commands
         level_a = next(command for command in commands if "level-a" in command)
         self.assertNotIn("--ability-class", level_a)

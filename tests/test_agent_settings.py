@@ -35,7 +35,6 @@ class AgentSettingsTests(unittest.TestCase):
                 "AGENT_MODEL": "general-model",
                 "AGENT_FAST_PLANNER_MODEL": "compact-planner",
                 "AGENT_FAST_FIRST_RESPONSE_MODEL": "natural-response-model",
-                "AGENT_FAST_TRUTH_MODEL": "truth-model",
             },
             clear=False,
         ):
@@ -44,7 +43,6 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertEqual(
             settings.fast_first_response_model, "natural-response-model"
         )
-        self.assertEqual(settings.fast_truth_model, "truth-model")
 
     def test_fast_first_response_model_defaults_to_profile_agent_model(self) -> None:
         with patch.dict(os.environ, {"AGENT_MODEL": "profile-model"}, clear=False):
@@ -54,20 +52,6 @@ class AgentSettingsTests(unittest.TestCase):
                 os.environ.pop("AGENT_FAST_FIRST_RESPONSE_MODEL")
                 settings = Settings()
         self.assertEqual(settings.fast_first_response_model, "profile-model")
-
-    def test_fast_truth_model_defaults_to_first_response_model(self) -> None:
-        with patch.dict(
-            os.environ,
-            {
-                "AGENT_MODEL": "general-model",
-                "AGENT_FAST_PLANNER_MODEL": "planner-model",
-                "AGENT_FAST_FIRST_RESPONSE_MODEL": "response-model",
-            },
-            clear=False,
-        ):
-            os.environ.pop("AGENT_FAST_TRUTH_MODEL", None)
-            settings = Settings()
-        self.assertEqual(settings.fast_truth_model, "response-model")
 
     def test_fast_first_response_timeout_is_independent_from_full_fast_planning(self) -> None:
         with patch.dict(

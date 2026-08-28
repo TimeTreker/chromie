@@ -4,7 +4,13 @@
   "suite": "cognitive_turn_loop",
   "level": "integration",
   "description": "A deterministic current-interaction stop cancels both the active and queued Trusted Capability Runtime requests, records the queued request as cancelled_before_start, retains both outcomes, and emits no stale final.",
-  "tags": ["level-a", "stop", "cancel", "skill-runtime", "evidence-retention"],
+  "tags": [
+    "level-a",
+    "stop",
+    "cancel",
+    "skill-runtime",
+    "evidence-retention"
+  ],
   "input": {
     "text": "Run the long first task and then the second task.",
     "language": "en-US"
@@ -16,10 +22,18 @@
       {
         "capability_id": "chromie.scenario.long_first",
         "provider_id": "scenario.blocking",
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "input_schema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "output_schema": {
           "type": "object",
-          "properties": {"summary": {"type": "string"}},
+          "properties": {
+            "summary": {
+              "type": "string"
+            }
+          },
           "additionalProperties": false
         },
         "interruptible": true
@@ -27,10 +41,18 @@
       {
         "capability_id": "chromie.scenario.queued_second",
         "provider_id": "scenario.blocking",
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+        "input_schema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
         "output_schema": {
           "type": "object",
-          "properties": {"summary": {"type": "string"}},
+          "properties": {
+            "summary": {
+              "type": "string"
+            }
+          },
           "additionalProperties": false
         },
         "interruptible": true
@@ -42,7 +64,10 @@
       "disposition": "execute",
       "coverage": "complete",
       "confidence": 0.99,
-      "goal_ids": ["goal-active", "goal-queued"],
+      "goal_ids": [
+        "goal-active",
+        "goal-queued"
+      ],
       "goal_summary": "Run two sequential cancellable tasks.",
       "steps": [
         {
@@ -50,14 +75,18 @@
           "capability_id": "chromie.scenario.long_first",
           "args": {},
           "timing": "sequential",
-          "source_goal_ids": ["goal-active"]
+          "source_goal_ids": [
+            "goal-active"
+          ]
         },
         {
           "step_id": "queued-second",
           "capability_id": "chromie.scenario.queued_second",
           "args": {},
           "timing": "sequential",
-          "source_goal_ids": ["goal-queued"]
+          "source_goal_ids": [
+            "goal-queued"
+          ]
         }
       ],
       "goal_outcomes": [
@@ -65,19 +94,26 @@
           "goal_id": "goal-active",
           "disposition": "execute",
           "coverage": "complete",
-          "step_ids": ["active-first"]
+          "step_ids": [
+            "active-first"
+          ]
         },
         {
           "goal_id": "goal-queued",
           "disposition": "execute",
           "coverage": "complete",
-          "step_ids": ["queued-second"]
+          "step_ids": [
+            "queued-second"
+          ]
         }
       ],
       "goal_satisfaction": {
         "score": 1.0,
         "status": "exact",
-        "satisfied_goal_ids": ["goal-active", "goal-queued"]
+        "satisfied_goal_ids": [
+          "goal-active",
+          "goal-queued"
+        ]
       }
     }
   },
@@ -87,10 +123,22 @@
     "turn_identity_preserved": true,
     "runtime_status": "cancelled",
     "aggregate_status": "cancelled",
-    "evidence_statuses": ["cancelled", "cancelled"],
-    "goal_statuses": ["cancelled", "cancelled"],
-    "goal_state_statuses": ["cancelled", "cancelled"],
-    "goal_state_outcome_statuses": ["cancelled", "cancelled"],
+    "evidence_statuses": [
+      "cancelled",
+      "cancelled"
+    ],
+    "goal_statuses": [
+      "cancelled",
+      "cancelled"
+    ],
+    "goal_state_statuses": [
+      "cancelled",
+      "cancelled"
+    ],
+    "goal_state_outcome_statuses": [
+      "cancelled",
+      "cancelled"
+    ],
     "closure_status": "suppressed_stale",
     "delivery_status": "suppressed",
     "suppression_reason": "stale_turn",
@@ -114,6 +162,62 @@
       "cancelled_current_interaction",
       "cancelled_before_start"
     ],
-    "provider_cancelled_step_ids": ["active-first"]
+    "provider_cancelled_step_ids": [
+      "active-first"
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "deterministic_safety_controls",
+        "title": "Deterministic Safety Controls",
+        "general_rule": "Stop, cancel, emergency, silence, and unusable-audio paths must not depend on model judgment.",
+        "rationale": "An active stop cancels through deterministic Runtime authority and retains outcome.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway/ingress",
+          "Cognitive Gateway/attention review",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider"
+        ]
+      },
+      {
+        "id": "evidence_coverage_and_claim_discipline",
+        "title": "Evidence Coverage And Claim Discipline",
+        "general_rule": "Tests should prove the user-visible boundary being claimed and should retain enough trace detail to locate the earliest wrong component.",
+        "rationale": "Cancellation evidence remains correlated.",
+        "root_cause_boundaries": [
+          "Test evidence",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "evidence_bound_cognitive_turn_closure",
+        "title": "Evidence-Bound Cognitive Turn Closure",
+        "general_rule": "Every admitted turn should preserve its identity and independent work across overlapping ordinary requests; only explicit protective control or Core-authorized interruption may cancel it. Effectful turns retain completed, missing, failed, and cancelled outcomes, commit goal state, suppress stale speech, and emit at most one evidence-bound speech-only final while the turn remains current.",
+        "rationale": "A deterministic current-interaction stop cancels the active provider request, closes its selected queued sibling as cancelled-before-start, retains both outcomes, and emits no late final.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway/ingress",
+          "Goal-Driven Cognitive Core",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider",
+          "Execution outcome evidence"
+        ]
+      },
+      {
+        "id": "human_like_cognitive_continuity",
+        "title": "Human-like Cognitive Continuity",
+        "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+        "rationale": "A stop/cancel turn changes the active work truth without fabricating or erasing the underlying Goal history.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "Goal Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

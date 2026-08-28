@@ -126,36 +126,6 @@ logging.basicConfig(
 logger = logging.getLogger("chromie.agent")
 
 
-def _fast_truth_context_window(
-    service_settings: Settings,
-) -> int:
-    if service_settings.cognitive_budget_profile == "qualification":
-        # Qualification measures semantic plausibility before latency tuning.  Its
-        # retained post-Evidence projection is not the compact interactive prompt,
-        # so do not apply the dedicated-runner 6144-token latency ceiling here.
-        return service_settings.fast_planner_num_ctx
-    model = service_settings.fast_truth_model
-    if model == service_settings.fast_planner_model:
-        # Reuse the already-resident Fast runner exactly when the roles genuinely
-        # share the same model. This is the preferred low-latency topology.
-        return service_settings.fast_planner_num_ctx
-    if model == service_settings.fast_first_response_model:
-        # A dedicated response/truth model must stay bounded even when those same
-        # weights also happen to own a 32K deliberative role such as Goal
-        # Association. Role identity does not justify inheriting another role's
-        # context window; that regression made a ten-word greeting allocate 32K.
-        return min(service_settings.fast_planner_num_ctx, 6144)
-    if model == service_settings.goal_association_model:
-        return service_settings.goal_association_num_ctx
-    if model == service_settings.cognitive_gateway_attention_model:
-        return service_settings.cognitive_gateway_attention_num_ctx
-    if model == service_settings.social_attention_model:
-        return service_settings.social_attention_num_ctx
-    if model == service_settings.agent_skill_selection_model:
-        return service_settings.agent_skill_selection_num_ctx
-    return min(service_settings.fast_planner_num_ctx, 6144)
-
-
 def _fast_first_response_context_window(
     service_settings: Settings,
     interpreter_settings: GoalInterpreterSettings,
@@ -172,11 +142,6 @@ def _fast_first_response_context_window(
         return service_settings.fast_planner_num_ctx
     if service_settings.fast_first_response_model == interpreter_settings.model:
         return interpreter_settings.llm_num_ctx
-    if (
-        service_settings.fast_first_response_model
-        == service_settings.fast_truth_model
-    ):
-        return _fast_truth_context_window(service_settings)
     return min(service_settings.fast_planner_num_ctx, 6144)
 
 ollama_client = OllamaClient(
@@ -420,34 +385,11 @@ fast_first_response_client = (
     if settings.use_llm and settings.fast_planner_enabled
     else None
 )
-fast_truth_client = (
-    fast_first_response_client
-    if settings.use_llm
-    and settings.fast_planner_enabled
-    and settings.fast_truth_model == settings.fast_first_response_model
-    else fast_planner_client
-    if settings.use_llm
-    and settings.fast_planner_enabled
-    and settings.fast_truth_model == settings.fast_planner_model
-    else OllamaClient(
-        settings.ollama_url,
-        settings.fast_truth_model,
-        timeout_ms=settings.fast_planner_timeout_ms,
-        purpose="fast_planner_truth",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.fast_planner_enabled
-    else None
-)
 fast_planner_resolver = (
     FastPlannerResolver(
         fast_planner_client,
         capability_catalog,
         first_response_ollama=fast_first_response_client,
-        truth_ollama=fast_truth_client,
-        truth_num_ctx=_fast_truth_context_window(
-            settings,
-        ),
         first_response_num_ctx=_fast_first_response_context_window(
             settings,
             goal_interpreter_settings,
@@ -474,8 +416,6 @@ deep_planner_client = (
 deep_planner_resolver = (
     DeepPlannerResolver(
         deep_planner_client, capability_catalog,
-        truth_ollama=fast_truth_client,
-        truth_num_ctx=_fast_truth_context_window(settings),
         num_ctx=settings.deep_planner_num_ctx,
         num_predict=settings.deep_planner_num_predict,
         max_capabilities=settings.deep_planner_max_capabilities,
@@ -594,9 +534,6 @@ async def health() -> HealthResponse:
             settings.fast_first_response_model
             if fast_planner_resolver is not None
             else None
-        ),
-        fast_truth_model=(
-            settings.fast_truth_model if fast_planner_resolver is not None else None
         ),
         deep_planner_enabled=deep_planner_resolver is not None,
         deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "qualification_continuous_weather_reentry",
+  "stage": "must_pass",
+  "difficulty": "medium",
+  "rationale": "External information completion must return through evidence-bound Planner re-entry instead of Host-authored completion speech.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "evidence_grounding",
+      "dialogue_continuity"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "evidence_grounding",
+      "dialogue_continuity"
+    ],
+    "primary_outcomes": [
+      "External information completion must return through evidence-bound Planner re-entry instead of Host-authored completion speech."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Close or abandon the turn before evidence-based re-entry completes."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "查一下重庆今晚热不热。",
+  "language": "zh-CN",
+  "require_fast_communicative_act": true,
+  "expected_fast_communicative_speech_acts": [
+    "acknowledge_and_check"
+  ],
+  "require_fast_planner_evidence_reentry": true,
+  "min_new_goal_count": 1,
+  "min_goal_outcome_count": 1,
+  "description": "External information completion must return through evidence-bound Planner re-entry instead of Host-authored completion speech.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "continuous_cognition_recovery",
+        "title": "Continuous Cognition and Recovery",
+        "general_rule": "Meaningful runtime Evidence or provider-state change may reactivate the same Planner without fabricating a user turn, replaying completed work, or letting stale request/Plan provenance regain authority.",
+        "rationale": "External information completion must return through evidence-bound Planner re-entry instead of Host-authored completion speech.",
+        "root_cause_boundaries": [
+          "Runtime Evidence",
+          "CognitiveOpportunity",
+          "Planner re-entry",
+          "Conversation state",
+          "Trusted Capability Runtime"
+        ]
+      }
+    ]
+  }
+}

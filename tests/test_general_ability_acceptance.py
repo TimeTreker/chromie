@@ -12,7 +12,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from scripts.general_ability_acceptance import (
-    DEFAULT_MANIFEST,
+    DEFAULT_LEVEL_A_SCENARIO_ROOT,
+    DEFAULT_LIVE_SCENARIO_ROOT,
     LiveCaseRef,
     TextScenarioCase,
     _exclusive_orchestrator_lock,
@@ -24,14 +25,15 @@ from scripts.general_ability_acceptance import (
     build_parser,
     level_a_keys,
     live_case_ids,
-    load_manifest,
+    load_scenario_library,
     main,
-    manifest_summary,
+    library_summary,
     run_level_a,
+    run_live_text,
     _live_case_namespace,
     select_ability_classes,
     validate_live_text_result,
-    validate_manifest,
+    validate_library,
 )
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
 
@@ -102,8 +104,9 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                         with _exclusive_orchestrator_lock():
                             self.fail("nested Host lock unexpectedly succeeded")
 
-    def test_default_manifest_declares_core_ability_classes(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+    def test_default_library_discovers_self_describing_scenarios(self) -> None:
+        manifest = load_scenario_library()
+        self.assertEqual(manifest.live_root, DEFAULT_LIVE_SCENARIO_ROOT.resolve())
 
         ability_ids = {item.ability_id for item in manifest.ability_classes}
 
@@ -122,7 +125,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("planner_goal_semantic_quality", ability_ids)
         self.assertIn("workdag_multi_goal_revision_integrity", ability_ids)
         self.assertIn("continuous_cognition_recovery", ability_ids)
-        self.assertEqual(validate_manifest(manifest), [])
+        self.assertEqual(validate_library(manifest), [])
         self.assertGreaterEqual(len(level_a_keys(manifest.ability_classes)), 20)
         live_ids = live_case_ids(manifest.ability_classes)
         self.assertIn("wal_forward_typo_walk", live_ids)
@@ -133,22 +136,109 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("qualification_planner_weather_evidence", live_ids)
         self.assertIn("qualification_workdag_walk_blink_once", live_ids)
         self.assertIn("qualification_continuous_weather_reentry", live_ids)
-
-    def test_manifest_rejects_first_turn_previous_speech_comparison(self) -> None:
-        payload = json.loads(DEFAULT_MANIFEST.read_text(encoding="utf-8"))
-        continuity = next(
-            item
-            for item in payload["ability_classes"]
-            if item.get("id") == "human_like_cognitive_continuity"
+        self.assertFalse(
+            (DEFAULT_LEVEL_A_SCENARIO_ROOT / "general_ability_acceptance.json").exists()
         )
-        continuity["live_text_cases"][0]["turns"][0][
-            "forbid_repeat_of_previous_speech"
-        ] = True
+        self.assertEqual(
+            [(stage.stage_id, len(stage.scenario_paths)) for stage in manifest.stages],
+            [("must_pass", 50), ("core", 15), ("challenge", 8)],
+        )
+        self.assertEqual(len(live_ids), 73)
+        self.assertEqual(
+            len({ref.source_path for ability in manifest.ability_classes for ref in ability.live_text_cases}),
+            73,
+        )
+        generated = [
+            ref
+            for ability in manifest.ability_classes
+            for ref in ability.live_text_cases
+            if ref.provenance.get("batch_id") == "common_must_pass_2026_08_28"
+        ]
+        self.assertEqual(len(generated), 25)
+        self.assertTrue(
+            all(
+                ref.provenance
+                == {
+                    "origin": "codex_generated_common_scene",
+                    "batch_id": "common_must_pass_2026_08_28",
+                    "derived_from_existing_scenario": False,
+                }
+                for ref in generated
+            )
+        )
+        for ability in manifest.ability_classes:
+            for ref in ability.live_text_cases:
+                self.assertIsNotNone(ref.source_path)
+                source = json.loads(ref.source_path.read_text(encoding="utf-8"))
+                serialized = json.dumps(source)
+                self.assertNotIn("expected_speech_any", serialized)
+                self.assertNotIn("expected_speech_all", serialized)
+                self.assertNotIn("forbidden_speech_any", serialized)
+                self.assertNotIn("ability_class", source)
+                self.assertEqual(
+                    source["general_ability"]["memberships"][0]["id"],
+                    ability.ability_id,
+                )
+                self.assertEqual(source["oracle_policy"]["mode"], "hybrid")
+                self.assertTrue(source["review_rubric"]["primary_outcomes"])
+            for ref in ability.level_a_scenarios:
+                self.assertIsNotNone(ref.source_path)
+                source = json.loads(ref.source_path.read_text(encoding="utf-8"))
+                membership_ids = {
+                    item["id"]
+                    for item in source["general_ability"]["memberships"]
+                }
+                self.assertIn(ability.ability_id, membership_ids)
+
+    def test_library_rejects_first_turn_previous_speech_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "manifest.json"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-            manifest = load_manifest(path)
-            errors = validate_manifest(manifest, validate_level_a_sources=False)
+            root = Path(directory)
+            live_root = root / "live"
+            level_a_root = root / "level-a"
+            case_path = live_root / "must_pass" / "continuity" / "invalid_first_turn_history.json"
+            case_path.parent.mkdir(parents=True)
+            case_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "chromie_general_ability_live_text",
+                        "id": "invalid_first_turn_history",
+                        "stage": "must_pass",
+                        "difficulty": "easy",
+                        "general_ability": {
+                            "memberships": [
+                                {
+                                    "id": "continuity",
+                                    "title": "Continuity",
+                                    "general_rule": "Preserve dialogue history.",
+                                    "rationale": "Preserve actual dialogue history.",
+                                    "root_cause_boundaries": ["dialogue_state"],
+                                }
+                            ]
+                        },
+                        "oracle_policy": {
+                            "mode": "hybrid",
+                            "deterministic_sources": ["runtime_contracts"],
+                            "semantic_dimensions": ["dialogue_continuity"],
+                            "semantic_blocking": True,
+                        },
+                        "review_rubric": {
+                            "dimensions": ["dialogue_continuity"],
+                            "primary_outcomes": ["Preserve actual dialogue history."],
+                        },
+                        "turns": [
+                            {
+                                "id": "first",
+                                "text": "What did you say?",
+                                "forbid_repeat_of_previous_speech": True,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            manifest = load_scenario_library(live_root, level_a_root)
+            errors = validate_library(manifest, validate_level_a_sources=False)
         self.assertTrue(any("previous-speech comparison" in item for item in errors))
 
     def test_live_validation_requires_structured_pending_work_speech(self) -> None:
@@ -510,8 +600,43 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         }
         self.assertEqual(validate_live_text_result(case, summary), [])
 
+    def test_live_validation_can_require_executed_safe_idle(self) -> None:
+        case = TextScenarioCase(
+            case_id="stop_active_motion",
+            text="停下！",
+            require_speech=False,
+            expect_no_speech=True,
+            require_safe_idle=True,
+        )
+        summary = {
+            "interaction_response": {"speech": [], "capabilities": []},
+            "preview_only": False,
+            "status_after": {
+                "safe_idle": False,
+                "active_task": "walk-1",
+                "emergency_stop": False,
+                "fallen": False,
+            },
+            "cognitive_runtime": {},
+        }
+
+        errors = validate_live_text_result(case, summary)
+        self.assertTrue(any("safe-idle final state" in item for item in errors))
+
+        summary["status_after"] = {
+            "safe_idle": True,
+            "active_task": None,
+            "emergency_stop": False,
+            "fallen": False,
+        }
+        self.assertEqual(validate_live_text_result(case, summary), [])
+
+        summary["preview_only"] = True
+        errors = validate_live_text_result(case, summary)
+        self.assertTrue(any("preview output is insufficient" in item for item in errors))
+
     def test_manifest_rejects_contradictory_fast_communicative_act_policy(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = manifest.ability_classes[0]
         contradictory = TextScenarioCase(
             case_id="contradictory",
@@ -531,7 +656,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             ability_classes=(patched_ability, *manifest.ability_classes[1:]),
         )
 
-        errors = validate_manifest(patched_manifest, validate_level_a_sources=False)
+        errors = validate_library(patched_manifest, validate_level_a_sources=False)
         self.assertTrue(any("both required and forbidden" in item for item in errors))
 
     def test_live_validation_counts_played_fast_complete_response_as_speech(self) -> None:
@@ -626,7 +751,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
 
     def test_manifest_rejects_contradictory_silence_policy(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = manifest.ability_classes[0]
         contradictory = TextScenarioCase(
             case_id="contradictory_silence",
@@ -646,11 +771,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             ability_classes=(patched_ability, *manifest.ability_classes[1:]),
         )
 
-        errors = validate_manifest(patched_manifest, validate_level_a_sources=False)
+        errors = validate_library(patched_manifest, validate_level_a_sources=False)
         self.assertTrue(any("speech cannot be both required and forbidden" in item for item in errors))
 
     def test_retained_voice_incident_is_a_two_turn_live_episode(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item
             for item in manifest.ability_classes
@@ -679,10 +804,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             ),
         )
 
-    def test_manifest_summary_labels_scope_and_counts(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+    def test_library_summary_labels_scope_and_counts(self) -> None:
+        manifest = load_scenario_library()
 
-        summary = manifest_summary(manifest)
+        summary = library_summary(manifest)
 
         self.assertTrue(summary["ok"], summary["errors"])
         self.assertEqual(summary["mode"], "check")
@@ -691,7 +816,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertGreater(summary["live_text_case_count"], 0)
 
     def test_select_ability_classes_rejects_unknown_id(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
 
         selected = select_ability_classes(manifest, ["deterministic_safety_controls"])
 
@@ -699,51 +824,131 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown ability class"):
             select_ability_classes(manifest, ["missing"])
 
-    def test_level_a_runner_writes_rollup_for_selected_case(self) -> None:
+    def test_live_stage_gate_finishes_must_pass_before_blocking_later_stages(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            manifest_path = Path(temp_dir) / "manifest.json"
-            manifest_path.write_text(
-                json.dumps(
-                    {
-                        "schema_version": 1,
-                        "title": "test manifest",
-                        "ability_classes": [
+            root = Path(temp_dir)
+            live_root = root / "live"
+            level_a_root = root / "level-a"
+            stage_cases = {
+                "must_pass": ["must_one", "must_two"],
+                "core": ["core_one"],
+                "challenge": ["challenge_one"],
+            }
+            for stage_id, case_ids in stage_cases.items():
+                for case_id in case_ids:
+                    path = live_root / stage_id / "intent" / f"{case_id}.json"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(
+                        json.dumps(
                             {
-                                "id": "controls",
-                                "title": "Controls",
-                                "general_rule": "Stops must be deterministic.",
-                                "minimum_level_a_cases": 1,
-                                "root_cause_boundaries": ["Cognitive Gateway/reflex"],
-                                "level_a_scenarios": [
-                                    {
-                                        "key": "cognitive_turn_loop/active_stop_cancel_retains_outcome",
-                                        "rationale": "Active cancellation retains its outcome.",
-                                    }
-                                ],
-                                "live_text_cases": [],
+                                "schema_version": 1,
+                                "kind": "chromie_general_ability_live_text",
+                                "id": case_id,
+                                "stage": stage_id,
+                                "difficulty": "easy" if stage_id == "must_pass" else "medium",
+                                "general_ability": {
+                                    "memberships": [
+                                        {
+                                            "id": "intent",
+                                            "title": "Intent",
+                                            "general_rule": "Understand the selected test turns.",
+                                            "rationale": "Understand this selected test turn.",
+                                            "root_cause_boundaries": ["goal_interpretation"],
+                                        }
+                                    ]
+                                },
+                                "text": case_id,
+                                "expect_no_capabilities": True,
+                                "oracle_policy": {
+                                    "mode": "hybrid",
+                                    "deterministic_sources": ["runtime_contracts"],
+                                    "semantic_dimensions": ["intent_understanding"],
+                                    "semantic_blocking": True,
+                                },
+                                "review_rubric": {
+                                    "dimensions": ["intent_understanding"],
+                                    "primary_outcomes": ["Understand the selected test turn."],
+                                },
                             }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
+                        ),
+                        encoding="utf-8",
+                    )
             args = build_parser().parse_args(
                 [
                     "--mode",
-                    "level-a",
-                    "--ability-manifest",
-                    str(manifest_path),
+                    "live-text",
+                    "--scenario-root",
+                    str(live_root),
+                    "--level-a-scenario-root",
+                    str(level_a_root),
                     "--no-write",
                 ]
             )
 
-            summary = run_level_a(args)
+            failing_runner = AsyncMock(
+                side_effect=[
+                    {"ok": False, "errors": ["hard failure"]},
+                    {"ok": True, "errors": []},
+                ]
+            )
+            with patch(
+                "scripts.general_ability_acceptance._run_live_case",
+                failing_runner,
+            ):
+                failed = asyncio.run(run_live_text(args))
+
+            self.assertEqual(failing_runner.await_count, 2)
+            self.assertEqual(
+                [call.args[1].case_id for call in failing_runner.await_args_list],
+                ["must_one", "must_two"],
+            )
+            self.assertEqual(failed["stopped_after_stage"], "must_pass")
+            self.assertEqual(failed["skipped_case_count"], 2)
+            self.assertEqual(
+                [item["status"] for item in failed["stage_results"]],
+                ["hard_fail", "skipped", "skipped"],
+            )
+
+            passing_runner = AsyncMock(
+                side_effect=[{"ok": True, "errors": []} for _ in range(4)]
+            )
+            with patch(
+                "scripts.general_ability_acceptance._run_live_case",
+                passing_runner,
+            ):
+                passed = asyncio.run(run_live_text(args))
+
+            self.assertEqual(passing_runner.await_count, 4)
+            self.assertIsNone(passed["stopped_after_stage"])
+            self.assertEqual(passed["skipped_case_count"], 0)
+            self.assertEqual(
+                [item["status"] for item in passed["stage_results"]],
+                ["hard_pass", "hard_pass", "hard_pass"],
+            )
+
+    def test_level_a_runner_discovers_selected_case_membership(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "--mode",
+                "level-a",
+                "--ability-class",
+                "deterministic_safety_controls",
+                "--only-case",
+                "cognitive_turn_loop/active_stop_cancel_retains_outcome",
+                "--no-write",
+            ]
+        )
+
+        summary = run_level_a(args)
 
         self.assertTrue(summary["ok"], summary["errors"])
         self.assertEqual(summary["evidence_level"], "A")
         self.assertIn("deterministic file-backed evidence", summary["claim_scope"])
         self.assertEqual(summary["case_count"], 1)
-        self.assertEqual(summary["ability_classes"][0]["id"], "controls")
+        self.assertEqual(
+            summary["ability_classes"][0]["id"],
+            "deterministic_safety_controls",
+        )
         self.assertEqual(
             summary["ability_classes"][0]["cases"][0]["key"],
             "cognitive_turn_loop/active_stop_cancel_retains_outcome",
@@ -792,12 +997,16 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
 
     def test_live_case_namespace_can_select_goal_driven_runtime(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item for item in manifest.ability_classes
             if item.ability_id == "multi_goal_daily_life"
         )
-        case = ability.live_text_cases[0].case
+        case = next(
+            ref.case
+            for ref in ability.live_text_cases
+            if ref.case.case_id == "multi_goal_look_then_blink"
+        )
         args = build_parser().parse_args(
             [
                 "--mode",
@@ -841,13 +1050,17 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertTrue(case.expect_no_fast_contract_failure)
 
     def test_live_validation_enforces_fast_terminal_path(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item
             for item in manifest.ability_classes
             if item.ability_id == "multi_goal_daily_life"
         )
-        case = ability.live_text_cases[-1].case
+        case = next(
+            ref.case
+            for ref in ability.live_text_cases
+            if ref.case.case_id == "multi_goal_blink_and_joke"
+        )
         summary = {
             "interaction_response": {
                 "capabilities": [
@@ -882,12 +1095,16 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertTrue(any("Fast Planner contract failure" in item for item in errors))
 
     def test_user_outcome_scope_retains_internal_path_mismatch_as_diagnostic(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item for item in manifest.ability_classes
             if item.ability_id == "multi_goal_daily_life"
         )
-        case = ability.live_text_cases[0].case
+        case = next(
+            ref.case
+            for ref in ability.live_text_cases
+            if ref.case.case_id == "multi_goal_look_then_blink"
+        )
         summary = {
             "interaction_response": {
                 "capabilities": [
@@ -930,12 +1147,16 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertTrue(summary["user_outcome"]["internal_diagnostics"])
 
     def test_failed_execution_receipt_cannot_satisfy_user_outcome(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item for item in manifest.ability_classes
             if item.ability_id == "multi_goal_daily_life"
         )
-        case = ability.live_text_cases[0].case
+        case = next(
+            ref.case
+            for ref in ability.live_text_cases
+            if ref.case.case_id == "multi_goal_look_then_blink"
+        )
         summary = {
             "interaction_response": {
                 "capabilities": [
@@ -969,13 +1190,17 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertFalse(summary["user_outcome"]["ok"])
 
     def test_llm_truncation_fails_user_outcome_even_when_actions_complete(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item
             for item in manifest.ability_classes
             if item.ability_id == "multi_goal_daily_life"
         )
-        case = ability.live_text_cases[0].case
+        case = next(
+            ref.case
+            for ref in ability.live_text_cases
+            if ref.case.case_id == "multi_goal_look_then_blink"
+        )
         summary = {
             "interaction_response": {"capabilities": [], "speech": [{"text": "Done."}]},
             "session_state": {
@@ -995,7 +1220,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertFalse(summary["user_outcome"]["llm_integrity"]["ok"])
 
     def test_incident_scorecard_hard_fails_goal_omission_and_stale_skill(self) -> None:
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         ability = next(
             item
             for item in manifest.ability_classes
@@ -1144,7 +1369,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
     def test_live_case_namespace_matches_text_checker_argument_contract(self) -> None:
         args = build_parser().parse_args(["--mode", "live-text"])
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         case = manifest.ability_classes[0].live_text_cases[0].case
 
         namespace = _live_case_namespace(args, case, Path("/tmp/contract-check"))
@@ -1159,6 +1384,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
     def test_live_text_defaults_allow_full_qualification_pipeline(self) -> None:
         args = build_parser().parse_args(["--mode", "live-text"])
 
+        self.assertFalse(hasattr(args, "ability_manifest"))
+        self.assertEqual(args.scenario_root, DEFAULT_LIVE_SCENARIO_ROOT)
         self.assertEqual(args.goal_driven_runtime, "apply")
         self.assertEqual(args.timeout_s, 600.0)
         self.assertEqual(args.case_timeout_s, 1200.0)
@@ -1168,7 +1395,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         args = build_parser().parse_args(
             ["--mode", "live-text", "--goal-driven-runtime", "off"]
         )
-        manifest = load_manifest(DEFAULT_MANIFEST)
+        manifest = load_scenario_library()
         case = manifest.ability_classes[0].live_text_cases[0].case
 
         namespace = _live_case_namespace(args, case, Path("/tmp/legacy-case"))

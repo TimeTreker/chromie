@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "bow_once_plain_request",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "A direct request to bow should use the catalog-backed bow gesture without substituting a nod or verbal greeting.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["intent_understanding", "capability_grounding"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "capability_grounding"],
+    "primary_outcomes": ["Ground the request to one supported bow gesture."],
+    "acceptable_auxiliary": ["A brief acknowledgement is optional."],
+    "forbidden_semantic_outcomes": [
+      "Substitute nodding, looking, or speech for the requested bow.",
+      "Deny the ability when it is present in the live catalog.",
+      "Claim execution without matching provider evidence."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "向我鞠个躬。",
+  "language": "zh-CN",
+  "expected_capabilities": ["soridormi.bow"],
+  "require_speech": false,
+  "description": "A common demonstration request should select the exact bow capability.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "A direct request to bow should use the catalog-backed bow gesture without substituting a nod or verbal greeting.",
+        "root_cause_boundaries": ["Cognitive Core/goal interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+      }
+    ]
+  }
+}

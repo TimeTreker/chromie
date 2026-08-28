@@ -21,11 +21,12 @@ claim it supports must be broad and explicit.
 
 The first implemented slice is:
 
-- [`../scenarios/general_ability_acceptance.json`](../scenarios/general_ability_acceptance.json)
-  as the manifest of ability classes, representative Level A scenarios, and
-  live text probes;
+- [`../scenarios/general_ability/`](../scenarios/general_ability/) as the live
+  scenario library, with exactly one self-describing scenario per file under
+  `must_pass`, `core`, or `challenge`; maintained Level-A files declare their
+  own `general_ability.memberships`;
 - [`../scripts/general_ability_acceptance.py`](../scripts/general_ability_acceptance.py)
-  as the manifest checker, Level A runner, and live-text runner;
+  as the directory-discovery checker, Level A runner, and live-text runner;
 - [`../tests/test_general_ability_acceptance.py`](../tests/test_general_ability_acceptance.py)
   as the Level A guard for the new framework;
 - `python scripts/test_matrix.py general-ability` as the focused command group.
@@ -33,6 +34,24 @@ The first implemented slice is:
 This is implemented and automatically verifiable at Level A. It is not target
 validation and it does not prove microphone, speaker, simulator execution, or
 physical hardware behavior.
+
+The current live library contains 73 cases: 50 `must_pass`, 15 `core`, and 8
+`challenge`. The first stage includes the retained 25-case regression cohort and
+25 independently generated common-scene probes covering ordinary language,
+supported body skills, composition, safety controls, uncertainty, evidence, and
+conversation continuity. The generated files declare scenario-local authoring
+provenance so later database extraction can distinguish them from migrated or
+user-reported probes. This count is a reviewed cohort, not a permanent target.
+The stage directory is the execution gate; `difficulty=easy|medium|hard` remains
+independent metadata inside each file. A future cluster scheduler can assign
+individual files or case ids to isolated service deployments without changing
+the scenario contract. The local runner remains sequential because one live
+Host owns the exclusive Orchestrator lock.
+
+There is deliberately no central scenario index. File discovery, counts, stage
+membership, ability membership, oracle policy, and review metadata come from
+the directories and scenario files themselves. Adding or removing a scenario
+therefore changes the executable cohort without a second registry edit.
 
 ## Removed And Demoted Standalone Tools
 
@@ -90,7 +109,7 @@ InteractionRuntime, adapter, and multi-turn dialogue behavior.
 Evidence level: Level A.
 
 These scenarios should be representative probes, not phrase-specific trophies.
-The general ability manifest groups them by the broader behavior they protect.
+Each file declares the broader abilities it protects.
 
 ### Layer 3 - General Ability Acceptance
 
@@ -104,10 +123,28 @@ python scripts/general_ability_acceptance.py --mode check
 python scripts/general_ability_acceptance.py --mode level-a
 python scripts/general_ability_acceptance.py --mode level-a \
   --ability-class deterministic_safety_controls
+python scripts/general_ability_acceptance.py --mode live-text \
+  --stage must_pass
 ```
 
 The output must include the evidence level and claim scope. Level A output
 means deterministic regression evidence only.
+
+The ordered live-text policy is stage-complete, then gate. All selected
+`must_pass` cases run even if an earlier case hard-fails, so the report shows the
+whole basic-regression shape. After the stage ends, any hard deterministic
+failure blocks `core` and `challenge`. If must-pass hard gates succeed, the
+runner proceeds in order. A focused `--only-case` or explicit `--stage` run is a
+diagnostic subset and does not prove that skipped prerequisite stages passed.
+
+Every live-text file declares a `hybrid` oracle. Exact response text is not the
+truth value: each case describes primary semantic outcomes, acceptable
+variation, forbidden semantic outcomes, and reviewer dimensions. Deterministic
+safety, authorization, capability, execution, provenance, timing, and
+LLM-integrity evidence remains non-overridable. The run emits a standard
+semantic-review bundle; pending semantic review keeps
+`qualification_complete=false` even when deterministic evidence collection
+succeeds.
 
 ### Layer 4 - Live Text Preview And Execution
 
@@ -165,7 +202,7 @@ human voice-device support.
 
 ## Ability Classes
 
-The first manifest tracks these classes:
+The discovered scenario metadata tracks these classes:
 
 | Ability class | Protected behavior |
 |---|---|
@@ -180,7 +217,7 @@ The first manifest tracks these classes:
 | `evidence_coverage_and_claim_discipline` | Prevent weak tests from being reported as stronger evidence than they are. |
 
 New user-reported failures should either map to one of these classes or justify
-adding a new class to the manifest.
+adding a new class in the scenario metadata and governing interaction contract.
 
 ## Failure Report Rule
 
@@ -201,17 +238,21 @@ boundary before claiming the failure is fixed.
 
 ## Reconstruction Plan
 
-### PR 0 - Manifest And Runner
+### PR 0 - Scenario Library And Runner
 
 State: implemented in this patch.
 
 Scope:
 
-- create the general ability manifest;
-- add a manifest checker;
+- create the self-describing one-file live scenario library;
+- add directory discovery and per-file metadata validation;
 - add Level A ability-class execution;
 - add live text preview/execution support using the existing text-to-MuJoCo
   boundary;
+- finish a stage before applying its gate, and block later stages after a
+  must-pass hard failure;
+- package natural-language outcomes for the existing hybrid semantic-review
+  workflow instead of using exact response-string truth;
 - add focused tests and test-matrix wiring;
 - document claim rules.
 

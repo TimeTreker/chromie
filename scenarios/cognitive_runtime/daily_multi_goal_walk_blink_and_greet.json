@@ -270,5 +270,36 @@
       "fast_plan",
       "deep_plan"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "Three goals preserve sequence, speech coverage, and motion confirmation.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Planner contract",
+          "Fast Planner communication",
+          "Trusted runtime adapter",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "workdag_multi_goal_revision_integrity",
+        "title": "WorkDAG Multi-Goal Revision Integrity",
+        "general_rule": "Planner-authored WorkDAG topology must preserve independent Goals, execute mechanically ready work once, retain completed-node immutability, and revise only affected unfinished work without duplicate physical effects.",
+        "rationale": "Body and conversational outcomes remain separate while one episode coordinates them.",
+        "root_cause_boundaries": [
+          "Planner",
+          "WorkDAG",
+          "DAGEngine",
+          "Trusted Capability Runtime",
+          "Execution observations"
+        ]
+      }
+    ]
   }
 }

@@ -2,18 +2,13 @@ from __future__ import annotations
 
 import unittest
 
-from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from agent.app.main import (
     _fast_first_response_context_window,
-    _fast_truth_context_window,
     app,
-    fast_first_response_client,
-    fast_truth_client,
 )
 from agent.app.settings import GoalInterpreterSettings, Settings
-from agent.app.planner_schema import fast_truth_certificate_response_schema
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.goal import (
@@ -23,7 +18,6 @@ from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.plan import (
     FastPlannerAdvance,
     FastPlannerCompleteResponseAct,
-    FastPlannerFirstResponseTruthCertificate,
     FastPlannerProgressAct,
 )
 
@@ -34,7 +28,6 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             update={
                 "fast_planner_model": "qwen3:4b",
                 "fast_first_response_model": "gemma4:12b",
-                "fast_truth_model": "gemma4:12b",
                 "goal_association_model": "gemma4:12b",
                 "fast_planner_num_ctx": 32768,
                 "goal_association_num_ctx": 32768,
@@ -51,18 +44,12 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             ),
             6144,
         )
-        self.assertEqual(
-            _fast_truth_context_window(service_settings),
-            6144,
-        )
-        self.assertIs(fast_first_response_client, fast_truth_client)
 
     def test_fast_response_reuses_fast_runner_when_models_match(self) -> None:
         service_settings = Settings().model_copy(
             update={
                 "fast_planner_model": "qwen3:4b",
                 "fast_first_response_model": "qwen3:4b",
-                "fast_truth_model": "qwen3:4b",
                 "goal_association_model": "gemma4:12b",
                 "fast_planner_num_ctx": 32768,
                 "goal_association_num_ctx": 32768,
@@ -78,15 +65,13 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             ),
             32768,
         )
-        self.assertEqual(_fast_truth_context_window(service_settings), 32768)
 
-    def test_qualification_truth_and_first_response_use_full_fast_context(self) -> None:
+    def test_qualification_first_response_uses_full_fast_context(self) -> None:
         service_settings = Settings().model_copy(
             update={
                 "cognitive_budget_profile": "qualification",
                 "fast_planner_model": "qwen3:4b",
                 "fast_first_response_model": "gemma4:12b",
-                "fast_truth_model": "gemma4:12b",
                 "fast_planner_num_ctx": 32768,
             }
         )
@@ -94,7 +79,6 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             update={"model": "qwen3:4b", "llm_num_ctx": 32768}
         )
 
-        self.assertEqual(_fast_truth_context_window(service_settings), 32768)
         self.assertEqual(
             _fast_first_response_context_window(
                 service_settings,
@@ -127,87 +111,6 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
                 source_responsibility_refs=["weather"],
                 evidence_refs=["weather-evidence"],
             )
-
-    def test_truth_certificate_projects_decision_from_complete_flag_vector(self) -> None:
-        fields = {
-            "has_unverified_result_or_completion_claim": False,
-            "has_ungrounded_method_or_world_claim": False,
-            "has_semantic_perspective_contradiction": False,
-            "has_epistemic_strength_contradiction": False,
-            "has_execution_status_contradiction": False,
-            "has_out_of_scope_goal_claim": False,
-        }
-
-        generic_reject = FastPlannerFirstResponseTruthCertificate.model_validate(
-            {**fields, "decision": "reject"}
-        )
-        contradictory_accept = FastPlannerFirstResponseTruthCertificate.model_validate(
-            {
-                **fields,
-                "has_execution_status_contradiction": True,
-                "decision": "accept",
-            }
-        )
-
-        self.assertEqual(generic_reject.decision, "accept")
-        self.assertEqual(contradictory_accept.decision, "reject")
-
-    def test_truth_certificate_requires_every_model_facing_audit_field(self) -> None:
-        with self.assertRaisesRegex(ValidationError, "Field required"):
-            FastPlannerFirstResponseTruthCertificate.model_validate(
-                {"has_execution_status_contradiction": True}
-            )
-
-    def test_truth_certificate_decoder_schema_requires_flat_complete_payload(self) -> None:
-        schema = fast_truth_certificate_response_schema()
-        Draft202012Validator.check_schema(schema)
-        validator = Draft202012Validator(schema)
-        fields = {
-            "has_unverified_result_or_completion_claim": False,
-            "has_ungrounded_method_or_world_claim": False,
-            "has_semantic_perspective_contradiction": False,
-            "has_epistemic_strength_contradiction": False,
-            "has_execution_status_contradiction": False,
-            "has_out_of_scope_goal_claim": False,
-        }
-
-        self.assertEqual(
-            list(validator.iter_errors({**fields, "decision": "accept"})),
-            [],
-        )
-        self.assertEqual(
-            list(
-                validator.iter_errors(
-                    {
-                        **fields,
-                        "has_execution_status_contradiction": True,
-                        "decision": "reject",
-                    }
-                )
-            ),
-            [],
-        )
-        self.assertNotEqual(
-            list(
-                validator.iter_errors(
-                    {"has_execution_status_contradiction": True}
-                )
-            ),
-            [],
-        )
-        self.assertNotIn("oneOf", schema)
-        self.assertNotIn("anyOf", schema)
-
-        # The complete flag vector owns the semantic judgment; the opposite
-        # redundant decision is projected after constrained decoding.
-        certificate = FastPlannerFirstResponseTruthCertificate.model_validate(
-            {
-                **fields,
-                "has_execution_status_contradiction": True,
-                "decision": "accept",
-            }
-        )
-        self.assertEqual(certificate.decision, "reject")
 
     def test_post_evidence_response_requires_exact_evidence_refs(self) -> None:
         with self.assertRaises(ValidationError):

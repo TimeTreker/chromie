@@ -237,7 +237,11 @@ scenarios/{args.suite}/<id>.json
 
 Then validate and run:
 python scripts/scenario_author.py validate-all --suite {args.suite}
-Add representative cases to scenarios/general_ability_acceptance.json.
+When the scenario protects a general ability, declare that membership in this
+file's `general_ability.memberships`. For a live-text case, create one
+self-describing file under
+scenarios/general_ability/<must_pass|core|challenge>/<ability_class>/; there is
+no central index to update.
 python scripts/general_ability_acceptance.py --mode check --no-write
 python scripts/general_ability_acceptance.py --mode level-a --no-write
 """

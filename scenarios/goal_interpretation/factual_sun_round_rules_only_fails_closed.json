@@ -56,5 +56,21 @@
         "output_mode": "information"
       }
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "A factual agreement question remains provider-neutral conversation.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

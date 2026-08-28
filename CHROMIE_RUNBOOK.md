@@ -463,7 +463,7 @@ The complete ordered procedure, review files, second-machine LAN probe, and
 physical profile are owned by
 [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). For Phase 6, initialize
 `--profile current_revision_qualification`; that profile additionally requires the canonical
-source report, the manifest-owned executed/full-assertion interaction set, and the live
+source report, the directory-discovered executed/full-assertion interaction set, and the live
 provider fault matrix on the same clean revision. Do not combine unrelated smoke logs into a
 stronger target claim.
 

@@ -925,66 +925,6 @@ def validate_resource_responsibility_capability_grounding(
             message + "; no supplied Capability set declares the missing resource coverage"
         )
 
-def coordinated_action_goal_ids(
-    authoritative_goals: list[dict[str, Any]],
-) -> set[str]:
-    """Return model-authored provider Goals requiring semantic coverage audit.
-
-    Goal Association preserves provider-neutral output modality and authors any
-    ``action_list`` binding or sibling Goal split. The Host uses only those typed
-    WHAT facts to require an independent model completeness audit; it does not infer
-    actions, parse user wording, or select Capabilities. Auditing effectful Goals
-    prevents a generic movement step from being accepted as object handling and
-    prevents a domain-specific read Capability from being broadened into unrelated
-    external retrieval.
-    """
-
-    goal_ids: set[str] = set()
-    source_groups: dict[str, set[str]] = {}
-    for goal in authoritative_goals:
-        if not isinstance(goal, dict):
-            continue
-        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-        if not goal_id:
-            continue
-        source_text = " ".join(str(goal.get("source_text") or "").strip().split())
-        if source_text:
-            source_groups.setdefault(source_text, set()).add(goal_id)
-        metadata = goal.get("metadata")
-        output_mode = (
-            " ".join(str(metadata.get("output_mode") or "").strip().split())
-            if isinstance(metadata, dict)
-            else ""
-        )
-        if output_mode in {"body_action", "media_playback"}:
-            goal_ids.add(goal_id)
-        resource_responsibility = goal.get("resource_responsibility")
-        if isinstance(resource_responsibility, dict) and resource_responsibility:
-            goal_ids.add(goal_id)
-        goal_object = goal.get("object")
-        if not isinstance(goal_object, dict):
-            continue
-        bindings = goal_object.get("bindings")
-        if not isinstance(bindings, dict):
-            continue
-        if any(
-            isinstance(binding, dict)
-            and "_".join(
-                str(binding.get("entity_type") or "").strip().casefold().replace("-", "_").split()
-            )
-            == "action_list"
-            for binding in bindings.values()
-        ):
-            goal_ids.add(goal_id)
-    for grouped_ids in source_groups.values():
-        # Three or more independently observable responsibilities from one
-        # model-segmented utterance cross the bounded-complexity threshold even
-        # when no one Goal owns an action_list binding. Two ordinary sibling
-        # Goals remain on the normal per-goal contract path.
-        if len(grouped_ids) >= 3:
-            goal_ids.update(grouped_ids)
-    return goal_ids
-
 def parallel_activity_contract_errors(
     activities: list[Any],
     capabilities: list[dict[str, Any]],

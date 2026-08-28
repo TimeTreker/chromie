@@ -111,33 +111,17 @@ authorization, confirmation, safety, privacy, resource and concurrency contracts
 apply. An internal opportunity is never user confirmation.
 
 The re-entry tries Fast Planner first and may use the existing HOW escalation to Deep
-Planner. The terminal response candidate from either tier is accepted only after the
-same Planner-owned immutable truth qualification checks Evidence scope, epistemic
-strength, and execution status. In particular, a probability strictly between 0% and
-100% cannot support categorical “will” or “will not” wording. Qualification rejection
-does not authorize Host rewriting and fails closed with no speculative speech. An exact
-past-tense claim for the scoped source-Plan effect is execution-consistent only when the
-trusted outcome marks that Goal complete and any required completion qualification is
-established; source-Plan `execute` disposition alone is never current-status evidence.
-The qualification DTO is internally closed: `accept` requires every violation flag to
-be false, while `reject` requires at least one specific violation flag to be true. The
-six required model-authored flags are the semantic judgments; trusted code mechanically
-projects the required `decision` field from that complete vector when a provider emits
-the opposite redundant enum. It never supplies a missing flag or makes a truth judgment.
-This
-prevents an ungrounded generic rejection from masquerading as a completed audit without
-granting the Host authority to interpret or rewrite Planner language. Every flag and the
-decision are required in model output; Python defaults may not silently complete a
-partial certificate. The provider-facing decoder grammar is deliberately a flat object
-with those seven required fields; the decision/flag consistency rule and redundant
-aggregate projection are enforced by the authoritative typed DTO after decoding. This
-avoids provider-specific composition-branch
-decoding that can omit required sibling fields without weakening or locally repairing the
-certificate. The auditor receives only the source step/argument/Goal projection,
-not historical Plan disposition, selected skills, or other planning state. Execution
-status means whether Chromie/provider performed that source step; tense inside an
-Evidence-owned world proposition (for example whether forecast rain will happen) is
-audited against Evidence and epistemic strength, not against lookup completion.
+Planner. The terminal response candidate from either tier must preserve Evidence scope,
+epistemic strength, execution status, perspective, and sibling-Goal boundaries in that
+tier's primary result. In particular, a probability strictly between 0% and 100% cannot
+support categorical “will” or “will not” wording. An exact past-tense claim for the
+scoped source-Plan effect is execution-consistent only when the trusted outcome marks
+that Goal complete and any required completion qualification is established; source-
+Plan `execute` disposition alone is never current-status evidence. The primary Planner
+prompt, per-Goal outcomes/satisfaction, constrained schema, and deterministic Evidence/
+provenance validation own this boundary. No second model qualifies, reviews, or rewrites
+the response. A violation is retained as primary-result quality evidence and fixed at
+the primary prompt/schema/model boundary rather than by adding a same-owner audit chain.
 
 ## Failure behavior
 

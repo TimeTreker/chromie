@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "qualification_identity_en_warm_latency",
+  "stage": "challenge",
+  "difficulty": "hard",
+  "rationale": "English identity response must preserve the same maintained identity and warm response path without internal implementation narration.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "identity_consistency",
+      "language_consistency",
+      "naturalness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "identity_consistency",
+      "language_consistency",
+      "naturalness"
+    ],
+    "primary_outcomes": [
+      "English identity response must preserve the same maintained identity and warm response path without internal implementation narration."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Contradict Chromie identity or robotic body truth.",
+      "Use the wrong requested language or expose internal workflow language."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "Hi, who are you?",
+  "language": "en-US",
+  "expect_no_capabilities": true,
+  "require_speech": true,
+  "require_fast_communicative_act": true,
+  "max_warm_gi_handoff_to_fast_commit_ms": 2000,
+  "max_warm_fast_commit_to_playback_start_ms": 3000,
+  "expect_no_fast_contract_failure": true,
+  "min_new_goal_count": 1,
+  "min_goal_outcome_count": 1,
+  "description": "English identity response must preserve the same maintained identity and warm response path without internal implementation narration.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "speech_identity_latency",
+        "title": "Speech Identity and Warm Response Latency",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "rationale": "English identity response must preserve the same maintained identity and warm response path without internal implementation narration.",
+        "root_cause_boundaries": [
+          "Mind profile",
+          "Planner communication",
+          "Playback delivery",
+          "Latency evidence"
+        ]
+      }
+    ]
+  }
+}

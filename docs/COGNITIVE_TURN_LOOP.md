@@ -216,11 +216,11 @@ Fast Planner is the first HOW owner. It must not be implemented as a greeting/we
 phrase rule, route shortcut, or second semantic authority.
 
 One validated GI result first enters Fast Planner's bounded first-response phase. It
-may author one immediately realizable Communicative Act. One bounded same-owner
-Epistemic Qualification then accepts or rejects that immutable Act against the current
-truth stage and admitted Evidence. It cannot rewrite, repair, retry, choose another Act,
-or affect Goal/Capability decisions; failure is silence for this phase. After that
-decision, Fast Advance cannot author or salvage substitute progress wording, and the same Fast Planner's
+may author one immediately realizable Communicative Act whose primary result contains
+the exact truth stage, grounding/provenance, and wording needed for trusted mechanical
+validation. No second same-owner model qualifies, reviews, or repairs that decision;
+primary-result rejection is silence for this phase. After that decision, Fast Advance
+cannot author or salvage substitute progress wording, and the same Fast Planner's
 remaining Activity planning and Goal Association fan out concurrently from the
 unchanged GI result. Both branches also retain the immutable admitted UserTurn as source
 evidence; the GI Responsibility is a structured projection over that source, not a
@@ -334,8 +334,7 @@ Goal Interpretation
       relationship: new/reference existing dinner Goal as context
 
 Fast Planner first response
-  `-- authored speaking Activity: prospective progress
-        `-- same-owner truth qualification: accept or reject only
+  `-- one primary authored speaking Activity with prospective truth/provenance
 
 concurrent continuation
   |-- same Fast Planner
@@ -829,12 +828,9 @@ independently turn the same terminal Evidence back into a requirement to repeat 
 completed Work. Planner, not a deterministic or model-backed post-execution composer,
 owns the human-relevant answer/follow-up/silence decision and exact wording. It cannot
 treat the result as a new user turn, reassign it to another Goal, or add execution
-authority. Before Runtime
-commits an answer, one bounded same-owner Epistemic Qualification accepts or rejects
-the immutable wording against the exact Goal/Evidence snapshot. It cannot rewrite the
-answer; rejection or unavailability delegates once through the existing Deep-Planner
-path or fails closed. The Host only validates provenance, structured claim boundaries,
-and delivery.
+authority. The Fast or Deep primary result owns its exact Goal/Evidence interpretation
+and wording. No second model qualifies or repairs that semantic decision. The Host only
+validates provenance, structured claim boundaries, and delivery.
 
 The final response must:
 

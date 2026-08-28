@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "polite_walk_three_seconds",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "A polite request remains a concrete three-second walking command; politeness must not hide the action or its duration.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["intent_understanding", "constraint_preservation"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "constraint_preservation"],
+    "primary_outcomes": [
+      "Understand the polite utterance as one forward-walk request and preserve the explicit three-second duration."
+    ],
+    "acceptable_auxiliary": [
+      "Natural acknowledgement may vary and may be omitted when the runtime contract does not require speech."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Treat politeness as non-actionable small talk.",
+      "Drop or change the requested duration.",
+      "Invent another body action."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "麻烦你往前走三秒，谢谢。",
+  "language": "zh-CN",
+  "expected_capabilities": ["soridormi.walk_forward"],
+  "expected_args": ["0:duration_s=3.0"],
+  "require_speech": false,
+  "description": "Common polite wording should preserve a concrete walking request.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "A polite request remains a concrete three-second walking command; politeness must not hide the action or its duration.",
+        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/goal interpretation", "Agent contract", "Test evidence"]
+      }
+    ]
+  }
+}

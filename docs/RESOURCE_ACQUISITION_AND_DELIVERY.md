@@ -245,10 +245,11 @@ The acquisition and its evidence-dependent explanation also stay one semantic re
 Goal Association must not duplicate one information request into one capability Goal that
 retrieves evidence and another capability Goal whose only purpose is to answer from that same
 evidence. Host-bound Evidence reactivates Fast Planner for natural delivery after
-acquisition. If a model promotes an evidence-dependent answer into another provider-required Goal with no
-independent bindings/resource contract, the bounded coverage proof rejects that
-candidate set and permits one fresh interpretation from the authoritative user
-turn rather than allowing duplicate provider calls.
+acquisition. The GA primary result must represent that responsibility once. If it
+promotes an evidence-dependent answer into another provider-required Goal with no
+independent bindings/resource contract, trusted Responsibility-conservation and
+resource validation reject the transaction terminally. No coverage reviewer or fresh
+interpretation may rewrite the primary result or permit duplicate provider calls.
 
 Separate Goals are still required for independently requested outcomes. For
 example, “bring the book and tell me a joke” contains one physical resource Goal

@@ -113,109 +113,6 @@ def first_response_target_goal_grounding(
     return result
 
 
-def fast_first_response_truth_system_prompt() -> str:
-    return (
-        "Classify one immutable Fast Planner sentence; do not rewrite it. Return "
-        "only the audit fields required by the JSON schema. Set each violation "
-        "flag explicitly, then accept only when all are false. Before action or Evidence, a "
-        "present acknowledgement or future intention is supported, while an "
-        "already-started/completed action, result, invented method, or invented fact is "
-        "not. A generic prospective statement that Chromie will check is method-neutral, "
-        "but saying she will go somewhere, look in a direction, use a device/sensor, or "
-        "otherwise naming how she will check is a concrete method claim. Before Work is "
-        "selected, that method must be present in authoritative Responsibility/context; "
-        "otherwise set has_ungrounded_method_or_world_claim=true. For pre_evidence "
-        "information checks, distinguish grammar explicitly: "
-        "an equivalent of 'I'll check' or '我来查一下' is prospective; an equivalent "
-        "of 'I checked', '我查过/我查了一下', followed by an answer assertion is past "
-        "acquisition plus a result and must set "
-        "has_unverified_result_or_completion_claim=true. An onset or progressive predicate saying execution starts, has "
-        "started, or is underway is an already-started claim even when an immediacy "
-        "marker appears before it. Resolve grammatical roles: in a human command addressed to Chromie, "
-        "Chromie is the commanded actor. Chromie's first-person subject is the "
-        "correct actor; the user's second-person command does not make that reply "
-        "a perspective contradiction. A reply telling the human to do Chromie's "
-        "action does. Wording that says Chromie will accompany the human, act together "
-        "with them, or otherwise makes the human a co-participant is also a perspective "
-        "contradiction unless the Responsibility explicitly requests joint participation. "
-        "Never choose a Capability or change Goal meaning."
-    )
-
-
-def fast_first_response_truth_prompt(
-    request: CognitiveWorkRequest,
-    *,
-    activity: Any,
-    responsibilities: list[CognitiveResponsibilityProposal],
-    trusted_evidence: list[Any],
-) -> LayeredPrompt:
-    contract = (
-        "Judge the exact immutable activity.text, not its label. At pre_evidence, "
-        "a present acknowledgement or prospective intention is valid; future-oriented "
-        "grammar may announce intended checking or action without claiming execution. "
-        "Onset, progressive, perfect, completion, and result predicates claim a later "
-        "truth stage and must be rejected when that stage is not established. For an "
-        "information check, an equivalent of 'I'll check'/'我来查一下' is prospective; "
-        "an equivalent of 'I checked'/'我查过/我查了一下' plus an answer proposition "
-        "is retrospective Evidence acquisition and an unverified result. "
-        "Reject only when the sentence contains an unverified result, changed-world "
-        "claim, already-started/completed claim, or when it invents a physical "
-        "instrument, source, sensor, observation, action, personal fact, or world "
-        "fact absent from Responsibility/context; never say Chromie will "
-        "look at a phone, camera, or look outside or use direct perception unless "
-        "supplied. Also reject a real speaker, experiencer, actor, addressee, "
-        "polarity, referent, or semantic relationship reversal. The sentence "
-        "must preserve each authoritative Responsibility's concrete outcome and "
-        "relationship. In particular, relationship=continue must sound like "
-        "continuing or resuming the resolved work rather than starting it as a "
-        "new action, and it must not fall back to a generic thing, matter, or "
-        "action after the target meaning is supplied. "
-        "For a command addressed to Chromie, first-person self-reference may be the "
-        "correct actor; reject only when the wording actually assigns Chromie's owed "
-        "action to the human or otherwise reverses the grounded semantic roles. Reject "
-        "unrequested joint-participation wording such as accompanying the human or acting "
-        "together with them when only Chromie's action was requested. "
-        "A human's feeling must remain the human's, and repeating Chromie's last utterance "
-        "must use the supplied assistant utterance. A progress question that asks "
-        "the human to supply or reconfirm information without an InformationGap "
-        "also reverses responsibility. For context_grounded text, reject invented "
-        "facts; for post_evidence text, require cited Evidence. Set each of the "
-        "audit flags explicitly. A missing continue/resume relationship in "
-        "wording for relationship=continue is a semantic-perspective contradiction. "
-        "Accept when none applies; otherwise reject. Never supply replacement wording."
-    )
-    rendered = (
-        contract
-        + "\n\nImmutable Communicative Activity JSON:\n"
-        + json.dumps(
-            activity.model_dump(mode="json", exclude_none=True),
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        + "\n\nAuthoritative Responsibility evidence JSON:\n"
-        + bounded_json(
-            [
-                item.model_dump(mode="json", exclude_none=True)
-                for item in responsibilities
-            ],
-            3000,
-        )
-        + "\n\nAdmitted trusted Evidence JSON:\n"
-        + bounded_json(trusted_evidence, 2200)
-        + "\n\nBounded Interaction Context JSON:\n"
-        + bounded_json(
-            (request.context or {}).get("interaction_context") or {}, 900
-        )
-        + "\n\nCurrent user turn (context only, never external-result Evidence):\n"
-        + str(request.original_user_text or "")[:700]
-    )
-    return LayeredPrompt.promote(
-        rendered,
-        operating_contract=(contract,),
-    )
-
-
 def fast_first_response_system_prompt() -> str:
     return (
         "You are Chromie's low-latency Fast Planner deciding whether there is one "
@@ -354,7 +251,8 @@ def fast_first_response_prompt(
         "true if no checking/execution has started and no result exists. If "
         "activity omits progress_kind as a complete conversational response, its "
         "content must already be supported by supplied trusted context. If neither "
-        "is useful, return activity=null."
+        "is useful, return activity=null. This primary result is the complete "
+        "Fast Planner decision; no later model will review or repair its meaning."
     )
     return LayeredPrompt.promote(
         rendered,
@@ -569,7 +467,7 @@ def fast_plan_prompt(
             "goal_satisfaction and every per-goal satisfaction are model judgments about prospective plan adequacy. A score from 0.95 through 1.0 requires status=exact. Escalation cannot claim exact satisfaction and therefore every escalation satisfaction score must be below 0.95. "
             "Generic response transport is not a task-plan step, so chromie.speak is never a plan step. Do not replace a conversational answer with a gesture or attention action. "
             "Use plan_relation=exact unless the plan materially changes the request; safe_adjustment or alternative requires user_confirmation_required=true and explanatory response_text. "
-            "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. Return JSON only.\n\n"
+            "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. This primary result must contain complete per-Goal coverage, exact response truth, step ownership, satisfaction, and unresolved-work decisions; no later model will audit or repair its semantics. Return JSON only.\n\n"
             f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
             f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
             f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
@@ -623,7 +521,7 @@ def fast_plan_prompt(
         "When an existing Goal should become cognitively ready at a known future wall-clock time, author time_conditions with that exact canonical goal_id and due_at_ms. Use time_conditions only for future readiness; never encode timers as fake executable capabilities, response text, or Host-parsed Goal prose. "
         "The Ollama decoder enforces the exact flat FastPlannerModelOutput schema out-of-band. "
         "The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. "
-        "Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
+        "This primary result must contain complete per-Goal coverage, exact response truth, step ownership, satisfaction, and unresolved-work decisions; no later model will audit or repair its semantics. Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
         f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
         f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
         f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
@@ -801,7 +699,10 @@ def fast_advance_layered_prompt(
         "Never claim execution or external results before Evidence.\n\n"
         "Validation errors from the prior Fast Plan, if any:\n"
         + (validation_errors or "[]")
-        + "\nReturn one fresh complete schema-constrained JSON object only."
+        + "\nThis primary result must contain the complete per-Goal coverage, exact "
+        "response truth, step ownership, satisfaction, and unresolved-work decision; "
+        "no later model will audit or repair its semantics. Return one fresh complete "
+        "schema-constrained JSON object only."
     )
     return LayeredPrompt.promote(
         rendered,
@@ -1354,7 +1255,11 @@ def deep_system_prompt() -> str:
     return (
         "You are Chromie's Deep Planner. Plan only the final authoritative user turn and canonical goals supplied at the end of the prompt. "
         "A same-tier regeneration is allowed only once for a mechanically malformed DTO; semantic rejection is terminal. You never call or return to the Fast Planner. "
-        "Capabilities are plan leaves, not planner ownership boundaries. Do not execute, authorize, or claim completion. Return JSON only."
+        "Capabilities are plan leaves, not planner ownership boundaries. This primary "
+        "result must contain the complete per-Goal coverage, exact response truth, "
+        "step ownership, satisfaction, and unresolved-work decision; no later model "
+        "will audit or repair its semantics. Do not execute, authorize, or claim "
+        "completion. Return JSON only."
     )
 
 

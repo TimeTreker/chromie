@@ -11,7 +11,7 @@ python -m benchmarks.scenarios check
 python -m benchmarks.scenarios run --suite dialogue --no-write
 ```
 
-Run behavior-quality gates through the retained general ability manifest:
+Run behavior-quality gates through the discovered general-ability scenario library:
 
 ```bash
 python scripts/general_ability_acceptance.py --mode check
@@ -61,6 +61,7 @@ scenarios/
   dialogue/         Multi-turn InteractionRuntime conversation scenarios
   cognitive_runtime/ Goal-driven planning and coordinated-response scenarios
   cognitive_turn_loop/ Deterministic outcome-closure and cancellation scenarios
+  general_ability/ Self-describing staged live-text scenarios
   templates/        Authoring templates, not executed as scenarios
 ```
 
@@ -113,13 +114,20 @@ final Goal Interpretation decision through the dependency-light native Interacti
 and assert emitted skills and arguments. This is deterministic Level A replay,
 not a live-model, microphone, simulator, or robot claim.
 
-## General ability acceptance manifest
+## General ability scenario library
 
-[`general_ability_acceptance.json`](general_ability_acceptance.json) groups
-representative scenarios by the broader robot ability they protect. It is not a
-scenario file itself and is not loaded by `scripts/scenario_runner.py`.
+There is no central general-ability index. Live scenarios are discovered under
+`general_ability/<must_pass|core|challenge>/<ability-class>/`; every file owns
+its stage, difficulty, ability membership, hybrid oracle, and review metadata.
+Optional scenario-local `provenance` records authoring origin, batch id, and
+whether the case was derived from an existing scenario. When present, the runner
+validates those fields and retains them in live summaries and semantic-review
+bundles; it never changes the verdict or creates a central registry.
+Maintained Level-A scenarios in the deterministic suites declare their own
+`general_ability.memberships`, including multi-ability membership where needed.
+Counts and ability-class reports are derived from those files.
 
-Run the manifest-level checks with:
+Run the directory and metadata checks with:
 
 ```bash
 python scripts/general_ability_acceptance.py --mode check

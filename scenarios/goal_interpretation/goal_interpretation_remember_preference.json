@@ -59,5 +59,21 @@
   },
   "provenance": {
     "legacy_scenario_id": "remember_preference"
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "A memory request remains a semantic Responsibility, not a Capability choice.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

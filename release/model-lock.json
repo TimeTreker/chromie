@@ -20,7 +20,8 @@
       "qwen3:4b",
       "qwen3:8b",
       "qwen3:4b-instruct-2507-q4_K_M",
-      "qwen3.5:9b"
+      "qwen3.5:9b",
+      "gemma4:12b"
     ]
   },
   "schema_version": 2,

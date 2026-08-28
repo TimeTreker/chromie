@@ -44,13 +44,6 @@ from shared.chromie_contracts.reflex import (
     CancellationScope,
 )
 
-from .capability_runtime_backend import (
-    CapabilityRuntimeBackend,
-    CapabilityRuntimeBackendHandle,
-    InProcessAsyncioBackend,
-)
-
-
 def schema_valid_completion_evidence_policy(
     *,
     claim: str = "capability request completed",
@@ -150,7 +143,6 @@ class CapabilityDefinition(CapabilityIdentityModel):
     # the configured playback-start barrier so Runtime cannot orphan synthesis.
     timeout_ms: int = Field(default=30000, ge=1, le=300000)
     idempotent: bool = False
-    durable_runtime_eligible: bool = False
     requires_safety_monitor: bool = False
     cancellation_domains: tuple[CancellationDomain, ...] = ()
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -398,12 +390,10 @@ class CapabilityRuntime:
         *,
         max_concurrency: int = 8,
         resource_arbiter: ResourceArbiter | None = None,
-        backend: CapabilityRuntimeBackend | None = None,
     ) -> None:
         self.registry = registry
         self._providers: dict[str, CapabilityProvider] = {}
         self._resource_arbiter = resource_arbiter or ResourceArbiter(max_concurrency)
-        self._backend: CapabilityRuntimeBackend = backend or InProcessAsyncioBackend()
         self._active: dict[
             tuple[str, str],
             tuple[
@@ -416,7 +406,7 @@ class CapabilityRuntime:
         self._active_lock = asyncio.Lock()
         self._open_interactions: set[str] = set()
         self._executing_interactions: set[str] = set()
-        self._submissions: dict[str, CapabilityRuntimeBackendHandle] = {}
+        self._submissions: dict[str, asyncio.Task[CapabilityRuntimeResult]] = {}
         self._dispatch_interactions: dict[str, str] = {}
         self._interaction_dispatch_ids: dict[str, str] = {}
         self._event_sequence = 0
@@ -773,7 +763,7 @@ class CapabilityRuntime:
         event_cursor = self._event_sequence
         execution_registered = False
         start_gate = asyncio.Event()
-        backend_handle: CapabilityRuntimeBackendHandle | None = None
+        submission_task: asyncio.Task[CapabilityRuntimeResult] | None = None
         try:
             async with self._active_lock:
                 if response.interaction_id in self._executing_interactions:
@@ -791,8 +781,8 @@ class CapabilityRuntime:
                 interaction_scheduled.update(
                     {request.request_id: (request, definition) for request, definition in validated}
                 )
-                backend_handle = self._backend.start_submission(
-                    lambda: self._run_submission(
+                submission_task = asyncio.create_task(
+                    self._run_submission(
                         response.interaction_id,
                         validated,
                         authorization,
@@ -801,7 +791,7 @@ class CapabilityRuntime:
                     ),
                     name=f"capability-dispatch:{response.interaction_id}:{dispatch_id}",
                 )
-                self._submissions[dispatch_id] = backend_handle
+                self._submissions[dispatch_id] = submission_task
                 self._dispatch_interactions[dispatch_id] = response.interaction_id
 
             for request, definition in validated:
@@ -814,8 +804,8 @@ class CapabilityRuntime:
                 )
             start_gate.set()
         except BaseException:
-            if backend_handle is not None:
-                self._backend.cancel_submission(backend_handle)
+            if submission_task is not None:
+                submission_task.cancel()
                 start_gate.set()
             if execution_registered:
                 async with self._active_lock:
@@ -844,8 +834,8 @@ class CapabilityRuntime:
 
         async with self._active_lock:
             interaction_id = self._dispatch_interactions.get(receipt.dispatch_id)
-            backend_handle = self._submissions.get(receipt.dispatch_id)
-        if interaction_id is None or backend_handle is None:
+            submission_task = self._submissions.get(receipt.dispatch_id)
+        if interaction_id is None or submission_task is None:
             raise ValueError(f"unknown or already-consumed dispatch_id={receipt.dispatch_id!r}")
         if interaction_id != receipt.interaction_id:
             raise ValueError(
@@ -853,19 +843,16 @@ class CapabilityRuntime:
                 f"registered={interaction_id!r} receipt={receipt.interaction_id!r}"
             )
         try:
-            result = await self._backend.wait_submission(backend_handle)
+            result = await submission_task
             if not isinstance(result, CapabilityRuntimeResult):
-                raise TypeError(
-                    "Capability Runtime backend returned a non-CapabilityRuntimeResult"
-                )
+                raise TypeError("Capability Runtime submission returned a non-CapabilityRuntimeResult")
             return result
         finally:
-            if self._backend.submission_done(backend_handle):
+            if submission_task.done():
                 async with self._active_lock:
-                    if self._submissions.get(receipt.dispatch_id) == backend_handle:
+                    if self._submissions.get(receipt.dispatch_id) is submission_task:
                         self._submissions.pop(receipt.dispatch_id, None)
                         self._dispatch_interactions.pop(receipt.dispatch_id, None)
-                        self._backend.release_submission(backend_handle)
 
     async def _run_submission(
         self,

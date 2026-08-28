@@ -460,42 +460,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "satisfied_goal_ids": ["goal-info"],
             },
         }
-        ollama = SequencedOllama(
-            [
-                raw,
-                {
-                    "has_unverified_result_or_completion_claim": False,
-                    "has_ungrounded_method_or_world_claim": False,
-                    "has_semantic_perspective_contradiction": False,
-                    "has_epistemic_strength_contradiction": False,
-                    "has_execution_status_contradiction": False,
-                    "has_out_of_scope_goal_claim": False,
-                    "decision": "accept",
-                },
-            ]
-        )
+        ollama = SequencedOllama([raw])
 
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.response_text, "The current state is available.")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(
-            ollama.prompts[1][1]["prompt_family"],
-            "deep_planner.evidence_response.truth_check",
-        )
-        self.assertEqual(
-            plan.metadata["evidence_response_truth_qualification"],
-            {
-                "has_unverified_result_or_completion_claim": False,
-                "has_ungrounded_method_or_world_claim": False,
-                "has_semantic_perspective_contradiction": False,
-                "has_epistemic_strength_contradiction": False,
-                "has_execution_status_contradiction": False,
-                "has_out_of_scope_goal_claim": False,
-                "decision": "accept",
-            },
-        )
+        self.assertEqual(len(ollama.prompts), 1)
         prompt = str(ollama.prompts[0][0])
         self.assertIn(
             "trusted terminal-Evidence Planner re-entry, not a new user turn",
@@ -510,89 +481,17 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "describe that exact source-Plan effect as completed",
             prompt,
         )
+        self.assertIn("never describe it as future, starting, or ongoing", prompt)
+        self.assertIn("no later model will audit or repair its semantics", planner_prompt.deep_system_prompt())
         schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("respond", schema["properties"]["disposition"].get("enum", []))
         self.assertGreater(schema["properties"]["steps"].get("maxItems", 0), 0)
 
-    def test_terminal_evidence_reentry_deep_response_fails_closed_when_truth_rejected(self):
-        data = {"aggregate_status": "completed"}
-        run_request = request("Walk forward.", goal_ids=["goal-walk"])
-        goal = run_request.context["goal_association_resolution"]["new_goals"][0]
-        goal["metadata"] = {"output_mode": "body_action"}
-        run_request.context["result_evidence_reentry"] = {
-            "source_goal_ids": ["goal-walk"],
-            "evidence_refs": ["evidence-walk"],
-        }
-        run_request.context["trusted_terminal_evidence"] = [
-            {
-                "evidence_id": "evidence-walk",
-                "tool_id": "soridormi.walk_forward",
-                "status": "completed",
-                "data": data,
-                "output_sha256": canonical_value_sha256(data),
-            }
-        ]
-        run_request.context["trusted_execution_outcome"] = {
-            "aggregate_status": "completed",
-            "goal_outcomes": [
-                {
-                    "goal_id": "goal-walk",
-                    "status": "completed",
-                    "evidence_ids": ["evidence-walk"],
-                }
-            ],
-        }
-        raw = {
-            "disposition": "respond",
-            "coverage": "complete",
-            "confidence": 1.0,
-            "goal_summary": "Report completed work.",
-            "response_text": "I will walk forward now.",
-            "steps": [],
-            "goal_outcomes": {
-                "goal-walk": {
-                    "disposition": "respond",
-                    "coverage": "complete",
-                    "response_text": "I will walk forward now.",
-                    "step_ids": [],
-                }
-            },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-walk"],
-            },
-        }
-        ollama = SequencedOllama(
-            [
-                raw,
-                {
-                    "has_unverified_result_or_completion_claim": False,
-                    "has_ungrounded_method_or_world_claim": False,
-                    "has_semantic_perspective_contradiction": False,
-                    "has_epistemic_strength_contradiction": False,
-                    "has_execution_status_contradiction": True,
-                    "has_out_of_scope_goal_claim": False,
-                    "decision": "reject",
-                },
-            ]
-        )
+    def test_deep_primary_contract_owns_terminal_response_truth(self):
+        prompt = planner_prompt.deep_system_prompt()
 
-        plan = asyncio.run(
-            DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request)
-        )
-
-        self.assertEqual(plan.disposition, "clarify")
-        self.assertEqual(plan.response_text, "")
-        self.assertEqual(
-            plan.metadata["reason"],
-            "deep_planner_evidence_response_truth_rejected",
-        )
-        self.assertTrue(
-            plan.metadata["evidence_response_truth_qualification"][
-                "has_execution_status_contradiction"
-            ]
-        )
+        self.assertIn("exact response truth", prompt)
+        self.assertIn("no later model will audit or repair its semantics", prompt)
 
     def test_canonical_body_goal_is_planned_from_goal_state(self):
         raw = {
@@ -648,13 +547,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         goal["metadata"] = {
             "output_mode": "body_action",
         }
-        coverage_review = {
-            "decision": "accept",
-            "confidence": 1.0,
-            "uncovered_requirements": [],
-            "reason": "The exact blink capability completely covers the canonical body Goal.",
-        }
-        ollama = SequencedOllama([raw, coverage_review])
+        ollama = SequencedOllama([raw])
 
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
@@ -884,18 +777,9 @@ class DeepPlannerResolverTests(unittest.TestCase):
             ],
         }
 
-        coverage_review = {
-            "decision": "accept",
-            "confidence": 1.0,
-            "uncovered_requirements": [],
-            "reason": (
-                "The advertised acquire and delivery steps jointly cover the "
-                "resource responsibility."
-            ),
-        }
         plan = asyncio.run(
             DeepPlannerResolver(
-                SequencedOllama([raw, coverage_review]),
+                SequencedOllama([raw]),
                 GranularResourceCatalog(),
             ).resolve(run_request.model_copy(update={"context": context}))
         )
@@ -1479,108 +1363,14 @@ class DeepPlannerResolverTests(unittest.TestCase):
             all(outcome.satisfaction is None for outcome in plan.goal_outcomes)
         )
 
-    def test_coverage_review_receives_safe_adjustment_confirmation_contract(self):
-        from agent.app.planner_audit import review_coordinated_action_plan_coverage
+    def test_deep_primary_contract_owns_coverage_and_confirmation(self):
+        prompt = planner_prompt.deep_system_prompt()
 
-        goal_ids = ["goal-walk", "goal-blink", "goal-song"]
-        plan = CanonicalPlan(
-            plan_id="safe-adjustment",
-            planner_tier="deep",
-            disposition="mixed",
-            coverage="complete",
-            confidence=1.0,
-            goal_ids=goal_ids,
-            response_text="I can do those actions one after the other. Is that okay?",
-            steps=[
-                {
-                    "step_id": "walk",
-                    "capability_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 15},
-                    "timing": "sequential",
-                    "source_goal_ids": ["goal-walk"],
-                }
-            ],
-            goal_outcomes=[
-                {
-                    "goal_id": "goal-walk",
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["walk"],
-                },
-                {
-                    "goal_id": "goal-blink",
-                    "disposition": "unavailable",
-                    "coverage": "uncertain",
-                },
-                {
-                    "goal_id": "goal-song",
-                    "disposition": "respond",
-                    "coverage": "complete",
-                    "response_text": "La la la.",
-                },
-            ],
-            goal_satisfaction={
-                "score": 0.75,
-                "status": "substantial",
-                "satisfied_goal_ids": ["goal-walk", "goal-song"],
-                "unmet_goal_ids": ["goal-blink"],
-            },
-            metadata={
-                "plan_relation": "safe_adjustment",
-                "user_confirmation_required": True,
-            },
-        )
-        ollama = SequencedOllama(
-            [
-                {
-                    "decision": "accept",
-                    "confidence": 1.0,
-                    "uncovered_requirements": [],
-                    "reason": "The adjustment is explicit and confirmation-bound.",
-                }
-            ]
-        )
+        self.assertIn("complete per-Goal coverage", prompt)
+        self.assertIn("exact response truth", prompt)
+        self.assertIn("no later model will audit or repair its semantics", prompt)
 
-        review = asyncio.run(
-            review_coordinated_action_plan_coverage(
-                ollama,
-                request_text="Walk and blink together, and sing.",
-                language="en-US",
-                authoritative_goals=[{"goal_id": item} for item in goal_ids],
-                plan=plan,
-                capabilities=[],
-                num_ctx=4096,
-            )
-        )
-
-        self.assertEqual(review.decision, "accept")
-        self.assertEqual(ollama.prompts[0][1]["options"]["num_predict"], 4096)
-        prompt = ollama.prompts[0][0]
-        self.assertIn('"plan_relation":"safe_adjustment"', prompt)
-        self.assertIn('"user_confirmation_required":true', prompt)
-        self.assertIn("ordinary world knowledge", prompt)
-        self.assertIn("supplied Capability contracts", prompt)
-        self.assertIn("Do not broaden a Capability", prompt)
-        self.assertIn("confirmation-bound plan relation", prompt)
-        self.assertNotIn("walking is not running", prompt)
-        self.assertIn(
-            "coverage=complete on a mixed Plan",
-            prompt,
-        )
-        self.assertIn(
-            "source_text repeats the whole multi-effect turn",
-            prompt,
-        )
-        review_schema = ollama.prompts[0][1]["response_format"]
-        self.assertEqual(
-            review_schema["properties"]["uncovered_requirements"]["items"][
-                "maxLength"
-            ],
-            320,
-        )
-        self.assertEqual(review_schema["properties"]["reason"]["maxLength"], 600)
-
-    def test_semantic_coverage_rejection_is_terminal_without_deep_replan(self):
+    def test_semantic_primary_plan_has_one_model_call_budget(self):
         goal_ids = ["goal-walk", "goal-sing"]
         run_request = request(
             "Walk while singing.",
@@ -1676,26 +1466,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "user_confirmation_required": False,
             }
 
-        ollama = SequencedOllama(
-            [
-                mixed_plan(),
-                {
-                    "decision": "reject",
-                    "confidence": 1.0,
-                    "uncovered_requirements": [
-                        "The selected movement does not fully implement the body mode."
-                    ],
-                    "reason": "The body action needs semantic regeneration.",
-                },
-                mixed_plan(),
-                {
-                    "decision": "accept",
-                    "confidence": 1.0,
-                    "uncovered_requirements": [],
-                    "reason": "The unavailable Goal is explicit and remains unmet.",
-                },
-            ]
-        )
+        ollama = SequencedOllama([mixed_plan()])
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
@@ -1703,12 +1474,9 @@ class DeepPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(plan.disposition, "clarify")
-        self.assertEqual(plan.steps, [])
-        self.assertEqual(plan.metadata["reason"], "coordinated_action_coverage_incomplete")
-        self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertIn("The selected movement does not fully implement the body mode.", plan.unresolved)
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertIn("no later model will audit or repair its semantics", planner_prompt.deep_system_prompt())
 
     def test_full_catalog_exact_plan(self):
         raw = {"disposition":"execute","coverage":"complete","confidence":0.91,"goal_ids":["goal-action"],"goal_summary":"walk then blink","steps":[
@@ -1722,7 +1490,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(catalog.scopes, ["all"])
         self.assertEqual(plan.metadata["attempt_count"], 1)
 
-    def test_coordinated_action_review_rejection_is_terminal(self):
+    def test_coordinated_action_primary_plan_is_not_second_model_reviewed(self):
         partial = {
             "disposition": "execute",
             "coverage": "complete",
@@ -1739,18 +1507,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 }
             ],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
-        }
-        rejected = {
-            "decision": "reject",
-            "confidence": 1.0,
-            "uncovered_requirements": ["blinking", "singing"],
-            "reason": "The proposed Plan contains only walking.",
-        }
-        adjusted_partial = {
-            **partial,
-            "response_text": "I cannot verify parallel safety; may I walk first?",
-            "plan_relation": "safe_adjustment",
-            "user_confirmation_required": True,
         }
         run_request = request("Walk while blinking and singing.")
         context = dict(run_request.context)
@@ -1772,9 +1528,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 }
             ],
         }
-        ollama = SequencedOllama(
-            [partial, rejected, adjusted_partial, rejected]
-        )
+        ollama = SequencedOllama([partial])
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, FullCatalog(), max_contract_repairs=1).resolve(
@@ -1782,18 +1536,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(plan.disposition, "clarify")
-        self.assertEqual(plan.steps, [])
-        self.assertIn("blinking", plan.unresolved)
-        self.assertIn("singing", plan.unresolved)
-        self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertEqual(plan.metadata["reason"], "coordinated_action_coverage_incomplete")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "execute")
         self.assertIn(
             "Optional coordinated expression belongs to the separate Social Attention owner",
             ollama.prompts[0][0],
         )
-        self.assertIn("separate Social Attention owner", ollama.prompts[1][0])
+        self.assertIn("no later model will audit or repair its semantics", planner_prompt.deep_system_prompt())
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {"disposition":"execute","coverage":"complete","confidence":0.92,"goal_ids":["goal-action"],"steps":[
@@ -2211,17 +1960,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "rationale": "Body work is covered but singing is unavailable.",
             },
         }
-        coverage_review = {
-            "decision": "accept",
-            "confidence": 1.0,
-            "uncovered_requirements": [],
-            "reason": "Walking and blinking each have an exact owned step.",
-        }
         catalog = FullCatalog()
         catalog.items[0] = catalog.items[0].model_copy(
             update={"can_run_parallel": True}
         )
-        ollama = SequencedOllama([invalid, repaired, coverage_review])
+        ollama = SequencedOllama([invalid, repaired])
 
         plan = asyncio.run(
             DeepPlannerResolver(ollama, catalog, max_contract_repairs=1).resolve(

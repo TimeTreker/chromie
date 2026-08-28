@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
 from .clients.ollama_client import (
-    LayeredPrompt,
     OllamaClient,
     OllamaGenerationError,
     llm_failure_metadata,
@@ -28,7 +27,6 @@ from .planner_schema import (
     canonical_resource_argument_response_schema,
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
-    fast_truth_certificate_response_schema,
     fast_first_response_response_schema,
     fast_advance_revision_response_schema,
     fast_advance_response_schema,
@@ -36,11 +34,9 @@ from .planner_schema import (
 )
 from .planner_context import (
     fast_capability_payload,
-    gateway_speech_act,
     planner_goal_context,
 )
 from .planner_validation import (
-    coordinated_action_goal_ids,
     normalize_common_planner_output,
     qualify_planner_capability_payload,
     validate_explicit_numeric_parameter_grounding,
@@ -66,10 +62,6 @@ from .planner_fallback import (
     materialize_fast_advance_fail_safe,
     materialize_fast_escalation,
 )
-from .planner_audit import (
-    qualify_evidence_response_truth,
-    review_coordinated_action_plan_coverage,
-)
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
 except ImportError:  # pragma: no cover - repository development path
@@ -92,7 +84,6 @@ try:
         FastPlannerAdvanceModelOutput,
         FastPlannerFirstResponse,
         FastPlannerFirstResponseModelOutput,
-        FastPlannerFirstResponseTruthCertificate,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -102,12 +93,9 @@ except ImportError:  # pragma: no cover
         FastPlannerAdvanceModelOutput,
         FastPlannerFirstResponse,
         FastPlannerFirstResponseModelOutput,
-        FastPlannerFirstResponseTruthCertificate,
     )
 
 from .planner_prompt import (
-    fast_first_response_truth_system_prompt,
-    fast_first_response_truth_prompt,
     fast_first_response_system_prompt,
     fast_first_response_prompt,
     fast_advance_layered_prompt,
@@ -146,8 +134,6 @@ class FastPlannerResolver:
         *,
         first_response_ollama: OllamaClient | None = None,
         first_response_num_ctx: int | None = None,
-        truth_ollama: OllamaClient | None = None,
-        truth_num_ctx: int | None = None,
         num_ctx: int = 8192,
         num_predict: int = 2048,
         cognitive_budget_profile: str = "interactive",
@@ -155,12 +141,9 @@ class FastPlannerResolver:
         max_contract_repairs: int = 1,
     ) -> None:
         self.ollama = ollama
-        # Fast Planner remains the sole semantic owner of both phases.  The
-        # Separately qualified clients may specialize the latency-critical
-        # natural-language Activity and its bounded accept/reject qualification;
-        # complete Capability planning stays on ``ollama``. When configured roles
-        # share a model, main reuses the exact client so bounded calls do not force
-        # an avoidable runner reload.
+        # Fast Planner remains the sole semantic owner of both phases. The
+        # latency-critical natural-language Activity may use a dedicated model;
+        # complete Capability planning stays on ``ollama``.
         self.first_response_ollama = first_response_ollama or ollama
         self.first_response_num_ctx = max(
             2048,
@@ -168,21 +151,6 @@ class FastPlannerResolver:
                 first_response_num_ctx
                 if first_response_num_ctx is not None
                 else min(num_ctx, 6144)
-            ),
-        )
-        self.truth_ollama = truth_ollama or ollama
-        self.truth_num_ctx = max(
-            2048,
-            int(
-                truth_num_ctx
-                if truth_num_ctx is not None
-                else (
-                    num_ctx
-                    if self.truth_ollama is self.ollama
-                    else self.first_response_num_ctx
-                    if self.truth_ollama is self.first_response_ollama
-                    else min(num_ctx, 6144)
-                )
             ),
         )
         self.catalog = catalog
@@ -341,69 +309,6 @@ class FastPlannerResolver:
                     "first-response completion is valid only for conversational speech WHAT; "
                     "information and observable/stateful effects remain Planner work"
                 )
-            speech_act = gateway_speech_act(request)
-            deterministic_greeting = bool(
-                speech_act == "greeting"
-                and activity.role == "complete_response"
-                and activity.truth_stage == "context_grounded"
-                and not activity.evidence_refs
-            )
-            if deterministic_greeting:
-                # Gateway has already classified this admitted turn as a greeting,
-                # and the Planner selected a context-grounded conversational response.
-                # A second LLM cannot add authoritative truth here; it only lengthens
-                # the human-facing critical path.
-                # Keep the same immutable Activity acceptance surface, but let
-                # trusted contract evidence close the qualification locally.
-                truth_certificate = FastPlannerFirstResponseTruthCertificate(
-                    has_unverified_result_or_completion_claim=False,
-                    has_ungrounded_method_or_world_claim=False,
-                    has_semantic_perspective_contradiction=False,
-                    has_epistemic_strength_contradiction=False,
-                    has_execution_status_contradiction=False,
-                    has_out_of_scope_goal_claim=False,
-                    decision="accept"
-                )
-                qualification_metadata = {
-                    "truth_qualification_owner": "trusted_gateway_greeting_contract",
-                    "truth_qualification_call_count": 0,
-                    "truth_qualification": truth_certificate.model_dump(
-                        mode="json",
-                        exclude_none=True,
-                        exclude_defaults=True,
-                    ),
-                }
-            else:
-                truth_certificate = await self._qualify_first_response_truth(
-                    request,
-                    activity=activity,
-                    responsibilities=responsibilities,
-                )
-                qualification_metadata = {
-                    "truth_qualification_owner": "fast_planner",
-                    "truth_qualification_call_count": 1,
-                    "truth_qualification": truth_certificate.model_dump(
-                        mode="json",
-                        exclude_none=True,
-                        exclude_defaults=True,
-                    ),
-                }
-            if truth_certificate.decision != "accept":
-                logger.warning(
-                    "fast_planner_first_response_truth_rejected sid=%s activity_id=%s",
-                    request.sid,
-                    activity.activity_id,
-                )
-                return FastPlannerFirstResponse(
-                    turn_id=str(request.sid or "turn-fast-first-response"),
-                    activity=None,
-                    metadata={
-                        "semantic_authority": "fast_planner_truth_rejection",
-                        "phase": "first_communicative_activity",
-                        "execution_authority": "none",
-                        **qualification_metadata,
-                    },
-                )
             return FastPlannerFirstResponse(
                 turn_id=str(request.sid or "turn-fast-first-response"),
                 activity=activity,
@@ -411,7 +316,8 @@ class FastPlannerResolver:
                     "semantic_authority": "fast_planner_model",
                     "phase": "first_communicative_activity",
                     "execution_authority": "host_communicative_runtime",
-                    **qualification_metadata,
+                    "semantic_result_call_count": 1,
+                    "truth_contract": "primary_prompt_schema_and_typed_provenance",
                 },
             )
         except Exception as exc:
@@ -445,74 +351,6 @@ class FastPlannerResolver:
                     **failure,
                 },
             )
-
-
-    async def _qualify_first_response_truth(
-        self,
-        request: CognitiveWorkRequest,
-        *,
-        activity: Any,
-        responsibilities: list[CognitiveResponsibilityProposal],
-    ) -> FastPlannerFirstResponseTruthCertificate:
-        """Accept or reject immutable wording without authoring a replacement.
-
-        This is Fast Planner's LLM Epistemic Qualification for responses whose
-        truth cannot be closed by an immutable Gateway/GI contract. A failure,
-        malformed certificate, or uncertain acceptance is
-        terminal for the first-response Activity and is never repaired.
-        """
-
-        schema = fast_truth_certificate_response_schema()
-        context = request.context if isinstance(request.context, dict) else {}
-        raw = await self.truth_ollama.generate(
-            fast_first_response_truth_prompt(
-                request,
-                activity=activity,
-                responsibilities=responsibilities,
-                trusted_evidence=context.get("trusted_terminal_evidence") or [],
-            ),
-            system=fast_first_response_truth_system_prompt(),
-            options={
-                "temperature": 0,
-                "top_p": 0.9,
-                "num_ctx": self.truth_num_ctx,
-                "num_predict": min(
-                    self.num_predict,
-                    256
-                    if self.cognitive_budget_profile == "qualification"
-                    else 128,
-                ),
-            },
-            response_format=schema,
-            prompt_family="fast_planner.first_response.truth_check",
-            turn_id=request.sid,
-            attempt=1,
-        )
-        certificate = FastPlannerFirstResponseTruthCertificate.model_validate(raw)
-        return certificate
-
-    async def _qualify_evidence_response_truth(
-        self,
-        request: CognitiveWorkRequest,
-        *,
-        plan: CanonicalPlan,
-    ) -> FastPlannerFirstResponseTruthCertificate:
-        """Accept or reject immutable post-Evidence wording without repairing it."""
-        return await qualify_evidence_response_truth(
-            self.truth_ollama,
-            request=request,
-            plan=plan,
-            num_ctx=self.truth_num_ctx,
-            num_predict=(
-                256
-                if self.cognitive_budget_profile == "qualification"
-                else 128
-            ),
-            prompt_family="fast_planner.evidence_response.truth_check",
-        )
-
-
-
     async def resolve_advance(self, request: CognitiveWorkRequest) -> FastPlannerAdvance:
         """Produce Fast Planner's first Activity Plan from GI Responsibilities."""
 
@@ -537,9 +375,8 @@ class FastPlannerResolver:
                 # make a valid communication decision. Treating it as intentional
                 # silence removes complete-response Activities from Advance and
                 # can make an ordinary speech Responsibility impossible to
-                # satisfy. A model-authored silence or truth rejection remains a
-                # real bounded decision and must still suppress replacement
-                # progress chatter.
+                # satisfy. Model-authored silence remains a real bounded
+                # decision and must still suppress replacement progress chatter.
                 first_response_decided = (
                     first_response.activity is not None
                     or first_response.metadata.get("semantic_authority")
@@ -548,7 +385,7 @@ class FastPlannerResolver:
                 if first_response.activity is not None:
                     committed_communicative_activities.append(first_response.activity)
 
-        # A fully qualified conversational response already covers an all-speech
+        # A validated primary conversational response already covers an all-speech
         # WHAT. Returning here keeps unrelated body/tool choices out of a second
         # model decision; work/evidence readiness is not imported from GI.
         if (
@@ -597,7 +434,7 @@ class FastPlannerResolver:
             interpretation_unresolved=list(request.interpretation_unresolved),
             # A null first-response result is still a terminal decision for that
             # bounded speech phase.  Advance must not author a substitute progress
-            # sentence and thereby bypass its one truth qualification.
+            # sentence and thereby bypass its primary fail-closed decision.
             committed_communicative=bool(committed_communicative_activities),
             suppress_new_communicative=(
                 first_response_decided
@@ -606,7 +443,7 @@ class FastPlannerResolver:
             # A failed bounded response call is not a semantic silence
             # decision, so ordinary speech may still be completed here. It is
             # nevertheless an attempted prospective-speech phase and Advance
-            # must not bypass its fail-closed result with unqualified progress.
+            # must not bypass its fail-closed result with substitute progress.
             suppress_new_progress=first_response_attempted,
         )
         options = {
@@ -1223,122 +1060,6 @@ class FastPlannerResolver:
                     path_classification=qualification.path_classification,
                 )
             validated = qualification.plan
-            if (
-                reentry_goal_ids
-                and validated.disposition == "respond"
-                and validated.response_text
-            ):
-                try:
-                    evidence_truth = await self._qualify_evidence_response_truth(
-                        request,
-                        plan=validated,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "fast_planner_evidence_response_truth_unavailable "
-                        "sid=%s error_type=%s error=%s",
-                        request.sid,
-                        type(exc).__name__,
-                        exc,
-                    )
-                    return materialize_fast_escalation(
-                        plan_id,
-                        request,
-                        "fast_planner_evidence_response_truth_unavailable",
-                        error=exc,
-                        unresolved=[
-                            "Post-Evidence wording could not be truth-qualified."
-                        ],
-                        path_classification="semantic_escalation",
-                    )
-                qualification = evidence_truth.model_dump(
-                    mode="json", exclude_none=True, exclude_defaults=True
-                )
-                if evidence_truth.decision != "accept":
-                    logger.warning(
-                        "fast_planner_evidence_response_truth_rejected sid=%s",
-                        request.sid,
-                    )
-                    return materialize_fast_escalation(
-                        plan_id,
-                        request,
-                        "fast_planner_evidence_response_truth_rejected",
-                        unresolved=[
-                            "Post-Evidence wording must preserve probability below "
-                            "100% as uncertainty rather than certainty."
-                        ],
-                        path_classification="semantic_escalation",
-                        metadata={
-                            "evidence_response_truth_qualification": qualification,
-                            "execution_allowed": False,
-                        },
-                    )
-                metadata = dict(validated.metadata)
-                metadata["evidence_response_truth_qualification"] = qualification
-                validated = validated.model_copy(update={"metadata": metadata})
-            coordinated_goal_ids = coordinated_action_goal_ids(
-                authoritative_goals
-            )
-            if (
-                coordinated_goal_ids.intersection(validated.goal_ids)
-                and validated.disposition in {"execute", "mixed"}
-                and validated.steps
-            ):
-                try:
-                    coverage_review = await review_coordinated_action_plan_coverage(
-                        self.ollama,
-                        request_text=request.text,
-                        language=str(request.language or "und"),
-                        authoritative_goals=authoritative_goals,
-                        plan=validated,
-                        capabilities=capability_payload,
-                        num_ctx=self.num_ctx,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "fast_planner_coverage_review_unavailable sid=%s error_type=%s error=%s",
-                        request.sid,
-                        type(exc).__name__,
-                        exc,
-                    )
-                    return materialize_fast_escalation(
-                        plan_id,
-                        request,
-                        "coordinated_action_coverage_review_unavailable",
-                        error=exc,
-                        path_classification="coverage_review_failure",
-                        metadata={
-                            "coordinated_goal_ids": sorted(coordinated_goal_ids),
-                            "execution_allowed": False,
-                        },
-                    )
-                if coverage_review.decision != "accept":
-                    logger.warning(
-                        "fast_planner_coverage_review_rejected sid=%s uncovered=%s reason=%s",
-                        request.sid,
-                        coverage_review.uncovered_requirements,
-                        coverage_review.reason,
-                    )
-                    return materialize_fast_escalation(
-                        plan_id,
-                        request,
-                        "coordinated_action_coverage_incomplete",
-                        unresolved=coverage_review.uncovered_requirements,
-                        path_classification="semantic_escalation",
-                        metadata={
-                            "coordinated_goal_ids": sorted(coordinated_goal_ids),
-                            "coverage_review": coverage_review.model_dump(mode="json"),
-                            "execution_allowed": False,
-                        },
-                    )
-                metadata = dict(validated.metadata)
-                metadata["coverage_review"] = {
-                    "status": "accepted",
-                    "confidence": coverage_review.confidence,
-                    "reason": coverage_review.reason,
-                    "execution_authority": "none",
-                }
-                validated = validated.model_copy(update={"metadata": metadata})
             if contract_repair_attempted:
                 metadata = dict(validated.metadata)
                 metadata.update(

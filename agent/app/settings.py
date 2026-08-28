@@ -332,15 +332,6 @@ class Settings(BaseModel):
             os.getenv("AGENT_MODEL", "gemma4:e2b"),
         )
     )
-    fast_truth_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_FAST_TRUTH_MODEL",
-            os.getenv(
-                "AGENT_FAST_FIRST_RESPONSE_MODEL",
-                os.getenv("AGENT_MODEL", "gemma4:e2b"),
-            ),
-        )
-    )
     fast_planner_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "2500")), ge=100, le=120000
     )

@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "debug_bundle_run_15_while_singing",
+  "stage": "challenge",
+  "difficulty": "hard",
+  "rationale": "Retained 2026-08-19 debug-bundle episode: forward locomotion and singing remain separate Goals; the maintained forward-motion provider may cover the 15-second body Goal, while unavailable singing must be explicit and ordinary TTS or an execution-start claim cannot substitute for it.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "primary_outcomes": [
+      "Retained 2026-08-19 debug-bundle episode: forward locomotion and singing remain separate Goals; the maintained forward-motion provider may cover the 15-second body Goal, while unavailable singing must be explicit and ordinary TTS or an execution-start claim cannot substitute for it."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Omit, merge, or reorder an independent requested outcome.",
+      "Carry stale context into an unrelated task."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "你往前跑15秒，然后在边跑边唱歌。",
+  "language": "zh-CN",
+  "expected_capabilities": [
+    "soridormi.walk_forward"
+  ],
+  "expected_args": [
+    "0:duration_s=15.0"
+  ],
+  "require_speech": true,
+  "min_new_goal_count": 2,
+  "min_goal_outcome_count": 2,
+  "description": "Retained 2026-08-19 debug-bundle episode: forward locomotion and singing remain separate Goals; the maintained forward-motion provider may cover the 15-second body Goal, while unavailable singing must be explicit and ordinary TTS or an execution-start claim cannot substitute for it.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "Retained 2026-08-19 debug-bundle episode: forward locomotion and singing remain separate Goals; the maintained forward-motion provider may cover the 15-second body Goal, while unavailable singing must be explicit and ordinary TTS or an execution-start claim cannot substitute for it.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

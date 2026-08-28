@@ -570,7 +570,7 @@ select a model winner, or carry Runtime policy authority. See
 
 `manifests/scenario_migration_v1.json` is the authoritative classification for
 all maintained scenario sources. Existing deterministic fixtures remain
-referenced in place so stable IDs, Git provenance, general-ability manifests,
+referenced in place so stable IDs, Git provenance, general-ability metadata,
 and evidence claims remain comparable. `manifests/suites.json` is a compatibility
 redirect and no longer duplicates source rules.
 

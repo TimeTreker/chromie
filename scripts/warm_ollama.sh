@@ -72,10 +72,8 @@ role_contexts = (
     ),
     ("AGENT_GOAL_ASSOCIATION_MODEL", "AGENT_GOAL_ASSOCIATION_NUM_CTX"),
     ("AGENT_FAST_PLANNER_MODEL", "AGENT_FAST_PLANNER_NUM_CTX"),
-    # Fast first-response/truth share the Fast Planner topology in the current
-    # runtime composition when they use the same model.
+    # Fast first-response shares the Fast Planner topology when it uses the same model.
     ("AGENT_FAST_FIRST_RESPONSE_MODEL", "AGENT_FAST_PLANNER_NUM_CTX"),
-    ("AGENT_FAST_TRUTH_MODEL", "AGENT_FAST_PLANNER_NUM_CTX"),
     ("AGENT_DEEP_PLANNER_MODEL", "AGENT_DEEP_PLANNER_NUM_CTX"),
     ("AGENT_TASK_CONTINUITY_MODEL", "AGENT_TASK_CONTINUITY_NUM_CTX"),
     ("AGENT_SOCIAL_ATTENTION_MODEL", "AGENT_SOCIAL_ATTENTION_NUM_CTX"),

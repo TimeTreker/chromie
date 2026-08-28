@@ -38,38 +38,24 @@
               "confidence": 0.93,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action"
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              }
             }
           ],
           "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_responsibility_coverage",
-        "decision": {
-          "responsibility_items": [
-            {
-              "source_excerpt": "眨两小眼睛",
-              "role": "responsibility",
-              "coverage": "covered",
-              "independently_satisfiable": true,
-              "responsibility_refs": ["r1"],
-              "required_output_mode": "body_action"
-            }
-          ],
-          "supporting_items": [],
-          "reason_summary": "The repaired blink outcome has one owner."
         }
       }
     ]
   },
   "expect": {
     "confidence": 0.93,
-    "llm_calls": 3,
+    "llm_calls": 2,
     "llm_stages": [
       "goal_interpretation",
-      "goal_interpretation_contract_repair",
-      "goal_interpretation_responsibility_coverage"
+      "goal_interpretation_contract_repair"
     ],
     "unresolved": [],
     "responsibilities": [

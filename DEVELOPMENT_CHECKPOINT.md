@@ -1,9 +1,9 @@
 # Chromie Development Checkpoint
 
-Status: current resume point; GI contract closure awaiting current-commit live proof
-Updated: 2026-08-27
-Implementation baseline: `6a5619ab8552d733c20f11788b9b0639f452f3ee`
-(`Harden goal interpretation contracts and live test workflow`)
+Status: GI/GA/Planner primary-result source closure retained; interactive resource admission blocks must-pass
+Updated: 2026-08-28
+Starting baseline: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
+(`Add external architecture audit`)
 Resume branch: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
@@ -11,100 +11,155 @@ Resume branch: the latest `origin/main` commit containing this checkpoint and `H
 Read [Project Charter](docs/PROJECT_CHARTER.md),
 [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
 [Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md),
-[Acceptance](docs/ACCEPTANCE.md), and the operational [Latest Handoff](HANDOFF.md).
+[Acceptance](docs/ACCEPTANCE.md), and [Latest Handoff](HANDOFF.md).
 Source, tests, and retained executable evidence win over this summary.
 
-## Active scope
+## Active issue and boundary
 
-This iteration preserves Chromie's Goal-driven single semantic authority and narrows work
-to its earliest Goal Interpretation boundary.
+This is the current Goal-driven single-semantic-authority delivery line.
+Charter principles 30–31 require each semantic authority to produce its complete
+grounding/conservation evidence in its primary model result. GI, Goal Association,
+and Fast/Deep Planner now follow that source contract. Do not treat whole-pipeline
+source closure as target-model or live behavior qualification.
 
-Close only Goal Interpretation (GI), its DTO/schema validators, and directly related
-contract evidence. Do not fix Goal Association (GA), Planner, weather-provider,
-WorkDAG, response wording, or latency failures in this iteration. Record those failures
-for the later GA/Planner pass.
-
-GI remains WHAT-only:
+The maintained GI workflow is now:
 
 ```text
-admitted turn
-  -> fast GI candidate
-  -> deterministic authority/provenance/shape validation
-  -> independent atomic coverage certificate
-  -> at most one certificate-bound deep resegmentation
-  -> typed Responsibilities
-  -> GA / Planner (out of current fix scope)
+admitted turn + bounded semantic context + closed source-token table
+  -> one primary WHAT-only GI result
+     (Responsibilities + modes + bindings + relations + source_evidence)
+  -> trusted mechanical validation
+  -> accept resolved valid meaning
+     OR one same-stage DTO repair for malformed shape
+     OR one source-based Deep GI delegation for genuine unresolved meaning
+     OR fail closed for semantic/authority contradiction
+  -> GA / Planner
 ```
 
-## Current committed implementation
+There is no GI coverage auditor, critic, reviewer, or resegmentation call.
 
-- The GI system prompt was equivalently compressed from 17,325 to 10,772 bytes without
-  changing the WHAT/HOW contract.
-- Dynamic schemas and deterministic validation now enforce exact prior-speech evidence,
-  canonical counts, explicit-number preservation, exact location/speed provenance,
-  typed sibling coordination, closed recovery binding grammars, and rejection of hidden
-  effect/HOW fields.
-- Coverage certificates carry an explicit independent-outcome count. Smaller stochastic
-  audits cannot erase already validated consequential effects, and invalid DTO structure
-  can impose a conservative minimum responsibility count on the one deep recovery pass.
-- Primary and coverage schemas now describe vocal modes per enum value: Chromie's own
-  singing is `singing`; `media_playback` is only control/playback of existing recorded
-  media. No phrase router or deterministic semantic-lane selector was added.
-- Aggregate-first live iteration rules are documented in `AGENTS.md`, `CONTRIBUTING.md`,
-  `docs/ACCEPTANCE.md`, and `docs/SCENARIO_DRIVEN_DEVELOPMENT.md`.
+The maintained GA workflow is now:
 
-## Evidence retained before the current commit
+```text
+accepted GI Responsibilities + bounded Goal/dialogue state
+  -> one primary Goal identity/continuity result
+  -> optional one mechanical JSON repair only for a Pydantic-invalid DTO
+  -> deterministic closed-reference/provenance/binding/conservation validation
+  -> canonical Goal commit or fail closed
+```
+
+There is no GA coverage certificate, reviewer, fresh interpretation, final audit, or
+semantic repair call. Grounding or conservation rejection is terminal.
+
+The maintained Planner workflow is now:
+
+```text
+Responsibility/Goal + bounded Situation/Work/Evidence
+  -> one Fast or Deep primary HOW result
+     (complete Goal coverage + truth strength + exact wording + provenance + satisfaction)
+  -> trusted schema/provenance/integrity validation
+  -> accept the Plan
+     OR one semantics-preserving DTO repair where that pass already permits it
+     OR distinct deeper-cognition escalation from Fast to Deep
+     OR fail closed
+```
+
+There is no same-owner Planner truth qualifier, coverage reviewer, communication
+reviewer, or audit model call.
+
+## Implemented in the current worktree
+
+- Added `ResponsibilitySourceEvidence` with inclusive source-token refs to the
+  shared Responsibility proposal and made the live GI schema require it.
+- Primary and Deep GI prompts now own completeness, atomic decomposition, modality,
+  material bindings, sibling relations, and source evidence in one result.
+- Trusted validation checks only source-ref membership/order/non-overlap and the
+  existing closed DTO/provenance/authority mechanics.
+- Removed the GI coverage-certificate DTOs, projection/resegmentation machinery,
+  coverage repair, and the `goal_interpretation_responsibility_coverage` stage.
+- Resolved valid GI now uses one model call. Mechanical primary shape failure has
+  one DTO repair; genuine unresolved meaning has one Deep delegation; semantic or
+  authority rejection fails closed.
+- Migrated retained GI/dialogue scenarios to primary evidence and logical call
+  budgets. Noncanonical `pace` fixtures now return canonical `speed` in the primary
+  DTO rather than relying on a semantic repair call.
+- Added a repository-policy guard against reintroducing the removed GI stage,
+  certificate, payload builder, or acceptance wrapper.
+- Removed the GA responsibility-coverage DTO/schema/prompt/validation lifecycle and
+  its coverage, fresh-interpretation, and final-audit model calls.
+- Limited GA to one valid primary invocation plus at most one mechanical DTO repair;
+  semantic/grounding/conservation validation runs after parsing and cannot enter repair.
+- Migrated GA regressions to primary-result conservation and exact one/two-call budgets.
+- Removed the Planner truth-qualification, retained-response review, and coordinated
+  Goal-coverage review calls together with their DTOs, schemas, prompts, audit module,
+  dedicated model client, runtime health field, environment key, and warm-model role.
+- Strengthened Fast first-response, Fast Advance, canonical Fast Plan, and Deep Plan
+  primary prompts so each result owns complete Goal/Evidence truth, exact wording,
+  step ownership, satisfaction, and unresolved decisions before trusted validation.
+- Migrated Fast/Deep Planner regressions to primary-result contracts and exact one-call
+  logical budgets, while preserving only existing bounded mechanical DTO repair and
+  distinct Fast-to-Deep escalation paths.
+
+## Other owner-authorized closure in this checkpoint
+
+- Removed the premature DBOS/durable-backend experiment completely: the optional
+  dependency, backend abstraction, DBOS adapter, eligibility field, and dedicated tests
+  are deleted. `CapabilityRuntime` directly owns its in-process `asyncio.Task` lifecycle
+  again. This does not reject a future inter-process event transport; it avoids freezing
+  a speculative backend contract before the in-process domain/event contract is proven.
+- Replaced the monolithic `scenarios/general_ability_acceptance.json` index with
+  self-describing, one-scenario-per-file discovery under
+  `scenarios/general_ability/<must_pass|core|challenge>/<ability-class>/`.
+  The retained cohort contains 50 must-pass, 15 core, and 8 challenge scenarios.
+  Every selected must-pass case runs before its stage report is produced; a hard
+  must-pass failure blocks core/challenge only after the complete must-pass stage.
+- Scenario metadata is local to each file, so a future scheduler or database importer
+  can shard/extract cases without synchronizing a central registry.
+
+## Evidence ledger
 
 | Evidence | Result | Qualification limit |
 |---|---|---|
-| Focused GI unit tests after the final dynamic-mode schema change | 113/113 passed | Automated source evidence only |
-| Full local gate before the final dynamic-mode schema change | 2,123 tests plus 20 legacy Agent tests passed; Level A 45/45 | Stale for the last schema-only change; rerun required |
-| Live iteration 34, dirty source tree `ec90c7b790cd...`, identity `9133e934580b...` | Complete Level C cohort: 25/36 passed | Diagnostic only; not the current clean commit |
-| Iteration 34 debug bundle | `/home/chromie/Downloads/chromie_debug_bundle_20260827_212141.tar.gz` | Local private runtime evidence; exactly one bundle was collected |
+| Pre-fix focused GI matrix at baseline | 110 passed | Reproduced the nonconforming extra coverage call; not target evidence |
+| Current focused GI matrix | 38 passed | Automated module/contract evidence |
+| Current retained GI + dialogue scenarios | 31/31 passed | Automated scripted module/dialogue evidence |
+| Current focused Planner matrix | 308 passed, 9 subtests passed | Automated primary-result/call-budget evidence |
+| Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
+| Canonical full local gate | 2,023 maintained tests plus 20 legacy Agent tests passed | Automated source/integration evidence |
+| Level A general abilities | 12/12 passed: robust intent 8/8; Planner/Goal semantic quality 4/4 | Deterministic Level A only |
+| Documentation authority gate | 96 Markdown files passed | Current documentation consistency only |
+| Pre-fix live iteration 50, RTX 4090/Qwen3 4B | 32/36 contract-valid; four legacy coverage HTTP 503 failures; about 25/36 strict semantic passes | Diagnostic baseline only; different implementation |
+| Pre-Planner-fix 50-case must-pass aggregate | 1/50 machine passes; 29/29 first-response truth-review calls timed out; GA primary accepted 18/45 | Diagnostic comparison only |
+| Post-Planner-fix 50-case must-pass aggregate | 8/50 machine passes; zero retired review calls; GA primary accepted 43/44; 16 foreground-deadline, 7 Runtime-timeout, 4 GA-stage failures | Dirty source-tree-bound C-preview identity; not target qualification |
 
-Iteration 34 proved both earlier GI omission cases in the complete cohort:
-
-- `weather_then_chinese_walk_blink_song`: weather completed, then GI emitted three
-  Responsibilities for run, blink, and singing without stale-weather contamination.
-- `user_probe_walk_sing_blink_simultaneously`: GI emitted three Responsibilities and GA
-  received all three.
-
-The same cohort exposed one new GI error in
-`debug_bundle_run_15_while_singing`: both the primary candidate and coverage auditor
-misclassified Chromie's own singing as `media_playback`. The committed dynamic-schema
-change addresses that exact general modality distinction. Iteration 35 focused live proof
-was intentionally interrupted during its first of three cases at the project owner's
-request to commit and push; it is incomplete and must not be reported as passing.
+The post-change aggregate is retained under
+`.chromie/acceptance/general-ability/20260828T101824Z-live-text` with runtime identity
+SHA-256 `c8b3fc0991b72d38dade6c7b38020353199c04cc3126eaae735bd42c5e53c9cc`.
+Its one valid post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260828_183021.tar.gz`. It is
+headless C-preview evidence from a dirty source tree, not physical microphone/speaker,
+simulator execution, physical robot, or release evidence. All 42 machine hard failures
+remain failures; manual semantic inspection of the eight mechanical passes additionally
+finds `capability_inventory_truthful` incomplete because it promises an introduction
+without naming any capability. Independent multi-model semantic review remains pending.
 
 ## Exact resume point
 
-Start from the latest clean `origin/main`; it must contain implementation commit
-`6a5619ab8552...` and this handoff update. The deployed image on the original machine was
-`sha256:0b5f59a2110b691570410c53b4d05a5c6abb0aeb3b7fd647d762de7c4c9fc787`, but another
-machine must build and capture its own deployment identity.
-
-1. Build/verify the current Agent and Soridormi simulator.
-2. Capture a **new clean current-commit** runtime identity. Do not reuse iteration 35
-   identity `1e9049b79eaf...`; it records the pre-commit dirty revision.
-3. In one focused invocation, run:
-   `user_probe_walk_while_singing`, `debug_bundle_run_15_while_singing`, and
-   `user_probe_walk_sing_blink_simultaneously`.
-4. Require GI output modes/counts of respectively:
-   `body_action + singing`, `body_action + singing`, and
-   `body_action + singing + body_action`; reject any GI 503 or `media_playback` substitution.
-5. If focused GI passes, run the complete 36-case manifest-owned live cohort once on the
-   same identity, with no source edit, rebuild, restart, or isolated-case substitution
-   between cases.
-6. After the complete cohort, run `./scripts/collect_debug_bundle.sh` exactly once, judge
-   every case, and cluster failures by earliest shared boundary. Defer confirmed non-GI
-   failures.
-7. Update this checkpoint, `HANDOFF.md`, and `docs/STATUS.md`, then run the canonical gates.
-
-Exact commands and evidence paths are in [HANDOFF.md](HANDOFF.md).
+1. Keep the removed GI/GA/Planner review chains absent. The next implementation boundary
+   is priority/resource admission inside existing owners: optional Social Attention and
+   TTS preparation must not consume the only runnable GPU slot ahead of GA/Fast/Deep
+   critical-path work. Do not add a new semantic owner or use a model swap to conceal
+   this scheduling defect.
+2. Reconstruct the failing critical path against the retained aggregate: GI commonly
+   consumed 2.5–5.4 seconds, concurrent GA/Fast Advance about 5–7 seconds, and required
+   canonical Fast planning another 6–8 seconds under the 15-second foreground deadline.
+   Preserve GA and Fast Advance as concurrent consumers; do not introduce a merge barrier.
+3. After a focused source fix and local gates, run one complete must-pass aggregate on
+   one unchanged identity. Only a hard-pass must-pass stage may permit core/challenge.
 
 ## Claim boundary
 
-Current status is development-only. Iteration 34 is injected live-text + Soridormi
-simulator Level C evidence, not physical microphone, audible speaker, or physical robot
-evidence. The current clean commit has not completed focused live proof, a complete live
-cohort, or the final canonical gates. Do not claim release qualification.
+The implementation is development-only. Automated source evidence does not qualify
+live model quality, audible voice, physical microphone behavior, simulator behavior,
+or robot hardware. Historical iteration 50 proves the old coverage-chain failure and
+must not be represented as proof of the new primary-result implementation.

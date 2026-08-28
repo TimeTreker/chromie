@@ -126,11 +126,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertTrue(report["ok"], report["cases"][0]["errors"])
         self.assertEqual(
             turns[1]["llm_stages"],
-            [
-                "goal_interpretation",
-                "goal_interpretation_deep",
-                "goal_interpretation_responsibility_coverage",
-            ],
+            ["goal_interpretation"],
         )
         self.assertEqual(
             turns[2]["interpretation"]["responsibilities"][0]["bindings"],

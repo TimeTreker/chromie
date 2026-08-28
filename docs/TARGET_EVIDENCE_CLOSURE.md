@@ -61,7 +61,7 @@ existing source-bound development evidence:
   WorkDAG/Evidence re-entry, Level-A general-ability, and deterministic provider-fault
   gates;
 - retained `general_ability_acceptance --mode live-text --execute --assertion-scope full`
-  evidence for the manifest-owned current-revision interaction cases; and
+  evidence for the directory-discovered current-revision interaction cases; and
 - the live Soridormi provider fault matrix with safe-idle and terminal-latency checks.
 
 The retained interaction set covers Chinese and English effectful turns, cancellation,
@@ -135,7 +135,7 @@ python scripts/run_target_evidence_closure.py collect-provider-faults \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-`collect-interaction-behavior` always uses the manifest-owned case set, `execute`,
+`collect-interaction-behavior` always uses the directory-discovered case set, `execute`,
 `assertion-scope=full`, the Goal-driven runtime, and supervised confirmation grants. A
 preview-only, dirty, different-revision, or user-outcome-only report is mechanically
 ineligible for this track. `collect-provider-faults` requires Soridormi's declared hidden

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-"""Deterministic Goal Association normalization, grounding, conflict, and coverage checks.
+"""Deterministic Goal Association normalization, grounding, and conservation checks.
 
 This module does not invoke a model or commit Goal continuity.
 """
 
 import copy
 import json
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -15,7 +15,6 @@ from .prompt_projection import bounded_json
 from .goal_association_contract import (
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
-    GoalResponsibilityCoverageCertificate,
     GoalSegmentationModelOutput,
     _validate_model_resource_quantity,
 )
@@ -65,10 +64,6 @@ def _ordinary_source_binding_pairs(
     }
 
 
-class _CoverageSourceExcerptViolation(ValueError):
-    """Coverage audit cited text outside the authoritative user turn."""
-
-
 def normalize_optional_referent_updates(
     raw: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -77,8 +72,8 @@ def normalize_optional_referent_updates(
     Referent focus changes, retirements, and introductions with actual entity
     content remain contract-authoritative and still fail closed. A correction
     without any supplied target referent cannot update the discourse index; the
-    canonical Goal association and coverage audit remain responsible for the
-    actual correction meaning.
+    canonical Goal association remains responsible for the actual correction
+    meaning.
     A model-added ``introduce`` item with neither an entity type nor canonical
     value cannot ground any Goal binding and must not discard otherwise valid
     Goals.
@@ -137,9 +132,9 @@ def normalize_resource_binding_branches(
     structured-output models nevertheless populate the mutually exclusive top-
     level ``bindings`` branch. Move nonduplicate model-authored bindings into the
     discriminated resource owner before clearing the inactive branch. This is
-    mechanical DTO normalization: no value is inferred or rewritten, and the
-    independent source-grounded coverage certificate still decides whether each
-    migrated fact belongs to the Responsibility.
+    mechanical DTO normalization: no value is inferred or rewritten, and trusted
+    source-grounded conservation validation still checks that every material fact
+    belongs to the primary Responsibility result.
     """
 
     normalized = copy.deepcopy(raw)
@@ -182,8 +177,8 @@ def normalize_resource_binding_branches(
         if physical_source_unknown and (top_level or has_inactive_physical_grounding):
             # `status` is the discriminant: unknown/provider-resolved sources
             # cannot own acquisition grounding. Clear model content from that
-            # inactive branch so the independent semantic coverage audit can
-            # decide whether the entire resource wrapper was justified. Never
+            # inactive branch so deterministic conservation validation can reject
+            # an unjustified or incomplete resource wrapper. Never
             # flip unknown to known or reinterpret body-motion parameters as an
             # object-acquisition location.
             source = resource["source"]
@@ -245,8 +240,8 @@ def normalize_optional_resource_quantity(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Drop only malformed optional quantity scalars before validation.
 
-    No replacement quantity is inferred. Responsibility coverage still proves
-    conservation of any source-grounded quantity, so removing decoder noise
+    No replacement quantity is inferred. Deterministic Responsibility conservation
+    still checks any source-grounded quantity, so removing decoder noise
     cannot silently erase a quantity the human actually supplied.
     """
 
@@ -292,8 +287,8 @@ def restore_missing_goal_descriptions(
     The source Responsibility remains the semantic authority.  Recovery is
     permitted only when the candidate names exactly one admitted local_ref and
     its description is absent or blank; no wording is generated or inferred.
-    Responsibility/output-mode conservation and the independent coverage audit
-    still validate the resulting Goal.
+    Responsibility/output-mode and source-grounded conservation checks still
+    validate the resulting Goal.
     """
 
     normalized = copy.deepcopy(raw)
@@ -887,7 +882,7 @@ def resource_source_binding_contract_conflicts(
     return conflicts
 
 
-def source_grounded_binding_coverage_conflicts(
+def source_grounded_binding_conservation_conflicts(
     model_output: (
         GoalAssociationModelOutput
         | GoalSegmentationModelOutput
@@ -1118,82 +1113,3 @@ def validation_error_json(exc: Exception) -> str:
     else:
         payload = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
     return bounded_json(payload, 6000)
-
-
-def responsibility_coverage_required(
-    model_output: GoalAssociationModelOutput | GoalSegmentationModelOutput,
-    *,
-    request: CognitiveWorkRequest,
-) -> bool:
-    """Audit every newly proposed Goal set and no association-only branch.
-
-    This is a structural transition, not a Host semantic risk heuristic.
-    Association-only results have no candidate new-Goal set for this certificate
-    to prove.
-    """
-
-    del request
-    return bool(model_output.new_goals)
-
-
-def coverage_verdict(
-    certificate: GoalResponsibilityCoverageCertificate,
-    *,
-    goal_count: int,
-) -> tuple[Literal["accept", "reject"], list[str]]:
-    problems: list[str] = []
-    responsibility_owner_counts: dict[int, int] = {}
-    positively_owned: set[int] = set()
-    for item in certificate.items:
-        if item.role in {"responsibility", "constraint"} and item.coverage not in {
-            "covered",
-            "clarification_required",
-        }:
-            problems.append(
-                f"{item.coverage}:{item.role}:{item.source_excerpt}"
-            )
-            # Preserve the auditor's typed semantic proof as feedback for the
-            # one already-authorized fresh interpretation.  The Host does not
-            # infer these facts from user wording; it only forwards fields the
-            # GA-owned coverage model explicitly declared.
-            if item.required_goal_shape != "ordinary":
-                problems.append(
-                    "required_goal_shape:"
-                    + item.required_goal_shape
-                    + f":{item.role}:{item.source_excerpt}"
-                )
-            if item.required_information_domain != "none":
-                problems.append(
-                    "required_information_domain:"
-                    + item.required_information_domain
-                    + f":{item.role}:{item.source_excerpt}"
-                )
-            if item.required_output_mode != "none":
-                problems.append(
-                    "required_output_mode:"
-                    + item.required_output_mode
-                    + f":{item.role}:{item.source_excerpt}"
-                )
-        if item.role != "responsibility" or item.coverage not in {
-            "covered",
-            "clarification_required",
-        }:
-            continue
-        for goal_index in item.candidate_goal_indices:
-            positively_owned.add(goal_index)
-            if item.independently_satisfiable:
-                responsibility_owner_counts[goal_index] = (
-                    responsibility_owner_counts.get(goal_index, 0) + 1
-                )
-    for goal_index, count in sorted(responsibility_owner_counts.items()):
-        if count > 1:
-            problems.append(
-                f"overmerged_independent_responsibilities:goal[{goal_index}]"
-            )
-    unjustified = sorted(set(range(max(0, goal_count))) - positively_owned)
-    if unjustified:
-        problems.append(
-            "unjustified_goal_indices:"
-            + ",".join(str(index) for index in unjustified)
-        )
-    return ("reject", problems) if problems else ("accept", [])

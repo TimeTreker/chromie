@@ -4,9 +4,7 @@ from agent.app import goal_association_validation as ga_validation
 
 import unittest
 
-from agent.app.goal_association import GoalAssociationResolver
-from agent.app.goal_association_contract import GoalAssociationModelOutput
-from agent.app.planner_validation import coordinated_action_goal_ids
+from agent.app import planner_validation
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
 
@@ -29,48 +27,15 @@ class PlannerCommunicationBoundaryTests(unittest.TestCase):
         self.assertFalse(summary["provider_dispatch_possible"])
 
 
-class GoalAndCoverageRegressionTests(unittest.TestCase):
-    def test_single_new_goal_with_retained_context_requires_coverage_proof(self) -> None:
-        output = GoalAssociationModelOutput.model_validate(
-            {
-                "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "source_responsibility_refs": ["r1"],
-                        "description": "Perform several independently observable outcomes together.",
-                        "output_mode": "other",
-                    }
-                ],
-                "confidence": 1.0,
-            }
+class GoalAndConservationRegressionTests(unittest.TestCase):
+    def test_goal_association_has_no_independent_coverage_authority(self) -> None:
+        self.assertFalse(
+            hasattr(ga_validation, "responsibility_coverage_required")
         )
+        self.assertFalse(hasattr(ga_validation, "coverage_verdict"))
 
-        required = ga_validation.responsibility_coverage_required(
-            output,
-            request=object(),
-        )
-
-        self.assertTrue(required)
-
-    def test_typed_resource_goal_always_requires_coverage_audit(self) -> None:
-        goal_ids = coordinated_action_goal_ids(
-            [
-                {
-                    "goal_id": "goal-resource",
-                    "metadata": {"output_mode": "information"},
-                    "resource_responsibility": {
-                        "responsibility_type": "acquire_and_deliver_resource",
-                        "resource": {
-                            "kind": "information",
-                            "description": "requested performance content",
-                        },
-                    },
-                    "object": {"bindings": {}},
-                }
-            ]
-        )
-
-        self.assertEqual(goal_ids, {"goal-resource"})
+    def test_planner_has_no_independent_coordinated_coverage_auditor(self) -> None:
+        self.assertFalse(hasattr(planner_validation, "coordinated_action_goal_ids"))
 
 
 if __name__ == "__main__":

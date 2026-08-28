@@ -167,5 +167,59 @@
     "final_speech_forbid": [
       "synthetic-provider-secret"
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "truthful_embodied_speech",
+        "title": "Truthful Embodied Speech",
+        "general_rule": "Chromie speech should reflect proposal, confirmation, execution, refusal, cancellation, and provider evidence without claiming uncommitted or impossible work.",
+        "rationale": "Provider failure before Evidence cannot become a completion claim.",
+        "root_cause_boundaries": [
+          "Agent contract",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "evidence_coverage_and_claim_discipline",
+        "title": "Evidence Coverage And Claim Discipline",
+        "general_rule": "Tests should prove the user-visible boundary being claimed and should retain enough trace detail to locate the earliest wrong component.",
+        "rationale": "Provider failure is retained before any result exists.",
+        "root_cause_boundaries": [
+          "Test evidence",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "evidence_bound_cognitive_turn_closure",
+        "title": "Evidence-Bound Cognitive Turn Closure",
+        "general_rule": "Every admitted turn should preserve its identity and independent work across overlapping ordinary requests; only explicit protective control or Core-authorized interruption may cancel it. Effectful turns retain completed, missing, failed, and cancelled outcomes, commit goal state, suppress stale speech, and emit at most one evidence-bound speech-only final while the turn remains current.",
+        "rationale": "A provider exception before terminal results closes every planned step as not_run without speaking internal failure text.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway/ingress",
+          "Goal-Driven Cognitive Core",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider",
+          "Execution outcome evidence"
+        ]
+      },
+      {
+        "id": "continuous_cognition_recovery",
+        "title": "Continuous Cognition and Recovery",
+        "general_rule": "Meaningful runtime Evidence or provider-state change may reactivate the same Planner without fabricating a user turn, replaying completed work, or letting stale request/Plan provenance regain authority.",
+        "rationale": "Provider failure remains typed runtime truth and cannot become fabricated successful completion.",
+        "root_cause_boundaries": [
+          "Runtime Evidence",
+          "CognitiveOpportunity",
+          "Planner re-entry",
+          "Conversation state",
+          "Trusted Capability Runtime"
+        ]
+      }
+    ]
   }
 }

@@ -257,7 +257,7 @@ Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3:4b-instruct-2507-q4_K_M`, and RTX 5090 uses `qwen3.5:9b`. Qualification mode preserves the selected hardware-profile model. |
+| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3:4b-instruct-2507-q4_K_M`, and RTX 5090 uses the already-resident `gemma4:12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for WHAT-only Fast interpretation, its optional mechanical DTO repair, or one allowed source-based Deep GI interpretation. |
@@ -277,10 +277,13 @@ intent, Activity, Work, Plan, Capability, provider, response wording, and canoni
 Goal/Task/Plan identities are outside Goal Interpretation authority. A malformed
 Fast DTO may receive one mechanical schema repair. When its schema-valid result retains
 genuine ambiguity in intended outcome, scope, Goal relation, or referent, one source-based
-Deep GI invocation re-reads the authoritative turn without receiving the Fast DTO. Fast
+Deep GI invocation re-reads the authoritative turn without receiving the Fast DTO. The
+primary result supplies per-Responsibility source-token evidence; no separate coverage,
+critic, reviewer, or resegmentation model call exists. Fast
 Planner—not GI—owns execution-input resolution, source/default policy, blocking state,
-and clarification selection. A same-authority Deep result receives no repair; semantic
-failure otherwise fails closed as `interpretation_unavailable`.
+and clarification selection. One mechanically malformed DTO may be regenerated once at
+its current GI stage; semantic failure otherwise fails closed as
+`interpretation_unavailable`.
 
 ## Mind, Principles, and Experience
 
@@ -852,7 +855,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because it produced the correct independent responsibility/constraint audit under the retained Chinese locomotion request. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `8000` in maintained interactive modes; endpoint model-call timeout. Goal Association runs behind the latency-critical first response and may emit a materially larger structured DTO, so the acknowledgement target is not reused as a cognition kill switch. Failure still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -872,22 +875,23 @@ default containers, persistence metadata, and the canonical
 `GoalAssociationResolution` after validation. Goal Association receives the
 immutable user turn, bounded dialogue/Goal state, and trusted evidence; prior
 routing labels, planner failures, and validator diagnostics are deliberately not
-semantic inputs. Contract validation may still invoke one bounded
-schema-constrained revision for genuinely malformed primary output. Every new
-Goal candidate set then receives an immutable responsibility-coverage proof. A
-semantic rejection permits one fresh interpretation plus final proof; neither
-the fresh interpretation nor an invalid proof receives repair. The logical
-semantic DAG is capped at five calls. There is no local relationship synonym,
-phrase mapping, word-form normalization, resource-alignment workflow, or
-certificate-repair fallback.
+semantic inputs. A Pydantic-invalid primary DTO may receive one bounded mechanical
+JSON repair that is not given the user turn, Goal candidates, identity context, or
+permission to change semantic claims. The accepted primary result then passes trusted
+deterministic reference, provenance, cardinality, binding-conservation, and continuity
+validation. A semantic, grounding, or Responsibility-conservation rejection is
+terminal and fails closed; it cannot invoke repair, review, fresh interpretation, or
+final audit. The logical model-call budget is therefore one normally and two only for
+the mechanical DTO-repair case. There is no local relationship synonym, phrase
+mapping, word-form normalization, resource-alignment workflow, coverage certificate,
+or certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around the Agent Goal Association watchdog. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
 | `AGENT_FAST_FIRST_RESPONSE_MODEL` | Defaults to the active Agent model; owns the latency-critical first natural Communicative Activity. |
-| `AGENT_FAST_TRUTH_MODEL` | Defaults to `AGENT_FAST_FIRST_RESPONSE_MODEL`; qualifies that model's immutable wording for truth and semantic consistency without authoring a replacement. Qualification mode selects the already-supported deliberate `ministral-3:14b` model for this existing role because retained live evidence showed the compact response model accepting a categorical “will not rain” claim beside an admitted nonzero probability; the qualifier still only accepts/rejects and never authors wording. The generated runtime profile and warm-model set include this role explicitly, so retained identity proves which qualifier was deployed. |
-| `AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS` | `2500` in maintained interactive modes; watchdog for the small latency-critical first-response/truth client. It is deliberately shorter than full Fast planning so the user-facing phase can fail silent without killing larger background cognition. Qualification mode raises it with the other model watchdogs. |
-| Fast first-response output budget | Interactive mode remains capped at `256` generated tokens inside Fast Planner. Qualification mode reuses the existing cognitive-budget profile and permits up to the configured Fast Planner allowance (currently `4096`), because retained multi-goal DTOs still reached the earlier `1024` ceiling before closing. Earlier Gemma/Qwen evidence showed that an unbounded allowance can repeat after a complete object, so qualification remains capped rather than becoming unlimited. Truth-certificate calls remain capped at `128` interactively and `256` in qualification. |
+| `AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS` | `2500` in maintained interactive modes; watchdog for the small latency-critical first-response client. It is deliberately shorter than full Fast planning so the user-facing phase can fail silent without killing larger background cognition. Qualification mode raises it with the other model watchdogs. |
+| Fast first-response output budget | Interactive mode remains capped at `256` generated tokens inside Fast Planner. Qualification mode reuses the existing cognitive-budget profile and permits up to the configured Fast Planner allowance (currently `4096`), because retained multi-goal DTOs still reached the earlier `1024` ceiling before closing. Earlier Gemma/Qwen evidence showed that an unbounded allowance can repeat after a complete object, so qualification remains capped rather than becoming unlimited. The single primary result owns the complete wording, truth strength, and provenance contract. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `8000` in maintained interactive modes; full Fast Planner model timeout. The small first-response phase is expected to return much earlier in healthy operation, while complete structured planning is allowed to finish behind that user-visible progress. |
 Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |

@@ -136,7 +136,7 @@ those artifacts replaces the required explanation.
 
 When the current revision contains behavior changes that have not yet been
 qualified, or when multiple live cases are due, the first live reproduction is
-the complete manifest-owned cohort, not a sequence of case/edit/case loops.
+the complete directory-discovered cohort, not a sequence of case/edit/case loops.
 Capture one clean source and deployed runtime identity, start the cohort once,
 and keep that revision and runtime immutable until the runner finishes. Do not
 change source, prompts, profiles, services, or scenario selection between cases.

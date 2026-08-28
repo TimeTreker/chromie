@@ -172,8 +172,7 @@ and the small owner-approved speaking-style projection. It returns
 `FastPlannerFirstResponse`: zero or one exact `progress` or `complete_response`
 Communicative Activity with the epistemic/grounding evidence required for deterministic
 validation in that same primary result. A separate same-owner Epistemic Qualification
-LLM call is prohibited; the current development implementation's legacy call is a
-Charter nonconformity pending removal. Validation cannot rewrite text, retry, select a Capability,
+LLM call is prohibited and removed. Validation cannot rewrite text, retry, select a Capability,
 resolve an execution input, create a planning InformationGap, or ask a clarification;
 rejection or checker failure returns a null Activity. Runtime may then structurally
 validate and start accepted exact wording immediately; optional Social Attention
@@ -223,12 +222,7 @@ it does not call a second wording model or rewrite the act. A pre-evidence act
 cannot cite Evidence or claim a result, while a post-evidence act must cite exact
 Host-admitted Evidence.
 
-On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Any post-Evidence wording still receives the same bounded same-owner
-accept/reject Epistemic Qualification before delivery. The certificate
-has no wording or planning fields. Rejection or checker unavailability returns a
-semantic escalation for the existing Deep Planner (or fails closed); the Host never
-rewrites the sentence. This prevents a forecast probability below 100% from being
-promoted to certainty without adding a second result-semantic or response-authoring stage.
+On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Any post-Evidence wording must establish its exact Goal/Evidence scope, execution status, perspective, and epistemic strength in that same primary Planner result. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. Failure at this boundary escalates to the distinct Deep Planner pass when permitted or fails closed; the Host never rewrites the sentence.
 
 `POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may still finish a provider-free easy turn directly. Canonical Goal commit with provisional Work, association to retained Goal state, trusted Evidence/result re-entry, or another relevant open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
@@ -327,9 +321,9 @@ mechanically conserves the authoritative GI Responsibilities and their integrate
 source/coverage evidence; it does not invoke a coverage reviewer, critic, fresh
 interpretation, or final semantic recheck. A semantic, grounding, or conservation
 rejection fails closed and cannot be repaired at the same authority. The current
-development implementation still contains the older certificate/reconsideration
-path; that path is a documented Charter nonconformity, not a supported contract or
-release-ready behavior, and must be removed before qualification.
+development implementation follows this primary-result contract; repository policy
+rejects restoration of the older certificate/reconsideration path. Live model quality
+still requires current-revision qualification.
 
 `GoalAssociationResolution.resolution_status` is the terminal contract:
 `resolved` or `fail_closed`. `fail_closed` contains no associations, new Goals,

@@ -328,15 +328,14 @@ Read the diagram with these boundaries:
 - The same GI result first enters Fast Planner's bounded first-response phase. That
   phase may author one immediately realizable Communicative Activity, but it cannot
   select a Capability, resolve an execution input, or ask a planning clarification.
-  Before commitment, one bounded **same-owner Epistemic Qualification** checks the
-  immutable wording against the Activity's truth stage, Responsibility facts, and
-  supplied Evidence. It may only accept or reject. It cannot rewrite, repair, retry,
-  select another Communicative Act, choose a Capability, or change Goal meaning.
-  Rejection or verifier unavailability commits no first speech and does not block the
+  That primary invocation owns the exact wording, truth stage, Responsibility
+  provenance, and admitted-context grounding in one complete result. Trusted code
+  validates only typed shape, closed references, and mechanical truth/provenance
+  boundaries; it must not call a second model to confirm or reinterpret the sentence.
+  Malformed or unavailable primary output commits no first speech and does not block
   remaining Planner/GA work. The remaining Advance cannot author or salvage a substitute
-  progress Activity for that completed first-response decision. This is a narrow truth gate inside Fast Planner, not a
-  new response-authoring or semantic-review stage. As soon as that
-  bounded decision exists, the same Fast Planner continues the remaining
+  progress Activity for that completed first-response decision. As soon as that bounded
+  decision exists, the same Fast Planner continues the remaining
   Activity Plan while Goal Association independently begins from the unchanged GI
   result. Both retain the immutable admitted UserTurn as source evidence in addition to
   the structured GI Responsibility; source wording can expose lost qualifiers but does
@@ -990,12 +989,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    replacement wording or reopen ordinary meaning. TTS realizes accepted text as
    audio. Later planning may reuse the same act or plan a genuinely different act;
    it may not silently paraphrase one milestone into a second act.
-   Response-stage Goal coverage is not model-authored semantic truth:
+   Response-stage Goal coverage is not a second model-authored semantic decision:
    `covers_goal_ids` is mechanically projected from the immutable Plan/outcomes and
    exact reused-speech provenance after wording is accepted. A consequential response
-   may be checked by one immutable accept/reject
-   truth certificate, but that proof cannot author replacement wording or mutate
-   Goal/Plan/Social-Attention state, and it cannot enter its own repair workflow.
+   must carry its complete truth strength and evidence provenance in the primary
+   Planner result. Trusted code may validate only closed schema/provenance mechanics;
+   it cannot call another model to certify, review, or repair that response.
    Wording or presentation failure is local; it is not a reason to restart primary
    cognition. **Optional presentation must never reopen primary cognition.**
 
@@ -1034,12 +1033,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Planner alone decides whether the human-relevant next Main Activity is
    an answer, follow-up Work, revision, clarification, waiting, silence, or no new
    Activity; complex HOW may use the Planner deep pass. Neither Host nor a separate Tool Result Interpreter may
-   infer Goal ownership from result contents or author result meaning. Before a
-   post-Evidence answer is committed, one bounded same-owner Epistemic Qualification
-   may only accept or reject its immutable wording against the exact Goal/Evidence
-   snapshot. It cannot rewrite the answer. Rejection or qualification unavailability
-   delegates once through the existing Planner deep pass or fails closed; it never
-   creates a response-composition owner or repair chain. A mechanical DTO regeneration
+   infer Goal ownership from result contents or author result meaning. A post-Evidence
+   Fast or Deep primary result must itself preserve exact Goal/Evidence scope,
+   epistemic strength, execution status, perspective, and sibling-Goal boundaries.
+   Trusted code validates closed schema/provenance mechanics and must not invoke a
+   second same-owner model to qualify, review, or repair the response. A mechanical DTO regeneration
    may occur once without reconsidering meaning; it preserves the initial semantic
    disposition and may make schema defaults explicit so Runtime never guesses omitted
    scope. Consequential evidence/provenance failure remains fail-closed.
@@ -1085,8 +1083,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    checks, while the Cognitive Core owns what a returned result means, whether another
    Plan is needed, and whether any user-facing act is warranted. `ExecutionOutcomeBundle`
    remains immutable terminal execution truth and must not mislabel accepted/running work
-   as `not_run`. MCP, HTTP, gRPC, ROS 2, local Python, durable-workflow libraries, and future
-   transports/backends may realize execution beneath the same Capability contract without
+   as `not_run`. MCP, HTTP, gRPC, ROS 2, local Python, and future transports may realize
+   execution beneath the same Capability contract without
    becoming cognitive architecture. Do not add a parallel Work Manager, Result Agent, or
    Event Agent merely to implement this lifecycle.
 

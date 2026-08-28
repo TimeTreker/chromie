@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "nod_and_say_hello",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "common_must_pass_2026_08_28",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "A routine gesture-plus-speech request must preserve both the physical nods and the requested greeting.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["plan_completeness", "intent_understanding", "naturalness"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["plan_completeness", "intent_understanding", "naturalness"],
+    "primary_outcomes": ["Perform two nods and deliver a brief hello to the user."],
+    "acceptable_auxiliary": ["The greeting may be a natural equivalent such as 你好, 嗨, hello, or hi."],
+    "forbidden_semantic_outcomes": [
+      "Omit either the gesture or greeting.",
+      "Substitute ordinary speech for evidence that the nod executed.",
+      "Add an unrequested body action."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "点两下头，再跟我说声你好。",
+  "language": "zh-CN",
+  "expected_capabilities": ["soridormi.nod_yes"],
+  "expected_args": ["0:count=2"],
+  "require_speech": true,
+  "description": "A common body-plus-conversation request checks independent outcome coverage.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "multi_goal_daily_life",
+        "title": "Daily-Life Multi-Goal Coordination",
+        "general_rule": "Chromie should keep independent daily-life goals separate, assign every effectful step to the correct goal, execute supported goals in order, answer conversational goals, and clarify or report unavailable goals without dropping or cross-authorizing another goal.",
+        "rationale": "A routine gesture-plus-speech request must preserve both the physical nods and the requested greeting.",
+        "root_cause_boundaries": ["Goal Association", "Planner contract", "Fast Planner communication", "Trusted runtime adapter", "Trusted Capability Runtime/provider", "Test evidence"]
+      }
+    ]
+  }
+}

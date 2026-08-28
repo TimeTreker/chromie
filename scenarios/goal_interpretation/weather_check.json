@@ -54,5 +54,33 @@
         "output_mode": "information"
       }
     ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "A weather request without location remains clear at GI; Capability-input completeness and any question belong downstream to Planner.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "Weather meaning requires fresh evidence without turning a missing Capability location input into GI uncertainty.",
+        "root_cause_boundaries": [
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      }
+    ]
   }
 }

@@ -70,6 +70,25 @@ class CoreInterpretationUnavailable(BaseModel):
         return normalize_turn_text(str(value or ""))[:500]
 
 
+class ResponsibilitySourceEvidence(BaseModel):
+    """Primary-result citation into the authoritative admitted turn.
+
+    Goal Interpretation owns the semantic choice of the cited span. Trusted code
+    resolves the two closed token references back to the immutable turn and checks
+    only provenance, order, and non-overlap; it never retypes or resegments WHAT.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_start_token_ref: str = Field(min_length=1, max_length=24)
+    source_end_token_ref: str = Field(min_length=1, max_length=24)
+
+    @field_validator("source_start_token_ref", "source_end_token_ref", mode="before")
+    @classmethod
+    def normalize_source_token_ref(cls, value: Any) -> str:
+        return normalize_turn_text(str(value or ""))
+
+
 class CognitiveResponsibilityProposal(BaseModel):
     """Context-bound WHAT understood by Goal Interpretation.
 
@@ -144,6 +163,16 @@ class CognitiveResponsibilityProposal(BaseModel):
     relationship: GoalRelationship = "new"
     target_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    source_evidence: ResponsibilitySourceEvidence | None = Field(
+        default=None,
+        description=(
+            "Primary Goal-Interpretation evidence citing the exact inclusive token "
+            "span in the authoritative admitted turn that grounds this one "
+            "Responsibility. The live GI contract requires it; the optional model "
+            "default preserves construction of bounded downstream/test projections "
+            "that do not themselves author GI meaning."
+        ),
+    )
 
     @field_validator("local_ref", "outcome", mode="before")
     @classmethod

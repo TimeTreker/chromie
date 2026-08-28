@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "wal_forward_typo_walk",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "rationale": "ASR-style typo should be understood as a walking request when the live catalog supports walking.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "dialogue_continuity",
+      "naturalness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "intent_understanding",
+      "dialogue_continuity",
+      "naturalness"
+    ],
+    "primary_outcomes": [
+      "ASR-style typo should be understood as a walking request when the live catalog supports walking."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Misread the user meaning or invent a missing referent.",
+      "Expose internal workflow or model language as the response."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "Wal forward for 15 seconds, quickly.",
+  "expected_capabilities": [
+    "soridormi.walk_forward"
+  ],
+  "description": "ASR-style typo should be understood as a walking request when the live catalog supports walking.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "ASR-style typo should be understood as a walking request when the live catalog supports walking.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/goal interpretation",
+          "Agent contract",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

@@ -19,10 +19,8 @@ from agent.app.planner_fast_validation import (
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
-    planner_coverage_review_response_schema,
 )
 from agent.app.planner_validation import (
-    coordinated_action_goal_ids,
     information_goal_ids_without_declared_provider,
     qualify_capability_catalog_for_information_domains,
     validate_goal_responsibility_outcomes,
@@ -324,64 +322,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             sing_outcome["properties"]["step_ids"]["maxItems"],
             0,
         )
-
-    def test_coverage_review_schema_requires_branch_complete_output(self) -> None:
-        schema = planner_coverage_review_response_schema()
-
-        self.assertEqual(
-            set(schema["required"]),
-            {
-                "decision",
-                "confidence",
-                "semantic_mismatch_found",
-                "uncovered_requirements",
-                "reason",
-            },
-        )
-        branches = schema["allOf"][0]["anyOf"]
-        self.assertEqual(
-            branches[0]["properties"]["uncovered_requirements"]["maxItems"],
-            0,
-        )
-        self.assertEqual(
-            branches[1]["properties"]["uncovered_requirements"]["minItems"],
-            1,
-        )
-
-    def test_single_model_authored_executable_goal_requires_coverage_audit(self) -> None:
-        goal_ids = coordinated_action_goal_ids(
-            [
-                {
-                    "goal_id": "goal-fetch-water",
-                    "description": "Bring the user a cup of water.",
-                    "metadata": {"output_mode": "body_action"},
-                    "object": {
-                        "bindings": {
-                            "item": {
-                                "name": "item",
-                                "entity_type": "object",
-                                "value": "water",
-                            }
-                        }
-                    },
-                }
-            ]
-        )
-
-        self.assertEqual(goal_ids, {"goal-fetch-water"})
-
-    def test_plain_information_goal_does_not_imply_execution_scope_audit(self) -> None:
-        goal_ids = coordinated_action_goal_ids(
-            [
-                {
-                    "goal_id": "goal-current-place",
-                    "description": "Find a currently open restaurant.",
-                    "metadata": {"output_mode": "information"},
-                }
-            ]
-        )
-
-        self.assertEqual(goal_ids, set())
 
     def test_semantic_coverage_rejection_does_not_trigger_safety_revision(self) -> None:
         feedback = [
@@ -716,20 +656,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     ],
                     "confidence": 1.0,
                     "reason_summary": "Treat the fragment as conversation.",
-                },
-                {
-                    "responsibility_items": [
-                        {
-                            "source_excerpt": "F.",
-                            "role": "responsibility",
-                            "coverage": "covered",
-                            "independently_satisfiable": True,
-                            "candidate_goal_indices": [0],
-                        }
-                    ],
-                    "supporting_items": [],
-                    "reason_summary": "The candidate covers the conversational act.",
-                },
+                }
             ]
         )
         resolution = await GoalAssociationResolver(ollama).resolve(  # type: ignore[arg-type]
@@ -743,7 +670,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             resolution.new_goals[0].description,
             "Respond naturally to F.",
         )
-        self.assertEqual(len(ollama.schemas), 2)
+        self.assertEqual(len(ollama.schemas), 1)
         self.assertEqual(
             ollama.schemas[0]["properties"]["decision"]["enum"],
             ["create_goals"],

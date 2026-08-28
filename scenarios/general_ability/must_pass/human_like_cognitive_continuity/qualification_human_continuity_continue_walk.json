@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "qualification_human_continuity_continue_walk",
+  "stage": "must_pass",
+  "difficulty": "medium",
+  "rationale": "A follow-up continuation must bind to the retained walking Goal and perform exactly one new continuation effect rather than acknowledge or execute twice.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "dialogue_continuity",
+      "naturalness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "dialogue_continuity",
+      "naturalness"
+    ],
+    "primary_outcomes": [
+      "A follow-up continuation must bind to the retained walking Goal and perform exactly one new continuation effect rather than acknowledge or execute twice."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
+      "Optional social attention may be absent and must not delay or replace the primary act."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Lose the active conversational Goal or invent stale dialogue.",
+      "Respond mechanically in a way that ignores the retained human context."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "description": "A follow-up continuation must bind to the retained walking Goal and perform exactly one new continuation effect rather than acknowledge or execute twice.",
+  "turns": [
+    {
+      "id": "human_continuity_walk_context",
+      "text": "你往前走 10 秒。",
+      "language": "zh-CN",
+      "expected_capabilities": [
+        "soridormi.walk_forward"
+      ],
+      "expected_args": [
+        "0:duration_s=10.0"
+      ],
+      "require_speech": false,
+      "min_new_goal_count": 1,
+      "min_goal_outcome_count": 1,
+      "expected_observations": [
+        {
+          "type": "locomotion.walk_forward",
+          "args": {
+            "duration_s": 10.0
+          },
+          "min_occurrences": 1,
+          "max_occurrences": 1
+        }
+      ]
+    },
+    {
+      "id": "human_continuity_continue",
+      "text": "刚才那个继续。",
+      "language": "zh-CN",
+      "expected_capabilities": [
+        "soridormi.walk_forward"
+      ],
+      "expected_args": [
+        "0:duration_s=10.0"
+      ],
+      "require_speech": false,
+      "min_goal_outcome_count": 1,
+      "expected_observations": [
+        {
+          "type": "locomotion.walk_forward",
+          "args": {
+            "duration_s": 10.0
+          },
+          "min_occurrences": 1,
+          "max_occurrences": 1
+        }
+      ],
+      "forbid_repeat_of_previous_speech": true
+    }
+  ],
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "human_like_cognitive_continuity",
+        "title": "Human-like Cognitive Continuity",
+        "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+        "rationale": "A follow-up continuation must bind to the retained walking Goal and perform exactly one new continuation effect rather than acknowledge or execute twice.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "Goal Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}
