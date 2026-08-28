@@ -353,3 +353,4 @@ documented in
 - [Operations Runbook](CHROMIE_RUNBOOK.md): startup and recovery
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
 - [Documentation Index](docs/README.md): owner for every documentation fact
+- [Architecture Audit](ARCHITECTURE_AUDIT.md): external point-in-time review of the architecture and charter, 2026-08-28; not a maintained authority

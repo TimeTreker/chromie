@@ -223,6 +223,7 @@ mechanical-contract owner.
 - [Support](../SUPPORT.md)
 - [Changelog](../CHANGELOG.md)
 - [Coding Agent Guidance](../AGENTS.md)
+- [Architecture Audit](../ARCHITECTURE_AUDIT.md): external point-in-time review, 2026-08-28; not a maintained authority
 
 ## Update rules
 
