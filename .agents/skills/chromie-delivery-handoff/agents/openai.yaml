@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chromie Delivery Handoff"
+  short_description: "Prepare truthful Chromie delivery handoffs"
+  default_prompt: "Use $chromie-delivery-handoff to prepare this Chromie change for commit and push."
