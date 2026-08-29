@@ -102,6 +102,7 @@ class TextScenarioCase:
     require_safe_idle: bool = False
     expected_repeat_of_previous_speech: bool = False
     forbid_repeat_of_previous_speech: bool = False
+    trusted_target_context: dict[str, Any] = field(default_factory=dict)
     description: str = ""
     turns: tuple["TextScenarioCase", ...] = field(default_factory=tuple)
 
@@ -186,6 +187,57 @@ def _tuple_of_strings(value: Any) -> tuple[str, ...]:
     if isinstance(value, (list, tuple)):
         return tuple(str(item).strip() for item in value if str(item).strip())
     return (str(value).strip(),) if str(value).strip() else ()
+
+
+def _trusted_target_context(value: Any, *, case_id: str) -> dict[str, Any]:
+    """Validate one retained simulator target fixture without authoring meaning."""
+
+    if value in (None, {}):
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"live text scenario {case_id!r} trusted_target_context must be an object"
+        )
+    allowed = {
+        "source",
+        "target_ref",
+        "relative_direction",
+        "confidence",
+        "evidence_refs",
+    }
+    unknown = set(value) - allowed
+    if unknown:
+        raise ValueError(
+            f"live text scenario {case_id!r} trusted_target_context has unknown "
+            f"fields {sorted(unknown)}"
+        )
+    source = str(value.get("source") or "").strip()
+    target_ref = str(value.get("target_ref") or "").strip()
+    if source not in {"live_perception", "conversation_context"} or not target_ref:
+        raise ValueError(
+            f"live text scenario {case_id!r} trusted_target_context requires an "
+            "approved source and non-empty target_ref"
+        )
+    confidence = value.get("confidence", 0.0)
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise ValueError(
+            f"live text scenario {case_id!r} target confidence must be numeric"
+        )
+    confidence_value = float(confidence)
+    if not 0.0 <= confidence_value <= 1.0:
+        raise ValueError(
+            f"live text scenario {case_id!r} target confidence must be within [0,1]"
+        )
+    normalized: dict[str, Any] = {
+        "source": source,
+        "target_ref": target_ref,
+        "confidence": confidence_value,
+        "evidence_refs": list(_tuple_of_strings(value.get("evidence_refs"))),
+    }
+    relative_direction = str(value.get("relative_direction") or "").strip()
+    if relative_direction:
+        normalized["relative_direction"] = relative_direction
+    return normalized
 
 
 def _speech_text(summary: dict[str, Any]) -> str:
@@ -1060,6 +1112,10 @@ def _text_scenario_case(
         forbid_repeat_of_previous_speech=bool(
             raw.get("forbid_repeat_of_previous_speech", False)
         ),
+        trusted_target_context=_trusted_target_context(
+            raw.get("trusted_target_context"),
+            case_id=case_id,
+        ),
         description=str(raw.get("description") or ""),
     )
 
@@ -1927,6 +1983,7 @@ def _live_case_namespace(
         reject_internal_speech=True,
         reject_speech_pattern=[],
         cognitive_runtime=args.goal_driven_runtime == "apply",
+        trusted_target_context=dict(case.trusted_target_context),
     )
 
 
@@ -2184,6 +2241,7 @@ def _semantic_review_bundle(
                     "ability_class": ability.ability_id,
                     "stage": ref.stage,
                     "difficulty": ref.difficulty,
+                    "trusted_target_context": dict(case.trusted_target_context),
                 },
                 "capabilities": list(case.expected_capabilities),
                 "expectations": {

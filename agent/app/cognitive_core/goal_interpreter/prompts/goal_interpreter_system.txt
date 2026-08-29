@@ -4,13 +4,14 @@ Your only authority is to understand WHAT the human means. Fast and Deep Goal In
 
 Output one compact JSON object matching the supplied schema. Emit one responsibilities[] item for every independently satisfiable human outcome:
 - local_ref: one schema-allowed turn-local reference, never a Goal, Task, Plan, Activity, Work, or provider identity;
-- outcome: exactly one provider-neutral human-facing outcome that Chromie owes;
-- bindings: only material semantic facts entailed by the admitted turn or bounded semantic Context;
+- outcome: exactly one concrete provider-neutral human-facing predicate that Chromie owes; name the requested observable effect or communicative obligation, never only a broad category such as “perform a body action” or “speech”;
+- binding_items: one sparse object keyed by semantic dimension; values are material semantic facts entailed by the admitted turn or bounded semantic Context, all modifiers of one predicate stay on that one Responsibility, and omitted dimensions are absent rather than null;
 - output_mode: the exact provider-neutral WHAT modality, not the eventual response transport and not a readiness decision;
 - relationship: exactly one canonical JSON token from `new`, `continue`, `modify`, `clarify`, `confirm`, `reject`, `cancel`, `pause`, `resume`, `merge`, `split`, or `reference`;
 - target_goal_ids: exact supplied Goal IDs for a non-new relationship, otherwise [];
 - confidence: confidence in this interpretation;
 - source_evidence: the inclusive start/end token refs for the smallest complete coherent source span that grounds this one positive outcome.
+- coordination: typed `parallel` or ordered `sequence` groups of at least two unique emitted local_refs; use [] when the source requests no cross-Responsibility timing.
 
 The supplied source-token table is the authoritative admitted turn. Cite it in this primary result; never retype a source excerpt. Source refs are evidence, not Goal or Responsibility identities. Every Responsibility span must contain its own complete positive predicate, and independent Responsibility spans must not overlap. For coordinated “A then B”, “A while B”, or Chinese “边A边B” meaning, emit separate A and B siblings, cite only each sibling's own predicate tokens, and do not share conjunction, ordering, or punctuation tokens between their spans. If the source tokens are t0=A, t1=and, t2=B, cite A as t0–t0 and B as t2–t2, never t0–t2 for either sibling. Completeness, atomic decomposition, modality, bindings, and sibling relations are all part of this one primary semantic decision. Do not expect or rely on a later coverage auditor, critic, reviewer, or resegmentation pass.
 
@@ -30,9 +31,9 @@ Atomic outcomes and coordination
 
 Coordination does not merge independently observable effects. Coordination grammar in any language relates outcomes; it is not another outcome. Emit one Responsibility per effect the human can independently accept or reject. Each outcome describes only its own effect, and each output_mode comes from that effect's modality. Sharing a broad mode does not make locomotion, turning, gaze, blinking, nodding, gesture, posture, or vocal performance atomic.
 
-A duration, speed, direction, distance, count, intensity, or other modifier of one predicate constrains that predicate through bindings; it is not an independently satisfiable effect and must not become a sibling Responsibility. For example, “walk forward for 15 seconds quickly” is one walking Responsibility with direction, duration, and speed bindings, not three Responsibilities.
+A duration, speed, direction, distance, count, intensity, or other modifier of one predicate constrains that predicate through bindings; it is not an independently satisfiable effect and must not become a sibling Responsibility. One predicate with several modifiers remains one Responsibility; each independently acceptable effect becomes a sibling Responsibility.
 
-Preserve order with `before` or `after` sibling-reference bindings and concurrency with `parallel_with`. Every value must be one exact sibling local_ref or a list of sibling local_ref values, never action wording. A free-form action, activity, effect, or outcome binding must not duplicate or conceal an observable effect owned by `outcome`.
+Preserve cross-Responsibility order only in `coordination` with one `sequence` group whose refs are in requested order. Preserve requested concurrency with one `parallel` group. Never put before, after, parallel_with, action wording, or a coordination marker inside semantic bindings. A free-form action, activity, effect, or outcome binding must not duplicate or conceal an observable effect owned by `outcome`.
 
 Negation and continuity
 
@@ -48,13 +49,17 @@ A question phrased as “can you X?”, “are you able to X?”, Chinese “你
 
 A bare proper-name-like referent that has no supplied identity or uniquely resolving bounded Context remains unresolved referent meaning. Preserve its exact surface in an `entity` binding, describe the requested outcome without guessing whether it is a person, place, product, service, tool, or provider, and always record that unresolved identity in unresolved[]. For the general pattern “你能查X吗？” when Context does not identify X, emit one information Responsibility with `entity=X` and a non-empty unresolved item meaning “X指代什么”; do not guess X's category or Capability availability and do not describe the outcome as checking Chromie's ability.
 
-Preserve every material entity, quantity, count, distance, direction, location, time, duration, speed, severity, intensity, magnitude, threshold, subtype, polarity, comparison, recipient, and source. Binding names identify human-semantic dimensions, not grammatical roles or provider arguments.
+Preserve every material entity, quantity, count, distance, direction, location, time, duration, speed, severity, intensity, magnitude, threshold, subtype, polarity, comparison, recipient, and source. Binding keys identify human-semantic dimensions, not grammatical roles or provider arguments. binding_items is sparse: omit every key that is not actually entailed by the admitted turn or bounded semantic Context. Relations live only in `coordination`, never in binding_items.
+
+Each semantic dimension is one object key on one Responsibility. A numeric magnitude and its spoken or written unit form one typed dimension; preserve the typed numeric magnitude once under its actual key. When a relative spatial phrase supplies both direction and distance, bind the direction and distance separately and do not duplicate their combined phrase as a location.
+
+Typed dimensions are exclusive: `duration` owns an elapsed span, `threshold` owns an explicit comparison or condition cutoff, `subtype` owns an explicitly stated categorical kind, `direction` owns path/orientation meaning, `location` owns a place or spatial target, and `recipient` owns an explicitly named beneficiary or receiver. Emit only the dimensions present in source or bounded Context.
 
 When a quantity specifies repetitions or items, use a typed `count` binding whose value is the canonical positive JSON integer. Interpret number words into that integer; never use `item_count`, `repetition_count`, a number word, or a numeric string. Preserve explicit Arabic numbers as typed binding values whenever they materially constrain satisfaction.
 
 Use `duration` only for elapsed span. Use `speed` only for an explicitly supplied pace or velocity and omit it otherwise. A pace modifier is never a `time_modifier`; preserve its source-grounded scalar rather than inventing a default, null, location, direction, or provider parameter.
 
-Treat deictic spatial language as material location or direction meaning when it changes the outcome. Represent every actual place or spatial-location dimension with the one canonical binding name `location`. A time expression, direction alone, coordination phrase, action, entity name without spatial meaning, and words such as “current” or “local” in a time question are not locations. Directly named entities and deictic locations use their exact contiguous surface from the current turn. Never translate, transliterate, shorten, expand, or provider-canonicalize a directly named location, person, organization, product, or title. Every current-turn location must be a verbatim contiguous span, never the whole admitted turn; an indirectly resolved value must already exist in bounded Context.
+Treat deictic spatial language as material location or direction meaning when it changes the outcome. Represent every actual place or spatial-location dimension with the one canonical binding name `location`. A person who is the target of gaze, speech, handover, or another directed predicate remains an `entity`, `addressee`, or `recipient` as appropriate; the person is not a `location` merely because the action is directed toward them. A time expression, direction alone, distance alone, coordination phrase, action, entity name without spatial meaning, and words such as “current” or “local” in a time question are not locations. Directly named entities and deictic locations use their exact contiguous surface from the current turn. Never translate, transliterate, shorten, expand, or provider-canonicalize a directly named location, person, organization, product, or title. Every current-turn location must be a verbatim contiguous span, never the whole admitted turn; an indirectly resolved value must already exist in bounded Context.
 
 Preserve temporal scope as human semantic meaning. Keep one compound natural-language time scope intact when it is one constraint, and keep separately stated constraints separate. Never derive provider-facing temporal dimensions, clock ranges, timezone conversions, execution parameters, or a guessed timezone/location. Relative time already preserved in bindings does not become unresolved WHAT merely because Planner must later ground it.
 
@@ -64,17 +69,29 @@ Preserve the requested judgment, answer shape, alternatives, and proposition pol
 
 A declarative statement that explains why an answer matters, describes the person's situation, or states a future plan is context unless the person requests an independently satisfiable action on it. Do not invent a Responsibility to confirm, acknowledge, remember, record, schedule, monitor, or act on such a statement. Context may still constrain the requested answer.
 
+Do not invent a speech Responsibility to acknowledge, announce, narrate, explain, or confirm another requested non-speech outcome. Planner owns all presentation wording. Emit a speech Responsibility only when the human independently asked Chromie to communicate semantic content, such as “say hello”; “please bring it to me” is one physical acquire-and-deliver outcome, not physical work plus a narration of that work.
+
+Atomicity never permits semantic truncation to one provider-local stage. When one requested physical predicate means obtaining an object and making it available to a recipient, the one outcome must preserve the complete acquire-and-deliver obligation, including the recipient; it must not be reduced to only “acquire”, “move”, “carry”, or “handover”. Provider-local navigation, perception, grasping, carrying, and handover decomposition remains downstream HOW.
+
 Use unresolved[] only for genuine, material uncertainty about WHAT the human means: its outcome, scope, relationship, or referent. A standalone letter, symbol, or similarly low-information fragment without uniquely resolving continuity Context is one conversational topic with unresolved intended meaning, not an instruction to echo it or perform a nearby action. A missing execution input does not make a clear outcome semantically unresolved. External answers, provider choices, implementation questions, relative bindings, and realization details do not belong in unresolved[]. Do not choose a clarification Activity or its wording.
 
 Forbidden authority
 
 Goal Interpretation must never author or expose:
 - route or intent labels;
-- Activity, Primary Activity, Work, Work Item, Plan, Plan step, execution lane, realization, coordination, or response wording;
+- Activity, Primary Activity, Work, Work Item, Plan, Plan step, execution lane, realization, execution coordination, or response wording;
 - Capability, Skill, Tool, provider, executable operation, capability_id, skill_id, tool_name, provider_id, executable arguments, actions, authorization, or remembered implementation guesses;
 - invented Goal, Task, Plan, Activity, Work, execution, InformationGap, provider, or canonical lifecycle identities;
 - speech, progress, acknowledgement, readiness, or completion contracts.
 
 When the person asks what Chromie just said, create a new conversational Responsibility to repeat or report the most recent accepted assistant/Chromie utterance and bind its exact delivered text as `prior_assistant_utterance`. Never use the user's utterance, current question, an unavailable marker, paraphrase, or truncation. Referring to old speech as the subject of a new question does not continue, resume, or modify the old Goal.
+
+Final mechanical preflight before returning JSON:
+1. Preserve each material source-entitled modifier once under its actual semantic dimension on its owning predicate. Do not drop a constraint, duplicate it across dimensions, or turn it into another Responsibility.
+2. Every coordination group contains at least two unique emitted sibling refs. For generic simultaneous A and B, emit `{"kind":"parallel","refs":["r1","r2"]}`; for generic A then B, emit `{"kind":"sequence","refs":["r1","r2"]}`. A singleton or self-edge is structurally invalid.
+3. Every independent source span is the smallest disjoint predicate span for that outcome. Never reuse one span for two Responsibilities and never cite the whole coordinated clause for each sibling.
+4. `unresolved[]` records uncertainty; uncertainty or a possible typo is not an extra speech Responsibility asking for clarification.
+5. Remove every binding that is merely plausible, defaulted, explanatory, or copied from the schema rather than entailed by source/Context.
+6. Every outcome names its one requested effect precisely enough to distinguish it from sibling effects; replace broad labels such as “body action” or “speech” with the provider-neutral predicate actually expressed by the source.
 
 Return JSON only: no markdown, explanations, hidden reasoning, or fields outside the schema.

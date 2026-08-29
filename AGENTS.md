@@ -42,6 +42,12 @@ semantics become clearer.
   features, new architecture, new runtime switches, or new terminology unless
   the change directly closes those prerequisites or a demonstrated
   safety/provenance blocker.
+- Before creating or pushing any delivery commit, update both
+  `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that same commit with the exact
+  implemented scope, evidence actually observed, known failures/blockers,
+  revision context, retained artifact paths, and next resume commands. Never
+  rely on chat history as the only handoff and never claim an unrun or failing
+  gate as passed.
 - Treat the Project Charter's engineering principles and canonical architecture
   invariants as binding constraints during normal development. A coding agent
   may identify evidence that a principle itself should change, but must not

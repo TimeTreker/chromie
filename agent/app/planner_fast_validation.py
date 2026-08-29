@@ -24,7 +24,11 @@ except ImportError:  # pragma: no cover
 
 from .capabilities.validator import validate_args_for_schema
 from .planner_context import planner_goal_execution_requirements
-from .planner_grounding import semantic_numeric_values
+from .planner_grounding import (
+    _argument_realization_contract,
+    _material_values_equal,
+    semantic_numeric_values,
+)
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
 from .planner_validation import (
     parallel_activity_contract_errors,
@@ -53,6 +57,46 @@ class AuthoritativeGroundingValidationError(ValueError):
 
 class FastAdvanceMechanicalSchedulingError(PlannerDTOContractError):
     """A timing label is mechanically unusable without changing its meaning."""
+
+
+def _contains_exact_material_value(container: Any, expected: Any) -> bool:
+    """Return whether a declared structured realization conserves one GI value.
+
+    This is deliberately representation-only. The Capability owns which
+    semantic binding may realize into which provider argument; trusted code only
+    checks that the selected structured argument still contains the exact source
+    value somewhere in that declared argument subtree.
+    """
+
+    if _material_values_equal(container, expected):
+        return True
+    if isinstance(container, dict):
+        return any(
+            _contains_exact_material_value(value, expected)
+            for value in container.values()
+        )
+    if isinstance(container, list):
+        return any(
+            _contains_exact_material_value(value, expected)
+            for value in container
+        )
+    return False
+
+
+def _is_physical_resource_structured_realization(
+    definition: dict[str, Any],
+    parameter_schema: dict[str, Any],
+) -> bool:
+    """Recognize the typed resource boundary, never a capability-name pattern."""
+
+    hints = definition.get("hints")
+    scope = hints.get("semantic_scope") if isinstance(hints, dict) else None
+    return (
+        isinstance(scope, dict)
+        and scope.get("responsibility_type") == "acquire_and_deliver_resource"
+        and "physical_object" in set(scope.get("resource_kinds") or [])
+        and parameter_schema.get("type") == "object"
+    )
 
 
 def planner_validation_error_items(
@@ -666,6 +710,83 @@ def validate_fast_advance_output(
             if not isinstance(parameter_schema, dict):
                 continue
             if "default" in parameter_schema:
+                continue
+            # target_ref is not authored from a GI scalar binding.  GI owns the
+            # person/addressee meaning; the Planner realizes that meaning against
+            # the Runtime's current trusted target evidence.  Validate the exact
+            # opaque reference independently of a Capability's optional
+            # argument_realization metadata so a valid live target does not look
+            # like an invented required input.
+            if parameter == "target_ref":
+                target_context = request.context.get(
+                    "planner_auxiliary_social_context"
+                )
+                target_evidence = (
+                    target_context.get("target_evidence")
+                    if isinstance(target_context, dict)
+                    else None
+                )
+                target = (
+                    target_evidence.get("target")
+                    if isinstance(target_evidence, dict)
+                    and target_evidence.get("available")
+                    else None
+                )
+                expected_target_ref = str(
+                    target.get("target_ref")
+                    if isinstance(target, dict)
+                    else ""
+                ).strip()
+                actual_target_ref = str(
+                    activity.args.get(parameter) or ""
+                ).strip()
+                if (
+                    not expected_target_ref
+                    or actual_target_ref != expected_target_ref
+                ):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner target realization must copy exact "
+                        "current trusted target evidence: "
+                        f"{activity.capability_id}.{parameter}"
+                    )
+                continue
+            realization_sources = [
+                binding_name
+                for binding_name in authoritative_bindings
+                if (
+                    realization := _argument_realization_contract(
+                        definition,
+                        binding_name,
+                    )
+                )
+                is not None
+                and parameter
+                in {
+                    str(name)
+                    for name in realization.get("arguments") or []
+                }
+            ]
+            if realization_sources:
+                if _is_physical_resource_structured_realization(
+                    definition,
+                    parameter_schema,
+                ):
+                    actual_subtree = activity.args.get(parameter)
+                    missing_sources = [
+                        binding_name
+                        for binding_name in realization_sources
+                        if not _contains_exact_material_value(
+                            actual_subtree,
+                            authoritative_bindings[binding_name],
+                        )
+                    ]
+                    if missing_sources:
+                        raise AuthoritativeGroundingValidationError(
+                            "Fast Planner structured resource realization omitted "
+                            "exact GI bindings: "
+                            f"{activity.capability_id}.{parameter}="
+                            + ",".join(sorted(missing_sources))
+                        )
                 continue
             if parameter not in authoritative_bindings:
                 raise AuthoritativeGroundingValidationError(

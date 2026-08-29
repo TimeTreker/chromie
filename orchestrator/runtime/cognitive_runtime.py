@@ -1277,27 +1277,11 @@ class CanonicalPlanRuntimeAdapter:
 
         if plan.communicative_acts:
             executable_goal_ids = set(plan.executable_goal_ids())
-            clarification_acts = [
-                act for act in plan.communicative_acts if act.role == "clarification"
-            ]
-            execution_acts = [
-                act
-                for act in plan.communicative_acts
-                if act.role != "clarification"
-                and set(act.source_goal_ids).intersection(executable_goal_ids)
-            ]
-            other_acts = [
-                act
-                for act in plan.communicative_acts
-                if act.role != "clarification" and act not in execution_acts
-            ]
 
             def stage_for_acts(
                 acts: list[Any],
                 *,
-                speech_act: str,
-                commitment_state: str,
-                must_not_claim_completion: bool,
+                phase: str,
             ) -> ResponseStage | None:
                 if not acts:
                     return None
@@ -1316,6 +1300,31 @@ class CanonicalPlanRuntimeAdapter:
                         reused_event_id = " ".join(
                             str(reused_event.get("event_id") or "").strip().split()
                         )
+                clarification = any(act.role == "clarification" for act in acts)
+                terminal_communication = (
+                    all(act.role == "complete_response" for act in acts)
+                    and not set(covered).intersection(executable_goal_ids)
+                )
+                if clarification:
+                    speech_act = "ask_clarification"
+                    commitment_state = "waiting_for_user"
+                    must_not_claim_completion = True
+                elif phase == "pre_action" and confirmation_required:
+                    speech_act = "ask_confirmation"
+                    commitment_state = "waiting_for_user"
+                    must_not_claim_completion = True
+                elif terminal_communication:
+                    speech_act = acts[0].speech_act
+                    commitment_state = "completed"
+                    must_not_claim_completion = False
+                elif phase in {"pre_action", "progress"}:
+                    speech_act = acts[0].speech_act
+                    commitment_state = "evaluating"
+                    must_not_claim_completion = True
+                else:
+                    speech_act = acts[0].speech_act
+                    commitment_state = "none"
+                    must_not_claim_completion = True
                 return ResponseStage(
                     text=text,
                     speech_act=speech_act,
@@ -1327,6 +1336,7 @@ class CanonicalPlanRuntimeAdapter:
                     metadata={
                         "wording_owner": "planner",
                         "canonical_plan_id": plan.plan_id,
+                        "delivery_phase": phase,
                         "communicative_activity_ids": [
                             act.activity_id for act in acts
                         ],
@@ -1346,38 +1356,40 @@ class CanonicalPlanRuntimeAdapter:
             # ResponsePlan is a transport projection only. It combines exact
             # Planner-owned Activities that share a delivery phase; it never
             # invents or rewrites their wording.
-            immediate_acts = [*other_acts, *clarification_acts]
-            immediate = stage_for_acts(
-                immediate_acts,
-                speech_act=(
-                    "ask_clarification"
-                    if clarification_acts
-                    else (other_acts[0].speech_act if other_acts else "inform")
-                ),
-                commitment_state=(
-                    "waiting_for_user"
-                    if clarification_acts
-                    else (
-                        "completed"
-                        if plan.disposition == "respond"
-                        else "none"
-                    )
-                ),
-                must_not_claim_completion=(
-                    bool(clarification_acts) or plan.disposition != "respond"
-                ),
-            )
-            pre_action = stage_for_acts(
-                execution_acts,
-                speech_act=("ask_confirmation" if confirmation_required else "inform"),
-                commitment_state=(
-                    "waiting_for_user" if confirmation_required else "evaluating"
-                ),
-                must_not_claim_completion=True,
-            )
+            acts_by_phase = {
+                phase: [
+                    act
+                    for act in plan.communicative_acts
+                    if act.delivery_phase == phase
+                ]
+                for phase in ("immediate", "pre_action", "progress", "final")
+            }
             response_plan = ResponsePlan(
-                immediate=immediate,
-                pre_action=pre_action,
+                immediate=stage_for_acts(
+                    acts_by_phase["immediate"],
+                    phase="immediate",
+                ),
+                pre_action=stage_for_acts(
+                    acts_by_phase["pre_action"],
+                    phase="pre_action",
+                ),
+                progress=(
+                    [
+                        progress_stage
+                    ]
+                    if (
+                        progress_stage := stage_for_acts(
+                            acts_by_phase["progress"],
+                            phase="progress",
+                        )
+                    )
+                    is not None
+                    else []
+                ),
+                final=stage_for_acts(
+                    acts_by_phase["final"],
+                    phase="final",
+                ),
             )
             fingerprint = canonical_plan_fingerprint(plan)
             planner_response = PlannerResponseProjection(
@@ -1747,7 +1759,6 @@ class CanonicalPlanRuntimeAdapter:
         omitted_pre_execution_speech_phases: list[str] = []
         projected_speech_stages: list[dict[str, Any]] = []
         if effectful_pre_execution:
-            required_goal_ids = set(plan.goal_ids)
             immediate_item = (
                 ("immediate", response_plan.immediate)
                 if response_plan.immediate is not None
@@ -1761,57 +1772,48 @@ class CanonicalPlanRuntimeAdapter:
             available_pre_execution = [
                 item for item in (immediate_item, pre_action_item) if item is not None
             ]
+            final_items = (
+                [("final", response_plan.final)]
+                if response_plan.final is not None
+                else []
+            )
             covered_pre_execution = {
                 goal_id for _, stage in available_pre_execution for goal_id in stage.covers_goal_ids
             }
+            required_pre_execution_goal_ids = set(covered_pre_execution)
 
             # A safe, read-only lookup may start immediately without any spoken
             # acknowledgement. If the response model supplied a tiny natural
             # acknowledgement, it is optional and runs in parallel with the lookup.
-            # Effectful or confirmation-gated work retains the delivery barrier.
+            # Effectful or confirmation-gated pre-action speech retains the
+            # delivery barrier. A Planner-authored final phase remains after Work
+            # and is never forced to claim ownership of executable Goals.
             if safe_read_parallel:
-                if not safe_read_speech_optional and not available_pre_execution:
-                    raise ValueError(
-                        "mixed safe-read execution requires response speech for "
-                        "its non-executing goals"
-                    )
-                if available_pre_execution and not required_goal_ids.issubset(
-                    covered_pre_execution
-                ):
-                    raise ValueError(
-                        "safe-read pre-execution speech, when present, must cover "
-                        "all canonical goals"
-                    )
-                if pre_action_item is not None and required_goal_ids.issubset(
+                if pre_action_item is not None and required_pre_execution_goal_ids.issubset(
                     set(pre_action_item[1].covers_goal_ids)
                 ):
-                    stage_items = [pre_action_item]
-                elif immediate_item is not None and required_goal_ids.issubset(
+                    selected_pre_execution = [pre_action_item]
+                elif immediate_item is not None and required_pre_execution_goal_ids.issubset(
                     set(immediate_item[1].covers_goal_ids)
                 ):
-                    stage_items = [immediate_item]
+                    selected_pre_execution = [immediate_item]
                 else:
-                    stage_items = []
+                    selected_pre_execution = list(available_pre_execution)
             else:
                 if pure_execution_speech_optional:
-                    stage_items = []
-                elif not available_pre_execution or not required_goal_ids.issubset(
-                    covered_pre_execution
-                ):
-                    raise ValueError(
-                        "effectful pre-execution response requires immediate and/or "
-                        "pre_action stages covering all canonical goals"
-                    )
-                elif pre_action_item is not None and required_goal_ids.issubset(
+                    selected_pre_execution = []
+                elif pre_action_item is not None and required_pre_execution_goal_ids.issubset(
                     set(pre_action_item[1].covers_goal_ids)
                 ):
-                    stage_items = [pre_action_item]
-                elif immediate_item is not None and required_goal_ids.issubset(
+                    selected_pre_execution = [pre_action_item]
+                elif immediate_item is not None and required_pre_execution_goal_ids.issubset(
                     set(immediate_item[1].covers_goal_ids)
                 ):
-                    stage_items = [immediate_item]
+                    selected_pre_execution = [immediate_item]
                 else:
-                    stage_items = list(available_pre_execution)
+                    selected_pre_execution = list(available_pre_execution)
+
+            stage_items = [*selected_pre_execution, *final_items]
 
             selected_keys = {(phase, id(stage)) for phase, stage in stage_items}
             omitted_pre_execution_speech_phases = [
@@ -1824,15 +1826,6 @@ class CanonicalPlanRuntimeAdapter:
                 )
                 if stage is not None and (phase, id(stage)) not in selected_keys
             ]
-
-            model_pre_execution = next(
-                (
-                    (phase, stage)
-                    for phase, stage in stage_items
-                    if stage is not None and required_goal_ids.issubset(set(stage.covers_goal_ids))
-                ),
-                None,
-            )
 
             confirmation_stages = [
                 stage
@@ -1869,32 +1862,37 @@ class CanonicalPlanRuntimeAdapter:
                 )
 
             if safe_read_parallel:
-                if model_pre_execution is not None:
-                    phase, stage = model_pre_execution
-                    projected_speech_stages = [
-                        {
-                            "phase": phase,
-                            "text": stage.text,
-                            "speech_act": stage.speech_act,
-                            "commitment_state": stage.commitment_state,
-                            "must_not_claim_completion": True,
-                            "covers_goal_ids": list(stage.covers_goal_ids),
-                            "claims": stage.claims,
-                            "source": "planner_communicative_activity",
-                            "operational_text_source": "planner_wording_runtime_validated",
-                            "runtime_confirmation_required": False,
-                            "safe_read_micro_ack": safe_read_speech_optional,
-                            "coordination_id": stage.coordination_id,
-                            "delivery_role": stage.delivery_role,
-                            "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
-                            "reused_speech_event_id": stage.reused_speech_event_id,
-                            "communicative_activity_ids": list(
-                                (stage.metadata or {}).get("communicative_activity_ids") or []
-                            ),
-                        }
-                    ]
-                else:
-                    projected_speech_stages = []
+                projected_speech_stages = [
+                    {
+                        "phase": phase,
+                        "text": stage.text,
+                        "speech_act": stage.speech_act,
+                        "commitment_state": stage.commitment_state,
+                        "must_not_claim_completion": (
+                            True if phase != "final" else stage.must_not_claim_completion
+                        ),
+                        "covers_goal_ids": list(stage.covers_goal_ids),
+                        "claims": stage.claims,
+                        "source": "planner_communicative_activity",
+                        "operational_text_source": "planner_wording_runtime_validated",
+                        "runtime_confirmation_required": False,
+                        "safe_read_micro_ack": (
+                            safe_read_speech_optional and phase != "final"
+                        ),
+                        "coordination_id": stage.coordination_id,
+                        "delivery_role": stage.delivery_role,
+                        "reuse_current_turn_speech": (stage.reuse_current_turn_speech),
+                        "reused_speech_event_id": stage.reused_speech_event_id,
+                        "communicative_activity_ids": list(
+                            (stage.metadata or {}).get("communicative_activity_ids") or []
+                        ),
+                        "truth_stages": list(
+                            (stage.metadata or {}).get("truth_stages") or []
+                        ),
+                    }
+                    for phase, stage in stage_items
+                    if stage is not None
+                ]
             else:
                 projected_speech_stages = [
                     {
@@ -1916,6 +1914,9 @@ class CanonicalPlanRuntimeAdapter:
                         "reused_speech_event_id": stage.reused_speech_event_id,
                         "communicative_activity_ids": list(
                             (stage.metadata or {}).get("communicative_activity_ids") or []
+                        ),
+                        "truth_stages": list(
+                            (stage.metadata or {}).get("truth_stages") or []
                         ),
                     }
                     for phase, stage in stage_items
@@ -1939,6 +1940,9 @@ class CanonicalPlanRuntimeAdapter:
                     "communicative_activity_ids": list(
                         (stage.metadata or {}).get("communicative_activity_ids") or []
                     ),
+                    "truth_stages": list(
+                        (stage.metadata or {}).get("truth_stages") or []
+                    ),
                 }
                 for phase, stage in stage_items
                 if stage is not None
@@ -1950,12 +1954,17 @@ class CanonicalPlanRuntimeAdapter:
         speech: list[InteractionSpeech] = []
         for projected in projected_speech_stages:
             phase = str(projected["phase"])
+            stage_safe_read_parallel = safe_read_parallel and phase != "final"
             coordination_id = str(projected.get("coordination_id") or "").strip()
             coordination = lane_coordination_by_id.get(coordination_id)
             coordinated_speech = bool(coordination is not None and "vocal" in coordination.lanes)
             playback_barrier = (
                 projected.get("reuse_current_turn_speech") is True
-                or (not safe_read_parallel and not coordinated_speech)
+                or (
+                    (phase != "final" or not effectful_pre_execution)
+                    and not stage_safe_read_parallel
+                    and not coordinated_speech
+                )
             )
             speech_metadata = {
                 "source": projected["source"],
@@ -1975,9 +1984,19 @@ class CanonicalPlanRuntimeAdapter:
                 "communicative_activity_ids": list(
                     projected.get("communicative_activity_ids") or []
                 ),
+                "truth_stages": list(projected.get("truth_stages") or []),
                 "wait_for_playback_start": playback_barrier,
                 "playback_start_required_for_delivery": playback_barrier,
             }
+            ordered_context_grounded_after_work = (
+                phase == "final"
+                and set(speech_metadata["truth_stages"]) == {"context_grounded"}
+                and not set(projected.get("covers_goal_ids") or []).intersection(
+                    executable_goal_ids
+                )
+            )
+            if ordered_context_grounded_after_work:
+                speech_metadata["ordered_context_grounded_after_work"] = True
             if projected.get("reuse_current_turn_speech") is True:
                 reused_event_id = " ".join(
                     str(projected.get("reused_speech_event_id") or "").strip().split()
@@ -2055,7 +2074,7 @@ class CanonicalPlanRuntimeAdapter:
                 mixer_contract = media_mixer_by_coordination_id.get(coordination.coordination_id)
                 if mixer_contract is not None:
                     speech_metadata.update(mixer_contract)
-            elif safe_read_parallel:
+            elif stage_safe_read_parallel:
                 speech_metadata.update(
                     {
                         "safe_read_micro_ack": safe_read_speech_optional,
@@ -2075,8 +2094,10 @@ class CanonicalPlanRuntimeAdapter:
                 InteractionSpeech(
                     text=str(projected["text"]),
                     timing=(
-                        "parallel"
-                        if safe_read_parallel or coordinated_speech
+                        "after_capabilities"
+                        if phase == "final" and effectful_pre_execution
+                        else "parallel"
+                        if stage_safe_read_parallel or coordinated_speech
                         else "immediate"
                         if phase == "immediate"
                         else "sequential"
@@ -3014,37 +3035,6 @@ class GoalDrivenRuntimeCoordinator:
         return by_goal
 
     @classmethod
-    def _fast_advance_requires_canonical_resource_revision(
-        cls,
-        *,
-        advance: FastPlannerAdvance,
-        association: GoalAssociationResolution,
-    ) -> bool:
-        """Require Planner to bind provisional Work to GA's resource contract.
-
-        Fast Advance sees provider-neutral GI Responsibilities before Goal
-        Association has authored canonical resource shape and information-domain
-        bindings. A Capability Activity for such a newly canonicalized Goal cannot
-        become terminal merely by joining its Responsibility ref to a Goal ID:
-        the same Fast Planner must reconsider HOW against that resource contract
-        and the qualified catalog. Host still chooses no Capability or semantics.
-        """
-
-        capability_refs = {
-            responsibility_ref
-            for activity in advance.activities
-            if isinstance(activity, FastPlannerCapabilityActivity)
-            for responsibility_ref in activity.source_responsibility_refs
-        }
-        if not capability_refs:
-            return False
-        return any(
-            goal.resource_responsibility is not None
-            and capability_refs.intersection(goal.source_responsibility_refs)
-            for goal in association.new_goals
-        )
-
-    @classmethod
     def _canonical_plan_from_fast_advance(
         cls,
         *,
@@ -3129,7 +3119,12 @@ class GoalDrivenRuntimeCoordinator:
         outcomes: list[Any] = []
         unresolved = list(advance.unresolved)
         communicative_acts: list[PlannedCommunicativeAct] = []
-        for activity in advance.activities:
+        capability_activity_indexes = [
+            index
+            for index, activity in enumerate(advance.activities)
+            if activity.role == "capability"
+        ]
+        for activity_index, activity in enumerate(advance.activities):
             if activity.role == "capability":
                 continue
             activity_goal_ids: list[str] = []
@@ -3143,6 +3138,18 @@ class GoalDrivenRuntimeCoordinator:
                     text=activity.text,
                     role=activity.role,
                     timing=activity.timing,
+                    delivery_phase=(
+                        "immediate"
+                        if activity.role == "clarification"
+                        else "pre_action"
+                        if activity.role == "progress"
+                        else "final"
+                        if capability_activity_indexes
+                        and activity_index > max(capability_activity_indexes)
+                        else "pre_action"
+                        if capability_activity_indexes
+                        else "immediate"
+                    ),
                     speech_act=activity.speech_act,
                     source_goal_ids=activity_goal_ids,
                     source_responsibility_refs=list(
@@ -4449,13 +4456,6 @@ class GoalDrivenRuntimeCoordinator:
                 # the provisional Activities or InformationGaps still apply.
                 canonical_fast_revision_reason = (
                     "goal_association_update_reconciliation"
-                )
-            elif self._fast_advance_requires_canonical_resource_revision(
-                advance=fast_advance,
-                association=association,
-            ):
-                canonical_fast_revision_reason = (
-                    "goal_association_resource_grounding"
                 )
             if canonical_fast_revision_reason:
                 planning_context["canonical_fast_revision_reason"] = (

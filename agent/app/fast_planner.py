@@ -404,13 +404,16 @@ class FastPlannerResolver:
                         raise PlannerDTOContractError(
                             "PresentationCommit must cite supplied Responsibility refs"
                         )
-                    if activity.role == "complete_response" and any(
-                        item.output_mode != "speech" for item in responsibilities
-                    ):
-                        raise PlannerDTOContractError(
-                            "PresentationCommit completion is valid only for direct "
-                            "speech Responsibilities"
-                        )
+                    if activity.role == "complete_response":
+                        modes_by_ref = {
+                            item.local_ref: item.output_mode
+                            for item in responsibilities
+                        }
+                        if any(modes_by_ref.get(ref) != "speech" for ref in refs):
+                            raise PlannerDTOContractError(
+                                "PresentationCommit completion is valid only for direct "
+                                "speech Responsibilities cited by that Activity"
+                            )
                 commit = PresentationCommit(
                     commit_id=commit_id,
                     turn_id=turn_id,
@@ -460,11 +463,30 @@ class FastPlannerResolver:
                     "Fast Planner terminal result changed PresentationCommit"
                 )
             if any(
-                item.role in {"progress", "complete_response"}
+                item.role == "progress"
                 for item in output.terminal_result.activities
             ):
                 raise PlannerDTOContractError(
-                    "Fast Planner terminal result duplicated presentation speech"
+                    "Fast Planner terminal result cannot author a second progress Act"
+                )
+            committed_completion_refs = (
+                set(commit.activity.source_responsibility_refs)
+                if commit.activity is not None
+                and commit.activity.role == "complete_response"
+                else set()
+            )
+            duplicate_completion_refs = {
+                source_ref
+                for item in output.terminal_result.activities
+                if item.role == "complete_response"
+                for source_ref in item.source_responsibility_refs
+                if source_ref in committed_completion_refs
+            }
+            if duplicate_completion_refs:
+                raise PlannerDTOContractError(
+                    "Fast Planner terminal result duplicated presentation speech "
+                    "ownership for Responsibilities: "
+                    + ",".join(sorted(duplicate_completion_refs))
                 )
             combined_output = output.terminal_result.model_copy(
                 update={

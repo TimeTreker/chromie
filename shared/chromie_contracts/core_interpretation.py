@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -384,21 +385,77 @@ class CognitiveWorkRequest(BaseModel):
         return CoreInterpretationResult.normalize_unresolved(value)
 
     @property
-    def original_user_text(self) -> str:
-        """Return immutable Gateway source wording when it is available.
+    def source_turn_provenance(self) -> dict[str, Any]:
+        """Project immutable source wording without granting semantic authority.
 
         ``text`` is transport-normalized so model-facing work can compare turns
         deterministically.  Semantic owners must still be able to inspect the
         exact admitted source wording; the UserTurnEnvelope already owns that
-        immutable evidence, so do not create another persisted copy here.
+        immutable evidence, so this is a computed prompt projection rather than
+        another persisted copy.  A scoped Planner re-entry may supply the same
+        projection without replaying the whole UserTurnEnvelope as a fresh turn.
         """
 
         context = self.context if isinstance(self.context, dict) else {}
+        projected = context.get("source_turn_provenance")
+        if isinstance(projected, dict):
+            original = projected.get("original_text")
+            digest = str(projected.get("original_text_sha256") or "").strip()
+            if (
+                projected.get("authority") == "read_only_source_provenance"
+                and isinstance(original, str)
+                and original
+                and digest
+                == hashlib.sha256(original.encode("utf-8")).hexdigest()
+            ):
+                return {
+                    "schema_version": 1,
+                    "turn_id": str(projected.get("turn_id") or ""),
+                    "original_text": original,
+                    "original_text_sha256": digest,
+                    "language": str(
+                        projected.get("language") or self.language or "auto"
+                    ),
+                    "authority": "read_only_source_provenance",
+                }
         envelope = context.get("user_turn_envelope")
         if isinstance(envelope, dict):
             original = envelope.get("original_input")
             if isinstance(original, dict):
                 value = original.get("text")
-                if isinstance(value, str) and value:
-                    return value
-        return self.text
+                if (
+                    isinstance(value, str)
+                    and value
+                    and normalize_turn_text(value) == self.text
+                ):
+                    normalized = envelope.get("normalized_input")
+                    language = (
+                        normalized.get("language")
+                        if isinstance(normalized, dict)
+                        else self.language
+                    )
+                    return {
+                        "schema_version": 1,
+                        "turn_id": str(envelope.get("turn_id") or ""),
+                        "original_text": value,
+                        "original_text_sha256": hashlib.sha256(
+                            value.encode("utf-8")
+                        ).hexdigest(),
+                        "language": str(language or self.language or "auto"),
+                        "authority": "read_only_source_provenance",
+                    }
+        value = self.text
+        return {
+            "schema_version": 1,
+            "turn_id": "",
+            "original_text": value,
+            "original_text_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest(),
+            "language": str(self.language or "auto"),
+            "authority": "normalized_transport_fallback",
+        }
+
+    @property
+    def original_user_text(self) -> str:
+        """Return exact source wording from the validated provenance projection."""
+
+        return str(self.source_turn_provenance.get("original_text") or self.text)

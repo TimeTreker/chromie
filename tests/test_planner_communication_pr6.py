@@ -13,6 +13,7 @@ from shared.chromie_contracts.goal import (
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.plan import (
     FastPlannerAdvance,
+    FastPlannerCapabilityActivity,
     FastPlannerCompleteResponseAct,
     FastPlannerProgressAct,
 )
@@ -99,6 +100,63 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
         self.assertEqual(
             plan.metadata["presentation_commit_id"], "commit-greeting"
         )
+
+    def test_fast_activity_order_projects_after_work_speech_to_final_phase(self) -> None:
+        advance = FastPlannerAdvance(
+            turn_id="turn-nod-greeting",
+            disposition="execute",
+            coverage="complete",
+            covered_responsibility_refs=["nod", "greeting"],
+            activities=[
+                FastPlannerCapabilityActivity(
+                    activity_id="nod-twice",
+                    role="capability",
+                    capability_id="soridormi.nod_yes",
+                    args={"count": 2},
+                    timing="sequential",
+                    source_responsibility_refs=["nod"],
+                ),
+                FastPlannerCompleteResponseAct(
+                    activity_id="greeting-response",
+                    role="complete_response",
+                    text="你好",
+                    speech_act="greeting",
+                    timing="sequential",
+                    source_responsibility_refs=["greeting"],
+                ),
+            ],
+            confidence=1.0,
+            metadata={"presentation_commit_id": "commit-nod-greeting"},
+        )
+        association = GoalAssociationResolution(
+            turn_id="turn-nod-greeting",
+            resolution_status="resolved",
+            new_goals=[
+                SemanticGoal(
+                    goal_id="goal-nod",
+                    description="Nod twice.",
+                    source_text="点两下头",
+                    source_responsibility_refs=["nod"],
+                ),
+                SemanticGoal(
+                    goal_id="goal-greeting",
+                    description="Say hello.",
+                    source_text="说声你好",
+                    source_responsibility_refs=["greeting"],
+                ),
+            ],
+            confidence=1.0,
+        )
+
+        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+            advance=advance,
+            association=association,
+            user_text="点两下头，再跟我说声你好。",
+        )
+
+        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(plan.communicative_acts[0].delivery_phase, "final")
+        self.assertEqual(plan.communicative_acts[0].source_goal_ids, ["goal-greeting"])
 
     def test_duplicate_semantic_endpoints_are_removed(self) -> None:
         paths = {route.path for route in app.routes}

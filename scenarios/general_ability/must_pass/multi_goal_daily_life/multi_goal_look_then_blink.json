@@ -43,6 +43,13 @@
     ]
   },
   "text": "Look at me for two seconds, then blink twice.",
+  "trusted_target_context": {
+    "source": "live_perception",
+    "target_ref": "current_speaker",
+    "relative_direction": "front",
+    "confidence": 1.0,
+    "evidence_refs": ["scenario:multi_goal_look_then_blink:current_speaker_front"]
+  },
   "expected_capabilities": [
     "soridormi.look_at_person",
     "soridormi.blink_eyes"

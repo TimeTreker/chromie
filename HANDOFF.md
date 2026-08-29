@@ -9,10 +9,11 @@ checkpoint remain authoritative.
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Branch at start: `main`
-- Base commit: `1ec588fd00a2f8d9f0ecf0006c375bb12c504752`
-- Base subject: `docs: define streaming planner presentation commit follow-up`
-- Scope: retain Planner-owned `auxiliary_activities[]` and implement Issue #32 as one
-  streaming Fast Planner semantic invocation with an early typed presentation commit
+- Base commit: `e13a30405bf9b7d58976d2de8121038aa2ae5955`
+- Base subject: `feat: frame fast planner presentation and terminal plan`
+- Scope: tighten GI/GA/Planner prompt and schema grounding, preserve exact admitted
+  source wording through the lifecycle as read-only provenance, and retain the one-stream
+  Fast Planner/Planner-owned auxiliary architecture
 - Expected resume revision: the latest commit containing this handoff
 
 Bootstrap on another machine:
@@ -26,6 +27,24 @@ git status --short --branch
 ```
 
 ## What changed
+
+The exact admitted user wording now has one lifecycle owner and one downstream rule.
+`UserTurnEnvelope.original_input.text` is the sole stored source. GI receives that exact
+wording once in an explicit source block. `CognitiveWorkRequest` computes a digest-bound
+read-only projection for GA and Planner, and rejects an invalid/spoofed projection. Runtime
+retains the full envelope as metadata without interpreting it.
+
+Planner result/state re-entry now prefers the exact original input over its whitespace-
+normalized transport copy. The Host projects the exact text plus SHA-256 into re-entry
+context, but keeps `request.text` and all Responsibility/Goal/Plan/Evidence projections
+restricted to the affected Goal subset. The full turn is therefore visible for fidelity
+and correlation but cannot revive or narrate an excluded sibling. Prompt labels now state
+the authority boundary directly: GI owns current-turn WHAT, GA owns continuity, and
+Planner owns HOW from accepted Responsibilities/Goals.
+
+Project Charter principle 44, `AGENTS.md`, and `CONTRIBUTING.md` now require every future
+delivery commit/push to update this handoff and `DEVELOPMENT_CHECKPOINT.md` in the same
+commit with truthful evidence, blockers, revision context, and next commands.
 
 GI no longer calls a second coverage model or performs certificate-driven source
 resegmentation. The primary result now carries each Responsibility's inclusive source
@@ -119,9 +138,15 @@ Behavior scenarios: 31/31 passed
 python scripts/check_repository_policies.py
 Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
 
+pytest -q tests/test_goal_interpreter_llm_prompt.py \
+  tests/test_goal_association_pr2.py tests/test_fast_planner_pr3.py \
+  tests/test_planner_reentry_policy.py \
+  tests/test_capability_result_evidence_reentry.py \
+  tests/test_cognitive_runtime_pr7.py
+331 passed, 10 subtests passed
+
 ./scripts/run_tests.sh
-Ran 1994 tests ... OK
-20 legacy Agent tests passed
+Ran 2012 tests; FAILED (4 failures)
 
 python scripts/general_ability_acceptance.py --mode level-a \
   --ability-class planner_goal_semantic_quality \
@@ -131,7 +156,25 @@ General ability acceptance: 18/18 distinct cases passed mode=level-a evidence=A
 
 python scripts/check_docs.py
 Documentation checks passed: 96 Markdown files
+
+python scripts/check_test_ownership.py
+Test ownership checks passed
 ```
+
+The current full local gate is not closed. Its four failing test surfaces are:
+
+- `test_behavior_truth_suite` and `test_cognitive_runtime_acceptance_pr7` retain
+  related Level A multi-Goal/order behavior failures;
+- `test_general_ability_acceptance` reports five failed `multi_goal_daily_life`
+  cases from the same current scenario cluster;
+- `test_semantic_task_continuity` expects the older literal phrase
+  `Interpret this turn under the system WHAT-only contract`, while the current
+  prompt says `Apply the system WHAT-only contract...`.
+
+Treat the first three surfaces as one likely shared behavior cluster until workflow
+evidence proves otherwise. Do not make them pass by changing expected ordering or
+weakening validation. The literal prompt assertion should protect a semantic contract,
+not freeze incidental wording.
 
 The former local Ollama 0.32.14 / `qwen3.5:9b` structured-JSON probe emitted its ordered
 members normally, but that wire protocol is now superseded. The current internal model
@@ -203,7 +246,7 @@ post-cohort bundle is
 
 ## Resume commands
 
-Run local closure first:
+Inspect and close the known local-gate failures first, then rerun local closure:
 
 ```bash
 python scripts/check_repository_policies.py

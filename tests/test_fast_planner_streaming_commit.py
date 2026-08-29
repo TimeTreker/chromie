@@ -5,10 +5,14 @@ from typing import Any
 
 import pytest
 
+from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_prompt import (
     fast_advance_capability_prompt_projection,
     fast_advance_layered_prompt,
+    fast_advance_semantic_capability_projection,
+    fast_advance_streaming_capability_prompt_projection,
+    fast_responsibility_decision_projection,
     fast_streaming_advance_system_prompt,
 )
 from agent.app.planner_schema import fast_streaming_advance_response_schema
@@ -36,9 +40,12 @@ from tests.test_cognitive_runtime_pr7 import (
 
 
 class _Catalog:
+    def __init__(self, entries: list[CatalogCapability] | None = None) -> None:
+        self.entries = list(entries or [])
+
     async def prompt_entries(self, *, scope: str, refresh: bool) -> list[Any]:
         del scope, refresh
-        return []
+        return self.entries
 
 
 class _StreamingModel:
@@ -158,6 +165,306 @@ def _walk_capability() -> dict[str, Any]:
     }
 
 
+def _walk_catalog_capability() -> CatalogCapability:
+    return CatalogCapability(
+        capability_id="soridormi.walk_forward",
+        agent_id="capability_agent",
+        description="Walk the robot forward for the supplied duration.",
+        input_schema=_walk_capability()["input_schema"],
+        effects=["locomotion"],
+        available=True,
+        interaction_executable=True,
+        prompt_tier="common",
+        hints={"semantic_type": "body_action"},
+    )
+
+
+def _look_at_person_catalog_capability() -> CatalogCapability:
+    return CatalogCapability(
+        capability_id="soridormi.look_at_person",
+        agent_id="capability_agent",
+        description="Look at a person identified by a trusted target reference.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target_ref": {"type": "string", "minLength": 1},
+            },
+            "required": ["target_ref"],
+            "additionalProperties": False,
+        },
+        effects=["physical_motion"],
+        available=True,
+        interaction_executable=True,
+        prompt_tier="common",
+        behavior_domains=["social_attention", "orientation"],
+        can_run_parallel=True,
+        parallel_metadata_declared=True,
+        exclusive_group="body.head",
+        resource_claims=["body.head"],
+        hints={
+            "argument_realization": {
+                "person_addressee_target": {
+                    "source_entity_type": "addressee",
+                    "planner_owned": True,
+                    "arguments": ["target_ref"],
+                    "minimum_arguments": 1,
+                    "contract": (
+                        "Copy target_ref only from current trusted target evidence."
+                    ),
+                }
+            }
+        },
+    )
+
+
+def _nod_catalog_capability() -> CatalogCapability:
+    return CatalogCapability(
+        capability_id="soridormi.nod_yes",
+        agent_id="capability_agent",
+        description="Perform a bounded affirmative head nod.",
+        input_schema={
+            "type": "object",
+            "properties": {"count": {"type": "integer", "minimum": 1}},
+            "required": ["count"],
+            "additionalProperties": False,
+        },
+        effects=["physical_motion"],
+        available=True,
+        interaction_executable=True,
+        prompt_tier="common",
+        can_run_parallel=True,
+        parallel_metadata_declared=True,
+        exclusive_group="body.head",
+        resource_claims=["body.head"],
+    )
+
+
+def _blink_social_catalog_capability() -> CatalogCapability:
+    return CatalogCapability(
+        capability_id="soridormi.blink_eyes",
+        agent_id="capability_agent",
+        description="Blink as an optional visual social expression.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "count": {"type": "integer", "minimum": 1, "default": 2}
+            },
+            "additionalProperties": False,
+        },
+        effects=["visual_expression"],
+        available=True,
+        interaction_executable=True,
+        prompt_tier="common",
+        behavior_domains=["social_attention"],
+        can_run_parallel=True,
+        parallel_metadata_declared=True,
+        exclusive_group="visual.eyes",
+        resource_claims=["visual.eyes"],
+    )
+
+
+def _look_request() -> CognitiveWorkRequest:
+    return CognitiveWorkRequest(
+        sid="turn-stream-look",
+        text="看着我三秒",
+        language="zh-CN",
+        responsibilities=[
+            CognitiveResponsibilityProposal(
+                local_ref="look",
+                outcome="look at the addressee",
+                output_mode="body_action",
+                bindings={"addressee": "我"},
+                confidence=1.0,
+            )
+        ],
+        interpretation_confidence=1.0,
+        context={
+            "active_user_target": {
+                "source": "live_perception",
+                "target_ref": "current_speaker",
+                "relative_direction": "front",
+                "confidence": 1.0,
+                "evidence_refs": ["scenario:current-speaker"],
+            }
+        },
+    )
+
+
+def _look_output(*, target_ref: str) -> dict[str, Any]:
+    return {
+        "presentation_commit": {
+            "activity": None,
+            "auxiliary_activities": [],
+        },
+        "terminal_result": {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["look"],
+            "activities": [
+                {
+                    "role": "capability",
+                    "capability_id": "soridormi.look_at_person",
+                    "activity_id": "look-at-speaker",
+                    "args": {"target_ref": target_ref},
+                    "timing": "sequential",
+                    "source_responsibility_refs": ["look"],
+                }
+            ],
+            "auxiliary_activities": [],
+            "continuations": [],
+            "confidence": 1.0,
+            "unresolved": [],
+            "reason_summary": "Look at the trusted current speaker target.",
+        },
+    }
+
+
+def _structured_resource_catalog_capability() -> CatalogCapability:
+    realization = {
+        "physical_resource_entity": {
+            "source_entity_type": "entity",
+            "planner_owned": True,
+            "arguments": ["resource"],
+            "minimum_arguments": 1,
+            "contract": "Conserve the exact entity inside resource.",
+        },
+        "physical_resource_location": {
+            "source_entity_type": "location",
+            "planner_owned": True,
+            "arguments": ["source"],
+            "minimum_arguments": 1,
+            "contract": "Conserve the exact location inside source.",
+        },
+        "physical_resource_distance": {
+            "source_entity_type": "distance",
+            "planner_owned": True,
+            "arguments": ["source"],
+            "minimum_arguments": 1,
+            "contract": "Conserve the exact distance inside source.",
+        },
+        "physical_resource_recipient": {
+            "source_entity_type": "recipient",
+            "planner_owned": True,
+            "arguments": ["recipient"],
+            "minimum_arguments": 1,
+            "contract": "Conserve the exact recipient inside recipient.",
+        },
+    }
+    return CatalogCapability(
+        capability_id="soridormi.acquire_and_deliver_resource",
+        agent_id="capability_agent",
+        description="Acquire and deliver a physical resource.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "resource": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["physical_object"]},
+                        "description": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["kind", "description"],
+                    "additionalProperties": False,
+                },
+                "source": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string", "enum": ["known"]},
+                        "description": {"type": "string"},
+                        "bindings": {"type": "object"},
+                    },
+                    "required": ["status"],
+                    "additionalProperties": False,
+                },
+                "recipient": {
+                    "type": "object",
+                    "properties": {
+                        "description": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["description"],
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["resource", "source", "recipient"],
+            "additionalProperties": False,
+        },
+        effects=["physical_motion", "resource_delivery"],
+        available=True,
+        interaction_executable=True,
+        prompt_tier="common",
+        hints={
+            "semantic_scope": {
+                "responsibility_type": "acquire_and_deliver_resource",
+                "resource_kinds": ["physical_object"],
+            },
+            "argument_realization": realization,
+        },
+    )
+
+
+def _structured_resource_request() -> CognitiveWorkRequest:
+    return CognitiveWorkRequest(
+        sid="turn-stream-resource",
+        text=(
+            "there is a bottle of milk ahead of you about 50 meters, "
+            "please bring it to me"
+        ),
+        language="en-US",
+        responsibilities=[
+            CognitiveResponsibilityProposal(
+                local_ref="fetch",
+                outcome="acquire and deliver the resource",
+                output_mode="body_action",
+                bindings={
+                    "entity": "bottle of milk",
+                    "location": "ahead of you about 50 meters",
+                    "distance": 50,
+                    "recipient": "me",
+                },
+                confidence=1.0,
+            )
+        ],
+        interpretation_confidence=1.0,
+    )
+
+
+def _structured_resource_output(*, recipient: str = "me") -> dict[str, Any]:
+    return {
+        "presentation_commit": {"activity": None, "auxiliary_activities": []},
+        "terminal_result": {
+            "disposition": "execute",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["fetch"],
+            "activities": [
+                {
+                    "role": "capability",
+                    "capability_id": "soridormi.acquire_and_deliver_resource",
+                    "activity_id": "fetch-milk",
+                    "args": {
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "bottle of milk",
+                        },
+                        "source": {
+                            "status": "known",
+                            "description": "ahead of you about 50 meters",
+                            "bindings": {"distance": 50},
+                        },
+                        "recipient": {"description": recipient},
+                    },
+                    "timing": "sequential",
+                    "source_responsibility_refs": ["fetch"],
+                }
+            ],
+            "auxiliary_activities": [],
+            "continuations": [],
+            "confidence": 1.0,
+            "unresolved": [],
+            "reason_summary": "Acquire the resource and deliver it.",
+        },
+    }
+
+
 def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> None:
     request, responsibility = _body_request()
     capability = _walk_capability()
@@ -171,6 +478,10 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
     )
 
     projection = fast_advance_capability_prompt_projection([capability])
+    semantic_projection = fast_advance_semantic_capability_projection([capability])
+    streaming_projection = fast_advance_streaming_capability_prompt_projection(
+        [capability]
+    )
     prompt = str(
         fast_advance_layered_prompt(
             request,
@@ -183,9 +494,17 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
 
     assert "args_schema" in projection[0]
     assert "arguments" not in projection[0]
+    assert "args_schema" not in semantic_projection[0]
+    assert streaming_projection[0]["args_schema"] == capability["input_schema"]
+    assert "AUTHORITATIVE FAST DECISION TABLE" in prompt
+    assert "single exact argument authority" in prompt
     assert "reason_summary exists only once, at terminal_plan.reason_summary" in prompt
     assert "Never use arguments, effects, resource_claims" in prompt
     assert "perform_action for an embodied, media, vocal, or state-changing effect" in prompt
+    assert "FINAL DECISION CHECKLIST" in prompt
+    assert "A lone parallel Activity is always invalid" in prompt
+    assert "never invent speech only to anchor optional decoration" in prompt
+    assert "requested blink r1" in prompt
     assert "Stop immediately after" in prompt
     assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in prompt
     assert "<presentation_commit>" in prompt
@@ -197,6 +516,189 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
     ) in prompt
     assert "top-level JSON document" in system
     assert "repeated frame" in system
+
+
+def test_stream_prompt_exposes_trusted_target_for_primary_capability_grounding() -> None:
+    request, responsibility = _body_request()
+    request.context["planner_auxiliary_social_context"] = {
+        "eligible_capabilities": [],
+        "target_evidence": {
+            "available": True,
+            "source": "live_perception",
+            "target": {
+                "target_ref": "current_speaker",
+                "relative_direction": "front",
+                "confidence": 1.0,
+            },
+        },
+        "social_interaction_style": {},
+        "recent_auxiliary_behavior_evidence": [],
+        "max_activities": 0,
+    }
+    response_schema = fast_streaming_advance_response_schema(
+        [responsibility.local_ref],
+        responsibilities=[responsibility],
+        capabilities=[_walk_capability()],
+        auxiliary_social_capabilities=[],
+        interpretation_unresolved=[],
+        language="zh-CN",
+    )
+
+    prompt = str(
+        fast_advance_layered_prompt(
+            request,
+            responsibilities=[responsibility],
+            capabilities=[_walk_capability()],
+            response_schema=response_schema,
+        )
+    )
+
+    assert "Trusted semantic target evidence JSON" in prompt
+    assert "current_speaker" in prompt
+    assert "Copy the supplied target_ref exactly" in prompt
+    assert "infer yaw/pitch" in prompt
+
+
+def test_fast_decision_projection_localizes_coverage_bindings_and_relations() -> None:
+    look = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="look at the person",
+        output_mode="body_action",
+        bindings={"entity": "me", "parallel_with": ["r2"]},
+        confidence=1.0,
+    )
+    blink = CognitiveResponsibilityProposal(
+        local_ref="r2",
+        outcome="blink twice",
+        output_mode="body_action",
+        bindings={"count": 2, "parallel_with": "r1"},
+        confidence=1.0,
+    )
+
+    projection = fast_responsibility_decision_projection([look, blink])
+
+    assert projection == [
+        {
+            "ref": "r1",
+            "outcome": "look at the person",
+            "output_mode": "body_action",
+            "semantic_bindings": {"entity": "me"},
+            "relations": {"before": [], "after": [], "parallel_with": ["r2"]},
+            "goal_relationship": "new",
+            "target_goal_ids": [],
+            "terminal_owner_required": True,
+        },
+        {
+            "ref": "r2",
+            "outcome": "blink twice",
+            "output_mode": "body_action",
+            "semantic_bindings": {"count": 2},
+            "relations": {"before": [], "after": [], "parallel_with": ["r1"]},
+            "goal_relationship": "new",
+            "target_goal_ids": [],
+            "terminal_owner_required": True,
+        },
+    ]
+
+
+def test_stream_schema_keeps_ordered_speech_in_terminal_and_compacts_args() -> None:
+    body = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="nod twice",
+        output_mode="body_action",
+        bindings={"count": 2},
+        confidence=1.0,
+    )
+    speech = CognitiveResponsibilityProposal(
+        local_ref="r2",
+        outcome="say hello",
+        output_mode="speech",
+        bindings={"after": ["r1"]},
+        confidence=1.0,
+    )
+    schema = fast_streaming_advance_response_schema(
+        ["r1", "r2"],
+        responsibilities=[body, speech],
+        capabilities=[_walk_capability()],
+        auxiliary_social_capabilities=[],
+        interpretation_unresolved=[],
+        language="en-US",
+    )
+
+    activity_choices = schema["properties"]["presentation_commit"]["properties"][
+        "activity"
+    ]["anyOf"]
+    assert not any(
+        "progress_kind" not in branch.get("properties", {})
+        and "text" in branch.get("properties", {})
+        for branch in activity_choices
+    )
+    terminal = schema["properties"]["terminal_result"]
+    terminal_branches = terminal["properties"]["activities"]["items"]["oneOf"]
+    capability_branch = next(
+        branch
+        for branch in terminal_branches
+        if branch.get("properties", {}).get("role", {}).get("enum")
+        == ["capability"]
+    )
+    assert capability_branch["properties"]["args"] == {
+        "type": "object",
+        "additionalProperties": True,
+    }
+    complete_response_branch = next(
+        branch
+        for branch in terminal_branches
+        if branch.get("properties", {}).get("role", {}).get("enum")
+        == ["complete_response"]
+    )
+    assert complete_response_branch["properties"]["source_responsibility_refs"][
+        "items"
+    ]["enum"] == ["r2"]
+    assert terminal["properties"]["auxiliary_activities"] == {
+        "type": "array",
+        "enum": [[]],
+    }
+
+
+def test_ordered_terminal_speech_can_own_distinct_social_decoration() -> None:
+    body = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="nod twice",
+        output_mode="body_action",
+        bindings={"count": 2},
+        confidence=1.0,
+    )
+    speech = CognitiveResponsibilityProposal(
+        local_ref="r2",
+        outcome="say hello",
+        output_mode="speech",
+        bindings={"after": ["r1"]},
+        confidence=1.0,
+    )
+    auxiliary = {
+        "capability_id": "soridormi.blink_eyes",
+        "description": "Blink as an optional visual social expression.",
+        "input_schema": _blink_social_catalog_capability().input_schema,
+    }
+    schema = fast_streaming_advance_response_schema(
+        ["r1", "r2"],
+        responsibilities=[body, speech],
+        capabilities=[],
+        auxiliary_social_capabilities=[auxiliary],
+        interpretation_unresolved=[],
+        language="en-US",
+    )
+
+    presentation_auxiliary = schema["properties"]["presentation_commit"][
+        "properties"
+    ]["auxiliary_activities"]
+    terminal_auxiliary = schema["properties"]["terminal_result"]["properties"][
+        "auxiliary_activities"
+    ]
+
+    assert presentation_auxiliary["maxItems"] == 1
+    assert terminal_auxiliary["maxItems"] == 1
+    assert "soridormi.blink_eyes" in json.dumps(terminal_auxiliary)
 
 
 def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
@@ -294,6 +796,266 @@ async def test_terminal_cannot_duplicate_or_reword_committed_speech() -> None:
     assert isinstance(frames[1], FastPlannerStreamFailure)
     assert frames[1].failure_stage == "after_commit"
     assert "duplicated presentation speech" in frames[1].reason
+
+
+@pytest.mark.asyncio
+async def test_ordered_requested_speech_is_authored_once_after_terminal_work() -> None:
+    body = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="walk forward for ten seconds",
+        output_mode="body_action",
+        bindings={"duration_s": 10},
+        confidence=1.0,
+    )
+    speech = CognitiveResponsibilityProposal(
+        local_ref="r2",
+        outcome="say hello",
+        output_mode="speech",
+        bindings={"after": ["r1"]},
+        confidence=1.0,
+    )
+    request = CognitiveWorkRequest(
+        sid="turn-ordered-work-speech",
+        text="向前走十秒，再说你好",
+        language="zh-CN",
+        responsibilities=[body, speech],
+        interpretation_confidence=1.0,
+        context={},
+    )
+    output = {
+        "presentation_commit": {
+            "activity": None,
+            "auxiliary_activities": [],
+        },
+        "terminal_result": {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["r1", "r2"],
+            "activities": [
+                {
+                    "role": "capability",
+                    "capability_id": "soridormi.walk_forward",
+                    "activity_id": "walk-first",
+                    "args": {"duration_s": 10},
+                    "timing": "sequential",
+                    "source_responsibility_refs": ["r1"],
+                },
+                {
+                    "role": "complete_response",
+                    "activity_id": "say-after-walk",
+                    "text": "你好！",
+                    "timing": "sequential",
+                    "speech_act": "respond",
+                    "source_responsibility_refs": ["r2"],
+                    "truth_stage": "context_grounded",
+                    "evidence_refs": [],
+                },
+            ],
+            "auxiliary_activities": [],
+            "continuations": [],
+            "confidence": 1.0,
+            "unresolved": [],
+            "reason_summary": "Complete the requested work in order.",
+        },
+    }
+    resolver = FastPlannerResolver(
+        _StreamingModel([_wire_output(output)]),
+        _Catalog([_walk_catalog_capability()]),  # type: ignore[arg-type]
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(request)]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert frames[0].activity is None
+    assert isinstance(frames[1], FastPlannerStreamTerminal)
+    assert [activity.role for activity in frames[1].advance.activities] == [
+        "capability",
+        "complete_response",
+    ]
+    assert [activity.timing for activity in frames[1].advance.activities] == [
+        "sequential",
+        "sequential",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ordered_terminal_response_retains_its_own_social_decoration() -> None:
+    body = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="nod twice",
+        output_mode="body_action",
+        bindings={"count": 2},
+        confidence=1.0,
+    )
+    speech = CognitiveResponsibilityProposal(
+        local_ref="r2",
+        outcome="say hello",
+        output_mode="speech",
+        bindings={"after": ["r1"]},
+        confidence=1.0,
+    )
+    request = CognitiveWorkRequest(
+        sid="turn-ordered-nod-speech-decoration",
+        text="点两下头，然后跟我说声你好",
+        language="zh-CN",
+        responsibilities=[body, speech],
+        interpretation_confidence=1.0,
+        context={},
+    )
+    output = {
+        "presentation_commit": {
+            "activity": None,
+            "auxiliary_activities": [],
+        },
+        "terminal_result": {
+            "disposition": "mixed",
+            "coverage": "complete",
+            "covered_responsibility_refs": ["r1", "r2"],
+            "activities": [
+                {
+                    "role": "capability",
+                    "capability_id": "soridormi.nod_yes",
+                    "activity_id": "nod-first",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_responsibility_refs": ["r1"],
+                },
+                {
+                    "role": "complete_response",
+                    "activity_id": "hello-after-nod",
+                    "text": "你好呀！",
+                    "timing": "sequential",
+                    "speech_act": "respond",
+                    "source_responsibility_refs": ["r2"],
+                    "truth_stage": "context_grounded",
+                    "evidence_refs": [],
+                },
+            ],
+            "auxiliary_activities": [
+                {
+                    "capability_id": "soridormi.blink_eyes",
+                    "auxiliary_activity_id": "blink-with-hello",
+                    "anchor_kind": "communicative_act",
+                    "anchor_id": "hello-after-nod",
+                    "args": {"count": 2},
+                    "execution_role": "social_decoration",
+                    "timing": "parallel",
+                    "social_function": "engagement",
+                    "target": {"source": "none"},
+                }
+            ],
+            "continuations": [],
+            "confidence": 1.0,
+            "unresolved": [],
+            "reason_summary": "Nod first, then greet with optional expression.",
+        },
+    }
+    resolver = FastPlannerResolver(
+        _StreamingModel([_wire_output(output)]),
+        _Catalog(
+            [
+                _nod_catalog_capability(),
+                _blink_social_catalog_capability(),
+            ]
+        ),  # type: ignore[arg-type]
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(request)]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert frames[0].activity is None
+    assert isinstance(frames[1], FastPlannerStreamTerminal)
+    assert frames[1].advance.auxiliary_activities[0].anchor_id == "hello-after-nod"
+
+
+@pytest.mark.asyncio
+async def test_declared_addressee_target_realization_accepts_exact_trusted_ref() -> None:
+    model = _StreamingModel([_wire_output(_look_output(target_ref="current_speaker"))])
+    resolver = FastPlannerResolver(
+        model,
+        _Catalog([_look_at_person_catalog_capability()]),  # type: ignore[arg-type]
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(_look_request())]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamTerminal)
+    assert frames[1].advance.activities[0].args == {
+        "target_ref": "current_speaker"
+    }
+    assert "Trusted semantic target evidence JSON" in str(model.last_prompt)
+    assert "person_addressee_target" in str(model.last_prompt)
+
+
+@pytest.mark.asyncio
+async def test_required_target_ref_uses_trusted_evidence_without_binding_mapping() -> None:
+    capability = _look_at_person_catalog_capability().model_copy(
+        update={"hints": {}}
+    )
+    model = _StreamingModel([_wire_output(_look_output(target_ref="current_speaker"))])
+    resolver = FastPlannerResolver(
+        model,
+        _Catalog([capability]),  # type: ignore[arg-type]
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(_look_request())]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamTerminal)
+    assert frames[1].advance.activities[0].args["target_ref"] == "current_speaker"
+
+
+@pytest.mark.asyncio
+async def test_declared_target_realization_rejects_mismatched_trusted_ref() -> None:
+    resolver = FastPlannerResolver(
+        _StreamingModel([_wire_output(_look_output(target_ref="invented_person"))]),
+        _Catalog([_look_at_person_catalog_capability()]),  # type: ignore[arg-type]
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(_look_request())]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamFailure)
+    assert frames[1].failure_stage == "after_commit"
+    assert "must copy exact current trusted target evidence" in frames[1].reason
+
+
+@pytest.mark.asyncio
+async def test_declared_structured_resource_realization_accepts_exact_gi_values() -> None:
+    resolver = FastPlannerResolver(
+        _StreamingModel([_wire_output(_structured_resource_output())]),
+        _Catalog([_structured_resource_catalog_capability()]),  # type: ignore[arg-type]
+    )
+
+    frames = [
+        frame async for frame in resolver.stream_advance(_structured_resource_request())
+    ]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamTerminal)
+    args = frames[1].advance.activities[0].args
+    assert args["resource"]["description"] == "bottle of milk"
+    assert args["source"]["bindings"]["distance"] == 50
+    assert args["recipient"]["description"] == "me"
+
+
+@pytest.mark.asyncio
+async def test_declared_structured_resource_realization_rejects_lost_gi_value() -> None:
+    resolver = FastPlannerResolver(
+        _StreamingModel(
+            [_wire_output(_structured_resource_output(recipient="requester"))]
+        ),
+        _Catalog([_structured_resource_catalog_capability()]),  # type: ignore[arg-type]
+    )
+
+    frames = [
+        frame async for frame in resolver.stream_advance(_structured_resource_request())
+    ]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamFailure)
+    assert "structured resource realization omitted exact GI bindings" in frames[1].reason
+    assert "recipient=recipient" in frames[1].reason
 
 
 @pytest.mark.asyncio

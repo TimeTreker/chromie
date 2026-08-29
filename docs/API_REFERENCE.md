@@ -214,9 +214,19 @@ it does not call a second wording model or rewrite the act. A pre-evidence act
 cannot cite Evidence or claim a result, while a post-evidence act must cite exact
 Host-admitted Evidence.
 
+Canonical `PlannedCommunicativeAct.delivery_phase` preserves whether that exact
+Planner-owned act is immediate, pre-action, progress, or final. For the streaming
+Fast path, Host derives the phase mechanically from the already-validated unified
+terminal Activity order; it does not reorder or reinterpret the act. In a mixed
+Plan, Response Projection covers exactly the Goal IDs owned by Communicative Acts,
+while executable-only Goals remain covered by their Plan steps. A `final`
+context-grounded speech Goal that is ordered after Work is scheduled after the
+Capability batch only when it does not claim an executable Goal. Result-dependent
+completion wording still waits for terminal Evidence and Planner re-entry.
+
 On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Any post-Evidence wording must establish its exact Goal/Evidence scope, execution status, perspective, and epistemic strength in that same primary Planner result. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. Failure at this boundary escalates to the distinct Deep Planner pass when permitted or fails closed; the Host never rewrites the sentence.
 
-`POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may still finish a provider-free easy turn directly. Canonical Goal commit with provisional Work, association to retained Goal state, trusted Evidence/result re-entry, or another relevant open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
+`POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may finish an easy turn directly after its terminal result is mechanically bound to GA's conserved Responsibility-to-Goal mapping. Creating a new resource Goal from that unchanged Responsibility does not call `/fast-plan` again. Actual provisional or retained Work, a GA-authored change to retained Goal meaning, trusted Evidence/result re-entry, or another material open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
 `existing_work_activities` is the single bounded Planner input projection for same-turn provisional and retained Runtime Work. A Planner step selects
 reuse only by setting `reuse_activity_id` to one supplied stable identity while
@@ -269,6 +279,15 @@ are projections of that same requested period; explicitly named `current_*` fiel
 remain current observations and cannot support a future-period claim. If the provider cannot supply that hourly slice, execution fails with
 `forecast_period_unavailable`; daily or current values are never relabeled as
 night evidence. For a day-wide request, `forecast_period` is null.
+
+Live provider Capabilities may publish the same model-visible
+`metadata.argument_realization` contract when human semantic names differ from
+provider-local parameter names. The provider owns that mapping; Chromie validates
+that every declared target exists in the exact input schema and then projects it
+unchanged to Planner. For example, Soridormi declares human `speed -> vx_mps` and
+`duration -> duration_s` for `walk_velocity`, so an explicit numeric request must
+not be replaced by a provider default. The Host does not invent or repair the
+semantic transformation.
 
 Terminal Capability results do not enter a separate interpretation endpoint. The
 Host validates and correlates the result, binds a `ToolResultEvidence` object to

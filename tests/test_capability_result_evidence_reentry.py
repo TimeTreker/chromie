@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import unittest
 from types import SimpleNamespace
 
@@ -223,6 +224,16 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             interaction_id="weather",
             status="ok",
             metadata={
+                "user_turn_envelope": {
+                    "turn_id": "turn-weather-and-blink",
+                    "original_input": {
+                        "text": "  今天上午会下雨吗？然后眨两次眼。  "
+                    },
+                    "normalized_input": {
+                        "text": "今天上午会下雨吗？然后眨两次眼。",
+                        "language": "zh-CN",
+                    },
+                },
                 "goal_interpretation": {
                     "responsibilities": [
                         {
@@ -307,6 +318,21 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertNotIn(
             "source_text",
             request.context["goal_association_resolution"]["new_goals"][0],
+        )
+        self.assertEqual(
+            request.text,
+            "Determine whether rain is expected this morning.",
+        )
+        source_provenance = request.context["source_turn_provenance"]
+        exact_source = "  今天上午会下雨吗？然后眨两次眼。  "
+        self.assertEqual(source_provenance["original_text"], exact_source)
+        self.assertEqual(
+            source_provenance["original_text_sha256"],
+            hashlib.sha256(exact_source.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            source_provenance["authority"],
+            "read_only_source_provenance",
         )
 
         assistant._turn_speech_events = {

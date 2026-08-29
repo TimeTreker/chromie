@@ -34,6 +34,13 @@
   },
   "text": "看着我三秒，同时眨两下眼睛。",
   "language": "zh-CN",
+  "trusted_target_context": {
+    "source": "live_perception",
+    "target_ref": "current_speaker",
+    "relative_direction": "front",
+    "confidence": 1.0,
+    "evidence_refs": ["scenario:look_while_blinking_twice:current_speaker_front"]
+  },
   "expected_capabilities": ["soridormi.look_at_person", "soridormi.blink_eyes"],
   "expected_args": ["0:duration_s=3.0", "1:count=2"],
   "require_speech": false,

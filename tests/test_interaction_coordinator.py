@@ -1096,6 +1096,48 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item["text"] for item in spoken], ["Starting."])
         self.assertNotIn("Done.", [item["text"] for item in spoken])
 
+    async def test_context_grounded_speech_goal_remains_ordered_after_body_work(
+        self,
+    ) -> None:
+        spoken: list[dict[str, Any]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(args) or {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(),
+        )
+
+        result = await _execute_to_terminal(
+            coordinator,
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": "你好",
+                        "timing": "after_capabilities",
+                        "metadata": {
+                            "source": "planner_communicative_activity",
+                            "canonical_plan_id": "plan-ordered-greeting",
+                            "ordered_context_grounded_after_work": True,
+                            "truth_stages": ["context_grounded"],
+                            "source_goal_ids": ["goal-greeting"],
+                        },
+                    }
+                ],
+                capabilities=[
+                    {
+                        "request_id": "nod-before-greeting",
+                        "capability_id": "soridormi.nod_yes",
+                    }
+                ],
+                metadata={
+                    "language": "zh-CN",
+                    "canonical_plan_id": "plan-ordered-greeting",
+                },
+            ),
+            session_id="sid-ordered-greeting",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual([item["text"] for item in spoken], ["你好"])
+
     async def test_cognitive_body_failure_defers_terminal_speech_to_turn_closure(
         self,
     ) -> None:

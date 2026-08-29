@@ -227,8 +227,9 @@ def goal_association_response_schema(
             "type": "string",
             "minLength": 1,
             "description": (
-                "Human-facing recipient meaning. Use the current-turn surface or "
-                "requester when no supplied discourse referent ID exists."
+                "Human-facing recipient meaning. Copy an explicit current-turn "
+                "recipient surface exactly; use requester only when no explicit "
+                "recipient or supplied discourse referent exists."
             ),
         }
     # Apply the canonical binding clauses before copying the binding schema into
@@ -442,6 +443,60 @@ def goal_association_response_schema(
                     in spatial_names
                 ]
                 physical_properties = physical_schema.get("properties")
+                if isinstance(physical_properties, dict):
+                    expected_bindings = expected_source_bindings(source_ref)
+                    identity_names = {
+                        "desired_item",
+                        "entity",
+                        "item",
+                        "object",
+                        "resource",
+                        "resource_identity",
+                        "target_item",
+                    }
+                    recipient_names = {"delivery_recipient", "recipient"}
+                    identity_values = [
+                        value
+                        for name, value in expected_bindings
+                        if "_".join(
+                            name.strip().casefold().replace("-", "_").split()
+                        )
+                        in identity_names
+                    ]
+                    recipient_values = [
+                        value
+                        for name, value in expected_bindings
+                        if "_".join(
+                            name.strip().casefold().replace("-", "_").split()
+                        )
+                        in recipient_names
+                    ]
+                    if len(set(identity_values)) == 1:
+                        physical_properties["description"] = {
+                            "const": identity_values[0]
+                        }
+                    if len(set(recipient_values)) == 1:
+                        resource_recipient = copy.deepcopy(
+                            schema.get("$defs", {}).get(
+                                "GoalAssociationModelResourceRecipient"
+                            )
+                            or {}
+                        )
+                        resource_recipient_properties = (
+                            resource_recipient.setdefault("properties", {})
+                        )
+                        resource_recipient_properties["description"] = {
+                            "const": recipient_values[0]
+                        }
+                        resource_recipient["required"] = list(
+                            dict.fromkeys(
+                                [
+                                    *(resource_recipient.get("required") or []),
+                                    "description",
+                                ]
+                            )
+                        )
+                        physical_properties["recipient"] = resource_recipient
                 if expected_spatial_bindings and isinstance(
                     physical_properties, dict
                 ):

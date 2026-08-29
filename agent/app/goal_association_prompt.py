@@ -39,6 +39,25 @@ logger = logging.getLogger("chromie.agent.goal_association.prompt")
 # Goal Association prompt projection only. This module does not invoke a model,
 # mutate canonical Goal state, or commit continuity decisions.
 
+
+def immutable_source_turn_prompt(request: CognitiveWorkRequest) -> str:
+    """Expose exact source evidence while keeping GI/GA authority explicit."""
+
+    source = request.source_turn_provenance
+    projection = json.dumps(
+        {
+            "original_text": source["original_text"],
+            "authority": source["authority"],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return (
+        "IMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own "
+        "current-turn WHAT; GA owns continuity, never silent semantic repair):\n"
+        f"{projection}"
+    )
+
 def discourse_referents(request: CognitiveWorkRequest) -> list[dict[str, Any]]:
     context = request.context if isinstance(request.context, dict) else {}
     raw = context.get("discourse_referents")
@@ -186,7 +205,7 @@ def build_segmentation_prompt(
         "Recent accepted conversation JSON (reference evidence only):\n"
         f"{bounded_json((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
         f"Language hint: {request.language or 'auto'}\n"
-        f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}"
+        f"{immutable_source_turn_prompt(request)}"
     )
 
 
@@ -384,7 +403,7 @@ def build_association_prompt(
         "Accepted dialogue JSON:\n"
         f"{bounded_json(association_dialogue_projection(history), 1400)}\n\n"
         f"Language hint: {request.language or 'auto'}\n"
-        f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
+        f"{immutable_source_turn_prompt(request)}\n\n"
         "FINAL CANDIDATE GOAL IDS JSON:\n"
         f"{bounded_json([item.get('goal_id') for item in candidate_goals], 900)}"
     )
@@ -470,7 +489,7 @@ def build_prompt(
         "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
         "Goal Association must not author a clarification question, input-source policy, or planning InformationGap. Put only compact Goal-state rationale in reason_summary.\n\n"
         + output_instructions
-        + "Each new_goals object contains description, output_mode, optional media_operation, bindings, explicit resource_kind, optional resource_responsibility, related_goal_ids only when retained Goals remain relevant context, and supersedes_goal_ids only when the old Responsibility is genuinely abandoned and replaced by this new independently owed outcome. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_kind is the exact discriminator for resource_responsibility; resource_responsibility is provider-neutral and must follow the contract above. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
+        + "Each new_goals object contains description, output_mode, optional media_operation, bindings, explicit resource_kind, optional resource_responsibility, related_goal_ids only when retained Goals remain relevant context, and supersedes_goal_ids only when the old Responsibility is genuinely abandoned and replaced by this new independently owed outcome. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_kind is the exact discriminator for resource_responsibility; resource_responsibility is provider-neutral and must follow the contract above. For a physical resource, copy an explicit entity/item surface exactly into resource_responsibility.description and an explicit recipient surface exactly into recipient.description; never replace “me” or another supplied surface with “user” or “requester”. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
         "Owner-approved Chromie identity JSON:\n"
         f"{identity_json}\n\n"
         "Owner-approved Personality Expression JSON:\n"
@@ -495,7 +514,7 @@ def build_prompt(
         "For an open safe-read Goal whose bound Work is scheduled, running, or recoverable, associate a semantic follow-up with that exact Goal when appropriate; do not answer from another task's result. "
         "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
         f"Language hint: {request.language or 'auto'}\n"
-        f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
+        f"{immutable_source_turn_prompt(request)}\n\n"
         f"FINAL CANDIDATE GOAL IDS JSON:\n{bounded_json([item.get('goal_id') for item in candidate_goals], 1600)}"
     )
 

@@ -213,6 +213,41 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 second.render().index("第二个问题"),
             )
 
+    def test_fast_capability_layer_contains_every_contiguous_rendered_section(self) -> None:
+        context = dict(self.context)
+        context["agent_skill_disclosure"] = {
+            "agent_role": "fast_planner",
+            "projections": [
+                {
+                    "agent_skill_id": "chromie.test-method",
+                    "version": "1.0.0",
+                    "projection": "fast_planner",
+                    "content": "Use the supplied evidence without inventing a result.",
+                    "relevant_goal_ids": ["goal-identity"],
+                }
+            ],
+        }
+        context["planner_auxiliary_social_context"] = {
+            "eligible_capabilities": [],
+            "target_evidence": {"available": False},
+            "social_interaction_style": {},
+            "recent_auxiliary_behavior_evidence": [],
+            "max_activities": 0,
+        }
+        request = self.request.model_copy(update={"context": context})
+
+        prompt = planner_prompt.fast_layered_prompt(
+            request,
+            [],
+            response_schema={},
+        )
+
+        capability_layer = "".join(prompt.capability_contract)
+        self.assertIn("Owner-approved passive Agent Skill", capability_layer)
+        self.assertIn("No trusted semantic target evidence", capability_layer)
+        self.assertIn("No auxiliary candidates; use []", capability_layer)
+        self.assertIn("Executable common capability catalog JSON", capability_layer)
+
 
 if __name__ == "__main__":
     unittest.main()

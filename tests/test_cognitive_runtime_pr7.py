@@ -483,7 +483,7 @@ def walk_definition() -> CapabilityDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
-    def test_resource_goal_requires_canonical_fast_revision_after_advance(self):
+    def test_new_resource_goal_preserves_one_fast_decision_and_binds_goal_id(self):
         advance = FastPlannerAdvance(
             turn_id="turn-perception",
             disposition="execute",
@@ -493,12 +493,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "role": "capability",
                     "activity_id": "look-outside",
-                    "capability_id": "soridormi.look_direction",
-                    "args": {"head_yaw_rad": -0.6, "duration_s": 2.0},
+                    "capability_id": "chromie.environment.observe",
+                    "args": {"question": "whether anyone is outside"},
                     "source_responsibility_refs": ["r1"],
                 }
             ],
             confidence=0.95,
+            metadata={"presentation_commit_id": "present-perception"},
         )
         association = GoalAssociationResolution(
             resolution_status="resolved",
@@ -534,11 +535,19 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=0.95,
         )
 
-        self.assertTrue(
-            GoalDrivenRuntimeCoordinator._fast_advance_requires_canonical_resource_revision(
-                advance=advance,
-                association=association,
-            )
+        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+            advance=advance,
+            association=association,
+            user_text="Is anyone outside?",
+        )
+
+        self.assertEqual(
+            [step.capability_id for step in plan.steps],
+            ["chromie.environment.observe"],
+        )
+        self.assertEqual(
+            plan.goal_ids,
+            ["goal-perception"],
         )
 
     def test_interaction_context_includes_only_confirmed_prior_turn_speech(self):
@@ -4336,6 +4345,144 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertTrue(
             all(item.metadata["wait_for_playback_start"] for item in response.speech)
         )
+
+    def test_planner_owned_mixed_response_covers_only_communicative_goal(self):
+        plan = CanonicalPlan(
+            plan_id="plan-nod-greeting",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-nod", "goal-greeting"],
+            goal_summary="Nod twice, then say hello.",
+            communicative_acts=[
+                {
+                    "activity_id": "greeting",
+                    "text": "你好",
+                    "role": "complete_response",
+                    "timing": "sequential",
+                    "delivery_phase": "final",
+                    "speech_act": "greeting",
+                    "source_goal_ids": ["goal-greeting"],
+                    "source_responsibility_refs": ["r2"],
+                    "truth_stage": "context_grounded",
+                }
+            ],
+            steps=[
+                {
+                    "step_id": "nod",
+                    "capability_id": "soridormi.nod_yes",
+                    "args": {"count": 2},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-nod"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-nod",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["nod"],
+                },
+                {
+                    "goal_id": "goal-greeting",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                },
+            ],
+            goal_satisfaction={
+                "score": 1.0,
+                "status": "exact",
+                "satisfied_goal_ids": ["goal-nod", "goal-greeting"],
+            },
+        )
+        nod = CapabilityDefinition(
+            capability_id="soridormi.nod_yes",
+            provider_id="soridormi.mcp",
+            input_schema={
+                "type": "object",
+                "properties": {"count": {"type": "integer", "minimum": 1}},
+                "required": ["count"],
+            },
+            output_schema=TEST_SKILL_OUTPUT_SCHEMA,
+            available=True,
+            requires_confirmation=False,
+        )
+
+        response = asyncio.run(
+            CanonicalPlanRuntimeAdapter(
+                FakeRuntime([nod])
+            ).build_planner_owned_response(
+                plan=plan,
+                session_id="sid-nod-greeting",
+                language="zh-CN",
+            )
+        )
+
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.nod_yes"])
+        self.assertEqual([item.text for item in response.speech], ["你好"])
+        self.assertEqual(response.speech[0].timing, "after_capabilities")
+        self.assertTrue(
+            response.speech[0].metadata["ordered_context_grounded_after_work"]
+        )
+        self.assertEqual(
+            response.speech[0].metadata["covers_goal_ids"],
+            ["goal-greeting"],
+        )
+
+    def test_projection_rejects_communicative_stage_overclaiming_body_goal(self):
+        plan = CanonicalPlan(
+            plan_id="plan-overclaim",
+            planner_tier="fast",
+            disposition="mixed",
+            coverage="complete",
+            confidence=1.0,
+            goal_ids=["goal-body", "goal-speech"],
+            communicative_acts=[
+                {
+                    "activity_id": "answer",
+                    "text": "你好",
+                    "role": "complete_response",
+                    "speech_act": "greeting",
+                    "source_goal_ids": ["goal-speech"],
+                }
+            ],
+            steps=[
+                {
+                    "step_id": "body",
+                    "capability_id": "soridormi.nod_yes",
+                    "args": {"count": 1},
+                    "source_goal_ids": ["goal-body"],
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-body",
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["body"],
+                },
+                {
+                    "goal_id": "goal-speech",
+                    "disposition": "respond",
+                    "coverage": "complete",
+                },
+            ],
+        )
+
+        with self.assertRaisesRegex(ValueError, "overclaimed=goal-body"):
+            PlannerResponseProjection(
+                projection_id="projection-overclaim",
+                canonical_plan_id=plan.plan_id,
+                canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+                canonical_plan=plan,
+                response_plan=ResponsePlan(
+                    immediate=ResponseStage(
+                        text="你好",
+                        covers_goal_ids=["goal-body", "goal-speech"],
+                    )
+                ),
+            )
 
 
 

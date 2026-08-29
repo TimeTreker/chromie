@@ -2262,12 +2262,14 @@ Fast Planner may use:
 - common capabilities;
 - essential provider and safety state.
 
-A pre-Association Fast Capability Activity is not terminal merely because Host can
-join its Responsibility reference to a newly created canonical resource Goal. The
-same Fast Planner performs the existing canonical revision after Goal Association so
-the resource shape, information domain, and qualified Capability semantics participate
-in HOW selection. Host performs only the typed join and revision trigger; it does not
-choose or substitute a Capability.
+A pre-Association Fast terminal result already owns the complete HOW decision against
+the GI Responsibility and executable Capability catalog. When GA creates a new Goal that
+conserves that same Responsibility, Host mechanically joins the exact source ref to the
+new Goal identity, including GA's provider-neutral resource projection, and does not ask
+Fast Planner to decide the same HOW a second time. A new Fast pass is justified only when
+GA changes retained Goal meaning, the commit intersects Work that is actually
+queued/running/completed, or later trusted Runtime/Evidence/Situation state creates a
+genuinely new planning input. The Host never chooses or substitutes a Capability.
 
 The primary GI Responsibility evidence cites authoritative source tokens. Trusted
 validation may materialize those references and check their provenance, but it
@@ -2900,8 +2902,11 @@ Planner, which may author a new trustworthy communicative delta, new Work, or si
 an originating interaction contains multiple Capability requests, each per-request Runtime
 event can re-enter Planner immediately, but its transaction contains only that result's
 bound GI Responsibilities, Goals, source-Plan steps, and Evidence. The retained original
-whole-turn envelope is not replayed into a subset transaction, so one result cannot narrate
-a sibling that is still running. When
+whole-turn envelope is not replayed as the current request. Instead, the exact original
+wording is supplied separately as digest-validated, read-only source provenance while
+`request.text` is built only from the affected GI Responsibility outcomes. Canonical Goal,
+Plan, and Evidence projections remain restricted to that same subset, so source visibility
+cannot authorize narration or execution of a sibling that is still running. When
 every completed fact has already been delivered, aggregate closure still records whole-scope
 terminal truth without forcing speech. A newer overlapping turn suppresses early result speech rather than allowing
 an old result to interrupt it. Runtime open-interaction ownership remains visible to scoped
@@ -3484,6 +3489,9 @@ Exit criteria:
 
 - original input, reflex, attention, admission, and context provenance survive
   the Gateway/Core boundary;
+- exact admitted wording remains available to GI, GA, Planner, and scoped Planner
+  re-entry as read-only provenance without creating another persisted source or moving
+  WHAT/continuity/HOW authority;
 - success, partial failure, refusal, timeout, cancellation, and missing results
   are distinct per-goal outcomes;
 - unknown plan, goal, step, request, or evidence references fail closed;

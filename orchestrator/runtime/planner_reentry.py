@@ -24,6 +24,22 @@ def _normalized_text(value: object) -> str:
     return " ".join(str(value or "").strip().split())
 
 
+def terminal_result_waits_for_batch_closure(
+    *,
+    source_capability_count: int,
+    status: str,
+) -> bool:
+    """Defer successful sibling results until their dispatch closes as one fact set.
+
+    Provider progress and terminal failures still re-enter immediately.  A successful
+    result from a multi-Capability dispatch is incomplete presentation evidence while
+    its siblings remain in flight; the existing dispatch-closure path already owns the
+    aggregate outcome and can give Planner the whole immutable result set once.
+    """
+
+    return source_capability_count > 1 and _normalized_text(status) == "completed"
+
+
 def execution_outcome_user_text(
     source_response: InteractionResponse,
     plan: object,
@@ -36,11 +52,33 @@ def execution_outcome_user_text(
         else {}
     )
     envelope = metadata.get("user_turn_envelope")
+    original_input = (
+        envelope.get("original_input")
+        if isinstance(envelope, dict)
+        else None
+    )
     normalized_input = (
         envelope.get("normalized_input")
         if isinstance(envelope, dict)
         else None
     )
+    if isinstance(original_input, dict):
+        original_text = original_input.get("text")
+        normalized_text = (
+            normalized_input.get("text")
+            if isinstance(normalized_input, dict)
+            else None
+        )
+        if (
+            isinstance(original_text, str)
+            and original_text
+            and (
+                not isinstance(normalized_text, str)
+                or _normalized_text(original_text)
+                == _normalized_text(normalized_text)
+            )
+        ):
+            return original_text
     if isinstance(normalized_input, dict):
         text = str(normalized_input.get("text") or "").strip()
         if text:

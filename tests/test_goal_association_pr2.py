@@ -689,6 +689,82 @@ class GoalExecutionContractTests(unittest.TestCase):
             ],
         )
 
+    def test_physical_resource_schema_preserves_entity_recipient_and_source(self):
+        schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "body_action"},
+            responsibility_bindings={
+                "r1": {
+                    "entity": "bottle of milk",
+                    "recipient": "me",
+                    "location": "ahead of you about 50 meters",
+                    "distance": 50,
+                }
+            },
+        )
+        Draft202012Validator.check_schema(schema)
+        physical_branch = next(
+            branch
+            for branch in schema["$defs"]["GoalAssociationModelGoal"]["oneOf"]
+            if branch["properties"]["resource_kind"].get("const")
+            == "physical_object"
+        )
+        physical = physical_branch["properties"]["resource_responsibility"]
+
+        self.assertEqual(
+            physical["properties"]["description"],
+            {"const": "bottle of milk"},
+        )
+        self.assertEqual(
+            physical["properties"]["recipient"]["properties"]["description"],
+            {"const": "me"},
+        )
+        source_bindings = physical["properties"]["source"]["properties"][
+            "acquisition_bindings"
+        ]
+        self.assertEqual(source_bindings["minItems"], 2)
+        self.assertEqual(
+            [
+                item["properties"]["name"]["const"]
+                for item in source_bindings["prefixItems"]
+            ],
+            ["location", "distance"],
+        )
+
+        valid = create_goals(
+            goal(
+                "bring a bottle of milk to me",
+                "body_action",
+                resource=resource_responsibility(
+                    description="bottle of milk",
+                    source_status="known",
+                    source_description="ahead of you about 50 meters",
+                    source_bindings=[
+                        binding(
+                            "location",
+                            "relative_location",
+                            "ahead of you about 50 meters",
+                        ),
+                        binding("distance", "distance", "50"),
+                    ],
+                    recipient="me",
+                ),
+            )
+        )
+        valid.update(referent_updates=[], resolved_references=[])
+        validator = Draft202012Validator(schema)
+        self.assertEqual(list(validator.iter_errors(valid)), [])
+
+        wrong_recipient = copy.deepcopy(valid)
+        wrong_recipient["new_goals"][0]["resource_responsibility"]["recipient"][
+            "description"
+        ] = "user"
+        self.assertTrue(list(validator.iter_errors(wrong_recipient)))
+
     def test_primary_prompt_owns_information_and_effect_semantics(self):
         req = request(
             "I am in chongqing now, please help me check whether it will rain "
@@ -878,6 +954,48 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             ga_validation.source_grounded_binding_conservation_conflicts(
                 grounded_source,
+                request=req,
+            ),
+            [],
+        )
+
+    def test_physical_resource_entity_binding_is_conserved_by_description(self):
+        req = request(
+            "bring the bottle of milk to me",
+            language="en-US",
+            responsibility_outcomes=["bring the bottle of milk to me"],
+        ).model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "bring the bottle of milk to me",
+                        "bindings": {
+                            "entity": "bottle of milk",
+                            "recipient": "me",
+                        },
+                        "output_mode": "body_action",
+                        "confidence": 1.0,
+                    }
+                )
+            }
+        )
+        output = GoalSegmentationModelOutput.model_validate(
+            create_goals(
+                goal(
+                    "bring the bottle of milk to me",
+                    "body_action",
+                    resource=resource_responsibility(
+                        description="bottle of milk",
+                        recipient="me",
+                    ),
+                )
+            )
+        )
+
+        self.assertEqual(
+            ga_validation.source_grounded_binding_conservation_conflicts(
+                output,
                 request=req,
             ),
             [],
@@ -1809,13 +1927,17 @@ class GoalExecutionContractTests(unittest.TestCase):
 
         self.assertEqual(req.text, "今晚，重庆热不热？")
         self.assertEqual(req.original_user_text, "  今晚，重庆热不热？  ")
+        self.assertEqual(
+            req.source_turn_provenance["authority"],
+            "read_only_source_provenance",
+        )
         prompt = ga_prompt.build_prompt(
             req, [], output_type=GoalSegmentationModelOutput
         )
-        self.assertIn(
-            "FINAL AUTHORITATIVE USER TURN:\n  今晚，重庆热不热？  ",
-            prompt,
-        )
+        self.assertIn("IMMUTABLE SOURCE TURN JSON", prompt)
+        self.assertIn('"original_text":"  今晚，重庆热不热？  "', prompt)
+        self.assertIn("GI Responsibilities own current-turn WHAT", prompt)
+        self.assertIn("never silent semantic repair", prompt)
 
     def test_primary_goal_prompt_distinguishes_body_action_from_physical_resource(self):
         req = request(
@@ -1855,7 +1977,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("Responsibility conservation is strict", prompt)
         self.assertIn("distinct concrete object", prompt)
         self.assertIn("non-resource body_action Goals", prompt)
-        self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
+        self.assertIn("IMMUTABLE SOURCE TURN JSON", prompt)
 
     def test_existing_goal_association_prompt_fits_qualified_8k_preflight(self):
         resolver = GoalAssociationResolver(FakeOllama({}))

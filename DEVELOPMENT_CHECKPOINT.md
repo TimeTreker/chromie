@@ -1,9 +1,9 @@
 # Chromie Development Checkpoint
 
-Status: Planner-owned auxiliary social decoration and Issue #32 streaming Fast-Planner presentation are source-gated; Prompt/model promotion and live behavior evidence remain open
+Status: streaming Planner/prompt architecture and immutable source-turn provenance are implemented; canonical local gate and live model qualification remain open
 Updated: 2026-08-29
-Starting baseline: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
-(`Add external architecture audit`)
+Starting baseline: `e13a30405bf9b7d58976d2de8121038aa2ae5955`
+(`feat: frame fast planner presentation and terminal plan`)
 Resume branch: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
@@ -86,6 +86,17 @@ before the complete terminal result, canonical Goal binding, and full validation
 
 ## Implemented in the current worktree
 
+- `UserTurnEnvelope.original_input.text` remains the only stored admitted source.
+  GI receives the exact original wording once; GA and Planner receive a compact
+  read-only projection; scoped Planner re-entry carries digest-validated original
+  wording while its current request, Responsibilities, Goals, Plan, and Evidence stay
+  restricted to the affected Goal subset. Runtime IDs and the full Gateway envelope
+  are not duplicated into model prompts.
+- Downstream source visibility does not move authority: GI owns current-turn WHAT,
+  GA owns longitudinal association/canonical Goal continuity, and Planner owns HOW.
+  Invalid source projections fall back to scoped normalized transport text rather
+  than accepting spoofed provenance.
+
 - GI now requires per-Responsibility source evidence in its primary result. Trusted
   code validates closed mechanics; the former coverage/resegmentation model chain is
   removed, and only one DTO repair or one genuine Deep delegation remains eligible.
@@ -126,7 +137,8 @@ before the complete terminal result, canonical Goal binding, and full validation
 | Superseded structured-JSON provider probe | Ollama 0.32.14 + `qwen3.5:9b` emitted the former ordered JSON members normally | Historical protocol evidence only; the current tagged-frame text stream requires a fresh probe |
 | Resource-admission regression | 147 cognitive/runtime/interaction/TTS/Social tests passed | Automated invocation-order evidence only |
 | Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
-| Current canonical full local gate | 1,994 maintained tests plus 20 legacy Agent tests passed | Current automated source/integration evidence |
+| Current focused source-provenance/prompt/re-entry matrix | 331 passed, 10 subtests passed | Automated module/contract evidence |
+| Current canonical full local gate | 2,012 tests ran; 4 failures remain | Not closed: three existing Level A multi-Goal/order failure surfaces and one stale GI prompt-string assertion |
 | Level A general abilities for this amendment | 18/18 distinct cases passed: composable planning 5/5; multi-Goal daily life 10/10; Planner/Goal semantic quality 4/4 | Deterministic Level A only; one case belongs to two classes |
 | Documentation authority gate | 96 Markdown files passed | Current documentation consistency only |
 | Pre-default qwen3.5:4b comparison cohort | 2/50 hard-pass; 18/48 GI turns accepted, 25 timed out, 5 failed closed validation; 16/18 accepted results retained spurious unresolved meaning | GI-only model override with one resident Ollama model; diagnostic C-preview only |
@@ -134,7 +146,8 @@ before the complete terminal result, canonical Goal binding, and full validation
 
 ## Exact resume point
 
-1. Keep the source-closed Planner-owned auxiliary boundary intact. Do not restore
+1. Keep the source-closed Planner-owned auxiliary boundary and immutable source-turn
+   provenance intact. Do not restore
    compatibility environment fields, endpoint shims, or the retired social decision worker
    while tuning Prompt/model behavior.
 2. Keep the removed review chains absent and keep atomicity, mode, non-overlap, and
@@ -151,6 +164,12 @@ before the complete terminal result, canonical Goal binding, and full validation
    semantic review is 0/50. The remaining gaps are qwen3.5 false ambiguity/Deep-GI
    amplification and single-slot GA/Fast contention; do not weaken validation, resegment
    in Host, or add a same-authority repair call.
+5. Close the current local gate before another qualification claim. The last observed
+   `./scripts/run_tests.sh` ran 2,012 tests and failed four: three related Level A
+   multi-Goal/order test surfaces and one stale assertion expecting the older GI prompt
+   phrase. Diagnose the Level A failures at their earliest shared boundary; do not update
+   scenario expectations to hide changed behavior. Align the prompt-string assertion only
+   after confirming it protects a live contract rather than incidental wording.
 
 ## Claim boundary
 

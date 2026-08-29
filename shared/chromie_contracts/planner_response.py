@@ -95,14 +95,34 @@ class PlannerResponseProjection(BaseModel):
                 )
             covered_goals.update(stage.covers_goal_ids)
 
+        # A ResponsePlan transports Planner-owned communication; it does not
+        # become completion evidence for an executable-only Goal. When exact
+        # Communicative Activities exist, their source Goal IDs are the complete
+        # response-coverage authority. Plan steps and per-Goal outcomes retain
+        # ownership of the other Goals in a mixed Plan.
+        communicative_goals = {
+            goal_id
+            for act in plan.communicative_acts
+            for goal_id in act.source_goal_ids
+        }
+        required_response_goals = (
+            communicative_goals if plan.communicative_acts else known_goals
+        )
         if (
-            known_goals
-            and covered_goals != known_goals
+            required_response_goals
+            and covered_goals != required_response_goals
             and not speech_optional
         ):
-            missing = sorted(known_goals - covered_goals)
+            missing = sorted(required_response_goals - covered_goals)
+            overclaimed = sorted(covered_goals - required_response_goals)
+            details = []
+            if missing:
+                details.append("missing=" + ",".join(missing))
+            if overclaimed:
+                details.append("overclaimed=" + ",".join(overclaimed))
             raise ValueError(
-                "planner response projection does not cover all plan goals: " + ",".join(missing)
+                "planner response projection must exactly cover Planner-owned "
+                "communicative goals: " + ";".join(details)
             )
 
         coordination_by_id = {item.coordination_id: item for item in self.lane_coordination}
@@ -201,8 +221,6 @@ class PlannerResponseProjection(BaseModel):
         elif plan.disposition == "mixed":
             execute_goals = set(plan.executable_goal_ids())
             clarify_goals = set(plan.waiting_goal_ids())
-            if execute_goals and self.response_plan.final is not None:
-                raise ValueError("mixed pre-execution planner response must not include a final stage")
             allowed = {"none", "heard", "evaluating", "waiting_for_user"}
             for _, stage in phased_stages:
                 if set(stage.covers_goal_ids).intersection(execute_goals):

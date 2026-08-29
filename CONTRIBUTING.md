@@ -74,6 +74,11 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
 - Treat defect analysis, implementation, explanation, and verification as one
   deliverable. A patch without a causal explanation is incomplete, even when
   the code is correct.
+- Before a delivery commit is created or pushed, update
+  `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in the same commit. Record the exact
+  scope, observed validation state, blockers, retained evidence, revision/profile
+  identity, and next commands; do not leave the next session dependent on private
+  chat history or stale passing claims.
 
 ## Required defect-fix report
 

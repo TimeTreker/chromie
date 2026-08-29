@@ -284,7 +284,10 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
                         {
                             "skill_id": "acquire_and_deliver_resource",
                             "description": "Acquire and deliver a described physical object.",
-                            "parameters_schema": {"type": "object"},
+                            "parameters_schema": {
+                                "type": "object",
+                                "properties": {"resource": {"type": "object"}},
+                            },
                             "available": True,
                             "effects": ["physical_motion", "resource_delivery"],
                             "safety_class": "physical_motion",
@@ -297,6 +300,15 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
                                 },
                                 "resource_contract": {
                                     "result_field": "resource_outcome"
+                                },
+                                "argument_realization": {
+                                    "resource": {
+                                        "source_entity_type": "resource",
+                                        "planner_owned": True,
+                                        "arguments": ["resource"],
+                                        "minimum_arguments": 1,
+                                        "contract": "Preserve the canonical resource object.",
+                                    }
                                 },
                             },
                         }
@@ -321,7 +333,52 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             capability.metadata["resource_contract"]["result_field"],
             "resource_outcome",
         )
+        self.assertEqual(
+            capability.hints["argument_realization"]["resource"]["arguments"],
+            ["resource"],
+        )
         self.assertNotIn("provider_id", capability.hints["semantic_scope"])
+
+    async def test_live_named_skill_rejects_argument_realization_for_unknown_argument(self) -> None:
+        invoker = _SequenceInvoker(
+            [
+                {
+                    "mode": "sim",
+                    "skills": [
+                        {
+                            "skill_id": "walk_velocity",
+                            "parameters_schema": {
+                                "type": "object",
+                                "properties": {"vx_mps": {"type": "number"}},
+                            },
+                            "available": True,
+                            "metadata": {
+                                "argument_realization": {
+                                    "speed": {
+                                        "source_entity_type": "speed",
+                                        "planner_owned": True,
+                                        "arguments": ["missing_speed"],
+                                        "minimum_arguments": 1,
+                                        "contract": "Map speed.",
+                                    }
+                                }
+                            },
+                        }
+                    ],
+                }
+            ]
+        )
+        catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
+
+        snapshot = await catalog.snapshot(refresh=True)
+
+        self.assertIn("names unknown arguments", snapshot["live_refresh_error"])
+        self.assertFalse(
+            any(
+                item["capability_id"] == "soridormi.walk_velocity"
+                for item in snapshot["capabilities"]
+            )
+        )
 
     async def test_refreshes_live_named_skills_without_routing_from_query_text(self) -> None:
         invoker = _Invoker()

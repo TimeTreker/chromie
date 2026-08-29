@@ -1905,13 +1905,15 @@ def fast_presentation_commit_response_schema(
 ) -> dict[str, Any]:
     """Expose the early typed value inside one streamed Fast Planner result.
 
-    The decoder may choose a complete response only when every supplied
-    Responsibility is already conversational speech WHAT. Information,
-    body/media/vocal, and other observable/stateful Responsibilities still need
-    Planner work before they can be completed, so their pre-Evidence early-commit
-    schema exposes only prospective progress or silence. This keeps the decoder
-    from treating a text-only progress acknowledgement as a complete response just
-    because the compact DTO intentionally omits the mechanical ``role`` tag.
+    The decoder may choose a complete response only for ordinary speech WHAT that
+    is immediately deliverable. Speech explicitly ordered after or parallel with
+    another Responsibility remains terminal-plan work so its requested timing is
+    preserved. Information, body/media/vocal, and other observable/stateful
+    Responsibilities still need Planner work before they can be completed, so
+    their pre-Evidence early-commit schema exposes only prospective progress or
+    silence. This keeps the decoder from treating a text-only progress
+    acknowledgement as a complete response just because the compact DTO
+    intentionally omits the mechanical ``role`` tag.
     """
 
     schema = copy.deepcopy(
@@ -1925,24 +1927,56 @@ def fast_presentation_commit_response_schema(
     schema["required"] = required
     definitions = schema.get("$defs", {})
     activity_schema = schema.get("properties", {}).get("activity")
+    immediately_presentable_speech_refs: list[str] = []
     if isinstance(activity_schema, dict):
         # Keep the model-facing DTO semantic and tiny. Runtime restores the
         # discriminating role after decoding from the presence/absence of
         # progress_kind, so the LLM does not spend tokens on a mechanical tag.
         activity_schema.clear()
         supplied_responsibilities = list(responsibilities or [])
-        direct_conversation = supplied_responsibilities and all(
-            item.output_mode == "speech" for item in supplied_responsibilities
-        )
-        activity_choices: list[dict[str, Any]] = [
-            {
-                "$ref": (
-                    "#/$defs/FastPlannerCompleteResponseAct"
-                    if direct_conversation
-                    else "#/$defs/FastPlannerProgressAct"
-                )
-            },
+        by_ref = {item.local_ref: item for item in supplied_responsibilities}
+
+        def sibling_refs(value: Any) -> set[str]:
+            values = value if isinstance(value, list) else [value]
+            return {
+                str(item).strip()
+                for item in values
+                if str(item).strip() in by_ref
+            }
+
+        blocked_speech_refs: set[str] = set()
+        for item in supplied_responsibilities:
+            if item.output_mode != "speech":
+                continue
+            if sibling_refs(item.bindings.get("after")) or sibling_refs(
+                item.bindings.get("follows")
+            ) or sibling_refs(item.bindings.get("parallel_with")):
+                blocked_speech_refs.add(item.local_ref)
+        for item in supplied_responsibilities:
+            for target_ref in sibling_refs(item.bindings.get("before")) | sibling_refs(
+                item.bindings.get("precedes")
+            ) | sibling_refs(item.bindings.get("parallel_with")):
+                target = by_ref.get(target_ref)
+                if target is not None and target.output_mode == "speech":
+                    blocked_speech_refs.add(target_ref)
+        immediately_presentable_speech_refs = [
+            item.local_ref
+            for item in supplied_responsibilities
+            if item.output_mode == "speech"
+            and item.local_ref not in blocked_speech_refs
         ]
+        direct_conversation = bool(supplied_responsibilities) and all(
+            item.local_ref in immediately_presentable_speech_refs
+            for item in supplied_responsibilities
+        )
+        has_direct_conversation = bool(immediately_presentable_speech_refs)
+        activity_choices: list[dict[str, Any]] = []
+        if has_direct_conversation:
+            activity_choices.append(
+                {"$ref": "#/$defs/FastPlannerCompleteResponseAct"}
+            )
+        if not direct_conversation:
+            activity_choices.append({"$ref": "#/$defs/FastPlannerProgressAct"})
         activity_choices.append({"type": "null"})
         activity_schema.update(
             {
@@ -2025,12 +2059,17 @@ def fast_presentation_commit_response_schema(
                 )
         source_refs = properties.get("source_responsibility_refs")
         if isinstance(source_refs, dict):
+            allowed_refs = (
+                immediately_presentable_speech_refs
+                if contract_name == "FastPlannerCompleteResponseAct"
+                else list(responsibility_refs)
+            )
             source_refs["items"] = {
                 "type": "string",
-                "enum": list(dict.fromkeys(responsibility_refs)),
+                "enum": list(dict.fromkeys(allowed_refs)),
             }
             source_refs["uniqueItems"] = True
-            if len(set(responsibility_refs)) == 1:
+            if len(set(allowed_refs)) == 1 and len(set(responsibility_refs)) == 1:
                 properties.pop("source_responsibility_refs", None)
         if contract_name == "FastPlannerProgressAct":
             progress_kind = properties.get("progress_kind")
@@ -2275,7 +2314,11 @@ def fast_advance_response_schema(
         activities_schema["maxItems"] = max(
             1,
             len(responsibility_refs)
-            if committed_communicative or suppress_new_communicative
+            if (
+                committed_communicative
+                or suppress_new_communicative
+                or suppress_new_progress
+            )
             else len(responsibility_refs) * 2,
         )
     schema.setdefault("allOf", []).extend(
@@ -2614,7 +2657,11 @@ def _namespace_local_definitions(
     return projected, renamed
 
 
-def _ollama_streaming_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def _ollama_streaming_schema(
+    schema: dict[str, Any],
+    *,
+    retain_value_constraints: bool = False,
+) -> dict[str, Any]:
     """Compile the Fast stream contract to Ollama's reliable GBNF subset.
 
     Ollama converts ``format`` JSON Schema to a grammar. Nested Pydantic refs,
@@ -2648,6 +2695,22 @@ def _ollama_streaming_schema(schema: dict[str, Any]) -> dict[str, Any]:
         "title",
         "uniqueItems",
     }
+    if retain_value_constraints:
+        annotations.difference_update(
+            {
+                "exclusiveMaximum",
+                "exclusiveMinimum",
+                "maxItems",
+                "maxLength",
+                "maximum",
+                "minItems",
+                "minLength",
+                "minimum",
+                "multipleOf",
+                "pattern",
+                "uniqueItems",
+            }
+        )
 
     def compile_node(node: Any, stack: tuple[str, ...] = ()) -> Any:
         if isinstance(node, list):
@@ -2730,9 +2793,11 @@ def fast_streaming_advance_response_schema(
 ) -> dict[str, Any]:
     """Build the ordered single-call Fast Planner streaming decoder contract.
 
-    The terminal branch cannot author a second progress or complete-response Act.
-    It supplies only residual Capability/clarification planning; the Agent joins
-    the immutable presentation Activity before validating ``FastPlannerAdvance``.
+    The terminal branch cannot author a second progress Act. It supplies residual
+    Capability/clarification planning and any ordinary speech whose requested
+    ordering made it ineligible for the early commit. The Agent joins the immutable
+    presentation Activity before validating ``FastPlannerAdvance`` and rejects
+    duplicate completion ownership.
     """
 
     presentation, presentation_defs = _namespace_local_definitions(
@@ -2750,14 +2815,47 @@ def fast_streaming_advance_response_schema(
         capabilities=capabilities,
         auxiliary_social_capabilities=auxiliary_social_capabilities,
         interpretation_unresolved=interpretation_unresolved,
-        committed_communicative=True,
-        suppress_new_communicative=True,
+        committed_communicative=False,
+        suppress_new_communicative=False,
         suppress_new_progress=True,
     )
     # Runtime Pydantic and authoritative validation retain these invariants.
     # Omitting decoder-only conditionals and discriminator annotations avoids
     # Ollama grammar ambiguity inside the two-member streaming object.
     terminal_schema.pop("allOf", None)
+    terminal_definitions = terminal_schema.get("$defs", {})
+    terminal_capability = terminal_definitions.get(
+        "FastPlannerCapabilityActivity"
+    ) if isinstance(terminal_definitions, dict) else None
+    if isinstance(terminal_capability, dict):
+        # Tagged streaming is parsed as text and then checked by the full
+        # Pydantic/catalog validators. Keep one common Activity shape here and
+        # put every exact per-Capability args schema once in the prompt catalog;
+        # repeating the whole Activity union made the semantic choice remote and
+        # inflated the primary model surface without adding runtime safety.
+        terminal_capability.pop("oneOf", None)
+        capability_properties = terminal_capability.get("properties")
+        if isinstance(capability_properties, dict):
+            capability_id = capability_properties.get("capability_id")
+            if isinstance(capability_id, dict):
+                capability_id["enum"] = [
+                    str(item.get("capability_id") or "")
+                    for item in (capabilities or [])
+                    if str(item.get("capability_id") or "")
+                ]
+            capability_properties["args"] = {
+                "type": "object",
+                "additionalProperties": True,
+                "description": (
+                    "Must match the selected capability_id's one exact args_schema "
+                    "in the Capability catalog. Omit unrequested optional defaults. "
+                    "Preserve every owning Responsibility semantic binding exactly; "
+                    "for a structured physical-resource capability, entity/item owns "
+                    "resource.description, recipient owns recipient.description, and "
+                    "each location/direction/distance/route owns a separate same-named "
+                    "entry in source.bindings."
+                ),
+            }
     terminal_activities = terminal_schema.get("properties", {}).get("activities")
     terminal_items = (
         terminal_activities.get("items")
@@ -2779,7 +2877,7 @@ def fast_streaming_advance_response_schema(
         "required": ["presentation_commit", "terminal_result"],
         "additionalProperties": False,
         "$defs": {**presentation_defs, **terminal_defs},
-    })
+    }, retain_value_constraints=True)
 
 def fast_repair_response_schema(
     schema: dict[str, Any],

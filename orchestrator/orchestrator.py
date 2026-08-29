@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from difflib import SequenceMatcher
+import hashlib
 import json
 import logging
 import math
@@ -128,6 +129,7 @@ from orchestrator.runtime.planner_reentry import (
     suppress_already_delivered_speech,
     suppress_redundant_completed_body_followup,
     terminal_evidence_relevance,
+    terminal_result_waits_for_batch_closure,
 )
 from orchestrator.runtime.tts_text import (
     ends_with_tts_sentence_boundary,
@@ -5436,6 +5438,58 @@ class VoiceAssistant:
             observer=False,
         )
         context.update(context_updates)
+        source_envelope = metadata.get("user_turn_envelope")
+        source_original_input = (
+            source_envelope.get("original_input")
+            if isinstance(source_envelope, dict)
+            else None
+        )
+        source_normalized_input = (
+            source_envelope.get("normalized_input")
+            if isinstance(source_envelope, dict)
+            else None
+        )
+        source_original_text = (
+            source_original_input.get("text")
+            if isinstance(source_original_input, dict)
+            else None
+        )
+        source_normalized_text = (
+            source_normalized_input.get("text")
+            if isinstance(source_normalized_input, dict)
+            else None
+        )
+        if (
+            isinstance(source_original_text, str)
+            and source_original_text
+            and (
+                not isinstance(source_normalized_text, str)
+                or " ".join(source_original_text.strip().split())
+                == " ".join(source_normalized_text.strip().split())
+            )
+        ):
+            context["source_turn_provenance"] = {
+                "schema_version": 1,
+                "turn_id": str(
+                    source_envelope.get("turn_id")
+                    or metadata.get("turn_id")
+                    or ""
+                ),
+                "original_text": source_original_text,
+                "original_text_sha256": hashlib.sha256(
+                    source_original_text.encode("utf-8")
+                ).hexdigest(),
+                "language": str(
+                    (
+                        source_normalized_input.get("language")
+                        if isinstance(source_normalized_input, dict)
+                        else language
+                    )
+                    or language
+                    or "auto"
+                ),
+                "authority": "read_only_source_provenance",
+            }
         if isinstance(association, dict):
             context["goal_association_resolution"] = association
         if canonical_plan is not None:
@@ -5491,12 +5545,12 @@ class VoiceAssistant:
                 # Planner-authored prospective expectations are hypotheses to compare
                 # with fresh trusted Evidence, never Host-created Evidence themselves.
                 context["planner_reentry_expectations"] = planner_reentry_expectations
-        # A state re-entry is an exact Goal-subset transaction. The originating
-        # immutable UserTurnEnvelope can contain excluded sibling semantics, so it
-        # remains retained on the source response but is not projected into this
-        # Planner request. Use only the already-authoritative GI Responsibility
-        # outcomes as the scoped planning text; canonical Goal and Plan projections
-        # below retain the exact bindings and execution correlation.
+        # A state re-entry is an exact Goal-subset transaction. The full immutable
+        # UserTurnEnvelope can contain excluded sibling semantics, so it remains on
+        # the source response. Its exact wording is exposed separately above as
+        # read-only provenance, while only authoritative scoped GI Responsibility
+        # outcomes become request.text. Canonical Goal and Plan projections retain
+        # the scoped bindings and execution correlation.
         scoped_request_text = "\n".join(
             dict.fromkeys(
                 item.outcome.strip()
@@ -6216,12 +6270,22 @@ class VoiceAssistant:
         ]
         for result in preexecuted_capability_results:
             terminal_capability_ids.add(result.request_id)
-            if runtime_capability_request_ids:
+            if runtime_capability_request_ids and not terminal_result_waits_for_batch_closure(
+                source_capability_count=len(source_capability_request_ids),
+                status=result.status,
+            ):
                 await self._reenter_cognition_for_terminal_capability(
                     response=response,
                     result=result,
                     session_id=session_id,
                     generation=generation,
+                )
+            elif runtime_capability_request_ids:
+                self.session_log(
+                    session_id,
+                    "incremental_cognitive_reentry_deferred: request_id=%s "
+                    "reason=batch_closure",
+                    result.request_id,
                 )
 
         if receipt is not None:
@@ -6273,12 +6337,23 @@ class VoiceAssistant:
                         - len(terminal_capability_ids),
                     ),
                 )
-                await self._reenter_cognition_for_terminal_capability(
-                    response=response,
-                    result=event.result,
-                    session_id=session_id,
-                    generation=generation,
-                )
+                if terminal_result_waits_for_batch_closure(
+                    source_capability_count=len(source_capability_request_ids),
+                    status=event.result.status,
+                ):
+                    self.session_log(
+                        session_id,
+                        "incremental_cognitive_reentry_deferred: request_id=%s "
+                        "reason=batch_closure",
+                        event.request_id,
+                    )
+                else:
+                    await self._reenter_cognition_for_terminal_capability(
+                        response=response,
+                        result=event.result,
+                        session_id=session_id,
+                        generation=generation,
+                    )
 
         try:
             execution = await self.interaction_runtime.wait_dispatch(

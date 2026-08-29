@@ -1006,6 +1006,7 @@ def source_grounded_binding_conservation_conflicts(
                 if name
                 in {
                     "desired_item",
+                    "entity",
                     "item",
                     "object",
                     "resource",

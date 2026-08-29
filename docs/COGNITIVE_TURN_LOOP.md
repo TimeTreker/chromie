@@ -130,7 +130,7 @@ composer or execution specialist.
 |---|---|---|---|
 | Cognitive Gateway | captured turn, bounded Host context, deterministic protective controls | admitted immutable `UserTurnEnvelope` or protective outcome | user Goal, Capability, Plan, or social expression |
 | Goal Interpretation | admitted turn plus bounded Situation/continuity context | provider-neutral Responsibilities, bindings, qualifiers, and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
-| Planner fast pass / deep pass | GI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, exact Communicative Activities, and Capability Work; fast/deep differ only in cognition depth | canonical Goal identity, execution truth, or Host/runtime mutation |
+| Planner fast pass / deep pass | GI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, exact Communicative Activities with delivery phase, and Capability Work; fast/deep differ only in cognition depth | canonical Goal identity, execution truth, or Host/runtime mutation |
 | Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
@@ -274,7 +274,11 @@ Safe, side-effect-free, schema-valid reads may start without awaiting GA once th
 Capability also explicitly declares parallel safety, needs no confirmation, and is
 available. Their stable runtime request identity initially carries GI Responsibility
 refs, never an inferred Goal ID. GA commits only Canonical Goal continuity and emits no
-Work/replan decision. When a Goal commit intersects retained or provisional Work, Planner receives that
+Work/replan decision. A newly created Goal that conserves the same Responsibility does
+not cause a second Fast call merely to attach Goal identity or GA's resource projection;
+Host performs that exact typed join after the original terminal frame validates. When a
+Goal commit instead intersects Work that actually started provisionally, retained Work,
+or changed retained Goal meaning, Planner receives that
 Goal plus the relevant queued/running/completed Activity and result state. It semantically decides which existing Activities still
 advance the Responsibility and authors the complete desired Plan. A task shared by
 multiple Goals still has one request identity and executes once.
@@ -455,6 +459,15 @@ typed `CognitiveWorkRequest` for Goal Association and subsequent planning. No ro
 compatibility projection is created or reconstructed on the maintained path. Suppressed, unusable, and reflex-only
 envelopes cannot enter ordinary Core cognition.
 
+The exact `original_input.text` is projected once and without truncation into the primary
+GI prompt. `CognitiveWorkRequest.source_turn_provenance` then computes a compact read-only
+projection from the same envelope for GA and Planner; it is not another persisted copy.
+The projection preserves the exact text and Host-verifiable digest while omitting the full
+Gateway envelope and runtime correlation IDs from model prompts. Visibility does not move
+semantic authority: GI owns current-turn WHAT, GA owns longitudinal association and
+canonical Goal continuity, and Planner owns HOW from accepted Responsibilities/Goals. A
+downstream mismatch is fail-closed evidence, not permission to reconstruct missing WHAT.
+
 ## 5. Goal understanding and planning
 
 Goal Interpretation emits provider-neutral contextual Responsibility evidence, including
@@ -556,8 +569,11 @@ The live layer is projected by responsibility:
   smaller model happens to be configured.
 - Planner state re-entry receives the existing Responsibility/Goal, bounded Situation,
   actual queued/running/terminal Work, exact Host-bound Evidence, already-delivered
-  interaction delta, and compact Stable Mind. It may author response or genuinely new
-  Work, but result contents cannot infer a new Goal or repeat the terminal Activity.
+  interaction delta, compact Stable Mind, and the exact originating wording as read-only
+  source provenance. The request text and semantic projections remain restricted to the
+  affected Goal subset, so whole-turn source wording cannot reintroduce a sibling. It may
+  author response or genuinely new Work, but result contents cannot infer a new Goal or
+  repeat the terminal Activity.
 - Fast Advance and canonical Fast/Deep Planner projections may receive scene/target
   evidence, recent auxiliary history, primary Activity state, eligible exact social
   Capabilities, and the compact Stable Mind for their same-call optional
@@ -828,6 +844,12 @@ progress update requires correlated runtime evidence. Cancellation invalidates
 stages that have not begun; speech already heard remains delivery evidence.
 
 ### 8.2 Evidence-bound post-execution speech
+
+For a dispatch containing multiple sibling Capabilities, successful terminal results are
+retained as immutable Runtime facts but do not each trigger a separate user-facing
+Planner turn. Provider progress and any failure may still re-enter immediately; ordinary
+success waits until dispatch closure so Planner receives the complete sibling result set
+once and does not narrate a partial completion while related Work is still finishing.
 
 After terminal results have been joined and every executable Goal reconciled, the Host
 reactivates Planner with the immutable Goal/Evidence result bundle, beginning with the

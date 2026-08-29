@@ -371,7 +371,13 @@ Read the diagram with these boundaries:
   re-entered with the committed Goal and the Trusted Runtime's actual
   queued/running/completed Work, then emits only the necessary HOW delta; Runtime validates and applies that lifecycle delta. This is a structural
   continuation of an open Responsibility, not a Host semantic judgment, and it gives GA
-  no Capability or planning authority.
+  no Capability or planning authority. Creating a new Goal that conserves the same
+  source Responsibility and merely joins its canonical identity or resource projection
+  is not such a material Work change: the accepted terminal result from the original
+  Fast stream is bound mechanically to that Goal and is not sent through a second Fast
+  semantic invocation. Re-entry is reserved for an actual retained/provisional Work
+  intersection, a GA-authored update to retained Goal meaning, or later trusted
+  Runtime/Evidence/Situation change.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
 - Planner owns **what Work can advance those Goals now**, constrained by the currently
   available Capability/provider contracts. Fast/deep are cognition passes of that same
@@ -851,6 +857,23 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    requested Responsibility. Material cross-Responsibility order remains in
    `before`/`after` sibling-`local_ref` bindings and requested concurrency in
    `parallel_with`; these are WHAT relations, not Runtime scheduling permission.
+
+   Exact admitted wording is provenance, not a second writable semantic result.
+   `UserTurnEnvelope.original_input.text` remains the one immutable stored source;
+   every primary semantic authority for that turn receives its exact wording through
+   a compact read-only projection. GI alone interprets current-turn WHAT, GA alone
+   associates that meaning longitudinally and commits Goal continuity, and Planner
+   alone decides HOW from the accepted Responsibilities/Goals. A downstream owner may
+   preserve exact surface wording, correlate evidence, or realize an already-bound HOW
+   argument, but must fail closed rather than silently filling, overriding, or repairing
+   missing/conflicting upstream semantics from the source text. Host may validate the
+   source digest and correlation mechanically but may not interpret it. A scoped Planner
+   re-entry keeps the exact originating wording as read-only provenance while its
+   `request.text`, Responsibilities, Goals, Plan, and Evidence remain restricted to the
+   affected Goal subset; the whole-turn wording cannot widen that transaction or revive
+   a sibling Goal. A same-stage DTO-only regeneration is not another semantic authority
+   and may receive only the already-authored result plus mechanical errors when that is
+   necessary to prevent semantic reconsideration.
 31. **One model-authored semantic fact must have one model-facing source of truth.**
    When other execution fields are deterministic projections of one semantic
    decision, they do not belong beside that decision as writable model inputs.
@@ -1108,6 +1131,19 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Event Agent merely to implement this lifecycle.
 
 43. **Planner is the sole WorkDAG semantic mutation authority; DAGEngine advances execution mechanically.** A Chromie-level `WorkDAG` is a revisioned directed acyclic representation of Planner-authored planned Work, not another cognitive owner. Planner owns node selection, Capability choice, arguments, Goal ownership, dependency/concurrency topology, and any bounded fallback/retry policy committed in that DAG. Goal Association may change canonical Goal continuity but must never edit WorkDAG directly; changed Goal truth creates a Planner opportunity. `DAGEngine` may validate acyclicity/contracts, enforce monotonic `dag_id`/`revision` identity, calculate readiness, dispatch permitted parallel nodes, advance dependency state, enforce committed policy, propagate cancellation, inherit already-completed immutable nodes across the next valid revision, and record execution facts. Normal node completion therefore continues mechanically without another Planner call. It may not invent replacement Work, choose alternative Capabilities, rewrite completed history, author a recovery plan, produce engine-authored next-action guidance, interpret outcomes into user-facing meaning, or speak. Material failure or a changed Goal/Situation returns Evidence to the same Planner, which may choose NO_CHANGE or author the next/new WorkDAG. Provider-local DAGs/controllers remain valid implementation details behind their advertised Capability boundaries.
+
+44. **Every delivery commit must carry an exact next-session checkpoint and handoff.**
+   Before creating or pushing a delivery commit, update both
+   `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that same commit. The checkpoint
+   owns the stable resume boundary: active issue, implemented contract, evidence
+   status, open blockers, claim boundary, and ordered next work. The handoff owns the
+   volatile operational snapshot: base/revision context, branch, retained artifact
+   paths, exact commands, runtime/profile identities, known dirty or failing state,
+   and cross-machine bootstrap instructions. Neither file may claim a gate, live
+   behavior, or clean tree that was not actually observed. A commit or push without
+   both updated owners is incomplete even when the code itself is correct. The next
+   coding agent must be able to resume from the committed pair without reconstructing
+   hidden chat history.
 
 ### One personal voice; resources constrain coexistence
 

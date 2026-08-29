@@ -70,6 +70,41 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
 # Planner prompt/projection mechanics only. This module does not invoke a model,
 # validate or commit a Plan, mutate Goal/Work state, or authorize effects.
 
+
+def immutable_source_turn_prompt(
+    request: CognitiveWorkRequest,
+    *,
+    what_authority: str = "FINAL CANONICAL GOALS",
+) -> str:
+    """Expose exact source evidence without letting Planner re-author WHAT."""
+
+    source = request.source_turn_provenance
+    if what_authority == "GI Responsibilities":
+        projection = json.dumps(
+            {"original_text": source["original_text"]},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return (
+            "IMMUTABLE SOURCE TURN JSON (exact/read-only; GI Responsibilities "
+            "own WHAT):\n"
+            f"{projection}"
+        )
+    projection = json.dumps(
+        {
+            "original_text": source["original_text"],
+            "authority": source["authority"],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return (
+        "IMMUTABLE SOURCE TURN JSON (read-only; "
+        f"{what_authority} own WHAT; Planner may preserve exact wording or realize "
+        "bound HOW, never reinterpret or repair WHAT):\n"
+        f"{projection}"
+    )
+
 def auxiliary_social_planning_prompt_section(context: dict[str, Any]) -> str:
     """Describe Planner-owned optional decoration without creating another owner."""
 
@@ -96,9 +131,41 @@ def auxiliary_social_planning_prompt_section(context: dict[str, Any]) -> str:
         "and cite the exact primary anchor. Never create an auxiliary item for an internal "
         "cognition milestone, never move explicit user-requested behavior out of Goal-owned "
         "steps, never repeat a recent decoration, and never invent target/perception facts. "
+        "Do not create a communicative Activity merely to provide an anchor for decoration. "
+        "Do not copy a Goal-owned count, duration, direction, distance, or other modifier "
+        "into decoration args just because it is present on the primary Responsibility; "
+        "auxiliary args must be independently justified by the selected social function, "
+        "candidate schema, and trusted target evidence. "
         "If target freshness is absent, use an untargeted eligible expression or return an "
         "empty list. Auxiliary Activities never satisfy, block, cancel, clarify, or create a "
         "Goal and never justify response wording.\n\n"
+    )
+
+
+def trusted_target_evidence_prompt_section(context: dict[str, Any]) -> str:
+    """Expose one already-owned target reference for primary targeted Work.
+
+    The same bounded context may also qualify optional decoration, but target
+    Evidence is not auxiliary-only. Planner may copy an exact trusted reference
+    into a provider-declared target argument; it may never infer a direction or
+    synthesize a target when this projection is unavailable.
+    """
+
+    payload = context.get("planner_auxiliary_social_context")
+    target_evidence = (
+        payload.get("target_evidence") if isinstance(payload, dict) else None
+    )
+    if not isinstance(target_evidence, dict) or not target_evidence.get("available"):
+        return "No trusted semantic target evidence is available.\n"
+    return (
+        "Trusted semantic target evidence JSON:\n"
+        f"{bounded_json(target_evidence, 1400)}\n"
+        "This evidence may ground a primary targeted Capability only when its exact "
+        "semantic target matches the owning Responsibility and the Capability declares "
+        "the corresponding argument_realization. Copy the supplied target_ref exactly. "
+        "Never replace it with a pronoun surface, invent another target, infer yaw/pitch, "
+        "or use this evidence for an unrelated Responsibility. Provider and Runtime "
+        "retain target-resolution and safety authority.\n\n"
     )
 
 
@@ -119,6 +186,7 @@ def fast_plan_prompt(
         context,
         agent_role="fast_planner",
     )
+    skill_section += trusted_target_evidence_prompt_section(context)
     skill_section += auxiliary_social_planning_prompt_section(context)
     identity_json = bounded_identity_json(context)
     personality_json = bounded_personality_json(context)
@@ -220,10 +288,11 @@ def fast_plan_prompt(
         "re-entry may describe completion. "
     )
     current_turn_communication_contract = (
-        "The FINAL AUTHORITATIVE USER TURN owns the current communicative act. "
-        "Retained Goals, delivered evidence-bound dialogue, and verified memory "
-        "may support the response, but they must not replace what the person just "
-        "meant. For a reaction, feeling, acknowledgement, evaluation, or practical "
+        "The current canonical Goals own WHAT, with the immutable admitted source "
+        "turn available only as exact read-only provenance. Retained Goals, delivered "
+        "evidence-bound dialogue, and verified memory may support the response, but "
+        "they must not replace the current Goal meaning. For a reaction, feeling, "
+        "acknowledgement, evaluation, or practical "
         "decision, answer that latest act directly and naturally. Do not replay the "
         "previous task answer unless the latest turn actually asks for repetition, "
         "verification, explanation, comparison, or another answer from it. For a "
@@ -310,7 +379,7 @@ def fast_plan_prompt(
             "Generic response transport is not a task-plan step, so chromie.speak is never a plan step. Do not replace a conversational answer with a gesture or attention action. "
             "Use plan_relation=exact unless the plan materially changes the request; safe_adjustment or alternative requires user_confirmation_required=true and explanatory response_text. "
             "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. This primary result must contain complete per-Goal coverage, exact response truth, step ownership, satisfaction, and unresolved-work decisions; no later model will audit or repair its semantics. Return JSON only.\n\n"
-            f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
+            f"{immutable_source_turn_prompt(request)}\n\n"
             f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
             f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
             f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
@@ -364,7 +433,7 @@ def fast_plan_prompt(
         "The Ollama decoder enforces the exact flat FastPlannerModelOutput schema out-of-band. "
         "The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. "
         "This primary result must contain complete per-Goal coverage, exact response truth, step ownership, satisfaction, and unresolved-work decisions; no later model will audit or repair its semantics. Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
-        f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
+        f"{immutable_source_turn_prompt(request)}\n\n"
         f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
         f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
         f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}\n\n"
@@ -394,9 +463,11 @@ def fast_advance_layered_prompt(
         "wording, truth stage, and semantic provenance. The Host validates and realizes "
         "that immutable act; Trusted Capability Runtime alone authorizes execution."
     )
-    responsibilities_json = bounded_json(
-        [item.model_dump(mode="json", exclude_none=True) for item in responsibilities],
-        2200,
+    responsibility_decision_json = json.dumps(
+        fast_responsibility_decision_projection(responsibilities),
+        ensure_ascii=False,
+        sort_keys=False,
+        separators=(",", ":"),
     )
     active_goals = bounded_json(context.get("active_goal_snapshots") or [], 600)
     interaction_context = bounded_json(
@@ -404,10 +475,39 @@ def fast_advance_layered_prompt(
         1200,
     )
     capability_json = json.dumps(
-        fast_advance_capability_prompt_projection(capabilities),
+        fast_advance_streaming_capability_prompt_projection(capabilities),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
+    )
+    has_physical_resource_capability = any(
+        str(
+            ((item.get("hints") or {}).get("semantic_scope") or {}).get(
+                "responsibility_type"
+            )
+        )
+        == "acquire_and_deliver_resource"
+        and "physical_object"
+        in set(
+            ((item.get("hints") or {}).get("semantic_scope") or {}).get(
+                "resource_kinds"
+            )
+            or []
+        )
+        for item in capabilities
+        if isinstance(item, dict)
+    )
+    physical_resource_instruction = (
+        "For a structured physical-resource Capability, preserve exact resource "
+        "identity in resource.description, recipient surface in recipient.description, "
+        "and each source location, direction, distance, or route as a separate key in "
+        "source.bindings. General template: entity/item=R, recipient=P, location=L, "
+        "distance=D becomes resource.description=R, recipient.description=P, and "
+        "source.bindings containing location=L and distance=D. Compare every semantic "
+        "binding before closing terminal_plan; never collapse a numeric binding into "
+        "location prose.\n\n"
+        if has_physical_resource_capability
+        else ""
     )
     presentation_schema_json = ""
     terminal_schema_json = ""
@@ -426,8 +526,49 @@ def fast_advance_layered_prompt(
             separators=(",", ":"),
         )
     terminal_activity_limit = max(1, len(responsibilities))
+    final_decision_checklist = (
+        "FINAL DECISION CHECKLIST (apply after reading the schemas):\n"
+        "1. Explicitly requested observable behavior is primary Goal Work. Put it in "
+        "terminal_plan.activities, never presentation_commit.auxiliary_activities or "
+        "terminal_plan.auxiliary_activities. Auxiliary social decoration is optional, "
+        "normally [], and must not use a Capability whose effect overlaps any "
+        "Responsibility or terminal Capability Activity.\n"
+        "2. Cover every authoritative Responsibility exactly once by one Capability, "
+        "complete_response, or clarification owner. Immediate direct speech may be "
+        "completed in presentation_commit; speech ordered after or parallel with Work "
+        "must remain a terminal complete_response Activity. Never complete the same ref "
+        "in both frames. Do not omit a sibling and do not invent a new one.\n"
+        "3. Scheduling is mechanical. If any Responsibility says parallel_with a "
+        "sibling, every participating Capability Activity is timing=parallel and those "
+        "Activities are adjacent. For before/after, emit the Activities in that order "
+        "and mark every participant sequential. With no concurrency relation, use "
+        "sequential. A lone parallel Activity is always invalid.\n"
+        "4. Args are sparse. Copy every explicit binding to its matching required or "
+        "semantically corresponding catalog arg. Do not add optional tuning args that "
+        "the Responsibility did not request; provider defaults own omitted optional "
+        "values.\n"
+        "5. Generic examples: requested blink r1 => presentation auxiliary [], one "
+        "terminal blink Activity owned by r1. Concurrent r1+r2 => two adjacent parallel "
+        "terminal Activities. Ordered r1 then r2 => two sequential terminal Activities "
+        "in r1,r2 order.\n"
+        "6. The presentation text is speech about prospective work, not the work itself. "
+        "It never satisfies body, information, media, vocal-performance, or state-change "
+        "Responsibilities. If no useful immediate speech is needed, emit the whole "
+        "activity value as null. Never emit an Activity object with text=null or any "
+        "other null required member. A silent commit has auxiliary_activities=[]; never "
+        "invent speech only to anchor optional decoration. If the useful speech is an "
+        "ordered terminal complete_response, keep the presentation silent and put any "
+        "independently justified decoration in terminal_plan.auxiliary_activities with "
+        "that terminal Activity as its exact anchor.\n"
+        if presentation_schema_json and terminal_schema_json
+        else ""
+    )
     auxiliary_social_section = auxiliary_social_planning_prompt_section(context)
-    user_text = str(request.original_user_text or "")[:700]
+    trusted_target_section = trusted_target_evidence_prompt_section(context)
+    source_turn_prompt = immutable_source_turn_prompt(
+        request,
+        what_authority="GI Responsibilities",
+    )
     communication_instruction = (
         "This is one streaming semantic invocation. First author "
         "presentation_commit.activity as one useful immediate progress or "
@@ -435,8 +576,9 @@ def fast_advance_layered_prompt(
         "Give a non-null Activity a short stable activity_id; every optional "
         "auxiliary anchor_id must equal it exactly. Close that tagged frame before "
         "continuing the same decision in terminal_plan without repeating, rewording, "
-        "translating, or contradicting that Activity. terminal_plan.activities may contain only "
-        "still-needed Capability or genuine clarification Activities. Emit only "
+        "translating, or contradicting that Activity. terminal_plan.activities may contain "
+        "still-needed Capability, complete_response, or genuine clarification Activities, "
+        "but never another progress Activity. Emit only "
         "properties visible in the supplied payload schema for the selected object branch."
     )
     streaming_contract = (
@@ -448,8 +590,9 @@ def fast_advance_layered_prompt(
         "because the first closed, validated frame may be realized before generation ends. "
         "The presentation payload "
         "must contain both activity and auxiliary_activities. It may contain one "
-        "complete_response only when every covered Responsibility is direct speech "
-        "already grounded by trusted context; otherwise it may contain one short "
+        "complete_response only for ordinary speech already grounded by trusted context "
+        "and immediately deliverable without violating requested order or concurrency; "
+        "otherwise it may contain one short "
         "pre-evidence progress Activity, or activity=null when speaking now adds no "
         "useful semantic delta. Progress is prospective and method-blind: it must "
         "not ask a question, claim execution/result/completion, or name an instrument, "
@@ -458,8 +601,12 @@ def fast_advance_layered_prompt(
         "and use the requested language naturally. presentation_commit auxiliary "
         "Activities may only be optional social decoration anchored to that exact "
         "communicative Activity; a silent commit has none. terminal_plan is the "
-        "rest of the same HOW decision. It must not emit another progress or "
-        "complete_response Activity and must not repeat presentation decoration. "
+        "rest of the same HOW decision. It must not emit another progress Activity or "
+        "repeat presentation decoration. It may author distinct optional decoration only "
+        "for an exact primary Activity in terminal_plan.activities. It must emit a "
+        "complete_response for still-needed "
+        "ordinary speech that is ordered after or parallel with other terminal Work, and "
+        "must not repeat a Responsibility already completed by the presentation. "
         "FIELD PLACEMENT IS EXACT: presentation_commit.activity owns only the "
         "model-visible activity_id, progress_kind when applicable, text, and "
         "source_responsibility_refs when the schema asks for them. Never put "
@@ -496,12 +643,13 @@ def fast_advance_layered_prompt(
         + streaming_contract
         + "\n\n"
         + wire_skeleton
-        + "\n\nCurrent user turn:\n"
-        + user_text
+        + "\n\n"
+        + source_turn_prompt
         + "\nLanguage hint: "
         + str(request.language or "auto")[:32]
-        + "\n\nAuthoritative Responsibility evidence from Goal Interpretation:\n"
-        + responsibilities_json
+        + "\n\nAUTHORITATIVE FAST DECISION TABLE (one row must receive exactly one "
+        "terminal owner unless direct speech is completed by the presentation):\n"
+        + responsibility_decision_json
         + "\n\nGI unresolved-meaning evidence (exact strings or empty):\n"
         + bounded_json(request.interpretation_unresolved, 1200)
         + "\n\nActive Goal continuity summary only:\n"
@@ -513,11 +661,16 @@ def fast_advance_layered_prompt(
         + "\n\nExecutable common Capability catalog JSON:\n"
         + capability_json
         + "\n\n"
+        + trusted_target_section
+        + "\n"
         + auxiliary_social_section
         + "\n\nThe catalog projection is complete for this Fast decision. Compare each "
         "Responsibility with capability_id, description, when_to_use, effects, "
-        "semantic_type, semantic_scope, and args_schema. Select only a direct semantic "
-        "match. The absence of fresh result Evidence is the reason to execute a matching "
+        "semantic_type, semantic_scope, and the one args_schema shown for that Capability. "
+        "Select only a direct semantic match. This catalog is the single exact argument "
+        "authority; the terminal payload schema defines only common Activity placement. "
+        "The absence of fresh result "
+        "Evidence is the reason to execute a matching "
         "read Capability, never a reason to clarify. For a read request, physical-object "
         "acquisition, handover, body gestures, or attention motions cannot acquire external "
         "information. "
@@ -528,7 +681,8 @@ def fast_advance_layered_prompt(
         "when declared. Preserve every binding and explicit temporal dimension. Emit "
         "optional args when an explicit binding overrides a default; omit only unused "
         "defaults.\n\n"
-        "When one matching Capability has all required input, set disposition=execute, "
+        + physical_resource_instruction
+        + "When one matching Capability has all required input, set disposition=execute, "
         "coverage=complete, continuations=[], unresolved=[], and emit its schema-valid "
         "Capability Activity. Cover every Responsibility ref exactly. Use parallel only "
         "for genuine overlap without declared resource/safety conflict; dependent work "
@@ -572,6 +726,8 @@ def fast_advance_layered_prompt(
         )
         + "Validation errors from the prior Fast Plan, if any:\n"
         + (validation_errors or "[]")
+        + "\n"
+        + final_decision_checklist
         + "\nThis primary result must contain the complete per-Goal coverage, exact "
         "response truth, step ownership, satisfaction, and unresolved-work decision; "
         "no later model will audit or repair its semantics. Return exactly the two fresh "
@@ -583,6 +739,89 @@ def fast_advance_layered_prompt(
         rendered,
         operating_contract=(advance_contract,),
     )
+
+
+def _normalized_sibling_refs(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    return []
+
+
+def fast_responsibility_decision_projection(
+    responsibilities: list[CognitiveResponsibilityProposal],
+) -> list[dict[str, Any]]:
+    """Project GI WHAT into a small, local Planner coverage/scheduling table.
+
+    This is a lossless mechanical rearrangement of already-authoritative GI fields.
+    It neither selects a Capability nor changes a relation.  Keeping relation edges
+    beside their owner makes the model's coverage and timing choice local instead of
+    asking it to recover those constraints from a large DTO plus two schemas.
+    """
+
+    projected: list[dict[str, Any]] = []
+    relation_names = ("before", "after", "parallel_with")
+    for responsibility in responsibilities:
+        bindings = dict(responsibility.bindings or {})
+        relations = {
+            name: _normalized_sibling_refs(bindings.pop(name, None))
+            for name in relation_names
+        }
+        projected.append(
+            {
+                "ref": responsibility.local_ref,
+                "outcome": responsibility.outcome,
+                "output_mode": responsibility.output_mode,
+                "semantic_bindings": bindings,
+                "relations": relations,
+                "goal_relationship": responsibility.relationship,
+                "target_goal_ids": list(responsibility.target_goal_ids),
+                "terminal_owner_required": responsibility.output_mode != "speech",
+            }
+        )
+    return projected
+
+
+def fast_advance_semantic_capability_projection(
+    capabilities: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return the non-duplicated semantic index used before the exact schema.
+
+    The terminal response schema already carries the only legal per-Capability arg
+    branches.  Repeating those branches in the catalog made two overlapping sources
+    look authoritative to the model and inflated the Fast prompt substantially.
+    """
+
+    return [
+        {
+            key: value
+            for key, value in capability.items()
+            if key != "args_schema"
+        }
+        for capability in fast_advance_capability_prompt_projection(capabilities)
+    ]
+
+
+def fast_advance_streaming_capability_prompt_projection(
+    capabilities: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one exact argument contract beside each semantic catalog entry.
+
+    Tagged streaming does not use Ollama's JSON constrained decoder, so repeating
+    a full Activity union in the terminal payload schema only distracts the model.
+    The catalog carries each input schema once; strict runtime validation remains
+    unchanged after the tagged document is parsed.
+    """
+
+    semantic_projection = fast_advance_semantic_capability_projection(capabilities)
+    return [
+        {
+            **semantic,
+            "args_schema": dict(capability.get("input_schema") or {}),
+        }
+        for semantic, capability in zip(semantic_projection, capabilities)
+    ]
 
 
 def fast_advance_capability_prompt_projection(
@@ -730,6 +969,8 @@ def fast_layered_prompt(
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="fast_planner")
+        + trusted_target_evidence_prompt_section(context)
+        + auxiliary_social_planning_prompt_section(context)
         + "Executable common capability catalog JSON:\n"
         + bounded_json(capabilities, 9000)
         + "\n\n"
@@ -800,6 +1041,7 @@ def deep_plan_prompt(
         context,
         agent_role="deep_planner",
     )
+    skill_section += trusted_target_evidence_prompt_section(context)
     skill_section += auxiliary_social_planning_prompt_section(context)
     fast_plan = (
         context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
@@ -917,7 +1159,7 @@ def deep_plan_prompt(
         f"Deterministic validation feedback from the previous deep-plan or trusted host-runtime attempt:\n{feedback_section}\n\n"
         "When validation feedback is present but the previous output is null, regenerate one fresh complete object from the authoritative turn, goals, catalog, and all listed defects. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
         "When validation feedback reports parallel_step_count=1, the parallel label has no peer and is a malformed scheduling annotation rather than a user-visible concurrency plan; regenerate that exact one-step plan with timing=sequential. When validation feedback says multi-step parallel execution is not affirmatively safe, never silently change those parallel steps to an exact sequential plan. Either author plan_relation=safe_adjustment or alternative with user_confirmation_required=true and response_text explaining the timing change, or return a zero-step clarification/unavailable result. "
-        "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The FINAL AUTHORITATIVE USER TURN owns the current communicative act. Retained Goals and delivered evidence may support a response, but must not replace the latest reaction, feeling, acknowledgement, evaluation, or practical decision. Answer that current act directly; replay or re-explain a prior task only when the latest turn asks for it. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
+        "Produce the final DeepPlannerModelOutput for the complete user goal. Deep planning is terminal: never return to the Fast Planner. The current canonical Goals own WHAT; the immutable admitted source turn is exact read-only provenance, not permission to reinterpret or repair them. Retained Goals and delivered evidence may support a response, but must not replace the latest reaction, feeling, acknowledgement, evaluation, or practical decision represented by those Goals. Answer that current act directly; replay or re-explain a prior task only when the latest turn asks for it. The verified tool-memory index contains no answer facts. If one exact fresh index entry matches the authoritative Goal bindings, execute chromie.memory.retrieve_verified_tool_result with its evidence_id, original tool_id, and the exact material arguments. If no such entry exists, execute the fresh read capability. Never answer directly from index metadata, never reinterpret an unresolved reference from old memory, and never use another task's result. When a scheduled, running, or recoverable safe read has no matching completed memory entry, resume or retry its bound capability with the exact arguments. "
         "When Host-bound Goal cancellation Evidence is present, it is the trusted "
         "control result for the named cancellation: cancelled means the target Goal "
         "is terminal and must not be re-executed; not_cancelled means do not claim it "
@@ -965,7 +1207,7 @@ def deep_plan_prompt(
         "Every outcome step_id must name a real plan step, every plan step must be referenced by an execute outcome when goal_outcomes are present, and each step source_goal_ids must exactly match the execute outcomes that reference it. "
         "The Ollama decoder enforces the exact flat DeepPlannerModelOutput JSON Schema supplied out-of-band. The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. Populate only fields allowed by the model schema and return JSON only. "
         "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
-        f"FINAL AUTHORITATIVE USER TURN:\n{request.original_user_text}\n\n"
+        f"{immutable_source_turn_prompt(request)}\n\n"
         f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{bounded_json(grounding, 5000)}\n\n"
         f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
         f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
@@ -1004,6 +1246,7 @@ def deep_layered_prompt(
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="deep_planner")
+        + trusted_target_evidence_prompt_section(context)
         + auxiliary_social_planning_prompt_section(context)
         + "Executable capability catalog JSON:\n"
         + bounded_json(prompt_capabilities, 12000)

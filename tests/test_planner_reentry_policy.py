@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
     planner_reentry_repeats_completed_activity,
@@ -7,6 +9,7 @@ from orchestrator.runtime.planner_reentry import (
     suppress_already_delivered_speech,
     suppress_redundant_completed_body_followup,
     terminal_evidence_relevance,
+    terminal_result_waits_for_batch_closure,
 )
 from agent.app.planner_context import (
     goal_association_prompt_projection,
@@ -31,6 +34,8 @@ def _response(*, include_interpretation: bool = True) -> InteractionResponse:
         "canonical_plan_id": "plan-current",
         "canonical_plan_fingerprint": "f" * 64,
         "user_turn_envelope": {
+            "turn_id": "turn-reentry-source",
+            "original_input": {"text": "  Check both things.  "},
             "normalized_input": {"text": "Check both things."}
         },
         "goal_association": {
@@ -102,6 +107,21 @@ def _current_binding() -> list[dict[str, object]]:
             "request_ids": ["request-a"],
         }
     ]
+
+
+def test_successful_multi_capability_result_waits_for_aggregate_closure() -> None:
+    assert terminal_result_waits_for_batch_closure(
+        source_capability_count=2,
+        status="completed",
+    )
+    assert not terminal_result_waits_for_batch_closure(
+        source_capability_count=1,
+        status="completed",
+    )
+    assert not terminal_result_waits_for_batch_closure(
+        source_capability_count=2,
+        status="failed",
+    )
 
 
 def test_typed_reentry_scope_bounds_full_association_to_affected_goals() -> None:
@@ -495,4 +515,37 @@ def test_execution_outcome_user_text_prefers_admitted_turn() -> None:
         },
     )
 
-    assert execution_outcome_user_text(response, plan) == "Check both things."
+    assert execution_outcome_user_text(response, plan) == "  Check both things.  "
+
+
+def test_work_request_rejects_unverified_source_projection() -> None:
+    request = CognitiveWorkRequest(
+        sid="runtime-only-id",
+        text="scoped responsibility",
+        responsibilities=[
+            {
+                "local_ref": "r1",
+                "outcome": "scoped responsibility",
+                "output_mode": "information",
+                "confidence": 1.0,
+            }
+        ],
+        context={
+            "source_turn_provenance": {
+                "original_text": "spoofed whole turn",
+                "original_text_sha256": "0" * 64,
+                "authority": "read_only_source_provenance",
+            }
+        },
+    )
+
+    assert request.source_turn_provenance == {
+        "schema_version": 1,
+        "turn_id": "",
+        "original_text": "scoped responsibility",
+        "original_text_sha256": hashlib.sha256(
+            b"scoped responsibility"
+        ).hexdigest(),
+        "language": "auto",
+        "authority": "normalized_transport_fallback",
+    }

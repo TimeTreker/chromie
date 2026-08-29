@@ -74,6 +74,15 @@ _CONTEXT_OMIT_KEYS = {
     "recent_goal_snapshots",
     "current_task_context",
     "gateway_context_snapshot",
+    # Runtime target identity/direction is Planner realization evidence. GI may
+    # understand the current-turn person/addressee meaning, but must never copy
+    # an opaque target_ref or scene geometry into provider-neutral WHAT.
+    "active_user_target",
+    "planner_auxiliary_social_context",
+    # The exact source wording is projected once in its dedicated provenance
+    # block.  Do not duplicate the full Gateway envelope as ambient context.
+    "user_turn_envelope",
+    "source_turn_provenance",
 }
 
 # These keys belong either to downstream lifecycle/HOW authority or to the retired
@@ -164,6 +173,12 @@ class _GoalInterpretationSpeedProvenanceViolation(
     _GoalInterpretationSemanticStructureViolation
 ):
     """A speed field was invented or conflicts with another typed dimension."""
+
+
+class _GoalInterpretationDurationProvenanceViolation(
+    _GoalInterpretationSemanticStructureViolation
+):
+    """A duration field was invented or lost its source/context scalar."""
 
 
 def _without_goal_interpretation_authority(value: Any) -> Any:
@@ -601,45 +616,30 @@ def _source_tokens(text: str) -> list[dict[str, Any]]:
     return tokens
 
 
-def _source_token_span_surfaces(
-    text: str,
-    *,
-    max_span_tokens: int = 8,
-    max_values: int = 384,
-) -> list[str]:
-    """Return bounded exact token-aligned source slices for decoder constraints.
+def _goal_interpretation_source_turn_provenance(
+    request: GoalInterpretationRequest,
+) -> dict[str, Any]:
+    """Return exact admitted wording once, without ambient Gateway metadata."""
 
-    The model still decides whether a slice has semantic meaning and which typed
-    binding owns it. This helper only prevents source-bound string fields from
-    emitting transport identifiers, translations, or invented paraphrases that
-    trusted validation must reject after generation.
-    """
-
-    surface = " ".join(str(text or "").strip().split())
-    tokens = _source_tokens(surface)
-    if not surface or not tokens:
-        return []
-    normalized_surface = _normalized_turn_echo(surface)
-    values: list[str] = []
-    seen: set[str] = set()
-    for span_length in range(1, min(max_span_tokens, len(tokens)) + 1):
-        for start in range(0, len(tokens) - span_length + 1):
-            end = start + span_length - 1
-            candidate = surface[
-                int(tokens[start]["start"]) : int(tokens[end]["end"])
-            ].strip()
-            if (
-                not candidate
-                or _normalized_turn_echo(candidate) == normalized_surface
-                or not any(char.isalnum() for char in candidate)
-                or candidate in seen
-            ):
-                continue
-            seen.add(candidate)
-            values.append(candidate)
-            if len(values) >= max_values:
-                return values
-    return values
+    original_text = request.text
+    envelope = request.context.get("user_turn_envelope")
+    if isinstance(envelope, dict):
+        original_input = envelope.get("original_input")
+        candidate = (
+            original_input.get("text")
+            if isinstance(original_input, dict)
+            else None
+        )
+        if (
+            isinstance(candidate, str)
+            and candidate
+            and " ".join(candidate.strip().split()) == request.text
+        ):
+            original_text = candidate
+    return {
+        "original_text": original_text,
+        "authority": "read_only_source_provenance",
+    }
 
 
 def _validate_primary_source_evidence(
@@ -975,32 +975,6 @@ def _semantic_context_string_values(context: dict[str, Any]) -> set[str]:
     return values
 
 
-def _semantic_context_location_surfaces(context: dict[str, Any]) -> tuple[str, ...]:
-    """Project only explicitly typed location values from bounded GI context."""
-
-    values: set[str] = set()
-
-    def collect(node: Any) -> None:
-        if isinstance(node, dict):
-            for key, item in node.items():
-                normalized_key = "_".join(
-                    str(key).strip().casefold().replace("-", "_").split()
-                )
-                if normalized_key == "location" and isinstance(item, str):
-                    value = " ".join(item.strip().split())
-                    if value:
-                        values.add(value)
-                else:
-                    collect(item)
-        elif isinstance(node, (list, tuple, set)):
-            for item in node:
-                collect(item)
-
-    for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS:
-        collect(context.get(key))
-    return tuple(sorted(values, key=lambda value: (len(value), value)))
-
-
 def _reject_unprovenanced_location_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -1015,6 +989,12 @@ def _reject_unprovenanced_location_bindings(
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
     contextual_values = _semantic_context_string_values(request.context)
+    source_numbers = _decimal_values(request.text)
+    context_numbers = {
+        number
+        for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS
+        for number in _decimal_values(request.context.get(key))
+    }
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1253,9 +1233,22 @@ def _strip_mechanically_unprovenanced_speed_bindings(
             bindings.pop("speed", None)
 
 
-def _reject_non_scalar_duration_bindings(parsed: dict[str, Any]) -> None:
-    """Keep the existing duration dimension scalar for downstream grounding."""
+def _reject_unprovenanced_duration_bindings(
+    request: GoalInterpretationRequest,
+    parsed: dict[str, Any],
+) -> None:
+    """Require duration to remain one typed scalar with safe string provenance.
 
+    Numeric duration is GI-owned semantic normalization: number words in the
+    admitted language may legitimately become a JSON number.  The cited source
+    span carries its provenance, while the explicit-Arabic-number guard below
+    separately prevents literal numeric values from being dropped or rewritten.
+    Trusted code can mechanically verify only string copies here; it must not
+    reinterpret number words to challenge GI's semantic authority.
+    """
+
+    current_turn = " ".join((request.text or "").strip().split()).casefold()
+    contextual_values = _semantic_context_string_values(request.context)
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1267,11 +1260,25 @@ def _reject_non_scalar_duration_bindings(parsed: dict[str, Any]) -> None:
         if isinstance(duration, bool) or not isinstance(
             duration, (str, int, float, Decimal)
         ):
-            raise _GoalInterpretationSemanticStructureViolation(
+            raise _GoalInterpretationDurationProvenanceViolation(
                 "Goal Interpretation duration binding must remain one scalar "
                 "source value, never a nested provider-shaped object: "
                 f"responsibilities[{index}].bindings.duration={duration!r}."
             )
+        if isinstance(duration, str):
+            normalized = " ".join(duration.strip().split()).casefold()
+            if normalized and (
+                normalized in current_turn or normalized in contextual_values
+            ):
+                continue
+        else:
+            continue
+        raise _GoalInterpretationDurationProvenanceViolation(
+            "Goal Interpretation duration binding has no authoritative surface "
+            "provenance: "
+            f"responsibilities[{index}].bindings.duration={duration!r}. "
+            "Duration must preserve one explicitly supplied elapsed-time scalar."
+        )
 
 
 def _reject_runtime_identity_bindings(
@@ -1589,6 +1596,96 @@ def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
             )
 
 
+def _append_sibling_relation(
+    bindings: dict[str, Any],
+    relation_name: str,
+    sibling_refs: list[str],
+) -> None:
+    existing = bindings.get(relation_name)
+    values = (
+        [str(item) for item in existing]
+        if isinstance(existing, list)
+        else [str(existing)] if existing not in (None, "") else []
+    )
+    bindings[relation_name] = list(dict.fromkeys([*values, *sibling_refs]))
+
+
+def _normalize_model_interpretation_projection(parsed: dict[str, Any]) -> None:
+    """Mechanically lower the one-call model wire shape into the canonical DTO.
+
+    GI remains the sole author of every relation and numeric dimension.  This
+    adapter only moves those already-authored typed values into the legacy
+    canonical binding representation consumed by GA and Planner.
+    """
+
+    responsibilities = parsed.get("responsibilities")
+    if not isinstance(responsibilities, list):
+        return
+    for item in responsibilities:
+        if not isinstance(item, dict) or "binding_items" not in item:
+            continue
+        binding_items = item.pop("binding_items")
+        if not isinstance(binding_items, dict):
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation binding_items must be one sparse typed object"
+            )
+        bindings = item.setdefault("bindings", {})
+        if not isinstance(bindings, dict) or bindings:
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation cannot mix binding_items with bindings"
+            )
+        for raw_name, value in binding_items.items():
+            name = str(raw_name or "").strip()
+            if not name or name != raw_name or name in bindings:
+                raise _GoalInterpretationSemanticStructureViolation(
+                    "Goal Interpretation binding names must be canonical, non-empty, "
+                    "and unique"
+                )
+            bindings[name] = value
+    by_ref = {
+        str(item.get("local_ref") or "").strip(): item
+        for item in responsibilities
+        if isinstance(item, dict) and str(item.get("local_ref") or "").strip()
+    }
+    coordination = parsed.pop("coordination", [])
+    if not isinstance(coordination, list):
+        raise _GoalInterpretationSemanticStructureViolation(
+            "Goal Interpretation coordination must be one typed list"
+        )
+    for group in coordination:
+        if not isinstance(group, dict):
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation coordination item must be one typed object"
+            )
+        kind = str(group.get("kind") or "").strip()
+        refs = [str(item).strip() for item in group.get("refs") or []]
+        if (
+            kind not in {"parallel", "sequence"}
+            or len(refs) < 2
+            or len(set(refs)) != len(refs)
+            or any(ref not in by_ref for ref in refs)
+        ):
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation coordination requires parallel/sequence and "
+                "at least two unique emitted Responsibility refs"
+            )
+        if kind == "parallel":
+            for ref in refs:
+                item = by_ref[ref]
+                bindings = item.setdefault("bindings", {})
+                _append_sibling_relation(
+                    bindings,
+                    "parallel_with",
+                    [sibling for sibling in refs if sibling != ref],
+                )
+        else:
+            for previous_ref, ref in zip(refs, refs[1:]):
+                item = by_ref[ref]
+                bindings = item.setdefault("bindings", {})
+                _append_sibling_relation(bindings, "after", [previous_ref])
+
+
+
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
     return bounded_json(value, max_chars)
 
@@ -1846,7 +1943,6 @@ def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, An
 
 def _goal_interpretation_identity_context(mind: Any) -> str:
     identity: dict[str, Any] = {}
-    voice: dict[str, Any] = {}
     if isinstance(mind, dict):
         raw_identity = mind.get("identity")
         if isinstance(raw_identity, dict):
@@ -1854,7 +1950,6 @@ def _goal_interpretation_identity_context(mind: Any) -> str:
                 {
                     key: raw_identity.get(key)
                     for key in (
-                        "entity_id",
                         "name",
                         "kind",
                         "age_description",
@@ -1866,26 +1961,14 @@ def _goal_interpretation_identity_context(mind: Any) -> str:
         self_model = mind.get("self_model")
         speaker = self_model.get("speaker_entity") if isinstance(self_model, dict) else None
         if isinstance(speaker, dict):
-            for key in ("entity_id", "name", "kind"):
+            for key in ("name", "kind"):
                 if speaker.get(key) not in (None, "", [], {}):
                     identity[key] = speaker.get(key)
-        identity["profile_id"] = mind.get("profile_id")
-        identity["version"] = mind.get("version")
-        personality = mind.get("personality_expression")
-        if isinstance(personality, dict) and personality.get("owner_approved") is True:
-            voice = {
-                key: personality.get(key)
-                for key in ("spoken_style", "maturity_boundary")
-                if personality.get(key) not in (None, "", [], {})
-            }
-    profile = {
-        "identity": identity or {"entity_id": "chromie", "name": "Chromie"},
-        "voice": voice,
-    }
+    profile = {"self_identity": identity or {"name": "Chromie"}}
     return (
-        f"{_bounded_json(profile, max_chars=1150)}\n"
-        "This bounded owner-approved identity context may resolve self-reference or "
-        "social meaning. It does not authorize response wording or downstream work."
+        f"{_bounded_json(profile, max_chars=420)}\n"
+        "These semantic self facts may resolve identity or self-reference. "
+        "Presentation style and internal profile identifiers are intentionally absent."
     )
 
 
@@ -1941,26 +2024,15 @@ class OllamaGoalInterpreter:
             if prior_assistant_utterance is not None
             else ""
         )
-        explicit_numeric_values = sorted(
-            _decimal_values(request.text),
-            key=lambda value: (value, str(value)),
-        )
-        explicit_numeric_context = (
-            "Explicit Arabic numeric values that must remain as typed semantic "
-            "bindings in the primary result under their user-stated dimensions "
-            "(this preservation list is not a repetition count): "
-            f"{json.dumps([int(value) if value == value.to_integral_value() else float(value) for value in explicit_numeric_values])}\n\n"
-            if explicit_numeric_values
-            else ""
-        )
         return (
             "Current Turn:\n"
-            f"Latest user input: {request.text}\n"
+            "IMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; "
+            "Goal Interpretation owns current-turn WHAT):\n"
+            f"{json.dumps(_goal_interpretation_source_turn_provenance(request), ensure_ascii=False, separators=(',', ':'))}\n"
             f"language_hint={request.language or 'auto'}\n\n"
             "Authoritative source tokens (cite inclusive refs in each "
             "Responsibility.source_evidence):\n"
             f"{_bounded_json(_source_tokens(request.text), max_chars=5000)}\n\n"
-            f"{explicit_numeric_context}"
             "Bounded Identity Context:\n"
             f"{_goal_interpretation_identity_context(mind)}\n\n"
             "Semantic Continuity Context:\n"
@@ -1974,34 +2046,8 @@ class OllamaGoalInterpreter:
             f"{_bounded_json_array(_compact_active_goal_snapshots(request.context), max_chars=1400)}\n"
             "Active Task/Activity progress with identity and pending clarification JSON:"
             f"{_bounded_json_array(_compact_active_task_snapshots(request.context), max_chars=1400)}\n\n"
-            "Interpret this turn under the system WHAT-only contract. Return the complete "
-            "set of independently satisfiable Responsibilities, material semantic bindings, "
-            "canonical relationship tokens and supplied target Goal IDs, confidence, and "
-            "only genuine unresolved user meaning. Each Responsibility must cite the "
-            "smallest complete coherent source span for its own positive predicate; "
-            "independent Responsibility spans must not overlap. Source refs are "
-            "provenance only and never Goal or Activity identity. For speech, outcome describes the "
-            "communicative obligation or proposition to convey; Planner alone authors the "
-            "exact utterance. Bind prior_assistant_utterance only when a real utterance "
-            "object is supplied above and the current turn asks what Chromie said; copy "
-            "only that object's exact text. Use the one canonical positive integer binding "
-            "count for requested item or repetition quantity. Preserve perspective, "
-            "polarity, every independently observable effect, and exact source-grounded "
-            "modality. Do not copy envelope fields, status markers, whole-turn echoes, "
-            "InformationGaps, or HOW fields into bindings. Directly named entities and "
-            "deictic locations remain exact current-turn surfaces; every such location "
-            "binding must occur as one contiguous substring of "
-            f"{json.dumps(request.text, ensure_ascii=False)}. Preserve explicit Arabic "
-            "numbers as material typed values. Final preflight before JSON: emit one "
-            "sibling per independently acceptable effect and never encode the sibling "
-            "inventory size in bindings.count; duration, speed, direction, distance, "
-            "count, and intensity attached to one predicate are bindings on that one "
-            "Responsibility, never sibling effects; "
-            "each source span contains only its own predicate and does not overlap a "
-            "sibling; Chromie's own singing uses singing; location is omitted unless the "
-            "meaning contains an actual place or spatial target; unresolved must include a "
-            "bare name whose identity or category is not supplied or uniquely resolved "
-            "by bounded Context. Return JSON only."
+            "Apply the system WHAT-only contract to this authoritative turn and bounded "
+            "semantic Context. Return one complete schema-valid JSON decision only."
         )
 
     @staticmethod
@@ -2012,7 +2058,6 @@ class OllamaGoalInterpreter:
         allowed_goal_ids: tuple[str, ...] = (),
         prior_assistant_utterance: str | None = None,
         admitted_turn: str = "",
-        context_location_values: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -2157,64 +2202,41 @@ class OllamaGoalInterpreter:
                         "number words, or numeric strings."
                     ),
                 }
-                turn_surface = " ".join(str(admitted_turn or "").strip().split())
-                exact_source_surfaces = _source_token_span_surfaces(admitted_turn)
-                non_turn_string: dict[str, Any] = {
+                source_backed_string: dict[str, Any] = {
                     "type": "string",
                     "minLength": 1,
                 }
-                if turn_surface:
-                    non_turn_string["not"] = {"const": turn_surface}
-                exact_location_values = list(
-                    dict.fromkeys(
-                        [*exact_source_surfaces, *context_location_values]
-                    )
-                )
-                binding_properties["location"] = (
-                    {
-                        "type": "string",
-                        "enum": exact_location_values,
-                        "description": (
-                            "Only an explicitly spatial place/target value: choose one "
-                            "exact token-aligned current-turn surface or one typed "
-                            "location already supplied by semantic context. Never use a "
-                            "runtime identifier, time expression, direction alone, "
-                            "coordination phrase, action, or generic word such as local."
-                        ),
-                    }
-                    if exact_location_values
-                    else {
-                        **non_turn_string,
-                        "description": (
-                            "One exact source/context spatial place or target string, "
-                            "never transport metadata or the complete admitted turn."
-                        ),
-                    }
-                )
-                source_string = (
-                    {
-                        "type": "string",
-                        "enum": exact_source_surfaces,
-                    }
-                    if exact_source_surfaces
-                    else non_turn_string
-                )
-                binding_properties["duration"] = {
-                    "anyOf": [source_string, {"type": "number"}],
+                schema_definitions = schema.setdefault("$defs", {})
+                schema_definitions["SourceBackedBindingString"] = source_backed_string
+                binding_properties["location"] = {
+                    "$ref": "#/$defs/SourceBackedBindingString",
                     "description": (
-                        "One source-backed elapsed-time scalar. Preserve an explicit "
-                        "number as a JSON number or one exact source/context string; "
-                        "never emit a nested value/unit object or null."
+                        "One exact source/context place or spatial-target string. Trusted "
+                        "code validates exact source/context provenance."
+                    ),
+                }
+                binding_properties["duration"] = {
+                    "anyOf": [
+                        {"$ref": "#/$defs/SourceBackedBindingString"},
+                        {"type": "number"},
+                    ],
+                    "description": (
+                        "One source-backed elapsed-span scalar. Use a JSON number for a "
+                        "normalized magnitude or one exact source/context string. This "
+                        "typed value owns the complete elapsed-span meaning."
                     ),
                 }
                 binding_properties["speed"] = {
-                    "anyOf": [source_string, {"type": "number"}],
+                    "anyOf": [
+                        {"$ref": "#/$defs/SourceBackedBindingString"},
+                        {"type": "number"},
+                    ],
                     "description": (
-                        "A source-backed pace or velocity string/number only. Omit this "
-                        "property when no pace or velocity is supplied; never emit null."
+                        "One source-backed pace or velocity scalar, represented as a "
+                        "JSON number or exact source/context string."
                     ),
                 }
-                generic_scalar = {
+                schema_definitions["SemanticBindingScalar"] = {
                     "anyOf": [
                         {"type": "string", "minLength": 1},
                         {"type": "number"},
@@ -2232,9 +2254,26 @@ class OllamaGoalInterpreter:
                             "maxItems": 12,
                         },
                     ],
-                    "description": (
-                        "One source/context-backed human-semantic scalar or short scalar "
-                        "list; never a nested execution/provider object or explanation."
+                }
+                dimension_descriptions = {
+                    "direction": (
+                        "One explicitly supplied source-grounded path or orientation direction."
+                    ),
+                    "time": (
+                        "One explicitly supplied source-grounded time point."
+                    ),
+                    "time_scope": (
+                        "One explicitly supplied temporal scope or interval constraint."
+                    ),
+                    "threshold": (
+                        "One explicitly supplied cutoff for a comparison or condition."
+                    ),
+                    "subtype": (
+                        "One explicitly supplied categorical kind of the predicate or entity."
+                    ),
+                    "recipient": (
+                        "The explicitly named beneficiary or receiver of a transferred or "
+                        "communicated result."
                     ),
                 }
                 for semantic_name in (
@@ -2260,7 +2299,16 @@ class OllamaGoalInterpreter:
                     "preference",
                     "attribute",
                 ):
-                    binding_properties[semantic_name] = generic_scalar
+                    description = dimension_descriptions.get(semantic_name)
+                    binding_properties[semantic_name] = {
+                        "$ref": "#/$defs/SemanticBindingScalar",
+                        "description": description
+                        or (
+                            "One source/context-backed human-semantic scalar or short "
+                            "scalar list; never a nested execution/provider object or "
+                            "explanation."
+                        ),
+                    }
                 binding_properties = {
                     name: binding_properties[name]
                     for name in (
@@ -2292,24 +2340,6 @@ class OllamaGoalInterpreter:
                     )
                 }
                 bindings["properties"] = binding_properties
-                sibling_ref_value = {
-                    "anyOf": [
-                        {"type": "string", "enum": local_refs},
-                        {
-                            "type": "array",
-                            "items": {"type": "string", "enum": local_refs},
-                            "minItems": 1,
-                            "maxItems": 11,
-                            "uniqueItems": True,
-                        },
-                    ],
-                    "description": (
-                        "One exact sibling local_ref or a non-empty unique list of "
-                        "sibling local_ref values; never effect wording."
-                    ),
-                }
-                for relation_name in ("before", "after", "parallel_with"):
-                    binding_properties[relation_name] = sibling_ref_value
                 if prior_assistant_utterance is not None:
                     binding_properties["prior_assistant_utterance"] = {
                         "const": prior_assistant_utterance,
@@ -2320,6 +2350,24 @@ class OllamaGoalInterpreter:
                     }
                 else:
                     binding_properties.pop("prior_assistant_utterance", None)
+                responsibility_properties = responsibility.get("properties", {})
+                responsibility_properties.pop("bindings", None)
+                responsibility_properties["binding_items"] = {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": binding_properties,
+                    "description": (
+                        "Sparse material facts for this one predicate, keyed once by "
+                        "semantic dimension. Emit only entailed keys and no defaults. "
+                        "A magnitude and its natural-language unit are one typed value. "
+                        "Modifiers such as speed and duration remain keys on the same Responsibility; "
+                        "relations belong only in top-level coordination."
+                    ),
+                }
+                responsibility["required"] = [
+                    "binding_items" if name == "bindings" else name
+                    for name in responsibility.get("required", [])
+                ]
             item_confidence = responsibility.get("properties", {}).get("confidence")
             if isinstance(item_confidence, dict):
                 item_confidence.pop("minimum", None)
@@ -2476,6 +2524,45 @@ class OllamaGoalInterpreter:
             # Work/evidence readiness is deliberately absent: Planner derives it later
             # from canonical Goal state, trusted Evidence, and available Capabilities.
             responsibility["additionalProperties"] = False
+        local_refs = [f"r{index}" for index in range(1, 13)]
+        properties = schema.setdefault("properties", {})
+        properties["coordination"] = {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": ["parallel", "sequence"],
+                        "description": (
+                            "parallel means every listed Responsibility overlaps; "
+                            "sequence means refs are in exact requested order."
+                        ),
+                    },
+                    "refs": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": local_refs},
+                        "minItems": 2,
+                        "maxItems": 12,
+                        "uniqueItems": True,
+                        "description": (
+                            "At least two unique emitted Responsibility local_ref "
+                            "values. A singleton or self-edge is impossible."
+                        ),
+                    },
+                },
+                "required": ["kind", "refs"],
+            },
+            "description": (
+                "Typed relations between independently satisfiable Responsibilities. "
+                "Use [] when there is no requested concurrency or order. Relations "
+                "never belong inside semantic bindings."
+            ),
+        }
+        if "coordination" not in schema["required"]:
+            schema["required"].append("coordination")
         return schema
 
     @staticmethod
@@ -2553,9 +2640,6 @@ class OllamaGoalInterpreter:
                     prior["text"] if prior is not None else None
                 ),
                 admitted_turn=request.text,
-                context_location_values=_semantic_context_location_surfaces(
-                    request.context
-                ),
             ),
         }
         if self.keep_alive:
@@ -2585,9 +2669,6 @@ class OllamaGoalInterpreter:
                 prior["text"] if prior is not None else None
             ),
             admitted_turn=request.text,
-            context_location_values=_semantic_context_location_surfaces(
-                request.context
-            ),
         )
         bound_uncertainty_repair = (
             " The rejected DTO copied already-resolved binding values into top-level "
@@ -2778,6 +2859,7 @@ class OllamaGoalInterpreter:
         content: str,
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
+        _normalize_model_interpretation_projection(parsed)
         _normalize_mechanical_goal_interpretation_dto(parsed)
         _strip_bound_values_from_unresolved(parsed)
         # Planner/route fields are an authority violation rather than a generic
@@ -2796,7 +2878,7 @@ class OllamaGoalInterpreter:
         _reject_unprovenanced_location_bindings(request, parsed)
         _strip_mechanically_unprovenanced_speed_bindings(request, parsed)
         _reject_unprovenanced_speed_bindings(request, parsed)
-        _reject_non_scalar_duration_bindings(parsed)
+        _reject_unprovenanced_duration_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
         _reject_unavailable_or_mismatched_prior_assistant_utterance(request, parsed)
         _strip_language_envelope_bindings(request, parsed)

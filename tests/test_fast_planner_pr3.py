@@ -2462,7 +2462,12 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             run_request.original_user_text, "  今晚，重庆热不热？  "
         )
-        self.assertIn("Current user turn:\n  今晚，重庆热不热？  ", str(prompt))
+        self.assertIn("IMMUTABLE SOURCE TURN JSON", str(prompt))
+        self.assertIn(
+            '\"original_text\":\"  今晚，重庆热不热？  \"',
+            str(prompt),
+        )
+        self.assertIn("GI Responsibilities own WHAT", str(prompt))
 
     def test_first_activity_weather_prompt_fits_declared_context_budget(self):
         responsibility = {
@@ -3649,13 +3654,14 @@ class FastPlannerResolverTests(unittest.TestCase):
         ]
         self.assertTrue(
             any(
-                branch.get("properties", {})
+                "chromie.weather.lookup"
+                in branch.get("properties", {})
                 .get("capability_id", {})
-                .get("enum")
-                == ["chromie.weather.lookup"]
+                .get("enum", [])
                 for branch in terminal_branches
             )
         )
+        self.assertIn('"args_schema"', str(ollama.prompts[0][0]))
 
     def test_progress_activity_cannot_smuggle_unsupported_weather_result_text(self):
         ollama = FakeOllama(
@@ -6001,8 +6007,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(planner_request))
 
         prompt = ollama.prompts[0][0]
-        self.assertIn("FINAL AUTHORITATIVE USER TURN owns the current communicative act", prompt)
-        self.assertIn("must not replace what the person just meant", prompt)
+        self.assertIn("The current canonical Goals own WHAT", prompt)
+        self.assertIn("must not replace the current Goal meaning", prompt)
         self.assertIn("Do not replay the previous task answer", prompt)
         self.assertIn("first sentence directly state the requested decision", prompt)
         self.assertIn("never begin by restating prior evidence", prompt)
@@ -6187,7 +6193,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ],
         )
         prompt = ollama.prompts[0][0]
-        self.assertIn("FINAL AUTHORITATIVE USER TURN", prompt)
+        self.assertIn("IMMUTABLE SOURCE TURN JSON", prompt)
         self.assertIn("FINAL CANONICAL GOALS JSON", prompt)
         self.assertNotIn(
             "chromie.speak",

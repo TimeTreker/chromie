@@ -66,6 +66,91 @@ def json_compact(value: Any, *, max_chars: int = 420) -> str:
     return bounded_json(value or {}, max_chars)
 
 
+def normalize_provider_argument_realization(
+    value: Any,
+    *,
+    capability_id: str,
+    input_schema: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Validate a provider-owned human-semantic argument mapping.
+
+    The provider owns the vocabulary mapping. Chromie only admits a declaration
+    whose target arguments exist in the exact provider input schema, then exposes
+    that unchanged contract to Planner.
+    """
+
+    if value is None:
+        return {}
+    if not isinstance(value, dict) or not value:
+        raise ValueError(
+            f"Capability {capability_id!r} argument_realization must be a non-empty object"
+        )
+    properties = input_schema.get("properties")
+    declared_arguments = set(properties) if isinstance(properties, dict) else set()
+    normalized: dict[str, dict[str, Any]] = {}
+    for raw_name, raw_contract in value.items():
+        name = str(raw_name).strip()
+        if not name or not isinstance(raw_contract, dict):
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization entries must be named objects"
+            )
+        source_entity_type = raw_contract.get("source_entity_type")
+        if not isinstance(source_entity_type, str) or not source_entity_type.strip():
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                "requires source_entity_type"
+            )
+        if raw_contract.get("planner_owned") is not True:
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                "must remain planner_owned"
+            )
+        raw_arguments = raw_contract.get("arguments")
+        if not isinstance(raw_arguments, list) or not raw_arguments:
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                "requires arguments"
+            )
+        arguments = [str(argument).strip() for argument in raw_arguments]
+        if any(not argument for argument in arguments) or len(arguments) != len(
+            set(arguments)
+        ):
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                "arguments must be unique non-empty names"
+            )
+        unknown_arguments = set(arguments) - declared_arguments
+        if unknown_arguments:
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                f"names unknown arguments {sorted(unknown_arguments)}"
+            )
+        minimum_arguments = raw_contract.get("minimum_arguments")
+        if (
+            isinstance(minimum_arguments, bool)
+            or not isinstance(minimum_arguments, int)
+            or minimum_arguments < 1
+            or minimum_arguments > len(arguments)
+        ):
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                "has invalid minimum_arguments"
+            )
+        contract_text = raw_contract.get("contract")
+        if not isinstance(contract_text, str) or not contract_text.strip():
+            raise ValueError(
+                f"Capability {capability_id!r} argument_realization {name!r} "
+                "requires a contract"
+            )
+        normalized[name] = {
+            **raw_contract,
+            "source_entity_type": source_entity_type.strip(),
+            "arguments": arguments,
+            "contract": contract_text.strip(),
+        }
+    return normalized
+
+
 class CatalogCapability(BaseModel):
     capability_id: str
     agent_id: str
@@ -391,6 +476,11 @@ class CapabilityCatalog:
                     resource_contract = upstream_metadata.get("resource_contract")
                     if not isinstance(resource_contract, dict):
                         resource_contract = {}
+                    argument_realization = normalize_provider_argument_realization(
+                        upstream_metadata.get("argument_realization"),
+                        capability_id=capability_id,
+                        input_schema=input_schema,
+                    )
 
                     capability = CatalogCapability(
                         capability_id=capability_id,
@@ -433,6 +523,7 @@ class CapabilityCatalog:
                             "examples": item.get("examples"),
                             "safety_sensitive": item.get("safety_sensitive"),
                             "semantic_scope": dict(semantic_scope),
+                            "argument_realization": dict(argument_realization),
                             "resource_contract": dict(resource_contract),
                             "execution_lane": "activity",
                             "body_lane": body_lane,
@@ -444,6 +535,7 @@ class CapabilityCatalog:
                             "upstream_skill_id": upstream_id,
                             "version": item.get("version"),
                             "semantic_scope": dict(semantic_scope),
+                            "argument_realization": dict(argument_realization),
                             "resource_contract": dict(resource_contract),
                             "execution_lane": "activity",
                             "body_lane": body_lane,

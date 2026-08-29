@@ -110,6 +110,12 @@ CommunicativeTruthStage = Literal[
     "pre_evidence",
     "post_evidence",
 ]
+CommunicativeDeliveryPhase = Literal[
+    "immediate",
+    "pre_action",
+    "progress",
+    "final",
+]
 
 _FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
     FastProgressKind, FastProgressSpeechAct
@@ -384,6 +390,7 @@ class PlannedCommunicativeAct(BaseModel):
     text: str = Field(min_length=1, max_length=2400)
     role: FastCommunicativeActRole
     timing: PlanTiming = "parallel"
+    delivery_phase: CommunicativeDeliveryPhase = "immediate"
     speech_act: FastCommunicativeSpeechAct
     source_goal_ids: list[str] = Field(min_length=1)
     source_responsibility_refs: list[str] = Field(default_factory=list)

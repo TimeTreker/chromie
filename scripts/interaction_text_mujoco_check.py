@@ -808,6 +808,13 @@ async def run_check(
             }
         )
         context["robot_state"] = robot_state
+        trusted_target_context = getattr(args, "trusted_target_context", None)
+        if isinstance(trusted_target_context, dict) and trusted_target_context:
+            context["active_user_target"] = dict(trusted_target_context)
+            _write_json(
+                evidence_dir / "trusted_target_context.json",
+                trusted_target_context,
+            )
 
         gateway = assistant._cognitive_gateway_adapter()
         turn_capture = gateway.capture(

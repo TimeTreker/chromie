@@ -34,6 +34,13 @@
   },
   "text": "看着我三秒。",
   "language": "zh-CN",
+  "trusted_target_context": {
+    "source": "live_perception",
+    "target_ref": "current_speaker",
+    "relative_direction": "front",
+    "confidence": 1.0,
+    "evidence_refs": ["scenario:look_at_me_three_seconds:current_speaker_front"]
+  },
   "expected_capabilities": ["soridormi.look_at_person"],
   "expected_args": ["0:duration_s=3.0"],
   "require_speech": false,

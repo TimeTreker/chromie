@@ -825,15 +825,25 @@ class InteractionRuntimeCoordinator:
                 )
 
         # Result-dependent completion speech cannot be truthful before terminal
-        # Evidence.  Any response that also dispatches capabilities therefore
-        # drops pre-authored ``after_capabilities`` wording from the executable
-        # response. Cognitive result re-entry may compose grounded follow-up;
-        # non-cognitive/internal dispatch stays silent rather than inventing a
-        # completion claim.
+        # Evidence. Drop that pre-authored wording so Cognitive result re-entry
+        # can compose a grounded follow-up. A distinct context-grounded speech
+        # Goal explicitly ordered after Work (for example, perform A then greet)
+        # is not a completion claim about A; the Planner/Runtime projection marks
+        # that exact case and the scheduler preserves it after the capabilities.
         deferred_speech_ids = [
             speech.id
             for speech in prepared.speech
             if speech.timing == "after_capabilities"
+            and not (
+                speech.metadata.get("ordered_context_grounded_after_work") is True
+                and speech.metadata.get("source")
+                == "planner_communicative_activity"
+                and str(speech.metadata.get("canonical_plan_id") or "").strip()
+                == str(prepared.metadata.get("canonical_plan_id") or "").strip()
+                and bool(str(prepared.metadata.get("canonical_plan_id") or "").strip())
+                and set(speech.metadata.get("truth_stages") or [])
+                == {"context_grounded"}
+            )
         ] if prepared.capabilities else []
         runtime_response = prepared.model_copy(
             deep=True,

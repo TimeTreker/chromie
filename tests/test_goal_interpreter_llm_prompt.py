@@ -15,14 +15,15 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _GoalInterpretationAuthorityViolation,
     _GoalInterpretationSemanticStructureViolation,
     _extract_json_object,
+    _normalize_model_interpretation_projection,
     _payload_message_texts,
     _reject_canonical_goal_identity_refs,
     _reject_hidden_effect_or_how_bindings,
     _reject_noncanonical_count_bindings,
     _reject_planner_shaped_goal_interpretation,
     _reject_unavailable_or_mismatched_prior_assistant_utterance,
+    _reject_unprovenanced_duration_bindings,
     _reject_unprovenanced_speed_bindings,
-    _source_token_span_surfaces,
     _source_tokens,
     _strip_bound_values_from_unresolved,
     _strip_mechanically_unprovenanced_speed_bindings,
@@ -89,18 +90,30 @@ def _compound_output() -> dict[str, object]:
     }
 
 
+def test_model_interpretation_projection_lowers_typed_relations_and_numbers() -> None:
+    parsed = _compound_output()
+    parsed["responsibilities"][0].pop("bindings")
+    parsed["responsibilities"][0]["binding_items"] = {}
+    parsed["responsibilities"][1].pop("bindings")
+    parsed["responsibilities"][1]["binding_items"] = {"count": 2}
+    parsed["coordination"] = [{"kind": "sequence", "refs": ["r1", "r2"]}]
+
+    _normalize_model_interpretation_projection(parsed)
+
+    assert "coordination" not in parsed
+    assert parsed["responsibilities"][0]["bindings"] == {}
+    assert parsed["responsibilities"][1]["bindings"] == {
+        "after": ["r1"],
+        "count": 2,
+    }
+
+
 class GoalInterpreterContractTests(unittest.TestCase):
     def test_source_tokens_preserve_latin_cjk_and_punctuation(self) -> None:
         self.assertEqual(
             [(item["ref"], item["surface"]) for item in _source_tokens("Walk 前!")],
             [("t0", "Walk"), ("t1", "前"), ("t2", "!")],
         )
-
-    def test_source_token_span_surfaces_are_exact_and_exclude_whole_turn(self) -> None:
-        values = _source_token_span_surfaces("Walk forward quickly.")
-        self.assertIn("forward", values)
-        self.assertIn("forward quickly", values)
-        self.assertNotIn("Walk forward quickly.", values)
 
     def test_live_primary_validation_requires_source_evidence(self) -> None:
         parsed = _valid_output()
@@ -219,6 +232,23 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 {"responsibilities": [{"bindings": {"speed": "normal"}}]},
             )
 
+    def test_duration_requires_source_provenance(self) -> None:
+        with self.assertRaisesRegex(ValueError, "no authoritative surface provenance"):
+            _reject_unprovenanced_duration_bindings(
+                GoalInterpretationRequest(text="move briefly"),
+                {
+                    "responsibilities": [
+                        {"bindings": {"duration": "invented elapsed span"}}
+                    ]
+                },
+            )
+
+    def test_duration_accepts_gi_owned_number_word_normalization(self) -> None:
+        _reject_unprovenanced_duration_bindings(
+            GoalInterpretationRequest(text="持续三秒", language="zh-CN"),
+            {"responsibilities": [{"bindings": {"duration": 3}}]},
+        )
+
     def test_spatial_surface_cannot_be_retyped_as_speed(self) -> None:
         with self.assertRaisesRegex(ValueError, "Direction/location is never speed"):
             _reject_unprovenanced_speed_bindings(
@@ -232,6 +262,18 @@ class GoalInterpreterContractTests(unittest.TestCase):
             GoalInterpretationRequest(text="Nod twice."), parsed
         )
         self.assertEqual(parsed["responsibilities"][0]["bindings"], {"count": 2})
+
+    def test_explicit_numeric_speed_survives_both_provenance_gates(self) -> None:
+        request = GoalInterpretationRequest(text="move at speed 0.35")
+        parsed = {"responsibilities": [{"bindings": {"speed": 0.35}}]}
+
+        _strip_mechanically_unprovenanced_speed_bindings(request, parsed)
+        _reject_unprovenanced_speed_bindings(request, parsed)
+
+        self.assertEqual(
+            parsed["responsibilities"][0]["bindings"],
+            {"speed": 0.35},
+        )
 
     def test_typed_count_contract_is_canonical(self) -> None:
         for value in ("2", 0, -1, True):
@@ -312,21 +354,120 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         _, _, all_text = _payload_message_texts(payload)
         self.assertNotIn("runtime-secret-sid", all_text)
 
-    def test_primary_prompt_foregrounds_explicit_numeric_bindings(self) -> None:
+    def test_primary_prompt_does_not_expose_planner_target_realization(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="look at me",
+                context={
+                    "active_user_target": {
+                        "target_ref": "opaque-current-speaker",
+                        "relative_direction": "front",
+                    },
+                    "planner_auxiliary_social_context": {
+                        "target_evidence": {
+                            "available": True,
+                            "target": {"target_ref": "opaque-current-speaker"},
+                        }
+                    },
+                },
+            )
+        )
+
+        _, _, all_text = _payload_message_texts(payload)
+
+        self.assertNotIn("opaque-current-speaker", all_text)
+        self.assertNotIn("active_user_target", all_text)
+        self.assertNotIn("planner_auxiliary_social_context", all_text)
+
+    def test_primary_prompt_exposes_semantic_identity_not_presentation_profile(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="what is your name?",
+                context={
+                    "mind": {
+                        "profile_id": "internal-profile-id",
+                        "version": "internal-version",
+                        "identity": {
+                            "entity_id": "internal-entity-id",
+                            "name": "Chromie",
+                            "kind": "girl identity",
+                        },
+                        "personality_expression": {
+                            "owner_approved": True,
+                            "spoken_style": "internal-spoken-style",
+                            "maturity_boundary": "internal-maturity-boundary",
+                        },
+                    }
+                },
+            )
+        )
+
+        _, user_text, _ = _payload_message_texts(payload)
+
+        self.assertIn('"name":"Chromie"', user_text)
+        self.assertNotIn("internal-profile-id", user_text)
+        self.assertNotIn("internal-version", user_text)
+        self.assertNotIn("internal-entity-id", user_text)
+        self.assertNotIn("internal-spoken-style", user_text)
+        self.assertNotIn("internal-maturity-boundary", user_text)
+
+    def test_primary_prompt_does_not_repeat_extracted_numeric_answer_list(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(text="walk forward for 15 seconds")
         )
+        system_text, user_text, _ = _payload_message_texts(payload)
+        self.assertNotIn("Explicit Arabic numeric values", user_text)
+        self.assertNotIn("[15]", user_text)
+        self.assertNotIn("Every listed explicit Arabic number", system_text)
+        self.assertNotIn("speed V plus duration D", user_text)
+        self.assertIn("IMMUTABLE SOURCE TURN JSON", user_text)
+        self.assertIn('"original_text":"walk forward for 15 seconds"', user_text)
+
+    def test_primary_prompt_preserves_exact_gateway_wording_once(self) -> None:
+        exact = "  今晚，重庆热不热？  "
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                sid="turn-exact-source",
+                text="今晚，重庆热不热？",
+                language="zh-CN",
+                context={
+                    "user_turn_envelope": {
+                        "turn_id": "turn-exact-source",
+                        "original_input": {"text": exact},
+                        "normalized_input": {
+                            "text": "今晚，重庆热不热？",
+                            "language": "zh-CN",
+                        },
+                    }
+                },
+            )
+        )
         _, user_text, _ = _payload_message_texts(payload)
-        self.assertIn("must remain as typed semantic bindings", user_text)
-        self.assertIn("[15]", user_text)
+
+        self.assertEqual(user_text.count(exact), 1)
+        self.assertIn('"authority":"read_only_source_provenance"', user_text)
+        self.assertNotIn('"user_turn_envelope"', user_text)
+        self.assertIn("Goal Interpretation owns current-turn WHAT", user_text)
+
+    def test_primary_prompt_requires_sparse_non_self_relations_and_disjoint_spans(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="look at me while blinking")
+        )
+        system_text, user_text, _ = _payload_message_texts(payload)
+        self.assertIn("A singleton or self-edge is structurally invalid", system_text)
+        self.assertNotIn("FINAL SPARSE-OUTPUT CHECK", user_text)
+        self.assertIn("one complete schema-valid JSON decision", user_text)
 
     def test_primary_prompt_keeps_action_modifiers_on_one_responsibility(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
-            GoalInterpretationRequest(text="walk forward for 15 seconds quickly")
+            GoalInterpretationRequest(text="perform A with modifiers M and N")
         )
         system_text, user_text, _ = _payload_message_texts(payload)
-        self.assertIn("not three Responsibilities", system_text)
-        self.assertIn("never sibling effects", user_text)
+        self.assertIn(
+            "One predicate with several modifiers remains one Responsibility",
+            system_text,
+        )
+        self.assertNotIn("never sibling effects", user_text)
 
     def test_primary_prompt_requires_unknown_name_referent_uncertainty(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
@@ -334,7 +475,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         system_text, user_text, _ = _payload_message_texts(payload)
         self.assertIn("a non-empty unresolved item", system_text)
-        self.assertIn("unresolved must include a bare name", user_text)
+        self.assertNotIn("unresolved must include a bare name", user_text)
 
     def test_primary_schema_closes_source_token_refs(self) -> None:
         text = "今天晚上重庆热不热"
@@ -349,7 +490,91 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertEqual(evidence["properties"]["source_end_token_ref"]["enum"], refs)
         Draft202012Validator.check_schema(schema)
 
-    def test_primary_schema_closes_location_to_source_or_typed_context(self) -> None:
+    def test_primary_schema_rejects_binding_relation_and_singleton_coordination(self) -> None:
+        text = "continue walking"
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text=text)
+        )["format"]
+        decision = _valid_output(text)
+        decision["coordination"] = []
+        decision["responsibilities"][0]["bindings"]["parallel_with"] = "r1"
+
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(schema).validate(decision)
+
+        sibling_decision = _compound_output()
+        for responsibility in sibling_decision["responsibilities"]:
+            responsibility.pop("relationship")
+            responsibility.pop("target_goal_ids")
+            responsibility.pop("bindings")
+            responsibility["binding_items"] = {}
+        sibling_decision["coordination"] = [
+            {"kind": "sequence", "refs": ["r1", "r2"]}
+        ]
+        sibling_schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="nod then blink")
+        )["format"]
+        Draft202012Validator(sibling_schema).validate(sibling_decision)
+
+        sibling_decision["coordination"] = [
+            {"kind": "parallel", "refs": ["r1"]}
+        ]
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(sibling_schema).validate(sibling_decision)
+
+    def test_primary_schema_exposes_sparse_typed_binding_items(self) -> None:
+        text = "perform one action with two material modifiers"
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text=text)
+        )["format"]
+        binding_items = schema["$defs"]["CognitiveResponsibilityProposal"][
+            "properties"
+        ]["binding_items"]
+        names = set(binding_items["properties"])
+
+        self.assertEqual(binding_items["type"], "object")
+        self.assertFalse(binding_items["additionalProperties"])
+        self.assertIn("speed", names)
+        self.assertIn("duration", names)
+        self.assertIn(
+            "owns the complete elapsed-span meaning",
+            binding_items["properties"]["duration"]["description"],
+        )
+        self.assertIn(
+            "cutoff for a comparison or condition",
+            binding_items["properties"]["threshold"]["description"],
+        )
+        self.assertNotIn("explicit_numeric_bindings", schema["properties"])
+
+    def test_primary_schema_forbids_unknown_semantic_binding_names(self) -> None:
+        text = "bring the bottle from 50 meters ahead"
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text=text)
+        )["format"]
+        decision = _valid_output(text)
+        responsibility = decision["responsibilities"][0]  # type: ignore[index]
+        responsibility.pop("bindings")
+        responsibility["binding_items"] = {
+            "distance": 50,
+            "provider_argument": "meters",
+        }
+        decision["coordination"] = []
+
+        with self.assertRaises(JsonSchemaValidationError):
+            Draft202012Validator(schema).validate(decision)
+
+    def test_prompt_requires_precise_outcome_and_person_target_typing(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="look at me, then nod")
+        )
+        _, user_text, all_text = _payload_message_texts(payload)
+
+        self.assertNotIn("never classify a person target as location", user_text)
+        self.assertNotIn("concrete requested predicate", user_text)
+        self.assertIn("person is not a `location`", all_text)
+        self.assertIn("Each semantic dimension is one object key", all_text)
+
+    def test_primary_schema_keeps_source_backed_fields_compact(self) -> None:
         text = "What time is it now?"
         request = GoalInterpretationRequest(
             sid="runtime-secret-sid",
@@ -361,13 +586,19 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             },
         )
         schema = self._interpreter().build_interpretation_payload(request)["format"]
-        location = schema["$defs"]["CognitiveResponsibilityProposal"]["properties"][
-            "bindings"
-        ]["properties"]["location"]
-        self.assertIn("now", location["enum"])
-        self.assertIn("Chongqing", location["enum"])
-        self.assertNotIn("runtime-secret-sid", location["enum"])
-        self.assertNotIn(text, location["enum"])
+        binding_items = schema["$defs"]["CognitiveResponsibilityProposal"][
+            "properties"
+        ]["binding_items"]
+        location = binding_items["properties"]["location"]
+        self.assertEqual(location["$ref"], "#/$defs/SourceBackedBindingString")
+        self.assertNotIn("enum", location)
+        self.assertNotIn("not", schema["$defs"]["SourceBackedBindingString"])
+        self.assertNotIn("runtime-secret-sid", json.dumps(location))
+        for name in ("duration", "speed"):
+            self.assertEqual(
+                binding_items["properties"][name]["anyOf"][0]["$ref"],
+                "#/$defs/SourceBackedBindingString",
+            )
 
     def test_decoder_rejects_removed_readiness_fields(self) -> None:
         text = "weather in Chongqing"
@@ -383,10 +614,12 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         schema = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(text="nod and blink")
         )["format"]
-        bindings = schema["$defs"]["CognitiveResponsibilityProposal"]["properties"]["bindings"]
-        self.assertFalse(bindings["additionalProperties"])
+        binding_items = schema["$defs"]["CognitiveResponsibilityProposal"][
+            "properties"
+        ]["binding_items"]
+        names = set(binding_items["properties"])
         for name in ("capability", "provider", "concurrent_action", "agent_skill"):
-            self.assertNotIn(name, bindings["properties"])
+            self.assertNotIn(name, names)
 
     def test_repair_payload_does_not_replay_rejected_output(self) -> None:
         payload = self._interpreter().build_interpretation_repair_payload(
