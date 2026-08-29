@@ -23,6 +23,18 @@ class SourceQualificationTests(unittest.TestCase):
         self.assertIn("provider_fault_matrix_level_a", gate_ids)
         self.assertIn("release qualification", exclusions)
 
+    def test_every_declared_python_test_target_exists(self) -> None:
+        gates, _exclusions = load_contract(Path("config/source_qualification.json"))
+        missing = sorted(
+            argument
+            for gate in gates
+            for argument in gate.argv
+            if argument.startswith("tests/")
+            and argument.endswith(".py")
+            and not Path(argument).is_file()
+        )
+        self.assertEqual(missing, [])
+
     def test_missing_dependency_is_blocked_not_passed(self) -> None:
         gate = Gate(
             gate_id="missing-static-tool",

@@ -99,7 +99,9 @@
         "tests/test_work_dag_revision.py",
         "tests/test_work_dag_execution_state.py",
         "tests/test_cognitive_turn_loop_closure.py",
-        "tests/test_continuous_cognition_runtime.py",
+        "tests/test_fast_planner_streaming_commit.py",
+        "tests/test_planner_auxiliary_activity_contract.py",
+        "tests/test_cognitive_runtime_pr7.py",
         "tests/test_conversation_state.py",
         "tests/test_situation_projection.py",
         "tests/test_cognitive_gateway_reflex.py"
