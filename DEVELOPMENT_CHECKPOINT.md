@@ -1,6 +1,6 @@
 # Chromie Development Checkpoint
 
-Status: Planner-owned auxiliary social decoration is source-closed; current-revision Prompt/model and live behavior evidence remain open
+Status: Planner-owned auxiliary social decoration is source-closed; Issue #32 owns the proposed streaming Fast-Planner presentation boundary; Prompt/model and live behavior evidence remain open
 Updated: 2026-08-29
 Starting baseline: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
 (`Add external architecture audit`)
@@ -70,6 +70,11 @@ reviewer, Social Attention model, or audit model call. Fast First Response has n
 auxiliary surface; Fast Advance and canonical Fast/Deep planning make the optional
 decoration decision in their primary result.
 
+The maintained runtime still awaits Fast First Response before creating Fast Advance and
+GA tasks. Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the proposed
+single Fast Planner stream and early typed immutable `PresentationCommit`; no streaming
+source exists. Never stream raw tokens or start Goal-owned Work before full validation.
+
 ## Implemented in the current worktree
 
 - GI now requires per-Responsibility source evidence in its primary result. Trusted
@@ -82,8 +87,9 @@ decoration decision in their primary result.
   model/runtime surfaces are removed; existing DTO repair and Fast-to-Deep escalation
   retain their narrower contracts.
 - The Host now starts and yields both critical GI consumers—Fast Advance and Goal
-  Association—before dispatching the first Planner-authored speech to TTS. First speech
-  may still start before Goal Association finishes; there is no merge barrier.
+  Association—before dispatching the first Planner-authored speech to TTS, but only after
+  the separate Fast First Response call has completed. First speech may still start before
+  Goal Association finishes; the preceding serial gate is retained as the #32 regression.
 - The independent `SocialAttentionPlanner`, endpoint/client, model/config role, and
   background opportunity queue/worker are removed. `CanonicalPlan.auxiliary_activities[]`
   is fingerprinted separately from Goal-owned `steps[]`; it carries no Goal IDs or

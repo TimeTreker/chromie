@@ -233,6 +233,31 @@ Act while GA records the conversational Goal; a weather request can contain a pr
 Communicative Act and
 an exact weather-read Activity in parallel.
 
+The maintained implementation currently awaits the complete first-response round trip
+before it creates the Fast Advance and Goal Association tasks. Issue
+[#32](https://github.com/TimeTreker/chromie/issues/32) records this as a reproduced
+sequential-gate defect against the intended concurrency above. Its proposed replacement
+is not yet implemented:
+
+```text
+validated GI result
+  -> concurrently:
+       Goal Association
+       one Fast Planner stream
+          -> complete validated PresentationCommit? -> presentation may launch
+          -> complete terminal Planner result
+  -> join terminal Planner result with applicable canonical Goal state
+  -> validate Plan before Goal-owned Work
+```
+
+The early item is a closed typed commit, never a raw text/token stream. Its accepted
+wording, truth stage, provenance, Main-Activity anchor, and optional subordinate
+auxiliary activities are immutable. Host may validate, launch, suppress, or fail closed;
+it cannot complete a partial frame, restyle speech, reselect social behavior, or start
+Capability Work from the partial result. Provider failure before commit is silent;
+failure after a truthful commit preserves delivery evidence but authorizes no Goal-owned
+Work or Host-authored replacement response.
+
 GI reports only bounded unresolved meaning; it does not turn every absent value into an
 InformationGap or decide which Capability inputs are required. Fast Planner compares the
 immutable Responsibility with applicable planning, Agent-Skill, Capability, safety, and

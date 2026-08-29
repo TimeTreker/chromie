@@ -12,7 +12,8 @@ checkpoint remain authoritative.
 - Base commit: `9ca80635c0dee2c8dee87aad15963be09b8ee950`
 - Base subject: `fix: adopt qwen3.5 GI residency profile`
 - Scope: replace the independent Social Attention semantic writer with
-  Planner-owned `auxiliary_activities[]` while preserving the retained GI evidence line
+  Planner-owned `auxiliary_activities[]`, preserve the retained GI evidence line, and
+  record the next presentation-boundary design in Issue #32 without implementing it
 - Expected resume revision: the latest commit containing this handoff
 
 Bootstrap on another machine:
@@ -92,6 +93,16 @@ Planner proposal. It cannot choose another gesture or target. Accepted requests 
 `source_goal_ids`. Auxiliary-only failure, completion, or target drift cannot create a
 `CognitiveOpportunity`; there is no legal Goal ID to attach. Explicit user-requested
 gestures remain ordinary Goal-owned Plan steps.
+
+Issue [#32](https://github.com/TimeTreker/chromie/issues/32), **Streaming Planner with
+Early Typed Presentation Commit**, is now the owner-approved next design boundary. The
+current source still fully awaits `/fast-first-response` before it creates Fast Advance
+and Goal Association tasks. The Issue proposes one Fast Planner streaming invocation that
+may expose one complete validated immutable presentation frame while the same invocation
+continues its terminal Plan. It forbids raw-token TTS, Host-authored wording, early
+Goal-owned Work, a second review model, and a retained compatibility path. This handoff
+records the proposal only; no streaming parser, Agent transport, Client API, or Runtime
+scheduling change has landed.
 
 ## Evidence ledger
 
@@ -218,10 +229,12 @@ those authorities have changed.
 ## Next evidence boundary
 
 The auxiliary amendment's canonical source gates are complete. GI, GA, and Planner
-single-authority Prompt/model qualification is now the active evidence line: the prior cohort proves the GI
+single-authority Prompt/model qualification remains the active evidence line, but final
+Fast-Planner Prompt/model promotion must follow the #32 production-boundary decision. The prior cohort proves the GI
 default/residency change reduced transport loss, but qwen3.5 semantic qualification and
 the unchanged single-slot downstream latency boundary remain open. The next behavioral
-fix must address one of those reproduced boundaries without validator weakening, Host
+fix must address one of those reproduced boundaries—or the reproduced Fast First Response
+sequential gate owned by #32—without validator weakening, Host
 resegmentation, another semantic reviewer, a non-GI model substitution, or auxiliary
 decoration as Goal completion.
 

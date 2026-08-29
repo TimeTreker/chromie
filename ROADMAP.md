@@ -27,10 +27,17 @@ migrations. Continue in this order:
    Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
    behavior, duplicate-effect prevention, Planner-owned auxiliary social decoration,
    and latency.
-2. **Keep implementation, automated verification, target validation, and release readiness
+2. **Resolve the Fast-Planner presentation boundary before final Prompt/model promotion.**
+   Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the measured design
+   and possible source migration from the current sequential Fast First Response round trip
+   to one streaming Fast Planner invocation with an early typed immutable presentation
+   commit. The current endpoint/DTO/model path remains implemented truth until that Issue
+   passes its provider/model integrity and latency gates; do not optimize or select the
+   final Fast-Planner model against both paths as if both were production architecture.
+3. **Keep implementation, automated verification, target validation, and release readiness
    separate.** A source-closed architecture slice does not qualify microphone, provider,
    simulator, model quality, or latency behavior.
-3. **Reopen structural work only for a concrete ownership seam or defect.** File or method
+4. **Reopen structural work only for a concrete ownership seam or defect.** File or method
    count remains evidence of reconstructability cost, not permission to create another
    semantic manager or perform decomposition for its own sake.
 
@@ -542,6 +549,61 @@ Exit criteria:
 - unsupported/disallowed terminal Plan lanes produce typed no-action outcomes;
 - no authoritative failure enters another semantic planner;
 - current docs, profiles, and source describe the same authority and lane policy.
+
+### Streaming Planner with Early Typed Presentation Commit — design issue open
+
+Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this proposed
+replacement. Source implementation has **not** started. The maintained path still awaits
+the complete `/fast-first-response` call before creating Fast Advance and Goal Association,
+so its claimed "continue while speaking" concurrency is not realized. This reproduced
+sequential gate is the concrete seam that permits the architecture to be reconsidered.
+
+The target is one Fast Planner semantic invocation, not one raw text stream:
+
+```text
+immutable GI result
+  -> concurrently:
+       Goal Association
+       one Fast Planner stream
+          -> zero or one validated PresentationCommit
+          -> complete typed Planner result
+
+accepted PresentationCommit
+  -> primary presentation launch
+  -> optional auxiliary scheduling after primary launch
+
+complete Planner result + applicable canonical Goal binding
+  -> complete Plan validation
+  -> confirmation / Work dispatch / Deep escalation / silence / fail closed
+```
+
+`PresentationCommit` is a typed serialization boundary inside the same Planner authority.
+It may carry one immediately truthful Communicative Main Activity or silence together with
+optional subordinate `auxiliary_activities[]`. Runtime acts only after the whole frame is
+parsed and mechanically validated. Raw tokens and partial JSON never reach TTS or a
+Capability. Once accepted, wording, truth stage, anchor, and auxiliary proposal are
+immutable; the terminal result must reference the same commit and cannot regenerate,
+contradict, duplicate, or silently omit it. Goal-owned Work, confirmation/result claims,
+and completion remain unavailable until the full Plan, Goal binding, and Evidence contracts
+permit them.
+
+Exit criteria:
+
+- retain the current sequential-gate regression and a non-streaming unified control;
+- prove Goal Association and the Planner stream start without waiting for presentation;
+- probe the exact target Ollama/model combination for NDJSON framing, structured streaming,
+  mid-stream errors, malformed/duplicate/contradictory frames, and terminal consistency;
+- measure accepted-commit, TTS first-PCM, playback-start, and terminal-Plan latency instead
+  of treating non-streaming duration as time to first commit;
+- prove failure before commit is silent and failure after a truthful commit dispatches no
+  Goal-owned Work or Host-authored semantic fallback;
+- preserve Goal Progress Communication, auxiliary Goal isolation, post-primary auxiliary
+  scheduling, cancellation, confirmation, Evidence truth, and Interaction Ledger identity;
+- amend Charter principles 23 and 37 and all owned contracts in the same source migration;
+- remove the superseded endpoint, DTO, model/configuration role, tests, and documentation
+  rather than retaining a compatibility path; and
+- complete source gates and current-target qualification before Fast-Planner Prompt/model
+  promotion. Issue #24 remains the separate model-role qualification authority.
 
 ### Goal-scoped Interaction Ledger and current-turn continuity
 

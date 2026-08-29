@@ -678,6 +678,21 @@ evidence; wording similarity is never a de-duplication authority. A delivered or
 already-scheduled Activity must not be spoken again merely because GA reconciliation,
 plan projection, retry, or transport ordering created another delivery attempt.
 
+Issue [#32](https://github.com/TimeTreker/chromie/issues/32) proposes a different
+realization of this same courtesy contract: one Fast Planner streaming invocation may
+commit one complete typed `PresentationCommit` before its terminal Plan output. This is
+not current behavior. It must never expose raw tokens or partial JSON to TTS. Speech may
+start only after the entire commit frame is parsed, truth/provenance checked, and accepted
+as immutable. GA and the rest of Fast planning must already be eligible to progress; the
+presentation frame must not remain their sequential gate.
+
+The trigger remains a user-relevant task-state delta—sufficient understanding, a genuine
+clarification/confirmation need, meaningful progress, result, failure, or cancellation—not
+a personality-specific response module. Character affects whether a nonessential progress
+ping adds value and how an accepted act is worded. Optional Social Attention is a separate
+subordinate presentation choice that may accompany a ready Main Activity; it does not make
+speech mandatory and is not itself task progress.
+
 Foreground interaction deadlines and qualification watchdogs are separate concerns.
 Maintained human-facing modes use bounded interactive stage deadlines, a 15-second
 foreground Cognitive Runtime deadline, and a 3.5-second playback-start hard barrier.
@@ -974,6 +989,15 @@ the same primary result when the exact Activity anchor, recent context, style,
 target evidence, recent auxiliary evidence, and eligible named body capabilities
 are available. An empty list is complete and preferred unless a subtle cue adds
 real interaction value. This is not another model or post-response planning pass.
+
+That is the maintained contract. Under proposed Issue
+[#32](https://github.com/TimeTreker/chromie/issues/32), an accepted early
+`PresentationCommit` would atomically carry the Communicative Main Activity and any
+optional auxiliary proposal from the same Planner invocation, allowing decoration of an
+early utterance without a second semantic pass. The Main Activity launches first;
+auxiliary scheduling follows and remains fail-soft. This proposal does not change the
+rule that empty decoration is normal or that explicit user-requested gestures are
+Goal-owned Work.
 
 The same motion has different semantics depending on ownership. A user request
 such as "blink twice" makes **blink twice** the semantic primary Activity. A blink

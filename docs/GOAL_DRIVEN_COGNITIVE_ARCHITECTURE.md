@@ -2696,6 +2696,14 @@ Fast/Deep planning may emit auxiliary activities in their single primary model
 invocation. There is no post-response Social Attention model, endpoint, or
 background decision worker.
 
+This paragraph describes the maintained source. Proposed Issue
+[#32](https://github.com/TimeTreker/chromie/issues/32) would replace the separate
+Fast First Response round trip with an early typed presentation commit inside one
+streaming Fast Planner invocation. If and only if that proposal qualifies, the early
+commit may carry the ready Communicative Main Activity and its optional auxiliary
+activities together. Until then, neither that streaming contract nor an auxiliary
+Fast First Response surface is current architecture.
+
 ### 12.2 Explicit Activity and auxiliary social decoration
 
 A concrete user request such as “blink twice” or “look at me” remains an explicit
@@ -3082,6 +3090,57 @@ Each Communicative Act has one Planner wording owner and one downstream delivery
 with deterministic authority, evidence, cancellation, and delivery validation. The architecture does not add a
 second LLM to repair ordinary progress wording, and Goal Interpretation has no
 maintained response-authoring path.
+
+### 15.1.3 Proposed early typed presentation commit
+
+Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns a proposed latency
+amendment; it is not current source truth. Today the Runtime awaits the complete
+`/fast-first-response` provider round trip and only then creates Fast Advance and Goal
+Association tasks. That ordering contradicts the intended property that remaining
+planning and GA can proceed while the accepted first communication is realized.
+
+The proposed boundary keeps one semantic author and changes only when a closed subset of
+that author's result becomes executable:
+
+```text
+UserTurnEnvelope + validated GI Responsibilities + bounded trusted context
+  -> one Fast Planner streaming invocation
+       -> zero or one complete typed PresentationCommit frame
+       -> one complete typed terminal Planner result
+```
+
+Goal Association starts concurrently from the unchanged GI result. A trusted incremental
+parser may expose a `PresentationCommit` only after its complete frame has been parsed and
+validated. It is not a raw token stream, a partial JSON object, another model call, or a
+second response owner. The proposed module I/O is:
+
+| Boundary | Authoritative input | Authoritative output | Forbidden authority |
+|---|---|---|---|
+| Fast Planner stream | immutable GI Responsibilities; applicable Goal/Work/Situation/Evidence projection; exact catalog/schema, presentation, style, target, and recent-interaction facts | at most one early `PresentationCommit`, followed by one complete Planner result from the same invocation | Goal identity, execution truth, provider mutation, or later rewriting of an accepted commit |
+| Agent stream decoder | ordered provider frames plus the exact request/schema identity | a complete schema-valid commit event and a complete schema-valid terminal result, or typed failure | semantic repair, text completion, frame reordering, or calling another model |
+| Host presentation commit | validated commit plus exact turn/Responsibility/claim/anchor/catalog/resource bindings | immutable commit receipt; primary presentation launch; optional post-primary auxiliary scheduling/suppression | choosing wording, changing truth stage, selecting/reselecting a gesture or target, or dispatching Goal-owned Work |
+| Terminal Plan join | complete Planner result plus GA-owned canonical Goal binding and accepted-commit receipt | validated canonical Plan, confirmation/dispatch/deep-escalation/silence/fail-closed outcome | contradiction, duplication, omission, or reinterpretation of the accepted commit |
+
+An accepted commit may contain one immediately truthful Communicative Activity or
+silence and optional subordinate auxiliary activities. Early progress cannot claim that
+Capability Work started or completed, that confirmation was granted, that an effect
+occurred, or that a result is known without the corresponding full-Plan/Evidence boundary.
+A speech-only turn may complete in the early Activity only when no downstream Work,
+confirmation, or fresh Evidence is required.
+
+Accepted wording, truth stage, provenance, Main-Activity anchor, and auxiliary proposals
+are immutable. The terminal result references the exact commit identity and may not
+regenerate, contradict, duplicate, or silently omit it. Failure before commit is silent.
+Failure after an accepted truthful commit preserves its delivery truth but dispatches no
+Goal-owned Work and cannot cause the Host to author replacement speech. Capability work
+always waits for the complete Planner result, applicable canonical Goal grounding, and
+trusted validation.
+
+This proposal is accepted only after the exact provider/model combination proves reliable
+structured frame emission, mid-stream error containment, commit/terminal consistency, and
+a useful improvement in accepted-commit and playback latency under the actual single-slot
+resource profile. A non-streaming call duration is not evidence of streaming time to first
+commit.
 
 ### 15.2 Post-execution response
 
