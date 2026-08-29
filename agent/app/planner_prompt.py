@@ -381,6 +381,7 @@ def fast_advance_layered_prompt(
     *,
     responsibilities: list[CognitiveResponsibilityProposal],
     capabilities: list[dict[str, Any]],
+    response_schema: dict[str, Any] | None = None,
     validation_errors: str = "",
 ) -> LayeredPrompt:
     context = request.context if isinstance(request.context, dict) else {}
@@ -407,6 +408,16 @@ def fast_advance_layered_prompt(
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
+    )
+    response_schema_json = (
+        json.dumps(
+            response_schema,
+            ensure_ascii=False,
+            sort_keys=False,
+            separators=(",", ":"),
+        )
+        if response_schema
+        else ""
     )
     auxiliary_social_section = auxiliary_social_planning_prompt_section(context)
     user_text = str(request.original_user_text or "")[:700]
@@ -448,7 +459,9 @@ def fast_advance_layered_prompt(
         "confidence, unresolved, and reason_summary. A terminal Capability Activity "
         "uses only role, capability_id, activity_id, args, timing, and "
         "source_responsibility_refs. Never use arguments, effects, resource_claims, "
-        "or terminal-level decision fields inside an Activity. reason_summary exists "
+        "or terminal-level decision fields inside an Activity. Every terminal Activity "
+        "activity_id must differ from the committed presentation activity_id. "
+        "reason_summary exists "
         "only once, at terminal_result.reason_summary. "
         "No partial string or token is a commitment; only the complete typed first "
         "member is."
@@ -515,7 +528,15 @@ def fast_advance_layered_prompt(
         "state is not a robot action. Keep terminal_result.reason_summary to one clause. "
         "Escalate to deep_planner only when HOW exceeds the Fast budget, with no Capability "
         "Activities. Goal Association is concurrent, never a continuation.\n\n"
-        "Validation errors from the prior Fast Plan, if any:\n"
+        + (
+            "EXACT MODEL-VISIBLE OUTPUT JSON SCHEMA (this is the same schema supplied "
+            "to the decoder; match it literally):\n"
+            + response_schema_json
+            + "\n\n"
+            if response_schema_json
+            else ""
+        )
+        + "Validation errors from the prior Fast Plan, if any:\n"
         + (validation_errors or "[]")
         + "\nThis primary result must contain the complete per-Goal coverage, exact "
         "response truth, step ownership, satisfaction, and unresolved-work decision; "
@@ -650,8 +671,9 @@ def fast_streaming_advance_system_prompt() -> str:
         "separately owns longitudinal association and Canonical Goal commits. Trusted "
         "Capability Runtime alone authorizes Work. Do not claim Work, fresh Evidence, "
         "or completion in the early presentation. Return exactly one ordered JSON "
-        "object with no Markdown, code fence, explanation, self-check, or repeated "
-        "object. Stop immediately after its final closing brace."
+        "object matching the exact schema printed in the user prompt, with no Markdown, "
+        "code fence, explanation, self-check, or repeated object. Stop immediately "
+        "after its final closing brace."
     )
 
 

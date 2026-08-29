@@ -1992,7 +1992,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.activities[0].role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
         response_schema = ollama.prompts[0][1]["response_format"]
-        self.assertIn("FastPlannerCompleteResponseAct", str(response_schema))
+        presentation_activity = response_schema["properties"][
+            "presentation_commit"
+        ]["properties"]["activity"]["anyOf"][0]
+        self.assertIn("text", presentation_activity["properties"])
+        self.assertNotIn("progress_kind", presentation_activity["properties"])
 
     def test_complete_response_act_cannot_hide_wording_in_speech_act(self):
         with self.assertRaises(ValidationError):
@@ -2539,6 +2543,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "confidence",
                 "unresolved",
                 "reason_summary",
+                "auxiliary_activities",
             },
         )
         for activity_contract in (
@@ -3597,8 +3602,26 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
         response_schema = ollama.prompts[0][1]["response_format"]
-        self.assertIn("FastPlannerProgressAct", str(response_schema))
-        self.assertIn("FastPlannerCapabilityActivity", str(response_schema))
+        presentation_activity = response_schema["properties"][
+            "presentation_commit"
+        ]["properties"]["activity"]["anyOf"][0]
+        self.assertIn("progress_kind", presentation_activity["properties"])
+        self.assertIn(
+            "check_information",
+            presentation_activity["properties"]["progress_kind"]["enum"],
+        )
+        terminal_branches = response_schema["properties"]["terminal_result"][
+            "properties"
+        ]["activities"]["items"]["oneOf"]
+        self.assertTrue(
+            any(
+                branch.get("properties", {})
+                .get("capability_id", {})
+                .get("enum")
+                == ["chromie.weather.lookup"]
+                for branch in terminal_branches
+            )
+        )
 
     def test_progress_activity_cannot_smuggle_unsupported_weather_result_text(self):
         ollama = FakeOllama(

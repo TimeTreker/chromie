@@ -2266,6 +2266,10 @@ def fast_advance_response_schema(
     schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     top_properties = schema.get("properties", {})
+    top_required = list(schema.get("required") or [])
+    if "auxiliary_activities" not in top_required:
+        top_required.append("auxiliary_activities")
+    schema["required"] = top_required
     activities_schema = top_properties.get("activities")
     if isinstance(activities_schema, dict):
         activities_schema["maxItems"] = max(
@@ -2522,8 +2526,9 @@ def fast_advance_response_schema(
         if isinstance(capability_properties, dict):
             capability_properties.pop("reason_summary", None)
             capability_required = list(capability_contract.get("required", []))
-            if "args" not in capability_required:
-                capability_required.append("args")
+            for field_name in ("args", "timing"):
+                if field_name not in capability_required:
+                    capability_required.append(field_name)
             capability_contract["required"] = capability_required
             branches: list[dict[str, Any]] = []
             for capability in allowed_capabilities:
@@ -2609,6 +2614,111 @@ def _namespace_local_definitions(
     return projected, renamed
 
 
+def _ollama_streaming_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Compile the Fast stream contract to Ollama's reliable GBNF subset.
+
+    Ollama converts ``format`` JSON Schema to a grammar. Nested Pydantic refs,
+    an object carrying both base properties and a branch union, and annotation
+    keywords have produced silently unconstrained output in supported Ollama
+    releases. Runtime still validates the full Pydantic contract after decode;
+    this projection preserves the structural choices needed during generation.
+    """
+
+    definitions = schema.get("$defs", {})
+    if not isinstance(definitions, dict):
+        definitions = {}
+    annotations = {
+        "$defs",
+        "$schema",
+        "default",
+        "description",
+        "discriminator",
+        "examples",
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "format",
+        "maxItems",
+        "maxLength",
+        "maximum",
+        "minItems",
+        "minLength",
+        "minimum",
+        "multipleOf",
+        "pattern",
+        "title",
+        "uniqueItems",
+    }
+
+    def compile_node(node: Any, stack: tuple[str, ...] = ()) -> Any:
+        if isinstance(node, list):
+            return [compile_node(item, stack) for item in node]
+        if not isinstance(node, dict):
+            return node
+        if node.get("type") == "array" and node.get("maxItems") == 0:
+            return {"type": "array", "enum": [[]]}
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/$defs/"):
+            name = ref.rsplit("/", 1)[-1]
+            if name in stack or name not in definitions:
+                raise ValueError(f"invalid recursive or missing streaming schema ref: {ref}")
+            compiled = compile_node(definitions[name], (*stack, name))
+            siblings = {key: value for key, value in node.items() if key != "$ref"}
+            if siblings:
+                if not isinstance(compiled, dict):
+                    raise ValueError(f"streaming schema ref cannot accept siblings: {ref}")
+                compiled = {**compiled, **compile_node(siblings, stack)}
+            return compiled
+
+        # Capability and auxiliary definitions first carry their generic object
+        # shape and then exact per-capability object branches. The branch objects
+        # already contain the complete shape, so avoid an ambiguous conjunction.
+        branches = node.get("oneOf")
+        if (
+            node.get("type") == "object"
+            and "properties" in node
+            and isinstance(branches, list)
+            and branches
+        ):
+            node = {"oneOf": branches}
+
+        compiled_node: dict[str, Any] = {}
+        for key, value in node.items():
+            if key in annotations:
+                continue
+            if key == "const":
+                compiled_node["enum"] = [compile_node(value, stack)]
+            elif key == "properties" and isinstance(value, dict):
+                # Property names such as ``description`` or ``default`` are
+                # application fields, not schema annotations.
+                compiled_node[key] = {
+                    property_name: compile_node(property_schema, stack)
+                    for property_name, property_schema in value.items()
+                }
+            else:
+                compiled_node[key] = compile_node(value, stack)
+        union = compiled_node.get("oneOf")
+        if isinstance(union, list):
+            flattened: list[Any] = []
+            for branch in union:
+                if isinstance(branch, dict) and set(branch) == {"oneOf"}:
+                    nested = branch.get("oneOf")
+                    if isinstance(nested, list):
+                        flattened.extend(nested)
+                        continue
+                flattened.append(branch)
+            if len(flattened) == 1:
+                only_branch = flattened[0]
+                if isinstance(only_branch, dict):
+                    return only_branch
+            compiled_node["oneOf"] = flattened
+        return compiled_node
+
+    compiled_schema = compile_node(copy.deepcopy(schema))
+    if not isinstance(compiled_schema, dict):
+        raise ValueError("compiled streaming response schema must remain an object")
+    return compiled_schema
+
+
 def fast_streaming_advance_response_schema(
     responsibility_refs: list[str],
     *,
@@ -2660,7 +2770,7 @@ def fast_streaming_advance_response_schema(
         terminal_schema,
         prefix="Terminal_",
     )
-    return {
+    return _ollama_streaming_schema({
         "type": "object",
         "properties": {
             "presentation_commit": presentation,
@@ -2669,7 +2779,7 @@ def fast_streaming_advance_response_schema(
         "required": ["presentation_commit", "terminal_result"],
         "additionalProperties": False,
         "$defs": {**presentation_defs, **terminal_defs},
-    }
+    })
 
 def fast_repair_response_schema(
     schema: dict[str, Any],

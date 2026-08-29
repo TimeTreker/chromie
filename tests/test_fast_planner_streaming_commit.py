@@ -45,9 +45,12 @@ class _StreamingModel:
     def __init__(self, chunks: list[str]) -> None:
         self.chunks = chunks
         self.calls = 0
+        self.last_prompt: Any = None
+        self.last_kwargs: dict[str, Any] = {}
 
     async def generate_stream(self, *args: Any, **kwargs: Any):
-        del args, kwargs
+        self.last_prompt = args[0]
+        self.last_kwargs = kwargs
         self.calls += 1
         for chunk in self.chunks:
             yield chunk
@@ -147,6 +150,14 @@ def _walk_capability() -> dict[str, Any]:
 def test_stream_prompt_teaches_exact_field_placement_and_one_object_stop() -> None:
     request, responsibility = _body_request()
     capability = _walk_capability()
+    response_schema = fast_streaming_advance_response_schema(
+        [responsibility.local_ref],
+        responsibilities=[responsibility],
+        capabilities=[capability],
+        auxiliary_social_capabilities=[],
+        interpretation_unresolved=[],
+        language="zh-CN",
+    )
 
     projection = fast_advance_capability_prompt_projection([capability])
     prompt = str(
@@ -154,6 +165,7 @@ def test_stream_prompt_teaches_exact_field_placement_and_one_object_stop() -> No
             request,
             responsibilities=[responsibility],
             capabilities=[capability],
+            response_schema=response_schema,
         )
     )
     system = fast_streaming_advance_system_prompt()
@@ -164,6 +176,12 @@ def test_stream_prompt_teaches_exact_field_placement_and_one_object_stop() -> No
     assert "Never use arguments, effects, resource_claims" in prompt
     assert "perform_action for an embodied, media, vocal, or state-changing effect" in prompt
     assert "Stop immediately after" in prompt
+    assert "EXACT MODEL-VISIBLE OUTPUT JSON SCHEMA" in prompt
+    assert json.dumps(
+        response_schema,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ) in prompt
     assert "repeated object" in system
 
 
@@ -178,39 +196,27 @@ def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
         language="zh-CN",
     )
 
-    definitions = schema["$defs"]
     presentation = schema["properties"]["presentation_commit"]
     terminal = schema["properties"]["terminal_result"]
     terminal_items = terminal["properties"]["activities"]["items"]
+    serialized = json.dumps(schema)
 
-    assert "Presentation_FastPlannerCompleteResponseAct" not in definitions
-    assert "Terminal_FastPlannerProgressAct" not in definitions
-    assert "Terminal_FastPlannerCompleteResponseAct" not in definitions
+    assert "$defs" not in schema
+    assert "$ref" not in serialized
+    assert len(serialized) < 8000
     assert "reason_summary" not in json.dumps(presentation)
-    assert all(
-        "reason_summary" not in value.get("properties", {})
-        for value in definitions.values()
-        if isinstance(value, dict)
-    )
     assert "reason_summary" in terminal["properties"]
     assert "allOf" not in terminal
     assert "discriminator" not in terminal_items
-
-    refs: set[str] = set()
-
-    def collect_refs(node: Any) -> None:
-        if isinstance(node, dict):
-            ref = node.get("$ref")
-            if isinstance(ref, str) and ref.startswith("#/$defs/"):
-                refs.add(ref.rsplit("/", 1)[-1])
-            for value in node.values():
-                collect_refs(value)
-        elif isinstance(node, list):
-            for value in node:
-                collect_refs(value)
-
-    collect_refs(schema)
-    assert refs <= set(definitions)
+    assert presentation["properties"]["auxiliary_activities"]["enum"] == [[]]
+    assert terminal["properties"]["auxiliary_activities"]["enum"] == [[]]
+    capability_branch = next(
+        branch
+        for branch in terminal_items["oneOf"]
+        if branch.get("properties", {}).get("role", {}).get("enum")
+        == ["capability"]
+    )
+    assert "timing" in capability_branch["required"]
 
 
 @pytest.mark.asyncio
@@ -223,6 +229,9 @@ async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
     frames = [frame async for frame in resolver.stream_advance(_request())]
 
     assert model.calls == 1
+    assert model.last_kwargs["response_format"]
+    assert "$defs" not in model.last_kwargs["response_format"]
+    assert "EXACT MODEL-VISIBLE OUTPUT JSON SCHEMA" in str(model.last_prompt)
     assert isinstance(frames[0], PresentationCommit)
     assert frames[0].activity is not None
     assert frames[0].activity.text == "你好呀！"

@@ -296,6 +296,7 @@ class FastPlannerResolver:
             request,
             responsibilities=responsibilities,
             capabilities=capability_payload,
+            response_schema=response_schema,
         )
         options = {
             "temperature": 0,
