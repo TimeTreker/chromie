@@ -70,7 +70,16 @@ def _constrain_auxiliary_activity_schema(
     base_properties = definition.get("properties")
     if not isinstance(base_properties, dict):
         return
-    required = list(definition.get("required") or [])
+    # ``reason_summary`` has an empty Pydantic default. Keeping it in this
+    # latency-critical projection taught small models to leak it into the
+    # primary presentation Activity, where it is forbidden. Planner still owns
+    # every material decoration field; trusted code restores only the default.
+    base_properties.pop("reason_summary", None)
+    required = [
+        name
+        for name in (definition.get("required") or [])
+        if name != "reason_summary"
+    ]
     for field_name in (
         "auxiliary_activity_id",
         "anchor_kind",
@@ -81,7 +90,6 @@ def _constrain_auxiliary_activity_schema(
         "timing",
         "social_function",
         "target",
-        "reason_summary",
     ):
         if field_name not in required:
             required.append(field_name)
@@ -2553,6 +2561,36 @@ def _namespace_local_definitions(
     definitions = projected.pop("$defs", {})
     if not isinstance(definitions, dict):
         definitions = {}
+
+    def local_definition_refs(node: Any) -> set[str]:
+        refs: set[str] = set()
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                refs.add(ref.rsplit("/", 1)[-1])
+            for value in node.values():
+                refs.update(local_definition_refs(value))
+        elif isinstance(node, list):
+            for value in node:
+                refs.update(local_definition_refs(value))
+        return refs
+
+    # Pydantic keeps every original union member in $defs after the root has
+    # narrowed its choices. Exclude unreachable branches so the decoder cannot
+    # borrow fields from Activity roles that are invalid in this stream phase.
+    reachable: set[str] = set()
+    pending = list(local_definition_refs(projected))
+    while pending:
+        name = pending.pop()
+        if name in reachable:
+            continue
+        reachable.add(name)
+        definition = definitions.get(name)
+        if definition is not None:
+            pending.extend(local_definition_refs(definition) - reachable)
+    definitions = {
+        name: value for name, value in definitions.items() if name in reachable
+    }
     renamed = {f"{prefix}{name}": value for name, value in definitions.items()}
 
     def rewrite(node: Any) -> None:
@@ -2596,17 +2634,30 @@ def fast_streaming_advance_response_schema(
         ),
         prefix="Presentation_",
     )
+    terminal_schema = fast_advance_response_schema(
+        responsibility_refs,
+        responsibilities=responsibilities,
+        capabilities=capabilities,
+        auxiliary_social_capabilities=auxiliary_social_capabilities,
+        interpretation_unresolved=interpretation_unresolved,
+        committed_communicative=True,
+        suppress_new_communicative=True,
+        suppress_new_progress=True,
+    )
+    # Runtime Pydantic and authoritative validation retain these invariants.
+    # Omitting decoder-only conditionals and discriminator annotations avoids
+    # Ollama grammar ambiguity inside the two-member streaming object.
+    terminal_schema.pop("allOf", None)
+    terminal_activities = terminal_schema.get("properties", {}).get("activities")
+    terminal_items = (
+        terminal_activities.get("items")
+        if isinstance(terminal_activities, dict)
+        else None
+    )
+    if isinstance(terminal_items, dict):
+        terminal_items.pop("discriminator", None)
     terminal, terminal_defs = _namespace_local_definitions(
-        fast_advance_response_schema(
-            responsibility_refs,
-            responsibilities=responsibilities,
-            capabilities=capabilities,
-            auxiliary_social_capabilities=auxiliary_social_capabilities,
-            interpretation_unresolved=interpretation_unresolved,
-            committed_communicative=True,
-            suppress_new_communicative=True,
-            suppress_new_progress=True,
-        ),
+        terminal_schema,
         prefix="Terminal_",
     )
     return {

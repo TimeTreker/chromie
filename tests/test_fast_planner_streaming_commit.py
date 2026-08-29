@@ -6,6 +6,12 @@ from typing import Any
 import pytest
 
 from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner_prompt import (
+    fast_advance_capability_prompt_projection,
+    fast_advance_layered_prompt,
+    fast_streaming_advance_system_prompt,
+)
+from agent.app.planner_schema import fast_streaming_advance_response_schema
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveStageFailure,
@@ -98,6 +104,113 @@ def _valid_output() -> dict[str, Any]:
             "reason_summary": "Greeting response is complete.",
         },
     }
+
+
+def _body_request() -> tuple[CognitiveWorkRequest, CognitiveResponsibilityProposal]:
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="walk",
+        outcome="walk forward for ten seconds",
+        output_mode="body_action",
+        bindings={"duration_s": 10},
+        confidence=0.99,
+    )
+    return (
+        CognitiveWorkRequest(
+            sid="turn-stream-walk",
+            text="向前走十秒",
+            language="zh-CN",
+            responsibilities=[responsibility],
+            interpretation_confidence=0.99,
+            context={},
+        ),
+        responsibility,
+    )
+
+
+def _walk_capability() -> dict[str, Any]:
+    return {
+        "capability_id": "soridormi.walk_forward",
+        "description": "Walk the robot forward for the supplied duration.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "duration_s": {"type": "number", "minimum": 0.1},
+            },
+            "required": ["duration_s"],
+            "additionalProperties": False,
+        },
+        "effects": ["locomotion"],
+        "hints": {"semantic_type": "body_action"},
+    }
+
+
+def test_stream_prompt_teaches_exact_field_placement_and_one_object_stop() -> None:
+    request, responsibility = _body_request()
+    capability = _walk_capability()
+
+    projection = fast_advance_capability_prompt_projection([capability])
+    prompt = str(
+        fast_advance_layered_prompt(
+            request,
+            responsibilities=[responsibility],
+            capabilities=[capability],
+        )
+    )
+    system = fast_streaming_advance_system_prompt()
+
+    assert "args_schema" in projection[0]
+    assert "arguments" not in projection[0]
+    assert "reason_summary exists only once, at terminal_result.reason_summary" in prompt
+    assert "Never use arguments, effects, resource_claims" in prompt
+    assert "perform_action for an embodied, media, vocal, or state-changing effect" in prompt
+    assert "Stop immediately after" in prompt
+    assert "repeated object" in system
+
+
+def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
+    _, responsibility = _body_request()
+    schema = fast_streaming_advance_response_schema(
+        [responsibility.local_ref],
+        responsibilities=[responsibility],
+        capabilities=[_walk_capability()],
+        auxiliary_social_capabilities=[],
+        interpretation_unresolved=[],
+        language="zh-CN",
+    )
+
+    definitions = schema["$defs"]
+    presentation = schema["properties"]["presentation_commit"]
+    terminal = schema["properties"]["terminal_result"]
+    terminal_items = terminal["properties"]["activities"]["items"]
+
+    assert "Presentation_FastPlannerCompleteResponseAct" not in definitions
+    assert "Terminal_FastPlannerProgressAct" not in definitions
+    assert "Terminal_FastPlannerCompleteResponseAct" not in definitions
+    assert "reason_summary" not in json.dumps(presentation)
+    assert all(
+        "reason_summary" not in value.get("properties", {})
+        for value in definitions.values()
+        if isinstance(value, dict)
+    )
+    assert "reason_summary" in terminal["properties"]
+    assert "allOf" not in terminal
+    assert "discriminator" not in terminal_items
+
+    refs: set[str] = set()
+
+    def collect_refs(node: Any) -> None:
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                refs.add(ref.rsplit("/", 1)[-1])
+            for value in node.values():
+                collect_refs(value)
+        elif isinstance(node, list):
+            for value in node:
+                collect_refs(value)
+
+    collect_refs(schema)
+    assert refs <= set(definitions)
 
 
 @pytest.mark.asyncio
