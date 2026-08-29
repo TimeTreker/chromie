@@ -15,7 +15,8 @@ move behind narrow collaborators with explicit contracts and focused tests.
 
 There is one maintained Host-to-Agent service boundary. `chromie-agent` is one
 FastAPI service containing separately testable GI, GA, Planner fast/deep passes,
-Reflection, and Social Attention modules/endpoints; those cognitive roles are not
+and Reflection modules/endpoints. Optional Social Attention is part of Planner output,
+not another module or endpoint; these cognitive roles are not
 independent deployment services. `VoiceAssistant` coordinates their lifecycle and
 dataflow but cannot reinterpret one module's semantics or become a response author.
 

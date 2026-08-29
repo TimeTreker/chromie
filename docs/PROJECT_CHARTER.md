@@ -1006,16 +1006,36 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or other consequential uncertainty must stop before commitment. Spend cognitive
    cost where being wrong matters; do not turn perfectionism into architecture.
 
-37. **Social Attention has one semantic writer.** `SocialAttentionPlanner` alone
-   decides optional decoration for one concrete semantic primary observable Activity. Planner never authors
-   a `SocialAttentionPlan`; Goal/Planner stages do not decide it; the Host only
-   supplies bounded context and validates/materializes accepted decoration. A valid
-   `none` stands. Malformed, unavailable, conflicting, or unsafe decoration disappears
-   locally without a second model call, speech recomposition, Goal/Plan mutation, or
-   reopened cognition. Cooldown/repetition control is keyed to the concrete primary
-   Activity, not the whole turn: one accepted decoration does not suppress a later
-   distinct primary Activity in the same turn. Model-facing candidates exclude
-   provider/backend/calibration identity so the social decision remains embodiment-independent.
+37. **Optional social decoration is authored once by the primary Planner.** The
+   same Fast or Deep Planner invocation that authors a Main Activity may also
+   author zero or more subordinate `auxiliary_activities[]` for that Activity.
+   There is no separate Social Attention model, endpoint, opportunity queue, or
+   second semantic decision after Plan commitment. Fast First Response deliberately
+   has no auxiliary surface; Fast Advance and canonical Fast/Deep Plans may include
+   it when the primary Activity, fresh target evidence, owner-approved style,
+   recent auxiliary evidence, and exact eligible catalog candidates are already in
+   the primary Planner input. Empty is normal and complete.
+
+   `CanonicalPlan.auxiliary_activities[]` is structurally separate from Goal-owned
+   `steps[]`: it is included in Plan validation, fingerprinting, and revision truth,
+   but carries no Goal IDs, cannot satisfy or complete a Goal, and cannot authorize
+   an effect. An explicitly requested gesture remains ordinary Goal-owned Work in
+   `steps[]`, even when the same Capability can also be used as optional decoration.
+   The Host may validate the exact proposed Capability, schema, anchor, target
+   freshness, availability, confirmation, safety, parallelism, repetition, and
+   resource compatibility, then execute it fail-soft through the Activity lane. It
+   may suppress a stale or invalid proposal but must never select a replacement,
+   infer social intent, or mutate Planner-authored arguments. Suppression does not
+   change speech, primary Work, Goal state, or Plan completion.
+
+   Auxiliary-only target change, invalidation, failure, or completion must not create
+   a `CognitiveOpportunity` and must never borrow or fabricate a Goal ID to re-enter
+   Planner; the existing non-empty `goal_ids` contract is a hard boundary. If a real
+   Goal-relevant state change independently creates a valid opportunity, the same
+   Planner may reconsider the whole affected Goal scope and author a new Plan revision.
+   Model-facing auxiliary candidates exclude provider/backend/calibration identity so
+   the social decision remains embodiment-independent. Machine guards must prevent the
+   deleted independent Social Attention writer and configuration surface from returning.
 
 38. **Capability-result meaning returns to Planner through immutable Evidence.**
    Trusted Capability Runtime emits a typed terminal event; the Host validates its

@@ -33,6 +33,8 @@ from .planner_schema import (
     fast_repair_response_schema,
 )
 from .planner_context import (
+    auxiliary_social_capability_payloads,
+    auxiliary_social_prompt_context,
     fast_capability_payload,
     planner_goal_context,
 )
@@ -416,6 +418,16 @@ class FastPlannerResolver:
 
         responsibility_refs = [item.local_ref for item in responsibilities]
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
+        auxiliary_catalog = await self.catalog.prompt_entries(scope="all", refresh=False)
+        auxiliary_social_capabilities = auxiliary_social_capability_payloads(
+            auxiliary_catalog
+        )
+        request.context["planner_auxiliary_social_context"] = (
+            auxiliary_social_prompt_context(
+                request.context,
+                auxiliary_social_capabilities,
+            )
+        )
         executable = [
             item
             for item in capabilities
@@ -431,6 +443,7 @@ class FastPlannerResolver:
             responsibility_refs,
             responsibilities=responsibilities,
             capabilities=capability_payload,
+            auxiliary_social_capabilities=auxiliary_social_capabilities,
             interpretation_unresolved=list(request.interpretation_unresolved),
             # A null first-response result is still a terminal decision for that
             # bounded speech phase.  Advance must not author a substitute progress
@@ -538,6 +551,7 @@ class FastPlannerResolver:
                         combined_output.covered_responsibility_refs
                     ),
                     activities=combined_output.activities,
+                    auxiliary_activities=combined_output.auxiliary_activities,
                     continuations=combined_output.continuations,
                     confidence=combined_output.confidence,
                     unresolved=combined_output.unresolved,
@@ -641,6 +655,14 @@ class FastPlannerResolver:
         response_only = goal_context.response_only
         requires_execution = goal_context.requires_execution
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
+        auxiliary_catalog = await self.catalog.prompt_entries(scope="all", refresh=False)
+        auxiliary_social_capabilities = auxiliary_social_capability_payloads(
+            auxiliary_catalog
+        )
+        context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(
+            context,
+            auxiliary_social_capabilities,
+        )
         executable = [
             item
             for item in capabilities
@@ -674,6 +696,7 @@ class FastPlannerResolver:
                     item["capability_id"]: item["input_schema"]
                     for item in capability_payload
                 },
+                auxiliary_social_capabilities=auxiliary_social_capabilities,
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
@@ -687,6 +710,7 @@ class FastPlannerResolver:
                     item["capability_id"]: item["input_schema"]
                     for item in capability_payload
                 },
+                auxiliary_social_capabilities=auxiliary_social_capabilities,
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,

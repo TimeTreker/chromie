@@ -80,7 +80,7 @@ class RuntimeReadyOrientationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(request.metadata["untargeted"])
         self.assertEqual(request.metadata["execution_lane"], "activity")
         self.assertEqual(request.metadata["execution_role"], "startup_orientation")
-        self.assertNotIn("auxiliary_social_attention", request.metadata)
+        self.assertNotIn("auxiliary_plan_activity", request.metadata)
         self.assertTrue(response.metadata["suppress_body_failure_speech"])
 
     async def test_startup_orientation_is_independent_of_social_attention_policy(self) -> None:

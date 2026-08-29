@@ -11,7 +11,10 @@ try:
     from chromie_contracts.core_interpretation import PlannerReentryScope
     from chromie_contracts.control import GoalCancellationEvidence
     from chromie_contracts.goal import GoalAssociationResolution
-    from chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
+    from chromie_contracts.interaction import (
+        MEDIA_CAPABILITY_IDS,
+        reject_forbidden_low_level_fields,
+    )
     from chromie_contracts.situation import SituationProjection
     from chromie_contracts.tool_result import ToolResultEvidence
     from chromie_contracts.plan import FastPlannerFirstResponse
@@ -19,7 +22,10 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.control import GoalCancellationEvidence
     from shared.chromie_contracts.goal import GoalAssociationResolution
-    from shared.chromie_contracts.interaction import MEDIA_CAPABILITY_IDS
+    from shared.chromie_contracts.interaction import (
+        MEDIA_CAPABILITY_IDS,
+        reject_forbidden_low_level_fields,
+    )
     from shared.chromie_contracts.situation import SituationProjection
     from shared.chromie_contracts.tool_result import ToolResultEvidence
     from shared.chromie_contracts.plan import FastPlannerFirstResponse
@@ -732,6 +738,7 @@ def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False
         "resource_claims": list(item.resource_claims),
         "effects": list(item.effects),
         "safety_class": item.safety_class,
+        "behavior_domains": list(item.behavior_domains),
         "hints": dict(item.hints),
     }
     if include_side_effect_free:
@@ -751,10 +758,134 @@ def deep_capability_payload(item: Any) -> dict[str, Any]:
         "requires_confirmation": item.requires_confirmation,
         "effects": item.effects,
         "safety_class": item.safety_class,
+        "behavior_domains": list(item.behavior_domains),
         "can_run_parallel": item.can_run_parallel,
         "parallel_metadata_declared": item.parallel_metadata_declared,
         "exclusive_group": item.exclusive_group,
         "resource_claims": item.resource_claims,
         "execution_constraints": item.execution_constraints,
         "hints": dict(item.hints),
+    }
+
+
+def auxiliary_social_capability_payloads(entries: list[Any]) -> list[dict[str, Any]]:
+    """Project only catalog-qualified optional social-decoration Capabilities.
+
+    This is a read-only catalog filter. It does not decide that an expression is
+    useful; the same primary Planner result makes that semantic choice. Requiring
+    explicit behavior-domain and parallel-safety declarations keeps the model from
+    borrowing an arbitrary body Capability for decoration.
+    """
+
+    projected: list[dict[str, Any]] = []
+    for item in entries:
+        domains = {
+            str(value).strip().lower()
+            for value in (getattr(item, "behavior_domains", None) or [])
+            if str(value).strip()
+        }
+        if (
+            not getattr(item, "available", False)
+            or not getattr(item, "interaction_executable", False)
+            or "social_attention" not in domains
+            or bool(getattr(item, "requires_confirmation", False))
+            or getattr(item, "can_run_parallel", None) is not True
+            or not bool(getattr(item, "parallel_metadata_declared", False))
+        ):
+            continue
+        input_schema = getattr(item, "input_schema", None)
+        if not isinstance(input_schema, dict):
+            continue
+        try:
+            reject_forbidden_low_level_fields(input_schema)
+        except ValueError:
+            continue
+        projected.append(
+            {
+                "capability_id": str(item.capability_id),
+                "description": str(item.description)[:180],
+                "input_schema": copy.deepcopy(input_schema),
+                "can_run_parallel": True,
+                "parallel_metadata_declared": True,
+                "exclusive_group": getattr(item, "exclusive_group", None),
+                "resource_claims": list(getattr(item, "resource_claims", None) or []),
+                "behavior_domains": ["social_attention"],
+            }
+        )
+    return projected
+
+
+def auxiliary_social_prompt_context(
+    context: dict[str, Any],
+    candidates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Return the bounded scene/style/history input for Planner decoration."""
+
+    mind = context.get("mind")
+    raw_style = mind.get("social_interaction_style") if isinstance(mind, dict) else None
+    style = (
+        {
+            key: raw_style[key]
+            for key in ("expressiveness", "repetition_guidance", "restraint")
+            if key in raw_style
+        }
+        if isinstance(raw_style, dict) and raw_style.get("owner_approved") is True
+        else {}
+    )
+    target_evidence: dict[str, Any] = {"available": False}
+    for key in (
+        "auxiliary_social_target",
+        "social_attention_target",
+        "active_user_target",
+        "perceived_user_target",
+    ):
+        value = context.get(key)
+        if not isinstance(value, dict) or not value:
+            continue
+        explicit_source = str(value.get("source") or "").strip()
+        source = (
+            explicit_source
+            if explicit_source in {"live_perception", "conversation_context"}
+            else "live_perception"
+            if "perception" in key or "perceived" in key
+            else "conversation_context"
+        )
+        raw_target = value.get("target")
+        target = dict(raw_target) if isinstance(raw_target, dict) else dict(value)
+        target_evidence = {
+            "available": True,
+            "source": source,
+            "target": {
+                name: target[name]
+                for name in (
+                    "target_ref",
+                    "relative_direction",
+                    "confidence",
+                    "evidence_refs",
+                )
+                if name in target
+            },
+        }
+        break
+    recent = [
+        {
+            key: item[key]
+            for key in (
+                "capability_id",
+                "semantic_args",
+                "social_function",
+                "anchor_id",
+                "execution_claim",
+            )
+            if key in item
+        }
+        for item in (context.get("recent_auxiliary_behavior_evidence") or [])[-12:]
+        if isinstance(item, dict)
+    ]
+    return {
+        "eligible_capabilities": candidates,
+        "target_evidence": target_evidence,
+        "social_interaction_style": style,
+        "recent_auxiliary_behavior_evidence": recent,
+        "max_activities": 3,
     }

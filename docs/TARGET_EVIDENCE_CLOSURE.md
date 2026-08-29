@@ -288,7 +288,7 @@ python scripts/run_target_evidence_closure.py collect-social \
   --mind-profile <approved-mind-profile-revision> \
   --runtime-topology cognitive-runtime-apply \
   --effective-model fast_planner=<resolved-model> \
-  --effective-model social_attention=<resolved-model>
+  --effective-model deep_planner=<resolved-model>
 ```
 
 The collector derives the complete mode/style set from the reviewed dataset,
@@ -309,7 +309,10 @@ python scripts/run_target_evidence_closure.py attach-social \
 ```
 
 Benchmark remains an evaluator. It does not choose Social Attention behavior for
-the Runtime.
+the Runtime. The Social Attention track is a logical behavior-domain track over
+Planner-authored `auxiliary_activities[]`; it is not a separate endpoint or model
+identity. Its retained run must name the Fast/Deep Planner models that could author
+the containing Plan.
 
 ## Deployed loopback and LAN evidence
 

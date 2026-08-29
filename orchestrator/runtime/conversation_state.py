@@ -5731,7 +5731,7 @@ class ConversationStateManager:
             action_metadata = item.get("metadata")
             if not isinstance(action_metadata, dict):
                 action_metadata = {}
-            if action_metadata.get("auxiliary_social_attention"):
+            if action_metadata.get("auxiliary_plan_activity"):
                 continue
             item["metadata"] = action_metadata
             primary_actions.append(item)

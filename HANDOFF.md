@@ -9,10 +9,10 @@ checkpoint remain authoritative.
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Branch at start: `main`
-- Base commit: `7738651a2fe56daf850a7b088c12594e976796f9`
-- Base subject: `Close cognition authority chains and rebuild acceptance suite`
-- Scope: preserve semantic-authority closure, make `qwen3.5:4b` the RTX 4090 Laptop GI
-  default without changing another model role, and retain root-cause evidence
+- Base commit: `9ca80635c0dee2c8dee87aad15963be09b8ee950`
+- Base subject: `fix: adopt qwen3.5 GI residency profile`
+- Scope: replace the independent Social Attention semantic writer with
+  Planner-owned `auxiliary_activities[]` while preserving the retained GI evidence line
 - Expected resume revision: the latest commit containing this handoff
 
 Bootstrap on another machine:
@@ -79,15 +79,19 @@ must-pass case and reports all failures before the stage gate can block core/cha
 This layout is directly shardable and can later be imported into a database without
 changing scenario identity or maintaining a second registry.
 
-The current worktree fixes the first wrong post-Fast-response boundary. The Host
-previously queued optional Social Attention and dispatched GPU-backed first-speech TTS
-before starting Fast Advance or Goal Association. It now creates both critical tasks,
-yields them to their Agent-call boundaries, and then starts first speech; Goal
-Association and Fast Advance remain concurrent, and speech need not wait for GA to
-finish. Per-activity pre-resolution Social Attention calls are removed; the existing
-post-resolution bridge queues decoration only after canonical planning and mechanically
-retains committed Fast speech omitted from the terminal response. No model, semantic
-authority, runtime flag, architecture layer, or first-class term was added.
+The current worktree applies the owner-approved Social Attention amendment. The same
+Fast Advance or canonical Fast/Deep Planner primary result now owns zero or more
+`auxiliary_activities[]`; Fast First Response has no auxiliary field. The field is part
+of Plan fingerprint/revision truth but structurally separate from Goal-owned `steps[]`
+and cannot affect completion. The independent Planner/DTO/endpoint/client/model settings
+and Host background opportunity queue/worker are deleted.
+
+Runtime performs exact mechanical validation and then executes or suppresses the
+Planner proposal. It cannot choose another gesture or target. Accepted requests use
+`source=canonical_plan_auxiliary_activity`, `auxiliary_plan_activity=true`, and empty
+`source_goal_ids`. Auxiliary-only failure, completion, or target drift cannot create a
+`CognitiveOpportunity`; there is no legal Goal ID to attach. Explicit user-requested
+gestures remain ordinary Goal-owned Plan steps.
 
 ## Evidence ledger
 
@@ -105,13 +109,14 @@ python scripts/check_repository_policies.py
 Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
 
 ./scripts/run_tests.sh
-Ran 2023 tests ... OK
+Ran 2017 tests ... OK
 20 legacy Agent tests passed
 
 python scripts/general_ability_acceptance.py --mode level-a \
-  --ability-class robust_intent_understanding \
-  --ability-class planner_goal_semantic_quality --no-write
-General ability acceptance: 12/12 passed mode=level-a evidence=A
+  --ability-class planner_goal_semantic_quality \
+  --ability-class composable_action_planning \
+  --ability-class multi_goal_daily_life --no-write
+General ability acceptance: 18/18 distinct cases passed mode=level-a evidence=A
 
 python scripts/check_docs.py
 Documentation checks passed: 96 Markdown files
@@ -212,12 +217,13 @@ those authorities have changed.
 
 ## Next evidence boundary
 
-GI, GA, and Planner single-authority closure remains implemented. The complete post-change
-cohort proves the GI default/residency change reduced transport loss, but qwen3.5 semantic
-qualification and the unchanged single-slot downstream latency boundary remain open. The
-next fix must address one of those reproduced boundaries without validator weakening, Host
-resegmentation, another semantic reviewer, a non-GI model substitution, or Social Attention
-as Goal completion.
+The auxiliary amendment's canonical source gates are complete. GI, GA, and Planner
+single-authority Prompt/model qualification is now the active evidence line: the prior cohort proves the GI
+default/residency change reduced transport loss, but qwen3.5 semantic qualification and
+the unchanged single-slot downstream latency boundary remain open. The next behavioral
+fix must address one of those reproduced boundaries without validator weakening, Host
+resegmentation, another semantic reviewer, a non-GI model substitution, or auxiliary
+decoration as Goal completion.
 
 ## Claim boundary
 

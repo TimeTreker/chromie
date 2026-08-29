@@ -84,7 +84,6 @@ class TextScenarioCase:
     expected_fast_communicative_speech_acts: tuple[str, ...] = field(
         default_factory=tuple
     )
-    require_social_attention_opportunity: bool = False
     require_fast_planner_evidence_reentry: bool = False
     require_pre_ga_safe_capability_dispatch: bool = False
     require_canonical_work_reconciliation: bool = False
@@ -300,8 +299,11 @@ def _is_expressive_cue_capability(item: dict[str, Any]) -> bool:
     return bool(
         isinstance(metadata, dict)
         and (
-            metadata.get("source") in {"expressive_body_cue", "social_attention_plan"}
-            or metadata.get("auxiliary_social_attention") is True
+            metadata.get("source") in {
+                "expressive_body_cue",
+                "canonical_plan_auxiliary_activity",
+            }
+            or metadata.get("auxiliary_plan_activity") is True
         )
     )
 
@@ -787,19 +789,6 @@ def validate_live_text_result(
         for item in session_state.get("cognitive_workflow_stages") or []
         if isinstance(item, dict)
     ]
-    if case.require_social_attention_opportunity:
-        opportunity_count = int(
-            runtime_metadata.get("social_attention_opportunity_count") or 0
-        )
-        retained_opportunity = any(
-            item.get("stage") == "social_attention_opportunity"
-            and (item.get("metadata") or {}).get("attached_to_main_activity") is True
-            for item in workflow_stages
-        )
-        if opportunity_count < 1 and not retained_opportunity:
-            errors.append(
-                "Social Attention opportunity was not attached to the fast Main Activity"
-            )
     if (
         case.require_fast_planner_evidence_reentry
         and not bool(summary.get("preview_only"))
@@ -1011,9 +1000,6 @@ def _text_scenario_case(
         ),
         expected_fast_communicative_speech_acts=_tuple_of_strings(
             raw.get("expected_fast_communicative_speech_acts")
-        ),
-        require_social_attention_opportunity=bool(
-            raw.get("require_social_attention_opportunity", False)
         ),
         require_fast_planner_evidence_reentry=bool(
             raw.get("require_fast_planner_evidence_reentry", False)

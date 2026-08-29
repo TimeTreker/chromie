@@ -299,48 +299,6 @@
       ]
     },
     {
-      "path": "agent/app/social_attention.py",
-      "symbol": "SocialAttentionContextBuilder._ensure_candidates",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "ed79e043ac5fc364cddb7efacbdca6991c8aa8fabf5b03fc5d3e5d013bd9c0da",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/social_attention.py",
-      "symbol": "SocialAttentionContextBuilder._ensure_candidates",
-      "ordinal": 2,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "a8ad96a64e45fea921687358f13809a48bb8184e273ae04ee0abb54227ecf1ff",
-      "failure_signals": [
-        "continue",
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "agent/app/social_attention.py",
-      "symbol": "SocialAttentionPlanner.plan",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "2a1ba18c96526d9909bd620b3ba696a68568fafaf857c8b07bd970925c03b96d",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
       "path": "agent/app/soridormi_acceptance.py",
       "symbol": "run_soridormi_runtime_cancellation_acceptance",
       "ordinal": 1,
@@ -1083,6 +1041,19 @@
       "body_sha256": "dc935d5a7dc66b95c002b59b2f7b1e179f50bb005bc778542c1029743441d60e",
       "failure_signals": [
         "continue"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._execute_resolution_auxiliary_activities",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Contain optional auxiliary-Activity execution failure as a typed nonblocking workflow-stage failure without changing primary Plan, Goal, speech, or re-entry truth.",
+      "review_status": "reviewed",
+      "body_sha256": "5fe0e7c80984482422f0a38876bb3572d687f9e761e829a0e4a9386c41d38467",
+      "failure_signals": [
+        "return"
       ]
     },
     {

@@ -1137,8 +1137,8 @@ class ExecutionOutcomeReconciler:
                 metadata.get("canonical_plan_id") or ""
             ).strip()
             declared_step_id = str(metadata.get("step_id") or "").strip()
-            if metadata.get("auxiliary_social_attention") is True:
-                if source != "social_attention_plan":
+            if metadata.get("auxiliary_plan_activity") is True:
+                if source != "canonical_plan_auxiliary_activity":
                     raise ValueError(
                         "auxiliary request has an invalid source"
                     )

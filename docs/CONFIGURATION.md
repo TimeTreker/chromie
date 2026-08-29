@@ -117,7 +117,6 @@ twice.
 | `ORCH_TTS_CJK_CHUNK_CHARS` | `36` | Smaller chunk target for CJK speech so long Chinese weather/status responses can begin playback while later chunks are still synthesized. |
 | `ORCH_TTS_CJK_MIN_CHUNK_CHARS` | `8` | Minimum CJK clause size used when grouping punctuation-bounded fragments. |
 | `ORCH_CONFIRMATION_TTL_SEC` | `20` | Expiry in seconds for one pending spoken, request-bound confirmation. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | `on` | Embodiment-independent auxiliary interaction policy. Supported values are `off`, `report_only`, and `on`. A legacy simulator-scoped value is migrated to `on`; Soridormi/provider remains responsible for simulator-versus-physical backend selection and all body safety. |
 | `AGENT_ENABLE_READ_ONLY_DAG_EXECUTION` | `0` | Enable the read-only execution endpoint. |
 | `AGENT_ENABLE_PLANNING_DAG_EXECUTION` | `0` | Enable safe reads plus stateful `planning_only` execution. |
 | `AGENT_ENABLE_PARALLEL_DAG_EXECUTION` | `0` | Enable bounded parallel read/planning and guarded non-physical work. |
@@ -401,14 +400,6 @@ retained. See
 | `AGENT_TIMEOUT_MS` | Generic Agent-to-Ollama fallback timeout. Normal cognitive stages use their stage-specific timeouts; explicit qualification mode raises the generic fallback to `240000`. |
 | `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout; common default `9000`. Cognitive stage calls use their explicit Host stage deadlines; qualification mode raises the generic fallback to `300000`. |
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
-| `AGENT_SOCIAL_ATTENTION_MODE` | Embodiment-independent policy with values `off`, `report_only`, or `on`; maintained default `on`. Legacy simulator-scoped values are no longer accepted; maintained modes compose this service-owned policy explicitly. Soridormi/provider owns simulator-versus-physical selection. See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). |
-| `AGENT_SOCIAL_ATTENTION_MODEL` | Dedicated Ollama model for optional `SocialAttentionPlan` generation; default `qwen3:4b`. |
-| `AGENT_SOCIAL_ATTENTION_TIMEOUT_MS` | Model-call timeout for social attention; default `2500`. Qualification mode and the architecture-validation overlay raise it to `120000` so qualification tests model capability before latency tuning. |
-| `AGENT_SOCIAL_ATTENTION_NUM_CTX` | Context window for the compact social-attention prompt; default `8192`. Qualification mode and the architecture-validation overlay use `32768`. |
-| `AGENT_SOCIAL_ATTENTION_NUM_PREDICT` | JSON output budget for social-attention planning; default `160`. Qualification mode and the architecture-validation overlay use `4096` so a complete structured decision is not judged as a cognition failure merely because the interactive output ceiling truncated it. |
-| `AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS` | Maximum model-authored auxiliary behaviors per turn; default `2`. |
-| `AGENT_SOCIAL_ATTENTION_CAPABILITIES` | Optional comma-separated exact catalog IDs added to behavior-domain discovery. Default empty. Normal candidates are available interaction-executable entries tagged `social_attention`; provider backend metadata is ignored. |
-
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
 | `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |

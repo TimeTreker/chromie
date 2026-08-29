@@ -1,6 +1,6 @@
 # Chromie Development Checkpoint
 
-Status: qwen3.5:4b is the default GI; residency is fixed but semantic and downstream latency gaps remain
+Status: Planner-owned auxiliary social decoration is source-closed; current-revision Prompt/model and live behavior evidence remain open
 Updated: 2026-08-29
 Starting baseline: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
 (`Add external architecture audit`)
@@ -56,7 +56,8 @@ The maintained Planner workflow is now:
 ```text
 Responsibility/Goal + bounded Situation/Work/Evidence
   -> one Fast or Deep primary HOW result
-     (complete Goal coverage + truth strength + exact wording + provenance + satisfaction)
+     (complete Goal coverage + truth strength + exact wording + provenance + satisfaction
+      + optional non-Goal auxiliary_activities[])
   -> trusted schema/provenance/integrity validation
   -> accept the Plan
      OR one semantics-preserving DTO repair where that pass already permits it
@@ -65,7 +66,9 @@ Responsibility/Goal + bounded Situation/Work/Evidence
 ```
 
 There is no same-owner Planner truth qualifier, coverage reviewer, communication
-reviewer, or audit model call.
+reviewer, Social Attention model, or audit model call. Fast First Response has no
+auxiliary surface; Fast Advance and canonical Fast/Deep planning make the optional
+decoration decision in their primary result.
 
 ## Implemented in the current worktree
 
@@ -81,27 +84,16 @@ reviewer, or audit model call.
 - The Host now starts and yields both critical GI consumers—Fast Advance and Goal
   Association—before dispatching the first Planner-authored speech to TTS. First speech
   may still start before Goal Association finishes; there is no merge barrier.
-- Pre-resolution Social Attention calls are removed. The post-resolution presentation
-  bridge retains every committed Fast Communicative Activity, including complete speech
-  intentionally omitted from the terminal `InteractionResponse`.
-- A fail-first ordering regression covers critical fan-out before TTS and canonical Fast
-  completion before Social Attention. No model, semantic owner, flag, or term was added.
-
-## Other owner-authorized closure in this checkpoint
-
-- Removed the premature DBOS/durable-backend experiment completely: the optional
-  dependency, backend abstraction, DBOS adapter, eligibility field, and dedicated tests
-  are deleted. `CapabilityRuntime` directly owns its in-process `asyncio.Task` lifecycle
-  again. This does not reject a future inter-process event transport; it avoids freezing
-  a speculative backend contract before the in-process domain/event contract is proven.
-- Replaced the monolithic `scenarios/general_ability_acceptance.json` index with
-  self-describing, one-scenario-per-file discovery under
-  `scenarios/general_ability/<must_pass|core|challenge>/<ability-class>/`.
-  The retained cohort contains 50 must-pass, 15 core, and 8 challenge scenarios.
-  Every selected must-pass case runs before its stage report is produced; a hard
-  must-pass failure blocks core/challenge only after the complete must-pass stage.
-- Scenario metadata is local to each file, so a future scheduler or database importer
-  can shard/extract cases without synchronizing a central registry.
+- The independent `SocialAttentionPlanner`, endpoint/client, model/config role, and
+  background opportunity queue/worker are removed. `CanonicalPlan.auxiliary_activities[]`
+  is fingerprinted separately from Goal-owned `steps[]`; it carries no Goal IDs or
+  completion authority.
+- Runtime validates, suppresses, or executes only the exact Planner-authored auxiliary
+  Capability. It cannot reselect or retarget. Auxiliary-only changes/results never create
+  `CognitiveOpportunity` or borrow its required Goal scope.
+- Focused regressions cover Planner schema/candidate binding, canonical fingerprint and
+  anchors, exact Runtime materialization, Goal isolation, and suppression without
+  reselection. Repository guards reject restoration of the retired second writer.
 
 ## Evidence ledger
 
@@ -113,8 +105,8 @@ reviewer, or audit model call.
 | Current focused Planner matrix | 308 passed, 9 subtests passed | Automated primary-result/call-budget evidence |
 | Resource-admission regression | 147 cognitive/runtime/interaction/TTS/Social tests passed | Automated invocation-order evidence only |
 | Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
-| Canonical full local gate | 2,023 maintained tests plus 20 legacy Agent tests passed | Automated source/integration evidence |
-| Level A general abilities | 12/12 passed: robust intent 8/8; Planner/Goal semantic quality 4/4 | Deterministic Level A only |
+| Canonical full local gate | 2,017 maintained tests plus 20 legacy Agent tests passed | Automated source/integration evidence |
+| Level A general abilities for this amendment | 18/18 distinct cases passed: composable planning 5/5; multi-Goal daily life 10/10; Planner/Goal semantic quality 4/4 | Deterministic Level A only; one case belongs to two classes |
 | Documentation authority gate | 96 Markdown files passed | Current documentation consistency only |
 | Pre-fix live iteration 50, RTX 4090/Qwen3 4B | 32/36 contract-valid; four legacy coverage HTTP 503 failures; about 25/36 strict semantic passes | Diagnostic baseline only; different implementation |
 | Pre-Planner-fix 50-case must-pass aggregate | 1/50 machine passes; 29/29 first-response truth-review calls timed out; GA primary accepted 18/45 | Diagnostic comparison only |
@@ -136,12 +128,15 @@ call, or optional Social Attention satisfying a requested effect.
 
 ## Exact resume point
 
-1. Keep the removed review chains absent and keep atomicity, mode, non-overlap, and
+1. Keep the source-closed Planner-owned auxiliary boundary intact. Do not restore
+   compatibility environment fields, endpoint shims, or the retired social decision worker
+   while tuning Prompt/model behavior.
+2. Keep the removed review chains absent and keep atomicity, mode, non-overlap, and
    source-provenance validation fail-closed.
-2. The RTX 4090 Laptop profile now uses `qwen3.5:4b` only for GI, with a bounded 16K/512
+3. The RTX 4090 Laptop profile now uses `qwen3.5:4b` only for GI, with a bounded 16K/512
    runner and two-model residency. Every other cognition model remains unchanged. This
    removes the reproduced GI eviction boundary; it does not qualify qwen3.5 semantics.
-3. The complete post-change must-pass cohort is retained under
+4. The complete post-change must-pass cohort is retained under
    `.chromie/acceptance/general-ability/gi-qwen35-default-fixed`, bound to runtime identity
    `78847784d3ff08df8b606fb921eb28010a0e87f34b146da41c4fabe1cc9341b8`.
    Its exactly one post-cohort bundle is

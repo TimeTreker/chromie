@@ -328,10 +328,10 @@ not require the supervised real-microphone run.
   speech uses a short original line and still applies the same walking safety
   normalization. Chromie waits until that speech is actually audible before
   starting the body walk, so the song and walk overlap.
-- Chat-only turns may include optional model-authored Social Attention. The
-  maintained mode is `on`; use `report_only` to retain advisory plans without
-  body requests or `off` to suppress auxiliary planning. These settings do not
-  select a simulator or physical body. The older `AGENT_EXPRESSIVE_BODY_CUES`
+- Chat-only turns may include optional Planner-authored Social Attention in
+  `auxiliary_activities[]`. There is no independent Social Attention mode or model;
+  Runtime validates or suppresses the exact proposal. These semantics do not select a
+  simulator or physical body. The older `AGENT_EXPRESSIVE_BODY_CUES`
   name is only a compatibility alias.
 - Compound requests should preserve order unless a safety or validation rule
   refuses the request.

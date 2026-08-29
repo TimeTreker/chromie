@@ -682,15 +682,15 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             ["goal-action"],
         )
 
-    def test_auxiliary_social_attention_and_its_result_are_ignored(self) -> None:
+    def test_auxiliary_plan_activity_and_its_result_are_ignored(self) -> None:
         plan = single_plan()
         request = request_for_step(plan, "lookup")
         social = CapabilityRequest(
             request_id="social-look",
             capability_id="soridormi.look_at_person",
             metadata={
-                "source": "social_attention_plan",
-                "auxiliary_social_attention": True,
+                "source": "canonical_plan_auxiliary_activity",
+                "auxiliary_plan_activity": True,
                 "canonical_plan_id": plan.plan_id,
             },
         )

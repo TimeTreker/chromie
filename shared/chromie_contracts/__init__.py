@@ -164,18 +164,6 @@ from .user_turn import (
     UserTurnEnvelope,
     normalize_turn_text,
 )
-from .social_attention import (
-    SocialAttentionActivityAnchor,
-    SocialAttentionActivityPhase,
-    SocialAttentionActivityRealization,
-    SocialAttentionExecutionLane,
-    SocialAttentionBehavior,
-    SocialAttentionMode,
-    SocialAttentionPlan,
-    SocialAttentionTarget,
-    normalize_social_attention_mode,
-    SocialAttentionRequest,
-)
 from .discourse import (
     DiscourseReferenceSource,
     DiscourseReferent,
@@ -362,16 +350,6 @@ __all__ = [
     "UserTurnChannel",
     "UserTurnEnvelope",
     "normalize_turn_text",
-    "SocialAttentionActivityAnchor",
-    "SocialAttentionActivityPhase",
-    "SocialAttentionActivityRealization",
-    "SocialAttentionExecutionLane",
-    "SocialAttentionBehavior",
-    "SocialAttentionMode",
-    "SocialAttentionPlan",
-    "SocialAttentionRequest",
-    "SocialAttentionTarget",
-    "normalize_social_attention_mode",
     "DiscourseReferenceSource",
     "DiscourseReferent",
     "DiscourseReferentOperation",
@@ -409,6 +387,8 @@ __all__ = [
     "TaskContextSnapshot",
     "CanonicalPlan",
     "CanonicalPlanStep",
+    "AuxiliaryActivityTarget",
+    "AuxiliaryPlanActivity",
     "GoalSatisfactionAssessment",
     "PlanCoverage",
     "PlanDisposition",
@@ -423,6 +403,8 @@ __all__ = [
 ]
 
 from .plan import (
+    AuxiliaryActivityTarget,
+    AuxiliaryPlanActivity,
     CanonicalPlan,
     CanonicalPlanStep,
     GoalSatisfactionAssessment,

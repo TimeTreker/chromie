@@ -177,7 +177,7 @@ class InteractionLedgerTests(unittest.TestCase):
             capability_id="soridormi.look_at_person",
             args={},
             metadata={
-                "auxiliary_social_attention": True,
+                "auxiliary_plan_activity": True,
                 "source_goal_ids": ["goal-greet"],
             },
         )

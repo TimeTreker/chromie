@@ -127,18 +127,14 @@ class ComposeConfigurationTests(unittest.TestCase):
         self.assertIn("      dockerfile: agent/Dockerfile", agent_block)
         self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", agent_block)
 
-    def test_agent_service_passes_capability_planner_budget(self) -> None:
+    def test_agent_service_passes_planner_catalog_configuration(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent_block = compose.split("  chromie-agent:", 1)[1].split(
             "\nnetworks:",
             1,
         )[0]
 
-        self.assertIn(
-            "AGENT_SOCIAL_ATTENTION_MODE: ${AGENT_SOCIAL_ATTENTION_MODE:-on}",
-            agent_block,
-        )
-        self.assertNotIn("AGENT_SOCIAL_ATTENTION_FALLBACK_", agent_block)
+        self.assertNotIn("AGENT_SOCIAL_ATTENTION_", agent_block)
         self.assertIn(
             "AGENT_CAPABILITY_MANIFESTS: ${AGENT_CAPABILITY_MANIFESTS:-/app/capabilities/soridormi.json}",
             agent_block,

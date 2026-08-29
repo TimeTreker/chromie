@@ -664,8 +664,8 @@ class SoridormiCapabilityProvider:
         metadata = request.metadata if isinstance(request.metadata, dict) else {}
         source_goal_ids = metadata.get("source_goal_ids") or []
         return bool(
-            metadata.get("source") == "social_attention_plan"
-            and metadata.get("auxiliary_social_attention") is True
+            metadata.get("source") == "canonical_plan_auxiliary_activity"
+            and metadata.get("auxiliary_plan_activity") is True
             and not any(str(value).strip() for value in source_goal_ids)
         )
 
@@ -864,7 +864,7 @@ class SoridormiCapabilityProvider:
         * Soridormi's freshly created plan says ``requires_confirmation=false``;
         * the live named-skill definition and committed request agree;
         * the request came from either a goal-grounded canonical plan or reviewed
-          auxiliary Social Attention; and
+          a Planner-owned auxiliary activity; and
         * Soridormi's safety monitor has already accepted the motion.
 
         This is not a fabricated ``confirmed=true`` claim.  The execution context
@@ -885,9 +885,9 @@ class SoridormiCapabilityProvider:
             if str(value).strip()
         }
 
-        reviewed_social = bool(
-            source == "social_attention_plan"
-            and metadata.get("auxiliary_social_attention") is True
+        reviewed_auxiliary = bool(
+            source == "canonical_plan_auxiliary_activity"
+            and metadata.get("auxiliary_plan_activity") is True
             and safety_class == "low_risk_action"
             and "physical_motion" not in effects
         )
@@ -906,7 +906,7 @@ class SoridormiCapabilityProvider:
             planned_output.get("requires_confirmation") is False
             and request.requires_confirmation is False
             and definition.requires_confirmation is False
-            and (reviewed_social or canonical_goal_action)
+            and (reviewed_auxiliary or canonical_goal_action)
         )
 
     def _resource_completion_failure(

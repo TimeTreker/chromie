@@ -31,7 +31,7 @@ Options:
   --no-orchestrator       Start/probe services, then skip the host Orchestrator
   --architecture-validation
                           Use long-context, long-output, long-timeout validation
-                          budgets while retaining Social Attention inference
+                          budgets for primary cognitive model qualification
   --tts-backend NAME      Select cosyvoice3 (default), oute, or qwen3
   -h, --help              Show this help
 USAGE
@@ -53,7 +53,7 @@ done
 
 if [ "$ARCHITECTURE_VALIDATION" = "1" ]; then
   export CHROMIE_VALIDATION_PROFILE=architecture
-  echo "[chromie] Architecture-validation budgets enabled; Social Attention remains active."
+  echo "[chromie] Architecture-validation budgets enabled for primary cognition."
 fi
 
 for cmd in docker python3 flock; do
@@ -446,7 +446,6 @@ EFFECTIVE_GOAL_ASSOCIATION_MODEL="${AGENT_GOAL_ASSOCIATION_MODEL}"
 EFFECTIVE_FAST_PLANNER_MODEL="${AGENT_FAST_PLANNER_MODEL}"
 EFFECTIVE_FAST_FIRST_RESPONSE_MODEL="${AGENT_FAST_FIRST_RESPONSE_MODEL}"
 EFFECTIVE_DEEP_PLANNER_MODEL="${AGENT_DEEP_PLANNER_MODEL}"
-EFFECTIVE_SOCIAL_ATTENTION_MODEL="${AGENT_SOCIAL_ATTENTION_MODEL}"
 EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX="${AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX}"
 EFFECTIVE_GOAL_INTERPRETER_NUM_CTX="${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX}"
 EFFECTIVE_GOAL_ASSOCIATION_NUM_CTX="${AGENT_GOAL_ASSOCIATION_NUM_CTX}"
@@ -463,7 +462,6 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}
   EFFECTIVE_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
   EFFECTIVE_FAST_FIRST_RESPONSE_MODEL="$COSYVOICE_BRAIN_MODEL"
   EFFECTIVE_DEEP_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  EFFECTIVE_SOCIAL_ATTENTION_MODEL="$COSYVOICE_BRAIN_MODEL"
   COSYVOICE_BRAIN_NUM_CTX="${TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192}"
   EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1
   echo "[chromie] CosyVoice shared-GPU cognition: ${COSYVOICE_BRAIN_MODEL} context_fallback=${COSYVOICE_BRAIN_NUM_CTX} (generated role contexts preserved; one resident Ollama model/runner)."
@@ -479,7 +477,6 @@ Goal Association                   | ${EFFECTIVE_GOAL_ASSOCIATION_MODEL} | Goal 
 Fast Planner                       | ${EFFECTIVE_FAST_PLANNER_MODEL} | fallback when readiness does not fully cover Goals
 Fast first response                | ${EFFECTIVE_FAST_FIRST_RESPONSE_MODEL} | prospective spoken Activity and bounded truth check
 Deep Planner                       | ${EFFECTIVE_DEEP_PLANNER_MODEL} | terminal planning escalation / one mechanical DTO regeneration max
-Social Attention                   | ${EFFECTIVE_SOCIAL_ATTENTION_MODEL} | background social-decoration loop
 EOF_MODEL_ROLES
 
 cat > "$SERVICE_OVERRIDE" <<EOF_SERVICE
@@ -493,7 +490,6 @@ AGENT_GOAL_ASSOCIATION_MODEL=${EFFECTIVE_GOAL_ASSOCIATION_MODEL}
 AGENT_FAST_PLANNER_MODEL=${EFFECTIVE_FAST_PLANNER_MODEL}
 AGENT_FAST_FIRST_RESPONSE_MODEL=${EFFECTIVE_FAST_FIRST_RESPONSE_MODEL}
 AGENT_DEEP_PLANNER_MODEL=${EFFECTIVE_DEEP_PLANNER_MODEL}
-AGENT_SOCIAL_ATTENTION_MODEL=${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
 AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=${EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX}
 AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=${EFFECTIVE_GOAL_INTERPRETER_NUM_CTX}
 AGENT_GOAL_ASSOCIATION_NUM_CTX=${EFFECTIVE_GOAL_ASSOCIATION_NUM_CTX}
@@ -515,10 +511,6 @@ services:
       AGENT_DEEP_PLANNER_MODEL: "${EFFECTIVE_DEEP_PLANNER_MODEL}"
       AGENT_CAPABILITY_MANIFESTS: /app/capabilities/soridormi.json
       SORIDORMI_MCP_URL: ${CONTAINER_MCP_URL}
-      # Honor the resolved embodiment-independent policy. Soridormi/provider
-      # owns backend selection and safety; auxiliary behavior stays optional.
-      AGENT_SOCIAL_ATTENTION_MODE: ${AGENT_SOCIAL_ATTENTION_MODE:-on}
-      AGENT_SOCIAL_ATTENTION_MODEL: "${EFFECTIVE_SOCIAL_ATTENTION_MODEL}"
   chromie-llm:
     environment:
       OLLAMA_MAX_LOADED_MODELS: "${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}"
@@ -542,7 +534,6 @@ AGENT_GOAL_ASSOCIATION_MODEL=${EFFECTIVE_GOAL_ASSOCIATION_MODEL}
 AGENT_FAST_PLANNER_MODEL=${EFFECTIVE_FAST_PLANNER_MODEL}
 AGENT_FAST_FIRST_RESPONSE_MODEL=${EFFECTIVE_FAST_FIRST_RESPONSE_MODEL}
 AGENT_DEEP_PLANNER_MODEL=${EFFECTIVE_DEEP_PLANNER_MODEL}
-AGENT_SOCIAL_ATTENTION_MODEL=${EFFECTIVE_SOCIAL_ATTENTION_MODEL}
 OLLAMA_MAX_LOADED_MODELS=${EFFECTIVE_OLLAMA_MAX_LOADED_MODELS}
 EOF_ORCH
 

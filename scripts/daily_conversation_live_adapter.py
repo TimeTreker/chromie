@@ -32,7 +32,6 @@ QUALITY_HEALTH_FIELDS = (
 )
 FAST_HEALTH_FIELDS = (
     "fast_planner_model",
-    "social_attention_model",
 )
 
 

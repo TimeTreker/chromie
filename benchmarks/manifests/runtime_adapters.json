@@ -29,7 +29,8 @@
       "name": "social_attention",
       "layers": ["module", "integration"],
       "url_env": "CHROMIE_BENCHMARK_SOCIAL_ATTENTION_URL",
-      "callable_env": "CHROMIE_BENCHMARK_SOCIAL_ATTENTION_CALLABLE"
+      "callable_env": "CHROMIE_BENCHMARK_SOCIAL_ATTENTION_CALLABLE",
+      "description": "Logical Planner-owned auxiliary Activity and Host-validation evidence boundary; not a production endpoint"
     }
   ]
 }

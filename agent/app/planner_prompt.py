@@ -261,6 +261,38 @@ def fast_first_response_prompt(
     )
 
 
+def auxiliary_social_planning_prompt_section(context: dict[str, Any]) -> str:
+    """Describe Planner-owned optional decoration without creating another owner."""
+
+    payload = context.get("planner_auxiliary_social_context")
+    if not isinstance(payload, dict):
+        payload = {
+            "eligible_capabilities": [],
+            "target_evidence": {"available": False},
+            "social_interaction_style": {},
+            "recent_auxiliary_behavior_evidence": [],
+            "max_activities": 0,
+        }
+    eligible = payload.get("eligible_capabilities")
+    if not isinstance(eligible, list) or not eligible:
+        return "No auxiliary candidates; use [].\n"
+    return (
+        "Planner-owned auxiliary social Activity context JSON:\n"
+        f"{bounded_json(payload, 5000)}\n"
+        "auxiliary_activities is an optional non-Goal list in this same primary "
+        "Planner result. Empty is normal. Add an item only when a small body expression "
+        "materially improves one real primary communicative act, plan response, or plan "
+        "step and remains non-disruptive. Select only an eligible capability shown here, "
+        "use schema-valid semantic args, timing=parallel, execution_role=social_decoration, "
+        "and cite the exact primary anchor. Never create an auxiliary item for an internal "
+        "cognition milestone, never move explicit user-requested behavior out of Goal-owned "
+        "steps, never repeat a recent decoration, and never invent target/perception facts. "
+        "If target freshness is absent, use an untargeted eligible expression or return an "
+        "empty list. Auxiliary Activities never satisfy, block, cancel, clarify, or create a "
+        "Goal and never justify response wording.\n\n"
+    )
+
+
 def fast_plan_prompt(
     request: CognitiveWorkRequest,
     capabilities: list[dict[str, Any]],
@@ -278,6 +310,7 @@ def fast_plan_prompt(
         context,
         agent_role="fast_planner",
     )
+    skill_section += auxiliary_social_planning_prompt_section(context)
     identity_json = bounded_identity_json(context)
     personality_json = bounded_personality_json(context)
     association = goal_association_prompt_projection(
@@ -569,6 +602,7 @@ def fast_advance_layered_prompt(
         sort_keys=True,
         separators=(",", ":"),
     )
+    auxiliary_social_section = auxiliary_social_planning_prompt_section(context)
     user_text = str(request.original_user_text or "")[:700]
     committed_communicative_json = bounded_json(
         [
@@ -624,6 +658,8 @@ def fast_advance_layered_prompt(
         + communication_instruction
         + "\n\nExecutable common Capability catalog JSON:\n"
         + capability_json
+        + "\n\n"
+        + auxiliary_social_section
         + "\n\nThe catalog projection above is complete for this Fast decision; every "
         "allowed Capability has a visible capability_id, arguments, effects, and "
         "semantic scope. Compare the Responsibility outcome against all projected "
@@ -681,8 +717,9 @@ def fast_advance_layered_prompt(
         "Responsibility's observable outcome. A read-only information request must use "
         "an information-read Capability when one is supplied; physical-object acquisition, "
         "handover, body gestures, or attention motions cannot acquire external information. "
-        "Do not add decorative Capability Activities that the Responsibility did not ask "
-        "for. Preserve speaker, experiencer, and actor ownership: a human report of "
+        "Do not put decorative work in primary activities. Use auxiliary_activities only "
+        "under the supplied optional-decoration contract. Preserve speaker, experiencer, "
+        "and actor ownership: a human report of "
         "their feeling or state does not request any robot body state, stop, posture, "
         "gesture, or other physical effect. Preserve every GI binding, "
         "including all independent temporal dimensions. When fresh Evidence is still "
@@ -923,6 +960,7 @@ def deep_plan_prompt(
         context,
         agent_role="deep_planner",
     )
+    skill_section += auxiliary_social_planning_prompt_section(context)
     fast_plan = (
         context.get("fast_plan_resolution") or context.get("fast_planner_resolution") or {}
     )
@@ -1079,7 +1117,7 @@ def deep_plan_prompt(
         "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, step_type, or effects into a plan step. "
         "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
         "When a supplied Goal requires future readiness at a known wall-clock instant, author time_conditions with the exact canonical goal_id and due_at_ms. Time conditions are cognition readiness, not provider work and not execution evidence. "
-        "Keep the plan minimal: every executable step must be necessary for one concrete observable outcome in the canonical Goal that owns it. A general body_action output mode does not authorize unrelated body effects. Do not add a blink, gaze, gesture, posture, attention expression, personality flourish, social enhancement, neutral-position, reset, transition, cleanup, or other presentation step merely to seem natural or improve the interaction. Optional coordinated expression belongs to the separate Social Attention owner; it enters the main Plan only when the user explicitly requested that exact observable effect or a supplied capability execution constraint explicitly requires it. "
+        "Keep the plan minimal: every executable step must be necessary for one concrete observable outcome in the canonical Goal that owns it. A general body_action output mode does not authorize unrelated body effects. Do not add a blink, gaze, gesture, posture, attention expression, personality flourish, social enhancement, neutral-position, reset, transition, cleanup, or other presentation step merely to seem natural or improve the interaction. An explicitly requested observable effect remains an ordinary Goal-owned step. Optional coordinated social expression may appear only in auxiliary_activities in this same primary Planner result, under the supplied closed candidate/anchor/target contract; it never enters steps or Goal outcomes. "
         "goal_outcomes is a JSON object keyed by every supplied canonical goal ID exactly once, never a list; every Deep Planner result must include it. Every outcome must explicitly author disposition, coverage, response_text, unresolved, step_ids, satisfaction, and rationale. Each value describes only that key's goal and must not repeat goal_id inside the value. Per-goal outcome invariants are mandatory: execute requires coverage=complete and at least one real plan step_id copied exactly from steps; respond requires coverage=complete, the actual answer text now (not a promise that it will be supplied later), and zero step_ids; clarify requires coverage=partial or uncertain, exact natural response_text, and zero step_ids; unavailable and refused require exact natural response_text and zero step_ids. Top-level and per-goal satisfaction are always non-null model judgments with score, status, satisfied_goal_ids, unmet_goal_ids, unmet_requirements, and rationale. A satisfaction score from 0.95 through 1.0 requires status=exact; score=1.0 must never use substantial. Do not assign a physical skill to a conversational answer merely because it is the nearest remaining capability. "
         "Complete plan coverage means every Goal has an explicit outcome; it does not mean every Goal can be satisfied. An unavailable, refused, or unresolved Goal must remain in unmet_goal_ids with a non-exact satisfaction status and score. The top-level satisfaction must preserve those same unmet Goals and requirements even when independent execute Goals can proceed in a coverage=complete mixed plan. "
         "An unavailable or refused outcome explicitly represents its Goal but does not satisfy it, and it is not by itself a safe adjustment or alternative. Do not promise, acknowledge as forthcoming, or otherwise claim that unavailable or refused work will occur in top-level or per-goal response_text. State the limitation truthfully while preserving exact independent executable work. "
@@ -1126,6 +1164,7 @@ def deep_layered_prompt(
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="deep_planner")
+        + auxiliary_social_planning_prompt_section(context)
         + "Executable capability catalog JSON:\n"
         + bounded_json(prompt_capabilities, 12000)
         + "\n\n"

@@ -963,95 +963,6 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_SOCIAL_ATTENTION_CAPABILITIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "acceptance_override",
-      "key": "AGENT_SOCIAL_ATTENTION_MODE",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/validation/architecture.env",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_SOCIAL_ATTENTION_MODEL",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/default.env",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env",
-        "env/profiles/nvidia_ada.env",
-        "env/profiles/nvidia_blackwell.env",
-        "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_SOCIAL_ATTENTION_NUM_CTX",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_SOCIAL_ATTENTION_NUM_PREDICT",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_SOCIAL_ATTENTION_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "profile_constant",
       "key": "AGENT_TASK_CONTINUITY_MODEL",
       "owners": [
@@ -4025,14 +3936,14 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 37,
+      "acceptance_override": 33,
       "bounded_compatibility_alias": 0,
       "profile_constant": 129,
       "public_choice": 9,
-      "service_internal": 208
+      "service_internal": 205
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 383
+    "total_keys": 376
   }
 }

@@ -76,8 +76,8 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
        |-> Fast Planner: input resolution + exact Communicative/Capability Activity Plan
        |     `-> Host truth/provenance validation -> Vocal/TTS realization
        |     `-> Deep Planner only when HOW exceeds the Fast budget
-       |-> Goal Association: sole canonical Goal commit/version authority
-       `-> Social Attention may decorate one concrete observable Main Activity
+       `-> Goal Association: sole canonical Goal commit/version authority
+  -> Fast Advance / canonical Plan may include optional auxiliary social Activities
   -> bind Activities into one Runtime task-list view per Goal
   -> start ready side-effect-free reads; hold effects for Goal/confirmation authority
   -> Planner-owned exact communication is mechanically materialized when needed

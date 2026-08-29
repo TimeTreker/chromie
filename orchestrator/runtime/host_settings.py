@@ -274,7 +274,6 @@ class CognitionSettings:
     goal_association_timeout_ms: int
     runtime_mode: str
     runtime_timeout_ms: int
-    social_attention_mode: str
     capability_manifest_paths: str
     soridormi_manifest: Path
     dag_engine_execution_token: str
@@ -378,14 +377,6 @@ class HostSettingsSnapshot:
             or ollama_model
         )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
-        social_mode = _text(
-            values, "AGENT_SOCIAL_ATTENTION_MODE", "on"
-        ).casefold()
-        if social_mode not in {"off", "report_only", "on"}:
-            raise HostConfigurationError(
-                "AGENT_SOCIAL_ATTENTION_MODE must be off, report_only, or on; "
-                f"got {social_mode!r}"
-            )
         mind_profile_path = _optional_path(
             values, "ORCH_MIND_PROFILE_PATH", project_root=project_root
         ) or (project_root / "config" / "mind" / "chromie_default.json").resolve()
@@ -601,7 +592,6 @@ class HostSettingsSnapshot:
                     15000,
                     minimum=1000,
                 ),
-                social_attention_mode=social_mode,
                 capability_manifest_paths=_text(
                     values, "AGENT_CAPABILITY_MANIFESTS", ""
                 ),

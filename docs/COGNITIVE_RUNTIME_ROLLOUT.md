@@ -108,8 +108,8 @@ Context; wording never becomes execution evidence.
 - resolve low-consequence parameters or request material information;
 - propose exact, adjusted, alternative, clarification, unavailable, or refused
   outcomes;
-- compose goal-scoped speech;
-- `SocialAttentionPlanner` alone may propose optional Social Attention decoration.
+- compose goal-scoped speech and optional non-Goal `auxiliary_activities[]` in the
+  same primary Planner result.
 
 ### Models may not
 
@@ -302,11 +302,13 @@ Trusted checks ensure:
 - pre-execution speech does not claim completion; and
 - clarification enters `waiting_for_user` semantics.
 
-Social Attention is a separate background cognition owned by
-`SocialAttentionPlanner`. Its valid `none`, malformed output, target/resource
-validation, and optional execution never delay or rewrite the attached Main
-Activity. Every opportunity names that concrete observable Activity; `none` is
-a valid decision and late standalone decoration is suppressed.
+Social Attention is a Planner-owned behavior domain, not separate background
+cognition. Fast Advance and canonical Fast/Deep planning may emit bounded
+`auxiliary_activities[]`; Fast First Response cannot. Empty or invalid output,
+target/resource validation, and optional execution never delay or rewrite the
+attached Main Activity. Runtime may suppress an invalid or stale exact proposal but
+cannot reselect or retarget it. An auxiliary-only change or result cannot create a
+Goal-scoped `CognitiveOpportunity`.
 
 ## 11. Evidence records
 

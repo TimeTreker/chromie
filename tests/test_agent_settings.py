@@ -17,15 +17,14 @@ class AgentSettingsTests(unittest.TestCase):
             os.environ,
             {
                 "AGENT_PORT": "9012",
-                "AGENT_SOCIAL_ATTENTION_NUM_CTX": "4096",
                 "AGENT_WEATHER_TIMEOUT_S": "12.5",
                 "AGENT_WEATHER_ENABLED": "0",
             },
         ):
             settings = Settings()
         self.assertEqual(settings.port, 9012)
-        self.assertEqual(settings.social_attention_num_ctx, 4096)
         self.assertEqual(settings.weather_timeout_s, 12.5)
+        self.assertFalse(hasattr(settings, "social_attention_model"))
         self.assertFalse(settings.weather_enabled)
 
     def test_fast_first_response_model_is_profile_owned_and_independent(self) -> None:

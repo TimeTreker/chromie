@@ -5,18 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-try:
-    from chromie_contracts.social_attention import (
-        SocialAttentionMode,
-        normalize_social_attention_mode,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.social_attention import (
-        SocialAttentionMode,
-        normalize_social_attention_mode,
-    )
-
-
 class Settings(BaseModel):
     cognitive_budget_profile: str = Field(
         default_factory=lambda: os.getenv(
@@ -32,47 +20,6 @@ class Settings(BaseModel):
     use_llm: bool = Field(
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
-    )
-    social_attention_mode: SocialAttentionMode = Field(
-        default_factory=lambda: normalize_social_attention_mode(
-            os.getenv("AGENT_SOCIAL_ATTENTION_MODE", "on"),
-            default="on",
-        )
-    )
-    social_attention_model: str = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SOCIAL_ATTENTION_MODEL",
-            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
-        )
-    )
-    social_attention_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS", "2500")),
-        ge=100,
-        le=120000,
-    )
-    social_attention_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_CTX", "4096")),
-        ge=512,
-    )
-    social_attention_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_NUM_PREDICT", "160")),
-        ge=32,
-        le=4096,
-    )
-    social_attention_max_behaviors: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_SOCIAL_ATTENTION_MAX_BEHAVIORS", "2")),
-        ge=1,
-        le=3,
-    )
-    social_attention_capability_ids: tuple[str, ...] = Field(
-        default_factory=lambda: tuple(
-            item.strip()
-            for item in os.getenv(
-                "AGENT_SOCIAL_ATTENTION_CAPABILITIES",
-                "",
-            ).split(",")
-            if item.strip()
-        )
     )
     enable_read_only_dag_execution: bool = Field(
         default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_DAG_EXECUTION", "0").strip().lower()

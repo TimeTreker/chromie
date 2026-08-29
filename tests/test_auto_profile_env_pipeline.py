@@ -20,7 +20,6 @@ MODEL_KEYS = (
     "AGENT_FAST_FIRST_RESPONSE_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
-    "AGENT_SOCIAL_ATTENTION_MODEL",
 )
 
 
@@ -216,7 +215,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3.5:9b")
         self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODEL"], "qwen3.5:9b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
@@ -232,13 +230,10 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_DEEP_PLANNER_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "32768")
         self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "32768")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
@@ -306,7 +301,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_FAST_FIRST_RESPONSE_MODEL",
             "AGENT_DEEP_PLANNER_MODEL",
             "AGENT_TASK_CONTINUITY_MODEL",
-            "AGENT_SOCIAL_ATTENTION_MODEL",
             "AGENT_SKILL_SELECTION_MODEL",
             "TTS_COSYVOICE_OLLAMA_MODEL",
         ):
@@ -330,11 +324,9 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
             "AGENT_TASK_CONTINUITY_NUM_CTX",
-            "AGENT_SOCIAL_ATTENTION_NUM_CTX",
             "AGENT_SKILL_SELECTION_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "160")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "8000")
@@ -344,7 +336,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "9000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "15000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "2500")
 
     def test_primary_gpu_profiles_do_not_own_foreground_latency(self) -> None:
         retired_profile_owned_budgets = {
@@ -419,9 +410,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_CTX"], "32768")
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_CTX"], "40960")
         self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
@@ -663,7 +651,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_FAST_PLANNER_MODEL": "shared-fast",
             "AGENT_FAST_FIRST_RESPONSE_MODEL": "shared-fast",
             "AGENT_DEEP_PLANNER_ENABLED": "0",
-            "AGENT_SOCIAL_ATTENTION_MODE": "off",
         }
 
         result = subprocess.run(

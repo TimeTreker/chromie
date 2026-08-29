@@ -498,6 +498,12 @@ lanes, semantic authority, runtime topology, provider/hardware revisions, and
 sample count. Optional Social Attention lifecycle evidence distinguishes proposal,
 Host materialization, Provider acceptance/completion, and safe idle.
 
+This is a logical behavior-domain track. Its adapter must exercise the ordinary
+Fast/Deep Planner result and observe `auxiliary_activities[]`; it must not call or
+emulate a separate Social Attention semantic endpoint. The benchmark `off`,
+`report_only`, and `on` values are qualification conditions implemented by candidate
+availability/execution observation, not product runtime switches.
+
 Build a deterministic hard-gate report from retained E2E evidence with:
 
 ```bash

@@ -272,8 +272,8 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                         "timing": "parallel",
                         "requires_confirmation": False,
                         "metadata": {
-                            "source": "social_attention_plan",
-                            "auxiliary_social_attention": True,
+                            "source": "canonical_plan_auxiliary_activity",
+                            "auxiliary_plan_activity": True,
                         },
                     }
                 ],
@@ -327,8 +327,8 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                         "args": {},
                         "requires_confirmation": False,
                         "metadata": {
-                            "source": "social_attention_plan",
-                            "auxiliary_social_attention": True,
+                            "source": "canonical_plan_auxiliary_activity",
+                            "auxiliary_plan_activity": True,
                         },
                     }
                 ],

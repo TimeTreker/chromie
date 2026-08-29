@@ -170,7 +170,7 @@ def collect_observations(
         status = str((receipt or {}).get("status") or "planned")
         role = (
             "auxiliary_expression"
-            if metadata.get("auxiliary_social_attention") is True
+            if metadata.get("auxiliary_plan_activity") is True
             else "explicit_user_goal"
             if metadata.get("source_goal_ids")
             else "task_execution"

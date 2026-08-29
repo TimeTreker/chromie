@@ -341,7 +341,7 @@ class InteractionLedger:
         recorded: list[InteractionLedgerEvent] = []
         for request in requests:
             metadata = request.metadata
-            social = metadata.get("auxiliary_social_attention") is True
+            social = metadata.get("auxiliary_plan_activity") is True
             vocal = (
                 metadata.get("execution_lane") == "vocal" and not social
             )
@@ -490,7 +490,7 @@ class InteractionLedger:
         requests_by_id = {
             item.request_id: item
             for item in requests
-            if item.metadata.get("auxiliary_social_attention") is True
+            if item.metadata.get("auxiliary_plan_activity") is True
         }
         recorded: list[InteractionLedgerEvent] = []
         for result in results:

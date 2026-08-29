@@ -19,19 +19,20 @@ confidence/unresolved meaning. No route/intent compatibility projection exists o
 maintained Core handoff. Retained source-bound live-text and MuJoCo evidence remains open.
 
 
-## One Core, two execution lanes, and background Social Attention
+## One Core, two execution lanes, and Planner-owned social decoration
 
 The Goal-Driven Cognitive Core remains the single semantic authority. The
 maintained runtime has two execution lanes: **Vocal** and **Activity**. Social
-Attention is not a third lane. It is background social cognition that may add
-small optional embodied decoration around an already-anchored interaction.
+Attention is not a third lane or another cognitive stage. It is a behavior domain
+from which the primary Planner may add small optional embodied decoration around
+an already-authored Main Activity.
 Accepted decoration executes through Activity with explicit auxiliary metadata
 and no Goal-completion authority.
 
 Planner may author explicit best-effort lane coordination only between Vocal
-and Activity around parallel Canonical Plan work. It does not author a
-`SocialAttentionPlan`. `SocialAttentionPlanner` is the single semantic owner of
-optional decoration; Social Attention never appears in `LaneCoordinationGroup`,
+and Activity around parallel Canonical Plan work. The same Planner primary result
+owns optional `auxiliary_activities[]`; no separate social model reopens the Plan.
+Social Attention never appears in `LaneCoordinationGroup`,
 never authors response text, and never owns a user Responsibility. Provider metadata and the Trusted Capability Runtime remain
 authoritative for physical overlap. Soridormi is a peer Capability Provider
 below Activity and owns subtle-expression/body concurrency and physical safety
@@ -819,12 +820,13 @@ planner tier.
 }
 ```
 
-### 4.7 Social attention plan
+### 4.7 Auxiliary Plan activities
 
-An auxiliary interaction plan describing optional nonverbal attention. It is
-authored only by the background `SocialAttentionPlanner`, never by Response
-Composer or Planner. Malformed output fails soft to no decoration and is not
-repaired because the opportunity is optional.
+`CanonicalPlan.auxiliary_activities[]` describes optional nonverbal decoration
+authored in the same primary Planner result as its Main Activity. It is canonical
+fingerprinted Plan truth but structurally carries no Goal ownership or completion
+authority. Malformed output fails soft to no decoration and is not repaired because
+the expression is optional.
 
 It is not a user goal unless the user explicitly requested the behavior; in that
 case the requested behavior is ordinary primary Activity instead.
@@ -1770,12 +1772,11 @@ Goal Association is therefore always the sole canonical Responsibility/continuit
 boundary. It runs concurrently rather than acting as a wall-clock gate. Fast
 Planner is the
 exclusive intention-forming owner of Capability selection and executable arguments.
-Fast Planner owns each still-needed communicative delta. Background
-`SocialAttentionPlanner` is the single
-place that may decide optional decoration for a concrete primary observable
-Activity; cognition milestones do not create anchors. Social Attention still never
-owns response wording. Provider observations are cognition events, not merely
-terminal inputs to a speech formatter.
+Fast Planner owns each still-needed communicative delta and any optional decoration
+for its concrete primary observable Activities in that same result; cognition
+milestones do not create anchors. Decoration never independently owns response
+wording. Provider observations are cognition events, not merely terminal inputs to
+a speech formatter.
 
 The implemented Fast substrate covers provider-neutral Responsibility evidence,
 immediate native conversation, explicit Goal binding, Planner-owned Capability
@@ -2677,139 +2678,77 @@ reconstructs action meaning from capability-specific phrase templates.
 
 ## 12. Social interaction layer
 
-### 12.1 Social Attention is a behavior domain
+### 12.1 One Planner result, two structural roles
 
-A turn may have an immutable user task plan, independent response language, and
-zero or more optional Social Attention opportunities, one for each concrete
-**semantic** primary human-observable Activity. Primary Activity answers what
-Chromie is doing; response speech, Vocal modes, execution lanes, provider requests,
-and Capability IDs are realization facts beneath that meaning. These are not
-authored as one compound object. `SocialAttentionPlanner` alone authors each
-decoration plan. Social Attention is not one skill and not a deterministic
-utterance-to-gesture mapping; it is optional body expression or deliberate
-stillness attached to a primary Activity.
-
-The related shapes are:
+A primary Fast or Deep Planner result may contain both Goal-owned Main Activities
+and optional social decoration. `steps[]` remains Goal-owned Work;
+`auxiliary_activities[]` is separate, bounded, subordinate Plan truth. Both enter
+the canonical Plan fingerprint, but only `steps[]` can advance Goal completion.
 
 ```text
-Canonical User Task Plan          -> primary responsibility
-Response Plan                     -> Vocal/user-facing meaning
-SocialAttentionPlan               -> optional body decoration only
+Planner primary result
+  +-- Main Activities / steps[]       Goal-owned
+  `-- auxiliary_activities[]          no Goal ownership
 ```
+
+Fast First Response has no auxiliary output surface. Fast Advance and canonical
+Fast/Deep planning may emit auxiliary activities in their single primary model
+invocation. There is no post-response Social Attention model, endpoint, or
+background decision worker.
 
 ### 12.2 Explicit Activity and auxiliary social decoration
 
-A concrete user request such as "blink twice" or "look at me" remains an
-explicit CanonicalPlan Activity responsibility. It is non-droppable and cannot
-be replaced with a more convenient gesture.
+A concrete user request such as “blink twice” or “look at me” remains an explicit
+Goal-owned Plan step. It is non-droppable and cannot be replaced by a convenient
+gesture. The same Capability may be optional decoration only when the Planner
+places it in `auxiliary_activities[]` under a different Main Activity anchor.
 
-`SocialAttentionPlan` is different. It exists only for optional decoration
-around one concrete `primary_activity` anchor. Its `interaction_role=auxiliary_expression`
-means auxiliary embodied expression; it does not represent another speech
-channel. Decoration may support acknowledgement, listening, engagement, empathy,
-turn taking, deference, or neutral presence, but cannot satisfy, replace,
-authorize, delay, or claim completion of a user Goal.
+Decoration may support acknowledgement, engagement, empathy, turn taking,
+deference, or neutral presence. It cannot satisfy, replace, authorize, delay, or
+claim completion of a Goal. Empty auxiliary output is normal and complete.
 
-### 12.3 Model authority
+### 12.3 Planner and Runtime authority
 
-The Social Attention model receives the exact `primary_activity` anchor, bounded
-interaction context, target evidence, owner-approved Social Interaction Style,
-recent decoration evidence, and exact catalog candidates tagged with the
-`social_attention` behavior domain. It owns:
+The primary Planner receives exact eligible catalog candidates, target evidence,
+owner-approved Social Interaction Style, recent auxiliary evidence, and the Main
+Activity in the same request that authors the Plan. It alone chooses whether to
+decorate, and if so the exact Capability, arguments, anchor, social function, and
+target.
 
-- whether small embodied decoration is useful now;
-- the social purpose;
-- exact eligible body Capability IDs, arguments, timing, social function, and
-  target; and
-- the choice between a body decoration and `decision=none`.
+Runtime validates catalog membership, schema, anchor identity, current target
+evidence, availability, confirmation, safety, low-level-field exclusion,
+parallelism, duplicate-primary rejection, resource conflicts, repetition, and
+bounded count. Runtime can execute the exact proposal or drop it. It cannot select
+a replacement Capability, retarget it, rewrite arguments, generate a gesture, or
+infer social intent. Malformed or stale decoration therefore fails soft without a
+repair/review model call.
 
-It does **not** own speech text, speech style, response semantics, Goal meaning,
-provider identity, or motor implementation. Planner retains language authority
-independently of Social Attention.
-No other model stage may author a competing Social Attention decision.
+An auxiliary-only target change, invalidation, execution result, or new decorative
+possibility cannot construct a `CognitiveOpportunity`: its schema requires real
+non-empty Goal ownership, which decoration does not have. A separate Goal-relevant
+state transition may re-enter the same Planner normally, and that new primary Plan
+may contain a fresh auxiliary choice.
 
-The Host does not map purposes or user phrases to gestures. It validates catalog
-membership, schemas, target evidence, resource conflicts, confirmation and
-safety policy, low-level-field exclusion, auxiliary limits, and execution
-evidence. Provider/backend/calibration identity is stripped from the model-facing
-candidate projection. A malformed Social Attention DTO fails soft to no
-decoration with no repair or second model call.
-
-### 12.4 Capability taxonomy is not planning
+### 12.4 Capability taxonomy, target, and execution
 
 Capabilities may declare multiple behavior domains. Gaze, blink, nod, head
-orientation, posture, and other qualified subtle body behaviors can be Social
-Attention candidates, but the same Capability can be primary Activity when it
-is explicitly requested. The owning semantic reason, not the actuator, decides
-whether work is primary or decorative.
+orientation, posture, and other qualified subtle behavior can be candidates when
+tagged `social_attention`, but the owning structural role—not the actuator—decides
+whether work is primary or decorative. Provider/backend/calibration identity and
+low-level motor fields are absent from model-facing candidates.
 
-`capabilities/behavior_domains.json` supplies semantic taxonomy; simulator or
-hardware provider metadata never participates in candidate discovery or social
-policy. Soridormi backends preserve named-skill and semantic-argument contracts.
-Backend selection, controller adaptation, calibration, motion limits, collision
-safety, stop, and recovery remain provider responsibilities.
-
-### 12.5 Primary Activity anchor, target evidence, and conflict policy
-
-Social Attention requires a concrete **semantic** primary human-observable
-Activity anchor: greet Alice, tell a joke, walk toward someone, sing a song, hand
-over water, show/play something, and similar outward behavior. The anchor answers
-**what Chromie is doing**. Its `realization` answers **how** that same Activity is
-currently expressed: `Vocal`/`Activity` execution lanes, execution-item IDs, exact
-Capability IDs, and any Vocal Expression modes. Speaking (`mode=speech`),
-expressive speech, recitation, singing, humming, and nonverbal vocalization are
-modes of one Vocal Expression; they are not peer Primary-Activity kinds.
-
-Responsibility/Goal meaning is **above** Activity identity. After Goal Association,
-concrete Primary Activities follow canonical Work/Plan granularity: a Communicative
-Act is one semantic Activity, and executable provider work is projected at canonical
-Plan-step granularity. One Goal may therefore own several Activities—for example a
-`bring water` Responsibility may require walking, acquiring, returning, and handover
-Activities when only low-level providers are available. If a qualified provider later
-exposes one atomic `bring water` capability/workflow, the Planner may instead keep
-that behavior as one Activity. This is the same dynamic capability boundary used by
-the rest of Chromie.
-
-Before Goal Association, a concrete scheduled Communicative Act such as an
-acknowledgement may temporarily anchor Social Attention from its semantic function
-and independently realized wording,
-while its realization records only `Vocal Expression(mode=speech)`. After planning,
-Plan-step `reason_summary`/ownership provide Activity meaning; request IDs and exact
-Capability IDs remain realization evidence. `InteractionResponse` is a coordination
-envelope, not an Activity ontology, and execution items must never be promoted into
-Primary Activity identity.
-
-`understanding_ready`, Goal Association, planning, waiting, evidence arrival, lane
-transitions, and similar internal cognitive/runtime milestones cannot provide
-Activity meaning. Pure unanchored idle animation is a separate embodiment/liveliness
-concern. Each distinct semantic primary Activity in one turn is an independent
-optional decoration opportunity; multiple execution items realizing that Activity
-do not multiply opportunities.
-
-Target priority is:
-
-1. live perceived user;
-2. structured conversational target;
-3. no targeted behavior.
-
-Chromie never accepts installation calibration or body coordinates as target
-evidence. Soridormi resolves the semantic target for its active embodiment.
-
-Invalid, sequential, unavailable, repetitive, unnecessary, or conflicting
-auxiliary body decoration is dropped. There is no Social-Attention speech
-fallback: dropping decoration leaves ResponsePlan/Vocal output unchanged.
-Decoration never delays speech, emergency handling, or primary task execution.
-The Social Interaction Style controls frequency/restraint, and recent accepted or terminal decoration evidence supports repetition control for
-the same primary Activity without becoming Goal completion evidence. Decoration
-on one primary Activity does not globally suppress a later distinct Activity in
-the same turn.
+Valid anchors are semantic human-observable Planner Activities: a Communicative
+Act, canonical Plan response, or Plan step. Internal milestones such as
+understanding ready, Goal Association, planning, waiting, Work start, Evidence
+arrival, or lane transitions are never anchors. Target priority is fresh perceived
+interaction target, structured conversational target, then no target. Runtime drops
+a stale target rather than choosing another person.
 
 Accepted decoration executes through Activity with
-`auxiliary_social_attention=true` and `execution_role=social_decoration`.
-`LaneCoordinationGroup` remains Vocal/Activity only; Social Attention decoration
-does not carry `coordination_id`. Same-provider body overlap is compiled and
-validated from the actual runtime batch and provider concurrency/safety
-contracts.
+`source=canonical_plan_auxiliary_activity`, `auxiliary_plan_activity=true`,
+`execution_role=social_decoration`, and empty `source_goal_ids`. It is recorded as
+auxiliary evidence but never completion Evidence. Failure never delays or changes
+Vocal output, emergency handling, or primary Work.
 
 See [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md).
 
@@ -3133,12 +3072,11 @@ only the maintained delivery lifecycle proves that the user was actually told.
 Internal modules, schemas, provider plumbing, planning mechanics, and ordinary
 low-level steps are not milestones merely because they occurred.
 
-Every ready human-observable Communicative Act is also an eligible Social
-Attention anchor, whether it is the first Goal Progress Communication act or a
-post-Evidence, failure, correction, or completion response. Social Attention remains
-an optional peer decoration lane and may choose `none`; speech never requires a
-gesture. Conversely, a tool lookup or an internal cognition milestone is not promoted
-into a Social Attention anchor merely because it happened.
+Every ready human-observable Communicative Act may be an auxiliary-activity anchor
+when it is present in the owning Fast Advance or canonical Fast/Deep Planner result.
+Fast First Response alone has no auxiliary surface. Empty decoration is normal and
+speech never requires a gesture. Conversely, a tool lookup or internal cognition
+milestone is not promoted into an anchor merely because it happened.
 
 Each Communicative Act has one Planner wording owner and one downstream delivery owner,
 with deterministic authority, evidence, cancellation, and delivery validation. The architecture does not add a
@@ -3207,9 +3145,8 @@ Goal updates:
 The individual goals remain separately tracked even when speech is consolidated.
 
 The model-facing Fast-Planner contract carries exact wording, truth stage,
-Evidence references, Vocal/Activity timing, and Goal coverage constrained to the
-immutable Goal/Plan snapshot. Social Attention is absent and is authored
-independently by `SocialAttentionPlanner` for that same Main Activity. On terminal
+Evidence references, Vocal/Activity timing, Goal coverage, and optional bounded
+`auxiliary_activities[]` constrained to the immutable Goal/Plan snapshot. On terminal
 Capability Evidence the Host reactivates Fast Planner with the exact Goal/Evidence
 snapshot; there is no post-execution wording model. The Host retains the Planner,
 canonical Plan, and execution-outcome fingerprints. A mechanically malformed Plan
@@ -3426,7 +3363,7 @@ Deliver:
 
 - multi-Goal Planner communication;
 - validated response commitments;
-- independent social attention plan;
+- Planner-owned auxiliary social activities;
 - target-evidence and resource-conflict validation;
 - latency-bounded optional behavior.
 

@@ -13,6 +13,7 @@ try:
         GoalOutcomeDisposition,
         GoalSatisfactionAssessment,
         GoalSatisfactionStatus,
+        AuxiliaryPlanActivity,
         PlanCoverage,
         PlanDisposition,
         PlanParameterResolution,
@@ -27,6 +28,7 @@ except ImportError:  # pragma: no cover
         GoalOutcomeDisposition,
         GoalSatisfactionAssessment,
         GoalSatisfactionStatus,
+        AuxiliaryPlanActivity,
         PlanCoverage,
         PlanDisposition,
         PlanParameterResolution,
@@ -229,6 +231,10 @@ class PlannerModelOutput(BaseModel):
     goal_summary: str = ""
     response_text: str = ""
     steps: list[PlannerModelStep] = Field(default_factory=list)
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
+        default_factory=list,
+        max_length=3,
+    )
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
@@ -296,6 +302,38 @@ class PlannerModelOutput(BaseModel):
             )
         if self.coverage != "complete" and self.steps:
             raise ValueError("non-complete planner output must not carry executable steps")
+        if self.disposition == "escalate" and self.auxiliary_activities:
+            raise ValueError(
+                "an escalating Planner result cannot author auxiliary Activities"
+            )
+        step_ids = {step.step_id for step in self.steps if step.step_id}
+        primary_capability_ids = {step.capability_id for step in self.steps}
+        auxiliary_ids = [
+            item.auxiliary_activity_id for item in self.auxiliary_activities
+        ]
+        if len(auxiliary_ids) != len(set(auxiliary_ids)):
+            raise ValueError("Planner auxiliary Activity IDs must be unique")
+        for auxiliary in self.auxiliary_activities:
+            if auxiliary.anchor_kind == "plan_step" and auxiliary.anchor_id not in step_ids:
+                raise ValueError(
+                    "Planner auxiliary Activity references an unknown plan step"
+                )
+            if auxiliary.anchor_kind == "communicative_act":
+                raise ValueError(
+                    "flat Planner output has no communicative-act identity; use "
+                    "anchor_kind=plan_response for response_text"
+                )
+            if auxiliary.anchor_kind == "plan_response" and (
+                auxiliary.anchor_id != "response" or not self.response_text.strip()
+            ):
+                raise ValueError(
+                    "plan_response auxiliary Activity requires anchor_id=response "
+                    "and Planner-owned response_text"
+                )
+            if auxiliary.capability_id in primary_capability_ids:
+                raise ValueError(
+                    "an auxiliary Activity cannot duplicate a primary Plan Capability"
+                )
         if self.disposition == "execute" and not self.steps:
             raise ValueError("execute planner output requires at least one step")
         if self.disposition == "mixed" and (not self.steps or not self.goal_outcomes):

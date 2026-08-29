@@ -41,6 +41,7 @@ from shared.chromie_contracts.interaction import (
 from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
+    AuxiliaryPlanActivity,
     CanonicalPlan,
     CanonicalPlanStep,
     ClarifyGoalPlanOutcome,
@@ -58,13 +59,6 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
-from shared.chromie_contracts.social_attention import (
-    SocialAttentionActivityAnchor,
-    SocialAttentionActivityRealization,
-    SocialAttentionPlan,
-    SocialAttentionRequest,
-    normalize_social_attention_mode,
-)
 from shared.chromie_contracts.user_turn import (
     AttentionReviewResult,
     GatewayContextSnapshot,
@@ -163,7 +157,6 @@ class _FastAdvanceStageResult:
     ready_capability_execution: Any | None
     ready_capability_status: str
     communicative_realization_status: str
-    social_attention_opportunity_delta: int
     ready_communicative_executions: tuple[Any, ...]
     vocal_activity_ids: tuple[str, ...]
 
@@ -184,11 +177,6 @@ class CognitiveAgentClient(Protocol):
     async def resolve_reflection(
         self, session: Any, **kwargs: Any
     ) -> ReflectionResolution: ...
-
-    async def resolve_social_attention(
-        self, session: Any, **kwargs: Any
-    ) -> SocialAttentionPlan: ...
-
 
 class CognitiveEvidenceRecorder:
     """Append-only operational evidence and in-process rollout counters."""
@@ -448,14 +436,9 @@ class CanonicalPlanRuntimeAdapter:
         self,
         interaction_runtime: Any,
         *,
-        social_attention_mode: str = "on",
         recent_auxiliary_evidence_limit: int = 12,
     ) -> None:
         self.interaction_runtime = interaction_runtime
-        self.social_attention_mode = normalize_social_attention_mode(
-            social_attention_mode,
-            default="on",
-        )
         self._recent_auxiliary_behavior_evidence: deque[dict[str, Any]] = deque(
             maxlen=max(1, int(recent_auxiliary_evidence_limit))
         )
@@ -477,7 +460,7 @@ class CanonicalPlanRuntimeAdapter:
         *,
         session_id: str,
     ) -> None:
-        if not request.metadata.get("auxiliary_social_attention"):
+        if not request.metadata.get("auxiliary_plan_activity"):
             return
         if any(
             item.get("request_id") == request.request_id
@@ -493,9 +476,13 @@ class CanonicalPlanRuntimeAdapter:
                 "request_id": request.request_id,
                 "capability_id": request.capability_id,
                 "semantic_args": dict(request.args),
-                "purpose": request.metadata.get("social_attention_purpose"),
+                "social_function": request.metadata.get("social_function"),
                 "turn_id": request.metadata.get("turn_id"),
-                "primary_activity_id": request.metadata.get("primary_activity_id"),
+                "anchor_kind": request.metadata.get("anchor_kind"),
+                "anchor_id": request.metadata.get("anchor_id"),
+                "auxiliary_activity_id": request.metadata.get(
+                    "auxiliary_activity_id"
+                ),
                 "primary_activity_goal_ids": list(
                     request.metadata.get("primary_activity_goal_ids") or []
                 ),
@@ -506,7 +493,6 @@ class CanonicalPlanRuntimeAdapter:
                     request.metadata.get("primary_activity_vocal_modes") or []
                 ),
                 "canonical_plan_id": request.metadata.get("canonical_plan_id"),
-                "policy_mode": request.metadata.get("social_attention_policy_mode"),
             }
         )
 
@@ -699,11 +685,57 @@ class CanonicalPlanRuntimeAdapter:
         return errors
 
     @staticmethod
-    def _attention_target_error(attention: Any, context: dict[str, Any]) -> str | None:
+    def _current_auxiliary_target_evidence(
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Project current trusted target semantics without selecting a target."""
+
+        for key in (
+            "auxiliary_social_target",
+            "social_attention_target",
+            "active_user_target",
+            "perceived_user_target",
+        ):
+            value = context.get(key)
+            if not isinstance(value, dict) or not value:
+                continue
+            explicit_source = str(value.get("source") or "").strip()
+            source = (
+                explicit_source
+                if explicit_source in {"live_perception", "conversation_context"}
+                else "live_perception"
+                if "perception" in key or "perceived" in key
+                else "conversation_context"
+            )
+            raw_target = value.get("target")
+            target = dict(raw_target) if isinstance(raw_target, dict) else dict(value)
+            return {
+                "available": True,
+                "source": source,
+                "target": {
+                    name: target[name]
+                    for name in (
+                        "target_ref",
+                        "relative_direction",
+                        "confidence",
+                        "evidence_refs",
+                    )
+                    if name in target
+                },
+            }
+        return {"available": False}
+
+    @staticmethod
+    def _attention_target_error(
+        attention: AuxiliaryPlanActivity,
+        context: dict[str, Any],
+    ) -> str | None:
         target = attention.target
         if target.source == "none":
             return None
-        evidence = context.get("social_attention_target_evidence")
+        evidence = CanonicalPlanRuntimeAdapter._current_auxiliary_target_evidence(
+            context
+        )
         if not isinstance(evidence, dict) or not evidence.get("available"):
             return "attention_target_not_available"
         if str(evidence.get("source") or "") != target.source:
@@ -729,7 +761,9 @@ class CanonicalPlanRuntimeAdapter:
         semantic_keys = {"direction", "relative_direction", "target_ref"}
         if not semantic_keys.intersection(args):
             return None
-        evidence = context.get("social_attention_target_evidence")
+        evidence = CanonicalPlanRuntimeAdapter._current_auxiliary_target_evidence(
+            context
+        )
         if not isinstance(evidence, dict) or not evidence.get("available"):
             return "targeted_behavior_requires_semantic_evidence"
         target = evidence.get("target")
@@ -778,64 +812,37 @@ class CanonicalPlanRuntimeAdapter:
                 return True
         return False
 
-    async def execute_social_attention_event(
+    async def execute_auxiliary_activities(
         self,
         *,
-        plan: SocialAttentionPlan,
+        plan: CanonicalPlan,
         session_id: str,
         turn_id: str,
-        event: str,
+        interaction: InteractionResponse | None,
         context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Validate and execute one background Social-Attention decoration proposal.
+        """Validate and execute Planner-owned optional social decoration.
 
-        This path has no Goal-completion authority and never waits on or rewrites
-        the primary response.  It reuses the same Trusted Capability Runtime as
-        ordinary Activity work.
+        Runtime may accept or suppress the exact proposal. It never reselects the
+        Capability, target, arguments, social function, or primary anchor. The
+        resulting Activity has no Goal-completion or cognition-reentry authority.
         """
 
-        if self.social_attention_mode != "on" or plan.decision != "express":
+        if not plan.auxiliary_activities:
             return {
                 "status": "not_executed",
-                "decision": plan.decision,
-                "event": event,
                 "materialized_count": 0,
+            }
+        if interaction is None:
+            return {
+                "status": "rejected",
+                "materialized_count": 0,
+                "reasons": ["primary_interaction_not_materialized"],
             }
         runtime_context = dict(context or {})
-        try:
-            primary_activity = SocialAttentionActivityAnchor.model_validate(
-                runtime_context.get("social_attention_primary_activity")
-            )
-        except (ValidationError, TypeError, ValueError):
-            return {
-                "status": "rejected",
-                "decision": plan.decision,
-                "event": event,
-                "materialized_count": 0,
-                "reasons": ["missing_or_invalid_primary_activity_anchor"],
-            }
-        target_error = self._attention_target_error(plan, runtime_context)
-        if target_error:
-            return {
-                "status": "rejected",
-                "decision": plan.decision,
-                "event": event,
-                "materialized_count": 0,
-                "reasons": [target_error],
-            }
-
         requests: list[CapabilityRequest] = []
         reasons: list[str] = []
-        interaction_state = runtime_context.get("social_attention_interaction_state")
-        if not isinstance(interaction_state, dict):
-            interaction_state = {}
-        raw_primary_ids = interaction_state.get("primary_capability_ids")
-        primary_capability_ids = {
-            str(item).strip()
-            for item in raw_primary_ids
-            if str(item).strip()
-        } if isinstance(raw_primary_ids, list) else set()
-        primary_capability_ids.update(primary_activity.realization.capability_ids)
+        primary_capability_ids = {step.capability_id for step in plan.steps}
         primary_definitions: dict[str, Any] = {}
         unresolved_embodied_primary_ids: set[str] = set()
         for capability_id in sorted(primary_capability_ids):
@@ -860,9 +867,32 @@ class CanonicalPlanRuntimeAdapter:
                 {"physical_motion", "visual_expression", "social_expression"}
             ):
                 primary_definitions[capability_id] = primary_definition
+        communicative_ids = {item.activity_id for item in plan.communicative_acts}
+        step_ids = {item.step_id for item in plan.steps}
+        has_plan_response = bool(
+            plan.response_text or any(item.response_text for item in plan.goal_outcomes)
+        )
         seen: set[str] = set()
-        for index, behavior in enumerate(plan.behaviors):
+        for index, behavior in enumerate(plan.auxiliary_activities):
             try:
+                anchor_valid = (
+                    behavior.anchor_id in step_ids
+                    if behavior.anchor_kind == "plan_step"
+                    else behavior.anchor_id in communicative_ids
+                    if behavior.anchor_kind == "communicative_act"
+                    else behavior.anchor_id == "response" and has_plan_response
+                )
+                if not anchor_valid:
+                    reasons.append(
+                        f"stale_or_invalid_anchor:{behavior.auxiliary_activity_id}"
+                    )
+                    continue
+                target_error = self._attention_target_error(behavior, runtime_context)
+                if target_error:
+                    reasons.append(
+                        f"target_error:{behavior.capability_id}:{target_error}"
+                    )
+                    continue
                 if behavior.capability_id in primary_capability_ids:
                     reasons.append(
                         f"duplicates_primary_activity:{behavior.capability_id}"
@@ -886,7 +916,18 @@ class CanonicalPlanRuntimeAdapter:
                     reasons.append(f"not_social_attention:{behavior.capability_id}")
                     continue
                 if behavior.capability_id in seen:
-                    reasons.append(f"duplicate_social_skill:{behavior.capability_id}")
+                    reasons.append(f"duplicate_auxiliary_capability:{behavior.capability_id}")
+                    continue
+                if any(
+                    item.get("session_id") == session_id
+                    and item.get("canonical_plan_id") == plan.plan_id
+                    and item.get("anchor_id") == behavior.anchor_id
+                    and item.get("capability_id") == behavior.capability_id
+                    for item in self._recent_auxiliary_behavior_evidence
+                ):
+                    reasons.append(
+                        f"duplicate_auxiliary_dispatch:{behavior.capability_id}"
+                    )
                     continue
                 if not definition.available:
                     reasons.append(f"unavailable:{behavior.capability_id}")
@@ -929,10 +970,10 @@ class CanonicalPlanRuntimeAdapter:
                     continue
                 schema_digest = output_schema_sha256(definition.output_schema)
                 digest = hashlib.sha256(
-                    f"{turn_id}|{primary_activity.activity_id}|{event}|{index}|{behavior.capability_id}".encode("utf-8")
+                    f"{turn_id}|{plan.plan_id}|{behavior.auxiliary_activity_id}|{index}|{behavior.capability_id}".encode("utf-8")
                 ).hexdigest()[:20]
                 request = CapabilityRequest(
-                    request_id=f"social_{digest}",
+                    request_id=f"aux_{digest}",
                     capability_id=behavior.capability_id,
                     capability_version=definition.version,
                     args=dict(behavior.args),
@@ -941,7 +982,7 @@ class CanonicalPlanRuntimeAdapter:
                     cancellable=definition.interruptible,
                     requires_confirmation=False,
                     idempotency_key=(
-                        f"{turn_id}:social:{primary_activity.activity_id}:{event}:{index}"
+                        f"{turn_id}:aux:{plan.plan_id}:{behavior.auxiliary_activity_id}"
                     ),
                     committed_output_schema_sha256=schema_digest,
                     committed_completion_evidence_sha256=(
@@ -952,28 +993,25 @@ class CanonicalPlanRuntimeAdapter:
                         else None
                     ),
                     metadata={
-                        "source": "social_attention_plan",
-                        "auxiliary_social_attention": True,
+                        "source": "canonical_plan_auxiliary_activity",
+                        "auxiliary_plan_activity": True,
                         "behavior_domain": "social_attention",
                         "interaction_role": "auxiliary_expression",
-                        "social_attention_event": event,
-                        "social_attention_purpose": plan.purpose,
                         "social_function": behavior.social_function,
-                        "target": plan.target.model_dump(mode="json", exclude_none=True),
-                        "reason": behavior.reason,
-                        "social_attention_policy_mode": self.social_attention_mode,
+                        "target": behavior.target.model_dump(
+                            mode="json", exclude_none=True
+                        ),
+                        "reason": behavior.reason_summary,
                         "execution_lane": "activity",
                         "execution_role": "social_decoration",
                         "source_goal_ids": [],
                         "turn_id": turn_id,
-                        "primary_activity_id": primary_activity.activity_id,
-                        "primary_activity_goal_ids": list(primary_activity.goal_ids),
-                        "primary_activity_execution_lanes": list(
-                            primary_activity.realization.execution_lanes
-                        ),
-                        "primary_activity_vocal_modes": list(
-                            primary_activity.realization.vocal_modes
-                        ),
+                        "canonical_plan_id": plan.plan_id,
+                        "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
+                        "auxiliary_activity_id": behavior.auxiliary_activity_id,
+                        "anchor_kind": behavior.anchor_kind,
+                        "anchor_id": behavior.anchor_id,
+                        "primary_activity_goal_ids": [],
                     },
                 )
                 requests.append(request)
@@ -985,29 +1023,19 @@ class CanonicalPlanRuntimeAdapter:
         if not requests:
             return {
                 "status": "rejected" if reasons else "not_executed",
-                "decision": plan.decision,
-                "event": event,
                 "materialized_count": 0,
                 "reasons": reasons,
             }
-        interaction_id = (
-            f"social_{turn_id}_"
-            f"{hashlib.sha256(primary_activity.activity_id.encode('utf-8')).hexdigest()[:10]}"
-        )
+        interaction_id = f"aux_{turn_id}_{hashlib.sha256(plan.plan_id.encode('utf-8')).hexdigest()[:10]}"
         response_metadata: dict[str, Any] = {
-            "source": "continuous_social_attention",
-            "auxiliary_social_attention": True,
+            "source": "canonical_plan_auxiliary_activities",
+            "auxiliary_plan_activity": True,
             "turn_id": turn_id,
             "session_id": session_id,
-            "social_attention_event": event,
-            "primary_activity_id": primary_activity.activity_id,
-            "primary_activity_goal_ids": list(primary_activity.goal_ids),
-            "primary_activity_execution_lanes": list(
-                primary_activity.realization.execution_lanes
-            ),
-            "primary_activity_vocal_modes": list(
-                primary_activity.realization.vocal_modes
-            ),
+            "canonical_plan_id": plan.plan_id,
+            "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
+            "source_goal_ids": [],
+            "cognitive_reentry_eligible": False,
         }
         envelope = runtime_context.get("user_turn_envelope")
         if isinstance(envelope, dict):
@@ -1025,8 +1053,6 @@ class CanonicalPlanRuntimeAdapter:
         execution = await self.interaction_runtime.wait_dispatch(dispatch)
         return {
             "status": execution.status,
-            "decision": plan.decision,
-            "event": event,
             "materialized_count": len(requests),
             "request_ids": [item.request_id for item in requests],
             "reasons": reasons,
@@ -2298,27 +2324,21 @@ class GoalDrivenRuntimeCoordinator:
             "interaction_ledger",
             None,
         )
-        self._auxiliary_tasks: set[asyncio.Task[Any]] = set()
-        self._social_attention_pending: dict[
-            tuple[str, str], dict[str, Any]
-        ] = {}
-        self._social_attention_workers: dict[
-            tuple[str, str], asyncio.Task[Any]
-        ] = {}
+        self._auxiliary_execution_tasks: set[asyncio.Task[Any]] = set()
 
-    def _track_auxiliary_task(self, task: asyncio.Task[Any]) -> None:
-        """Keep background social decoration alive without making it a turn-response barrier."""
+    def _track_auxiliary_execution_task(self, task: asyncio.Task[Any]) -> None:
+        """Retain fail-soft Runtime execution without creating cognition work."""
 
-        self._auxiliary_tasks.add(task)
+        self._auxiliary_execution_tasks.add(task)
 
         def _done(completed: asyncio.Task[Any]) -> None:
-            self._auxiliary_tasks.discard(completed)
+            self._auxiliary_execution_tasks.discard(completed)
             if completed.cancelled():
                 return
             exc = completed.exception()
-            if exc is not None:  # pragma: no cover - background-loop bug visibility guard
+            if exc is not None:  # pragma: no cover - task visibility guard
                 logger.warning(
-                    "auxiliary cognitive task failed task=%s error_type=%s error=%s",
+                    "auxiliary Activity execution failed task=%s error_type=%s error=%s",
                     completed.get_name(),
                     type(exc).__name__,
                     exc,
@@ -2326,478 +2346,111 @@ class GoalDrivenRuntimeCoordinator:
 
         task.add_done_callback(_done)
 
-    @staticmethod
-    def _fast_planner_communicative_social_activity(
-        activity: FastPlannerCommunicativeAct,
+    async def _execute_resolution_auxiliary_activities(
+        self,
         *,
-        ready_execution: Any | None = None,
-    ) -> SocialAttentionActivityAnchor:
-        """Use the Planner-authored Communicative Act as its own SA anchor.
-
-        Fast Planner already owns semantic Activity identity here. Do not wait for
-        a later context projection to rediscover scheduled speech, and do not
-        promote the underlying cognition milestone into a social Activity.
-        """
-
-        speech = getattr(ready_execution, "speech", None)
-        execution_item_id = str(getattr(speech, "id", "") or "").strip()
-        if not execution_item_id:
-            execution_item_id = f"fast_activity_speech_{activity.activity_id}"
-        return SocialAttentionActivityAnchor(
-            activity_id=activity.activity_id,
-            phase="ready",
-            summary=" ".join(activity.text.strip().split())[:500],
-            realization=SocialAttentionActivityRealization(
-                execution_lanes=["vocal"],
-                vocal_modes=["speech"],
-                execution_item_ids=[execution_item_id],
-            ),
-        )
-
-    @staticmethod
-    def _scheduled_speech_social_activity(
-        context: dict[str, Any],
-        *,
-        turn_id: str,
-    ) -> SocialAttentionActivityAnchor | None:
-        """Project one scheduled Fast-Planner Communicative Act as a semantic Activity.
-
-        The act is not called a ``speech Activity``.  Speaking is only its Vocal
-        Expression realization; the text/purpose carries the outward semantic act.
-        """
-
-        rows = context.get("scheduled_turn_speech")
-        if not isinstance(rows, list):
-            return None
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            text = " ".join(str(row.get("text") or "").strip().split())
-            if not text:
-                continue
-            execution_item_id = " ".join(
-                str(row.get("speech_event_id") or "").strip().split()
-            )
-            purpose = " ".join(str(row.get("purpose") or "").strip().split())
-            commitment = " ".join(str(row.get("commitment") or "").strip().split())
-            identity_digest = hashlib.sha256(
-                "|".join(
-                    [turn_id, "scheduled_communicative_act", purpose, commitment, text]
-                ).encode("utf-8")
-            ).hexdigest()[:20]
-            if not execution_item_id:
-                execution_item_id = f"speech_{identity_digest}"
-            return SocialAttentionActivityAnchor(
-                activity_id=f"activity_{identity_digest}",
-                phase="ready",
-                summary=(f"{purpose}: {text}" if purpose else text),
-                realization=SocialAttentionActivityRealization(
-                    execution_lanes=["vocal"],
-                    vocal_modes=["speech"],
-                    execution_item_ids=[execution_item_id],
-                ),
-            )
-        return None
-
-    @staticmethod
-    def _resolution_social_activities(
         resolution: CognitiveRuntimeResolution,
-        *,
+        sid: str,
         turn_id: str,
-        context: dict[str, Any] | None = None,
-    ) -> list[SocialAttentionActivityAnchor]:
-        """Project prepared work into semantic primary Activities.
+        context: dict[str, Any],
+    ) -> None:
+        """Execute the exact terminal-Plan decoration after the main turn yields."""
 
-        The hierarchy is deliberately three-layered:
-
-        Responsibility/Goal -> semantic Activity/Work -> execution realization.
-
-        A Goal may own several Activities, while a sufficiently high-level provider
-        capability may realize one whole Activity atomically.  Interaction speech is
-        projected as a semantic Communicative Act; canonical Capability work is
-        projected at Plan-step granularity.  Vocal modes, execution lanes, request IDs,
-        and Capability IDs stay strictly below Activity identity as realization facts.
-        """
-
+        plan = resolution.terminal_plan
         interaction = resolution.interaction_response
-        if interaction is None:
-            return []
-        runtime_context = context if isinstance(context, dict) else {}
-
-        goal_summary_by_id: dict[str, str] = {}
-
-        def remember_goal(goal_id: Any, summary: Any) -> None:
-            normalized_id = " ".join(str(goal_id or "").strip().split())
-            normalized_summary = " ".join(str(summary or "").strip().split())
-            if normalized_id and normalized_summary and normalized_id not in goal_summary_by_id:
-                goal_summary_by_id[normalized_id] = normalized_summary
-
-        for key in ("active_goal_snapshots", "recent_goal_snapshots"):
-            rows = runtime_context.get(key)
-            if not isinstance(rows, list):
-                continue
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                goal = row.get("goal") if isinstance(row.get("goal"), dict) else {}
-                remember_goal(
-                    row.get("goal_id") or goal.get("goal_id"),
-                    goal.get("description") or row.get("last_user_update"),
-                )
-
-        if resolution.goal_association is not None:
-            for goal in resolution.goal_association.new_goals:
-                remember_goal(goal.goal_id, goal.description)
-
-        association_payload = runtime_context.get("goal_association_resolution")
-        if isinstance(association_payload, dict):
-            for row in association_payload.get("new_goals") or []:
-                if isinstance(row, dict):
-                    remember_goal(row.get("goal_id"), row.get("description"))
-
-        single_plan_goal_ids = (
-            list(resolution.terminal_plan.goal_ids)
-            if resolution.terminal_plan is not None
-            and len(resolution.terminal_plan.goal_ids) == 1
-            else []
-        )
-        fallback_goal_summary = (
-            " ".join(str(resolution.terminal_plan.goal_summary or "").strip().split())
-            if resolution.terminal_plan is not None
-            else ""
-        )
-
-        def item_goal_ids(metadata: dict[str, Any]) -> list[str]:
-            raw = metadata.get("source_goal_ids")
-            if not isinstance(raw, list):
-                raw = metadata.get("covers_goal_ids")
-            if not isinstance(raw, list):
-                return sorted(dict.fromkeys(single_plan_goal_ids))
-            normalized = [
-                text
-                for item in raw
-                if (text := " ".join(str(item or "").strip().split()))
-            ]
-            return sorted(dict.fromkeys(normalized)) or sorted(
-                dict.fromkeys(single_plan_goal_ids)
+        if plan is None or not plan.auxiliary_activities or interaction is None:
+            return
+        # Give the caller one event-loop turn to submit the primary InteractionResponse.
+        # This is scheduling only; no semantic decision is deferred to this task.
+        await asyncio.sleep(0)
+        started_ms = time.perf_counter() * 1000.0
+        try:
+            outcome = await self.adapter.execute_auxiliary_activities(
+                plan=plan,
+                session_id=sid,
+                turn_id=turn_id,
+                interaction=interaction,
+                context=context,
             )
-
-        def goal_context(goal_ids: list[str]) -> str:
-            summaries = [
-                goal_summary_by_id[item]
-                for item in goal_ids
-                if item in goal_summary_by_id
-            ]
-            if summaries:
-                return "; ".join(dict.fromkeys(summaries))[:420]
-            return fallback_goal_summary[:420]
-
-        activities: dict[str, dict[str, Any]] = {}
-
-        def get_activity(
-            *,
-            activity_id: str,
-            summary: str,
-            goal_ids: list[str],
-        ) -> dict[str, Any] | None:
-            normalized_summary = " ".join(str(summary or "").strip().split())[:500]
-            if not normalized_summary:
-                return None
-            return activities.setdefault(
-                activity_id,
-                {
-                    "activity_id": activity_id,
-                    "summary": normalized_summary,
-                    "goal_ids": list(goal_ids),
-                    "execution_lanes": [],
-                    "vocal_modes": [],
-                    "execution_item_ids": [],
-                    "capability_ids": [],
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # fail-soft optional execution boundary
+            self._record_workflow_stage(
+                sid=sid,
+                stage="auxiliary_activity_execution",
+                started_monotonic_ms=started_ms,
+                finished_monotonic_ms=time.perf_counter() * 1000.0,
+                status="failed",
+                input_payload={
+                    "canonical_plan_id": plan.plan_id,
+                    "auxiliary_activities": plan.auxiliary_activities,
+                },
+                output_payload=None,
+                errors=[{"error_type": type(exc).__name__}],
+                attempt=1,
+                metadata={
+                    "blocks_main_activity": False,
+                    "semantic_owner": "planner",
+                    "cognitive_reentry_eligible": False,
                 },
             )
-
-        def add_unique(row: dict[str, Any], field: str, value: str) -> None:
-            if value and value not in row[field]:
-                row[field].append(value)
-
-        for speech in interaction.speech:
-            text = " ".join(str(speech.text or "").strip().split())
-            if not text:
-                continue
-            goal_ids = item_goal_ids(speech.metadata)
-            speech_act = " ".join(
-                str(speech.metadata.get("speech_act") or "conversational_act")
-                .strip()
-                .split()
-            )
-            delivery_role = " ".join(
-                str(speech.metadata.get("delivery_role") or "response").strip().split()
-            )
-            phase = " ".join(str(speech.metadata.get("phase") or "").strip().split())
-            goal_meaning = goal_context(goal_ids)
-            summary = (
-                f"{speech_act}: {goal_meaning}"
-                if goal_meaning
-                else text
-            )
-            digest = hashlib.sha256(
-                "|".join(
-                    [
-                        turn_id,
-                        "communicative_act",
-                        *goal_ids,
-                        speech_act,
-                        delivery_role,
-                        phase,
-                        text,
-                    ]
-                ).encode("utf-8")
-            ).hexdigest()[:20]
-            row = get_activity(
-                activity_id=f"activity_{digest}",
-                summary=summary,
-                goal_ids=goal_ids,
-            )
-            if row is None:
-                continue
-            add_unique(row, "execution_lanes", "vocal")
-            add_unique(row, "vocal_modes", "speech")
-            add_unique(row, "execution_item_ids", speech.id)
-
-        for request in interaction.capabilities:
-            capability_id = str(request.capability_id or "").strip()
-            if not (
-                capability_id.startswith("soridormi.")
-                or capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
-                or capability_id.startswith("chromie.media.")
-            ):
-                continue
-            goal_ids = item_goal_ids(request.metadata)
-            reason_summary = " ".join(
-                str(request.metadata.get("reason_summary") or "").strip().split()
-            )
-            summary = reason_summary or goal_context(goal_ids)
-            if not summary:
-                # Activity meaning must come from semantic Goal/Plan evidence, never
-                # by decoding the Capability identifier in Host code.
-                continue
-            plan_id = " ".join(
-                str(request.metadata.get("canonical_plan_id") or "").strip().split()
-            )
-            step_id = " ".join(
-                str(request.metadata.get("step_id") or "").strip().split()
-            )
-            identity_material = (
-                f"plan_step|{plan_id}|{step_id}"
-                if plan_id and step_id
-                else "|".join(["semantic_work", *goal_ids, summary])
-            )
-            digest = hashlib.sha256(
-                f"{turn_id}|{identity_material}".encode("utf-8")
-            ).hexdigest()[:20]
-            row = get_activity(
-                activity_id=f"activity_{digest}",
-                summary=summary,
-                goal_ids=goal_ids,
-            )
-            if row is None:
-                continue
-            execution_lane = (
-                "vocal"
-                if capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
-                else "activity"
-            )
-            add_unique(row, "execution_lanes", execution_lane)
-            add_unique(row, "execution_item_ids", request.request_id)
-            add_unique(row, "capability_ids", capability_id)
-            if capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID:
-                vocal_mode = " ".join(str(request.args.get("mode") or "").strip().split())
-                if vocal_mode in VOCAL_MODES:
-                    add_unique(row, "vocal_modes", vocal_mode)
-
-        return [
-            SocialAttentionActivityAnchor(
-                activity_id=row["activity_id"],
-                phase="ready",
-                summary=row["summary"],
-                goal_ids=row["goal_ids"],
-                realization=SocialAttentionActivityRealization(
-                    execution_lanes=row["execution_lanes"],
-                    vocal_modes=row["vocal_modes"],
-                    execution_item_ids=row["execution_item_ids"],
-                    capability_ids=row["capability_ids"],
-                ),
-            )
-            for row in activities.values()
-        ]
-
-    def queue_interaction_social_attention(
-        self,
-        session: Any,
-        *,
-        response: InteractionResponse,
-        sid: str,
-        context: dict[str, Any],
-    ) -> None:
-        """Offer one ready user-facing response to optional Social Attention.
-
-        This is a presentation bridge only. It does not create speech, infer Goal
-        meaning, or force an expression; Social Attention may still choose ``none``.
-        """
-
-        metadata = response.metadata if isinstance(response.metadata, dict) else {}
-        bundle = metadata.get("execution_outcome_bundle")
-        bundle_turn_id = (
-            str(bundle.get("turn_id") or "").strip()
-            if isinstance(bundle, dict)
-            else ""
-        )
-        turn_id = (
-            str(metadata.get("turn_id") or "").strip()
-            or bundle_turn_id
-            or str(sid or response.interaction_id or "response").strip()
-        )
-        language = str(metadata.get("language") or "auto").strip() or "auto"
-        history = context.get("history")
-        if not isinstance(history, list):
-            history = []
-        user_text = ""
-        for item in reversed(history):
-            if not isinstance(item, dict) or item.get("role") != "user":
-                continue
-            user_text = str(item.get("text") or "").strip()
-            if user_text:
-                break
-        projection = CognitiveRuntimeResolution(
-            mode="apply",
-            status="applied",
-            interaction_response=response,
-        )
-        for activity in self._resolution_social_activities(
-            projection, turn_id=turn_id, context=context
-        ):
-            self._queue_social_attention_for_activity(
-                session,
-                activity=activity,
-                text=user_text,
-                sid=sid,
-                turn_id=turn_id,
-                language=language,
-                context=context,
-                history=[dict(item) for item in history if isinstance(item, dict)],
-            )
-
-    def _queue_social_attention_for_activity(
-        self,
-        session: Any,
-        *,
-        activity: SocialAttentionActivityAnchor | None,
-        text: str,
-        sid: str,
-        turn_id: str,
-        language: str,
-        context: dict[str, Any],
-        history: list[dict[str, Any]],
-    ) -> None:
-        if activity is None:
             return
-        event = (
-            "primary_activity_ready"
-            if activity.phase == "ready"
-            else "primary_activity_started"
-        )
-        self._queue_social_attention_event(
-            session,
-            event=event,
-            text=text,
-            sid=sid,
-            turn_id=turn_id,
-            language=language,
-            context={
-                **context,
-                "social_attention_primary_activity": activity.model_dump(
-                    mode="json", exclude_none=True
-                ),
-            },
-            history=history,
-        )
-
-    def _queue_social_attention_event(
-        self,
-        session: Any,
-        *,
-        event: str,
-        text: str,
-        sid: str,
-        turn_id: str,
-        language: str,
-        context: dict[str, Any],
-        history: list[dict[str, Any]],
-    ) -> None:
-        """Coalesce background social-decoration state without blocking primary cognition."""
-
-        if self.policy.mode != "apply" or self.adapter.social_attention_mode == "off":
-            return
-        raw_activity = context.get("social_attention_primary_activity")
-        if not isinstance(raw_activity, dict):
-            return
-        activity_id = str(raw_activity.get("activity_id") or "").strip()
-        if not activity_id:
-            return
-        key = (sid, activity_id)
-        # Coalesce only duplicate updates for the same primary Activity. Different
-        # observable Activities in one turn remain independently eligible for optional
-        # Social Attention.
-        self._social_attention_pending[key] = {
-            "session": session,
-            "event": event,
-            "text": text,
-            "sid": sid,
-            "turn_id": turn_id,
-            "language": language,
-            "context": dict(context),
-            "history": [dict(item) for item in history if isinstance(item, dict)],
-        }
-        queued_ms = time.perf_counter() * 1000.0
         self._record_workflow_stage(
             sid=sid,
-            stage="social_attention_opportunity",
-            started_monotonic_ms=queued_ms,
-            finished_monotonic_ms=queued_ms,
-            status="queued",
+            stage="auxiliary_activity_execution",
+            started_monotonic_ms=started_ms,
+            finished_monotonic_ms=time.perf_counter() * 1000.0,
+            status=(
+                "accepted"
+                if int(outcome.get("materialized_count") or 0) > 0
+                else "suppressed"
+            ),
             input_payload={
-                "event": event,
-                "primary_activity": raw_activity,
+                "canonical_plan_id": plan.plan_id,
+                "auxiliary_activities": plan.auxiliary_activities,
             },
-            output_payload={"background": True, "blocks_main_activity": False},
+            output_payload=outcome,
             errors=[],
             attempt=1,
             metadata={
-                "turn_id": turn_id,
-                "primary_activity_id": activity_id,
-                "attached_to_main_activity": True,
+                "blocks_main_activity": False,
+                "semantic_owner": "planner",
+                "cognitive_reentry_eligible": False,
             },
         )
-        existing = self._social_attention_workers.get(key)
-        if existing is not None and not existing.done():
-            return
-        worker = asyncio.create_task(
-            self._drain_social_attention_events(key),
-            name=f"social-attention:{sid}:{turn_id}",
-        )
-        self._social_attention_workers[key] = worker
-        self._track_auxiliary_task(worker)
 
-    async def _drain_social_attention_events(self, key: tuple[str, str]) -> None:
-        try:
-            while True:
-                payload = self._social_attention_pending.pop(key, None)
-                if payload is None:
-                    return
-                await self._run_social_attention_event(**payload)
-        finally:
-            self._social_attention_workers.pop(key, None)
-            self._social_attention_pending.pop(key, None)
+    def schedule_resolution_auxiliary_activities(
+        self,
+        resolution: CognitiveRuntimeResolution,
+        *,
+        sid: str,
+        turn_id: str,
+        context: dict[str, Any],
+    ) -> None:
+        """Start decoration only after Host has committed and launched the main response.
+
+        The caller deliberately invokes this after the primary dispatch task is created.
+        Confirmation-held or rejected primary work never reaches this boundary.
+        """
+
+        plan = resolution.terminal_plan
+        if (
+            self.policy.mode != "apply"
+            or plan is None
+            or not plan.auxiliary_activities
+            or resolution.interaction_response is None
+        ):
+            return
+        task = asyncio.create_task(
+            self._execute_resolution_auxiliary_activities(
+                resolution=resolution,
+                sid=sid,
+                turn_id=turn_id,
+                context=dict(context),
+            ),
+            name=f"auxiliary-activity:{sid}:{turn_id}",
+        )
+        self._track_auxiliary_execution_task(task)
 
     _CONTINUITY_REFRESH_KEYS = frozenset(
         {
@@ -3302,6 +2955,25 @@ class GoalDrivenRuntimeCoordinator:
                     )
                 )
 
+        auxiliary_activities = []
+        capability_activity_ids = {
+            item.activity_id
+            for item in advance.activities
+            if isinstance(item, FastPlannerCapabilityActivity)
+        }
+        for auxiliary in advance.auxiliary_activities:
+            auxiliary_activities.append(
+                auxiliary.model_copy(
+                    update={
+                        "anchor_kind": (
+                            "plan_step"
+                            if auxiliary.anchor_id in capability_activity_ids
+                            else "communicative_act"
+                        )
+                    }
+                )
+            )
+
         outcomes: list[Any] = []
         unresolved = list(advance.unresolved)
         communicative_acts: list[PlannedCommunicativeAct] = []
@@ -3440,6 +3112,7 @@ class GoalDrivenRuntimeCoordinator:
             ),
             communicative_acts=communicative_acts,
             steps=steps,
+            auxiliary_activities=auxiliary_activities,
             unresolved=(unresolved if disposition in {"clarify", "mixed"} else []),
             goal_outcomes=outcomes,
             goal_satisfaction=global_satisfaction,
@@ -3844,245 +3517,6 @@ class GoalDrivenRuntimeCoordinator:
             )
         )
 
-    async def _run_social_attention_event(
-        self,
-        session: Any,
-        *,
-        event: str,
-        text: str,
-        sid: str,
-        turn_id: str,
-        language: str,
-        context: dict[str, Any],
-        history: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        resolver = getattr(self.agent_client, "resolve_social_attention", None)
-        if not callable(resolver) or self.adapter.social_attention_mode == "off":
-            return {"status": "not_available", "event": event}
-
-        social_context = dict(context)
-        raw_activity = social_context.get("social_attention_primary_activity")
-        try:
-            primary_activity = SocialAttentionActivityAnchor.model_validate(raw_activity)
-        except (ValidationError, TypeError, ValueError):
-            return {
-                "status": "suppressed",
-                "event": event,
-                "decision": "none",
-                "materialized_count": 0,
-                "reasons": ["missing_or_invalid_primary_activity_anchor"],
-            }
-
-        # Throttle per semantic primary Activity, never per cognition turn or execution
-        # modality/item. A Fast acknowledgement may be its own Communicative Act;
-        # after planning, canonical conversational/Plan-step Work defines Activity identity.
-        # Goal ownership is context above that identity, not the cooldown key.
-        recent = getattr(self.adapter, "recent_auxiliary_behavior_evidence", None)
-        recent_evidence = recent(sid) if callable(recent) else []
-        if any(
-            str(item.get("primary_activity_id") or "").strip()
-            == primary_activity.activity_id
-            for item in recent_evidence
-            if isinstance(item, dict)
-        ):
-            return {
-                "status": "suppressed",
-                "event": event,
-                "decision": "none",
-                "materialized_count": 0,
-                "reasons": ["same_primary_activity_auxiliary_cooldown"],
-            }
-
-        social_context["social_attention_event"] = event
-        primary_progress: list[dict[str, Any]] = []
-        primary_capability_ids: list[str] = list(
-            primary_activity.realization.capability_ids
-        )
-        seen_primary_ids: set[str] = set(primary_capability_ids)
-        activity_goal_ids = set(primary_activity.goal_ids)
-
-        def retain_primary_progress(rows: Any) -> None:
-            if not isinstance(rows, list):
-                return
-            for row in rows[:12]:
-                if not isinstance(row, dict):
-                    continue
-                row_goal_ids = {
-                    text
-                    for item in (row.get("source_goal_ids") or row.get("covers_goal_ids") or [])
-                    if (text := " ".join(str(item or "").strip().split()))
-                }
-                if activity_goal_ids:
-                    if not row_goal_ids.intersection(activity_goal_ids):
-                        continue
-                elif row_goal_ids:
-                    # An unbound Communicative Act must not inherit unrelated later
-                    # Goal/Plan implementation merely because it shares the turn.
-                    continue
-                capability_id = str(
-                    row.get("capability_id") or ""
-                ).strip()
-                if not capability_id:
-                    continue
-                if capability_id not in seen_primary_ids:
-                    seen_primary_ids.add(capability_id)
-                    primary_capability_ids.append(capability_id)
-                projection = {
-                    key: row[key]
-                    for key in (
-                        "candidate_id",
-                        "step_id",
-                        "capability_id",
-                        "args",
-                        "source_goal_ids",
-                        "covers_goal_ids",
-                    )
-                    if key in row
-                }
-                primary_progress.append(projection)
-
-        retain_primary_progress(social_context.get("execution_capabilities"))
-        canonical_plan = social_context.get("canonical_plan_resolution")
-        if isinstance(canonical_plan, dict):
-            retain_primary_progress(canonical_plan.get("steps"))
-        social_context["social_attention_interaction_state"] = {
-            "event": event,
-            "primary_activity": primary_activity.model_dump(mode="json", exclude_none=True),
-            "primary_capability_ids": primary_capability_ids,
-            "primary_progress": primary_progress,
-            "primary_work_known": bool(
-                primary_activity.summary
-                or primary_activity.realization.execution_item_ids
-                or primary_capability_ids
-            ),
-        }
-        social_context["recent_auxiliary_behavior_evidence"] = recent_evidence
-        request = SocialAttentionRequest(
-            session_id=sid,
-            turn_id=turn_id,
-            event=event,
-            primary_activity=primary_activity,
-            text=text,
-            language=language,
-            context=social_context,
-            history=[dict(item) for item in history[-6:] if isinstance(item, dict)],
-        )
-        planner_started_ms = time.perf_counter() * 1000.0
-        planner_outcome = (
-            await asyncio.gather(
-                resolver(session, request=request),
-                return_exceptions=True,
-            )
-        )[0]
-        if isinstance(planner_outcome, asyncio.CancelledError):
-            raise planner_outcome
-        if isinstance(planner_outcome, BaseException):
-            self._record_workflow_stage(
-                sid=sid,
-                stage="social_attention_decision",
-                started_monotonic_ms=planner_started_ms,
-                finished_monotonic_ms=time.perf_counter() * 1000.0,
-                status="failed",
-                input_payload={"primary_activity": request.primary_activity},
-                output_payload=None,
-                errors=[{"error_type": type(planner_outcome).__name__}],
-                attempt=1,
-                metadata={"blocks_main_activity": False},
-            )
-            return {
-                "status": "planner_failed",
-                "event": event,
-                "error_type": type(planner_outcome).__name__,
-                "error": str(planner_outcome)[:240],
-            }
-        plan = planner_outcome
-        self._record_workflow_stage(
-            sid=sid,
-            stage="social_attention_decision",
-            started_monotonic_ms=planner_started_ms,
-            finished_monotonic_ms=time.perf_counter() * 1000.0,
-            status="accepted",
-            input_payload={"primary_activity": request.primary_activity},
-            output_payload={"decision": plan.decision, "plan": plan},
-            errors=[],
-            attempt=1,
-            metadata={
-                "blocks_main_activity": False,
-                "attached_to_main_activity": True,
-            },
-        )
-        execution_started_ms = time.perf_counter() * 1000.0
-        execution_outcome = (
-            await asyncio.gather(
-                self.adapter.execute_social_attention_event(
-                    plan=plan,
-                    session_id=sid,
-                    turn_id=turn_id,
-                    event=event,
-                    context=social_context,
-                ),
-                return_exceptions=True,
-            )
-        )[0]
-        if isinstance(execution_outcome, asyncio.CancelledError):
-            raise execution_outcome
-        if isinstance(execution_outcome, BaseException):
-            self._record_workflow_stage(
-                sid=sid,
-                stage="social_attention_execution",
-                started_monotonic_ms=execution_started_ms,
-                finished_monotonic_ms=time.perf_counter() * 1000.0,
-                status="failed",
-                input_payload={"decision": plan.decision},
-                output_payload=None,
-                errors=[{"error_type": type(execution_outcome).__name__}],
-                attempt=1,
-                metadata={"blocks_main_activity": False},
-            )
-            return {
-                "status": "execution_failed",
-                "event": event,
-                "decision": plan.decision,
-                "error_type": type(execution_outcome).__name__,
-                "error": str(execution_outcome)[:240],
-            }
-        self._record_workflow_stage(
-            sid=sid,
-            stage="social_attention_execution",
-            started_monotonic_ms=execution_started_ms,
-            finished_monotonic_ms=time.perf_counter() * 1000.0,
-            status="completed",
-            input_payload={"decision": plan.decision},
-            output_payload=execution_outcome,
-            errors=[],
-            attempt=1,
-            metadata={
-                "blocks_main_activity": False,
-                "attached_to_main_activity": True,
-            },
-        )
-        logger.info(
-            "continuous_social_attention_event_done sid=%s turn_id=%s event=%s "
-            "status=%s decision=%s materialized_count=%d request_ids=%s reasons=%s",
-            sid,
-            turn_id,
-            event,
-            str(execution_outcome.get("status") or "unknown"),
-            plan.decision,
-            int(execution_outcome.get("materialized_count") or 0),
-            ",".join(
-                str(item)
-                for item in execution_outcome.get("request_ids", [])
-                if str(item)
-            ),
-            ",".join(
-                str(item)
-                for item in execution_outcome.get("reasons", [])
-                if str(item)
-            ),
-        )
-        return execution_outcome
-
     @staticmethod
     def _fast_plan_path(plan: CanonicalPlan | None) -> str:
         if plan is None:
@@ -4294,6 +3728,9 @@ class GoalDrivenRuntimeCoordinator:
             **context,
             "core_interpretation": core_interpretation.model_dump(mode="json"),
         }
+        context["recent_auxiliary_behavior_evidence"] = (
+            self.adapter.recent_auxiliary_behavior_evidence(sid)
+        )
 
         if turn_envelope is not None:
             if turn_envelope.admission not in {"admit", "reflex_and_admit"}:
@@ -4366,95 +3803,6 @@ class GoalDrivenRuntimeCoordinator:
                 }
             )
 
-        def queue_resolution_social_attention(
-            resolution: CognitiveRuntimeResolution,
-        ) -> None:
-            resolved_turn_id = (
-                turn_envelope.turn_id
-                if turn_envelope is not None
-                else self._context_turn_id(context, sid)
-            )
-            activities: list[SocialAttentionActivityAnchor] = []
-            resolution_metadata = (
-                resolution.metadata if isinstance(resolution.metadata, dict) else {}
-            )
-            committed_fast_activity_ids = {
-                str(item).strip()
-                for item in resolution_metadata.get("fast_vocal_activity_ids", [])
-                if str(item).strip()
-            }
-            retained_fast_activity_ids: set[str] = set()
-
-            def retain_committed_fast_activity(
-                activity: FastPlannerCommunicativeAct | None,
-            ) -> None:
-                if (
-                    activity is None
-                    or activity.activity_id not in committed_fast_activity_ids
-                    or activity.activity_id in retained_fast_activity_ids
-                ):
-                    return
-                activities.append(
-                    self._fast_planner_communicative_social_activity(activity)
-                )
-                retained_fast_activity_ids.add(activity.activity_id)
-
-            first_response_payload = resolution_metadata.get(
-                "fast_planner_first_response"
-            )
-            if isinstance(first_response_payload, dict):
-                try:
-                    first_response = FastPlannerFirstResponse.model_validate(
-                        first_response_payload
-                    )
-                except ValidationError:
-                    first_response = None
-                first_activity = (
-                    first_response.activity if first_response is not None else None
-                )
-                retain_committed_fast_activity(first_activity)
-            advance_payload = resolution_metadata.get("fast_planner_advance")
-            if isinstance(advance_payload, dict):
-                try:
-                    fast_advance = FastPlannerAdvance.model_validate(advance_payload)
-                except ValidationError:
-                    fast_advance = None
-                for activity in fast_advance.activities if fast_advance else []:
-                    if isinstance(activity, FastPlannerCapabilityActivity):
-                        continue
-                    retain_committed_fast_activity(activity)
-            # Complete Fast responses are deliberately omitted from the terminal
-            # InteractionResponse after speech is committed. Preserve every
-            # already-validated, committed Planner Activity as an optional
-            # presentation anchor once canonical resolution ends.
-            activities.extend(
-                self._resolution_social_activities(
-                    resolution,
-                    turn_id=resolved_turn_id,
-                    context=context,
-                )
-            )
-            social_context = dict(context)
-            if resolution.goal_association is not None:
-                social_context["goal_association"] = (
-                    resolution.goal_association.prompt_projection()
-                )
-            if resolution.terminal_plan is not None:
-                social_context["canonical_plan_resolution"] = (
-                    resolution.terminal_plan.prompt_projection()
-                )
-            for activity in activities:
-                self._queue_social_attention_for_activity(
-                    session,
-                    activity=activity,
-                    text=text,
-                    sid=sid,
-                    turn_id=resolved_turn_id,
-                    language=language,
-                    context=social_context,
-                    history=history,
-                )
-
         trace_scope = runtime_tracer.start_trace(
             correlations={
                 "session_id": sid,
@@ -4479,7 +3827,6 @@ class GoalDrivenRuntimeCoordinator:
             if turn_envelope is not None:
                 resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
             resolution = attach_core_identity(resolution)
-            queue_resolution_social_attention(resolution)
             return resolution
         try:
             async with trace_scope:
@@ -4496,7 +3843,6 @@ class GoalDrivenRuntimeCoordinator:
                     if turn_envelope is not None:
                         resolution = resolution.model_copy(update={"turn_envelope": turn_envelope})
                     resolution = attach_core_identity(resolution)
-                    queue_resolution_social_attention(resolution)
                     span.set_attribute("result_status", resolution.status)
                     if resolution.status == "error":
                         span.set_status("error")
@@ -4647,7 +3993,6 @@ class GoalDrivenRuntimeCoordinator:
             ready_capability_execution=ready_capability_execution,
             ready_capability_status=ready_capability_status,
             communicative_realization_status=communicative_realization_status,
-            social_attention_opportunity_delta=0,
             ready_communicative_executions=tuple(ready_communicative_executions),
             vocal_activity_ids=tuple(vocal_activity_ids),
         )
@@ -4686,7 +4031,6 @@ class GoalDrivenRuntimeCoordinator:
         fast_vocal_activity_ids: list[str] = []
         ready_fast_communicative_executions: list[Any] = []
         fast_communicative_realization_status = "not_started"
-        social_attention_opportunity_count = 0
         ready_fast_capability_execution: Any | None = None
         ready_fast_capability_status = "not_started"
         fast_advance_progress = _FastAdvanceProgress()
@@ -4755,9 +4099,6 @@ class GoalDrivenRuntimeCoordinator:
                 "fast_vocal_activity_ids": list(fast_vocal_activity_ids),
                 "fast_communicative_realization_status": (
                     fast_communicative_realization_status
-                ),
-                "social_attention_opportunity_count": (
-                    social_attention_opportunity_count
                 ),
                 "fast_capability_activity_status": ready_fast_capability_status,
                 "retained_work_reconciliation_status": (
@@ -4962,9 +4303,6 @@ class GoalDrivenRuntimeCoordinator:
                 fast_communicative_realization_status = (
                     fast_advance_stage.communicative_realization_status
                 )
-            social_attention_opportunity_count += (
-                fast_advance_stage.social_attention_opportunity_delta
-            )
             ready_fast_communicative_executions.extend(
                 fast_advance_stage.ready_communicative_executions
             )

@@ -943,8 +943,8 @@ format can block an otherwise correct plan.
 
 Chromie may accompany a concrete **semantic** primary human-observable Activity—
 such as greeting someone, telling a joke, walking toward a person, singing a song,
-handing over water, or showing/playing something—with subtle nonverbal Social
-Attention decoration. The decoration is **not** the Goal. It is an optional way of
+handing over water, or showing/playing something—with subtle nonverbal decoration
+from the `social_attention` behavior domain. The decoration is **not** the Goal. It is an optional way of
 making the already-intended Activity feel socially present rather than mechanically
 isolated.
 
@@ -961,26 +961,19 @@ implementation items. A semantic Activity may use one or several of those realiz
 mechanisms without becoming several Activities merely because its execution spans
 multiple items.
 
-For example, a greeting remains the same greeting text while Social Attention
+For example, a greeting remains the same greeting text while optional decoration
 may add gaze toward the person, a natural blink, a small nod or wave, or another
-qualified subtle body cue. Social Attention must not rewrite what Chromie says,
+qualified subtle body cue. Decoration must not rewrite what Chromie says,
 create an extra user task, or make the greeting fail if the decoration cannot
 run.
 
-The spoken fast response is itself the Planner-owned Communicative Main Activity;
-Social Attention is only optional coordinated expression attached to that same
-Activity while it is observable. It is not emitted merely because GI, GA,
-planning, waiting, or evidence arrival occurred. `decision=none` is a complete
-and valid result. A late decoration that misses the Main Activity's observable
-window is suppressed rather than performed alone as a delayed social gesture,
-and Social Attention planning or execution never delays Vocal scheduling.
-
-The Social Attention model receives the exact `primary_activity` anchor, recent
-context, owner-approved Social Interaction Style, bounded recent decoration
-evidence, eligible named body capabilities, target evidence, and semantic
-resource metadata. It may produce a structured `SocialAttentionPlan` with
-`decision=express` or `decision=none`. `decision=express` requires at least one
-body behavior; there is no Social-Attention speech-expression field or fallback.
+The spoken fast response is itself a Planner-owned Communicative Main Activity.
+Fast First Response deliberately does not plan decoration. Fast Advance and the
+canonical Fast/Deep Planner may include zero or more `auxiliary_activities[]` in
+the same primary result when the exact Activity anchor, recent context, style,
+target evidence, recent auxiliary evidence, and eligible named body capabilities
+are available. An empty list is complete and preferred unless a subtle cue adds
+real interaction value. This is not another model or post-response planning pass.
 
 The same motion has different semantics depending on ownership. A user request
 such as "blink twice" makes **blink twice** the semantic primary Activity. A blink
@@ -989,10 +982,10 @@ decoration, regardless of whether that greeting is realized through speaking, a
 compatible body cue, or both. The Capability may be the same, but only the first
 participates in Goal completion.
 
-An explicit action can also carry social framing. "Blink twice and be cute"
+An explicit action can also carry social framing. “Blink twice and be cute”
 still makes exactly two blinks mandatory primary Activity; it does not authorize
-Social Attention to replace, repeat, or alter them. From the supplied utterance
-and Core context, the Social Attention model may optionally choose a
+optional decoration to replace, repeat, or alter them. From the supplied utterance
+and Core context, the primary Planner may optionally choose a
 **different**, compatible small cue when that improves the interaction and fits
 the owner-approved style and recent-decoration evidence. "Blink twice" as a
 capability test may naturally receive no extra cue, while "do something cute"
@@ -1000,22 +993,27 @@ requires normal Cognitive Core / Goal reasoning because it asks Chromie to
 choose the primary behavior. The Host never implements this distinction with a
 "cute" phrase rule.
 
-Deterministic runtime code validates exact skill IDs, schemas, target evidence,
+Deterministic runtime code validates exact Capability IDs, schemas, target evidence,
 confirmation policy, execution availability, latency budget, parallel timing,
 duplicate-primary rejection, resource conflicts, and provider concurrency.
 Accepted decoration executes
-through Activity with `auxiliary_social_attention=true` and
+through Activity with `auxiliary_plan_activity=true` and
 `execution_role=social_decoration`. It is suppressed rather than delaying or
 conflicting with Vocal, emergency handling, or primary Activity.
 
-Social Attention is not a generic idle-animation loop. Its decoration requires a
+The behavior domain is not a generic idle-animation loop. Decoration requires a
 concrete semantic primary human-observable Activity anchor. `understanding_ready`,
 Goal Association, planning, waiting, evidence arrival, execution-lane transitions,
 and other internal milestones are not Activity meaning. Each distinct semantic
-primary Activity is independently eligible; multiple speech/body/provider items
-realizing the same Activity do not create extra opportunities. A previous
-decoration on another Activity in the same turn is not a blanket suppression rule.
+primary Activity is independently eligible in its owning Planner result; multiple
+speech/body/provider items realizing the same Activity do not create duplicate
+auxiliary items. A previous decoration on another Activity in the same turn is not
+a blanket suppression rule.
 Pure baseline embodiment/liveliness without a primary Activity is a separate concern.
+
+Runtime may suppress an exact stale or invalid proposal, but it cannot retarget or
+reselect. An auxiliary-only target change, failure, or completion never creates a
+`CognitiveOpportunity`, because that would fabricate Goal authority for decoration.
 
 Backend selection, calibration, motion limits, collision safety, stop, and
 recovery remain provider-owned. Do not implement normal attention through rules

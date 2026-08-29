@@ -21,14 +21,14 @@ Chromie Cognitive Core
           ├── Memory
           └── future providers
 
-Background Social Attention
-  └── may add optional embodied decoration around an anchored interaction
+Planner-owned auxiliary Activities
+  └── may add optional embodied decoration around an anchored Main Activity
       └── accepted body decoration executes through Activity
 ```
 
 The shared contracts and maintained runtime support explicit best-effort
 coordination between Vocal and Activity. Social Attention is deliberately not a
-third lane. It is background social cognition that may propose small auxiliary
+third lane or background cognition. It is a Planner-owned behavior domain for small auxiliary
 body decoration such as gaze, blink, nod, a small wave, or slight posture /
 orientation when the live catalog and interaction make that appropriate.
 
@@ -76,65 +76,53 @@ ordinary asynchronous dispatch.
 
 | Layer | Owns | Must not own |
 |---|---|---|
-| Cognitive Core | user meaning, Goal Association, Goal lifecycle, planning, response meaning, temporal intent | motor control, provider internals |
-| Background Social Attention | whether an anchored interaction benefits from small optional embodied decoration; social purpose and eligible body candidate | user Goal creation, response wording, completion, execution-lane membership, motor authorization |
+| Cognitive Core / primary Planner | user meaning, Goal lifecycle, Main Activities, response meaning, temporal intent, and optional auxiliary decoration in one Plan result | motor control, provider internals |
 | Vocal Execution Lane | realization of one personal `Vocal Expression`: speaking (`mode=speech`), expressive speech, recitation, singing, humming, nonverbal vocalization; playback/interruption/cancellation/output ordering | independent personality, semantic Primary-Activity meaning, or existing-media lifecycle ownership |
 | Activity Execution Lane | non-Vocal provider calls, primary execution work, optional Social Attention body decoration, asynchronous lifecycle monitoring, cancellation, recovery, and correlated outcome collection | Goal or semantic Primary-Activity meaning, or raw motor control |
 | Soridormi | embodied feasibility, body arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
 
 The Activity lane executes work; it does not own Goals. Optional Social
 Attention decoration also executes through Activity, but carries
-`auxiliary_social_attention=true` and `execution_role=social_decoration` so it
+`auxiliary_plan_activity=true` and `execution_role=social_decoration` so it
 cannot be mistaken for primary completion work. Vocal delivers Chromie-authored
 personal voice output; it is not a separate conversational agent.
 
-## Background Social Attention
+## Planner-owned Social Attention
 
-Social Attention is continuous background social cognition, not an execution
-lane and not a standalone action generator. It may reconsider whether a small
-decoration is useful when a **semantic primary Activity** becomes ready/starts or
-when evidence materially changes how that already-anchored Activity should be
-socially expressed, for example:
+Fast Advance and canonical Fast/Deep Planner calls may author bounded
+`auxiliary_activities[]` beside their Main Activities. Fast First Response has no
+auxiliary surface. Empty output is normal. There is no later social model call or
+event-driven reconsideration solely because an Activity becomes ready, target evidence
+changes, or execution completes.
 
-- a concrete greeting, joke, walk, song, handover, answer, or similar outward act
-  becomes ready or starts;
-- new scene/target evidence changes the social context of that Activity; or
-- interruption/cancellation changes whether that Activity is still active.
+Fast understanding, Goal Association, provider readiness, Evidence arrival, and
+Vocal/Activity lane transitions are **not anchors**. Only a human-observable
+Planner-authored Communicative Act, Plan response, or Plan step can be an anchor.
+A decoration is useful only when it supports that Activity and remains small,
+non-disruptive, interruptible, optional, and subordinate.
 
-Fast understanding, Goal Association, planning, provider readiness, evidence
-arrival, and Vocal/Activity lane transitions may cause the system to prepare or
-update an Activity, but those internal milestones are **not themselves anchors**.
-The Social-Attention model may choose `decision=none`. A decoration is useful only
-when it supports the anchored semantic Activity and remains small, non-disruptive,
-interruptible, optional, and subordinate to the primary responsibility.
+Social Attention must not become a generic idle-animation loop. A blink attached to
+an active Main Activity may be decoration; an autonomous idle blink with no interaction
+anchor belongs to baseline embodiment/liveliness.
 
-Social Attention must not become a generic idle-animation loop. A blink while
-actively listening may be Social Attention; an autonomous idle blink with no
-social interaction belongs to baseline embodiment/liveliness if that separate
-behavior is ever implemented.
+The same Fast/Deep Planner primary result is the single semantic writer for optional
+decoration, exact wording, speech acts, and Vocal style. Runtime validates and
+materializes the exact auxiliary proposal through Activity; it may suppress but never
+reselect or retarget it. Eligible candidates are decoder-constrained from the live
+catalog. Trusted code checks arguments, target evidence, resources, safety, provider
+availability, and concurrency without reconstructing controller policy.
 
-Fast/Deep Planner never authors Social Attention. The background
-`SocialAttentionPlanner` is the single semantic writer for optional decoration;
-exact wording, speech acts, and Vocal style remain with the applicable Planner.
-Accepted decoration is validated independently and materialized through Activity.
-
-When the runtime knows the reviewed live set of eligible Social Attention body
-Capabilities, the model-facing contract constrains `capability_id` to those
-candidates. Trusted code still validates arguments, target evidence, resources,
-safety, provider availability, and provider concurrency. The model decides
-whether a decoration is socially appropriate; it does not reconstruct machine
-identifiers or body-controller policy.
-
-Optional decoration fails soft with respect to unrelated primary work. A slow,
-invalid, unavailable, conflicting, or rejected Social Attention proposal must
-not delay ready Vocal or Activity work and must not change Goal truth.
+Optional decoration fails soft with respect to primary work. An invalid, stale,
+unavailable, conflicting, or rejected auxiliary proposal must not delay ready Vocal or
+Activity work and must not change Goal truth. Auxiliary-only changes/results cannot
+construct a Goal-scoped `CognitiveOpportunity`.
 
 Example:
 
 ```text
 Goal: greet Alice
   -> Vocal says "Hello!"
-  -> Social Attention may optionally propose look/blink/small wave
+  -> the same Planner result may optionally propose look/blink/small wave
        -> accepted decoration executes as auxiliary Activity
        -> decoration failure does not make the greeting Goal false
 ```
@@ -144,7 +132,7 @@ Activity responsibility. The physical Capability may be the same; the semantic
 role and completion authority are not.
 
 Social meaning may coexist with that exact responsibility. For "blink twice and
-be cute", Core still owns the two required blinks. Background Social Attention
+be cute", Core still owns the two required blinks. The primary Planner
 may use the supplied playful framing to propose one different compatible cue;
 it may not issue another blink, change the count, replace the primary action, or
 claim its completion. Trusted Runtime rejects duplicate Capability IDs and
@@ -245,7 +233,7 @@ The participating response stage may copy the same identifier:
 }
 ```
 
-A Social Attention decoration does **not** join that coordination group and does
+An auxiliary Social Attention decoration does **not** join that coordination group and does
 not carry `coordination_id`:
 
 ```json
@@ -310,10 +298,9 @@ Host may reuse an exact source-authored, mechanically validated current-turn
 `robot_action` Fast Response as `pre_action` coverage. It may not invent text, cover a clarification
 or unavailable Goal mechanically, or change the immutable Capability Plan.
 
-Optional Social Attention is likewise not execution authority. A model output
-with `decision=express` requires at least one valid decorative body behavior;
-otherwise the advisory plan is rejected or normalized to `decision=none` at the
-applicable bounded boundary. Social Attention cannot fall back to changing
+Optional Social Attention is likewise not execution authority. A malformed or invalid
+`auxiliary_activities[]` proposal is suppressed at the bounded Runtime boundary.
+Runtime cannot replace it, and decoration cannot fall back to changing
 speech text. Dropping optional decoration leaves the immutable Vocal/Activity
 work unchanged.
 

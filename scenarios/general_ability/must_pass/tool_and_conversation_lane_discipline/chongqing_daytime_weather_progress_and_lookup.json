@@ -59,7 +59,6 @@
   "expected_fast_communicative_speech_acts": [
     "acknowledge_and_check"
   ],
-  "require_social_attention_opportunity": true,
   "require_fast_planner_evidence_reentry": true,
   "require_pre_ga_safe_capability_dispatch": true,
   "require_canonical_work_reconciliation": true,

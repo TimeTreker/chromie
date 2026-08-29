@@ -2,7 +2,7 @@
 
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
 separately testable Goal Interpretation, Goal Association, Planner fast/deep passes,
-Reflection, Social Attention, capability-catalog, and WorkDAG diagnostic
+Reflection, capability-catalog, and WorkDAG diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
 
@@ -45,7 +45,10 @@ CognitiveOpportunity    ephemeral readiness trigger when useful
 Planner                  0..N Activity changes or none
 ```
 
-Social Attention is an optional Activity-scoped auxiliary cognition path. It may select only eligible live social-expression capabilities supplied by the bounded catalog context; it cannot create Goals, replace primary work, alter completion, author response text, or select provider/backend mechanics.
+Optional Social Attention decoration is emitted as `auxiliary_activities[]` in the
+same Fast Advance or canonical Fast/Deep Planner result as its Main Activity. It has
+no Goal-completion authority. Fast First Response has no auxiliary surface; there is
+no second social model call.
 
 Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
 
@@ -65,17 +68,18 @@ Important endpoints include:
 - `POST /fast-advance`
 - `POST /fast-plan`
 - `POST /deep-plan`
-- `POST /social-attention/plan`
 - Agent Skill selection/disclosure endpoints
 - WorkDAG validate/dry-run/guarded execution/trace diagnostics
 
 See [`../docs/API_REFERENCE.md`](../docs/API_REFERENCE.md) for the exact maintained API surface.
 
-## Social Attention configuration
+## Auxiliary social decoration
 
-The maintained policy is `AGENT_SOCIAL_ATTENTION_MODE=on`. Valid values are `off`, `report_only`, and `on`. Social Attention is detached from primary-response completion: there is no compatibility wait-after-response setting.
-
-Provider-owned body calibration, backend identity, joint targets, and low-level controller parameters are excluded from model-facing Social Attention context. Soridormi resolves semantic body requests for its active embodiment.
+Planner schemas receive only exact eligible catalog candidates; provider-owned body
+calibration, backend identity, joint targets, and low-level controller parameters are
+excluded. Runtime validates or suppresses the exact Planner proposal and Soridormi
+resolves an accepted semantic target for its active embodiment. No independent
+social-decoration model configuration surface exists.
 
 ## Capability and Agent Skill distinction
 

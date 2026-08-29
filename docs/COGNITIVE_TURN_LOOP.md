@@ -548,9 +548,10 @@ The live layer is projected by responsibility:
   actual queued/running/terminal Work, exact Host-bound Evidence, already-delivered
   interaction delta, and compact Stable Mind. It may author response or genuinely new
   Work, but result contents cannot infer a new Goal or repeat the terminal Activity.
-- Social Attention receives current interaction events, scene/target evidence,
-  recent expressive history, primary activity state, eligible exact social
-  capabilities, and the compact stable Mind.
+- Fast Advance and canonical Fast/Deep Planner projections may receive scene/target
+  evidence, recent auxiliary history, primary Activity state, eligible exact social
+  Capabilities, and the compact Stable Mind for their same-call optional
+  `auxiliary_activities[]` decision.
 - Planner deep pass is the deliberate rich-context HOW path. When planning complexity or
   consequence warrants escalation, it may receive broader Goal relationships,
   relevant long-term memory, environment, capability state, trustworthy
@@ -644,7 +645,7 @@ propagates before per-request terminal evidence is returned, the host
 conservatively records each affected committed request as `cancelled` with an
 unknown-start diagnostic rather than asserting it never ran. An unknown or
 uncommitted runtime result fails exact reconciliation; only a result for an
-explicitly committed auxiliary social-attention request may be excluded.
+explicitly committed `auxiliary_plan_activity` request may be excluded.
 Pre-action speech and auxiliary Social Attention decoration do not satisfy an effectful
 user goal. Provider postcondition evidence such as `safe_idle=true` may support
 a safety claim, but does not by itself prove every requested goal completed.
@@ -751,7 +752,7 @@ their own delivery obligations.
 Cross-lane awareness is transported through the append-only `Interaction
 Ledger`. Existing owners append only typed facts they are qualified to observe:
 playback owns audible speech, Cognitive Runtime owns Goal/Plan decisions, the
-Trusted Capability Runtime owns committed provider work and Social Attention
+Trusted Capability Runtime owns committed provider work and auxiliary-Activity
 results, and `ExecutionOutcomeBundle` closure owns trusted Activity and
 provider-backed Vocal outcomes. No entry edits or upgrades another owner's
 evidence.

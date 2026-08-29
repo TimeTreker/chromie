@@ -479,7 +479,6 @@ class VoiceAssistant:
             agent_client=self.agent_client,
             adapter=CanonicalPlanRuntimeAdapter(
                 self.interaction_runtime,
-                social_attention_mode=cognition_settings.social_attention_mode,
             ),
             policy=self.cognitive_runtime_policy,
             # Goal Association is already the validated, model-owned semantic
@@ -2493,11 +2492,6 @@ class VoiceAssistant:
                 ),
             )
             self.conversation_state.record_interaction_response(session_id, safe_response)
-            if not fallback_speech_suppressed:
-                await self._queue_response_social_attention(
-                    safe_response,
-                    session_id=session_id,
-                )
             record_cognitive_runtime_evidence(
                 getattr(self, "cognitive_evidence", None),
                 resolution, session_id=session_id, user_text=user_text,
@@ -2956,6 +2950,12 @@ class VoiceAssistant:
         self.conversation_state.record_interaction_response(session_id, response)
         self._launch_interaction(
             response, session_id, reset_playback=not fast_first_scheduled
+        )
+        self.cognitive_runtime.schedule_resolution_auxiliary_activities(
+            resolution,
+            sid=session_id,
+            turn_id=turn_envelope.turn_id,
+            context=context,
         )
         return True
 
@@ -3423,10 +3423,6 @@ class VoiceAssistant:
             ),
         )
         self.conversation_state.record_interaction_response(session_id, safe_response)
-        await self._queue_response_social_attention(
-            safe_response,
-            session_id=session_id,
-        )
         self._launch_interaction(safe_response, session_id)
         return
 
@@ -3989,39 +3985,6 @@ class VoiceAssistant:
             )
         )
 
-    async def _queue_response_social_attention(
-        self,
-        response: InteractionResponse,
-        *,
-        session_id: str | None,
-    ) -> None:
-        """Offer a Host-presented Communicative Act to Social Attention.
-
-        Normal cognitive-runtime responses are already anchored inside the runtime.
-        This bridge is for presentation paths that bypass that return boundary, such
-        as post-Evidence outcome speech and fail-closed conversational responses.
-        """
-
-        runtime = getattr(self, "cognitive_runtime", None)
-        queue = getattr(runtime, "queue_interaction_social_attention", None)
-        if not callable(queue):
-            return
-        try:
-            session = await self.get_http_session()
-            queue(
-                session,
-                response=response,
-                sid=str(session_id or response.interaction_id or "response"),
-                context=self.build_context(session_id),
-            )
-        except (TypeError, ValueError, ValidationError, RuntimeError, AttributeError) as exc:
-            self.session_log(
-                session_id,
-                "response_social_attention_queue_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-
     async def _execute_cognitive_outcome_response(
         self,
         response: InteractionResponse,
@@ -4029,10 +3992,6 @@ class VoiceAssistant:
         session_id: str | None,
         detached_delivery: bool = False,
     ) -> str:
-        await self._queue_response_social_attention(
-            response,
-            session_id=session_id,
-        )
         try:
             delivery_session_id = session_id
             if detached_delivery and isinstance(

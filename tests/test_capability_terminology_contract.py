@@ -21,7 +21,7 @@ from shared.chromie_contracts import (
     CanonicalPlanStep,
     ExecutionEvidence,
     InteractionResponse,
-    SocialAttentionBehavior,
+    AuxiliaryPlanActivity,
 )
 from shared.chromie_contracts.interaction import CapabilityTraceEvent
 
@@ -129,7 +129,12 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
                 source_goal_ids=["goal-1"],
                 status="completed",
             ),
-            SocialAttentionBehavior(capability_id="soridormi.blink_eyes"),
+            AuxiliaryPlanActivity(
+                auxiliary_activity_id="aux-blink",
+                anchor_kind="plan_response",
+                anchor_id="response",
+                capability_id="soridormi.blink_eyes",
+            ),
             EpisodeCapabilityRequestRecord(
                 request_id="request-episode",
                 capability_id="chromie.weather.lookup",

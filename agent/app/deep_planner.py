@@ -38,6 +38,8 @@ from .planner_schema import (
     deep_contract_revision_response_schema,
 )
 from .planner_context import (
+    auxiliary_social_capability_payloads,
+    auxiliary_social_prompt_context,
     deep_capability_payload,
     planner_goal_context,
     planner_provider_media_goal_operations,
@@ -157,6 +159,13 @@ class DeepPlannerResolver:
         response_only = goal_context.response_only
         requires_execution = goal_context.requires_execution
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
+        auxiliary_social_capabilities = auxiliary_social_capability_payloads(
+            capabilities
+        )
+        context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(
+            context,
+            auxiliary_social_capabilities,
+        )
         executable = [
             item
             for item in capabilities
@@ -219,6 +228,7 @@ class DeepPlannerResolver:
             capability_input_schemas={
                 item["capability_id"]: item["input_schema"] for item in payload
             },
+            auxiliary_social_capabilities=auxiliary_social_capabilities,
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=list(goal_context.response_goal_ids),

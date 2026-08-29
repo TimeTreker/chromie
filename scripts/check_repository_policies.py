@@ -1005,14 +1005,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ("reset_phrases", "ORCH_CONVERSATION_RESET_PHRASES"),
             "runtime configuration may not expose semantic phrase tables",
         ),
-        "agent/app/social_attention.py": (
-            RULE_CANONICAL_CAPABILITY_ID,
-            (
-                "exact skill_id values",
-                "Each behavior contains skill_id",
-            ),
-            "Social Attention model prompts must emit canonical capability_id",
-        ),
     }
     for relative, (rule_id, tokens, message) in source_checks.items():
         path = root / relative
@@ -1261,8 +1253,8 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
     """
 
     targets = {
-        "shared/chromie_contracts/social_attention.py": {
-            "SocialAttentionBehavior": "CapabilityIdentityModel",
+        "shared/chromie_contracts/plan.py": {
+            "AuxiliaryPlanActivity": "CapabilityIdentityModel",
         },
         "orchestrator/runtime/episode.py": {
             "EpisodeCapabilityRequestRecord": "CapabilityIdentityModel",
@@ -1614,6 +1606,8 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             )
 
     retired_runtime_paths = (
+        "agent/app/social_attention.py",
+        "shared/chromie_contracts/social_attention.py",
         "orchestrator/runtime/abilities.py",
         "orchestrator/runtime/skill_runtime.py",
         "orchestrator/runtime/skill_adapters.py",
@@ -1630,6 +1624,39 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                     message=(
                         "retired duplicate runtime/ability authority module must not exist; "
                         "Planner + live Capability Registry own executable HOW/availability"
+                    ),
+                )
+            )
+
+    retired_social_planner_tokens = {
+        "agent/app/main.py": ("/social-attention/plan", "SocialAttentionPlanner"),
+        "agent/app/settings.py": ("social_attention_model",),
+        "orchestrator/clients/agent_client.py": ("resolve_social_attention",),
+        "orchestrator/runtime/cognitive_runtime.py": (
+            "_social_attention_pending",
+            "_social_attention_workers",
+            "social_attention_opportunity",
+        ),
+    }
+    for relative, tokens in retired_social_planner_tokens.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token not in source:
+                continue
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_HOST_SEMANTIC_AUTHORITY,
+                    symbol=token,
+                    message=(
+                        "optional social decoration must remain inside the primary "
+                        "Planner result plus trusted Runtime validation; the retired "
+                        "independent Social Attention planner/endpoint/worker must not "
+                        "be reintroduced"
                     ),
                 )
             )

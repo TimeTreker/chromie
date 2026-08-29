@@ -28,7 +28,7 @@ class OutcomeObservationTests(unittest.TestCase):
                         "capability_id": "soridormi.look_at_person",
                         "args": {"target_ref": "current_speaker", "duration_s": 2.0},
                         "metadata": {
-                            "auxiliary_social_attention": True,
+                            "auxiliary_plan_activity": True,
                             "behavior_domain": "social_attention",
                         },
                     },

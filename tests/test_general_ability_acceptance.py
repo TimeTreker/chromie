@@ -302,12 +302,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertEqual(validate_live_text_result(case, summary), [])
 
-    def test_live_validation_gates_fast_commit_social_attachment_and_reentry(self) -> None:
+    def test_live_validation_gates_fast_commit_and_goal_evidence_reentry(self) -> None:
         case = TextScenarioCase(
             case_id="weather",
             text="哎，今天上午重庆会不会下雨？",
             require_speech=False,
-            require_social_attention_opportunity=True,
             require_fast_planner_evidence_reentry=True,
             require_pre_ga_safe_capability_dispatch=True,
             require_canonical_work_reconciliation=True,
@@ -322,7 +321,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "cognitive_runtime": {
                 "timings_ms": {"fast_planner_commit": 600.0},
                 "metadata": {
-                    "social_attention_opportunity_count": 1,
                     "fast_capability_activity_status": (
                         "completed_before_canonical_dispatch:completed"
                     ),
@@ -337,11 +335,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                         "started_elapsed_ms": 500.0,
                         "duration_ms": 600.0,
                         "finished_elapsed_ms": 1100.0,
-                    },
-                    {
-                        "stage": "social_attention_opportunity",
-                        "status": "queued",
-                        "metadata": {"attached_to_main_activity": True},
                     },
                     {
                         "stage": "fast_planner_evidence_reentry",

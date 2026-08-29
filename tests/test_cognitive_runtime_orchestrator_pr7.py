@@ -93,6 +93,17 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant._record_cognitive_runtime_evidence = lambda *args, **kwargs: None
         assistant._launch_interaction_calls = []
         assistant._launch_interaction = lambda *args, **kwargs: assistant._launch_interaction_calls.append((args, kwargs))
+        assistant._auxiliary_schedule_calls = []
+
+        class _CognitiveRuntime:
+            def schedule_resolution_auxiliary_activities(self, *args, **kwargs):
+                if not assistant._launch_interaction_calls:
+                    raise AssertionError(
+                        "auxiliary Activity was scheduled before primary launch"
+                    )
+                assistant._auxiliary_schedule_calls.append((args, kwargs))
+
+        assistant.cognitive_runtime = _CognitiveRuntime()
 
         async def run_pipeline(*args, **kwargs):
             return resolution
@@ -135,6 +146,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant.conversation_state.user_turns), 1)
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
+        self.assertEqual(len(assistant._auxiliary_schedule_calls), 1)
         prepared_response = assistant.interaction_runtime.prepared[0][0]
         self.assertEqual(prepared_response.metadata["turn_id"], "sid")
         self.assertEqual(
@@ -387,47 +399,44 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         asyncio.run(run())
         self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
 
-    def test_host_presented_response_is_offered_to_social_attention(self):
+    def test_host_has_no_post_response_social_attention_bridge(self):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        queued = []
+        self.assertFalse(hasattr(assistant, "_queue_response_social_attention"))
 
-        class Runtime:
-            def queue_interaction_social_attention(self, *args, **kwargs):
-                queued.append((args, kwargs))
-
-        assistant.cognitive_runtime = Runtime()
-
-        async def get_http_session():
-            return object()
-
-        assistant.get_http_session = get_http_session
-        assistant.build_context = lambda session_id: {
-            "history": [{"role": "user", "text": "重庆今晚会下雨吗？"}]
-        }
-        assistant.session_log = lambda *args, **kwargs: None
+    def test_confirmation_held_primary_does_not_schedule_auxiliary_activity(self):
         response = InteractionResponse(
-            interaction_id="interaction-weather",
-            speech=[{"text": "今晚有雨。", "timing": "immediate"}],
-            metadata={
-                "language": "zh-CN",
-                "execution_outcome_bundle": {"turn_id": "turn-weather"},
-            },
+            speech=[{"text": "Please confirm.", "timing": "immediate"}],
+            requires_confirmation=True,
+            metadata={"source": "goal_driven_cognitive_runtime"},
         )
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="applied",
+            interaction_response=response,
+        )
+        assistant = self._assistant(resolution)
 
-        asyncio.run(
-            assistant._queue_response_social_attention(
-                response,
-                session_id="sid-weather",
+        async def hold_confirmation(*args, **kwargs):
+            return True
+
+        assistant._stage_interaction_confirmation = hold_confirmation
+        core, envelope = _core_and_envelope("Please do it.", sid="sid-confirm")
+
+        async def run():
+            handled = await assistant._try_apply_cognitive_runtime(
+                object(),
+                user_text="Please do it.",
+                session_id="sid-confirm",
+                context={"history": []},
+                core_interpretation=core,
+                core_interpretation_latency_ms=10.0,
+                turn_envelope=envelope,
             )
-        )
+            self.assertTrue(handled)
 
-        self.assertEqual(len(queued), 1)
-        self.assertEqual(queued[0][1]["response"], response)
-        self.assertEqual(queued[0][1]["sid"], "sid-weather")
-        self.assertEqual(
-            queued[0][1]["context"]["history"][0]["text"],
-            "重庆今晚会下雨吗？",
-        )
+        asyncio.run(run())
+        self.assertEqual(assistant._launch_interaction_calls, [])
+        self.assertEqual(assistant._auxiliary_schedule_calls, [])
 
     def test_cognitive_failure_uses_deterministic_fail_closed_response(self):
         resolution = CognitiveRuntimeResolution(

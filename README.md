@@ -35,8 +35,8 @@ experience artifacts. See
 > decision while independent sibling Work is still running. Newly planned Work
 > returns through the same trusted asynchronous Runtime; confirmation, privacy,
 > safety, resource and provider contracts remain authoritative, and an internal
-> event is never user consent. Background Social Attention remains optional
-> body-only decoration attached to a concrete Main Activity and never delays or
+> event is never user consent. Planner-owned Social Attention remains optional
+> body-only decoration in the same primary Plan as a concrete Main Activity and never delays or
 > completes the primary Responsibility. Current implementation and qualification
 > evidence are tracked separately in [Status](docs/STATUS.md).
 >
@@ -51,8 +51,8 @@ experience artifacts. See
 > by planning from exact registered semantic scope. See
 > [Resource Acquisition and Delivery](docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
 > Chromie has two execution lanes beneath the one Cognitive Core: Vocal and
-> Activity. Social Attention is background social-decoration cognition, not a
-> third lane; accepted decoration executes through Activity with no Goal-completion
+> Activity. Social Attention is a Planner-owned behavior domain, not a
+> third lane or second cognitive stage; accepted decoration executes through Activity with no Goal-completion
 > authority. Soridormi remains a peer Capability Provider beneath Activity and
 > owns its subtle-expression, locomotion/whole-body, and safety arbitration. See
 > [Execution Lanes and Coordination](docs/EXECUTION_LANES_AND_COORDINATION.md).
@@ -160,7 +160,7 @@ Retained target evidence additionally proves:
 - clean full-matrix generated-speech acceptance after the post-merge fixes;
 - positive Agent Skill selection with trustworthy real provider-backed weather
   execution and follow-up conversation;
-- the reviewed Social Attention live baseline;
+- a reviewed current-Plan auxiliary Social Attention live baseline;
 - second-machine LAN exposure validation;
 - broader/bilingual audio quality, physical acoustic barge-in, hot-plug, and
   current-revision qualification against the declared warm interaction latency targets; and

@@ -53,6 +53,13 @@ adaptation are not additional semantic owners. They refine factual/context input
 existing owners and cannot inherit downstream Goal, Plan, authorization, or effect
 authority.
 
+Optional social decoration is part of that same Planner authority, not a separate
+semantic owner. Fast Advance and canonical Fast/Deep results may carry bounded
+`auxiliary_activities[]` alongside their Main Activities. The field is fingerprinted
+Plan truth but is structurally outside Goal-owned `steps[]`; Runtime may validate,
+execute, or suppress the exact proposal, never reselect it. Auxiliary-only events
+cannot create a Goal-scoped `CognitiveOpportunity` or borrow Goal identity.
+
 Single semantic authority does not freeze capability granularity. A provider may
 change which bounded capabilities it advertises as its implementation improves.
 Chromie plans only across the capabilities visible in the current catalog: one
@@ -89,7 +96,7 @@ continue mechanically without a Planner turn, while material invalidation re-ent
 | Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
-| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Goal Association, Reflection, Social Attention, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
+| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner (including optional auxiliary activities), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
 The maintained first user-facing speech path is Planner-owned. Goal
 Interpretation emits Responsibility evidence only. Planner's fast pass may author one

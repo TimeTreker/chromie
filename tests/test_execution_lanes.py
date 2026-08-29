@@ -229,7 +229,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             resources=["base_motion", "balance_control"],
         )
         view = _InteractionRuntimeView([walk])
-        adapter = CanonicalPlanRuntimeAdapter(view, social_attention_mode="on")
+        adapter = CanonicalPlanRuntimeAdapter(view)
         contract = ExecutionLaneContractTests()
         plan = contract._plan()
         planner_response = contract._planner_response(plan)
@@ -273,7 +273,6 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         walk.metadata.pop("parallel_metadata_declared", None)
         adapter = CanonicalPlanRuntimeAdapter(
             _InteractionRuntimeView([walk]),
-            social_attention_mode="on",
         )
         contract = ExecutionLaneContractTests()
         plan = contract._plan()

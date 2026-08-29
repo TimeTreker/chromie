@@ -46,7 +46,6 @@ from shared.chromie_contracts.plan import (
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage, SemanticGoal
-from shared.chromie_contracts.social_attention import SocialAttentionPlan
 
 
 TEST_SKILL_OUTPUT_SCHEMA = {
@@ -1060,13 +1059,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 events.append("fast")
                 return await super().resolve_fast_plan(*args, **kwargs)
 
-            async def resolve_social_attention(self, *args, **kwargs):
-                events.append("social_attention_started")
-                return SocialAttentionPlan(
-                    decision="none",
-                    reason="The optional cue is unnecessary.",
-                )
-
         advance = FastPlannerAdvance(
             turn_id="turn-weather",
             disposition="unavailable",
@@ -1101,15 +1093,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(mode="apply"),
         )
-        original_queue = coordinator._queue_social_attention_for_activity
-
-        def observe_social_attention_queue(*args, **kwargs):
-            activity = kwargs.get("activity")
-            if activity is not None and activity.activity_id == "weather-progress":
-                events.append("social_attention_queued")
-            return original_queue(*args, **kwargs)
-
-        coordinator._queue_social_attention_for_activity = observe_social_attention_queue
         core, envelope = admitted_core(
             "今天下午重庆会下雨吗？",
             sid="turn-weather",
@@ -1134,9 +1117,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 history=[],
                 language="zh-CN",
             )
-            if coordinator._auxiliary_tasks:
+            if coordinator._auxiliary_execution_tasks:
                 await asyncio.gather(
-                    *tuple(coordinator._auxiliary_tasks),
+                    *tuple(coordinator._auxiliary_execution_tasks),
                     return_exceptions=True,
                 )
             return result
@@ -1156,14 +1139,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             events.index("vocal_activity_started"),
             events.index("association_completed"),
         )
-        self.assertLess(
-            events.index("fast"),
-            events.index("social_attention_queued"),
-        )
-        self.assertLess(
-            events.index("social_attention_queued"),
-            events.index("social_attention_started"),
-        )
+        self.assertNotIn("social_attention_started", events)
         self.assertEqual(runtime.started_fast_activities[0][1], "我先看看能不能查到。")
         self.assertEqual(
             client.calls,
@@ -1201,16 +1177,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 mode="apply",
             ),
         )
-        queued_social_activity_ids: list[str] = []
-
-        def retain_social_activity(*args, **kwargs):
-            del args
-            activity = kwargs.get("activity")
-            if activity is not None:
-                queued_social_activity_ids.append(activity.activity_id)
-
-        coordinator._queue_social_attention_for_activity = retain_social_activity
-
         result = self.run_resolution(coordinator, client, text="你好")
 
         self.assertEqual(result.status, "applied")
@@ -1220,7 +1186,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.terminal_plan.goal_ids, ["goal-1"])
         self.assertEqual(runtime.started_fast_activities[0][1], "你好呀！")
         self.assertEqual(result.interaction_response.speech, [])
-        self.assertEqual(queued_social_activity_ids, ["greeting-response"])
+        self.assertEqual(result.terminal_plan.auxiliary_activities, [])
         self.assertTrue(result.metadata["gi_fanout_concurrent"])
 
     def test_fast_clarification_commits_goal_with_information_gap(self):
@@ -2183,7 +2149,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "fast_planner",
                 "canonical_plan_validation",
                 "planner_communicative_activity_validation",
-                "social_attention_opportunity",
             ],
         )
         for _, stage in observed:

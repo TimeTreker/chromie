@@ -56,7 +56,9 @@ COMPONENT_PROFILES: dict[str, ComponentProfile] = {
         layers=("module", "integration"),
         url_env="CHROMIE_BENCHMARK_SOCIAL_ATTENTION_URL",
         callable_env="CHROMIE_BENCHMARK_SOCIAL_ATTENTION_CALLABLE",
-        description="Social Attention proposal and validation boundary",
+        description=(
+            "Planner-owned auxiliary Activity proposal and Host validation boundary"
+        ),
     ),
 }
 

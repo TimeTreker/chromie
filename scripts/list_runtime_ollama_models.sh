@@ -49,10 +49,6 @@ fi
 if is_enabled "${AGENT_DEEP_PLANNER_ENABLED:-1}"; then
   append_model "${AGENT_DEEP_PLANNER_MODEL:-}"
 fi
-if [ "${AGENT_SOCIAL_ATTENTION_MODE:-off}" != "off" ]; then
-  append_model "${AGENT_SOCIAL_ATTENTION_MODEL:-}"
-fi
-
 if [ "${#models[@]}" -eq 0 ]; then
   echo "[models][error] Active runtime selected no Ollama models." >&2
   exit 1

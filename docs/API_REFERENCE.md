@@ -57,7 +57,7 @@ running.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, Social Attention mode, and WorkDAG diagnostic counters. |
+| `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, and WorkDAG diagnostic counters. |
 | `GET` | `/semantic-authority` | Return the machine-readable maintained single-authority matrix for Goal-driven `apply` and `report_only`. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic Goal Interpretation inside the Core. |
@@ -72,7 +72,6 @@ running.
 | `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`; only one mechanical DTO regeneration is permitted. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
-| `POST` | `/social-attention/plan` | Produce one event-scoped auxiliary `SocialAttentionPlan` from the reviewed live social-capability set; it has no Goal, speech, or execution authority. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 
 `GET /agent-skills` reports the passive read-only cognitive-content registry.
@@ -141,7 +140,6 @@ Important interaction-related endpoints are:
 | `POST` | `/goal-association` | Commit no Host state; return the model-authored canonical Goal association/segmentation proposal for Host application. |
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
-| `POST` | `/social-attention/plan` | Return an event-scoped auxiliary Social-Attention proposal with behavior IDs decoder-constrained to the reviewed live candidate set. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 
 The maintained Goal-driven planning endpoints (`/fast-first-response`, `/fast-advance`, `/goal-association`,
@@ -175,8 +173,8 @@ validation in that same primary result. A separate same-owner Epistemic Qualific
 LLM call is prohibited and removed. Validation cannot rewrite text, retry, select a Capability,
 resolve an execution input, create a planning InformationGap, or ask a clarification;
 rejection or checker failure returns a null Activity. Runtime may then structurally
-validate and start accepted exact wording immediately; optional Social Attention
-receives that same Activity as its Main-Activity anchor and cannot delay it. This
+validate and start accepted exact wording immediately. Fast First Response has no
+auxiliary-decoration surface and cannot be delayed by one. This
 endpoint is a phase of Fast Planner, not an independent response-composition authority.
 
 `POST /fast-advance` continues the same Fast Planner Activity decision after any first
@@ -254,7 +252,12 @@ Capability authorization and execution.
 
 `POST /reflection` reuses the configured Deep Planner model only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition. **Current endpoint semantics remain open-Responsibility-only:** applied actions require runtime-bound trusted evidence and a completed outcome is terminal to this API path. Reflection may propose future replan, clarification, a future user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, reopen the current turn, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary. The accepted architecture now specifies a later contract split in which terminal evidence may support bounded `experience`/`calibration` without reopening Responsibility; that design is not implemented by this endpoint yet.
 
-`POST /social-attention/plan` accepts a `SocialAttentionRequest` describing one concrete **semantic** `primary_activity` event in phase `ready` or `started`: what Chromie is doing, such as greeting somebody, telling a joke, walking, singing, handing something over, or showing/playing something. Responsibility/Goal meaning sits above Activity. Canonical Communicative Acts and Plan-step Work provide concrete Activity identity/granularity; one Goal may own several Activities, while a high-level provider capability may keep one behavior atomic. A Fast-Planner scheduled Communicative Act carries its own semantic identity. `primary_activity.realization` separately records how the Activity is currently realized through the Vocal/Activity execution lanes, Vocal Expression modes, execution-item IDs, and Capability IDs. `speech`, `singing`, `humming`, etc. are modes of one Vocal Expression and are not Primary-Activity kinds. Multiple realization items serving one semantic Activity do not create duplicate decoration opportunities. Internal cognition milestones (`understanding_ready`, Goal Association, planning, waiting, evidence arrival), lane transitions, and provider readiness are not valid anchors. Independent semantic Activities are independently eligible for optional decoration. It returns an auxiliary `SocialAttentionPlan`. `SocialAttentionPlanner` is the single semantic owner of that plan. The decoder constrains every behavior `capability_id` to the reviewed live candidate set and excludes provider-owned backend/calibration fields from the model-facing projection. A valid primary `decision=none` is terminal. A malformed primary DTO fails soft to no decoration; there is no second critic or same-stage semantic/DTO repair call. The endpoint only proposes; the Host independently validates target evidence, schemas, confirmation, resources, provider concurrency, and availability before the Trusted Capability Runtime may execute a behavior. The proposal owns no Goal state, speech meaning, or completion evidence.
+Fast Advance, `/fast-plan`, and `/deep-plan` expose bounded
+`auxiliary_activities[]` inside their primary Planner output. Each item is anchored
+to a Planner-authored Main Activity and decoder-constrained to exact eligible live
+catalog candidates. Fast First Response deliberately has no such field. Runtime
+validates or suppresses the exact proposal; it cannot reselect. Auxiliary-only
+events do not create Goal-scoped cognitive re-entry.
 
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
@@ -366,13 +369,11 @@ Evidence qualification.
 Shared contracts reject unknown fields and recursively reject low-level motor,
 joint, torque, and actuator fields. The maintained response is projected from
 Planner-owned Communicative and Capability Activities; there is no legacy
-response-adapter/fallback mode. When `AGENT_SOCIAL_ATTENTION_MODE` allows it, the independent
-`SocialAttentionPlanner` may attach its advisory `social_attention_plan`. The plan identifies the
-`social_attention` behavior domain, the `auxiliary_expression` role, a social
-purpose, and optional small body behaviors selected from the reviewed catalog.
-It cannot author or adapt response text. Applied decoration requests carry
-`metadata.source=social_attention_plan`,
-`metadata.auxiliary_social_attention=true`,
+response-adapter/fallback mode. The primary Planner may include advisory
+`auxiliary_activities[]` selected from the reviewed `social_attention` behavior
+domain. They cannot author or adapt response text independently. Applied decoration requests carry
+`metadata.source=canonical_plan_auxiliary_activity`,
+`metadata.auxiliary_plan_activity=true`,
 `metadata.execution_lane=activity`, and
 `metadata.execution_role=social_decoration`; they are excluded from user task
 proposals and Goal completion. Runtime validation checks exact catalog

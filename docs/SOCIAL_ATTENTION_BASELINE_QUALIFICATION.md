@@ -11,11 +11,12 @@ semantic decisions into the Host Runtime.
 > Thinking belongs to the LLM. Benchmark evaluates intelligence; it must not
 > implement intelligence.
 
-The LLM remains responsible for the optional Social Attention proposal. The Host
-validates and materializes trusted work. The Provider accepts, rejects, and
-executes embodiment-specific work. Benchmark only selects scenarios, records
-identity and evidence, checks declared deterministic boundaries, and preserves
-review artifacts.
+The same primary Fast or Deep Planner result that authors the Main Activity
+remains responsible for any optional Social Attention proposal in
+`auxiliary_activities[]`. The Host validates and materializes only that exact
+proposal. The Provider accepts, rejects, and executes embodiment-specific work.
+Benchmark only selects scenarios, records identity and evidence, checks declared
+deterministic boundaries, and preserves review artifacts.
 
 ## Repository audit
 
@@ -29,10 +30,13 @@ normalized scenario and resolve only a configured URL or Python callable.
 
 The audit found one qualification-orchestration defect: the original foundation
 accepted one global E2E `run` while the 128-case dataset intentionally spans
-three launcher-effective Social Attention modes and four owner-approved
-interaction styles. A deployed Runtime does not become `off`, `report_only`, or
-`on` because Benchmark metadata says so, and an owner-approved MindProfile is not
-`mixed-by-scenario`. The qualification contract now accepts a bundle of repeated
+three Social Attention qualification conditions and four owner-approved
+interaction styles. These conditions are harness inputs: `off` supplies no
+eligible auxiliary candidates, `report_only` observes a proposal while suppressing
+execution, and `on` exercises normal validation/execution. They are not product
+environment switches, independent model modes, or permission for scenario metadata
+to select behavior. An owner-approved MindProfile is not `mixed-by-scenario`. The
+qualification contract accepts a bundle of repeated
 `--report` inputs. Each report must be homogeneous for one effective mode and one
 interaction style, and every result is checked against its scenario scope.
 Missing, duplicate, unexpected, or scope-mismatched results fail closed.
@@ -40,8 +44,10 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 ### Default model topology
 
 The RTX 5090 hardware profile declares `qwen3.5:9b` for Goal Interpretation,
-Fast Planning, terminal Evidence re-entry, and Social Attention; Goal Association
-and Deep Planning use `gemma4:12b`. It explicitly opts out of CosyVoice compact cognition and keeps
+Fast Planning, and terminal Evidence re-entry; Goal Association and Deep Planning
+use `gemma4:12b`. Social Attention has no model role of its own: its effective
+model is the Fast or Deep Planner model that authored the containing Plan. The
+profile explicitly opts out of CosyVoice compact cognition and keeps
 two Ollama models resident. Other profiles may retain the one-model compact
 topology when their committed profile leaves that setting enabled. Qualification
 therefore records launcher-effective component identities; a static
@@ -54,25 +60,29 @@ The authoritative goal-driven path is:
 ```text
 Cognitive Gateway
 → Goal-Driven Cognitive Core
-→ anchored interaction-state event
-→ background Social Attention planner
-→ Host validation/materialization
+→ Fast/Deep Planner primary result
+  ├─ Goal-owned Main Activities
+  └─ optional auxiliary_activities[]
+→ Host commits and launches the Main Activity
+→ Host exact validation/materialization of the attached auxiliary proposal
 → Provider acceptance/completion
 ```
 
-The goal-driven Runtime coalesces current-turn background events and supplies
-primary-progress context, owner-approved Social Interaction Style, bounded
-recent-decoration evidence, target evidence, and the reviewed live Capability
-set. Candidate preparation removes any explicit primary Capability from the
-model's allowed enum. The Host independently repeats duplicate-primary and
-resource-conflict checks before the Trusted Capability Runtime.
+The primary Planner receives the Main Activity context, owner-approved Social
+Interaction Style, bounded recent-decoration evidence, target evidence, and the
+reviewed live Capability set in the same invocation. Candidate preparation keeps
+the auxiliary enum structurally separate from primary Capability selection. The
+Plan contract rejects a duplicate primary Capability; the Host repeats catalog,
+target-freshness, duplicate-primary, and resource-conflict checks before the
+Trusted Capability Runtime.
 
-Every Social Attention opportunity is attached to one concrete observable Main
-Activity and retains that Activity ID. The Planner does not author a duplicate
-decoration, `decision=none` remains valid, and a late proposal cannot become
-standalone motion. The maintained live-service harness must prove that the goal-driven
-runtime acquired the turn and that the background planner was the proposal
-source.
+Every auxiliary Activity is attached to one concrete observable Main Activity and
+retains that Activity ID. An empty list remains valid. Host commit and primary
+launch precede auxiliary scheduling; confirmation-held or rejected primary work
+does not schedule its decoration. A stale proposal is suppressed rather than
+retargeted or replaced. The maintained live-service harness must prove that the
+goal-driven Runtime acquired the turn and that the containing Fast/Deep Plan was
+the proposal source.
 
 ### Evidence and execution profiles
 
@@ -177,7 +187,6 @@ python -m benchmarks.e2e.run \
   --dataset social_attention \
   --model qwen3:4b \
   --effective-model fast_planner=qwen3:4b \
-  --effective-model social_attention=qwen3:4b \
   --prompt-revision planner-activity-prompt-v1 \
   --code-revision <commit-sha> \
   --mind-profile <approved-profile-revision> \
@@ -185,7 +194,7 @@ python -m benchmarks.e2e.run \
   --social-attention-mode on \
   --style courteous \
   --mode on \
-  --semantic-authority-owner goal_driven_cognitive_core \
+  --semantic-authority-owner fast_planner \
   --runtime-topology launcher-effective-compact-cognition \
   --sample-count 1 \
   --run-id social-attention-live-model-on-courteous \
@@ -204,7 +213,7 @@ python -m benchmarks.e2e.run \
   --dataset social_attention \
   --provider-revision <provider-revision> \
   --hardware-profile rtx5090 \
-  --semantic-authority-owner goal_driven_cognitive_core \
+  --semantic-authority-owner goal_driven_cognitive_core.planner \
   --runtime-topology cognitive-runtime-apply \
   --code-revision <commit-sha> \
   --prompt-revision <prompt-revision> \
@@ -282,24 +291,20 @@ remain reviewed qualitative dimensions.
 
 ## Closure state and remaining evidence
 
-The Social Attention behavior design and source implementation are closed for
-this increment. Focused source tests cover background request identity, primary
-Capability exclusion, optional compatible decoration, duplicate/resource
-rejection, non-blocking/coalescing behavior, style, and evidence grounding.
+The Planner-owned behavior design is implemented in the current amendment and is
+not source-qualified until the canonical gates pass. Focused source tests cover
+primary-result identity, independent auxiliary candidate binding, Goal isolation,
+anchor validity, optional compatible decoration, duplicate/resource rejection,
+post-primary scheduling, confirmation-held suppression, style, and evidence
+grounding.
 
-Formal target qualification is not closed. Rebuilt working-tree planner probes
-accepted greeting, exact blink, and playful-blink inputs; explicit primary blink
-was absent from the auxiliary candidate enum and the model safely selected no
-decoration. Retained full-path diagnostics then completed both exact blink and
-“Blink twice and be cute” through Soridormi/MuJoCo. The latter retained one
-`body_action` Goal, executed `soridormi.blink_eyes(count=2)` exactly once, and
-returned standing/safe-idle. Intermediate failed runs exposed and closed upstream
-Goal-segmentation, extra-candidate coverage, contradictory-decision, and
-clarification-escape defects. These dirty-working-tree artifacts are diagnostic
-evidence, not a source-bound baseline.
+Formal target qualification is not closed. Retained reports produced through the
+retired independent Planner/endpoint/worker path are historical diagnostics only;
+they do not qualify the new primary Planner prompt/schema or Host scheduling
+boundary.
 
 To close formal qualification, connect the first-party adapter contract to the
-authoritative cognitive-runtime harness, commit/rebuild the exact source, retain
+authoritative Planner-backed cognitive-runtime harness, commit/rebuild the exact source, retain
 the 128-case homogeneous mode/style bundle, and complete fingerprint-bound human
 review. The same fixed scenarios can then support model comparison, stress
 distribution, selected MuJoCo evidence, earliest-error classification, and

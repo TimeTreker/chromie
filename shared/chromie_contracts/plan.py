@@ -36,6 +36,27 @@ GoalOutcomeDisposition = Literal[
 ]
 PlanTiming = Literal["sequential", "parallel"]
 PlanStepPurpose = Literal["achieve_effect", "acquire_information"]
+AuxiliaryActivityAnchorKind = Literal[
+    "communicative_act",
+    "plan_response",
+    "plan_step",
+]
+AuxiliaryActivityExecutionRole = Literal["social_decoration"]
+AuxiliarySocialFunction = Literal[
+    "acknowledge",
+    "listening",
+    "engagement",
+    "empathy",
+    "turn_taking",
+    "deference",
+    "neutral_presence",
+    "other",
+]
+AuxiliaryTargetSource = Literal[
+    "live_perception",
+    "conversation_context",
+    "none",
+]
 ParameterResolutionStrategy = Literal[
     "user_supplied",
     "schema_default",
@@ -274,6 +295,86 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
         return reject_forbidden_low_level_fields(value)
 
 
+class AuxiliaryActivityTarget(BaseModel):
+    """Bounded semantic target cited by a Planner-owned auxiliary Activity.
+
+    Live perception is authority-owned state and therefore need not be relabelled
+    as retained Evidence. ``evidence_refs`` carries exact retained references when
+    they exist; Runtime still checks the target against the freshest trusted state
+    before dispatch.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_ref: str = "none"
+    source: AuxiliaryTargetSource = "none"
+    relative_direction: str | None = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("target_ref", mode="before")
+    @classmethod
+    def normalize_target_ref(cls, value: Any) -> str:
+        return normalize_whitespace(value) or "none"
+
+    @field_validator("relative_direction", mode="before")
+    @classmethod
+    def normalize_relative_direction(cls, value: Any) -> str | None:
+        return normalize_whitespace(value) or None
+
+    @field_validator("evidence_refs", mode="before")
+    @classmethod
+    def normalize_evidence_refs(cls, value: Any) -> list[str]:
+        return _normalize_ids(value)
+
+    @model_validator(mode="after")
+    def validate_target_shape(self) -> "AuxiliaryActivityTarget":
+        if self.source == "none":
+            if self.target_ref != "none" or self.relative_direction or self.evidence_refs:
+                raise ValueError(
+                    "an untargeted auxiliary Activity cannot claim target semantics"
+                )
+        elif self.target_ref == "none":
+            raise ValueError(
+                "a targeted auxiliary Activity requires a semantic target_ref"
+            )
+        return self
+
+
+class AuxiliaryPlanActivity(CapabilityIdentityModel):
+    """Optional Planner-authored social decoration around one primary Activity.
+
+    Membership in ``auxiliary_activities`` is the non-Goal contract: there are no
+    Goal IDs, outcome links, completion flags, or model-authored optionality
+    booleans here. Runtime may validate, suppress, or execute this exact proposal,
+    but may not select a replacement Capability, target, argument, or anchor.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    auxiliary_activity_id: str = Field(min_length=1, max_length=160)
+    anchor_kind: AuxiliaryActivityAnchorKind
+    anchor_id: str = Field(min_length=1, max_length=160)
+    args: dict[str, Any] = Field(default_factory=dict)
+    execution_role: AuxiliaryActivityExecutionRole = "social_decoration"
+    timing: Literal["parallel"] = "parallel"
+    social_function: AuxiliarySocialFunction = "neutral_presence"
+    target: AuxiliaryActivityTarget = Field(default_factory=AuxiliaryActivityTarget)
+    reason_summary: str = Field(default="", max_length=320)
+
+    @field_validator(
+        "auxiliary_activity_id", "anchor_id", "reason_summary", mode="before"
+    )
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        return normalize_whitespace(value)
+
+    @field_validator("args")
+    @classmethod
+    def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return reject_forbidden_low_level_fields(value)
+
+
 class PlannedCommunicativeAct(BaseModel):
     """Goal-bound exact communication selected and worded by Planner."""
 
@@ -472,6 +573,10 @@ class FastPlannerAdvance(BaseModel):
     coverage: PlanCoverage
     covered_responsibility_refs: list[str] = Field(default_factory=list)
     activities: list[FastPlannerActivity] = Field(default_factory=list, max_length=24)
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
+        default_factory=list,
+        max_length=3,
+    )
     continuations: list[FastPlannerContinuation] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     unresolved: list[str] = Field(default_factory=list)
@@ -528,6 +633,45 @@ class FastPlannerAdvance(BaseModel):
         activity_ids = [item.activity_id for item in self.activities]
         if len(activity_ids) != len(set(activity_ids)):
             raise ValueError("Fast Planner Activity IDs must be unique")
+        auxiliary_ids = [
+            item.auxiliary_activity_id for item in self.auxiliary_activities
+        ]
+        if len(auxiliary_ids) != len(set(auxiliary_ids)):
+            raise ValueError("Fast Planner auxiliary Activity IDs must be unique")
+        if self.disposition == "escalate" and self.auxiliary_activities:
+            raise ValueError(
+                "an escalating Fast Planner result cannot author auxiliary Activities"
+            )
+        activity_id_set = set(activity_ids)
+        capability_activity_ids = {
+            item.activity_id
+            for item in self.activities
+            if isinstance(item, FastPlannerCapabilityActivity)
+        }
+        primary_capability_ids = {
+            item.capability_id
+            for item in self.activities
+            if isinstance(item, FastPlannerCapabilityActivity)
+        }
+        for auxiliary in self.auxiliary_activities:
+            if auxiliary.anchor_id not in activity_id_set:
+                raise ValueError(
+                    "Fast Planner auxiliary Activity references an unknown primary Activity"
+                )
+            expected_kind = (
+                "plan_step"
+                if auxiliary.anchor_id in capability_activity_ids
+                else "communicative_act"
+            )
+            if auxiliary.anchor_kind != expected_kind:
+                raise ValueError(
+                    "Fast Planner auxiliary Activity anchor_kind does not match its "
+                    "primary Activity"
+                )
+            if auxiliary.capability_id in primary_capability_ids:
+                raise ValueError(
+                    "an auxiliary Activity cannot duplicate a primary Capability Activity"
+                )
         for activity in self.activities:
             unknown = set(activity.source_responsibility_refs) - set(
                 self.covered_responsibility_refs
@@ -570,6 +714,12 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     coverage: PlanCoverage
     covered_responsibility_refs: list[str]
     activities: list[FastPlannerActivity]
+    # Python callers may omit the empty list in deterministic fixtures. The
+    # model-facing JSON schema still requires the primary Planner to emit it.
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
+        default_factory=list,
+        max_length=3,
+    )
     continuations: list[FastPlannerContinuation]
     confidence: float = Field(ge=0.0, le=1.0)
     unresolved: list[str]
@@ -894,6 +1044,10 @@ class CanonicalPlan(BaseModel):
         max_length=24,
     )
     steps: list[CanonicalPlanStep] = Field(default_factory=list)
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
+        default_factory=list,
+        max_length=3,
+    )
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
@@ -1071,6 +1225,33 @@ class CanonicalPlan(BaseModel):
                 raise ValueError(
                     "Communicative Act references unknown Goal IDs: "
                     + ",".join(sorted(unknown_act_goals))
+                )
+        auxiliary_ids = [
+            item.auxiliary_activity_id for item in self.auxiliary_activities
+        ]
+        if len(auxiliary_ids) != len(set(auxiliary_ids)):
+            raise ValueError("Canonical Plan auxiliary Activity IDs must be unique")
+        step_id_set_for_anchors = {item.step_id for item in self.steps}
+        communicative_id_set = set(communicative_act_ids)
+        has_plan_response = bool(
+            self.response_text
+            or any(item.response_text for item in self.goal_outcomes)
+        )
+        primary_capability_ids = {item.capability_id for item in self.steps}
+        for auxiliary in self.auxiliary_activities:
+            if auxiliary.anchor_kind == "plan_step":
+                valid_anchor = auxiliary.anchor_id in step_id_set_for_anchors
+            elif auxiliary.anchor_kind == "communicative_act":
+                valid_anchor = auxiliary.anchor_id in communicative_id_set
+            else:
+                valid_anchor = auxiliary.anchor_id == "response" and has_plan_response
+            if not valid_anchor:
+                raise ValueError(
+                    "auxiliary Activity must reference an existing primary Plan Activity"
+                )
+            if auxiliary.capability_id in primary_capability_ids:
+                raise ValueError(
+                    "an auxiliary Activity cannot duplicate a primary Plan Capability"
                 )
         provenance_keys = [
             (item.agent_skill_id, item.selected_by_agent_role)

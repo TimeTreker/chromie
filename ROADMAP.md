@@ -25,7 +25,8 @@ migrations. Continue in this order:
 1. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
    and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
    Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
-   behavior, duplicate-effect prevention, Social Attention, and latency.
+   behavior, duplicate-effect prevention, Planner-owned auxiliary social decoration,
+   and latency.
 2. **Keep implementation, automated verification, target validation, and release readiness
    separate.** A source-closed architecture slice does not qualify microphone, provider,
    simulator, model quality, or latency behavior.
@@ -75,10 +76,11 @@ Reviewed architecture status (each item states its implementation state explicit
    terminal Evidence through immutable request
    provenance to exact Goal IDs, then creates a bounded readiness opportunity for Planner
    with a version-consistent Goal/Evidence/Work snapshot. Planner chooses answer,
-   follow-up Work, revision, clarification, waiting, silence, or no new Activity. Social Attention remains optional
-   decoration attached to the same observable Main Activity and never delays it.
+   follow-up Work, revision, clarification, waiting, silence, or no new Activity. The
+   same primary Planner result may include optional `auxiliary_activities[]` attached
+   to an observable Main Activity; Runtime cannot reselect and decoration never delays it.
    Retain separate first-commit, TTS-first-PCM, playback-start, result-reentry,
-   and Social-Attention-opportunity timing evidence.
+   auxiliary validation/dispatch, and auxiliary suppression timing evidence.
 4. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
@@ -267,8 +269,8 @@ available.
    event should resume from current Goal/Work/Evidence state rather than restart the
    whole request. Corrections revise current meaning, reuse compatible Work, and repair
    incompatible speech or effects forward without rewriting history.
-5. **Add restrained embodied expression.** Qualify Social Attention only around an
-   explicit primary Activity with current target/scene evidence. Optional gaze, posture,
+5. **Add restrained embodied expression.** Qualify Planner-owned auxiliary social
+   Activities only around an explicit primary Activity with current target/scene evidence. Optional gaze, posture,
    or expression remains resource-aware and fail-soft, never delays the primary outcome,
    and never becomes Goal-completion Evidence. Missing expression is preferable to a
    mismatched or unsafe gesture.
@@ -464,7 +466,7 @@ authority behind a new manager.
    the deterministic provider fault matrix; target-evidence closure adds a
    `current_revision_qualification` profile requiring the same clean revision across source,
    Gateway/Core, Agent Skill/weather, directory-discovered live interaction behavior, live provider
-   faults, Social Attention, and LAN tracks. The interaction track now requires explicit
+   faults, Planner-owned auxiliary social behavior, and LAN tracks. The interaction track now requires explicit
    passing coverage for human-like continuity, Planner/Goal semantic quality, WorkDAG
    multi-Goal revision/cardinality, and continuous-cognition recovery in addition to the
    retained baseline probes and warm Fast-Planner/playback budgets. Source qualification pins
@@ -547,7 +549,7 @@ Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the append-onl
 Interaction Ledger and bounded Goal-scoped Interaction Context supplied to Goal
 Association, Fast Planner, and Deep Planner. The Ledger
 transports facts from existing owners; it does not replace or rewrite playback,
-Social Attention results, the canonical Plan, Goal state, static preflight
+auxiliary-Activity results, the canonical Plan, Goal state, static preflight
 diagnostics, or `ExecutionOutcomeBundle` evidence.
 
 Exit criteria:

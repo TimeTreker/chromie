@@ -42,7 +42,6 @@ try:
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
-    from chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
@@ -65,7 +64,6 @@ except ImportError:  # pragma: no cover
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
     )
-    from shared.chromie_contracts.social_attention import SocialAttentionPlan, SocialAttentionRequest
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
         ToolExecutionResponse,
@@ -83,11 +81,6 @@ try:
     from chromie_contracts.reflection import ReflectionRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.reflection import ReflectionRequest
-from .social_attention import (
-    SocialAttentionContextBuilder,
-    SocialAttentionPlanner,
-    SocialAttentionServices,
-)
 from .schema import HealthResponse
 from .cognitive_core.goal_interpreter import (
     GoalInterpretationRequest,
@@ -162,17 +155,6 @@ external_information_client = (
     else None
 )
 
-social_attention_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.social_attention_model,
-        timeout_ms=settings.social_attention_timeout_ms,
-        purpose="social_attention",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.social_attention_mode != "off"
-    else None
-)
 cognitive_gateway_attention_client = (
     OllamaClient(
         settings.ollama_url,
@@ -259,17 +241,6 @@ capability_catalog = CapabilityCatalog(
         settings.capability_prompt_tier_overrides
     ),
 )
-social_attention_services = SocialAttentionServices(
-    social_attention_mode=settings.social_attention_mode,
-    social_attention_ollama=social_attention_client,
-    social_attention_num_ctx=settings.social_attention_num_ctx,
-    social_attention_num_predict=settings.social_attention_num_predict,
-    social_attention_max_behaviors=settings.social_attention_max_behaviors,
-    social_attention_capability_ids=settings.social_attention_capability_ids,
-    capability_catalog=capability_catalog,
-)
-social_attention_context_builder = SocialAttentionContextBuilder(social_attention_services)
-social_attention_planner = SocialAttentionPlanner(social_attention_services)
 read_only_invoker = (
     McpStreamableHttpInvoker(capability_registry)
     if settings.enable_read_only_dag_execution
@@ -537,10 +508,6 @@ async def health() -> HealthResponse:
         ),
         deep_planner_enabled=deep_planner_resolver is not None,
         deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
-        social_attention_mode=settings.social_attention_mode,
-        social_attention_model=(
-            settings.social_attention_model if social_attention_client is not None else None
-        ),
     )
 
 
@@ -668,20 +635,6 @@ async def resolve_reflection(request: ReflectionRequest):
     if reflection_resolver is None:
         raise HTTPException(status_code=503, detail="Reflection is disabled")
     return await reflection_resolver.resolve(request)
-
-
-@app.post("/social-attention/plan", response_model=SocialAttentionPlan)
-async def plan_social_attention(request: SocialAttentionRequest) -> SocialAttentionPlan:
-    """Plan one independent, event-scoped auxiliary Social-Attention proposal."""
-    await social_attention_context_builder.prepare(request)
-    plan = await social_attention_planner.plan(request)
-    if plan is None:
-        return SocialAttentionPlan(
-            decision="none",
-            reason="No eligible Social-Attention proposal was available for this event.",
-            metadata={"resolver": "social_attention", "event": request.event},
-        )
-    return plan
 
 
 @app.post("/tools/execute", response_model=ToolExecutionResponse)

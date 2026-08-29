@@ -1539,7 +1539,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "execute")
         self.assertIn(
-            "Optional coordinated expression belongs to the separate Social Attention owner",
+            "Optional coordinated social expression may appear only in auxiliary_activities",
             ollama.prompts[0][0],
         )
         self.assertIn("no later model will audit or repair its semantics", planner_prompt.deep_system_prompt())

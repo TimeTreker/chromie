@@ -40,6 +40,79 @@ from .planner_model_contract import (
     ResourceResponsibilityCapabilityGroundingError,
 )
 
+
+def _constrain_auxiliary_activity_schema(
+    schema: dict[str, Any],
+    candidates: list[dict[str, Any]] | None,
+) -> None:
+    """Bind optional decoration to the exact eligible live-catalog surface."""
+
+    properties = schema.get("properties", {})
+    activities = properties.get("auxiliary_activities")
+    if not isinstance(activities, dict):
+        return
+    candidate_rows = [
+        item
+        for item in (candidates or [])
+        if isinstance(item, dict)
+        and str(item.get("capability_id") or "").strip()
+        and isinstance(item.get("input_schema"), dict)
+    ]
+    activities["maxItems"] = min(3, len(candidate_rows)) if candidate_rows else 0
+    activities["description"] = (
+        "Optional non-Goal social decorations authored in this same primary Planner "
+        "result. Empty is normal and preferred unless one candidate materially improves "
+        "the anchored primary Activity."
+    )
+    definition = schema.get("$defs", {}).get("AuxiliaryPlanActivity")
+    if not isinstance(definition, dict):
+        return
+    base_properties = definition.get("properties")
+    if not isinstance(base_properties, dict):
+        return
+    required = list(definition.get("required") or [])
+    for field_name in (
+        "auxiliary_activity_id",
+        "anchor_kind",
+        "anchor_id",
+        "capability_id",
+        "args",
+        "execution_role",
+        "timing",
+        "social_function",
+        "target",
+        "reason_summary",
+    ):
+        if field_name not in required:
+            required.append(field_name)
+    definition["required"] = required
+    if not candidate_rows:
+        return
+    # The generic capability constraint is applied before this role-specific
+    # one. Replace its primary-capability enum too, so an eligible auxiliary
+    # capability does not also have to be a Goal step.
+    base_properties["capability_id"] = {
+        "type": "string",
+        "enum": [str(item["capability_id"]) for item in candidate_rows],
+    }
+    branches: list[dict[str, Any]] = []
+    for candidate in candidate_rows:
+        branch_properties = copy.deepcopy(base_properties)
+        branch_properties["capability_id"] = {
+            "type": "string",
+            "enum": [str(candidate["capability_id"])],
+        }
+        branch_properties["args"] = copy.deepcopy(candidate["input_schema"])
+        branches.append(
+            {
+                "type": "object",
+                "properties": branch_properties,
+                "required": required,
+                "additionalProperties": False,
+            }
+        )
+    definition["oneOf"] = branches
+
 def canonical_resource_argument_response_schema(
     base_schema: dict[str, Any],
     *,
@@ -332,6 +405,7 @@ def canonical_plan_response_schema(
     expected_goal_ids: list[str],
     allowed_capability_ids: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None = None,
+    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
@@ -358,6 +432,7 @@ def canonical_plan_response_schema(
             expected_goal_ids=expected_goal_ids,
             allowed_capability_ids=allowed_capability_ids,
             capability_input_schemas=capability_input_schemas,
+            auxiliary_social_capabilities=auxiliary_social_capabilities,
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
@@ -378,6 +453,7 @@ def canonical_plan_response_schema(
         "goal_summary",
         "response_text",
         "steps",
+        "auxiliary_activities",
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
@@ -682,6 +758,7 @@ def canonical_plan_response_schema(
                 constrain(value)
 
     constrain(schema)
+    _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     _constrain_plan_relation_confirmation(schema)
 
     # Ollama's structured decoder does not reliably apply nested ``required``
@@ -1099,6 +1176,7 @@ def fast_multi_goal_response_schema(
     expected_goal_ids: list[str],
     allowed_capability_ids: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None = None,
+    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
@@ -1128,6 +1206,7 @@ def fast_multi_goal_response_schema(
         "goal_summary",
         "response_text",
         "steps",
+        "auxiliary_activities",
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
@@ -1677,6 +1756,7 @@ def fast_multi_goal_response_schema(
         "goal_summary",
         "goal_outcomes",
         "steps",
+        "auxiliary_activities",
         "goal_satisfaction",
         "disposition",
         "coverage",
@@ -1692,6 +1772,7 @@ def fast_multi_goal_response_schema(
         key: properties[key] for key in preferred_property_order if key in properties
     }
     _constrain_terminal_unresolved(schema)
+    _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     return schema
 
 def _constrain_planner_step_args(
@@ -2142,6 +2223,7 @@ def fast_advance_response_schema(
     *,
     responsibilities: list[CognitiveResponsibilityProposal] | None = None,
     capabilities: list[dict[str, Any]] | None = None,
+    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     interpretation_unresolved: list[str] | None = None,
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
@@ -2156,6 +2238,7 @@ def fast_advance_response_schema(
     """
 
     schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
+    _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     top_properties = schema.get("properties", {})
     activities_schema = top_properties.get("activities")
     if isinstance(activities_schema, dict):
@@ -2556,6 +2639,7 @@ def deep_plan_response_schema(
     *,
     allowed_capability_ids: list[str] | None = None,
     capability_input_schemas: dict[str, dict[str, Any]] | None = None,
+    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
@@ -2570,6 +2654,7 @@ def deep_plan_response_schema(
         expected_goal_ids=expected_goal_ids,
         allowed_capability_ids=list(allowed_capability_ids or []),
         capability_input_schemas=capability_input_schemas,
+        auxiliary_social_capabilities=auxiliary_social_capabilities,
         response_only=response_only,
         requires_execution=requires_execution,
         response_goal_ids=response_goal_ids,

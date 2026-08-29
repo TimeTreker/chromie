@@ -121,11 +121,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE"], "2.0")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "512")
 
-    def test_capability_planner_has_json_output_budget(self) -> None:
+    def test_auxiliary_planning_has_no_second_model_configuration(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_SOCIAL_ATTENTION_MODE"], "on")
         self.assertFalse(
-            any(name.startswith("AGENT_SOCIAL_ATTENTION_FALLBACK_") for name in values)
+            any(name.startswith("AGENT_SOCIAL_ATTENTION_") for name in values)
         )
         self.assertEqual(values["AGENT_CAPABILITY_MANIFESTS"], "")
         self.assertEqual(values["SORIDORMI_MCP_URL"], "")
@@ -473,7 +472,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
             "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
             "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",
-            "Social Attention": "EFFECTIVE_SOCIAL_ATTENTION_MODEL",
         }
         for role, variable in expected_roles.items():
             with self.subTest(role=role):
@@ -485,7 +483,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Role                               | Model                            | Maintained runtime use",
             launcher,
         )
-        self.assertIn("background social-decoration loop", launcher)
+        self.assertNotIn("EFFECTIVE_SOCIAL_ATTENTION_MODEL", launcher)
+        self.assertNotIn("background social-decoration loop", launcher)
         self.assertNotIn("EFFECTIVE_RESPONSE_REVIEW_MODEL", launcher)
         self.assertNotIn("Response Review                    |", launcher)
         self.assertIn("fallback when readiness does not fully cover Goals", launcher)
@@ -536,7 +535,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertNotIn('wait_for_tcp 127.0.0.1 8092 300 "Agent"', source)
 
-    def test_architecture_validation_preserves_social_attention(self) -> None:
+    def test_architecture_validation_uses_primary_planner_budgets(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"
         )
@@ -544,21 +543,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("--architecture-validation", source)
-        self.assertIn("Social Attention remains active", source)
-        self.assertIn(
-            "${AGENT_SOCIAL_ATTENTION_MODE:-on}",
-            source,
-        )
-        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_CTX=32768", overlay)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_NUM_PREDICT=4096", overlay)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_TIMEOUT_MS=120000", overlay)
+        self.assertNotIn("AGENT_SOCIAL_ATTENTION_", source)
+        self.assertNotIn("AGENT_SOCIAL_ATTENTION_", overlay)
         self.assertIn("OLLAMA_NUM_CTX=32768", overlay)
         self.assertIn("OLLAMA_NUM_PREDICT=4096", overlay)
         self.assertIn("OLLAMA_NUM_PARALLEL=2", overlay)
 
 
-    def test_social_attention_defaults_are_profile_specific_and_nonblocking(self) -> None:
+    def test_social_attention_has_no_independent_runtime_configuration(self) -> None:
         common = (ROOT / ".env.common").read_text(encoding="utf-8")
         overlay = (ROOT / "env" / "validation" / "architecture.env").read_text(
             encoding="utf-8"
@@ -571,11 +563,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", common)
-        self.assertIn("AGENT_SOCIAL_ATTENTION_MODE=on", overlay)
-        self.assertIn("there is no compatibility wait-after-response setting", agent_readme)
-        self.assertNotIn("AGENT_SOCIAL_ATTENTION_WAIT_AFTER_RESPONSE_MS", configuration)
-        self.assertNotIn("default `150`", configuration)
+        for source in (common, overlay, agent_readme, configuration):
+            self.assertNotIn("AGENT_SOCIAL_ATTENTION_", source)
 
     def test_start_chromie_diagnoses_soridormi_probe_failures(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(

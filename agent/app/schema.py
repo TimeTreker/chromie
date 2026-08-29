@@ -40,8 +40,6 @@ class HealthResponse(BaseModel):
     fast_first_response_model: str | None = None
     deep_planner_enabled: bool = False
     deep_planner_model: str | None = None
-    social_attention_mode: str = "on"
-    social_attention_model: str | None = None
 
 
 def detect_language(text: str) -> str:
