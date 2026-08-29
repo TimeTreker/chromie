@@ -409,16 +409,23 @@ def fast_advance_layered_prompt(
         sort_keys=True,
         separators=(",", ":"),
     )
-    response_schema_json = (
-        json.dumps(
-            response_schema,
+    presentation_schema_json = ""
+    terminal_schema_json = ""
+    if response_schema:
+        properties = response_schema.get("properties") or {}
+        presentation_schema_json = json.dumps(
+            properties.get("presentation_commit") or {},
             ensure_ascii=False,
             sort_keys=False,
             separators=(",", ":"),
         )
-        if response_schema
-        else ""
-    )
+        terminal_schema_json = json.dumps(
+            properties.get("terminal_result") or {},
+            ensure_ascii=False,
+            sort_keys=False,
+            separators=(",", ":"),
+        )
+    terminal_activity_limit = max(1, len(responsibilities))
     auxiliary_social_section = auxiliary_social_planning_prompt_section(context)
     user_text = str(request.original_user_text or "")[:700]
     communication_instruction = (
@@ -426,17 +433,20 @@ def fast_advance_layered_prompt(
         "presentation_commit.activity as one useful immediate progress or "
         "complete conversational response, or null for intentional silence. "
         "Give a non-null Activity a short stable activity_id; every optional "
-        "auxiliary anchor_id must equal it exactly. Then continue the same decision "
-        "in terminal_result without repeating, rewording, translating, or "
-        "contradicting that Activity. terminal_result.activities may contain only "
+        "auxiliary anchor_id must equal it exactly. Close that tagged frame before "
+        "continuing the same decision in terminal_plan without repeating, rewording, "
+        "translating, or contradicting that Activity. terminal_plan.activities may contain only "
         "still-needed Capability or genuine clarification Activities. Emit only "
-        "properties visible in the decoder schema for the selected object branch."
+        "properties visible in the supplied payload schema for the selected object branch."
     )
     streaming_contract = (
-        "STREAMING PRESENTATION COMMIT CONTRACT: Return exactly one top-level JSON "
-        "object whose first member is presentation_commit and whose second member "
-        "is terminal_result. Property order is mandatory because the first complete "
-        "typed value may be realized before generation ends. presentation_commit "
+        "STREAMING PRESENTATION COMMIT CONTRACT: Return exactly two tagged frames "
+        "from this one invocation. The first frame is <presentation_commit> followed "
+        "by one JSON payload object and </presentation_commit>. The second frame is "
+        "<terminal_plan> followed by one JSON payload object and </terminal_plan>. "
+        "Do not wrap the two frames in a top-level JSON object. Frame order is mandatory "
+        "because the first closed, validated frame may be realized before generation ends. "
+        "The presentation payload "
         "must contain both activity and auxiliary_activities. It may contain one "
         "complete_response only when every covered Responsibility is direct speech "
         "already grounded by trusted context; otherwise it may contain one short "
@@ -447,29 +457,45 @@ def fast_advance_layered_prompt(
         "authoritative Responsibility evidence. Preserve speaker and actor ownership "
         "and use the requested language naturally. presentation_commit auxiliary "
         "Activities may only be optional social decoration anchored to that exact "
-        "communicative Activity; a silent commit has none. terminal_result is the "
+        "communicative Activity; a silent commit has none. terminal_plan is the "
         "rest of the same HOW decision. It must not emit another progress or "
         "complete_response Activity and must not repeat presentation decoration. "
         "FIELD PLACEMENT IS EXACT: presentation_commit.activity owns only the "
         "model-visible activity_id, progress_kind when applicable, text, and "
         "source_responsibility_refs when the schema asks for them. Never put "
         "reason_summary, truth_stage, evidence_refs, role, timing, speech_act, or "
-        "semantic_provenance there. terminal_result alone owns disposition, coverage, "
+        "semantic_provenance there. terminal_plan alone owns disposition, coverage, "
         "covered_responsibility_refs, activities, auxiliary_activities, continuations, "
         "confidence, unresolved, and reason_summary. A terminal Capability Activity "
         "uses only role, capability_id, activity_id, args, timing, and "
         "source_responsibility_refs. Never use arguments, effects, resource_claims, "
         "or terminal-level decision fields inside an Activity. Every terminal Activity "
         "activity_id must differ from the committed presentation activity_id. "
-        "reason_summary exists "
-        "only once, at terminal_result.reason_summary. "
-        "No partial string or token is a commitment; only the complete typed first "
-        "member is."
+        "reason_summary exists only once, at terminal_plan.reason_summary. "
+        "No partial string, token, opening tag, or unclosed payload is a commitment; "
+        "only the complete validated first tagged frame is."
+    )
+    wire_skeleton = (
+        "MECHANICAL TWO-FRAME SKELETON (replace values; do not omit keys):\n"
+        "<presentation_commit>\n"
+        '{"activity":null,"auxiliary_activities":[]}\n'
+        "</presentation_commit>\n"
+        "<terminal_plan>\n"
+        '{"disposition":"...","coverage":"...",'
+        '"covered_responsibility_refs":[],"activities":[],'
+        '"auxiliary_activities":[],"continuations":[],"confidence":0.0,'
+        '"unresolved":[],"reason_summary":"..."}\n'
+        "</terminal_plan>\n"
+        f"terminal_plan.activities may contain at most {terminal_activity_limit} "
+        "items for this request. Use only the minimum Work needed to satisfy the "
+        "Responsibilities; social decoration belongs only in auxiliary_activities."
     )
     rendered = (
         advance_contract
         + "\n\n"
         + streaming_contract
+        + "\n\n"
+        + wire_skeleton
         + "\n\nCurrent user turn:\n"
         + user_text
         + "\nLanguage hint: "
@@ -525,25 +551,33 @@ def fast_advance_layered_prompt(
         "use only auxiliary_activity_id, anchor_kind, anchor_id, capability_id, args, "
         "execution_role, timing, social_function, and target; never activity_id or "
         "reason_summary. Preserve speaker/actor ownership: a human report about their own "
-        "state is not a robot action. Keep terminal_result.reason_summary to one clause. "
+        "state is not a robot action. Keep terminal_plan.reason_summary to one clause. "
         "Escalate to deep_planner only when HOW exceeds the Fast budget, with no Capability "
         "Activities. Goal Association is concurrent, never a continuation.\n\n"
         + (
-            "EXACT MODEL-VISIBLE OUTPUT JSON SCHEMA (this is the same schema supplied "
-            "to the decoder; match it literally):\n"
-            + response_schema_json
+            "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT:\n"
+            "<presentation_commit>\n"
+            "{one JSON object matching PRESENTATION PAYLOAD SCHEMA}\n"
+            "</presentation_commit>\n"
+            "<terminal_plan>\n"
+            "{one JSON object matching TERMINAL PLAN PAYLOAD SCHEMA}\n"
+            "</terminal_plan>\n\n"
+            "PRESENTATION PAYLOAD SCHEMA:\n"
+            + presentation_schema_json
+            + "\n\nTERMINAL PLAN PAYLOAD SCHEMA:\n"
+            + terminal_schema_json
             + "\n\n"
-            if response_schema_json
+            if presentation_schema_json and terminal_schema_json
             else ""
         )
         + "Validation errors from the prior Fast Plan, if any:\n"
         + (validation_errors or "[]")
         + "\nThis primary result must contain the complete per-Goal coverage, exact "
         "response truth, step ownership, satisfaction, and unresolved-work decision; "
-        "no later model will audit or repair its semantics. Return exactly one fresh "
-        "complete schema-constrained JSON object. Do not add Markdown, a code fence, "
-        "an explanation, a self-check, or a second object. Stop immediately after the "
-        "single top-level closing brace."
+        "no later model will audit or repair its semantics. Return exactly the two fresh "
+        "tagged frames above. Do not add Markdown, a code fence, an explanation, a "
+        "self-check, a third frame, or any content after </terminal_plan>. Stop "
+        "immediately after that closing tag."
     )
     return LayeredPrompt.promote(
         rendered,
@@ -662,18 +696,20 @@ def fast_streaming_advance_system_prompt() -> str:
 
     return (
         "You are Chromie's low-latency Fast Planner. Produce one complete semantic "
-        "result as schema-constrained JSON. Emit presentation_commit first and "
-        "terminal_result second. presentation_commit owns the exact wording and "
+        "result as exactly two tagged frames in one continuous output stream. Emit "
+        "<presentation_commit>...</presentation_commit> first and "
+        "<terminal_plan>...</terminal_plan> second. Each frame contains exactly one "
+        "JSON payload object matching its printed schema; the whole output is not a "
+        "top-level JSON document. presentation_commit owns the exact wording and "
         "optional social decoration that may be realized as soon as that complete "
-        "typed member validates; terminal_result continues the same decision and "
+        "typed frame validates; terminal_plan continues the same decision and "
         "must not duplicate or contradict it. Accept Goal Interpretation's "
         "Responsibility evidence as authoritative contextual WHAT. Goal Association "
         "separately owns longitudinal association and Canonical Goal commits. Trusted "
         "Capability Runtime alone authorizes Work. Do not claim Work, fresh Evidence, "
-        "or completion in the early presentation. Return exactly one ordered JSON "
-        "object matching the exact schema printed in the user prompt, with no Markdown, "
-        "code fence, explanation, self-check, or repeated object. Stop immediately "
-        "after its final closing brace."
+        "or completion in the early presentation. Use no Markdown, code fence, "
+        "explanation, self-check, repeated frame, or extra text. Stop immediately "
+        "after </terminal_plan>."
     )
 
 

@@ -863,13 +863,16 @@ make GI the owner of why Planner asked or which source policy it chose. GA remai
 sole authority that commits that Goal version.
 
 The same immutable GI result starts Goal Association and one Fast Planner stream
-concurrently. The model emits one ordered JSON object: `presentation_commit` first and
-`terminal_result` second. The Agent exposes the first value only after it is complete and
+concurrently. The model emits one non-JSON wire document containing exactly two ordered
+tagged frames: `<presentation_commit>...</presentation_commit>` first and
+`<terminal_plan>...</terminal_plan>` second. Each frame contains one JSON payload object
+for strict DTO validation; there is no shared top-level JSON wrapper. The Agent exposes the
+first payload only after its closing tag is present and the complete payload is
 schema-valid, then serializes it as a typed NDJSON `PresentationCommit`. That commit holds
 intentional silence or one exact immediately truthful Communicative Activity, plus
 optional auxiliary Activities anchored to the exact communication. It carries no Goal
-identity, executable Work, confirmation, result, or completion authority. Raw tokens and
-partial JSON never cross the Agent boundary.
+identity, executable Work, confirmation, result, or completion authority. Raw tokens,
+unclosed tags, and partial payloads never cross the Agent boundary.
 
 The same model invocation then emits a typed `FastPlannerStreamTerminal` containing
 `FastPlannerAdvance`. Both the wire terminal and the advance reference the immutable
@@ -3080,13 +3083,13 @@ UserTurnEnvelope + validated GI Responsibilities + bounded trusted context
 
 Goal Association starts concurrently from the unchanged GI result. A trusted incremental
 parser may expose a `PresentationCommit` only after its complete frame has been parsed and
-validated. It is not a raw token stream, a partial JSON object, another model call, or a
+validated. It is not a raw token stream, an opening tag, a partial payload, another model call, or a
 second response owner. The maintained module I/O is:
 
 | Boundary | Authoritative input | Authoritative output | Forbidden authority |
 |---|---|---|---|
 | Fast Planner stream | immutable GI Responsibilities; applicable Goal/Work/Situation/Evidence projection; exact catalog/schema, presentation, style, target, and recent-interaction facts | at most one early `PresentationCommit`, followed by one complete Planner result from the same invocation | Goal identity, execution truth, provider mutation, or later rewriting of an accepted commit |
-| Agent stream decoder | ordered provider frames plus the exact request/schema identity | a complete schema-valid commit event and a complete schema-valid terminal result, or typed failure | semantic repair, text completion, frame reordering, or calling another model |
+| Agent stream decoder | ordered provider text deltas plus exact tagged-frame payload schemas and request identity | a complete schema-valid commit event and a complete schema-valid terminal result, or typed failure | semantic repair, text completion, frame reordering, trailing content, or calling another model |
 | Host presentation commit | validated commit plus exact turn/Responsibility/claim/anchor/catalog/resource bindings | immutable commit receipt; primary presentation launch; optional post-primary auxiliary scheduling/suppression | choosing wording, changing truth stage, selecting/reselecting a gesture or target, or dispatching Goal-owned Work |
 | Terminal Plan join | complete Planner result plus GA-owned canonical Goal binding and accepted-commit receipt | validated canonical Plan, confirmation/dispatch/deep-escalation/silence/fail-closed outcome | contradiction, duplication, omission, or reinterpretation of the accepted commit |
 

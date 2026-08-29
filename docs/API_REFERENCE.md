@@ -168,7 +168,8 @@ evidence and makes exactly one streaming model invocation. The response media ty
 `application/x-ndjson`. Its ordered typed frames are:
 
 1. exactly one `PresentationCommit` (`frame_type=presentation_commit`) after the complete
-   first JSON member has parsed and validated; it contains intentional silence or one
+   internal `<presentation_commit>...</presentation_commit>` payload has parsed and
+   validated; it contains intentional silence or one
    exact immediately truthful `progress`/`complete_response` Communicative Activity and
    optional auxiliary Activities anchored to that exact Activity;
 2. exactly one `FastPlannerStreamTerminal` (`frame_type=terminal`) whose
@@ -179,7 +180,9 @@ evidence and makes exactly one streaming model invocation. The response media ty
    after commit. A pre-commit failure is silent. A post-commit failure preserves only the
    already-launched truthful presentation and authorizes no Goal Work.
 
-Raw provider tokens, partial JSON, and partial DTOs never reach TTS or a Capability. The
+The internal model stream is exactly two tagged frames, with the presentation payload
+first and the terminal Plan payload second; it is not one top-level JSON document. Raw
+provider tokens, unclosed tags, partial payloads, and partial DTOs never reach TTS or a Capability. The
 terminal result cannot repeat, reword, translate, contradict, or omit the accepted
 communication or decoration. No retry/reviewer call repairs this streamed semantic result.
 A clarification Communicative Act owns one

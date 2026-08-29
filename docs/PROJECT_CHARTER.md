@@ -326,12 +326,13 @@ Read the diagram with these boundaries:
   or fresh Evidence is still needed from canonical Goal state, current Evidence, and
   available Capability truth.
 - The same immutable GI result starts Goal Association and one streaming Fast Planner
-  invocation concurrently. The first ordered member of that single Planner result is a
-  typed `PresentationCommit`: intentional silence or one immediately truthful
+  invocation concurrently. The first closed tagged frame of that single Planner result is
+  a typed `PresentationCommit`: intentional silence or one immediately truthful
   Communicative Activity, plus optional auxiliary social Activities anchored to that
-  exact communication. Trusted code exposes it only after the complete typed member is
-  parsed and validated; raw tokens and partial JSON never reach TTS or a Capability.
-  The terminal member completes the same HOW decision, references the accepted commit,
+  exact communication. Trusted code exposes it only after the complete frame payload is
+  parsed and validated; raw tokens, tags, and partial payloads never reach TTS or a
+  Capability. A second closed `terminal_plan` frame completes the same HOW decision,
+  references the accepted commit,
   and cannot regenerate, contradict, duplicate, or silently omit it. Both branches retain
   the immutable admitted UserTurn as source evidence in addition to the structured GI
   Responsibility; source wording can expose lost qualifiers but does not grant Planner a
@@ -689,8 +690,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    obligation.**
    Once Goal Interpretation has emitted sufficient Responsibility evidence, Fast
    Planner starts one streamed HOW decision concurrently with Goal Association. Its first
-   complete typed member is the only early `PresentationCommit`; the same invocation then
-   emits its terminal Capability/input/clarification decision. No separate response
+   complete typed tagged frame is the only early `PresentationCommit`; the same invocation
+   then emits its terminal Capability/input/clarification decision in a second tagged
+   frame. The two frames are not wrapped in one top-level JSON document. No separate response
    module, model role, endpoint, or second wording owner exists.
    Whenever cognition
    has a new trustworthy, user-relevant semantic delta, the current speech-capable

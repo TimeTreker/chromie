@@ -52,14 +52,13 @@ There is no GA coverage certificate, reviewer, fresh interpretation, final audit
 semantic repair call. Grounding or conservation rejection is terminal.
 
 The maintained initial Fast Planner workflow is now:
-
 ```text
 immutable GI Responsibilities
   -> concurrently:
        GA continuity transaction
        one Fast Planner stream
-          -> validated PresentationCommit (speech/silence + anchored auxiliary)
-          -> terminal Fast result or typed pre/post-commit failure
+          -> closed/validated <presentation_commit> (speech/silence + anchored auxiliary)
+          -> closed <terminal_plan> payload or typed pre/post-commit failure
   -> terminal result + GA mapping + accepted commit identity
   -> canonical Plan validation
   -> confirmation / Work dispatch / Deep escalation / silence / fail closed
@@ -96,9 +95,10 @@ before the complete terminal result, canonical Goal binding, and full validation
   ownership, and satisfaction. Same-owner truth/coverage reviewers and their dedicated
   model/runtime surfaces are removed; existing DTO repair and Fast-to-Deep escalation
   retain their narrower contracts.
-- The Agent `/fast-advance` endpoint now makes one Ollama streaming invocation and emits
-  typed NDJSON frames. The Host starts that stream and GA concurrently, launches only a
-  complete validated `PresentationCommit`, and requires the same commit identity in the
+- The Agent `/fast-advance` endpoint makes one Ollama text stream containing exactly two
+  closed tagged JSON-payload frames (`presentation_commit`, then `terminal_plan`), validates
+  them, and emits typed NDJSON externally. The Host starts that stream and GA concurrently, launches only
+  a complete validated `PresentationCommit`, and requires the same commit identity in the
   terminal Fast result and CanonicalPlan.
 - Failures before commit are silent; failures after commit preserve the already-launched
   truthful communication but dispatch no Goal Work. No read/effect Capability starts
@@ -123,10 +123,10 @@ before the complete terminal result, canonical Goal binding, and full validation
 | Current retained GI + dialogue scenarios | 31/31 passed | Automated scripted module/dialogue evidence |
 | Current focused Planner matrix | 308 passed, 9 subtests passed | Automated primary-result/call-budget evidence |
 | Issue #32 focused stream matrix | Ordered commit/terminal, one-call, failure containment, exact commit identity, no early Work, auxiliary anchoring, client/Runtime/scenario regressions pass | Automated source/contract evidence |
-| Exact local provider probe | Ollama 0.32.14 + current `qwen3.5:9b` emitted 25 structured chunks with `presentation_commit` before `terminal_result`, terminal `done=stop`, and no thinking/error fields | Protocol probe only; not semantic, latency-under-load, live voice, or physical evidence |
+| Superseded structured-JSON provider probe | Ollama 0.32.14 + `qwen3.5:9b` emitted the former ordered JSON members normally | Historical protocol evidence only; the current tagged-frame text stream requires a fresh probe |
 | Resource-admission regression | 147 cognitive/runtime/interaction/TTS/Social tests passed | Automated invocation-order evidence only |
 | Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
-| Current canonical full local gate | 1,993 maintained tests plus 20 legacy Agent tests passed | Current automated source/integration evidence |
+| Current canonical full local gate | 1,994 maintained tests plus 20 legacy Agent tests passed | Current automated source/integration evidence |
 | Level A general abilities for this amendment | 18/18 distinct cases passed: composable planning 5/5; multi-Goal daily life 10/10; Planner/Goal semantic quality 4/4 | Deterministic Level A only; one case belongs to two classes |
 | Documentation authority gate | 96 Markdown files passed | Current documentation consistency only |
 | Pre-default qwen3.5:4b comparison cohort | 2/50 hard-pass; 18/48 GI turns accepted, 25 timed out, 5 failed closed validation; 16/18 accepted results retained spurious unresolved meaning | GI-only model override with one resident Ollama model; diagnostic C-preview only |

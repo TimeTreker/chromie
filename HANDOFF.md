@@ -95,7 +95,8 @@ gestures remain ordinary Goal-owned Plan steps.
 
 Issue [#32](https://github.com/TimeTreker/chromie/issues/32), **Streaming Planner with
 Early Typed Presentation Commit**, is implemented in source as the sole `/fast-advance`
-path. The Agent makes one structured Ollama streaming invocation and emits typed NDJSON:
+path. The Agent makes one Ollama text-streaming invocation with ordered closed
+`presentation_commit` and `terminal_plan` payload frames, then emits typed NDJSON:
 one complete validated immutable `PresentationCommit`, then one terminal result or a
 typed pre/post-commit failure. GA starts concurrently. Runtime may launch only the exact
 committed communication and its anchored auxiliary proposal; all Goal Work waits for the
@@ -119,7 +120,7 @@ python scripts/check_repository_policies.py
 Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
 
 ./scripts/run_tests.sh
-Ran 1993 tests ... OK
+Ran 1994 tests ... OK
 20 legacy Agent tests passed
 
 python scripts/general_ability_acceptance.py --mode level-a \
@@ -132,9 +133,10 @@ python scripts/check_docs.py
 Documentation checks passed: 96 Markdown files
 ```
 
-The exact local Ollama 0.32.14 / current `qwen3.5:9b` protocol probe emitted 25
-structured chunks with `presentation_commit` before `terminal_result`, a normal terminal
-stop, and no thinking/error fields. This is protocol evidence only.
+The former local Ollama 0.32.14 / `qwen3.5:9b` structured-JSON probe emitted its ordered
+members normally, but that wire protocol is now superseded. The current internal model
+stream is text containing a closed `<presentation_commit>` payload followed by a closed
+`<terminal_plan>` payload; it requires fresh protocol and behavior qualification.
 
 Pre-fix live iteration 50 on RTX 4090/Qwen3 4B remains diagnostic evidence only:
 32/36 cases were contract-valid, four legacy coverage-stage calls returned HTTP 503,
@@ -231,12 +233,11 @@ those authorities have changed.
 
 ## Next evidence boundary
 
-The auxiliary amendment's canonical source gates are complete. Issue #32 source is
-implemented and now requires the full canonical source gates plus current-target
-qualification. The exact local Ollama 0.32.14 / current `qwen3.5:9b` protocol probe emitted
-ordered structured chunks (`presentation_commit` before `terminal_result`) with a normal
-terminal stop and no thinking/error fields; this is not latency-under-load, semantic,
-audible voice, or robot evidence. After source gates, measure accepted-commit, TTS first
+The auxiliary amendment's canonical source gates are complete. Issue #32 now uses one
+model text stream with two closed tagged JSON-payload frames rather than one top-level
+structured JSON object. It requires the full canonical source gates plus fresh
+current-target qualification; the superseded structured-JSON probe is not evidence for
+this wire path. After source gates, measure accepted-commit, TTS first
 PCM, playback start, terminal Plan latency, commit/terminal consistency, and GPU
 residency/contention before Fast-Planner Prompt/model promotion. Do not weaken validators,
 add Host resegmentation or another semantic reviewer, or treat auxiliary decoration as

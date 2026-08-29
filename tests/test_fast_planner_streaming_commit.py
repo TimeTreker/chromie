@@ -109,6 +109,17 @@ def _valid_output() -> dict[str, Any]:
     }
 
 
+def _wire_output(output: dict[str, Any]) -> str:
+    return (
+        "<presentation_commit>"
+        + json.dumps(output["presentation_commit"], ensure_ascii=False)
+        + "</presentation_commit>"
+        + "<terminal_plan>"
+        + json.dumps(output["terminal_result"], ensure_ascii=False)
+        + "</terminal_plan>"
+    )
+
+
 def _body_request() -> tuple[CognitiveWorkRequest, CognitiveResponsibilityProposal]:
     responsibility = CognitiveResponsibilityProposal(
         local_ref="walk",
@@ -147,7 +158,7 @@ def _walk_capability() -> dict[str, Any]:
     }
 
 
-def test_stream_prompt_teaches_exact_field_placement_and_one_object_stop() -> None:
+def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> None:
     request, responsibility = _body_request()
     capability = _walk_capability()
     response_schema = fast_streaming_advance_response_schema(
@@ -172,17 +183,20 @@ def test_stream_prompt_teaches_exact_field_placement_and_one_object_stop() -> No
 
     assert "args_schema" in projection[0]
     assert "arguments" not in projection[0]
-    assert "reason_summary exists only once, at terminal_result.reason_summary" in prompt
+    assert "reason_summary exists only once, at terminal_plan.reason_summary" in prompt
     assert "Never use arguments, effects, resource_claims" in prompt
     assert "perform_action for an embodied, media, vocal, or state-changing effect" in prompt
     assert "Stop immediately after" in prompt
-    assert "EXACT MODEL-VISIBLE OUTPUT JSON SCHEMA" in prompt
+    assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in prompt
+    assert "<presentation_commit>" in prompt
+    assert "<terminal_plan>" in prompt
     assert json.dumps(
-        response_schema,
+        response_schema["properties"]["presentation_commit"],
         ensure_ascii=False,
         separators=(",", ":"),
     ) in prompt
-    assert "repeated object" in system
+    assert "top-level JSON document" in system
+    assert "repeated frame" in system
 
 
 def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
@@ -221,17 +235,18 @@ def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
 
 @pytest.mark.asyncio
 async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
-    payload = json.dumps(_valid_output(), ensure_ascii=False)
-    boundary = payload.index('}, "terminal_result"') + 1
+    payload = _wire_output(_valid_output())
+    boundary = payload.index("</presentation_commit>") + len(
+        "</presentation_commit>"
+    )
     model = _StreamingModel([payload[:boundary], payload[boundary:]])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
     frames = [frame async for frame in resolver.stream_advance(_request())]
 
     assert model.calls == 1
-    assert model.last_kwargs["response_format"]
-    assert "$defs" not in model.last_kwargs["response_format"]
-    assert "EXACT MODEL-VISIBLE OUTPUT JSON SCHEMA" in str(model.last_prompt)
+    assert model.last_kwargs["response_format"] == "text"
+    assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in str(model.last_prompt)
     assert isinstance(frames[0], PresentationCommit)
     assert frames[0].activity is not None
     assert frames[0].activity.text == "你好呀！"
@@ -243,9 +258,11 @@ async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
 
 @pytest.mark.asyncio
 async def test_failure_after_commit_preserves_commit_and_blocks_terminal_work() -> None:
-    payload = json.dumps(_valid_output(), ensure_ascii=False)
-    boundary = payload.index('}, "terminal_result"') + 1
-    model = _StreamingModel([payload[:boundary], ', "terminal_result": {'])
+    payload = _wire_output(_valid_output())
+    boundary = payload.index("</presentation_commit>") + len(
+        "</presentation_commit>"
+    )
+    model = _StreamingModel([payload[:boundary], "<terminal_plan>{"])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
     frames = [frame async for frame in resolver.stream_advance(_request())]
@@ -267,7 +284,7 @@ async def test_terminal_cannot_duplicate_or_reword_committed_speech() -> None:
             "text": "另一个回答",
         }
     ]
-    payload = json.dumps(output, ensure_ascii=False)
+    payload = _wire_output(output)
     model = _StreamingModel([payload])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
@@ -281,9 +298,10 @@ async def test_terminal_cannot_duplicate_or_reword_committed_speech() -> None:
 
 @pytest.mark.asyncio
 async def test_terminal_before_commit_fails_silently() -> None:
-    payload = json.dumps(
-        {"terminal_result": _valid_output()["terminal_result"]},
-        ensure_ascii=False,
+    payload = (
+        "<terminal_plan>"
+        + json.dumps(_valid_output()["terminal_result"], ensure_ascii=False)
+        + "</terminal_plan>"
     )
     resolver = FastPlannerResolver(  # type: ignore[arg-type]
         _StreamingModel([payload]),
@@ -296,6 +314,67 @@ async def test_terminal_before_commit_fails_silently() -> None:
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert frames[0].failure_stage == "before_commit"
     assert frames[0].presentation_commit_id is None
+
+
+@pytest.mark.asyncio
+async def test_content_after_terminal_frame_fails_after_preserving_commit() -> None:
+    payload = _wire_output(_valid_output()) + "unexpected trailing text"
+    resolver = FastPlannerResolver(  # type: ignore[arg-type]
+        _StreamingModel([payload]),
+        _Catalog(),
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(_request())]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamFailure)
+    assert frames[1].failure_stage == "after_commit"
+    assert "after </terminal_plan>" in frames[1].reason
+
+
+@pytest.mark.asyncio
+async def test_unclosed_presentation_frame_never_commits() -> None:
+    payload = (
+        "<presentation_commit>"
+        + json.dumps(_valid_output()["presentation_commit"], ensure_ascii=False)
+    )
+    resolver = FastPlannerResolver(  # type: ignore[arg-type]
+        _StreamingModel([payload]),
+        _Catalog(),
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(_request())]
+
+    assert len(frames) == 1
+    assert isinstance(frames[0], FastPlannerStreamFailure)
+    assert frames[0].failure_stage == "before_commit"
+    assert frames[0].presentation_commit_id is None
+
+
+@pytest.mark.asyncio
+async def test_duplicate_presentation_frame_is_rejected_after_first_commit() -> None:
+    output = _valid_output()
+    presentation = (
+        "<presentation_commit>"
+        + json.dumps(output["presentation_commit"], ensure_ascii=False)
+        + "</presentation_commit>"
+    )
+    payload = presentation + presentation + (
+        "<terminal_plan>"
+        + json.dumps(output["terminal_result"], ensure_ascii=False)
+        + "</terminal_plan>"
+    )
+    resolver = FastPlannerResolver(  # type: ignore[arg-type]
+        _StreamingModel([payload]),
+        _Catalog(),
+    )
+
+    frames = [frame async for frame in resolver.stream_advance(_request())]
+
+    assert isinstance(frames[0], PresentationCommit)
+    assert isinstance(frames[1], FastPlannerStreamFailure)
+    assert frames[1].failure_stage == "after_commit"
+    assert "<terminal_plan>" in frames[1].reason
 
 
 def test_presentation_commit_cannot_contain_work_or_unanchored_decoration() -> None:

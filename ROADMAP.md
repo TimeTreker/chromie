@@ -552,8 +552,8 @@ Exit criteria:
 ### Streaming Planner with Early Typed Presentation Commit — source-gated, qualification open
 
 Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this replacement. The
-separate `/fast-first-response` path is removed. `/fast-advance` now makes one structured
-streaming Fast Planner invocation while Goal Association starts concurrently, and Runtime
+separate `/fast-first-response` path is removed. `/fast-advance` now makes one text-streaming
+Fast Planner invocation while Goal Association starts concurrently, and Runtime
 launches only a complete validated typed presentation value before terminal planning ends.
 
 The maintained path is one Fast Planner semantic invocation, not one raw text stream:
@@ -563,7 +563,9 @@ immutable GI result
   -> concurrently:
        Goal Association
        one Fast Planner stream
+          -> closed <presentation_commit> JSON payload
           -> zero or one validated PresentationCommit
+          -> closed <terminal_plan> JSON payload
           -> complete typed Planner result
 
 accepted PresentationCommit
@@ -577,8 +579,10 @@ complete Planner result + applicable canonical Goal binding
 
 `PresentationCommit` is a typed serialization boundary inside the same Planner authority.
 It may carry one immediately truthful Communicative Main Activity or silence together with
-optional subordinate `auxiliary_activities[]`. Runtime acts only after the whole frame is
-parsed and mechanically validated. Raw tokens and partial JSON never reach TTS or a
+optional subordinate `auxiliary_activities[]`. The model emits those two payloads inside
+ordered closing tags, not inside one top-level JSON document. Runtime acts only after the
+whole owning frame is parsed and mechanically validated. Raw tokens, unclosed tags, and
+partial payloads never reach TTS or a
 Capability. Once accepted, wording, truth stage, anchor, and auxiliary proposal are
 immutable; the terminal result must reference the same commit and cannot regenerate,
 contradict, duplicate, or silently omit it. Goal-owned Work, confirmation/result claims,

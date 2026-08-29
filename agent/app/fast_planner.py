@@ -108,6 +108,11 @@ from .planner_prompt import (
 
 logger = logging.getLogger("chromie.agent.fast_planner")
 
+PRESENTATION_COMMIT_OPEN = "<presentation_commit>"
+PRESENTATION_COMMIT_CLOSE = "</presentation_commit>"
+TERMINAL_PLAN_OPEN = "<terminal_plan>"
+TERMINAL_PLAN_CLOSE = "</terminal_plan>"
+
 def presentation_commit_id(request: CognitiveWorkRequest) -> str:
     responsibility_refs = "|".join(
         str(item.local_ref) for item in request.responsibilities
@@ -118,50 +123,112 @@ def presentation_commit_id(request: CognitiveWorkRequest) -> str:
     return f"present_{digest}"
 
 
-def first_stream_member(buffer: str) -> dict[str, Any] | None:
-    """Return the complete first ordered member, or None while incomplete."""
+def _tagged_json_frame(
+    buffer: str,
+    *,
+    open_tag: str,
+    close_tag: str,
+    frame_name: str,
+    start: int = 0,
+    final: bool = False,
+) -> tuple[dict[str, Any], int] | None:
+    """Parse one closed tagged JSON object without interpreting its semantics."""
 
-    decoder = json.JSONDecoder()
-    index = 0
+    index = start
     while index < len(buffer) and buffer[index].isspace():
         index += 1
-    if index >= len(buffer):
+    available = buffer[index:]
+    if not available:
+        if final:
+            raise PlannerDTOContractError(
+                f"Fast Planner stream is missing <{frame_name}>"
+            )
         return None
-    if buffer[index] != "{":
+    if not available.startswith(open_tag):
+        if not final and open_tag.startswith(available):
+            return None
         raise PlannerDTOContractError(
-            "Fast Planner stream must begin with a JSON object"
+            f"Fast Planner stream must emit {open_tag} at this boundary"
         )
-    index += 1
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    try:
-        key, index = decoder.raw_decode(buffer, index)
-    except json.JSONDecodeError:
-        return None
-    if key != "presentation_commit":
+
+    payload_start = index + len(open_tag)
+    search_start = payload_start
+    saw_close = False
+    while True:
+        payload_end = buffer.find(close_tag, search_start)
+        if payload_end < 0:
+            break
+        saw_close = True
+        candidate = buffer[payload_start:payload_end].strip()
+        try:
+            value = json.loads(candidate)
+        except json.JSONDecodeError:
+            # A literal closing tag may occur inside a JSON string. Keep looking
+            # for the real frame boundary instead of committing a partial value.
+            search_start = payload_end + 1
+            continue
+        if not isinstance(value, dict):
+            if final:
+                raise PlannerDTOContractError(
+                    f"Fast Planner {frame_name} payload must be a JSON object"
+                )
+            search_start = payload_end + 1
+            continue
+        return value, payload_end + len(close_tag)
+
+    if final:
+        detail = "contains invalid JSON" if saw_close else "is not closed"
         raise PlannerDTOContractError(
-            "Fast Planner stream must emit presentation_commit first"
+            f"Fast Planner {frame_name} frame {detail}"
         )
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    if index >= len(buffer):
-        return None
-    if buffer[index] != ":":
+    return None
+
+
+def first_presentation_frame(buffer: str) -> dict[str, Any] | None:
+    """Return the first closed presentation payload, or None while incomplete."""
+
+    parsed = _tagged_json_frame(
+        buffer,
+        open_tag=PRESENTATION_COMMIT_OPEN,
+        close_tag=PRESENTATION_COMMIT_CLOSE,
+        frame_name="presentation_commit",
+    )
+    return parsed[0] if parsed is not None else None
+
+
+def parse_fast_stream_document(
+    buffer: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Validate the exact two-frame wire document after provider completion."""
+
+    presentation = _tagged_json_frame(
+        buffer,
+        open_tag=PRESENTATION_COMMIT_OPEN,
+        close_tag=PRESENTATION_COMMIT_CLOSE,
+        frame_name="presentation_commit",
+        final=True,
+    )
+    if presentation is None:  # defensive; final=True raises on incompleteness
         raise PlannerDTOContractError(
-            "Fast Planner presentation_commit member is malformed"
+            "Fast Planner stream is missing <presentation_commit>"
         )
-    index += 1
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    try:
-        value, _ = decoder.raw_decode(buffer, index)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(value, dict):
+    terminal = _tagged_json_frame(
+        buffer,
+        open_tag=TERMINAL_PLAN_OPEN,
+        close_tag=TERMINAL_PLAN_CLOSE,
+        frame_name="terminal_plan",
+        start=presentation[1],
+        final=True,
+    )
+    if terminal is None:  # defensive; final=True raises on incompleteness
         raise PlannerDTOContractError(
-            "Fast Planner presentation_commit must be an object"
+            "Fast Planner stream is missing <terminal_plan>"
         )
-    return value
+    if buffer[terminal[1] :].strip():
+        raise PlannerDTOContractError(
+            "Fast Planner stream added content after </terminal_plan>"
+        )
+    return presentation[0], terminal[0]
 
 def normalize_presentation_payload(
     raw: dict[str, Any],
@@ -309,7 +376,7 @@ class FastPlannerResolver:
                 prompt,
                 system=fast_streaming_advance_system_prompt(),
                 options=options,
-                response_format=response_schema,
+                response_format="text",
                 prompt_family="fast_planner.streaming_advance",
                 turn_id=request.sid,
                 attempt=1,
@@ -317,7 +384,7 @@ class FastPlannerResolver:
                 raw_text += delta
                 if commit is not None:
                     continue
-                raw_presentation = first_stream_member(raw_text)
+                raw_presentation = first_presentation_frame(raw_text)
                 if raw_presentation is None:
                     continue
                 normalized_presentation = normalize_presentation_payload(
@@ -366,15 +433,7 @@ class FastPlannerResolver:
                 raise PlannerDTOContractError(
                     "Fast Planner stream ended before a typed PresentationCommit"
                 )
-            raw_output = self.ollama._parse_json(raw_text)
-            raw_presentation = raw_output.get("presentation_commit")
-            raw_terminal = raw_output.get("terminal_result")
-            if not isinstance(raw_presentation, dict) or not isinstance(
-                raw_terminal, dict
-            ):
-                raise PlannerDTOContractError(
-                    "Fast Planner stream is missing its ordered result members"
-                )
+            raw_presentation, raw_terminal = parse_fast_stream_document(raw_text)
             normalized_presentation = normalize_presentation_payload(
                 raw_presentation,
                 request=request,

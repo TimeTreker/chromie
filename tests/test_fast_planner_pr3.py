@@ -67,6 +67,36 @@ def _streaming_payload(response):
     }
 
 
+def _streaming_document(response):
+    payload = _streaming_payload(response)
+    if not isinstance(payload, dict):
+        return payload
+    return (
+        "<presentation_commit>"
+        + json.dumps(payload["presentation_commit"], ensure_ascii=False)
+        + "</presentation_commit>"
+        + "<terminal_plan>"
+        + json.dumps(payload["terminal_result"], ensure_ascii=False)
+        + "</terminal_plan>"
+    )
+
+
+def _tagged_frame_schemas(prompt):
+    rendered = str(prompt)
+    presentation_marker = "PRESENTATION PAYLOAD SCHEMA:\n"
+    terminal_marker = "\n\nTERMINAL PLAN PAYLOAD SCHEMA:\n"
+    presentation_start = rendered.index(presentation_marker) + len(
+        presentation_marker
+    )
+    presentation_end = rendered.index(terminal_marker, presentation_start)
+    terminal_start = presentation_end + len(terminal_marker)
+    terminal_end = rendered.index("\n\nValidation errors", terminal_start)
+    return (
+        json.loads(rendered[presentation_start:presentation_end]),
+        json.loads(rendered[terminal_start:terminal_end]),
+    )
+
+
 class FakeOllama:
     def __init__(self, response):
         self.response = response
@@ -82,7 +112,7 @@ class FakeOllama:
         self.prompts.append((prompt, kwargs))
         if isinstance(self.response, Exception):
             raise self.response
-        yield json.dumps(_streaming_payload(self.response), ensure_ascii=False)
+        yield _streaming_document(self.response)
 
     @staticmethod
     def _parse_json(text):
@@ -110,7 +140,7 @@ class ScriptedOllama:
         value = self.responses.pop(0)
         if isinstance(value, Exception):
             raise value
-        yield json.dumps(_streaming_payload(value), ensure_ascii=False)
+        yield _streaming_document(value)
 
     @staticmethod
     def _parse_json(text):
@@ -1991,10 +2021,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertEqual(advance.activities[0].role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
-        response_schema = ollama.prompts[0][1]["response_format"]
-        presentation_activity = response_schema["properties"][
-            "presentation_commit"
-        ]["properties"]["activity"]["anyOf"][0]
+        self.assertEqual(ollama.prompts[0][1]["response_format"], "text")
+        presentation_schema, _ = _tagged_frame_schemas(ollama.prompts[0][0])
+        presentation_activity = presentation_schema["properties"]["activity"][
+            "anyOf"
+        ][0]
         self.assertIn("text", presentation_activity["properties"])
         self.assertNotIn("progress_kind", presentation_activity["properties"])
 
@@ -3601,18 +3632,21 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.activities[1].args["period"], "evening")
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
-        response_schema = ollama.prompts[0][1]["response_format"]
-        presentation_activity = response_schema["properties"][
-            "presentation_commit"
-        ]["properties"]["activity"]["anyOf"][0]
+        self.assertEqual(ollama.prompts[0][1]["response_format"], "text")
+        presentation_schema, terminal_schema = _tagged_frame_schemas(
+            ollama.prompts[0][0]
+        )
+        presentation_activity = presentation_schema["properties"]["activity"][
+            "anyOf"
+        ][0]
         self.assertIn("progress_kind", presentation_activity["properties"])
         self.assertIn(
             "check_information",
             presentation_activity["properties"]["progress_kind"]["enum"],
         )
-        terminal_branches = response_schema["properties"]["terminal_result"][
-            "properties"
-        ]["activities"]["items"]["oneOf"]
+        terminal_branches = terminal_schema["properties"]["activities"]["items"][
+            "oneOf"
+        ]
         self.assertTrue(
             any(
                 branch.get("properties", {})
