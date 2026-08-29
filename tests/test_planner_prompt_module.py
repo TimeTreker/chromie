@@ -18,7 +18,7 @@ def test_planner_prompt_module_stays_projection_only() -> None:
 
     assert planner_prompt.fast_plan_prompt.__module__ == "agent.app.planner_prompt"
     assert planner_prompt.deep_plan_prompt.__module__ == "agent.app.planner_prompt"
-    assert planner_prompt.fast_first_response_prompt.__module__ == (
+    assert planner_prompt.fast_streaming_advance_system_prompt.__module__ == (
         "agent.app.planner_prompt"
     )
 

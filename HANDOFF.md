@@ -9,11 +9,10 @@ checkpoint remain authoritative.
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Branch at start: `main`
-- Base commit: `9ca80635c0dee2c8dee87aad15963be09b8ee950`
-- Base subject: `fix: adopt qwen3.5 GI residency profile`
-- Scope: replace the independent Social Attention semantic writer with
-  Planner-owned `auxiliary_activities[]`, preserve the retained GI evidence line, and
-  record the next presentation-boundary design in Issue #32 without implementing it
+- Base commit: `1ec588fd00a2f8d9f0ecf0006c375bb12c504752`
+- Base subject: `docs: define streaming planner presentation commit follow-up`
+- Scope: retain Planner-owned `auxiliary_activities[]` and implement Issue #32 as one
+  streaming Fast Planner semantic invocation with an early typed presentation commit
 - Expected resume revision: the latest commit containing this handoff
 
 Bootstrap on another machine:
@@ -56,9 +55,9 @@ and their DTO/schema/prompt/validation surfaces are removed. Grounding, Responsi
 conservation, binding, and continuity validation run deterministically after parsing and
 fail closed without another model call.
 
-Fast first response, Fast Advance, canonical Fast Plan, and Deep Plan now each require
-their complete Goal/Evidence truth, exact wording, provenance, step ownership, and
-satisfaction decision in the primary result. The separate truth qualifier, retained
+The streaming Fast result, canonical Fast Plan, and Deep Plan now each require their
+complete Goal/Evidence truth, exact wording, provenance, step ownership, and satisfaction
+decision in the primary result. The separate truth qualifier, retained
 response review, and coordinated Goal-coverage review calls are removed together with
 their DTO/schema/prompt surfaces, `planner_audit.py`, dedicated truth-model client,
 runtime health field, environment key, and warm-model role. Trusted validation remains
@@ -80,9 +79,9 @@ must-pass case and reports all failures before the stage gate can block core/cha
 This layout is directly shardable and can later be imported into a database without
 changing scenario identity or maintaining a second registry.
 
-The current worktree applies the owner-approved Social Attention amendment. The same
-Fast Advance or canonical Fast/Deep Planner primary result now owns zero or more
-`auxiliary_activities[]`; Fast First Response has no auxiliary field. The field is part
+The current worktree applies the owner-approved Social Attention amendment. A
+`PresentationCommit`, terminal Fast result, or canonical Fast/Deep Planner primary result
+now owns zero or more `auxiliary_activities[]` under exact primary anchors. The field is part
 of Plan fingerprint/revision truth but structurally separate from Goal-owned `steps[]`
 and cannot affect completion. The independent Planner/DTO/endpoint/client/model settings
 and Host background opportunity queue/worker are deleted.
@@ -95,14 +94,14 @@ Planner proposal. It cannot choose another gesture or target. Accepted requests 
 gestures remain ordinary Goal-owned Plan steps.
 
 Issue [#32](https://github.com/TimeTreker/chromie/issues/32), **Streaming Planner with
-Early Typed Presentation Commit**, is now the owner-approved next design boundary. The
-current source still fully awaits `/fast-first-response` before it creates Fast Advance
-and Goal Association tasks. The Issue proposes one Fast Planner streaming invocation that
-may expose one complete validated immutable presentation frame while the same invocation
-continues its terminal Plan. It forbids raw-token TTS, Host-authored wording, early
-Goal-owned Work, a second review model, and a retained compatibility path. This handoff
-records the proposal only; no streaming parser, Agent transport, Client API, or Runtime
-scheduling change has landed.
+Early Typed Presentation Commit**, is implemented in source as the sole `/fast-advance`
+path. The Agent makes one structured Ollama streaming invocation and emits typed NDJSON:
+one complete validated immutable `PresentationCommit`, then one terminal result or a
+typed pre/post-commit failure. GA starts concurrently. Runtime may launch only the exact
+committed communication and its anchored auxiliary proposal; all Goal Work waits for the
+terminal result, GA binding, and canonical validation. The terminal frame, Fast advance,
+and CanonicalPlan must reference the same commit. The separate endpoint, DTO, model/config
+role, client method, and compatibility path are removed.
 
 ## Evidence ledger
 
@@ -120,7 +119,7 @@ python scripts/check_repository_policies.py
 Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
 
 ./scripts/run_tests.sh
-Ran 2017 tests ... OK
+Ran 1993 tests ... OK
 20 legacy Agent tests passed
 
 python scripts/general_ability_acceptance.py --mode level-a \
@@ -132,6 +131,10 @@ General ability acceptance: 18/18 distinct cases passed mode=level-a evidence=A
 python scripts/check_docs.py
 Documentation checks passed: 96 Markdown files
 ```
+
+The exact local Ollama 0.32.14 / current `qwen3.5:9b` protocol probe emitted 25
+structured chunks with `presentation_commit` before `terminal_result`, a normal terminal
+stop, and no thinking/error fields. This is protocol evidence only.
 
 Pre-fix live iteration 50 on RTX 4090/Qwen3 4B remains diagnostic evidence only:
 32/36 cases were contract-valid, four legacy coverage-stage calls returned HTTP 503,
@@ -228,15 +231,16 @@ those authorities have changed.
 
 ## Next evidence boundary
 
-The auxiliary amendment's canonical source gates are complete. GI, GA, and Planner
-single-authority Prompt/model qualification remains the active evidence line, but final
-Fast-Planner Prompt/model promotion must follow the #32 production-boundary decision. The prior cohort proves the GI
-default/residency change reduced transport loss, but qwen3.5 semantic qualification and
-the unchanged single-slot downstream latency boundary remain open. The next behavioral
-fix must address one of those reproduced boundaries—or the reproduced Fast First Response
-sequential gate owned by #32—without validator weakening, Host
-resegmentation, another semantic reviewer, a non-GI model substitution, or auxiliary
-decoration as Goal completion.
+The auxiliary amendment's canonical source gates are complete. Issue #32 source is
+implemented and now requires the full canonical source gates plus current-target
+qualification. The exact local Ollama 0.32.14 / current `qwen3.5:9b` protocol probe emitted
+ordered structured chunks (`presentation_commit` before `terminal_result`) with a normal
+terminal stop and no thinking/error fields; this is not latency-under-load, semantic,
+audible voice, or robot evidence. After source gates, measure accepted-commit, TTS first
+PCM, playback start, terminal Plan latency, commit/terminal consistency, and GPU
+residency/contention before Fast-Planner Prompt/model promotion. Do not weaken validators,
+add Host resegmentation or another semantic reviewer, or treat auxiliary decoration as
+Goal completion.
 
 ## Claim boundary
 

@@ -4,10 +4,9 @@ import logging
 import secrets
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse, StreamingResponse
 
 from .settings import (
-    GoalInterpreterSettings,
     Settings,
     agent_service_settings as settings,
     goal_interpreter_settings,
@@ -118,24 +117,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("chromie.agent")
 
-
-def _fast_first_response_context_window(
-    service_settings: Settings,
-    interpreter_settings: GoalInterpreterSettings,
-) -> int:
-    if service_settings.cognitive_budget_profile == "qualification":
-        return service_settings.fast_planner_num_ctx
-    # Prefer exact reuse of the Fast or GI runner. A dedicated response model is
-    # intentionally bounded; it must not inherit a large context merely because
-    # the same weights are also assigned to a deliberative role.
-    if (
-        service_settings.fast_first_response_model
-        == service_settings.fast_planner_model
-    ):
-        return service_settings.fast_planner_num_ctx
-    if service_settings.fast_first_response_model == interpreter_settings.model:
-        return interpreter_settings.llm_num_ctx
-    return min(service_settings.fast_planner_num_ctx, 6144)
 
 ollama_client = OllamaClient(
     settings.ollama_url,
@@ -340,31 +321,10 @@ fast_planner_client = (
     if settings.use_llm and settings.fast_planner_enabled
     else None
 )
-fast_first_response_client = (
-    fast_planner_client
-    if settings.use_llm
-    and settings.fast_planner_enabled
-    and settings.fast_first_response_model == settings.fast_planner_model
-    and settings.fast_first_response_timeout_ms == settings.fast_planner_timeout_ms
-    else OllamaClient(
-        settings.ollama_url,
-        settings.fast_first_response_model,
-        timeout_ms=settings.fast_first_response_timeout_ms,
-        purpose="fast_planner_first_response",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.fast_planner_enabled
-    else None
-)
 fast_planner_resolver = (
     FastPlannerResolver(
         fast_planner_client,
         capability_catalog,
-        first_response_ollama=fast_first_response_client,
-        first_response_num_ctx=_fast_first_response_context_window(
-            settings,
-            goal_interpreter_settings,
-        ),
         num_ctx=settings.fast_planner_num_ctx,
         num_predict=settings.fast_planner_num_predict,
         cognitive_budget_profile=settings.cognitive_budget_profile,
@@ -501,11 +461,6 @@ async def health() -> HealthResponse:
         ),
         fast_planner_enabled=fast_planner_resolver is not None,
         fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
-        fast_first_response_model=(
-            settings.fast_first_response_model
-            if fast_planner_resolver is not None
-            else None
-        ),
         deep_planner_enabled=deep_planner_resolver is not None,
         deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
     )
@@ -588,16 +543,11 @@ async def resolve_fast_advance(request: CognitiveWorkRequest):
     # Fast Planner authors the first Activity Plan over GI Responsibility refs.
     # Agent Skill disclosure remains deferred; the endpoint may select only the
     # bounded common Capability catalog supplied by the Fast Planner resolver.
-    return await fast_planner_resolver.resolve_advance(request)
+    async def frames():
+        async for frame in fast_planner_resolver.stream_advance(request):
+            yield frame.model_dump_json(exclude_none=True) + "\n"
 
-
-@app.post("/fast-first-response")
-async def resolve_fast_first_response(request: CognitiveWorkRequest):
-    if fast_planner_resolver is None:
-        raise HTTPException(status_code=503, detail="Fast planner is disabled")
-    # This is Fast Planner's latency phase, not a separate response author.
-    # Capability selection and parameter completeness remain in /fast-advance.
-    return await fast_planner_resolver.resolve_first_response(request)
+    return StreamingResponse(frames(), media_type="application/x-ndjson")
 
 
 @app.post("/fast-plan")

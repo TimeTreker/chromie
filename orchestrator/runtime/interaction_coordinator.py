@@ -111,6 +111,7 @@ class ReadyPlannerCommunicativeExecution:
 
     activity: FastPlannerCommunicativeAct
     interaction_id: str
+    interaction_response: InteractionResponse
     speech: InteractionSpeech
     task: asyncio.Task[CapabilityRuntimeResult]
 
@@ -370,6 +371,7 @@ class InteractionRuntimeCoordinator:
         return ReadyPlannerCommunicativeExecution(
             activity,
             interaction_id,
+            response,
             speech,
             task,
         )

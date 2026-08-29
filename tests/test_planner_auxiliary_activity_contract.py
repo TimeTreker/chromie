@@ -12,7 +12,7 @@ from agent.app.planner_context import (
 from agent.app.planner_prompt import auxiliary_social_planning_prompt_section
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
-    fast_first_response_response_schema,
+    fast_presentation_commit_response_schema,
 )
 from orchestrator.runtime.capability_runtime import CapabilityDefinition
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
@@ -21,6 +21,7 @@ from shared.chromie_contracts.plan import (
     AuxiliaryPlanActivity,
     CanonicalPlan,
     GoalSatisfactionAssessment,
+    PresentationCommit,
     canonical_plan_fingerprint,
 )
 
@@ -136,9 +137,16 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "existing primary Plan Activity"):
             CanonicalPlan.model_validate(payload)
 
-    def test_first_response_schema_deliberately_has_no_auxiliary_surface(self) -> None:
-        schema = fast_first_response_response_schema(["r1"])
-        self.assertNotIn("auxiliary_activities", schema.get("properties", {}))
+    def test_presentation_commit_schema_owns_early_auxiliary_surface(self) -> None:
+        schema = fast_presentation_commit_response_schema(
+            ["r1"],
+            auxiliary_social_capabilities=[],
+        )
+        self.assertIn("auxiliary_activities", schema.get("properties", {}))
+        progress = schema["$defs"]["FastPlannerProgressAct"]
+        self.assertIn("activity_id", progress["properties"])
+        self.assertIn("activity_id", progress["required"])
+        self.assertIn("anchor_id", schema["$defs"]["AuxiliaryPlanActivity"]["properties"])
 
     def test_canonical_schema_binds_auxiliary_capability_and_args(self) -> None:
         candidate = {
@@ -228,6 +236,49 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
         self.assertFalse(
             runtime.executed[0][0].metadata["cognitive_reentry_eligible"]
         )
+
+    def test_runtime_executes_commit_decoration_after_primary_launch(self) -> None:
+        runtime = _Runtime([_definition()])
+        commit = PresentationCommit(
+            commit_id="presentation-social",
+            turn_id="turn-social",
+            activity={
+                "activity_id": "greeting",
+                "role": "complete_response",
+                "text": "你好！",
+                "source_responsibility_refs": ["r1"],
+            },
+            auxiliary_activities=[
+                AuxiliaryPlanActivity(
+                    auxiliary_activity_id="aux-blink",
+                    anchor_kind="communicative_act",
+                    anchor_id="greeting",
+                    capability_id="soridormi.blink_eyes",
+                    args={"count": 1},
+                    social_function="engagement",
+                )
+            ],
+        )
+        outcome = asyncio.run(
+            CanonicalPlanRuntimeAdapter(runtime).execute_auxiliary_activities(
+                presentation_commit=commit,
+                session_id="session-1",
+                turn_id="turn-social",
+                interaction=InteractionResponse(
+                    interaction_id="primary",
+                    status="ok",
+                ),
+                context={},
+            )
+        )
+
+        self.assertEqual(outcome["materialized_count"], 1)
+        request = runtime.executed[0][0].capabilities[0]
+        self.assertEqual(
+            request.metadata["presentation_commit_id"], "presentation-social"
+        )
+        self.assertNotIn("canonical_plan_id", request.metadata)
+        self.assertEqual(request.metadata["source_goal_ids"], [])
 
     def test_runtime_drops_non_social_capability_instead_of_reselecting(self) -> None:
         runtime = _Runtime([_definition(domains=["locomotion"])])

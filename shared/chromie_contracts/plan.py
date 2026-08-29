@@ -475,46 +475,83 @@ FastPlannerImmediateCommunicativeAct = Annotated[
 ]
 
 
-class FastPlannerFirstResponseModelOutput(BaseModel):
-    """Minimal model payload for Fast Planner's first-response latency phase.
+class FastPlannerPresentationCommitModelOutput(BaseModel):
+    """First complete value in one streamed Fast Planner semantic result.
 
-    ``activity=None`` is a first-class Planner decision: if no still-needed
-    user-facing semantic delta exists yet, silence is correct.
+    The model may commit one immediately realizable communicative Activity and
+    social decoration anchored to that Activity, or explicitly commit silence.
+    Capability Work and clarification remain in the terminal result.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     activity: FastPlannerImmediateCommunicativeAct | None = None
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
+        default_factory=list,
+        max_length=3,
+    )
 
 
-class FastPlannerFirstResponse(BaseModel):
-    """Fast Planner's earliest independently realizable communicative decision.
+class PresentationCommit(BaseModel):
+    """Immutable early presentation accepted from one Fast Planner stream.
 
-    This is a latency phase of Fast Planner, not a response-composition owner.
-    It carries the exact immutable wording that Runtime may start while the same
-    Planner continues Capability/clarification planning and Goal Association
-    independently commits canonical Goal state.
+    This is a typed commit boundary, never a partial-token or partial-JSON
+    boundary. It carries no Goal IDs, completion authority, or executable Work.
+    The terminal stream frame references ``commit_id`` and may only add the
+    still-needed terminal planning fields.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    frame_type: Literal["presentation_commit"] = "presentation_commit"
     schema_version: int = Field(default=1, ge=1)
+    commit_id: str = Field(min_length=1, max_length=160)
     turn_id: str = Field(min_length=1, max_length=160)
     planner_tier: Literal["fast"] = "fast"
     activity: FastPlannerImmediateCommunicativeAct | None = None
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
+        default_factory=list,
+        max_length=3,
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("turn_id", mode="before")
+    @field_validator("commit_id", "turn_id", mode="before")
     @classmethod
-    def normalize_turn_id(cls, value: Any) -> Any:
+    def normalize_identity(cls, value: Any) -> Any:
         return normalize_whitespace(value)
 
     @field_validator("metadata")
     @classmethod
-    def reject_first_response_low_level_metadata(
+    def reject_commit_low_level_metadata(
         cls, value: dict[str, Any]
     ) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
+    @model_validator(mode="after")
+    def validate_presentation_boundary(self) -> "PresentationCommit":
+        if self.activity is None and self.auxiliary_activities:
+            raise ValueError(
+                "a silent PresentationCommit cannot carry auxiliary Activities"
+            )
+        if self.activity is None:
+            return self
+        auxiliary_ids = [
+            item.auxiliary_activity_id for item in self.auxiliary_activities
+        ]
+        if len(auxiliary_ids) != len(set(auxiliary_ids)):
+            raise ValueError("PresentationCommit auxiliary Activity IDs must be unique")
+        for auxiliary in self.auxiliary_activities:
+            if auxiliary.anchor_kind != "communicative_act":
+                raise ValueError(
+                    "PresentationCommit auxiliary Activities must anchor to its "
+                    "communicative Activity"
+                )
+            if auxiliary.anchor_id != self.activity.activity_id:
+                raise ValueError(
+                    "PresentationCommit auxiliary Activity references an unknown "
+                    "primary Activity"
+                )
+        return self
 
 FastPlannerActivity = Annotated[
     Union[
@@ -734,6 +771,90 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     @classmethod
     def normalize_output_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
+
+
+class FastPlannerStreamingModelOutput(BaseModel):
+    """One model-authored Fast result with an early ordered presentation value.
+
+    JSON object member order is part of this transport contract even though it
+    is not ordinary JSON semantics: ``presentation_commit`` must be emitted and
+    validated before ``terminal_result`` begins. The Agent rejects a stream that
+    does not preserve that order.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    presentation_commit: FastPlannerPresentationCommitModelOutput
+    terminal_result: FastPlannerAdvanceModelOutput
+
+
+class FastPlannerStreamTerminal(BaseModel):
+    """Terminal wire frame for the same Fast Planner semantic invocation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    frame_type: Literal["terminal"] = "terminal"
+    schema_version: int = Field(default=1, ge=1)
+    turn_id: str = Field(min_length=1, max_length=160)
+    presentation_commit_id: str = Field(min_length=1, max_length=160)
+    advance: FastPlannerAdvance
+
+    @field_validator("turn_id", "presentation_commit_id", mode="before")
+    @classmethod
+    def normalize_terminal_identity(cls, value: Any) -> Any:
+        return normalize_whitespace(value)
+
+
+class FastPlannerStreamFailure(BaseModel):
+    """Typed fail-closed terminal frame for a Fast Planner stream."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    frame_type: Literal["failure"] = "failure"
+    schema_version: int = Field(default=1, ge=1)
+    turn_id: str = Field(min_length=1, max_length=160)
+    failure_stage: Literal["before_commit", "after_commit"]
+    presentation_commit_id: str | None = Field(default=None, max_length=160)
+    failure_class: str = Field(min_length=1, max_length=160)
+    failure_domain: str = Field(min_length=1, max_length=160)
+    architecture_attribution: str = Field(default="not_evaluated", max_length=160)
+    retryable: bool = False
+    error_type: str = Field(default="", max_length=160)
+    reason: str = Field(default="", max_length=500)
+
+    @field_validator(
+        "turn_id",
+        "presentation_commit_id",
+        "failure_class",
+        "failure_domain",
+        "architecture_attribution",
+        "error_type",
+        "reason",
+        mode="before",
+    )
+    @classmethod
+    def normalize_failure_text(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        return normalize_whitespace(value)
+
+    @model_validator(mode="after")
+    def validate_failure_commit_reference(self) -> "FastPlannerStreamFailure":
+        if self.failure_stage == "after_commit" and not self.presentation_commit_id:
+            raise ValueError("post-commit failure requires presentation_commit_id")
+        if self.failure_stage == "before_commit" and self.presentation_commit_id:
+            raise ValueError("pre-commit failure cannot reference a commit")
+        return self
+
+
+FastPlannerStreamFrame = Annotated[
+    Union[
+        PresentationCommit,
+        FastPlannerStreamTerminal,
+        FastPlannerStreamFailure,
+    ],
+    Field(discriminator="frame_type"),
+]
 
 
 def _normalize_ids(value: Any) -> list[str]:

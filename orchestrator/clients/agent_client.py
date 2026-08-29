@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, AsyncIterator
 from urllib.parse import quote
 
 import aiohttp
+from pydantic import TypeAdapter
 from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     CoreInterpretationResult,
@@ -15,7 +16,8 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
-    FastPlannerFirstResponse,
+    FastPlannerStreamFrame,
+    FastPlannerStreamTerminal,
 )
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
 from shared.chromie_contracts.tool_result import (
@@ -32,6 +34,8 @@ from shared.chromie_contracts.user_turn import (
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 logger = logging.getLogger(__name__)
+
+_FAST_PLANNER_STREAM_FRAME_ADAPTER = TypeAdapter(FastPlannerStreamFrame)
 
 
 class AgentClient:
@@ -108,19 +112,24 @@ class AgentClient:
             return await resp.json()
 
 
-    async def resolve_fast_advance(
+    async def stream_fast_advance(
         self,
         session: aiohttp.ClientSession,
         *,
         request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
-    ) -> FastPlannerAdvance:
+    ) -> AsyncIterator[FastPlannerStreamFrame]:
+        """Yield validated NDJSON frames from one Fast Planner invocation."""
+
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
         async with runtime_tracer.span(
             module=self.TRACE_MODULE,
-            operation="resolve_fast_advance",
+            operation="stream_fast_advance",
             kind="tool_call",
-            attributes={"endpoint": "/fast-advance", "timeout_ms": effective_timeout_ms},
+            attributes={
+                "endpoint": "/fast-advance",
+                "timeout_ms": effective_timeout_ms,
+            },
         ) as span:
             req = request.model_copy(
                 update={
@@ -133,64 +142,43 @@ class AgentClient:
                 json=req.model_dump(mode="json"),
                 timeout=timeout,
             ) as resp:
-                body = await resp.text()
                 span.set_attribute("http_status", resp.status)
                 if resp.status != 200:
+                    body = await resp.text()
                     raise RuntimeError(
-                        f"Agent fast-advance endpoint returned HTTP {resp.status}: {body[:500]}"
-                    )
-                result = FastPlannerAdvance.model_validate_json(body)
-            runtime_tracer.merge_fragment_from_metadata(result.metadata)
-            span.set_attribute("continuations", ",".join(result.continuations))
-            span.set_attribute("activity_count", len(result.activities))
-            span.set_attribute(
-                "vocal_activity_count",
-                sum(item.role != "capability" for item in result.activities),
-            )
-            return result
-
-    async def resolve_fast_first_response(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        request: CognitiveWorkRequest,
-        timeout_ms: int | None = None,
-    ) -> FastPlannerFirstResponse:
-        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
-        async with runtime_tracer.span(
-            module=self.TRACE_MODULE,
-            operation="resolve_fast_first_response",
-            kind="tool_call",
-            attributes={
-                "endpoint": "/fast-first-response",
-                "timeout_ms": effective_timeout_ms,
-            },
-        ) as span:
-            req = request.model_copy(
-                update={
-                    "context": runtime_tracer.inject_carrier(request.context),
-                }
-            )
-            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
-            async with session.post(
-                f"{self.base_url}/fast-first-response",
-                json=req.model_dump(mode="json"),
-                timeout=timeout,
-            ) as resp:
-                body = await resp.text()
-                span.set_attribute("http_status", resp.status)
-                if resp.status != 200:
-                    raise RuntimeError(
-                        "Agent fast-first-response endpoint returned HTTP "
+                        "Agent fast-advance stream returned HTTP "
                         f"{resp.status}: {body[:500]}"
                     )
-                result = FastPlannerFirstResponse.model_validate_json(body)
-            runtime_tracer.merge_fragment_from_metadata(result.metadata)
-            span.set_attribute(
-                "activity_role",
-                result.activity.role if result.activity is not None else "none",
-            )
-            return result
+                pending = b""
+                frame_count = 0
+                terminal_seen = False
+                async for chunk in resp.content:
+                    pending += bytes(chunk)
+                    while b"\n" in pending:
+                        line, pending = pending.split(b"\n", 1)
+                        if not line.strip():
+                            continue
+                        frame = _FAST_PLANNER_STREAM_FRAME_ADAPTER.validate_json(
+                            line
+                        )
+                        frame_count += 1
+                        if isinstance(frame, FastPlannerStreamTerminal):
+                            terminal_seen = True
+                            runtime_tracer.merge_fragment_from_metadata(
+                                frame.advance.metadata
+                            )
+                        yield frame
+                if pending.strip():
+                    frame = _FAST_PLANNER_STREAM_FRAME_ADAPTER.validate_json(pending)
+                    frame_count += 1
+                    if isinstance(frame, FastPlannerStreamTerminal):
+                        terminal_seen = True
+                        runtime_tracer.merge_fragment_from_metadata(
+                            frame.advance.metadata
+                        )
+                    yield frame
+                span.set_attribute("frame_count", frame_count)
+                span.set_attribute("terminal_seen", terminal_seen)
 
     async def resolve_fast_plan(
         self,

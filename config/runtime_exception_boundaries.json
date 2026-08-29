@@ -76,6 +76,21 @@
       ]
     },
     {
+      "path": "agent/app/clients/ollama_client.py",
+      "symbol": "OllamaClient.generate_stream",
+      "ordinal": 1,
+      "classification": "narrow_reraise",
+      "owner": "agent.llm_transport",
+      "contract": "Retain rejected streaming-call evidence, normalize transport timeout, and re-raise without retry or semantic repair.",
+      "review_status": "reviewed",
+      "body_sha256": "bca987ff70073789c5dfb100ab2ff7290d780bf7ec9f254addd468b03a984128",
+      "failure_signals": [
+        "bare_reraise",
+        "raise",
+        "state_update"
+      ]
+    },
+    {
       "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
       "symbol": "initialize_goal_interpreter",
       "ordinal": 1,
@@ -215,31 +230,15 @@
     },
     {
       "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.resolve_advance",
+      "symbol": "FastPlannerResolver.stream_advance",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
-      "contract": "Map Fast Activity-Plan inference and contract failures into a typed unavailable FastPlannerAdvance without authorizing Work.",
+      "contract": "Map single-invocation streaming failures into a typed pre-commit or post-commit failure frame without authorizing Goal Work.",
       "review_status": "reviewed",
-      "body_sha256": "1d936a1fe35ee040071a2d4cc3fdd4a42e37ee8e938e27a1346b23150e780b67",
-      "failure_signals": [
-        "continue",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.resolve_first_response",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent.fast_planner",
-      "contract": "Map first-response inference or DTO failure to an explicit no-Activity FastPlannerFirstResponse without inventing speech or blocking remaining cognition.",
-      "review_status": "reviewed",
-      "body_sha256": "2a075f8bb26aea813252cad1f3014f04c800644f64dca9af1e9042d68a2dcf62",
+      "body_sha256": "d2ac238d9194a77e19a4d5caa59c604218cb9850d5665bdca95a7a587ede46ba",
       "failure_signals": [
         "diagnostic",
-        "return",
         "state_update"
       ]
     },
@@ -1013,6 +1012,19 @@
       "symbol": "VocalPerformanceCapabilityProvider.execute",
       "ordinal": 1,
       "body_sha256": "6977f2357feb3e3b1f2c8dbad2c5e34076efad491913ed57e06f5bf71206d97c",
+      "failure_signals": [
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._execute_presentation_commit_auxiliary_activities",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Suppress an invalid or failed exact auxiliary proposal without changing its primary presentation or selecting replacement social behavior.",
+      "review_status": "reviewed",
+      "body_sha256": "ed9ee1bf72585996fde3154639d0fb58dd203d9897b540ae4f8614ee798f13dc",
       "failure_signals": [
         "return"
       ]

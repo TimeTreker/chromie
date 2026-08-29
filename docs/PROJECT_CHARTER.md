@@ -325,23 +325,21 @@ Read the diagram with these boundaries:
   provider requests, authorization, or readiness flags. Planner derives whether work
   or fresh Evidence is still needed from canonical Goal state, current Evidence, and
   available Capability truth.
-- The same GI result first enters Fast Planner's bounded first-response phase. That
-  phase may author one immediately realizable Communicative Activity, but it cannot
-  select a Capability, resolve an execution input, or ask a planning clarification.
-  That primary invocation owns the exact wording, truth stage, Responsibility
-  provenance, and admitted-context grounding in one complete result. Trusted code
-  validates only typed shape, closed references, and mechanical truth/provenance
-  boundaries; it must not call a second model to confirm or reinterpret the sentence.
-  Malformed or unavailable primary output commits no first speech and does not block
-  remaining Planner/GA work. The remaining Advance cannot author or salvage a substitute
-  progress Activity for that completed first-response decision. As soon as that bounded
-  decision exists, the same Fast Planner continues the remaining
-  Activity Plan while Goal Association independently begins from the unchanged GI
-  result. Both retain the immutable admitted UserTurn as source evidence in addition to
-  the structured GI Responsibility; source wording can expose lost qualifiers but does
-  not grant Planner a second WHAT authority. The two continuations run concurrently. This is one Planner with phased
-  readiness, not a response stage followed by a Planner, and the progress sentence
-  does not stand in for the still-required Plan. Fast Planner is the first **HOW /
+- The same immutable GI result starts Goal Association and one streaming Fast Planner
+  invocation concurrently. The first ordered member of that single Planner result is a
+  typed `PresentationCommit`: intentional silence or one immediately truthful
+  Communicative Activity, plus optional auxiliary social Activities anchored to that
+  exact communication. Trusted code exposes it only after the complete typed member is
+  parsed and validated; raw tokens and partial JSON never reach TTS or a Capability.
+  The terminal member completes the same HOW decision, references the accepted commit,
+  and cannot regenerate, contradict, duplicate, or silently omit it. Both branches retain
+  the immutable admitted UserTurn as source evidence in addition to the structured GI
+  Responsibility; source wording can expose lost qualifiers but does not grant Planner a
+  second WHAT authority. Failure before commit is silent. Failure after commit preserves
+  only the already-launched truthful presentation and authorizes no Goal-owned Work.
+  Capability Work always waits for the complete terminal result, GA-owned canonical Goal
+  binding, and trusted validation. This is one Planner with typed incremental readiness,
+  not a response module followed by a Planner. Fast Planner is the first **HOW /
   Work-advancement authority**. Planner owns
   execution-input completeness and source strategy against the immutable
   Responsibility, applicable Plan/Agent-Skill/Capability schemas, safety policy, and
@@ -690,9 +688,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 23. **Goal Progress Communication is semantic courtesy with a measured latency
    obligation.**
    Once Goal Interpretation has emitted sufficient Responsibility evidence, Fast
-   Planner first runs a bounded communicative phase and owns the first possible
-   user-facing HOW advancement. It then continues Capability/input/clarification
-   planning from the same Responsibility evidence; no second wording owner is created.
+   Planner starts one streamed HOW decision concurrently with Goal Association. Its first
+   complete typed member is the only early `PresentationCommit`; the same invocation then
+   emits its terminal Capability/input/clarification decision. No separate response
+   module, model role, endpoint, or second wording owner exists.
    Whenever cognition
    has a new trustworthy, user-relevant semantic delta, the current speech-capable
    owner may communicate it; when an equivalent act is already delivered or pending,
@@ -700,7 +699,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    to fill silence. For a simple greeting the first Communicative Act may fully
    satisfy the turn. If downstream work, fresh Evidence, retained continuity, or
    effects remain, that act is prospective progress only and Fast Planner requests
-   Goal Association. Later owners communicate only genuinely new limitation, wait,
+   Goal Association continuity. Later Planner re-entry communicates only genuinely new limitation, wait,
    failure, correction, result, or completion meaning. The first valid
    Communicative Activity must also be produced and offered to Vocal delivery
    within the qualified fast-response budget; a correct acknowledgement after a
@@ -737,23 +736,20 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Chromie does not wait for every cognitive stage to finish before every useful
    part of an interaction may advance, but local readiness never grants an upstream
    stage authority that belongs downstream. Goal Interpretation emits one contextual
-   Responsibility result. Fast Planner first commits any immediately useful
-   Communicative Activity; immediately afterward its remaining Activity planning and
-   GA consume that same immutable result concurrently. Fast Planner may then complete
-   the Activity Plan containing Capability and any still-needed clarification
-   Activities without re-authoring committed speech. Safe, side-effect-free,
-   schema-valid read Activities may start while GA establishes canonical Goal
-   identity; Runtime initially indexes them by GI
-   Responsibility and then reindexes the same task identity into each applicable
-   Goal's task-list view. Effectful work still waits for canonical Goal binding and
-   retains confirmation, authorization, resource, and safety barriers. GA never judges
-   Work compatibility. When Canonical Goal commit intersects retained or provisional
+   Responsibility result. Goal Association and one Fast Planner stream consume that
+   immutable result concurrently. A complete validated `PresentationCommit` may launch
+   its exact communication before either branch finishes. The same Planner invocation
+   then completes its terminal Activity Plan without re-authoring committed speech.
+   No Capability Activity—read-only or effectful—starts from the early commit or before
+   canonical Goal binding and full Plan validation. All Work retains confirmation,
+   authorization, resource, provider, and safety barriers. GA never judges
+   Work compatibility. When Canonical Goal commit intersects retained
    Work, Orchestrator structurally re-enters Fast Planner with the Goal and bounded
    actual Work snapshot. Planner explicitly selects reuse by stable Activity ID or
    authors replacement/supplemental Work; Runtime then validates exact identity,
    version, state, Capability, arguments, ownership, and timing. Runtime reuses selected
    Work and cancels/replaces only pending or cancellable unselected Work after that
-   decision. Evidence from incompatible provisional Work remains auditable
+   decision. Evidence from incompatible retained Work remains auditable
    but unbound and cannot support Goal completion or response claims. A one-turn greeting still receives a
    canonical conversational Goal; it does not need a second planning pass merely to
    permit speech.
@@ -1010,11 +1006,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    same Fast or Deep Planner invocation that authors a Main Activity may also
    author zero or more subordinate `auxiliary_activities[]` for that Activity.
    There is no separate Social Attention model, endpoint, opportunity queue, or
-   second semantic decision after Plan commitment. Fast First Response deliberately
-   has no auxiliary surface; Fast Advance and canonical Fast/Deep Plans may include
-   it when the primary Activity, fresh target evidence, owner-approved style,
+   second semantic decision after Plan commitment. A Fast Planner
+   `PresentationCommit` may carry decoration only for its exact Communicative Activity;
+   its terminal member and canonical Fast/Deep Plans may include decoration for other
+   primary Activities when the primary Activity, fresh target evidence, owner-approved style,
    recent auxiliary evidence, and exact eligible catalog candidates are already in
-   the primary Planner input. Empty is normal and complete.
+   the primary Planner input. A silent commit has no decoration. Empty is normal and complete.
 
    `CanonicalPlan.auxiliary_activities[]` is structurally separate from Goal-owned
    `steps[]`: it is included in Plan validation, fingerprinting, and revision truth,

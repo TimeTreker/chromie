@@ -1661,6 +1661,40 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                 )
             )
 
+    retired_split_fast_presentation_tokens = {
+        "agent/app/main.py": ("/fast-first-response",),
+        "agent/app/fast_planner.py": ("resolve_first_response",),
+        "agent/app/settings.py": (
+            "fast_first_response_model",
+            "fast_first_response_timeout_ms",
+        ),
+        "shared/chromie_contracts/plan.py": ("FastPlannerFirstResponse",),
+        "orchestrator/clients/agent_client.py": ("resolve_fast_first_response",),
+        "docker-compose.yml": ("AGENT_FAST_FIRST_RESPONSE",),
+        ".env.common": ("AGENT_FAST_FIRST_RESPONSE",),
+        "scripts/generate_runtime_env.py": ("AGENT_FAST_FIRST_RESPONSE",),
+    }
+    for relative, tokens in retired_split_fast_presentation_tokens.items():
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for token in tokens:
+            if token not in source:
+                continue
+            findings.append(
+                _source_policy_finding(
+                    root=root,
+                    path=relative,
+                    rule_id=RULE_HOST_SEMANTIC_AUTHORITY,
+                    symbol="<retired-split-fast-presentation>",
+                    message=(
+                        "the retired separate Fast presentation endpoint/model/DTO "
+                        "must not return beside the single typed Fast Planner stream"
+                    ),
+                )
+            )
+
     # These are Chromie-owned executable/runtime sources. Agent Skill code and
     # Soridormi wire payload strings are intentionally not scanned as aliases.
     retired_symbols = (

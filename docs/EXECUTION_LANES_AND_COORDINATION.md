@@ -89,9 +89,9 @@ personal voice output; it is not a separate conversational agent.
 
 ## Planner-owned Social Attention
 
-Fast Advance and canonical Fast/Deep Planner calls may author bounded
-`auxiliary_activities[]` beside their Main Activities. Fast First Response has no
-auxiliary surface. Empty output is normal. There is no later social model call or
+`PresentationCommit`, terminal Fast output, and canonical Fast/Deep Planner calls may
+author bounded `auxiliary_activities[]` beside their Main Activities. Empty output is
+normal. There is no later social model call or
 event-driven reconsideration solely because an Activity becomes ready, target evidence
 changes, or execution completes.
 

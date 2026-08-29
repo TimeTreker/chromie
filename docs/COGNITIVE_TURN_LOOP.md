@@ -215,36 +215,23 @@ Interpretation itself stops at Responsibility evidence; once that WHAT is suffic
 Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
 phrase rule, route shortcut, or second semantic authority.
 
-One validated GI result first enters Fast Planner's bounded first-response phase. It
-may author one immediately realizable Communicative Act whose primary result contains
-the exact truth stage, grounding/provenance, and wording needed for trusted mechanical
-validation. No second same-owner model qualifies, reviews, or repairs that decision;
-primary-result rejection is silence for this phase. After that decision, Fast Advance
-cannot author or salvage substitute progress wording, and the same Fast Planner's
-remaining Activity planning and Goal Association fan out concurrently from the
-unchanged GI result. Both branches also retain the immutable admitted UserTurn as source
-evidence; the GI Responsibility is a structured projection over that source, not a
-replacement for it. GA independently remains the only canonical Goal commit authority.
-This is phased readiness inside one Planner, not an independent response author. The
-resulting Fast Plan mechanically retains the already-committed Act and may contain
-additional Communicative Acts and Capability Activities with explicit
-sequential/parallel relations. A greeting can therefore be one complete Communicative
-Act while GA records the conversational Goal; a weather request can contain a progress
-Communicative Act and
-an exact weather-read Activity in parallel.
-
-The maintained implementation currently awaits the complete first-response round trip
-before it creates the Fast Advance and Goal Association tasks. Issue
-[#32](https://github.com/TimeTreker/chromie/issues/32) records this as a reproduced
-sequential-gate defect against the intended concurrency above. Its proposed replacement
-is not yet implemented:
+One validated GI result starts Goal Association and one Fast Planner stream concurrently.
+The stream may expose one immediately realizable typed `PresentationCommit` whose
+complete value contains exact truth stage, grounding/provenance, wording, and optional
+anchored auxiliary Activities. No second same-owner model qualifies, reviews, or repairs
+that decision. The same invocation then emits its terminal Activity result and may not
+substitute, repeat, or re-author committed speech. Both branches retain the immutable
+admitted UserTurn as source evidence; the GI Responsibility is a structured projection
+over that source, not a replacement for it. GA remains the only canonical Goal commit
+authority. This is typed incremental readiness inside one Planner, not an independent
+response author.
 
 ```text
 validated GI result
   -> concurrently:
        Goal Association
        one Fast Planner stream
-          -> complete validated PresentationCommit? -> presentation may launch
+          -> complete validated PresentationCommit -> non-silent presentation may launch
           -> complete terminal Planner result
   -> join terminal Planner result with applicable canonical Goal state
   -> validate Plan before Goal-owned Work
@@ -473,24 +460,22 @@ envelopes cannot enter ordinary Core cognition.
 Goal Interpretation emits provider-neutral contextual Responsibility evidence, including
 the proposed relationship to supplied Goals and bounded unresolved meaning interpreted
 against any pending clarification. It does not create planning InformationGaps. The same
-result first enters Fast Planner's bounded first-response phase; after that commitment,
-remaining Fast planning and Goal Association continue concurrently. Fast Planner authors
-the complete first Activity Plan and owns execution-input resolution; GA alone commits the
-canonical Goal relation. This is model-authored planning, never a Host greeting phrase
-table or `route == chat` shortcut.
+result starts Goal Association and one Fast Planner stream concurrently. Fast Planner
+authors the early typed presentation and complete terminal Activity decision in one model
+invocation and owns execution-input resolution; GA alone commits the canonical Goal
+relation. This is model-authored planning, never a Host greeting phrase table or
+`route == chat` shortcut.
 
 ```text
 UserTurnEnvelope + Session Context
   -> Goal Interpretation
-  -> Fast Planner -> first Communicative Activity or silence
-  -> concurrent continuation
-       |-> same Fast Planner -> remaining Activity Plan
-       |     |-> Capability and still-needed Communicative Activities
-       |     |-> input resolution or a user-resolvable clarification
-       |     `-> Deep Planner only for complex HOW
+  -> concurrent
+       |-> one Fast Planner stream
+       |     |-> validated PresentationCommit -> exact wording may launch
+       |     `-> terminal Activity result / Deep continuation / typed failure
        `-> Goal Association -> canonical Goal commit/version
-  -> Host validates and Vocal Runtime mechanically realizes exact Planner wording
-  -> deterministic Responsibility-to-Goal binding
+  -> terminal result + accepted commit + deterministic Responsibility-to-Goal binding
+  -> Host validates canonical Plan
   -> Goal-grouped Runtime task-list views
   -> terminal CanonicalPlan / Plan revision
   -> deterministic validation
@@ -520,9 +505,9 @@ nontrivial dependency, material alternative, novelty/broader planning context,
 Plan-coverage difficulty, or safety/resource reasoning that truly requires wider
 cognition. Genuine ambiguity in Responsibility meaning belongs to Deep Goal
 Interpretation before planning; Deep Planner may not repair or reinterpret it.
-Independent Responsibilities may therefore progress at different cognitive
-depths; once each has canonical Goal grounding, a confirmation-free safe read may
-execute while unrelated deeper cognition continues. A purely mechanical Planner DTO/schema failure may be
+Independent Responsibilities may therefore be planned at different cognitive
+depths; Capability Work begins only after the selected terminal Planner result has
+canonical Goal grounding and full validation. A purely mechanical Planner DTO/schema failure may be
 regenerated once under the same semantic meaning. Fast planning-grounding/coverage
 rejection may escalate once to Deep when broader reasoning is warranted. Deep
 planning-grounding/coverage rejection is terminal for that cognition attempt and

@@ -179,18 +179,13 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant = self._assistant(resolution)
         events = []
 
-        async def schedule_fast_first(*args, **kwargs):
-            del args, kwargs
-            events.append("legacy_fast_response_scheduled")
-            return True
-
         async def run_pipeline(*args, **kwargs):
             del args, kwargs
             events.append("runtime_started")
             return resolution
 
-        assistant._schedule_fast_first_response = schedule_fast_first
         assistant._run_cognitive_runtime_pipeline = run_pipeline
+        self.assertFalse(hasattr(assistant, "_schedule_fast" + "_first_response"))
         core, envelope = _core_and_envelope(
             "今天北京下雨了没有？", sid="sid-weather", language="zh-CN"
         )

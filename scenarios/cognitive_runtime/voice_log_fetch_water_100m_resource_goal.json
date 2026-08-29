@@ -234,8 +234,8 @@
     ],
     "requires_confirmation": false,
     "calls": [
-      "fast_advance",
       "goal_association",
+      "fast_stream",
       "fast_plan"
     ]
   },

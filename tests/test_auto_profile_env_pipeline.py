@@ -17,7 +17,6 @@ MODEL_KEYS = (
     "AGENT_GOAL_INTERPRETER_MODEL",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
-    "AGENT_FAST_FIRST_RESPONSE_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_DEEP_PLANNER_MODEL",
 )
@@ -214,7 +213,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
         self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3.5:9b")
-        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_MODEL"], "gemma4:12b")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
@@ -298,7 +296,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
             "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_FAST_PLANNER_MODEL",
-            "AGENT_FAST_FIRST_RESPONSE_MODEL",
             "AGENT_DEEP_PLANNER_MODEL",
             "AGENT_TASK_CONTINUITY_MODEL",
             "AGENT_SKILL_SELECTION_MODEL",
@@ -331,7 +328,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "8000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "8000")
-        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "2500")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "9000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "9000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "15000")
@@ -346,7 +342,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
             "AGENT_FAST_PLANNER_TIMEOUT_MS",
-            "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS",
             "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
             "ORCH_FAST_PLANNER_TIMEOUT_MS",
@@ -408,7 +403,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_WEATHER_TIMEOUT_S"], "120")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_CTX"], "40960")
         self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "150000")
@@ -564,7 +558,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?",
             "CHROMIE_COGNITIVE_BUDGET_PROFILE: ${CHROMIE_COGNITIVE_BUDGET_PROFILE:-interactive}",
             "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
-            "AGENT_FAST_FIRST_RESPONSE_MODEL: ${AGENT_FAST_FIRST_RESPONSE_MODEL:-gemma4:e2b}",
             "AGENT_DEEP_PLANNER_MODEL: ${AGENT_DEEP_PLANNER_MODEL:-gemma4:e2b}",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS: ${AGENT_DEEP_PLANNER_TIMEOUT_MS:-9000}",
             "AGENT_DEEP_PLANNER_NUM_CTX: ${AGENT_DEEP_PLANNER_NUM_CTX:-8192}",
@@ -649,7 +642,6 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_MODEL": "shared-fast",
             "AGENT_FAST_PLANNER_ENABLED": "1",
             "AGENT_FAST_PLANNER_MODEL": "shared-fast",
-            "AGENT_FAST_FIRST_RESPONSE_MODEL": "shared-fast",
             "AGENT_DEEP_PLANNER_ENABLED": "0",
         }
 

@@ -60,7 +60,7 @@
     "acknowledge_and_check"
   ],
   "require_fast_planner_evidence_reentry": true,
-  "require_pre_ga_safe_capability_dispatch": true,
+  "require_work_held_until_canonical_validation": true,
   "require_canonical_work_reconciliation": true,
   "max_warm_gi_handoff_to_fast_commit_ms": 2000,
   "max_warm_fast_commit_to_playback_start_ms": 3000,

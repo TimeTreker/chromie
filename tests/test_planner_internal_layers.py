@@ -208,8 +208,7 @@ def test_resolvers_contain_only_planner_lifecycle_methods() -> None:
     }
     assert fast_methods == {
         "__init__",
-        "resolve_first_response",
-        "resolve_advance",
+        "stream_advance",
         "resolve",
         "_resolve",
     }
@@ -272,11 +271,8 @@ def test_fast_and_deep_resolvers_do_not_reown_schema_mechanics() -> None:
         for name in removed:
             assert not hasattr(resolver, name)
 
-    assert fast_planner.fast_first_response_response_schema is (
-        planner_schema.fast_first_response_response_schema
-    )
-    assert fast_planner.fast_advance_response_schema is (
-        planner_schema.fast_advance_response_schema
+    assert fast_planner.fast_streaming_advance_response_schema is (
+        planner_schema.fast_streaming_advance_response_schema
     )
     assert deep_planner.deep_plan_response_schema is planner_schema.deep_plan_response_schema
     assert deep_planner.requires_safety_revision is planner_validation.requires_safety_revision

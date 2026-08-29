@@ -53,12 +53,9 @@ primary realization.
 
 ## Planner input and output
 
-Fast First Response has no auxiliary field. Its job is the earliest safe
-Communicative Activity, before the complete planning context is ready. It must not
-spend latency or semantic authority on decoration.
-
-Fast Advance and canonical Fast/Deep planning receive, in the same primary model
-call when applicable:
+The Fast `PresentationCommit` may carry auxiliary items only for its exact early
+Communicative Activity. Its terminal result and canonical Fast/Deep planning receive,
+in the same primary model call when applicable:
 
 - the semantic Main Activity or Plan response that may be decorated;
 - current Responsibility, Goal, Work, Evidence, and interaction context;

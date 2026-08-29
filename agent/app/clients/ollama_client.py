@@ -8,7 +8,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, AsyncIterator, Literal
 
 
 from ..settings import AgentServiceSettings
@@ -406,6 +406,337 @@ class OllamaClient:
             elif isinstance(result, dict):
                 span.set_attribute("response_key_count", len(result))
             return result
+
+    async def generate_stream(
+        self,
+        prompt: str | LayeredPrompt,
+        *,
+        system: str | None = None,
+        options: dict[str, Any] | None = None,
+        response_format: ResponseFormat = "text",
+        prompt_family: str | None = None,
+        turn_id: str | None = None,
+        attempt: int | None = None,
+    ) -> AsyncIterator[str]:
+        """Yield trusted Ollama response deltas from one inference invocation.
+
+        This transport does not decide application-level commit boundaries. The
+        caller must buffer and validate a complete typed value before realizing
+        it. Provider errors, truncation, and non-thinking violations terminate the
+        iterator with ``OllamaGenerationError``; no automatic retry is performed.
+        """
+
+        request_options = self._effective_options(options)
+        layered_prompt = prompt if isinstance(prompt, LayeredPrompt) else None
+        rendered_prompt = layered_prompt.render() if layered_prompt else prompt
+        declared_stable_layers = (
+            layered_prompt.stable_layer_items(system=system)
+            if layered_prompt is not None
+            else None
+        )
+        structured_output = response_format == "json" or isinstance(
+            response_format, dict
+        )
+        if not isinstance(response_format, dict) and response_format not in {
+            "text",
+            "json",
+        }:
+            raise ValueError(f"Unsupported response_format: {response_format!r}")
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "prompt": rendered_prompt,
+            "stream": True,
+            "think": False,
+            "options": request_options,
+        }
+        if system:
+            payload["system"] = system
+        if response_format == "json":
+            payload["format"] = "json"
+        elif isinstance(response_format, dict):
+            payload["format"] = response_format
+
+        preflight = ollama_prompt_preflight_diagnostics(
+            prompt_chars=len(rendered_prompt),
+            system_chars=len(system or ""),
+            options=request_options,
+            chars_per_token=self.prompt_chars_per_token_estimate,
+            safety_margin_tokens=self.context_safety_margin_tokens,
+        )
+        for diagnostic in preflight:
+            self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
+        blocking_preflight = next(
+            (
+                item
+                for item in preflight
+                if item.event == "llm_prompt_budget_exceeded"
+                and item.level >= logging.ERROR
+            ),
+            None,
+        )
+        if blocking_preflight is not None:
+            raise OllamaGenerationError(
+                "Ollama streaming request rejected before inference: "
+                + blocking_preflight.render(),
+                failure_class="prompt_budget_exceeded",
+                failure_domain="llm_budget",
+                architecture_attribution="not_evaluated",
+                retryable=False,
+                details={
+                    "purpose": self.purpose,
+                    "model": self.model,
+                    **blocking_preflight.fields,
+                    "result_trusted": False,
+                    "new_execution_allowed": False,
+                },
+            )
+
+        request_contract_digest = "sha256:" + hashlib.sha256(
+            json.dumps(
+                {
+                    "options": request_options,
+                    "response_format": response_format,
+                    "stream": True,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            ).encode("utf-8")
+        ).hexdigest()
+        family = str(prompt_family or self.purpose).strip() or self.purpose
+        start_probe = _PREFIX_CACHE_TRACKER.begin(
+            purpose=self.purpose,
+            prompt_family=family,
+            model=self.model,
+            system=system,
+            prompt=rendered_prompt,
+            declared_stable_layers=declared_stable_layers,
+            request_contract_digest=request_contract_digest,
+            turn_id=turn_id,
+            attempt=attempt,
+        )
+        call_id = str(start_probe.fields["call_id"])
+        logger.info("%s", start_probe.render())
+        started = time.perf_counter()
+        full_text = ""
+        final_payload: dict[str, Any] | None = None
+        status = "failed"
+        active_error: BaseException | None = None
+        try:
+            timeout = httpx.Timeout(self.timeout_ms / 1000.0)
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                ) as response:
+                    if response.status_code >= 400:
+                        body = (await response.aread()).decode(
+                            "utf-8", errors="replace"
+                        )[:1000]
+                        raise OllamaGenerationError(
+                            f"Ollama returned HTTP {response.status_code}: {body[:300]}",
+                            failure_class="http_error",
+                            failure_domain="inference_transport",
+                            architecture_attribution="not_evaluated",
+                            retryable=True,
+                            details={
+                                "purpose": self.purpose,
+                                "model": self.model,
+                                "status_code": response.status_code,
+                            },
+                        )
+                    async for line in response.aiter_lines():
+                        if not line.strip():
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                        except json.JSONDecodeError as exc:
+                            raise OllamaGenerationError(
+                                "Ollama streaming response contained invalid NDJSON",
+                                failure_class="stream_transport_invalid",
+                                failure_domain="provider_contract",
+                                architecture_attribution="ollama",
+                                retryable=True,
+                            ) from exc
+                        if not isinstance(chunk, dict):
+                            raise OllamaGenerationError(
+                                "Ollama streaming response chunk is not an object",
+                                failure_class="stream_transport_invalid",
+                                failure_domain="provider_contract",
+                                architecture_attribution="ollama",
+                                retryable=True,
+                            )
+                        if chunk.get("error"):
+                            raise OllamaGenerationError(
+                                "Ollama streaming inference error: "
+                                + str(chunk.get("error"))[:300],
+                                failure_class="stream_provider_error",
+                                failure_domain="inference_transport",
+                                architecture_attribution="not_evaluated",
+                                retryable=True,
+                            )
+                        for field in ("thinking", "reasoning", "reasoning_content"):
+                            if chunk.get(field) not in (None, "", [], {}):
+                                raise OllamaGenerationError(
+                                    "Ollama streaming response exposed reasoning output",
+                                    failure_class="thinking_output_violation",
+                                    failure_domain="provider_contract",
+                                    architecture_attribution="ollama_or_model_template",
+                                    retryable=True,
+                                )
+                        delta = chunk.get("response")
+                        if delta is not None and not isinstance(delta, str):
+                            raise OllamaGenerationError(
+                                "Ollama streaming response delta is not text",
+                                failure_class="stream_transport_invalid",
+                                failure_domain="provider_contract",
+                                architecture_attribution="ollama",
+                                retryable=True,
+                            )
+                        if delta:
+                            full_text += delta
+                            yield delta
+                        if chunk.get("done") is True:
+                            final_payload = dict(chunk)
+            if final_payload is None:
+                raise OllamaGenerationError(
+                    "Ollama streaming response ended without a terminal chunk",
+                    failure_class="stream_terminal_missing",
+                    failure_domain="inference_transport",
+                    architecture_attribution="not_evaluated",
+                    retryable=True,
+                )
+            provider_payload = {**final_payload, "response": full_text}
+            try:
+                boundary = enforce_non_thinking_ollama_response(
+                    provider_payload,
+                    structured_output=structured_output,
+                )
+            except OllamaNonThinkingViolation as exc:
+                raise OllamaGenerationError(
+                    str(exc),
+                    failure_class="thinking_output_violation",
+                    failure_domain="provider_contract",
+                    architecture_attribution="ollama_or_model_template",
+                    retryable=True,
+                ) from exc
+            if boundary.recovered:
+                raise OllamaGenerationError(
+                    "Streaming output required non-thinking content recovery",
+                    failure_class="thinking_output_violation",
+                    failure_domain="provider_contract",
+                    architecture_attribution="ollama_or_model_template",
+                    retryable=True,
+                )
+            completion_diagnostics = ollama_completion_diagnostics(
+                options=request_options,
+                data=provider_payload,
+                prompt_chars=len(rendered_prompt) + len(system or ""),
+            )
+            for diagnostic in completion_diagnostics:
+                self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
+            blocking_completion = next(
+                (
+                    item
+                    for item in completion_diagnostics
+                    if item.event in {"llm_output_truncated", "llm_prompt_truncated"}
+                    and item.level >= logging.ERROR
+                ),
+                None,
+            )
+            if blocking_completion is not None:
+                raise OllamaGenerationError(
+                    "Ollama streaming generation rejected: "
+                    + blocking_completion.render(),
+                    failure_class=(
+                        "output_truncated"
+                        if blocking_completion.event == "llm_output_truncated"
+                        else "prompt_truncated"
+                    ),
+                    failure_domain="llm_budget",
+                    architecture_attribution="not_evaluated",
+                    retryable=False,
+                    details={
+                        **blocking_completion.fields,
+                        "result_trusted": False,
+                        "new_execution_allowed": False,
+                    },
+                )
+            _PREFIX_CACHE_TRACKER.record_response(call_id, provider_payload)
+            status = "completed"
+            log_llm_call_evidence(
+                logger,
+                call_id=call_id,
+                purpose=self.purpose,
+                stage=family,
+                transport="ollama.generate_stream",
+                request=payload,
+                response=provider_payload,
+                status="accepted",
+                elapsed_ms=(time.perf_counter() - started) * 1000.0,
+                correlations={"turn_id": turn_id, "attempt": attempt},
+                parsed_output=None,
+                error=None,
+            )
+        except BaseException as exc:
+            active_error = exc
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            normalized_error: BaseException = exc
+            if isinstance(exc, httpx.TimeoutException):
+                normalized_error = OllamaGenerationError(
+                    "Ollama streaming request timed out",
+                    failure_class="timeout",
+                    failure_domain="inference_transport",
+                    architecture_attribution="not_evaluated",
+                    retryable=True,
+                    details={"purpose": self.purpose, "model": self.model},
+                )
+                active_error = normalized_error
+            log_llm_call_evidence(
+                logger,
+                call_id=call_id,
+                purpose=self.purpose,
+                stage=family,
+                transport="ollama.generate_stream",
+                request=payload,
+                response={"response": full_text},
+                status="rejected",
+                elapsed_ms=(time.perf_counter() - started) * 1000.0,
+                correlations={"turn_id": turn_id, "attempt": attempt},
+                parsed_output=None,
+                error={
+                    "error_type": type(normalized_error).__name__,
+                    "message": str(normalized_error),
+                    **(
+                        normalized_error.metadata()
+                        if isinstance(normalized_error, OllamaGenerationError)
+                        else {}
+                    ),
+                },
+            )
+            if normalized_error is exc:
+                raise
+            raise normalized_error from exc
+        finally:
+            finish_probe = _PREFIX_CACHE_TRACKER.finish(
+                call_id,
+                status=(
+                    "cancelled"
+                    if isinstance(active_error, asyncio.CancelledError)
+                    else status
+                ),
+                error_type=(type(active_error).__name__ if active_error else None),
+                failure_class=(
+                    str(llm_failure_metadata(active_error).get("failure_class") or "")
+                    if isinstance(active_error, Exception)
+                    else ""
+                ),
+            )
+            if finish_probe is not None:
+                logger.info("%s", finish_probe.render())
 
     async def _generate(
         self,

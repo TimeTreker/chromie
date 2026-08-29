@@ -46,9 +46,9 @@ Planner                  0..N Activity changes or none
 ```
 
 Optional Social Attention decoration is emitted as `auxiliary_activities[]` in the
-same Fast Advance or canonical Fast/Deep Planner result as its Main Activity. It has
-no Goal-completion authority. Fast First Response has no auxiliary surface; there is
-no second social model call.
+same Fast `PresentationCommit`, terminal result, or canonical Fast/Deep Planner result
+as its Main Activity. It has no Goal-completion authority and there is no second social
+model call.
 
 Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
 

@@ -17,7 +17,6 @@ try:
     )
     from chromie_contracts.situation import SituationProjection
     from chromie_contracts.tool_result import ToolResultEvidence
-    from chromie_contracts.plan import FastPlannerFirstResponse
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.control import GoalCancellationEvidence
@@ -28,7 +27,6 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.situation import SituationProjection
     from shared.chromie_contracts.tool_result import ToolResultEvidence
-    from shared.chromie_contracts.plan import FastPlannerFirstResponse
 
 def goal_association_prompt_projection(
     context: dict[str, Any] | None,
@@ -708,20 +706,6 @@ def gateway_speech_act(request: Any) -> str:
     if not isinstance(attention, dict):
         return ""
     return " ".join(str(attention.get("speech_act") or "").strip().split()).casefold()
-
-
-def first_response_phase_decided(request: Any) -> bool:
-    """Return whether Fast Planner already made its bounded first-response decision."""
-
-    context = request.context if isinstance(request.context, dict) else {}
-    raw = context.get("fast_planner_first_response")
-    if not isinstance(raw, dict):
-        return False
-    try:
-        FastPlannerFirstResponse.model_validate(raw)
-    except ValidationError:
-        return False
-    return True
 
 
 def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False) -> dict[str, Any]:

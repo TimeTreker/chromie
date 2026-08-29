@@ -27,43 +27,22 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertFalse(hasattr(settings, "social_attention_model"))
         self.assertFalse(settings.weather_enabled)
 
-    def test_fast_first_response_model_is_profile_owned_and_independent(self) -> None:
+    def test_fast_planner_stream_has_one_model_and_timeout_authority(self) -> None:
         with patch.dict(
             os.environ,
             {
-                "AGENT_MODEL": "general-model",
-                "AGENT_FAST_PLANNER_MODEL": "compact-planner",
-                "AGENT_FAST_FIRST_RESPONSE_MODEL": "natural-response-model",
-            },
-            clear=False,
-        ):
-            settings = Settings()
-        self.assertEqual(settings.fast_planner_model, "compact-planner")
-        self.assertEqual(
-            settings.fast_first_response_model, "natural-response-model"
-        )
-
-    def test_fast_first_response_model_defaults_to_profile_agent_model(self) -> None:
-        with patch.dict(os.environ, {"AGENT_MODEL": "profile-model"}, clear=False):
-            with patch.dict(
-                os.environ, {"AGENT_FAST_FIRST_RESPONSE_MODEL": ""}, clear=False
-            ):
-                os.environ.pop("AGENT_FAST_FIRST_RESPONSE_MODEL")
-                settings = Settings()
-        self.assertEqual(settings.fast_first_response_model, "profile-model")
-
-    def test_fast_first_response_timeout_is_independent_from_full_fast_planning(self) -> None:
-        with patch.dict(
-            os.environ,
-            {
+                "AGENT_FAST_PLANNER_MODEL": "streaming-planner",
                 "AGENT_FAST_PLANNER_TIMEOUT_MS": "8000",
+                "AGENT_FAST_FIRST_RESPONSE_MODEL": "obsolete-model",
                 "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS": "2500",
             },
             clear=False,
         ):
             settings = Settings()
+        self.assertEqual(settings.fast_planner_model, "streaming-planner")
         self.assertEqual(settings.fast_planner_timeout_ms, 8000)
-        self.assertEqual(settings.fast_first_response_timeout_ms, 2500)
+        self.assertFalse(hasattr(settings, "fast_first_response_model"))
+        self.assertFalse(hasattr(settings, "fast_first_response_timeout_ms"))
 
     def test_goal_interpreter_deep_pass_retains_its_own_model_authority(self) -> None:
         with patch.dict(

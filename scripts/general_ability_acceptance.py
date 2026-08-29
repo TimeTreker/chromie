@@ -85,7 +85,7 @@ class TextScenarioCase:
         default_factory=tuple
     )
     require_fast_planner_evidence_reentry: bool = False
-    require_pre_ga_safe_capability_dispatch: bool = False
+    require_work_held_until_canonical_validation: bool = False
     require_canonical_work_reconciliation: bool = False
     max_warm_gi_handoff_to_fast_commit_ms: float = 0.0
     max_warm_fast_commit_to_playback_start_ms: float = 0.0
@@ -207,14 +207,14 @@ def _speech_text(summary: dict[str, Any]) -> str:
     # session evidence proves that TTS actually played in this turn.
     cognitive = summary.get("cognitive_runtime")
     metadata = cognitive.get("metadata") if isinstance(cognitive, dict) else None
-    first_response = (
-        metadata.get("fast_planner_first_response")
+    presentation_commit = (
+        metadata.get("presentation_commit")
         if isinstance(metadata, dict)
         else None
     )
     activity = (
-        first_response.get("activity")
-        if isinstance(first_response, dict)
+        presentation_commit.get("activity")
+        if isinstance(presentation_commit, dict)
         else None
     )
     session_state = summary.get("session_state")
@@ -470,7 +470,7 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         (
             item
             for item in stages
-            if item.get("stage") == "fast_planner_first_response"
+            if item.get("stage") == "fast_planner_presentation_commit"
         ),
         {},
     )
@@ -514,7 +514,7 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "clock": "session_relative_monotonic_elapsed_ms",
-        "fast_first_response_status": str(fast_stage.get("status") or ""),
+        "presentation_commit_status": str(fast_stage.get("status") or ""),
         "transport_evidence": (
             "speaker_enabled_playback_start"
             if summary.get("speaker") is True
@@ -524,9 +524,9 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
             "session_start_elapsed_ms": session_start,
             "goal_interpretation_done_elapsed_ms": interpretation_done,
             "goal_interpretation_duration_ms": goal_interpretation_duration,
-            "fast_first_response_started_elapsed_ms": fast_start,
-            "fast_first_response_finished_elapsed_ms": fast_finish,
-            "fast_first_response_duration_ms": fast_duration,
+            "presentation_commit_started_elapsed_ms": fast_start,
+            "presentation_commit_finished_elapsed_ms": fast_finish,
+            "presentation_commit_duration_ms": fast_duration,
             "first_tts_schedule_elapsed_ms": tts_schedule,
             "first_tts_provider_pcm_elapsed_ms": first_provider_pcm,
             "first_playback_start_elapsed_ms": playback_start,
@@ -802,14 +802,16 @@ def validate_live_text_result(
             "terminal Capability Evidence did not reactivate Fast Planner"
         )
     if (
-        case.require_pre_ga_safe_capability_dispatch
+        case.require_work_held_until_canonical_validation
         and not bool(summary.get("preview_only"))
-        and not str(
+        and str(
             runtime_metadata.get("fast_capability_activity_status") or ""
-        ).startswith("completed_before_canonical_dispatch")
+        )
+        != "deferred_until_canonical_validation"
     ):
         errors.append(
-            "safe Capability did not use the pre-GA Fast Activity dispatch path"
+            "Capability Work crossed the PresentationCommit boundary before "
+            "canonical validation"
         )
     if (
         case.require_canonical_work_reconciliation
@@ -825,7 +827,7 @@ def validate_live_text_result(
     if case.max_warm_gi_handoff_to_fast_commit_ms > 0:
         planner_commit_ms = timing_derived["gi_handoff_to_fast_commit_ms"]
         if (
-            timing_evidence["fast_first_response_status"] != "accepted"
+            timing_evidence["presentation_commit_status"] != "accepted"
             or planner_commit_ms is None
         ):
             errors.append(
@@ -1004,8 +1006,8 @@ def _text_scenario_case(
         require_fast_planner_evidence_reentry=bool(
             raw.get("require_fast_planner_evidence_reentry", False)
         ),
-        require_pre_ga_safe_capability_dispatch=bool(
-            raw.get("require_pre_ga_safe_capability_dispatch", False)
+        require_work_held_until_canonical_validation=bool(
+            raw.get("require_work_held_until_canonical_validation", False)
         ),
         require_canonical_work_reconciliation=bool(
             raw.get("require_canonical_work_reconciliation", False)

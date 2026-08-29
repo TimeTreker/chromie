@@ -497,8 +497,8 @@ cases, then blocks both later stages. An infrastructure failure that makes
 further cases impossible still leaves the cohort incomplete and cannot support
 a passing claim. See [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
 
-Warm fast-response cases use two non-overlapping contract intervals. The Planner
-budget is measured from the retained `fast_planner_first_response.started_elapsed_ms`
+Warm presentation cases use two non-overlapping contract intervals. The Planner
+budget is measured from the retained `fast_planner_presentation_commit.started_elapsed_ms`
 (the validated GI handoff) to its `finished_elapsed_ms` commitment. The delivery
 budget is measured from that commitment to the first retained `playback_start` on
 the same session-relative clock. The report also keeps session-start, GI duration,

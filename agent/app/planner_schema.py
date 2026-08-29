@@ -12,7 +12,7 @@ try:
     )
     from chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
-        FastPlannerFirstResponseModelOutput,
+        FastPlannerPresentationCommitModelOutput,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
-        FastPlannerFirstResponseModelOutput,
+        FastPlannerPresentationCommitModelOutput,
     )
 
 from .prompt_projection import bounded_json
@@ -1888,24 +1888,33 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
 # Fast/Deep Planner pass-specific constrained-decoder schemas. These functions
 # project an already-owned Planner contract; they do not invoke a model or choose HOW.
 
-def fast_first_response_response_schema(
+def fast_presentation_commit_response_schema(
     responsibility_refs: list[str],
     *,
     responsibilities: list[CognitiveResponsibilityProposal] | None = None,
+    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     language: str = "",
 ) -> dict[str, Any]:
-    """Expose Fast Planner's 0..1 first-communication decision to decoding.
+    """Expose the early typed value inside one streamed Fast Planner result.
 
     The decoder may choose a complete response only when every supplied
     Responsibility is already conversational speech WHAT. Information,
     body/media/vocal, and other observable/stateful Responsibilities still need
-    Planner work before they can be completed, so their pre-Evidence first-response
+    Planner work before they can be completed, so their pre-Evidence early-commit
     schema exposes only prospective progress or silence. This keeps the decoder
     from treating a text-only progress acknowledgement as a complete response just
     because the compact DTO intentionally omits the mechanical ``role`` tag.
     """
 
-    schema = copy.deepcopy(FastPlannerFirstResponseModelOutput.model_json_schema())
+    schema = copy.deepcopy(
+        FastPlannerPresentationCommitModelOutput.model_json_schema()
+    )
+    _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
+    required = list(schema.get("required") or [])
+    for field_name in ("activity", "auxiliary_activities"):
+        if field_name not in required:
+            required.append(field_name)
+    schema["required"] = required
     definitions = schema.get("$defs", {})
     activity_schema = schema.get("properties", {}).get("activity")
     if isinstance(activity_schema, dict):
@@ -1948,10 +1957,17 @@ def fast_first_response_response_schema(
             "timing",
             "speech_act",
             "truth_stage",
-            "activity_id",
             "role",
         ):
             properties.pop(field_name, None)
+        activity_id_contract = properties.get("activity_id")
+        if isinstance(activity_id_contract, dict):
+            activity_id_contract["maxLength"] = 48
+            activity_id_contract["pattern"] = r"^[A-Za-z0-9][A-Za-z0-9._-]*$"
+            activity_id_contract["description"] = (
+                "Stable short ID for this committed Communicative Activity. "
+                "Every auxiliary anchor_id must equal this value exactly."
+            )
         text_contract = properties.get("text")
         if isinstance(text_contract, dict):
             text_contract["maxLength"] = (
@@ -2023,7 +2039,7 @@ def fast_first_response_response_schema(
                     ]
         if contract_name == "FastPlannerProgressAct":
             ordered: dict[str, Any] = {}
-            for field_name in ("progress_kind", "text"):
+            for field_name in ("activity_id", "progress_kind", "text"):
                 if field_name in properties:
                     ordered[field_name] = properties[field_name]
             for field_name, field_schema in properties.items():
@@ -2039,6 +2055,7 @@ def fast_first_response_response_schema(
                 name
                 for name in (
                     "role",
+                    "activity_id",
                     "progress_kind",
                     "source_responsibility_refs",
                     "text",
@@ -2048,6 +2065,7 @@ def fast_first_response_response_schema(
                 required_names
                 - {
                     "role",
+                    "activity_id",
                     "progress_kind",
                     "source_responsibility_refs",
                     "text",
@@ -2359,8 +2377,8 @@ def fast_advance_response_schema(
         if isinstance(gaps, dict):
             gaps["maxItems"] = 1
     if committed_communicative or suppress_new_communicative:
-        # The first-response phase already made its one communication decision.
-        # Full Fast planning may still discover a real clarification need, but it
+        # PresentationCommit already made this invocation's communication decision.
+        # Its terminal portion may still discover a real clarification need, but it
         # must not manufacture substitute progress/completion speech merely because
         # execution planning is continuing.
         activities = top_properties.get("activities")
@@ -2522,6 +2540,85 @@ def fast_advance_response_schema(
             if branches:
                 capability_contract["oneOf"] = branches
     return schema
+
+
+def _namespace_local_definitions(
+    schema: dict[str, Any],
+    *,
+    prefix: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Move one standalone schema's definitions into a collision-free namespace."""
+
+    projected = copy.deepcopy(schema)
+    definitions = projected.pop("$defs", {})
+    if not isinstance(definitions, dict):
+        definitions = {}
+    renamed = {f"{prefix}{name}": value for name, value in definitions.items()}
+
+    def rewrite(node: Any) -> None:
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                node["$ref"] = "#/$defs/" + prefix + ref.rsplit("/", 1)[-1]
+            for value in node.values():
+                rewrite(value)
+        elif isinstance(node, list):
+            for value in node:
+                rewrite(value)
+
+    rewrite(projected)
+    rewrite(renamed)
+    return projected, renamed
+
+
+def fast_streaming_advance_response_schema(
+    responsibility_refs: list[str],
+    *,
+    responsibilities: list[CognitiveResponsibilityProposal] | None = None,
+    capabilities: list[dict[str, Any]] | None = None,
+    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
+    interpretation_unresolved: list[str] | None = None,
+    language: str = "",
+) -> dict[str, Any]:
+    """Build the ordered single-call Fast Planner streaming decoder contract.
+
+    The terminal branch cannot author a second progress or complete-response Act.
+    It supplies only residual Capability/clarification planning; the Agent joins
+    the immutable presentation Activity before validating ``FastPlannerAdvance``.
+    """
+
+    presentation, presentation_defs = _namespace_local_definitions(
+        fast_presentation_commit_response_schema(
+            responsibility_refs,
+            responsibilities=responsibilities,
+            auxiliary_social_capabilities=auxiliary_social_capabilities,
+            language=language,
+        ),
+        prefix="Presentation_",
+    )
+    terminal, terminal_defs = _namespace_local_definitions(
+        fast_advance_response_schema(
+            responsibility_refs,
+            responsibilities=responsibilities,
+            capabilities=capabilities,
+            auxiliary_social_capabilities=auxiliary_social_capabilities,
+            interpretation_unresolved=interpretation_unresolved,
+            committed_communicative=True,
+            suppress_new_communicative=True,
+            suppress_new_progress=True,
+        ),
+        prefix="Terminal_",
+    )
+    return {
+        "type": "object",
+        "properties": {
+            "presentation_commit": presentation,
+            "terminal_result": terminal,
+        },
+        "required": ["presentation_commit", "terminal_result"],
+        "additionalProperties": False,
+        "$defs": {**presentation_defs, **terminal_defs},
+    }
 
 def fast_repair_response_schema(
     schema: dict[str, Any],

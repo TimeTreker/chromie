@@ -189,8 +189,8 @@ or utterance adds work. It may cancel or supersede them only through an explicit
 deterministic stop/cancel scope or a Core decision that unambiguously authorizes
 foreground interruption; that decision and the affected work remain auditable.
 
-For one simple Communicative Act, one natural response is usually enough. If
-fast-first already answered a simple greeting or clarification, the final agent
+For one simple Communicative Act, one natural response is usually enough. If an accepted
+`PresentationCommit` already answered a simple greeting or clarification, the terminal Planner
 must not answer the same act again. A later Goal-Association, planning, or runtime
 failure remains visible as failure Evidence/telemetry but must not append a generic
 Host apology over an already committed or delivered Planner Communicative Activity.
@@ -201,9 +201,9 @@ clarifications, and relevant Evidence. It emits contextual Responsibility eviden
 with Goal relationship and bounded unresolved meaning. It may understand an answer
 against a pending clarification, but it does not decide that a Capability parameter is
 missing, create a planning `InformationGap`, classify one as blocking, or choose how it
-should be resolved. The same GI result first goes to Fast Planner's bounded
-first-response phase; after that commitment, remaining Fast planning and Goal
-Association consume it concurrently. Deep Goal Interpretation is reserved for genuine consequential ambiguity
+should be resolved. The same GI result starts one Fast Planner stream and Goal
+Association concurrently; the stream may expose one complete typed presentation commit
+before its terminal planning member. Deep Goal Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
 For a conversational Responsibility, GI describes the communicative obligation or
@@ -418,8 +418,8 @@ runtime immediately. A simple greeting may be delivered before Goal Association
 finishes, but GA still commits its canonical conversational Goal and later binds the
 delivered Activity to that Goal. This binding is continuity and completion Evidence;
 it never authorizes a second response. If persistent work also exists, Fast Planner may
-author only prospective progress while requesting Goal Association. The compact
-first-response decoder therefore exposes `complete_response` or silence when every supplied
+author only prospective progress while Goal Association establishes continuity. The compact
+`PresentationCommit` decoder therefore exposes `complete_response` or silence when every supplied
 Responsibility is conversational speech WHAT; it does not mislabel an already-authored
 conversational answer as progress and then authorize the same answer again. Information
 and observable/stateful WHAT can choose only prospective progress or silence until fresh
@@ -565,8 +565,8 @@ receives admitted evidence and emits provider-neutral Responsibility proposals,
 material semantic bindings, Goal relationships, and bounded unresolved meaning. It
 does not emit planning InformationGaps, input-source policy, conversational progress,
 route/intent labels, Activities, or Capabilities.
-The same GI result enters Fast Planner's first-response phase, then remaining Fast
-planning and Goal Association concurrently; Fast Planner is the first owner of
+The same GI result starts one Fast Planner stream and Goal Association concurrently;
+Fast Planner is the first owner of
 conversational and executable Activities, execution-
 input completeness, source/default policy, and clarification selection. Capability
 contracts constrain realization but cannot make Planner reinterpret Responsibility or
@@ -982,20 +982,20 @@ qualified subtle body cue. Decoration must not rewrite what Chromie says,
 create an extra user task, or make the greeting fail if the decoration cannot
 run.
 
-The spoken fast response is itself a Planner-owned Communicative Main Activity.
-Fast First Response deliberately does not plan decoration. Fast Advance and the
-canonical Fast/Deep Planner may include zero or more `auxiliary_activities[]` in
+The early spoken response is itself a Planner-owned Communicative Main Activity.
+Its `PresentationCommit`, terminal Fast result, and the canonical Fast/Deep Planner may
+include zero or more `auxiliary_activities[]` in
 the same primary result when the exact Activity anchor, recent context, style,
 target evidence, recent auxiliary evidence, and eligible named body capabilities
 are available. An empty list is complete and preferred unless a subtle cue adds
 real interaction value. This is not another model or post-response planning pass.
 
-That is the maintained contract. Under proposed Issue
+That is the maintained contract. Under Issue
 [#32](https://github.com/TimeTreker/chromie/issues/32), an accepted early
-`PresentationCommit` would atomically carry the Communicative Main Activity and any
+`PresentationCommit` atomically carries the Communicative Main Activity and any
 optional auxiliary proposal from the same Planner invocation, allowing decoration of an
 early utterance without a second semantic pass. The Main Activity launches first;
-auxiliary scheduling follows and remains fail-soft. This proposal does not change the
+auxiliary scheduling follows and remains fail-soft. This implemented boundary does not change the
 rule that empty decoration is normal or that explicit user-requested gestures are
 Goal-owned Work.
 

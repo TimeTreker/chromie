@@ -1,6 +1,6 @@
 # Chromie Development Checkpoint
 
-Status: Planner-owned auxiliary social decoration is source-closed; Issue #32 owns the proposed streaming Fast-Planner presentation boundary; Prompt/model and live behavior evidence remain open
+Status: Planner-owned auxiliary social decoration and Issue #32 streaming Fast-Planner presentation are source-gated; Prompt/model promotion and live behavior evidence remain open
 Updated: 2026-08-29
 Starting baseline: `7b4a25d8c8343b7f67509d3916e32272d6afc86f`
 (`Add external architecture audit`)
@@ -51,10 +51,24 @@ accepted GI Responsibilities + bounded Goal/dialogue state
 There is no GA coverage certificate, reviewer, fresh interpretation, final audit, or
 semantic repair call. Grounding or conservation rejection is terminal.
 
-The maintained Planner workflow is now:
+The maintained initial Fast Planner workflow is now:
 
 ```text
-Responsibility/Goal + bounded Situation/Work/Evidence
+immutable GI Responsibilities
+  -> concurrently:
+       GA continuity transaction
+       one Fast Planner stream
+          -> validated PresentationCommit (speech/silence + anchored auxiliary)
+          -> terminal Fast result or typed pre/post-commit failure
+  -> terminal result + GA mapping + accepted commit identity
+  -> canonical Plan validation
+  -> confirmation / Work dispatch / Deep escalation / silence / fail closed
+```
+
+Re-entry planning remains:
+
+```text
+Goal + bounded Situation/Work/Evidence
   -> one Fast or Deep primary HOW result
      (complete Goal coverage + truth strength + exact wording + provenance + satisfaction
       + optional non-Goal auxiliary_activities[])
@@ -66,14 +80,10 @@ Responsibility/Goal + bounded Situation/Work/Evidence
 ```
 
 There is no same-owner Planner truth qualifier, coverage reviewer, communication
-reviewer, Social Attention model, or audit model call. Fast First Response has no
-auxiliary surface; Fast Advance and canonical Fast/Deep planning make the optional
-decoration decision in their primary result.
-
-The maintained runtime still awaits Fast First Response before creating Fast Advance and
-GA tasks. Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the proposed
-single Fast Planner stream and early typed immutable `PresentationCommit`; no streaming
-source exists. Never stream raw tokens or start Goal-owned Work before full validation.
+reviewer, Social Attention model, or audit model call. `PresentationCommit`, terminal
+Fast output, and canonical Fast/Deep planning make optional decoration decisions only
+under exact primary anchors. Raw tokens never reach TTS and Goal-owned Work never starts
+before the complete terminal result, canonical Goal binding, and full validation.
 
 ## Implemented in the current worktree
 
@@ -86,10 +96,13 @@ source exists. Never stream raw tokens or start Goal-owned Work before full vali
   ownership, and satisfaction. Same-owner truth/coverage reviewers and their dedicated
   model/runtime surfaces are removed; existing DTO repair and Fast-to-Deep escalation
   retain their narrower contracts.
-- The Host now starts and yields both critical GI consumers—Fast Advance and Goal
-  Association—before dispatching the first Planner-authored speech to TTS, but only after
-  the separate Fast First Response call has completed. First speech may still start before
-  Goal Association finishes; the preceding serial gate is retained as the #32 regression.
+- The Agent `/fast-advance` endpoint now makes one Ollama streaming invocation and emits
+  typed NDJSON frames. The Host starts that stream and GA concurrently, launches only a
+  complete validated `PresentationCommit`, and requires the same commit identity in the
+  terminal Fast result and CanonicalPlan.
+- Failures before commit are silent; failures after commit preserve the already-launched
+  truthful communication but dispatch no Goal Work. No read/effect Capability starts
+  before the terminal result, GA binding, and canonical validation.
 - The independent `SocialAttentionPlanner`, endpoint/client, model/config role, and
   background opportunity queue/worker are removed. `CanonicalPlan.auxiliary_activities[]`
   is fingerprinted separately from Goal-owned `steps[]`; it carries no Goal IDs or
@@ -109,28 +122,15 @@ source exists. Never stream raw tokens or start Goal-owned Work before full vali
 | Current focused GI matrix | 38 passed | Automated module/contract evidence |
 | Current retained GI + dialogue scenarios | 31/31 passed | Automated scripted module/dialogue evidence |
 | Current focused Planner matrix | 308 passed, 9 subtests passed | Automated primary-result/call-budget evidence |
+| Issue #32 focused stream matrix | Ordered commit/terminal, one-call, failure containment, exact commit identity, no early Work, auxiliary anchoring, client/Runtime/scenario regressions pass | Automated source/contract evidence |
+| Exact local provider probe | Ollama 0.32.14 + current `qwen3.5:9b` emitted 25 structured chunks with `presentation_commit` before `terminal_result`, terminal `done=stop`, and no thinking/error fields | Protocol probe only; not semantic, latency-under-load, live voice, or physical evidence |
 | Resource-admission regression | 147 cognitive/runtime/interaction/TTS/Social tests passed | Automated invocation-order evidence only |
 | Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
-| Canonical full local gate | 2,017 maintained tests plus 20 legacy Agent tests passed | Automated source/integration evidence |
+| Current canonical full local gate | 1,993 maintained tests plus 20 legacy Agent tests passed | Current automated source/integration evidence |
 | Level A general abilities for this amendment | 18/18 distinct cases passed: composable planning 5/5; multi-Goal daily life 10/10; Planner/Goal semantic quality 4/4 | Deterministic Level A only; one case belongs to two classes |
 | Documentation authority gate | 96 Markdown files passed | Current documentation consistency only |
-| Pre-fix live iteration 50, RTX 4090/Qwen3 4B | 32/36 contract-valid; four legacy coverage HTTP 503 failures; about 25/36 strict semantic passes | Diagnostic baseline only; different implementation |
-| Pre-Planner-fix 50-case must-pass aggregate | 1/50 machine passes; 29/29 first-response truth-review calls timed out; GA primary accepted 18/45 | Diagnostic comparison only |
-| Post-Planner-fix 50-case must-pass aggregate | 8/50 machine passes; zero retired review calls; GA primary accepted 43/44; 16 foreground-deadline, 7 Runtime-timeout, 4 GA-stage failures | Dirty source-tree-bound C-preview identity; not target qualification |
-| Post-admission-fix 50-case must-pass aggregate | 0/50 hard-pass; 24 GI overlap rejections, 8 GI transport timeouts, 1 GI whole-turn binding rejection, 6 GA timeouts, 7 Runtime/foreground timeouts | RTX 4090 Laptop/Qwen3 4B dirty C-preview diagnosis only |
 | Pre-default qwen3.5:4b comparison cohort | 2/50 hard-pass; 18/48 GI turns accepted, 25 timed out, 5 failed closed validation; 16/18 accepted results retained spurious unresolved meaning | GI-only model override with one resident Ollama model; diagnostic C-preview only |
 | Post-default qwen3.5:4b residency cohort | 2/50 mechanical hard-pass, 0/50 after manual semantic review; top-level retained GI results increased 17 -> 29 and explicit GI `ReadTimeout` cases fell 25 -> 6; 26/29 retained results carried false unresolved meaning | Dirty source-tree-bound C-preview identity; proves the residency fix but not semantic or end-to-end qualification |
-
-The earlier post-admission aggregate is retained under
-`.chromie/acceptance/general-ability/20260828T153643Z-live-text`, bound to runtime identity
-SHA-256 `86a04a8da490c02918545d2dfe01674800b516e5cf0b80e838b34a06c9906546`.
-Its one post-cohort bundle is
-`/home/chromie/Downloads/chromie_debug_bundle_20260828_234314.tar.gz`. All 50 cases are
-hard failures, so core/challenge correctly did not start. Dominant raw primary outputs
-duplicate atomic effects, cite overlapping spans, invent relation Responsibilities, and
-label embodied requests as speech despite the explicit prompt/schema. Validation is
-correctly fail-closed; this is not justification for resegmentation, a semantic repair
-call, or optional Social Attention satisfying a requested effect.
 
 ## Exact resume point
 

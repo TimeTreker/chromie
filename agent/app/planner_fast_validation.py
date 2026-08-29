@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvanceModelOutput, FastPlannerProgressAct
 
 from .capabilities.validator import validate_args_for_schema
-from .planner_context import first_response_phase_decided, planner_goal_execution_requirements
+from .planner_context import planner_goal_execution_requirements
 from .planner_grounding import semantic_numeric_values
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
 from .planner_validation import (

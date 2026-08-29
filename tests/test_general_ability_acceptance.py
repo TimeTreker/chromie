@@ -308,7 +308,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             text="哎，今天上午重庆会不会下雨？",
             require_speech=False,
             require_fast_planner_evidence_reentry=True,
-            require_pre_ga_safe_capability_dispatch=True,
+            require_work_held_until_canonical_validation=True,
             require_canonical_work_reconciliation=True,
             max_warm_gi_handoff_to_fast_commit_ms=2000,
             max_warm_fast_commit_to_playback_start_ms=3000,
@@ -322,7 +322,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "timings_ms": {"fast_planner_commit": 600.0},
                 "metadata": {
                     "fast_capability_activity_status": (
-                        "completed_before_canonical_dispatch:completed"
+                        "deferred_until_canonical_validation"
                     ),
                     "work_reconciliation_required": True,
                 },
@@ -330,7 +330,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "session_state": {
                 "cognitive_workflow_stages": [
                     {
-                        "stage": "fast_planner_first_response",
+                        "stage": "fast_planner_presentation_commit",
                         "status": "accepted",
                         "started_elapsed_ms": 500.0,
                         "duration_ms": 600.0,
@@ -373,13 +373,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         self.assertFalse(evidence["claim_limits"]["audible_speaker_proven"])
 
-        deferred_summary = json.loads(json.dumps(summary))
-        deferred_summary["cognitive_runtime"]["metadata"][
+        premature_summary = json.loads(json.dumps(summary))
+        premature_summary["cognitive_runtime"]["metadata"][
             "fast_capability_activity_status"
-        ] = "deferred_to_canonical_validation:ValueError"
-        errors = validate_live_text_result(case, deferred_summary)
+        ] = "completed_before_canonical_dispatch:completed"
+        errors = validate_live_text_result(case, premature_summary)
         self.assertTrue(
-            any("pre-GA Fast Activity dispatch" in item for item in errors),
+            any("crossed the PresentationCommit boundary" in item for item in errors),
             errors,
         )
 
@@ -408,7 +408,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "session_state": {
                 "cognitive_workflow_stages": [
                     {
-                        "stage": "fast_planner_first_response",
+                        "stage": "fast_planner_presentation_commit",
                         "status": "accepted",
                         "started_elapsed_ms": 1300.879,
                         "duration_ms": 1062.218,
@@ -480,8 +480,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "schema_version": 1,
                 "clock": "session_relative_monotonic_elapsed_ms",
                 "raw": {
-                    "fast_first_response_started_elapsed_ms": 100.0,
-                    "fast_first_response_finished_elapsed_ms": 900.0,
+                    "presentation_commit_started_elapsed_ms": 100.0,
+                    "presentation_commit_finished_elapsed_ms": 900.0,
                     "first_playback_start_elapsed_ms": 2500.0,
                 },
                 "derived": {
@@ -527,7 +527,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             )
             self.assertEqual(
                 timeline["cases"][0]["raw"][
-                    "fast_first_response_finished_elapsed_ms"
+                    "presentation_commit_finished_elapsed_ms"
                 ],
                 900.0,
             )
@@ -663,7 +663,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
                 "metadata": {
-                    "fast_planner_first_response": {
+                    "presentation_commit": {
                         "activity": {
                             "role": "complete_response",
                             "text": "You sound tired; get some rest.",
@@ -690,7 +690,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
                 "metadata": {
-                    "fast_planner_first_response": {
+                    "presentation_commit": {
                         "activity": {
                             "role": "progress",
                             "text": "好，我接着往前走。",
@@ -717,7 +717,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": []},
             "cognitive_runtime": {
                 "metadata": {
-                    "fast_planner_first_response": {
+                    "presentation_commit": {
                         "activity": {
                             "role": "complete_response",
                             "text": "你好！有什么想聊的吗？",

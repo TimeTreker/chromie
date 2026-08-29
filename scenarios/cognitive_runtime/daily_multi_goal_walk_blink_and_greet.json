@@ -265,8 +265,8 @@
     "confirmation_prompt_matches_speech": true,
     "requires_confirmation": true,
     "calls": [
-      "fast_advance",
       "goal_association",
+      "fast_stream",
       "fast_plan",
       "deep_plan"
     ]

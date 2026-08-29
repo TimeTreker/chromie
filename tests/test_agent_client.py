@@ -9,7 +9,7 @@ from typing import Any
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.semantic_task import SemanticGoal
-from shared.chromie_contracts.plan import FastPlannerFirstResponse
+from shared.chromie_contracts.plan import PresentationCommit
 from shared.chromie_runtime.runtime_trace import TRACE_CARRIER_KEY, runtime_tracer
 
 try:
@@ -31,6 +31,7 @@ class _FakeResponse:
         self.status = status
         self._text = text
         self._payload = payload or {}
+        self.content = _FakeContent([text.encode("utf-8")])
 
     async def __aenter__(self) -> "_FakeResponse":
         return self
@@ -43,6 +44,18 @@ class _FakeResponse:
 
     async def json(self) -> dict[str, Any]:
         return dict(self._payload)
+
+
+class _FakeContent:
+    def __init__(self, chunks: list[bytes]) -> None:
+        self.chunks = chunks
+
+    def __aiter__(self):
+        async def iterate():
+            for chunk in self.chunks:
+                yield chunk
+
+        return iterate()
 
 
 class _FakeSession:
@@ -58,9 +71,10 @@ class _FakeSession:
 @unittest.skipIf(AgentClient is None, "aiohttp is unavailable")
 class AgentClientTests(unittest.IsolatedAsyncioTestCase):
 
-    async def test_fast_first_response_uses_dedicated_fast_planner_endpoint(self) -> None:
-        first_response = FastPlannerFirstResponse(
-            turn_id="turn-fast-first",
+    async def test_fast_stream_yields_typed_commit_from_single_endpoint(self) -> None:
+        commit = PresentationCommit(
+            commit_id="commit-fast",
+            turn_id="turn-fast",
             activity={
                 "activity_id": "ack",
                 "role": "progress",
@@ -69,34 +83,35 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
                 "source_responsibility_refs": ["weather"],
             },
         )
-        session = _FakeSession(
-            _FakeResponse(text=first_response.model_dump_json())
-        )
+        session = _FakeSession(_FakeResponse(text=commit.model_dump_json() + "\n"))
 
-        result = await AgentClient(
-            "http://agent.local"
-        ).resolve_fast_first_response(
-            session,  # type: ignore[arg-type]
-            request=CognitiveWorkRequest(
-                sid="turn-fast-first",
-                text="查一下天气",
-                language="zh-CN",
-                responsibilities=[
-                    CognitiveResponsibilityProposal(
-                        local_ref="weather",
-                        outcome="check the weather",
-                        confidence=0.95,
-                    )
-                ],
-                interpretation_confidence=0.95,
-            ),
-            timeout_ms=1900,
-        )
+        frames = [
+            frame
+            async for frame in AgentClient(
+                "http://agent.local"
+            ).stream_fast_advance(
+                session,  # type: ignore[arg-type]
+                request=CognitiveWorkRequest(
+                    sid="turn-fast",
+                    text="查一下天气",
+                    language="zh-CN",
+                    responsibilities=[
+                        CognitiveResponsibilityProposal(
+                            local_ref="weather",
+                            outcome="check the weather",
+                            confidence=0.95,
+                        )
+                    ],
+                    interpretation_confidence=0.95,
+                ),
+                timeout_ms=1900,
+            )
+        ]
 
-        self.assertEqual(result.activity.text, "我先看看。")
+        self.assertEqual(frames[0].activity.text, "我先看看。")
         self.assertEqual(
             session.posts[0]["url"],
-            "http://agent.local/fast-first-response",
+            "http://agent.local/fast-advance",
         )
         self.assertAlmostEqual(session.posts[0]["timeout"].total, 1.9)
 

@@ -70,197 +70,6 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
 # Planner prompt/projection mechanics only. This module does not invoke a model,
 # validate or commit a Plan, mutate Goal/Work state, or authorize effects.
 
-def first_response_target_goal_grounding(
-    context: dict[str, Any],
-    responsibilities: list[CognitiveResponsibilityProposal],
-) -> list[dict[str, Any]]:
-    """Project retained Goal meaning needed by the pre-GA fast speech pass."""
-
-    target_goal_ids = {
-        str(goal_id).strip()
-        for responsibility in responsibilities
-        for goal_id in responsibility.target_goal_ids
-        if str(goal_id).strip()
-    }
-    if not target_goal_ids:
-        return []
-    result: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for item in [
-        *canonical_goal_grounding(context),
-        *(context.get("active_goal_snapshots") or []),
-        *(context.get("recent_goal_snapshots") or []),
-    ]:
-        if not isinstance(item, dict):
-            continue
-        goal = item.get("goal") if isinstance(item.get("goal"), dict) else item
-        goal_id = " ".join(
-            str(item.get("goal_id") or goal.get("goal_id") or "").split()
-        )
-        if not goal_id or goal_id not in target_goal_ids or goal_id in seen:
-            continue
-        seen.add(goal_id)
-        result.append(
-            {
-                "goal_id": goal_id,
-                "description": goal.get("description") or item.get("last_user_update") or "",
-                "source_text": goal.get("source_text") or item.get("last_user_update") or "",
-                "object": goal.get("object") or {},
-                "constraints": goal.get("constraints") or {},
-                "success_criteria": goal.get("success_criteria") or [],
-            }
-        )
-    return result
-
-
-def fast_first_response_system_prompt() -> str:
-    return (
-        "You are Chromie's low-latency Fast Planner deciding whether there is one "
-        "immediately useful Communicative Activity. You own whether to communicate, "
-        "its communicative function, and exact natural wording. Silence is valid when "
-        "no still-needed user-facing semantic delta exists. You own its communicative "
-        "function and exact natural wording. Do not select a Capability, resolve "
-        "parameters, ask a clarification, claim execution, or invent external "
-        "Evidence in this latency phase. This is a method-blind phase: never name "
-        "where or how Chromie will check or act, including an instrument, device, "
-        "screen, sensor, source, or implementation, unless that exact method is "
-        "already explicit in Responsibility evidence. Name only the user-level "
-        "outcome Chromie will check or do. Return only schema-constrained JSON."
-    )
-
-
-def fast_first_response_prompt(
-    request: CognitiveWorkRequest,
-    *,
-    responsibilities: list[CognitiveResponsibilityProposal],
-) -> LayeredPrompt:
-    context = request.context if isinstance(request.context, dict) else {}
-    language = str(request.language or "auto")[:32]
-    decision_contract = (
-        "Choose exactly one of three semantic decisions: (1) activity=null when no "
-        "new user-facing delta is needed now; (2) when the decoder permits a complete "
-        "conversational response, return an activity object without progress_kind and "
-        "only when its content is already supportable from supplied trusted context; "
-        "or (3) return an activity object with progress_kind for a useful prospective "
-        "acknowledgement when meaningful work/evidence still appears necessary. The "
-        "decoder intentionally omits the mechanical role tag, so never emit a role "
-        "field. Never speak merely because a processing phase exists."
-    )
-    identity = owner_approved_identity_context(context).get("identity") or {}
-    personality = owner_approved_personality_context(context)
-    identity_projection = {
-        "identity": {
-            key: identity[key]
-            for key in ("name",)
-            if identity.get(key) not in (None, "", [], {})
-        },
-        "voice": {
-            key: str(personality[key])[:360]
-            for key in ("spoken_style", "tool_use_style")
-            if personality.get(key) not in (None, "", [], {})
-        },
-    }
-    identity_section = "Bounded owner-approved speaking style JSON:\n" + json.dumps(
-        identity_projection,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-    progress_contract = (
-        "Fast Planner first-response contract: decide whether one useful spoken Main "
-        "Activity is still needed and, if so, author its exact wording. Returning no "
-        "Activity is correct when equivalent communication is already delivered/pending "
-        "or speaking now adds no useful semantic delta. At truth_stage=pre_evidence, no check, "
-        "execution, or fresh Evidence has happened. Say only a present "
-        "acknowledgement or prospective intention; never claim or predict a result, "
-        "completion, method, instrument, source, sensor, or screen. A check must use "
-        "prospective grammar (an equivalent of 'I'll check' or '我来查一下'), never "
-        "retrospective/perfect grammar (an equivalent of 'I checked' or "
-        "'我查过/我查了一下') and never the requested proposition's answer. A progress "
-        "Activity is not a clarification: never ask a question, request a choice, "
-        "or ask the person to reconfirm supplied meaning. Preserve who said, felt, "
-        "perceived, or did each thing: the human's first person never becomes "
-        "Chromie's first person. An imperative addressed to Chromie makes Chromie "
-        "the actor. Reply to a command with Chromie's first-person intention; never "
-        "repeat the commanded action with the human as its subject. Do not turn a command "
-        "into an invitation, accompaniment, or joint activity with the human unless joint "
-        "participation is part of the authoritative Responsibility. Do not turn a command into an "
-        "observation about the human's hobbies, practice, preferences, or recent "
-        "activity. For a human feeling, acknowledge the human as 你/you, never as "
-        "我/I. For a request to restate Chromie's last utterance, use only the "
-        "supplied assistant utterance. When a Responsibility continues, resumes, "
-        "modifies, or otherwise references a supplied Goal, use the resolved "
-        "target Goal meaning below. The sentence must name that concrete resolved "
-        "user-level action or work in natural language and preserve the supplied "
-        "relationship. For relationship=continue, the wording must semantically mark "
-        "continuation or resumption rather than sounding like a new start, while "
-        "preserving the resolved user-level action instead of replacing it with a "
-        "generic stand-in. It may omit repeated parameter detail when brevity makes "
-        "that natural. Before an embodied or state-changing action, use prospective "
-        "grammar so intention is not mistaken for execution already underway; onset "
-        "or progressive claims require Runtime commitment. Do not invent current activity, household "
-        "work, personal state, or external facts."
-    )
-    responsibility_field_contract = (
-        "The decoder schema omits Responsibility refs when exactly one Responsibility "
-        "exists; trusted runtime restores that mechanical provenance. Otherwise use "
-        "source_responsibility_refs with only supplied refs. Never invent a nested "
-        "Responsibility object."
-    )
-    rendered = (
-        identity_section
-        + "\n\n"
-        + progress_contract
-        + "\n\nCurrent user turn:\n"
-        + str(request.original_user_text or "")[:700]
-        + "\nRequired response language: "
-        + language
-        + "\nUse that language naturally in activity.text; zh/zh-CN requires "
-        "natural Chinese.\n\n"
-        + decision_contract
-        + " When a direct conversational Responsibility can be answered in the same "
-        "terminal mixed Plan as a small bounded effect, prefer activity=null: the "
-        "substantive response is the useful speech and a preliminary promise would be "
-        "duplicative. Emit progress only when meaningful downstream work remains before "
-        "the requested answer can be delivered."
-        + " Use one brief conversational sentence. Progress states the prospective "
-        "check, action, or work instead of repeating the question; omit a second "
-        "clause explaining what the check will reveal. For an effectful command, "
-        "a useful progress sentence must naturally name every referenced user-level "
-        "effect. A generic reply such as saying only that Chromie will do it is not "
-        "a sufficient semantic delta; return activity=null instead when the effects "
-        "cannot be named briefly. "
-        + responsibility_field_contract
-        + "\n\n"
-        "Authoritative Responsibility evidence:\n"
-        + bounded_json(
-            [
-                item.model_dump(mode="json", exclude_none=True)
-                for item in responsibilities
-            ],
-            2600,
-        )
-        + "\n\nResolved target Goal semantics for referenced Responsibilities:\n"
-        + bounded_json(
-            first_response_target_goal_grounding(context, responsibilities), 1800
-        )
-        + "\n\nAlready delivered or pending interaction summary:\n"
-        + bounded_json(context.get("interaction_context") or {}, 700)
-        + "\n\nFINAL TRUTH CHECK: if activity contains progress_kind, the exact "
-        "sentence must remain "
-        "true if no checking/execution has started and no result exists. If "
-        "activity omits progress_kind as a complete conversational response, its "
-        "content must already be supported by supplied trusted context. If neither "
-        "is useful, return activity=null. This primary result is the complete "
-        "Fast Planner decision; no later model will review or repair its meaning."
-    )
-    return LayeredPrompt.promote(
-        rendered,
-        identity_world=(identity_section,),
-        operating_contract=(progress_contract,),
-    )
-
-
 def auxiliary_social_planning_prompt_section(context: dict[str, Any]) -> str:
     """Describe Planner-owned optional decoration without creating another owner."""
 
@@ -572,9 +381,6 @@ def fast_advance_layered_prompt(
     *,
     responsibilities: list[CognitiveResponsibilityProposal],
     capabilities: list[dict[str, Any]],
-    committed_communicative_activities: list[Any] | None = None,
-    first_response_decided: bool = False,
-    first_response_attempted: bool = False,
     validation_errors: str = "",
 ) -> LayeredPrompt:
     context = request.context if isinstance(request.context, dict) else {}
@@ -604,42 +410,41 @@ def fast_advance_layered_prompt(
     )
     auxiliary_social_section = auxiliary_social_planning_prompt_section(context)
     user_text = str(request.original_user_text or "")[:700]
-    committed_communicative_json = bounded_json(
-        [
-            item.model_dump(mode="json", exclude_none=True)
-            for item in (committed_communicative_activities or [])
-        ],
-        900,
+    communication_instruction = (
+        "This is one streaming semantic invocation. First author "
+        "presentation_commit.activity as one useful immediate progress or "
+        "complete conversational response, or null for intentional silence. "
+        "Give a non-null Activity a short stable activity_id; every optional "
+        "auxiliary anchor_id must equal it exactly. Then continue the same decision "
+        "in terminal_result without repeating, rewording, translating, or "
+        "contradicting that Activity. terminal_result.activities may contain only "
+        "still-needed Capability or genuine clarification Activities."
     )
-    if committed_communicative_activities:
-        communication_instruction = (
-            "A Fast Planner Communicative Activity has already been committed and "
-            "is shown below. Do not repeat, replace, translate, or re-author it in "
-            "activities. Continue the same HOW decision with only the still-needed "
-            "Capability or clarification Activities."
-        )
-    elif first_response_decided:
-        communication_instruction = (
-            "The bounded first-response phase completed with no committed speech. "
-            "Do not bypass that decision by authoring a replacement progress "
-            "Activity. Continue with only the still-needed Capability or genuine "
-            "source-grounded clarification Activities."
-        )
-    elif first_response_attempted:
-        communication_instruction = (
-            "The bounded first-response phase failed closed without committed "
-            "speech. Do not replace it with a prospective progress Activity. A "
-            "complete_response remains valid only for an ordinary speech "
-            "Responsibility that otherwise has no terminal Activity; continue "
-            "non-speech work with Capability or genuine source-grounded "
-            "clarification Activities."
-        )
-    else:
-        communication_instruction = (
-            "No Fast Planner Communicative Activity decision exists yet."
-        )
+    streaming_contract = (
+        "STREAMING PRESENTATION COMMIT CONTRACT: Return exactly one top-level JSON "
+        "object whose first member is presentation_commit and whose second member "
+        "is terminal_result. Property order is mandatory because the first complete "
+        "typed value may be realized before generation ends. presentation_commit "
+        "must contain both activity and auxiliary_activities. It may contain one "
+        "complete_response only when every covered Responsibility is direct speech "
+        "already grounded by trusted context; otherwise it may contain one short "
+        "pre-evidence progress Activity, or activity=null when speaking now adds no "
+        "useful semantic delta. Progress is prospective and method-blind: it must "
+        "not ask a question, claim execution/result/completion, or name an instrument, "
+        "source, screen, sensor, implementation, or Capability unless supplied as "
+        "authoritative Responsibility evidence. Preserve speaker and actor ownership "
+        "and use the requested language naturally. presentation_commit auxiliary "
+        "Activities may only be optional social decoration anchored to that exact "
+        "communicative Activity; a silent commit has none. terminal_result is the "
+        "rest of the same HOW decision. It must not emit another progress or "
+        "complete_response Activity and must not repeat presentation decoration. "
+        "No partial string or token is a commitment; only the complete typed first "
+        "member is."
+    )
     rendered = (
         advance_contract
+        + "\n\n"
+        + streaming_contract
         + "\n\nCurrent user turn:\n"
         + user_text
         + "\nLanguage hint: "
@@ -652,9 +457,7 @@ def fast_advance_layered_prompt(
         + active_goals
         + "\n\nAlready-spoken/pending interaction summary only:\n"
         + interaction_context
-        + "\n\nAlready committed Fast Planner Communicative Activity JSON:\n"
-        + committed_communicative_json
-        + "\n"
+        + "\n\n"
         + communication_instruction
         + "\n\nExecutable common Capability catalog JSON:\n"
         + capability_json
@@ -672,9 +475,9 @@ def fast_advance_layered_prompt(
         "missing inputs. When one matching Capability has every required input, use "
         "disposition=execute, coverage=complete, continuations=[], unresolved=[], and "
         "emit its schema-valid Capability Activity. For an external information read, "
-        "include one short progress Activity with progress_kind=check_information "
-        "for fresh external information work only when no committed Fast Planner "
-        "Communicative Activity is supplied above. Never fuse progress wording into "
+        "put one short progress Activity with progress_kind=check_information in "
+        "presentation_commit when streaming, or in activities only when no earlier "
+        "communication decision exists. Never fuse progress wording into "
         "a Capability Activity or use a Capability ID as a progress activity_id.\n\n"
         "Cover every Responsibility ref exactly. Activities are one ordered list. "
         "Speaking is an Activity and uses the same timing field as Capability work. "
@@ -723,8 +526,9 @@ def fast_advance_layered_prompt(
         "their feeling or state does not request any robot body state, stop, posture, "
         "gesture, or other physical effect. Preserve every GI binding, "
         "including all independent temporal dimensions. When fresh Evidence is still "
-        "needed and no committed Communicative Activity is supplied above, add one "
-        "concise progress speaking Activity that does not claim a result. Every "
+        "needed, put at most one concise progress speaking Activity in the presentation "
+        "commit when streaming; otherwise add it only when no committed Communicative "
+        "Activity exists. It must not claim a result. Every "
         "Communicative Activity must use the requested response language; zh or "
         "zh-CN requires natural Chinese, never English or pinyin. Use short Activity "
         "IDs. Emit an optional Capability argument whenever an explicit GI binding "
@@ -853,23 +657,20 @@ def fast_advance_capability_prompt_projection(
     return projected
 
 
-def fast_advance_system_prompt() -> str:
+def fast_streaming_advance_system_prompt() -> str:
+    """System authority for one Fast invocation with an early typed commit."""
+
     return (
-        "You are Chromie's low-latency Fast Planner. Accept Goal Interpretation's "
-        "Responsibility evidence as authoritative contextual WHAT. Produce the first "
-        "Activity Plan, including speaking and exact available Capability Activities. "
-        "Speaking Activities are Communicative Acts: select their function, exact "
-        "natural wording, timing, truth stage, and Responsibility/InformationGap "
-        "provenance; speech_act remains a closed communicative-function enum. Ask "
-        "through a clarification act when a required user-resolvable "
-        "binding is genuinely absent after checking GI bindings and Capability defaults; "
-        "never reinterpret a present normalized binding as missing or ambiguous. Select "
-        "only a Capability whose declared description, effects, and semantic scope match "
-        "the requested outcome; information reads are not physical-object delivery or "
-        "decorative body motion. Delegate only genuinely complex HOW to Deep Planner. Goal "
-        "Association separately owns Canonical Goal commits, and Trusted Capability "
-        "Runtime owns execution authority and mechanically realizes Planner wording. "
-        "Return only schema-constrained JSON."
+        "You are Chromie's low-latency Fast Planner. Produce one complete semantic "
+        "result as schema-constrained JSON. Emit presentation_commit first and "
+        "terminal_result second. presentation_commit owns the exact wording and "
+        "optional social decoration that may be realized as soon as that complete "
+        "typed member validates; terminal_result continues the same decision and "
+        "must not duplicate or contradict it. Accept Goal Interpretation's "
+        "Responsibility evidence as authoritative contextual WHAT. Goal Association "
+        "separately owns longitudinal association and Canonical Goal commits. Trusted "
+        "Capability Runtime alone authorizes Work. Do not claim Work, fresh Evidence, "
+        "or completion in the early presentation. Return only the ordered JSON object."
     )
 
 

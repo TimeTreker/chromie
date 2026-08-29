@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any
+from typing import Any, AsyncIterator
 
 from pydantic import ValidationError
 
@@ -27,9 +27,7 @@ from .planner_schema import (
     canonical_resource_argument_response_schema,
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
-    fast_first_response_response_schema,
-    fast_advance_revision_response_schema,
-    fast_advance_response_schema,
+    fast_streaming_advance_response_schema,
     fast_repair_response_schema,
 )
 from .planner_context import (
@@ -52,7 +50,6 @@ from .planner_validation import (
 from .planner_fast_validation import (
     AuthoritativeGroundingValidationError,
     CapabilityArgumentValidationError,
-    FastAdvanceMechanicalSchedulingError,
     capability_argument_errors,
     planner_validation_error_json,
     qualify_fast_canonical_plan,
@@ -60,10 +57,7 @@ from .planner_fast_validation import (
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
-from .planner_fallback import (
-    materialize_fast_advance_fail_safe,
-    materialize_fast_escalation,
-)
+from .planner_fallback import materialize_fast_escalation
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
 except ImportError:  # pragma: no cover - repository development path
@@ -83,25 +77,29 @@ try:
     from chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
-        FastPlannerAdvanceModelOutput,
-        FastPlannerFirstResponse,
-        FastPlannerFirstResponseModelOutput,
+        FastPlannerPresentationCommitModelOutput,
+        FastPlannerStreamingModelOutput,
+        FastPlannerStreamFailure,
+        FastPlannerStreamFrame,
+        FastPlannerStreamTerminal,
+        PresentationCommit,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
-        FastPlannerAdvanceModelOutput,
-        FastPlannerFirstResponse,
-        FastPlannerFirstResponseModelOutput,
+        FastPlannerPresentationCommitModelOutput,
+        FastPlannerStreamingModelOutput,
+        FastPlannerStreamFailure,
+        FastPlannerStreamFrame,
+        FastPlannerStreamTerminal,
+        PresentationCommit,
     )
 
 from .planner_prompt import (
-    fast_first_response_system_prompt,
-    fast_first_response_prompt,
     fast_advance_layered_prompt,
-    fast_advance_system_prompt,
+    fast_streaming_advance_system_prompt,
     fast_layered_prompt,
     fast_system_prompt,
     fast_repair_system_prompt,
@@ -110,13 +108,97 @@ from .planner_prompt import (
 
 logger = logging.getLogger("chromie.agent.fast_planner")
 
+def presentation_commit_id(request: CognitiveWorkRequest) -> str:
+    responsibility_refs = "|".join(
+        str(item.local_ref) for item in request.responsibilities
+    )
+    digest = hashlib.sha256(
+        f"{request.sid}|{responsibility_refs}|presentation".encode("utf-8")
+    ).hexdigest()[:20]
+    return f"present_{digest}"
 
 
+def first_stream_member(buffer: str) -> dict[str, Any] | None:
+    """Return the complete first ordered member, or None while incomplete."""
 
+    decoder = json.JSONDecoder()
+    index = 0
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    if index >= len(buffer):
+        return None
+    if buffer[index] != "{":
+        raise PlannerDTOContractError(
+            "Fast Planner stream must begin with a JSON object"
+        )
+    index += 1
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    try:
+        key, index = decoder.raw_decode(buffer, index)
+    except json.JSONDecodeError:
+        return None
+    if key != "presentation_commit":
+        raise PlannerDTOContractError(
+            "Fast Planner stream must emit presentation_commit first"
+        )
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    if index >= len(buffer):
+        return None
+    if buffer[index] != ":":
+        raise PlannerDTOContractError(
+            "Fast Planner presentation_commit member is malformed"
+        )
+    index += 1
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    try:
+        value, _ = decoder.raw_decode(buffer, index)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        raise PlannerDTOContractError(
+            "Fast Planner presentation_commit must be an object"
+        )
+    return value
 
-
-
-
+def normalize_presentation_payload(
+    raw: dict[str, Any],
+    *,
+    request: CognitiveWorkRequest,
+    responsibility_refs: list[str],
+) -> dict[str, Any]:
+    payload = dict(raw)
+    raw_activity = payload.get("activity")
+    if not isinstance(raw_activity, dict):
+        return payload
+    activity = dict(raw_activity)
+    if len(responsibility_refs) == 1:
+        activity.setdefault("source_responsibility_refs", responsibility_refs)
+    role = str(activity.get("role") or "")
+    if not role:
+        role = (
+            "progress"
+            if activity.get("progress_kind") not in (None, "")
+            else "complete_response"
+        )
+        activity["role"] = role
+    activity.setdefault(
+        "activity_id",
+        ("progress_" if role == "progress" else "response_")
+        + hashlib.sha256(
+            (
+                str(request.sid or "turn")
+                + "|"
+                + role
+                + "|"
+                + "|".join(responsibility_refs)
+            ).encode("utf-8")
+        ).hexdigest()[:12],
+    )
+    payload["activity"] = activity
+    return payload
 
 
 class FastPlannerResolver:
@@ -134,8 +216,6 @@ class FastPlannerResolver:
         ollama: OllamaClient,
         catalog: CapabilityCatalog,
         *,
-        first_response_ollama: OllamaClient | None = None,
-        first_response_num_ctx: int | None = None,
         num_ctx: int = 8192,
         num_predict: int = 2048,
         cognitive_budget_profile: str = "interactive",
@@ -143,18 +223,6 @@ class FastPlannerResolver:
         max_contract_repairs: int = 1,
     ) -> None:
         self.ollama = ollama
-        # Fast Planner remains the sole semantic owner of both phases. The
-        # latency-critical natural-language Activity may use a dedicated model;
-        # complete Capability planning stays on ``ollama``.
-        self.first_response_ollama = first_response_ollama or ollama
-        self.first_response_num_ctx = max(
-            2048,
-            int(
-                first_response_num_ctx
-                if first_response_num_ctx is not None
-                else min(num_ctx, 6144)
-            ),
-        )
         self.catalog = catalog
         self.num_ctx = max(2048, int(num_ctx))
         self.num_predict = max(128, int(num_predict))
@@ -164,15 +232,11 @@ class FastPlannerResolver:
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
         self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
 
-    async def resolve_first_response(
-        self, request: CognitiveWorkRequest
-    ) -> FastPlannerFirstResponse:
-        """Author the earliest useful speech while Fast HOW planning continues.
-
-        This is deliberately a latency phase of Fast Planner. It neither selects a
-        Capability nor resolves an execution-input gap, and it never creates a
-        second response-authoring owner.
-        """
+    async def stream_advance(
+        self,
+        request: CognitiveWorkRequest,
+    ) -> AsyncIterator[FastPlannerStreamFrame]:
+        """Stream one Fast Planner result through an immutable typed commit."""
 
         responsibilities = [
             CognitiveResponsibilityProposal.model_validate(
@@ -181,244 +245,16 @@ class FastPlannerResolver:
             for item in request.responsibilities
         ]
         responsibility_refs = [item.local_ref for item in responsibilities]
-        if request.interpretation_unresolved:
-            # GI owns WHAT and has explicitly retained an unresolved meaning.  A
-            # prospective first response would falsely imply that one meaning was
-            # selected before the same Planner has authored its typed clarification.
-            return FastPlannerFirstResponse(
-                turn_id=str(request.sid or "turn-fast-first-response"),
-                activity=None,
-                metadata={
-                    "semantic_authority": "fast_planner_unresolved_meaning_contract",
-                    "phase": "first_communicative_activity",
-                    "decision": "silence",
-                    "execution_authority": "none",
-                    "unresolved_meaning_count": len(request.interpretation_unresolved),
-                },
-            )
-        response_schema = fast_first_response_response_schema(
-            responsibility_refs,
-            responsibilities=responsibilities,
-            language=str(request.language or ""),
+        turn_id = str(request.sid or "turn-fast-stream")
+        commit_id = presentation_commit_id(request)
+        commit: PresentationCommit | None = None
+        raw_text = ""
+        capabilities = await self.catalog.prompt_entries(
+            scope="common", refresh=False
         )
-        try:
-            raw = await self.first_response_ollama.generate(
-                fast_first_response_prompt(
-                    request,
-                    responsibilities=responsibilities,
-                ),
-                system=fast_first_response_system_prompt(),
-                options={
-                    "temperature": 0,
-                    "top_p": 0.9,
-                    # The bootstrap topology chooses this context explicitly:
-                    # reuse the Fast runner when models match, otherwise keep the
-                    # latency-critical response phase bounded rather than inheriting
-                    # a deliberate role's context window.
-                    "num_ctx": self.first_response_num_ctx,
-                    # The schema is compact, but retained qualification evidence
-                    # includes a valid multi-goal first response that reached the
-                    # former 128-token ceiling before Ollama closed the JSON object.
-                    # Keep this below the historical 512-token repetition failure
-                    # while allowing one complete bounded response.
-                    "num_predict": min(
-                        self.num_predict,
-                        4096
-                        if self.cognitive_budget_profile == "qualification"
-                        else 256,
-                    ),
-                    "stop": [
-                        "✅",
-                        "\n\nNote:",
-                        "\n\nExplanation:",
-                        "\n\nFinal truth check:",
-                        # Gemma 4 can close the schema-valid object and then loop
-                        # over Markdown-fenced copies until num_predict is exhausted.
-                        # Stop at the mechanical suffix while retaining the first
-                        # complete JSON object; this does not salvage a truncated
-                        # response or alter any semantic field.
-                        "_```json",
-                        "}```json",
-                        "\n```json",
-                        "```",
-                    ],
-                },
-                response_format=response_schema,
-                prompt_family="fast_planner.first_response",
-                turn_id=request.sid,
-                attempt=1,
-            )
-            if isinstance(raw, dict):
-                raw_activity = raw.get("activity")
-                if isinstance(raw_activity, dict):
-                    activity_payload = dict(raw_activity)
-                    if len(responsibility_refs) == 1:
-                        # There is no semantic association choice in the single-
-                        # Responsibility case. Keep that mechanical provenance out
-                        # of the latency-critical model DTO and restore it before the
-                        # authoritative Activity contract is validated.
-                        activity_payload.setdefault(
-                            "source_responsibility_refs", responsibility_refs
-                        )
-                    role = str(activity_payload.get("role") or "")
-                    if not role:
-                        # The latency-critical decoder omits the mechanical role
-                        # discriminator. Presence of progress_kind is the semantic
-                        # choice between a prospective progress act and a complete
-                        # conversational response; restore the contract tag here.
-                        role = (
-                            "progress"
-                            if activity_payload.get("progress_kind") not in (None, "")
-                            else "complete_response"
-                        )
-                        activity_payload["role"] = role
-                    activity_payload.setdefault(
-                        "activity_id",
-                        ("progress_" if role == "progress" else "response_")
-                        + hashlib.sha256(
-                            (
-                                str(request.sid or "turn")
-                                + "|"
-                                + role
-                                + "|"
-                                + "|".join(responsibility_refs)
-                            ).encode("utf-8")
-                        ).hexdigest()[:12],
-                    )
-                    raw = {**raw, "activity": activity_payload}
-            output = FastPlannerFirstResponseModelOutput.model_validate(raw)
-            activity = output.activity
-            if activity is None:
-                return FastPlannerFirstResponse(
-                    turn_id=str(request.sid or "turn-fast-first-response"),
-                    activity=None,
-                    metadata={
-                        "semantic_authority": "fast_planner_model",
-                        "phase": "first_communicative_activity",
-                        "decision": "silence",
-                        "execution_authority": "none",
-                    },
-                )
-            refs = set(activity.source_responsibility_refs)
-            if not refs or not refs.issubset(set(responsibility_refs)):
-                raise PlannerDTOContractError(
-                    "Fast first response must cite supplied Responsibility refs"
-                )
-            if activity.role == "complete_response" and any(
-                item.output_mode != "speech" for item in responsibilities
-            ):
-                raise PlannerDTOContractError(
-                    "first-response completion is valid only for conversational speech WHAT; "
-                    "information and observable/stateful effects remain Planner work"
-                )
-            return FastPlannerFirstResponse(
-                turn_id=str(request.sid or "turn-fast-first-response"),
-                activity=activity,
-                metadata={
-                    "semantic_authority": "fast_planner_model",
-                    "phase": "first_communicative_activity",
-                    "execution_authority": "host_communicative_runtime",
-                    "semantic_result_call_count": 1,
-                    "truth_contract": "primary_prompt_schema_and_typed_provenance",
-                },
-            )
-        except Exception as exc:
-            failure = (
-                llm_failure_metadata(exc)
-                if isinstance(exc, OllamaGenerationError)
-                else {
-                    "failure_class": "fast_first_response_contract_invalid",
-                    "failure_domain": "model_contract",
-                    "architecture_attribution": "not_evaluated",
-                    "retryable": True,
-                }
-            )
-            logger.warning(
-                "fast_planner_first_response_fail_safe sid=%s error_type=%s "
-                "error=%s failure_class=%s",
-                request.sid,
-                type(exc).__name__,
-                exc,
-                failure["failure_class"],
-            )
-            return FastPlannerFirstResponse(
-                turn_id=str(request.sid or "turn-fast-first-response"),
-                activity=None,
-                metadata={
-                    "semantic_authority": "deterministic_fail_safe",
-                    "phase": "first_communicative_activity",
-                    "execution_authority": "none",
-                    "error_type": type(exc).__name__,
-                    "error": str(exc)[:300],
-                    **failure,
-                },
-            )
-    async def resolve_advance(self, request: CognitiveWorkRequest) -> FastPlannerAdvance:
-        """Produce Fast Planner's first Activity Plan from GI Responsibilities."""
-
-        context = request.context if isinstance(request.context, dict) else {}
-        responsibilities = [
-            CognitiveResponsibilityProposal.model_validate(item.model_dump(mode="json"))
-            for item in request.responsibilities
-        ]
-        committed_communicative_activities: list[Any] = []
-        first_response_decided = False
-        raw_first_response = context.get("fast_planner_first_response")
-        first_response_attempted = isinstance(raw_first_response, dict)
-        if isinstance(raw_first_response, dict):
-            try:
-                first_response = FastPlannerFirstResponse.model_validate(
-                    raw_first_response
-                )
-            except ValidationError:
-                first_response = None
-            if first_response is not None:
-                # A fail-safe is evidence that this bounded model call did not
-                # make a valid communication decision. Treating it as intentional
-                # silence removes complete-response Activities from Advance and
-                # can make an ordinary speech Responsibility impossible to
-                # satisfy. Model-authored silence remains a real bounded
-                # decision and must still suppress replacement progress chatter.
-                first_response_decided = (
-                    first_response.activity is not None
-                    or first_response.metadata.get("semantic_authority")
-                    != "deterministic_fail_safe"
-                )
-                if first_response.activity is not None:
-                    committed_communicative_activities.append(first_response.activity)
-
-        # A validated primary conversational response already covers an all-speech
-        # WHAT. Returning here keeps unrelated body/tool choices out of a second
-        # model decision; work/evidence readiness is not imported from GI.
-        if (
-            responsibilities
-            and all(item.output_mode == "speech" for item in responsibilities)
-            and len(committed_communicative_activities) == 1
-            and committed_communicative_activities[0].role == "complete_response"
-        ):
-            return FastPlannerAdvance(
-                turn_id=str(request.sid or "turn-fast-advance"),
-                disposition="respond",
-                coverage="complete",
-                covered_responsibility_refs=[
-                    item.local_ref for item in responsibilities
-                ],
-                activities=committed_communicative_activities,
-                continuations=[],
-                confidence=min(item.confidence for item in responsibilities),
-                unresolved=[],
-                reason_summary="Immediate conversational response is complete.",
-                metadata={
-                    "semantic_authority": "fast_planner_model",
-                    "phase": "responsibility_activity_planning",
-                    "execution_authority": "host_communicative_runtime",
-                    "immediate_conversation_terminal": True,
-                },
-            )
-
-        responsibility_refs = [item.local_ref for item in responsibilities]
-        capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
-        auxiliary_catalog = await self.catalog.prompt_entries(scope="all", refresh=False)
+        auxiliary_catalog = await self.catalog.prompt_entries(
+            scope="all", refresh=False
+        )
         auxiliary_social_capabilities = auxiliary_social_capability_payloads(
             auxiliary_catalog
         )
@@ -439,25 +275,27 @@ class FastPlannerResolver:
             fast_capability_payload(item, include_side_effect_free=True)
             for item in executable[: self.max_capabilities]
         ]
-        response_schema = fast_advance_response_schema(
+        response_schema = fast_streaming_advance_response_schema(
             responsibility_refs,
             responsibilities=responsibilities,
             capabilities=capability_payload,
             auxiliary_social_capabilities=auxiliary_social_capabilities,
             interpretation_unresolved=list(request.interpretation_unresolved),
-            # A null first-response result is still a terminal decision for that
-            # bounded speech phase.  Advance must not author a substitute progress
-            # sentence and thereby bypass its primary fail-closed decision.
-            committed_communicative=bool(committed_communicative_activities),
-            suppress_new_communicative=(
-                first_response_decided
-                and not committed_communicative_activities
-            ),
-            # A failed bounded response call is not a semantic silence
-            # decision, so ordinary speech may still be completed here. It is
-            # nevertheless an attempted prospective-speech phase and Advance
-            # must not bypass its fail-closed result with substitute progress.
-            suppress_new_progress=first_response_attempted,
+            language=str(request.language or ""),
+        )
+        if request.interpretation_unresolved:
+            presentation_schema = response_schema["properties"][
+                "presentation_commit"
+            ]
+            presentation_schema["properties"]["activity"] = {"type": "null"}
+            presentation_schema["properties"]["auxiliary_activities"] = {
+                "type": "array",
+                "maxItems": 0,
+            }
+        prompt = fast_advance_layered_prompt(
+            request,
+            responsibilities=responsibilities,
+            capabilities=capability_payload,
         )
         options = {
             "temperature": 0,
@@ -465,146 +303,193 @@ class FastPlannerResolver:
             "num_ctx": self.num_ctx,
             "num_predict": min(self.num_predict, 2048),
         }
-        previous_errors = ""
-        last_raw: Any = None
-        revision_source: Any = None
-        for attempt in range(self.max_contract_repairs + 1):
-            try:
-                active_response_schema = (
-                    fast_advance_revision_response_schema(
-                        response_schema,
-                        revision_source,
-                        committed_communicative=first_response_decided,
-                        capabilities=capability_payload,
-                        responsibilities=responsibilities,
-                    )
-                    if attempt
-                    else response_schema
-                )
-                last_raw = await self.ollama.generate(
-                    fast_advance_layered_prompt(
-                        request,
-                        responsibilities=responsibilities,
-                        capabilities=capability_payload,
-                        committed_communicative_activities=(
-                            committed_communicative_activities
-                        ),
-                        first_response_decided=first_response_decided,
-                        first_response_attempted=first_response_attempted,
-                        validation_errors=previous_errors,
-                    ),
-                    system=fast_advance_system_prompt(),
-                    options=options,
-                    response_format=active_response_schema,
-                    prompt_family=(
-                        "fast_planner.advance.revision"
-                        if attempt
-                        else "fast_planner.advance"
-                    ),
-                    turn_id=request.sid,
-                    attempt=attempt + 1,
-                )
-                if not isinstance(last_raw, dict):
-                    raise PlannerDTOContractError(
-                        "Fast Planner advance response is not a JSON object"
-                    )
-                last_raw, authoritative_arg_repairs = (
-                    restore_required_capability_args_from_responsibilities(
-                        last_raw,
-                        responsibilities=responsibilities,
-                        capabilities=capability_payload,
-                    )
-                )
-                if authoritative_arg_repairs:
-                    logger.info(
-                        "fast_planner_advance_authoritative_args_restored sid=%s repairs=%s",
-                        request.sid,
-                        bounded_json(authoritative_arg_repairs, 2000),
-                    )
-                output = FastPlannerAdvanceModelOutput.model_validate(last_raw)
-                if first_response_decided and any(
-                    activity.role == "progress" for activity in output.activities
-                ):
-                    raise PlannerDTOContractError(
-                        "Fast Planner advance cannot replace a completed first-response "
-                        "accept/reject decision with another progress Activity"
-                    )
-                combined_output = output.model_copy(
-                    update={
-                        "activities": [
-                            *committed_communicative_activities,
-                            *output.activities,
-                        ]
-                    }
-                )
-                validate_fast_advance_output(
-                    combined_output,
+        try:
+            async for delta in self.ollama.generate_stream(
+                prompt,
+                system=fast_streaming_advance_system_prompt(),
+                options=options,
+                response_format=response_schema,
+                prompt_family="fast_planner.streaming_advance",
+                turn_id=request.sid,
+                attempt=1,
+            ):
+                raw_text += delta
+                if commit is not None:
+                    continue
+                raw_presentation = first_stream_member(raw_text)
+                if raw_presentation is None:
+                    continue
+                normalized_presentation = normalize_presentation_payload(
+                    raw_presentation,
                     request=request,
+                    responsibility_refs=responsibility_refs,
+                )
+                presentation = (
+                    FastPlannerPresentationCommitModelOutput.model_validate(
+                        normalized_presentation
+                    )
+                )
+                activity = presentation.activity
+                if activity is not None:
+                    refs = set(activity.source_responsibility_refs)
+                    if not refs or not refs.issubset(set(responsibility_refs)):
+                        raise PlannerDTOContractError(
+                            "PresentationCommit must cite supplied Responsibility refs"
+                        )
+                    if activity.role == "complete_response" and any(
+                        item.output_mode != "speech" for item in responsibilities
+                    ):
+                        raise PlannerDTOContractError(
+                            "PresentationCommit completion is valid only for direct "
+                            "speech Responsibilities"
+                        )
+                commit = PresentationCommit(
+                    commit_id=commit_id,
+                    turn_id=turn_id,
+                    activity=activity,
+                    auxiliary_activities=presentation.auxiliary_activities,
+                    metadata={
+                        "semantic_authority": "fast_planner_model",
+                        "phase": "streaming_presentation_commit",
+                        "execution_authority": (
+                            "host_communicative_runtime"
+                            if activity is not None
+                            else "none"
+                        ),
+                        "semantic_result_call_count": 1,
+                    },
+                )
+                yield commit
+
+            if commit is None:
+                raise PlannerDTOContractError(
+                    "Fast Planner stream ended before a typed PresentationCommit"
+                )
+            raw_output = self.ollama._parse_json(raw_text)
+            raw_presentation = raw_output.get("presentation_commit")
+            raw_terminal = raw_output.get("terminal_result")
+            if not isinstance(raw_presentation, dict) or not isinstance(
+                raw_terminal, dict
+            ):
+                raise PlannerDTOContractError(
+                    "Fast Planner stream is missing its ordered result members"
+                )
+            normalized_presentation = normalize_presentation_payload(
+                raw_presentation,
+                request=request,
+                responsibility_refs=responsibility_refs,
+            )
+            raw_terminal, authoritative_arg_repairs = (
+                restore_required_capability_args_from_responsibilities(
+                    raw_terminal,
                     responsibilities=responsibilities,
                     capabilities=capability_payload,
                 )
-                return FastPlannerAdvance(
-                    turn_id=str(request.sid or "turn-fast-advance"),
-                    disposition=combined_output.disposition,
-                    coverage=combined_output.coverage,
-                    covered_responsibility_refs=(
-                        combined_output.covered_responsibility_refs
-                    ),
-                    activities=combined_output.activities,
-                    auxiliary_activities=combined_output.auxiliary_activities,
-                    continuations=combined_output.continuations,
-                    confidence=combined_output.confidence,
-                    unresolved=combined_output.unresolved,
-                    reason_summary=combined_output.reason_summary,
-                    metadata={
-                        "semantic_authority": "fast_planner_model",
-                        "phase": "responsibility_activity_planning",
-                        "execution_authority": "trusted_capability_runtime",
-                        "contract_revision_attempted": bool(attempt),
-                        **(
-                            {"authoritative_arg_repairs": authoritative_arg_repairs}
-                            if authoritative_arg_repairs
-                            else {}
-                        ),
-                    },
+            )
+            output = FastPlannerStreamingModelOutput.model_validate(
+                {
+                    "presentation_commit": normalized_presentation,
+                    "terminal_result": raw_terminal,
+                }
+            )
+            if output.presentation_commit != FastPlannerPresentationCommitModelOutput(
+                activity=commit.activity,
+                auxiliary_activities=commit.auxiliary_activities,
+            ):
+                raise PlannerDTOContractError(
+                    "Fast Planner terminal result changed PresentationCommit"
                 )
-            except Exception as exc:
-                if attempt < self.max_contract_repairs and isinstance(
-                    exc,
-                    (
-                        ValidationError,
-                        FastAdvanceMechanicalSchedulingError,
-                        json.JSONDecodeError,
-                    ),
-                ):
-                    revision_source = last_raw
-                    previous_errors = planner_validation_error_json(
-                        exc,
-                        raw=last_raw,
-                        planner_tier="fast",
-                        expected_goal_ids_for_turn=responsibility_refs,
-                        # Advance validates an Activity DTO over GI
-                        # Responsibility refs, not a CanonicalPlan over Goal IDs.
-                        # Canonical-plan diagnostics here ask for unrelated
-                        # steps/outcomes and corrupt the one mechanical repair.
-                        include_canonical_plan_diagnostics=False,
-                    )
-                    continue
-                return materialize_fast_advance_fail_safe(
-                    request,
-                    responsibility_refs=responsibility_refs,
-                    error=exc,
-                    raw_output=last_raw,
-                    committed_communicative_activities=(
-                        committed_communicative_activities
-                    ),
-                    allow_progress_salvage=not first_response_decided,
+            if any(
+                item.role in {"progress", "complete_response"}
+                for item in output.terminal_result.activities
+            ):
+                raise PlannerDTOContractError(
+                    "Fast Planner terminal result duplicated presentation speech"
                 )
-        raise AssertionError("unreachable")
-
-
-
-
+            combined_output = output.terminal_result.model_copy(
+                update={
+                    "activities": [
+                        *([commit.activity] if commit.activity is not None else []),
+                        *output.terminal_result.activities,
+                    ],
+                    "auxiliary_activities": [
+                        *commit.auxiliary_activities,
+                        *output.terminal_result.auxiliary_activities,
+                    ],
+                }
+            )
+            validate_fast_advance_output(
+                combined_output,
+                request=request,
+                responsibilities=responsibilities,
+                capabilities=capability_payload,
+            )
+            advance = FastPlannerAdvance(
+                turn_id=turn_id,
+                disposition=combined_output.disposition,
+                coverage=combined_output.coverage,
+                covered_responsibility_refs=(
+                    combined_output.covered_responsibility_refs
+                ),
+                activities=combined_output.activities,
+                auxiliary_activities=combined_output.auxiliary_activities,
+                continuations=combined_output.continuations,
+                confidence=combined_output.confidence,
+                unresolved=combined_output.unresolved,
+                reason_summary=combined_output.reason_summary,
+                metadata={
+                    "semantic_authority": "fast_planner_model",
+                    "phase": "streaming_responsibility_activity_plan",
+                    "presentation_commit_id": commit.commit_id,
+                    "execution_authority": "trusted_capability_runtime",
+                    "semantic_result_call_count": 1,
+                    **(
+                        {"authoritative_arg_repairs": authoritative_arg_repairs}
+                        if authoritative_arg_repairs
+                        else {}
+                    ),
+                },
+            )
+            yield FastPlannerStreamTerminal(
+                turn_id=turn_id,
+                presentation_commit_id=commit.commit_id,
+                advance=advance,
+            )
+        except Exception as exc:
+            failure = (
+                llm_failure_metadata(exc)
+                if isinstance(exc, OllamaGenerationError)
+                else {
+                    "failure_class": "fast_stream_contract_invalid",
+                    "failure_domain": "model_contract",
+                    "architecture_attribution": "not_evaluated",
+                    "retryable": False,
+                }
+            )
+            logger.warning(
+                "fast_planner_stream_fail_closed sid=%s stage=%s error_type=%s "
+                "error=%s failure_class=%s",
+                request.sid,
+                "after_commit" if commit is not None else "before_commit",
+                type(exc).__name__,
+                exc,
+                failure["failure_class"],
+            )
+            yield FastPlannerStreamFailure(
+                turn_id=turn_id,
+                failure_stage=(
+                    "after_commit" if commit is not None else "before_commit"
+                ),
+                presentation_commit_id=(commit.commit_id if commit else None),
+                failure_class=str(failure["failure_class"]),
+                failure_domain=str(failure["failure_domain"]),
+                architecture_attribution=str(
+                    failure.get("architecture_attribution") or "not_evaluated"
+                ),
+                retryable=bool(failure.get("retryable")),
+                error_type=type(exc).__name__,
+                reason=str(exc)[:500],
+            )
 
     async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)

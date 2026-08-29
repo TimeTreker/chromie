@@ -301,7 +301,7 @@ knowledge that is not represented as an acquisition resource may remain directly
 Local/private/device/sensor state without a supplied trusted observation or Provider remains
 epistemically unknown; a generic web or weather source is not silently promoted into authority.
 
-Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, the primary first-response truth/progress contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
+Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, the typed streaming presentation/truth contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
 
 The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep mechanical-repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. Fast/Deep Resolvers retain the primary model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
 
@@ -862,49 +862,31 @@ the existing tea Goal; it is not interpreted as an isolated new request. This do
 make GI the owner of why Planner asked or which source policy it chose. GA remains the
 sole authority that commits that Goal version.
 
-The same immutable GI result first enters Fast Planner's bounded first-response phase,
-which returns `FastPlannerFirstResponse` containing zero or one exact immediately
-realizable Communicative Activity. It has no Capability, parameter-resolution, or
-clarification authority separate from Fast Planner. After that commitment, the same
-Planner continues the remaining Activity decision and Goal Association begins
-concurrently from the unchanged GI result. Both branches retain the immutable admitted
-UserTurn as source evidence alongside the structured Responsibility projection. The
-decoder exposes a direct complete response (or silence) for an all-conversational speech
-Responsibility set, and prospective progress (or silence) for work/evidence-bearing
-Responsibility sets. A complete conversational answer cannot be typed as progress and
-reissued by the terminal response phase.
-The
-continued Planner returns a typed `FastPlannerAdvance` that mechanically retains the committed act and completes the
-first real Activity Plan:
-exact Responsibility refs covered, zero or more Communicative Acts and Capability Activities,
-their sequential/parallel relation, and an optional `deep_planner` continuation for
-complex HOW. A Communicative Act records function, timing, Responsibility provenance,
-exact text, and exact typed reason provenance to GI unresolved meaning or a Planner-owned
-InformationGap. Fast Planner owns input-source resolution and
-selects a clarification act only for a user-resolvable blocker; it does not send ordinary
-input completion to Deep GI or Deep Planner. An available schema-valid safe,
-side-effect-free read with explicit parallel-safety metadata may begin without awaiting
-GA and initially carries only Responsibility refs. Effects remain gated by canonical
-Goal binding, confirmation, authorization, resource, and provider-safety checks.
+The same immutable GI result starts Goal Association and one Fast Planner stream
+concurrently. The model emits one ordered JSON object: `presentation_commit` first and
+`terminal_result` second. The Agent exposes the first value only after it is complete and
+schema-valid, then serializes it as a typed NDJSON `PresentationCommit`. That commit holds
+intentional silence or one exact immediately truthful Communicative Activity, plus
+optional auxiliary Activities anchored to the exact communication. It carries no Goal
+identity, executable Work, confirmation, result, or completion authority. Raw tokens and
+partial JSON never cross the Agent boundary.
+
+The same model invocation then emits a typed `FastPlannerStreamTerminal` containing
+`FastPlannerAdvance`. Both the wire terminal and the advance reference the immutable
+commit ID; the accepted act and decoration cannot be repeated, reworded, contradicted, or
+omitted. A typed failure records whether it occurred before or after commit. Before commit
+the path is silent. After commit the already-launched truthful presentation remains, but
+no Goal-owned Work is dispatched. There is no same-owner reviewer or repair call for the
+streamed semantic result.
 
 Goal Interpretation has no progress-speech or response-authoring contract. Goal
-Association consumes the same authoritative GI result after the bounded first-response
-commitment and never waits for the remaining Fast Activity Plan. Fast Activities retain
-GI Responsibility refs until the
-deterministic join maps them to GA-owned canonical Goal IDs. Trusted Capability Runtime
-then exposes one task-list view per Goal. A task shared across Goals appears in every
-applicable view with the same request identity and executes once. Fast/Deep
-Planner-authored canonical Plan revisions may cause Runtime to cancel or replace
-pending/cancellable Work while completed Evidence remains immutable. GA commits only
-Goal continuity and never emits a Work-compatibility or replan decision. When Canonical
-Goal state intersects retained or provisional Work, the existing Fast Planner receives
-the Goal plus relevant actual Work state and decides semantic reuse, replacement,
-addition, or no further Work. Planner selects reusable Work by its stable Activity
-identity; Orchestrator validates exact request/version/state/Capability/arguments/
-ownership without interpreting meaning. Stale validation reactivates Planner instead of
-repairing its decision. Runtime cancels/replaces pending/cancellable Work only after the
-Planner decision. Already-completed incompatible
-observations remain unbound audit Evidence and cannot ground Goal completion or speech.
+Association consumes the same authoritative GI result concurrently and alone commits
+canonical Goal continuity. Only after both the complete Fast terminal result and GA
+mapping exist may Host construct and validate a canonical Plan. No Capability Activity,
+including a safe read, starts before that join. Confirmation, authorization, resource,
+provider, and safety barriers remain unchanged. Retained Work from prior valid Plans may
+still be projected into later Planner re-entry; GA never judges compatibility, and Host
+never invents semantic reuse.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -2261,12 +2243,13 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 ### 8.1 Fast Planner
 
 The Fast Planner is the low-latency first HOW owner once Goal Interpretation has
-produced contextual Responsibility evidence. It authors one Activity Plan while GA
-independently establishes canonical Goal identity. Its first-response phase includes
-one primary invocation that owns the exact act, prospective/context-grounded truth,
-and Responsibility provenance before speech commitment. Typed code validates shape,
-closed references, and mechanical provenance without asking another model to confirm
-the same semantics. This remains one planner role with phased readiness.
+produced contextual Responsibility evidence. One streamed primary invocation authors an
+early typed `PresentationCommit` and its complete terminal Activity decision while GA
+independently establishes canonical Goal identity. The commit owns the exact act,
+prospective/context-grounded truth, Responsibility provenance, and any exact anchored
+auxiliary decoration. Typed code validates shape, closed references, and mechanical
+provenance without asking another model to confirm the same semantics. This remains one
+Planner authority with typed incremental readiness.
 Fast Planner may use:
 
 - the complete current canonical Goal;
@@ -2292,19 +2275,19 @@ not an invitation for Planner to run another interpretation.
 It may:
 
 - complete a simple conversational Responsibility with a speaking Activity;
-- combine prospective conversational progress with independent Capability Activities;
+- combine prospective conversational progress with still-needed terminal Capability Activities;
 - derive execution-input needs only from the immutable Responsibility and applicable
   Plan/Agent-Skill/Capability/safety contracts, then resolve them from an authoritative
   source or ask a user-resolvable clarification;
-- select exact safe/read-only Capability Activities before GA finishes, subject to
-  trusted Runtime validation and later canonical Goal binding;
+- select exact safe/read-only Capability Activities in the terminal result; dispatch
+  still waits for GA binding and complete canonical validation;
 - request Deep Planner when HOW exceeds the fast planning budget;
 - produce a complete direct common-skill Activity Plan without a second Fast pass;
 - propose a low-consequence bounded default in canonical planning;
 - escalate.
 
-When GI binds `prior_assistant_utterance` for an exact repeat request, the
-Fast first-response decoder constrains the complete response to that immutable
+When GI binds `prior_assistant_utterance` for an exact repeat request, the Fast
+`PresentationCommit` decoder constrains the complete response to that immutable
 already-delivered text. This is dialogue provenance projection, not new
 Host-authored wording; prefixes, the current question, and planner prose cannot
 replace what the user asked Chromie to repeat.
@@ -2326,11 +2309,9 @@ approval gate. Conversely, a Fast contract/provenance failure stops before execu
 it does not gain semantic legitimacy by asking Deep to repair the same malformed Plan.
 
 For confirmation-free `safe_read` work, Fast Planner may select the exact Capability
-and executable arguments from the bounded common catalog. Trusted Runtime may start it
-before GA finishes only after validating availability, schema, side-effect-free safety,
-parallel metadata, and absence of confirmation. The request initially retains GI
-Responsibility refs; GA later binds the same request identity into each applicable
-canonical Goal task-list view. It is never restarted merely to acquire Goal identity.
+and executable arguments from the bounded common catalog. Trusted Runtime starts it only
+after the terminal Planner result, GA binding, canonical Plan validation, availability,
+schema, side-effect-free safety, parallel metadata, and confirmation checks all pass.
 
 The planner model emits a flat semantic DTO, not the canonical transport
 envelope. Plan identity, schema version, planner tier, and authoritative
@@ -2691,18 +2672,11 @@ Planner primary result
   `-- auxiliary_activities[]          no Goal ownership
 ```
 
-Fast First Response has no auxiliary output surface. Fast Advance and canonical
-Fast/Deep planning may emit auxiliary activities in their single primary model
-invocation. There is no post-response Social Attention model, endpoint, or
-background decision worker.
-
-This paragraph describes the maintained source. Proposed Issue
-[#32](https://github.com/TimeTreker/chromie/issues/32) would replace the separate
-Fast First Response round trip with an early typed presentation commit inside one
-streaming Fast Planner invocation. If and only if that proposal qualifies, the early
-commit may carry the ready Communicative Main Activity and its optional auxiliary
-activities together. Until then, neither that streaming contract nor an auxiliary
-Fast First Response surface is current architecture.
+The Fast Planner `PresentationCommit` may emit auxiliary activities only when they
+anchor its exact Communicative Main Activity. The terminal Fast result and canonical
+Fast/Deep planning may emit auxiliary activities for other primary anchors in their
+single primary invocation. There is no post-response Social Attention model, endpoint,
+or background decision worker.
 
 ### 12.2 Explicit Activity and auxiliary social decoration
 
@@ -3081,9 +3055,9 @@ Internal modules, schemas, provider plumbing, planning mechanics, and ordinary
 low-level steps are not milestones merely because they occurred.
 
 Every ready human-observable Communicative Act may be an auxiliary-activity anchor
-when it is present in the owning Fast Advance or canonical Fast/Deep Planner result.
-Fast First Response alone has no auxiliary surface. Empty decoration is normal and
-speech never requires a gesture. Conversely, a tool lookup or internal cognition
+when it is present in the owning `PresentationCommit`, terminal Fast result, or
+canonical Fast/Deep Planner result. Empty decoration is normal and speech never
+requires a gesture. Conversely, a tool lookup or internal cognition
 milestone is not promoted into an anchor merely because it happened.
 
 Each Communicative Act has one Planner wording owner and one downstream delivery owner,
@@ -3091,16 +3065,11 @@ with deterministic authority, evidence, cancellation, and delivery validation. T
 second LLM to repair ordinary progress wording, and Goal Interpretation has no
 maintained response-authoring path.
 
-### 15.1.3 Proposed early typed presentation commit
+### 15.1.3 Early typed presentation commit
 
-Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns a proposed latency
-amendment; it is not current source truth. Today the Runtime awaits the complete
-`/fast-first-response` provider round trip and only then creates Fast Advance and Goal
-Association tasks. That ordering contradicts the intended property that remaining
-planning and GA can proceed while the accepted first communication is realized.
-
-The proposed boundary keeps one semantic author and changes only when a closed subset of
-that author's result becomes executable:
+Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this implemented latency
+boundary. It keeps one semantic author and changes only when a closed subset of that
+author's result becomes executable:
 
 ```text
 UserTurnEnvelope + validated GI Responsibilities + bounded trusted context
@@ -3112,7 +3081,7 @@ UserTurnEnvelope + validated GI Responsibilities + bounded trusted context
 Goal Association starts concurrently from the unchanged GI result. A trusted incremental
 parser may expose a `PresentationCommit` only after its complete frame has been parsed and
 validated. It is not a raw token stream, a partial JSON object, another model call, or a
-second response owner. The proposed module I/O is:
+second response owner. The maintained module I/O is:
 
 | Boundary | Authoritative input | Authoritative output | Forbidden authority |
 |---|---|---|---|
@@ -3136,11 +3105,11 @@ Goal-owned Work and cannot cause the Host to author replacement speech. Capabili
 always waits for the complete Planner result, applicable canonical Goal grounding, and
 trusted validation.
 
-This proposal is accepted only after the exact provider/model combination proves reliable
-structured frame emission, mid-stream error containment, commit/terminal consistency, and
-a useful improvement in accepted-commit and playback latency under the actual single-slot
-resource profile. A non-streaming call duration is not evidence of streaming time to first
-commit.
+Source and deterministic contract closure do not by themselves qualify a target model or
+live voice path. Model promotion still requires retained evidence for structured frame
+emission, mid-stream error containment, commit/terminal consistency, accepted-commit and
+playback latency, and actual single-slot resource contention. A non-streaming call duration
+is not evidence of streaming time to first commit.
 
 ### 15.2 Post-execution response
 

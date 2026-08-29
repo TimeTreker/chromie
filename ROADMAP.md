@@ -27,13 +27,12 @@ migrations. Continue in this order:
    Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
    behavior, duplicate-effect prevention, Planner-owned auxiliary social decoration,
    and latency.
-2. **Resolve the Fast-Planner presentation boundary before final Prompt/model promotion.**
-   Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the measured design
-   and possible source migration from the current sequential Fast First Response round trip
-   to one streaming Fast Planner invocation with an early typed immutable presentation
-   commit. The current endpoint/DTO/model path remains implemented truth until that Issue
-   passes its provider/model integrity and latency gates; do not optimize or select the
-   final Fast-Planner model against both paths as if both were production architecture.
+2. **Qualify the implemented Fast-Planner presentation boundary before final Prompt/model
+   promotion.** Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the one
+   streaming Fast Planner invocation and early typed immutable presentation commit. The
+   separate endpoint/DTO/model path is removed; run source gates and measure the single
+   production path's provider/model integrity, latency, and resource behavior before
+   optimizing its Prompt or selecting the final Fast-Planner model.
 3. **Keep implementation, automated verification, target validation, and release readiness
    separate.** A source-closed architecture slice does not qualify microphone, provider,
    simulator, model quality, or latency behavior.
@@ -550,15 +549,14 @@ Exit criteria:
 - no authoritative failure enters another semantic planner;
 - current docs, profiles, and source describe the same authority and lane policy.
 
-### Streaming Planner with Early Typed Presentation Commit — design issue open
+### Streaming Planner with Early Typed Presentation Commit — source-gated, qualification open
 
-Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this proposed
-replacement. Source implementation has **not** started. The maintained path still awaits
-the complete `/fast-first-response` call before creating Fast Advance and Goal Association,
-so its claimed "continue while speaking" concurrency is not realized. This reproduced
-sequential gate is the concrete seam that permits the architecture to be reconsidered.
+Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this replacement. The
+separate `/fast-first-response` path is removed. `/fast-advance` now makes one structured
+streaming Fast Planner invocation while Goal Association starts concurrently, and Runtime
+launches only a complete validated typed presentation value before terminal planning ends.
 
-The target is one Fast Planner semantic invocation, not one raw text stream:
+The maintained path is one Fast Planner semantic invocation, not one raw text stream:
 
 ```text
 immutable GI result
@@ -587,9 +585,9 @@ contradict, duplicate, or silently omit it. Goal-owned Work, confirmation/result
 and completion remain unavailable until the full Plan, Goal binding, and Evidence contracts
 permit them.
 
-Exit criteria:
+Source-implemented criteria:
 
-- retain the current sequential-gate regression and a non-streaming unified control;
+- retain the former sequential-gate regression and prove it cannot return;
 - prove Goal Association and the Planner stream start without waiting for presentation;
 - probe the exact target Ollama/model combination for NDJSON framing, structured streaming,
   mid-stream errors, malformed/duplicate/contradictory frames, and terminal consistency;
@@ -601,9 +599,12 @@ Exit criteria:
   scheduling, cancellation, confirmation, Evidence truth, and Interaction Ledger identity;
 - amend Charter principles 23 and 37 and all owned contracts in the same source migration;
 - remove the superseded endpoint, DTO, model/configuration role, tests, and documentation
-  rather than retaining a compatibility path; and
-- complete source gates and current-target qualification before Fast-Planner Prompt/model
-  promotion. Issue #24 remains the separate model-role qualification authority.
+  rather than retaining a compatibility path.
+
+Remaining exit criteria:
+
+- complete current-target qualification before Fast-Planner Prompt/model promotion.
+  Issue #24 remains the separate model-role qualification authority.
 
 ### Goal-scoped Interaction Ledger and current-turn continuity
 
@@ -779,7 +780,7 @@ runtime path.
 
 **Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and Responsibility-conservation mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
 
-**Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, first-response truth/progress prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain the primary model invocation, bounded mechanical repair/escalation decisions, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners. Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
+**Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, streaming presentation/truth prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain the primary model invocation, bounded mechanical repair/escalation decisions, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners. Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
 
 **Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained-decoder schemas, including pass-specific Fast/Deep schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (Fast primary-result/reuse/fail-safe validation mechanics), `planner_deep_validation.py` (Deep mechanical-repair/safety/diagnostic validation mechanics), and `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only). The former model-assisted coverage/communication audit module and its dedicated truth-model configuration are removed under Charter principles 30–31. Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 5 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
 

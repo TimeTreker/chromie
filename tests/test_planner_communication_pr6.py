@@ -4,11 +4,7 @@ import unittest
 
 from pydantic import ValidationError
 
-from agent.app.main import (
-    _fast_first_response_context_window,
-    app,
-)
-from agent.app.settings import GoalInterpreterSettings, Settings
+from agent.app.main import app
 from orchestrator.clients.agent_client import AgentClient
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.goal import (
@@ -23,70 +19,6 @@ from shared.chromie_contracts.plan import (
 
 
 class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
-    def test_dedicated_response_model_does_not_inherit_deliberative_context(self) -> None:
-        service_settings = Settings().model_copy(
-            update={
-                "fast_planner_model": "qwen3:4b",
-                "fast_first_response_model": "gemma4:12b",
-                "goal_association_model": "gemma4:12b",
-                "fast_planner_num_ctx": 32768,
-                "goal_association_num_ctx": 32768,
-            }
-        )
-        interpreter_settings = GoalInterpreterSettings().model_copy(
-            update={"model": "qwen3:4b", "llm_num_ctx": 32768}
-        )
-
-        self.assertEqual(
-            _fast_first_response_context_window(
-                service_settings,
-                interpreter_settings,
-            ),
-            6144,
-        )
-
-    def test_fast_response_reuses_fast_runner_when_models_match(self) -> None:
-        service_settings = Settings().model_copy(
-            update={
-                "fast_planner_model": "qwen3:4b",
-                "fast_first_response_model": "qwen3:4b",
-                "goal_association_model": "gemma4:12b",
-                "fast_planner_num_ctx": 32768,
-                "goal_association_num_ctx": 32768,
-            }
-        )
-        interpreter_settings = GoalInterpreterSettings().model_copy(
-            update={"model": "qwen3:4b", "llm_num_ctx": 32768}
-        )
-
-        self.assertEqual(
-            _fast_first_response_context_window(
-                service_settings, interpreter_settings
-            ),
-            32768,
-        )
-
-    def test_qualification_first_response_uses_full_fast_context(self) -> None:
-        service_settings = Settings().model_copy(
-            update={
-                "cognitive_budget_profile": "qualification",
-                "fast_planner_model": "qwen3:4b",
-                "fast_first_response_model": "gemma4:12b",
-                "fast_planner_num_ctx": 32768,
-            }
-        )
-        interpreter_settings = GoalInterpreterSettings().model_copy(
-            update={"model": "qwen3:4b", "llm_num_ctx": 32768}
-        )
-
-        self.assertEqual(
-            _fast_first_response_context_window(
-                service_settings,
-                interpreter_settings,
-            ),
-            32768,
-        )
-
     def test_fast_activity_owns_exact_text_and_truth_stage(self) -> None:
         activity = FastPlannerProgressAct(
             activity_id="weather-progress",
@@ -139,6 +71,7 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
                 )
             ],
             confidence=0.98,
+            metadata={"presentation_commit_id": "commit-greeting"},
         )
         association = GoalAssociationResolution(
             turn_id="turn-greeting",
@@ -163,15 +96,22 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
         self.assertEqual(plan.response_text, "你好呀！")
         self.assertEqual(plan.communicative_acts[0].text, "你好呀！")
         self.assertEqual(plan.communicative_acts[0].source_goal_ids, ["goal-greeting"])
+        self.assertEqual(
+            plan.metadata["presentation_commit_id"], "commit-greeting"
+        )
 
     def test_duplicate_semantic_endpoints_are_removed(self) -> None:
         paths = {route.path for route in app.routes}
         self.assertNotIn("/compose-response-plan", paths)
         self.assertNotIn("/communicative-acts/realize", paths)
         self.assertNotIn("/tool-result/interpret", paths)
+        self.assertNotIn("/fast-" + "first-response", paths)
         self.assertFalse(hasattr(AgentClient, "compose_response_plan"))
         self.assertFalse(hasattr(AgentClient, "realize_communicative_acts"))
         self.assertFalse(hasattr(AgentClient, "interpret_tool_result"))
+        self.assertFalse(
+            hasattr(AgentClient, "resolve_fast_" + "first_response")
+        )
 
 
 if __name__ == "__main__":

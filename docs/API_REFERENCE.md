@@ -135,14 +135,13 @@ Important interaction-related endpoints are:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/fast-first-response` | Let Fast Planner author one bounded first Communicative Activity candidate from immutable Responsibility evidence. |
-| `POST` | `/fast-advance` | Continue the same Fast Planner into remaining Work/Activity planning. |
+| `POST` | `/fast-advance` | Stream one Fast Planner semantic result as typed NDJSON: an early presentation commit, then a terminal result or typed failure. |
 | `POST` | `/goal-association` | Commit no Host state; return the model-authored canonical Goal association/segmentation proposal for Host application. |
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 
-The maintained Goal-driven planning endpoints (`/fast-first-response`, `/fast-advance`, `/goal-association`,
+The maintained Goal-driven planning endpoints (`/fast-advance`, `/goal-association`,
 `/fast-plan`, `/deep-plan`, and `/reflection`) accept a typed
 `CognitiveWorkRequest`: `sid`, original `text`, optional `language`, first-class
 `responsibilities`, interpretation confidence/unresolved meaning, bounded `context`, and
@@ -164,54 +163,46 @@ status, source/default selection, and clarification selection belong to Fast Pla
 GI carries only Responsibility meaning, Goal relation, and bounded unresolved meaning;
 its maintained schema contains no planning-gap or resolution-policy fields.
 
-`POST /fast-first-response` is Fast Planner's bounded latency phase. It consumes the
-authoritative turn, GI Responsibilities, response language, bounded interaction state,
-and the small owner-approved speaking-style projection. It returns
-`FastPlannerFirstResponse`: zero or one exact `progress` or `complete_response`
-Communicative Activity with the epistemic/grounding evidence required for deterministic
-validation in that same primary result. A separate same-owner Epistemic Qualification
-LLM call is prohibited and removed. Validation cannot rewrite text, retry, select a Capability,
-resolve an execution input, create a planning InformationGap, or ask a clarification;
-rejection or checker failure returns a null Activity. Runtime may then structurally
-validate and start accepted exact wording immediately. Fast First Response has no
-auxiliary-decoration surface and cannot be delayed by one. This
-endpoint is a phase of Fast Planner, not an independent response-composition authority.
+`POST /fast-advance` consumes the authoritative user turn plus contextual Responsibility
+evidence and makes exactly one streaming model invocation. The response media type is
+`application/x-ndjson`. Its ordered typed frames are:
 
-`POST /fast-advance` continues the same Fast Planner Activity decision after any first
-response commitment. It consumes the authoritative user turn plus contextual
-Responsibility evidence and returns `FastPlannerAdvance`: exact Responsibility refs
-covered, the already-committed Communicative Act plus remaining Communicative/Capability
-Activities with explicit timing, and an optional `deep_planner` continuation for complex
-HOW. It must not re-author committed wording. A clarification Communicative Act owns one
+1. exactly one `PresentationCommit` (`frame_type=presentation_commit`) after the complete
+   first JSON member has parsed and validated; it contains intentional silence or one
+   exact immediately truthful `progress`/`complete_response` Communicative Activity and
+   optional auxiliary Activities anchored to that exact Activity;
+2. exactly one `FastPlannerStreamTerminal` (`frame_type=terminal`) whose
+   `presentation_commit_id` and `advance.metadata.presentation_commit_id` reference the
+   same immutable commit and whose `FastPlannerAdvance` contains the complete remaining
+   HOW decision; or
+3. one `FastPlannerStreamFailure` (`frame_type=failure`) identifying failure before or
+   after commit. A pre-commit failure is silent. A post-commit failure preserves only the
+   already-launched truthful presentation and authorizes no Goal Work.
+
+Raw provider tokens, partial JSON, and partial DTOs never reach TTS or a Capability. The
+terminal result cannot repeat, reword, translate, contradict, or omit the accepted
+communication or decoration. No retry/reviewer call repairs this streamed semantic result.
+A clarification Communicative Act owns one
 or more typed Planner `InformationGap` records and no `response_text`. A semantic gap
 must cite one exact GI `unresolved` string; an execution-input gap must cite one exact
 available Capability ID and its genuinely absent, required, non-defaulted schema input.
 The gap records which authorized context, observation/query, preference, schema, or
-safe-default sources were considered. After the first-response commitment, Goal
-Association concurrently consumes the same GI result and remains the sole canonical
+safe-default sources were considered. Goal Association starts concurrently from the same
+GI result and remains the sole canonical
 Goal commit owner; it does not author clarification wording. After deterministic
 Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the exact
-canonical Goal before clarification wording may be delivered. The Host may start only
-schema-valid, available, side-effect-free safe reads before GA finishes; effects remain
-behind canonical Goal, confirmation, authorization, resource, and provider-safety gates.
-Parallel-timed early reads additionally require explicit provider parallel-safety
-metadata. The same task identity is then bound into applicable per-Goal Runtime task-list
-views only after Planner has compared provisional Work with the canonical Goal when that comparison is needed. GA emits no
+canonical Goal before clarification wording may be delivered. No Capability Activity,
+including a safe read, starts from the presentation commit or before the complete terminal
+result, canonical Goal binding, and full trusted Plan validation. GA emits no
 replan or compatibility flag. `/fast-plan` receives the Canonical Goal plus a bounded
-`existing_work_activities` projection of relevant retained/provisional Runtime
+`existing_work_activities` projection of relevant retained Runtime
 Work and active task bindings without cancelling
 first. The Planner explicitly sets `CanonicalPlanStep.reuse_activity_id` to an existing
 stable Activity identity when it wants reuse and authors the complete desired Plan;
 omission means no reuse selection. Runtime reuses the task only after Host
 validation proves exact request/version/state, Capability IDs, arguments, Goal ownership,
-and multi-Activity timing; otherwise it cancels pending/cancellable provisional Work
+and multi-Activity timing; otherwise it cancels pending/cancellable retained Work
 after the Planner decision and executes the corrected Plan.
-
-The single same-stage `/fast-advance` mechanical revision preserves the initial
-model-authored disposition. For an initial `execute` decision it constrains the repaired
-Activity list to Capability work, requires the selected Capability's exact argument
-schema, and explicitly materializes schema defaults. It cannot choose the Capability,
-reinterpret the Responsibility, or grow into another revision.
 
 Fast Planner Communicative Activities carry exact text, truth stage, Goal or
 Responsibility provenance, and Evidence references in the Planner result. The
@@ -252,10 +243,10 @@ Capability authorization and execution.
 
 `POST /reflection` reuses the configured Deep Planner model only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition. **Current endpoint semantics remain open-Responsibility-only:** applied actions require runtime-bound trusted evidence and a completed outcome is terminal to this API path. Reflection may propose future replan, clarification, a future user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, reopen the current turn, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary. The accepted architecture now specifies a later contract split in which terminal evidence may support bounded `experience`/`calibration` without reopening Responsibility; that design is not implemented by this endpoint yet.
 
-Fast Advance, `/fast-plan`, and `/deep-plan` expose bounded
-`auxiliary_activities[]` inside their primary Planner output. Each item is anchored
+`PresentationCommit`, terminal Fast Advance, `/fast-plan`, and `/deep-plan` expose
+bounded `auxiliary_activities[]` inside their primary Planner output. Each item is anchored
 to a Planner-authored Main Activity and decoder-constrained to exact eligible live
-catalog candidates. Fast First Response deliberately has no such field. Runtime
+catalog candidates. Runtime
 validates or suppresses the exact proposal; it cannot reselect. Auxiliary-only
 events do not create Goal-scoped cognitive re-entry.
 

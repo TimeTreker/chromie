@@ -40,8 +40,9 @@ from shared.chromie_contracts.plan import (
     FastPlannerCapabilityActivity,
     FastPlannerClarificationAct,
     FastPlannerCompleteResponseAct,
-    FastPlannerFirstResponse,
     FastPlannerProgressAct,
+    FastPlannerStreamTerminal,
+    PresentationCommit,
 )
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
@@ -178,7 +179,7 @@ class ScriptedClient:
         fast_plans: list[CanonicalPlan],
         deep_plans: list[CanonicalPlan] | None = None,
         fast_advances: list[FastPlannerAdvance] | None = None,
-        fast_first_responses: list[FastPlannerFirstResponse] | None = None,
+        presentation_commits: list[PresentationCommit] | None = None,
     ):
         self.association = association
         self.fast_plans = list(fast_plans)
@@ -205,29 +206,66 @@ class ScriptedClient:
         )
         self.deep_contexts: list[dict] = []
         self.calls: list[str] = []
-        self.fast_first_responses = list(
-            fast_first_responses
-            if fast_first_responses is not None
+        self.presentation_commits = list(
+            presentation_commits
+            if presentation_commits is not None
             else [
-                FastPlannerFirstResponse(
-                    turn_id="test-fast-first-response",
+                PresentationCommit(
+                    commit_id="test-presentation-commit",
+                    turn_id="test-fast-advance",
                     activity=None,
                     metadata={"semantic_authority": "test"},
                 )
             ]
         )
 
-    async def resolve_fast_first_response(self, *args, **kwargs):
-        self.calls.append("first_response")
-        if not self.fast_first_responses:
-            raise AssertionError("unexpected Fast Planner first response")
-        return self.fast_first_responses.pop(0)
-
-    async def resolve_fast_advance(self, *args, **kwargs):
-        self.calls.append("advance")
-        if not self.fast_advances:
-            raise AssertionError("unexpected Fast Planner advance")
-        return self.fast_advances.pop(0)
+    async def stream_fast_advance(self, *args, **kwargs):
+        del args, kwargs
+        self.calls.append("stream")
+        if not self.presentation_commits or not self.fast_advances:
+            raise AssertionError("unexpected Fast Planner stream")
+        commit = self.presentation_commits.pop(0)
+        advance = self.fast_advances.pop(0)
+        if commit.activity is None:
+            immediate = next(
+                (
+                    item
+                    for item in advance.activities
+                    if item.role in {"progress", "complete_response"}
+                ),
+                None,
+            )
+            if immediate is not None:
+                commit = commit.model_copy(update={"activity": immediate})
+        yield commit
+        committed_activities = (
+            [commit.activity]
+            if commit.activity is not None
+            and all(
+                item.activity_id != commit.activity.activity_id
+                for item in advance.activities
+            )
+            else []
+        )
+        combined_advance = advance.model_copy(
+            update={
+                "turn_id": commit.turn_id,
+                "activities": [*committed_activities, *advance.activities],
+                "auxiliary_activities": [
+                    *commit.auxiliary_activities,
+                    *advance.auxiliary_activities,
+                ],
+                "metadata": {
+                    **advance.metadata,
+                    "presentation_commit_id": commit.commit_id,
+                },
+            }
+        )
+        yield FastPlannerStreamTerminal(
+            turn_id=commit.turn_id,
+            presentation_commit_id=commit.commit_id,
+            advance=combined_advance,
+        )
 
     async def resolve_goal_association(self, *args, **kwargs):
         self.calls.append("association")
@@ -1044,9 +1082,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 )
 
         class Client(ScriptedClient):
-            async def resolve_fast_advance(self, *args, **kwargs):
-                events.append("advance")
-                return await super().resolve_fast_advance(*args, **kwargs)
+            async def stream_fast_advance(self, *args, **kwargs):
+                events.append("stream_started")
+                async for frame in super().stream_fast_advance(*args, **kwargs):
+                    yield frame
 
             async def resolve_goal_association(self, *args, **kwargs):
                 events.append("association_started")
@@ -1073,8 +1112,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             association=new_goal_association(),
             fast_plans=[respond_plan()],
             fast_advances=[advance],
-            fast_first_responses=[
-                FastPlannerFirstResponse(
+            presentation_commits=[
+                PresentationCommit(
+                    commit_id="weather-presentation",
                     turn_id="turn-weather",
                     activity=FastPlannerProgressAct(
                         activity_id="weather-progress",
@@ -1128,7 +1168,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertLess(
-            events.index("advance"),
+            events.index("stream_started"),
             events.index("vocal_activity_started"),
         )
         self.assertLess(
@@ -1143,7 +1183,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime.started_fast_activities[0][1], "我先看看能不能查到。")
         self.assertEqual(
             client.calls,
-            ["first_response", "advance", "association", "fast"],
+            ["stream", "association", "fast"],
         )
 
     def test_gi_fans_out_to_fast_planner_and_ga_without_second_fast_plan(self):
@@ -1180,8 +1220,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client, text="你好")
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:], ["advance", "association"])
+        self.assertCountEqual(client.calls, ["stream", "association"])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.terminal_plan.goal_ids, ["goal-1"])
         self.assertEqual(runtime.started_fast_activities[0][1], "你好呀！")
@@ -1558,24 +1597,23 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
-        self.assertEqual(client.calls[3:], ["fast"])
-        self.assertEqual(runtime.started, [(envelope.turn_id, ["weather-lookup"])])
-        self.assertEqual(runtime.bound[0]["goal_map"], {"weather": ["goal-weather"]})
+        self.assertCountEqual(client.calls[:2], ["stream", "association"])
+        self.assertEqual(client.calls[2:], [])
+        self.assertEqual(runtime.started, [])
+        self.assertEqual(runtime.bound, [])
         self.assertEqual(
             result.interaction_response.capabilities[0].metadata["source_goal_ids"],
             ["goal-weather"],
         )
-        self.assertTrue(
-            result.metadata["fast_capability_activity_status"].startswith(
-                "completed_before_canonical_dispatch"
-            )
+        self.assertEqual(
+            result.metadata["fast_capability_activity_status"],
+            "deferred_until_canonical_validation",
         )
 
     def test_foreground_cancellation_cleans_unbound_provisional_fast_work(self):
         async def run() -> None:
             provisional_started = asyncio.Event()
+            stream_finished = asyncio.Event()
 
             class CancellationRuntime:
                 def __init__(self) -> None:
@@ -1604,6 +1642,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     )()
 
             class SlowAssociationClient(ScriptedClient):
+                async def stream_fast_advance(self, *args, **kwargs):
+                    async for frame in super().stream_fast_advance(
+                        *args, **kwargs
+                    ):
+                        yield frame
+                    stream_finished.set()
+
                 async def resolve_goal_association(self, *args, **kwargs):
                     del args, kwargs
                     self.calls.append("association")
@@ -1665,14 +1710,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     language="en-US",
                 )
             )
-            await asyncio.wait_for(provisional_started.wait(), timeout=1.0)
+            await asyncio.wait_for(stream_finished.wait(), timeout=1.0)
+            self.assertFalse(provisional_started.is_set())
             task.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await task
 
             self.assertEqual(
                 runtime.runtime.cancelled,
-                [f"ready-{envelope.turn_id}"],
+                [],
             )
 
         asyncio.run(run())
@@ -1829,21 +1875,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(runtime.started, ["provisional-weather-lookup"])
-        self.assertEqual(
-            runtime.runtime.cancelled,
-            [f"ready-{envelope.turn_id}"],
-        )
+        self.assertEqual(runtime.started, [])
+        self.assertEqual(runtime.runtime.cancelled, [])
         self.assertEqual(runtime.bound, [])
         self.assertIn("fast", client.calls)
-        self.assertLess(
-            events.index("canonical_fast_revision"),
-            events.index("provisional_cancelled"),
-        )
+        self.assertEqual(events, ["canonical_fast_revision"])
         self.assertEqual(result.terminal_plan.plan_id, "canonical-weather-revision")
         self.assertEqual(
             result.metadata["fast_capability_activity_status"],
-            "cancelled_by_work_reconciliation",
+            "deferred_until_canonical_validation",
         )
 
     def test_ga_reconsideration_reuses_exact_work_selected_by_fast_planner(self):
@@ -1993,19 +2033,14 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(runtime.runtime.cancelled, [])
-        self.assertEqual(len(runtime.bound), 1)
+        self.assertEqual(runtime.bound, [])
         self.assertEqual(
-            runtime.bound[0]["goal_ids_by_responsibility"],
-            {"weather": ["goal-weather"]},
-        )
-        self.assertEqual(
-            result.terminal_plan.steps[0].metadata["fast_activity_id"],
+            result.terminal_plan.steps[0].reuse_activity_id,
             "provisional-weather-lookup",
         )
-        self.assertTrue(
-            result.metadata["fast_capability_activity_status"].startswith(
-                "completed_before_canonical_dispatch"
-            )
+        self.assertEqual(
+            result.metadata["fast_capability_activity_status"],
+            "deferred_until_canonical_validation",
         )
 
     def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):
@@ -2070,10 +2105,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertCountEqual(
-            client.calls[:4],
-            ["first_response", "advance", "association", "deep"],
+            client.calls[:3],
+            ["stream", "association", "deep"],
         )
-        self.assertEqual(client.calls[4:], [])
+        self.assertEqual(client.calls[3:], [])
         self.assertIsNone(result.fast_plan)
         self.assertEqual(result.terminal_plan.planner_tier, "deep")
         self.assertEqual(result.metadata["fast_planner_path"], "deep_escalation")
@@ -2138,9 +2173,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertCountEqual(
             stage_names[:3],
             [
-                "fast_planner_first_response",
-                "fast_planner_advance",
                 "goal_association",
+                "fast_planner_presentation_commit",
+                "fast_planner_stream_terminal",
             ],
         )
         self.assertEqual(
@@ -2324,8 +2359,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
+        self.assertCountEqual(client.calls[:2], ["stream", "association"])
         self.assertNotEqual(
             result.metadata.get("fast_planner_path"),
             "terminal_missing_ability",
@@ -2344,9 +2378,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client)
         self.assertEqual(result.status, "report_only")
         self.assertIsNone(result.interaction_response)
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
-        self.assertEqual(client.calls[3:], ["fast"])
+        self.assertCountEqual(client.calls[:2], ["stream", "association"])
+        self.assertEqual(client.calls[2:], ["fast"])
 
     def test_planner_response_adapter_receives_playback_started_current_turn_speech(self):
         client = ScriptedClient(
@@ -2438,8 +2471,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.metadata["failure_stage"], "goal_association")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:], ["advance", "association"])
+        self.assertCountEqual(client.calls, ["stream", "association"])
 
     def test_fast_planner_owns_semantic_clarification_after_provisional_goal(self):
         association = GoalAssociationResolution(
@@ -2524,8 +2556,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.terminal_plan.disposition, "clarify")
         self.assertEqual(result.interaction_response.speech[0].text, "你说的那里是哪里？")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:], ["advance", "association"])
+        self.assertCountEqual(client.calls, ["stream", "association"])
         snapshot = manager.active_goal_snapshots()[0]
         self.assertEqual(
             snapshot["open_information_gaps"][0]["source_kind"],
@@ -2558,8 +2589,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.metadata["failure_class"], "empty_canonical_goal_set")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:], ["advance", "association"])
+        self.assertCountEqual(client.calls, ["stream", "association"])
 
     def test_apply_chat_returns_speech_only_interaction(self):
         client = ScriptedClient(
@@ -2672,9 +2702,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
-        self.assertEqual(client.calls[3:], ["fast"])
+        self.assertCountEqual(client.calls[:2], ["stream", "association"])
+        self.assertEqual(client.calls[2:], ["fast"])
         self.assertIsNotNone(result.interaction_response)
         self.assertEqual(
             [item.capability_id for item in result.interaction_response.capabilities],
@@ -3606,9 +3635,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
-        self.assertEqual(client.calls[3:], ["fast"])
+        self.assertCountEqual(client.calls[:2], ["stream", "association"])
+        self.assertEqual(client.calls[2:], ["fast"])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
         self.assertFalse(result.metadata["deep_planner_invoked"])
@@ -4056,7 +4084,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             [
                 {
                     "source": "goal_driven_cognitive_runtime_goal_association",
-                    "client_calls": ["first_response", "advance", "association"],
+                    "client_calls": ["association"],
                 }
             ],
         )
@@ -4087,8 +4115,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = ScriptedClient(
             association=new_goal_association(),
             fast_plans=[respond_plan()],
-            fast_first_responses=[
-                FastPlannerFirstResponse(
+            presentation_commits=[
+                PresentationCommit(
+                    commit_id="greeting-presentation",
                     turn_id="turn-greeting",
                     activity=FastPlannerCompleteResponseAct(
                         activity_id="greeting-complete",
@@ -4175,9 +4204,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         result = asyncio.run(run())
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[0], "first_response")
-        self.assertCountEqual(client.calls[1:3], ["advance", "association"])
-        self.assertEqual(client.calls[3:], ["fast"])
+        self.assertCountEqual(client.calls[:2], ["stream", "association"])
+        self.assertEqual(client.calls[2:], ["fast"])
 
     def test_named_cancellation_is_not_committed_before_runtime_closure(self):
         association = GoalAssociationResolution(

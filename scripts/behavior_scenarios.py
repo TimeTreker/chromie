@@ -66,7 +66,8 @@ from shared.chromie_contracts.core_interpretation import (
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
-    FastPlannerFirstResponse,
+    FastPlannerStreamTerminal,
+    PresentationCommit,
 )
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
@@ -511,19 +512,6 @@ class _CognitiveScenarioClient:
         self.deep_plans = list(stub.get("deep_plans") or [])
         self.calls: list[str] = []
 
-    async def resolve_fast_first_response(
-        self, *args: Any, **kwargs: Any
-    ) -> FastPlannerFirstResponse:
-        del args
-        request = kwargs["request"]
-        # File-backed Level A scenarios do not fabricate model-authored speech.
-        # Live-text evidence covers the real first-response Planner phase.
-        return FastPlannerFirstResponse(
-            turn_id=str(request.sid),
-            activity=None,
-            metadata={"semantic_authority": "level_a_fixture"},
-        )
-
     async def resolve_goal_association(self, *args: Any, **kwargs: Any) -> GoalAssociationResolution:
         del args
         self.calls.append("goal_association")
@@ -540,11 +528,18 @@ class _CognitiveScenarioClient:
                 association["source_responsibility_refs"] = [refs[0]]
         return GoalAssociationResolution.model_validate(raw)
 
-    async def resolve_fast_advance(self, *args: Any, **kwargs: Any) -> FastPlannerAdvance:
+    async def stream_fast_advance(self, *args: Any, **kwargs: Any):
         del args
-        self.calls.append("fast_advance")
+        self.calls.append("fast_stream")
         request = kwargs["request"]
-        return FastPlannerAdvance(
+        commit = PresentationCommit(
+            commit_id=f"fixture-presentation-{request.sid}",
+            turn_id=str(request.sid),
+            activity=None,
+            metadata={"semantic_authority": "level_a_fixture"},
+        )
+        yield commit
+        advance = FastPlannerAdvance(
             turn_id=str(request.sid),
             disposition="unavailable",
             coverage="uncertain",
@@ -555,6 +550,12 @@ class _CognitiveScenarioClient:
             reason_summary=(
                 "The retained scenario supplies its canonical post-GA Fast Plan."
             ),
+            metadata={"presentation_commit_id": commit.commit_id},
+        )
+        yield FastPlannerStreamTerminal(
+            turn_id=str(request.sid),
+            presentation_commit_id=commit.commit_id,
+            advance=advance,
         )
 
     async def resolve_fast_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:

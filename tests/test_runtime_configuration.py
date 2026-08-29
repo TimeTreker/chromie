@@ -207,10 +207,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "AGENT_GOAL_INTERPRETER_MODEL=qwen3.5:4b",
             profile,
         )
-        self.assertIn(
-            "AGENT_FAST_FIRST_RESPONSE_MODEL=qwen3:4b-instruct-2507-q4_K_M",
-            profile,
-        )
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
         self.assertIn("AGENT_DEEP_PLANNER_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
@@ -234,7 +230,6 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=gemma4:12b", rtx5090)
         self.assertIn("AGENT_DEEP_PLANNER_MODEL=gemma4:12b", rtx5090)
         self.assertIn("AGENT_FAST_PLANNER_MODEL=qwen3.5:9b", rtx5090)
-        self.assertIn("AGENT_FAST_FIRST_RESPONSE_MODEL=gemma4:12b", rtx5090)
         self.assertIn("AGENT_SKILL_SELECTION_MODEL=qwen3.5:9b", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", rtx5090)
         self.assertIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT=1", rtx5090)
