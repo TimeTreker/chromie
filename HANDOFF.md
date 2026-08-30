@@ -7,7 +7,7 @@ Authority: operational snapshot only; source, tests, retained evidence, and the 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Pre-delivery branch/base: `main` at `ae250dd8ae40a01f58eb415b3f6e84e7bceed553`
+- Pre-delivery branch/base: `main` at `8300702fd84a32f0d6358393c6651b898c10f380`
 - Expected resume revision: latest `origin/main` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
 - Delivery scope: all project changes listed below are committed together; retained
@@ -27,36 +27,92 @@ Gateway -> GI WHAT/Responsibilities
            correlated Evidence -> scoped Planner re-entry
 ```
 
-One semantic authority owns each result. GI, GA, and Planner primary outputs contain
-their complete grounding/coverage evidence. Trusted code validates mechanics and fails
-closed. Do not restore semantic reviewers, Host resegmentation, same-owner repair chains,
-raw-token TTS, or Work before terminal Plan + GA binding + canonical validation.
+One semantic authority is intended to own each result. GI, GA, and Planner primary outputs
+must contain their complete grounding/coverage evidence, while trusted code validates only
+mechanics and fails closed. The audit below records current GI repair paths that violate this
+intended contract; do not treat them as precedent or extend them. Do not restore semantic
+reviewers, Host resegmentation, same-owner repair chains, raw-token TTS, or Work before
+terminal Plan + GA binding + canonical validation.
 
 ## Worktree changes
 
-- `agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt` now carries
-  the selected fixed-v4 general contract: Arabic-digit scalar normalization, exact role/mode
-  distinctions, anaphoric modifier ownership, and correction/binding-only source-evidence
-  boundaries. It contains no case-specific phrase rule.
-- `agent/app/cognitive_core/goal_interpreter/model_interpreter.py` projects matching dynamic
-  schema descriptions for numeric dimensions, recipient/addressee, proposition/preference,
-  subtype/intensity, output modes, and source-token boundaries. It does not add a call,
-  reviewer, repair chain, runtime switch, or authority.
-- `tests/test_goal_interpreter_llm_prompt.py` adds regressions for those prompt/schema
-  contracts. The final selected source has 68 focused passes plus 10 subtests.
-- `docs/STATUS.md` records the complete fixed-v4/fixed-v5 offline evidence and its claim
-  limits. `DEVELOPMENT_CHECKPOINT.md` and this handoff carry the exact Git resume boundary.
-- A broader fixed-v5 prompt/schema wording experiment was run on all 1,496 cases, regressed,
-  and was fully reverted. Before updating evidence-only status/handoff documents, the prompt
-  SHA and complete tracked diff matched the retained v4 manifest. The current prompt still
-  matches v4 exactly.
+- This delivery records a read-only audit of the complete GI model-facing path. It changes
+  `docs/STATUS.md`, `DEVELOPMENT_CHECKPOINT.md`, and this handoff only; implementation,
+  prompts, schemas, tests, runtime/profile configuration, and retained fixed-v4/v5 artifacts
+  remain byte-for-byte unchanged from `8300702fd84a32f0d6358393c6651b898c10f380`.
+- The audit found confirmed blockers before more prompt iteration: source-based same-stage
+  semantic regeneration is mislabeled DTO repair; Arabic-digit measured scalars lose their
+  units; standalone social-act instructions conflict with the non-empty Responsibility
+  schema and GA conservation; and the Charter has contradictory `output_mode` ownership.
+- No Charter amendment is included because the required project-owner authorization to change
+  a core principle was not given. No claimed defect is marked fixed, no model/profile is
+  promoted, and no additional 1,496-case iteration was run.
 
-Repository surface delta for this delivery: zero new tracked files and six modified tracked
-owners, including the checkpoint/handoff pair. It adds no current document, environment
-variable, architecture term, compatibility path, provider integration, or runtime profile.
-The ignored `.chromie` analysis report is local retained evidence, not repository surface.
-Consolidation opportunity: any future evaluator/reference correction belongs in the existing
-corpus/evidence tooling rather than another production prompt layer or dataset format.
+Repository surface delta for this delivery: zero new tracked files and three modified current
+documents, including the checkpoint/handoff pair. It adds no environment variable,
+architecture term, compatibility path, provider integration, runtime profile, or evidence
+artifact. Consolidation opportunity: remove duplicated field semantics from existing prompt
+layers after the authority and representation contracts are corrected; do not add another
+prompt, evaluator, dataset format, or semantic owner.
+
+## Post-delivery GI prompt/authority audit
+
+Audit revision: `8300702fd84a32f0d6358393c6651b898c10f380`.
+
+Observed model-facing construction:
+
+- runtime-loaded static system prompt: 14,059 characters after `.strip()`
+- representative complete primary system + user + dynamic schema payloads: approximately
+  34,000-37,000 characters
+- static layer order remains readable: authority, decision procedure, Responsibilities,
+  output modes, bindings, dimension vocabulary, coordination/source evidence, uncertainty,
+  one worked example, and final conditions
+- semantic field rules are also repeated in dynamic schema descriptions and Deep/repair
+  appendices, so the complete contract has no comparably small single reading surface
+
+Confirmed blockers:
+
+1. `build_interpretation_repair_payload()` explicitly discards `previous_content`, does not
+   expose the concrete validation error, re-supplies the source turn, and asks the model to
+   regenerate a complete WHAT decision. The live call path reaches this branch for ordinary
+   `ValueError`/`ValidationError`. Existing tests explicitly require the rejected DTO and
+   mechanical error to be absent. This conflicts with Charter principles 30, 31, and 33.
+2. Deep GI's location-provenance retry likewise calls a fresh source-based Deep payload with
+   a decoder constraint and no rejected Deep DTO. The first source-based Deep delegation for
+   genuine `unresolved` meaning remains the allowed boundary; its same-stage retry does not.
+3. Fixed-v4 makes an Arabic-digit measured scalar a bare JSON number without its unit. The
+   corpus therefore stores `5 seconds` as `duration: 5`, while GA requires quantitative value
+   and units to survive. Downstream authority cannot legally recover the missing unit by
+   reinterpreting the admitted turn.
+4. The base prompt says thanks and declarative circumstances do not create Responsibilities,
+   but `GoalInterpretationDecision` requires at least one item and GA requires standalone
+   thanks, feelings, and similar social acts to remain conversational Goals. Exact standalone
+   thanks/personal-state probes were not found in the 1,496-case daily-life corpus.
+5. Charter principle 30 and current source make `output_mode` GI-authored and GA-preserved;
+   one sentence in principle 31 says GA authors it. Current GA schema constrains its value
+   from the immutable GI Responsibility, so source is internally coherent while canonical
+   documentation is not. Owner authorization is required before correcting that sentence.
+6. The base prompt unconditionally marks unfamiliar proper-name-like surfaces unresolved,
+   even though its adjacent rule limits `unresolved` to material ambiguity and downstream
+   contracts preserve harmless direct names. This can spend Deep cognition without a
+   consequential uncertainty.
+
+Read-only checks run during the audit:
+
+```text
+python -m pytest -q \
+  tests/test_goal_interpreter_llm_prompt.py::GoalInterpreterPromptTests::test_repair_payload_does_not_replay_rejected_output \
+  tests/test_goal_interpreter_llm_prompt.py::GoalInterpreterExecutionTests::test_one_dto_repair_restores_missing_source_evidence \
+  tests/test_goal_interpreter_llm_prompt.py::GoalInterpreterPromptTests::test_primary_schema_disambiguates_iterative_audit_boundaries
+3 passed in 0.35s
+
+python scripts/check_repository_policies.py
+15 rule families, 0 reviewed exceptions; passed
+```
+
+These passes prove the current behavior is reachable and currently accepted by tests/guards;
+they do not prove principle compliance. The policy checker lacks a guard against discarding
+the prior DTO and source-regenerating under a same-stage repair label.
 
 ## Fixed-v4 full-corpus evidence
 
@@ -360,7 +416,7 @@ reinterpret GA, select Work, retry semantics, or shift any authority.
 
 ## Automated evidence
 
-Final canonical evidence:
+Final canonical evidence observed on this docs-only pre-commit tree:
 
 ```text
 python scripts/check_repository_policies.py
@@ -390,6 +446,14 @@ python scripts/general_ability_acceptance.py --mode level-a \
   --ability-class planner_goal_semantic_quality --json
 12/12 passed, Level A; evidence at
 .chromie/acceptance/general-ability/20260830T161609Z-level-a/
+
+Post-delivery source audit:
+
+python -m pytest -q <three exact GI prompt/repair node IDs retained above>
+3 passed in 0.35s; confirms current repair behavior, not principle compliance
+
+python scripts/check_repository_policies.py
+15 rule families, 0 reviewed exceptions; current guard does not detect source-based DTO regeneration
 ```
 
 `git diff --check` passed before delivery preparation. `git diff --cached --check` must run
@@ -415,10 +479,14 @@ python benchmarks/datasets/goal_interpretation_daily_life/validate.py
 
 Do not train on the corpus until independent semantic review promotes individual retained
 assets. The target-blind Codex-strength 1,496-case self-evaluation has now run and is retained
-locally at the fixed-v4 path above. The next useful evidence is an exact deployed
-provider/model/strict-decoder run bound to the committed revision and runtime identity;
-store raw output before grading and keep prompt, schema, decoder, parameters, repeats,
-latency, and failure attribution separate.
+locally at the fixed-v4 path above. Before another broad prompt iteration or provider/model
+qualification, obtain explicit owner authorization to correct the contradictory Charter
+`output_mode` sentence, remove source-based same-stage semantic repair, preserve measurement
+units in GI WHAT, reconcile standalone social Responsibilities, and add focused bilingual
+coverage. Then establish one new complete target-blind baseline. Only after that contract is
+coherent is the next useful provider evidence an exact deployed provider/model/strict-decoder
+run bound to the committed revision and runtime identity; store raw output before grading and
+keep prompt, schema, decoder, parameters, repeats, latency, and failure attribution separate.
 
 Do not rerun or append to the retained all-Qwen current-source cohort and do not collect
 another bundle for it. The current all-Qwen production profile remains unqualified. Do not

@@ -1,7 +1,7 @@
 # Chromie Current Status
 
 **Updated:** 2026-08-31
-**Current focus:** The owner-approved Planner-owned auxiliary social-decoration amendment and Issue [#32](https://github.com/TimeTreker/chromie/issues/32) streaming Fast-Planner presentation boundary are source-gated as one Goal-driven single-authority production path. Final Fast-Planner Prompt/model promotion now follows current-target latency/resource qualification. Source closure, provider protocol probing, live voice, and physical behavior remain separate evidence claims.
+**Current focus:** The owner-approved Goal-driven single-authority path remains the target, but a current-source audit found GI contract blockers before more prompt/model promotion: source-based same-stage semantic repair, measured-scalar unit loss, inconsistent standalone-social Responsibility handling, and contradictory Charter wording about `output_mode` ownership. Correct the canonical wording only after explicit owner authorization, restore principles 30/31/33 at the earliest boundary, then resume exact provider/model qualification. Source closure, provider protocol probing, live voice, and physical behavior remain separate evidence claims.
 
 This file contains current facts only. Historical implementation narratives,
 superseded architecture, old test totals, and revision-specific diagnostics belong in
@@ -155,18 +155,12 @@ It used 12,951/16,376 MiB with TTS stopped, so it also lacks the measured reside
 to coexist with TTS. This is isolated provider/GI evidence, not authority approval or
 workflow qualification, and production remains unchanged.
 
-The primary GI prompt/schema has now been corrected at the shared semantic boundary:
-`unresolved[]` and overlapping binding dimensions carry explicit decoder-visible
-contracts, and final preflight performs atomic decomposition, typed modifier coverage,
-and uncertainty audit in that order. This remains one primary model invocation; no Host
-phrase classifier, semantic reviewer, or repair call was added. On the unchanged
-no-deadline screen, production Qwen3.5-4B reached 3/5 once by fixing filler ambiguity but
-a fresh same-source final rerun scored 2/5. It still drops the weather `time_scope` and
-compound duration/action split. A typed-array/source-closed wire prototype was discarded:
-Ministral-3-14B reached 5/5 mechanically, but manual review and focused reruns exposed
-false temporal typing and duplicate duration; its unseen holdout was 6/8 mechanically and
-about 4/8 after manual review. Every other cached candidate scored at most 3/5. No
-model/profile was promoted.
+The primary GI prompt/schema now exposes decoder-visible `unresolved[]` and overlapping-binding
+contracts, then preflights atomic decomposition, typed modifier coverage, and uncertainty. That
+change added no Host semantic owner, but an older reachable source-based repair remains. On the
+unchanged screen, Qwen3.5-4B reached 3/5 once and 2/5 on a fresh rerun; the discarded typed-wire
+Ministral-3-14B prototype reached 5/5 mechanically but failed manual review and reached 6/8
+mechanically/about 4/8 manually on holdout. All other candidates were at most 3/5; none was promoted.
 
 An RTX 5090 dirty-checkout diagnostic separates raw GI model potential from production-contract
 compatibility through six dimensions. Under one simplified V2 prompt/schema, Ministral-3-14B
@@ -175,17 +169,23 @@ and unresolved passes, 24/28 coordination passes, and 16/28 binding passes. Gran
 preserved all 15 outcomes and modes but passed only 3/15 binding cases and invented or mis-typed
 values. Its diagnostic-only Ollama digest is `f586c02fdecdf151b656207c339aa003997345774a41768bac1fd6d2fb85913b`.
 
-The GI prompt audit replaced repeated schema/validator prose with a 10,225-character
-provider-neutral decision procedure. It covers all 25 model-facing binding dimensions,
-cross-clause collection, complete acquire-and-deliver outcomes, sparse source-grounded values,
-source perspective, decoder-safe binding order, and minimal predicate evidence, without the
-reported wording or candidate names. Context-only instructions remain conditional and add no
-model call. Prompt digest: `835a0a0ef3273e96e6dc3504ab8798d21b794f6505fb3b3a630ccdbb91568b25`.
+The selected fixed-v4 GI prompt is a 14,059-character provider-neutral decision procedure over
+all 25 binding dimensions, cross-clause outcomes, sparse grounded values, source perspective,
+decoder-safe order, and minimal predicate evidence. Context-only rules add no call. Digest:
+`2d0ce9814d3b8e882b925800225b152aaf0f0f3c6b5f838a5d9e7196eebb62ad`.
 
 An assistant-reference audit applied that prompt and each exact decoder schema to all 16 primary GI manifest cases without an external model/provider call. All 16 passed schema, Host validation, and six semantic dimensions. This proves only strong-reference prompt clarity, not deployed-model qualification: any candidate result measures the combined model + prompt + schema + decoder transaction and cannot alone prove the prompt correct or defective. Runtime contracts remain unchanged; no model was promoted.
 
 A full offline Codex GI diagnostic exercised all 1,496 bilingual daily-life scenarios on fixed source/prompt identities through four bounded iterations. The selected target-blind fixed-v4 run completed 1,496/1,496 calls without timeout or call failure; mechanical candidate equality rose from the 461-case baseline to 789, while generated-schema and production Host acceptance were each 1,496/1,496. The retained current prompt and implementation/test patch exactly match that v4 run; the later tracked-diff change is this evidence-only status update. Because the Codex wrapper supplied the schema only as prompt text and collapsed production roles into one envelope, this is not a decoder/provider qualification.
 A post-hoc one-reviewer, same-model self-audit judged 1,355 v4 raw outputs valid and 141 invalid, recommended no further prompt change, and judged only 1,078 assistant-authored references valid. A broader fixed-v5 wording experiment regressed to 761 mechanical and 1,338 self-adjudicated semantic passes, so it was rejected and the exact v4 source restored. The reviewer also produced inconsistent count/schema judgments across iterations, so these remain diagnostic lower-bound counts rather than independent truth or training approval. The corresponding Level-A `planner_goal_semantic_quality` and `robust_intent_understanding` classes pass 12/12 but do not prove live services, audio, simulation, or robot behavior. Evidence is under `.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v4/`, `.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v5/`, and `.chromie/acceptance/general-ability/20260830T161609Z-level-a/`; no production model/profile was promoted.
+
+A read-only call-path audit found unresolved blockers: primary DTO repair and Deep location repair
+both re-read source meaning instead of mechanically preserving rejected DTOs, conflicting with
+Charter principles 30, 31, and 33; fixed-v4 drops units from Arabic-digit measured scalars; and
+standalone social turns conflict across prompt, non-empty Responsibility schema, and GA contract.
+Principle 31 also says GA authors `output_mode`, while principle 30/runtime make it GI-authored
+and GA-preserved; changing that sentence requires explicit owner authorization. The audit changed
+no prompt, schema, runtime, test, Charter, model, or profile.
 
 | Area | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|---|
