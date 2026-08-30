@@ -202,16 +202,18 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("TTS_CONTEXT_SIZE=4096", profile)
         self.assertIn("TTS_MAX_LENGTH=4096", profile)
-        self.assertIn("AGENT_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
+        self.assertIn("AGENT_MODEL=qwen3.5:4b", profile)
         self.assertIn(
             "AGENT_GOAL_INTERPRETER_MODEL=qwen3.5:4b",
             profile,
         )
-        self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
-        self.assertIn("AGENT_DEEP_PLANNER_MODEL=qwen3:4b-instruct-2507-q4_K_M", profile)
+        self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=qwen3.5:4b", profile)
+        self.assertIn("AGENT_FAST_PLANNER_MODEL=qwen3.5:4b", profile)
+        self.assertIn("AGENT_DEEP_PLANNER_MODEL=qwen3.5:4b", profile)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
-        self.assertIn("OLLAMA_MAX_LOADED_MODELS=2", profile)
+        self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
+        self.assertIn("OLLAMA_NUM_PARALLEL=1", profile)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=16384", profile)
         self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT=512", profile)
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", profile)

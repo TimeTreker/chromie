@@ -15,6 +15,9 @@ Read:
 5. the relevant component README
 6. `docs/ACCEPTANCE.md` for the evidence level affected by the change
 
+For commit, push, publication, or project handoff work, also follow the
+[Chromie delivery-handoff skill](.agents/skills/chromie-delivery-handoff/SKILL.md).
+
 ## Development setup
 
 For GPU-free control-plane work:

@@ -41,6 +41,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerClarificationAct,
     FastPlannerCompleteResponseAct,
     FastPlannerProgressAct,
+    FastPlannerStreamFailure,
     FastPlannerStreamTerminal,
     PresentationCommit,
 )
@@ -1236,6 +1237,73 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.interaction_response.speech, [])
         self.assertEqual(result.terminal_plan.auxiliary_activities, [])
         self.assertTrue(result.metadata["gi_fanout_concurrent"])
+
+    def test_fast_failure_retrieves_already_failed_goal_association_task(self):
+        class Client:
+            async def resolve_goal_association(self, *args, **kwargs):
+                del args, kwargs
+                return GoalAssociationResolution(
+                    resolution_status="fail_closed",
+                    turn_id="turn-concurrent-failure",
+                    confidence=0.0,
+                    metadata={
+                        "failure_class": "timeout",
+                        "failure_domain": "inference_transport",
+                        "retryable": True,
+                    },
+                )
+
+            async def stream_fast_advance(self, *args, **kwargs):
+                del args, kwargs
+                # _resolve deliberately yields once after starting GA, so the
+                # fail-closed GA task is already terminal at this boundary.
+                yield FastPlannerStreamFailure(
+                    turn_id="turn-concurrent-failure",
+                    failure_stage="before_commit",
+                    failure_class="timeout",
+                    failure_domain="inference_transport",
+                    retryable=True,
+                )
+
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=Client(),
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+        )
+        core, envelope = admitted_core(
+            "hello",
+            sid="turn-concurrent-failure",
+            language="en",
+        )
+
+        async def exercise():
+            loop = asyncio.get_running_loop()
+            unhandled: list[dict] = []
+            prior_handler = loop.get_exception_handler()
+            loop.set_exception_handler(
+                lambda _loop, context: unhandled.append(dict(context))
+            )
+            try:
+                result = await coordinator.resolve(
+                    object(),
+                    text="hello",
+                    sid="turn-concurrent-failure",
+                    core_interpretation=core,
+                    context={"history": [], "active_goal_snapshots": []},
+                    history=[],
+                    language="en",
+                    turn_envelope=envelope,
+                )
+                await asyncio.sleep(0)
+                return result, unhandled
+            finally:
+                loop.set_exception_handler(prior_handler)
+
+        result, unhandled = asyncio.run(exercise())
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.metadata["failure_stage"], "fast_planner_stream")
+        self.assertEqual(unhandled, [])
 
     def test_fast_clarification_commits_goal_with_information_gap(self):
         gap = {

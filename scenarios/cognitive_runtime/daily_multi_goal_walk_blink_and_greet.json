@@ -126,6 +126,7 @@
             "text": "早上好！",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "immediate",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-greet"
@@ -139,6 +140,7 @@
             "text": "我可以先往前走一秒，再眨两下眼睛。这样可以吗？你说“好”，我就开始啦！",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "pre_action",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-walk",

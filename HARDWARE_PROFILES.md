@@ -100,11 +100,13 @@ context-window, output-budget, and residency topology; they do **not** own
 human-facing interaction deadlines. Both profiles reserve each stage's complete
 declared output budget plus a 2048-token safety margin before inference and
 reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
-its declared Qwen/Gemma role split. RTX 4090 Laptop keeps `qwen3.5:4b` in a
-16K/512 Goal Interpretation runner beside the unchanged 32K
-`qwen3:4b-instruct-2507-q4_K_M` runner used by every other cognition role.
-Both runners may remain resident, but provider parallelism remains one because
-two 32K downstream slots exceed the 16GB shared CosyVoice envelope. The
+its declared Qwen/Gemma role split. RTX 4090 Laptop assigns every LLM role to
+one `qwen3.5:4b` model, retains the 16K/512 Goal Interpretation request budget,
+and uses the existing 32K downstream role budgets. One resident runner avoids
+cross-role model swaps. Ollama 0.32.14 creates only one sequence slot for the
+`qwen35` architecture even when configured for two, so the maintained profile
+retains one provider request slot. Current-revision qualification must prove GPU
+coexistence and latency with CosyVoice. The
 supervised launcher clears stale Ollama runners before the first TTS synthesis
 probe.
 
@@ -124,7 +126,7 @@ qualification watchdog merely because that profile was auto-detected.
 | `nvidia_ada` | RTX 4080/4070 class | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `rtx4090` | Desktop RTX 4090 | `gemma4:e2b` | `qwen3:4b` | 4096 |
-| `rtx4090_laptop` | RTX 4090 Laptop GPU | `qwen3:8b` GI/Deep; `gemma4:e4b` Agent/GA | `qwen3:4b` | 4096 |
+| `rtx4090_laptop` | RTX 4090 Laptop GPU | `qwen3.5:4b` for all LLM roles | `qwen3.5:4b` | 4096 |
 | `rtx5090` | Desktop RTX 5090 | `gemma4:12b` | `qwen3:4b` | 8192 |
 | `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
@@ -133,12 +135,10 @@ qualification watchdog merely because that profile was auto-detected.
 The quality model is normally used by Goal Association and Deep Planner. The fast
 model is normally used by Goal Interpretation, Fast Planner (including terminal
 Evidence re-entry), Task Continuity, and Social Attention unless the profile
-explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop keeps
-`gemma4:e4b` for Agent/Goal Association, promotes Goal Interpretation and Deep
-Planning to `qwen3:8b`, and leaves Fast Planning on `qwen3:4b`. This exception is
-role-specific: an 8B Fast-Planner probe made an unverified present-tense execution
-claim, so the Fast role remains on its safer fail-closed 4B model. Camera frames are not yet part
-of the runtime input contract.
+explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop assigns
+all of those roles to one `qwen3.5:4b` runner with one provider request slot.
+That assignment is a maintained profile configuration, not a target-quality
+claim. Camera frames are not yet part of the runtime input contract.
 Input preflight
 reserves each stage's full `num_predict` allowance and safety margin;
 `done_reason=length`, exhausted output budgets, and prompt-context truncation are

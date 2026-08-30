@@ -4147,8 +4147,12 @@ class GoalDrivenRuntimeCoordinator:
             """Stop unfinished turn fan-out and unbound provisional Fast work."""
 
             nonlocal ready_fast_capability_status
-            if association_task is not None and not association_task.done():
-                association_task.cancel()
+            if association_task is not None:
+                if not association_task.done():
+                    association_task.cancel()
+                # A concurrent GA failure can finish just before Fast Planner
+                # fails. Always retrieve that terminal result so asyncio does
+                # not report an unowned "Task exception was never retrieved".
                 await asyncio.gather(association_task, return_exceptions=True)
             execution = ready_fast_capability_execution
             execution_status = ready_fast_capability_status

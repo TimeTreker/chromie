@@ -223,6 +223,7 @@ mechanical-contract owner.
 - [Support](../SUPPORT.md)
 - [Changelog](../CHANGELOG.md)
 - [Coding Agent Guidance](../AGENTS.md)
+- [Chromie Delivery Handoff Skill](../.agents/skills/chromie-delivery-handoff/SKILL.md): Git delivery workflow for keeping the checkpoint and handoff truthful
 - [Architecture Audit](../ARCHITECTURE_AUDIT.md): external point-in-time review, 2026-08-28; not a maintained authority
 
 ## Update rules

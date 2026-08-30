@@ -106,8 +106,6 @@ def test_model_interpretation_projection_lowers_typed_relations_and_numbers() ->
         "after": ["r1"],
         "count": 2,
     }
-
-
 class GoalInterpreterContractTests(unittest.TestCase):
     def test_source_tokens_preserve_latin_cjk_and_punctuation(self) -> None:
         self.assertEqual(
@@ -343,6 +341,23 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("one primary semantic decision", all_text)
         self.assertNotIn("Common Ability Catalog", all_text)
 
+    def test_primary_prompt_matches_schema_when_no_candidate_goal_exists(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="blink twice")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+        responsibility = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]
+
+        self.assertNotIn("relationship", responsibility["properties"])
+        self.assertNotIn("target_goal_ids", responsibility["properties"])
+        self.assertIn(
+            "when the schema omits relationship and target_goal_ids, omit both keys",
+            system_text,
+        )
+        self.assertIn("trusted construction applies the mechanical defaults", system_text)
+
     def test_primary_prompt_does_not_expose_runtime_sid(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(
@@ -477,6 +492,23 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("a non-empty unresolved item", system_text)
         self.assertNotIn("unresolved must include a bare name", user_text)
 
+    def test_primary_prompt_preflight_prioritizes_decomposition_and_binding_dimensions(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="move with two modifiers, then perform another effect"
+            )
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn("Scan the whole source for independently observable predicates", system_text)
+        self.assertIn("Use `time_scope` for a calendar/relative interval", system_text)
+        self.assertIn("Missing provider units or implementation details", system_text)
+        self.assertIn("discourse-only fillers", system_text)
+        self.assertIn("return `unresolved: []`", system_text)
+        self.assertIn("body-action outcome names the actual source predicate", system_text)
+
     def test_primary_schema_closes_source_token_refs(self) -> None:
         text = "今天晚上重庆热不热"
         schema = self._interpreter().build_interpretation_payload(
@@ -546,6 +578,28 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         self.assertNotIn("explicit_numeric_bindings", schema["properties"])
 
+    def test_primary_schema_contrasts_ambiguous_binding_dimensions_and_unresolved(self) -> None:
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="one clear request")
+        )["format"]
+        properties = schema["$defs"]["CognitiveResponsibilityProposal"][
+            "properties"
+        ]["binding_items"]["properties"]
+
+        self.assertIn(
+            "calendar, relative-time, or interval",
+            properties["time_scope"]["description"],
+        )
+        self.assertIn("Never place temporal scope", properties["time_scope"]["description"])
+        self.assertIn("Never put elapsed length in count", properties["duration"]["description"])
+        self.assertIn(
+            "outcome prose alone is not binding evidence",
+            properties["duration"]["description"],
+        )
+        self.assertIn("unknown proper-name-like referent", properties["entity"]["description"])
+        self.assertIn("Never use a place", properties["recipient"]["description"])
+        self.assertIn("Never list fillers", schema["properties"]["unresolved"]["description"])
+
     def test_primary_schema_forbids_unknown_semantic_binding_names(self) -> None:
         text = "bring the bottle from 50 meters ahead"
         schema = self._interpreter().build_interpretation_payload(
@@ -574,7 +628,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("person is not a `location`", all_text)
         self.assertIn("Each semantic dimension is one object key", all_text)
 
-    def test_primary_schema_keeps_source_backed_fields_compact(self) -> None:
+    def test_primary_schema_keeps_context_backed_location_open_to_host_validation(self) -> None:
         text = "What time is it now?"
         request = GoalInterpretationRequest(
             sid="runtime-secret-sid",
@@ -599,6 +653,39 @@ class GoalInterpreterPromptTests(unittest.TestCase):
                 binding_items["properties"][name]["anyOf"][0]["$ref"],
                 "#/$defs/SourceBackedBindingString",
             )
+
+    def test_fresh_turn_location_is_decoder_constrained_to_exact_source_surfaces(self) -> None:
+        text = "今晚重庆会不会下雨哦？"
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text=text)
+        )
+        source_turn = json.loads(
+            _payload_message_texts(payload)[1].split(
+                "IMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; "
+                "Goal Interpretation owns current-turn WHAT):\n",
+                1,
+            )[1].split("\n", 1)[0]
+        )
+        location = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["binding_items"]["properties"]["location"]
+
+        self.assertEqual(source_turn["speaker_role"], "user")
+        self.assertEqual(source_turn["addressee"], "Chromie")
+        self.assertIn("重庆", location["enum"])
+        self.assertNotIn("Chongqing", location["enum"])
+
+    def test_deep_location_constraint_targets_wire_binding_items(self) -> None:
+        payload = self._interpreter().build_deep_interpretation_payload(
+            GoalInterpretationRequest(text="今晚重庆会不会下雨哦？"),
+            constrain_location_provenance=True,
+        )
+        location = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["binding_items"]["properties"]["location"]
+
+        self.assertIn("重庆", location["enum"])
+        self.assertNotIn("Chongqing", location["enum"])
 
     def test_decoder_rejects_removed_readiness_fields(self) -> None:
         text = "weather in Chongqing"

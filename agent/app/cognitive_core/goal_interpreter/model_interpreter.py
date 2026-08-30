@@ -548,9 +548,10 @@ def _short_exact_surface_substrings(text: str) -> list[str]:
     """Enumerate exact source slices for a bounded decoder constraint.
 
     This does not identify an entity or choose its meaning. It only makes an
-    invalid translated location impossible to emit during short source-based
-    recovery. Longer turns retain the normal validator and fail closed without
-    growing an unbounded response schema.
+    invalid translated location impossible to emit when a short fresh turn has
+    no bounded semantic-context location to preserve. Longer or continuity-rich
+    turns retain the normal validator and fail closed without growing an
+    unbounded response schema.
     """
 
     surface = " ".join(str(text or "").strip().split())
@@ -638,6 +639,8 @@ def _goal_interpretation_source_turn_provenance(
             original_text = candidate
     return {
         "original_text": original_text,
+        "speaker_role": "user",
+        "addressee": "Chromie",
         "authority": "read_only_source_provenance",
     }
 
@@ -983,18 +986,13 @@ def _reject_unprovenanced_location_bindings(
 
     This gate does not resolve or repair a location. It only verifies that the
     model copied a current-turn surface or a value already present in bounded
-    semantic continuity context. A violation requires one fresh source-based
-    interpretation, never same-stage DTO repair of the rejected semantics.
+    semantic continuity context. A primary violation fails closed; the one
+    designated Deep interpretation may use a same-stage mechanical decoder
+    constraint, never a semantic review of rejected wording.
     """
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
     contextual_values = _semantic_context_string_values(request.context)
-    source_numbers = _decimal_values(request.text)
-    context_numbers = {
-        number
-        for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS
-        for number in _decimal_values(request.context.get(key))
-    }
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1679,7 +1677,7 @@ def _normalize_model_interpretation_projection(parsed: dict[str, Any]) -> None:
                     [sibling for sibling in refs if sibling != ref],
                 )
         else:
-            for previous_ref, ref in zip(refs, refs[1:]):
+            for previous_ref, ref in zip(refs, refs[1:], strict=False):
                 item = by_ref[ref]
                 bindings = item.setdefault("bindings", {})
                 _append_sibling_relation(bindings, "after", [previous_ref])
@@ -2058,10 +2056,27 @@ class OllamaGoalInterpreter:
         allowed_goal_ids: tuple[str, ...] = (),
         prior_assistant_utterance: str | None = None,
         admitted_turn: str = "",
+        exact_location_surfaces: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
         schema["required"] = ["confidence", "responsibilities", "unresolved"]
+        unresolved = schema.get("properties", {}).get("unresolved")
+        if isinstance(unresolved, dict):
+            unresolved["description"] = (
+                "Only genuine material uncertainty about WHAT outcome, scope, "
+                "relationship, or referent the human means. Use [] for clear meaning. "
+                "Never list fillers, hesitation, politeness, missing units or provider "
+                "details, unknown external answers, or a value already preserved in "
+                "binding_items. Do not invent an alternative speaker/addressee reading "
+                "when the supplied provenance identifies user -> Chromie."
+            )
+            unresolved_items = unresolved.get("items")
+            if isinstance(unresolved_items, dict):
+                unresolved_items["description"] = (
+                    "One concise human-meaning uncertainty that the user can resolve; "
+                    "never a label for filler/disfluency or an execution question."
+                )
         confidence_values = [0.0, 0.25, 0.5, 0.75, 1.0]
         aggregate_confidence = schema.get("properties", {}).get("confidence")
         if isinstance(aggregate_confidence, dict):
@@ -2115,7 +2130,13 @@ class OllamaGoalInterpreter:
                     "or rejected on its own requires a sibling Responsibility. For "
                     "one predicate, duration, speed, direction, distance, count, intensity, "
                     "and other modifiers belong in bindings and never become sibling "
-                    "outcomes. For "
+                    "outcomes. Mentioning a modifier in outcome prose does not preserve "
+                    "it: every material modifier must also appear under its typed "
+                    "binding_items key. For "
+                    "body_action, name the actual source predicate such as locomote, "
+                    "turn, gaze, blink, nod, gesture, carry, or hand over; never emit "
+                    "'perform a body action'. For information, name the proposition or "
+                    "subject to determine rather than only 'provide information'. For "
                     "speech, describe the communicative obligation or proposition; never "
                     "write the exact utterance, which Planner alone authors."
                 )
@@ -2215,15 +2236,29 @@ class OllamaGoalInterpreter:
                         "code validates exact source/context provenance."
                     ),
                 }
+                if exact_location_surfaces:
+                    binding_properties["location"] = {
+                        "type": "string",
+                        "enum": list(exact_location_surfaces),
+                        "description": (
+                            "If present, copy one exact contiguous surface from the "
+                            "authoritative current turn. This closed spelling constraint "
+                            "does not decide whether any surface is a location."
+                        ),
+                    }
                 binding_properties["duration"] = {
                     "anyOf": [
                         {"$ref": "#/$defs/SourceBackedBindingString"},
                         {"type": "number"},
                     ],
                     "description": (
-                        "One source-backed elapsed-span scalar. Use a JSON number for a "
-                        "normalized magnitude or one exact source/context string. This "
-                        "typed value owns the complete elapsed-span meaning."
+                        "Elapsed length only, such as a source expression meaning for N "
+                        "seconds/minutes. Use the normalized JSON number N or one exact "
+                        "source/context string; this value owns the complete elapsed-span meaning. "
+                        "Whenever the source explicitly supplies elapsed length, emit duration; "
+                        "outcome prose alone is not binding evidence. "
+                        "Never put elapsed length in count, time, time_scope, threshold, "
+                        "comparison, or quantity."
                     ),
                 }
                 binding_properties["speed"] = {
@@ -2232,8 +2267,9 @@ class OllamaGoalInterpreter:
                         {"type": "number"},
                     ],
                     "description": (
-                        "One source-backed pace or velocity scalar, represented as a "
-                        "JSON number or exact source/context string."
+                        "Explicit pace or velocity only, represented as a JSON number or "
+                        "exact source/context string. A missing physical unit does not "
+                        "make an explicitly supplied speed scalar unresolved."
                     ),
                 }
                 schema_definitions["SemanticBindingScalar"] = {
@@ -2256,24 +2292,42 @@ class OllamaGoalInterpreter:
                     ],
                 }
                 dimension_descriptions = {
+                    "entity": (
+                        "Exact person, organization, object, product, service, title, or "
+                        "unknown proper-name-like referent that the predicate is about. "
+                        "Preserve an unfamiliar name here without guessing its category."
+                    ),
                     "direction": (
-                        "One explicitly supplied source-grounded path or orientation direction."
+                        "Explicit path or orientation direction only, such as left, right, "
+                        "ahead, toward, or an equivalent source-grounded direction."
                     ),
                     "time": (
-                        "One explicitly supplied source-grounded time point."
+                        "One source-grounded instant or clock point, such as now or at a "
+                        "stated clock time. Never use for an interval, elapsed duration, "
+                        "comparison cutoff, or category."
                     ),
                     "time_scope": (
-                        "One explicitly supplied temporal scope or interval constraint."
+                        "One exact source/context calendar, relative-time, or interval scope, "
+                        "such as tonight, tomorrow, this week, or during a stated period. "
+                        "Preserve its source language and surface rather than translating or "
+                        "normalizing it. Never place temporal scope in time, subtype, "
+                        "threshold, or comparison."
                     ),
                     "threshold": (
-                        "One explicitly supplied cutoff for a comparison or condition."
+                        "An explicit cutoff for a comparison or condition only, such as "
+                        "at least N, above N, below N, or until a stated condition. "
+                        "Never use for a time scope, duration, speed, count, category, "
+                        "or ordinary value."
                     ),
                     "subtype": (
-                        "One explicitly supplied categorical kind of the predicate or entity."
+                        "An explicitly supplied categorical kind of the predicate or "
+                        "entity only. Never use for time, duration, speed, count, a whole "
+                        "action, or an inferred provider category."
                     ),
                     "recipient": (
                         "The explicitly named beneficiary or receiver of a transferred or "
-                        "communicated result."
+                        "communicated result. Never use a place, action actor, gaze target, "
+                        "or Chromie itself unless the source explicitly names it as receiver."
                     ),
                 }
                 for semantic_name in (
@@ -2360,8 +2414,10 @@ class OllamaGoalInterpreter:
                         "Sparse material facts for this one predicate, keyed once by "
                         "semantic dimension. Emit only entailed keys and no defaults. "
                         "A magnitude and its natural-language unit are one typed value. "
-                        "Modifiers such as speed and duration remain keys on the same Responsibility; "
-                        "relations belong only in top-level coordination."
+                        "Every material modifier remains required here even when outcome "
+                        "prose already mentions it. "
+                        "Modifiers such as speed and duration remain keys on the same "
+                        "Responsibility; relations belong only in top-level coordination."
                     ),
                 }
                 responsibility["required"] = [
@@ -2617,6 +2673,11 @@ class OllamaGoalInterpreter:
         self, request: GoalInterpretationRequest
     ) -> dict[str, Any]:
         prior = _most_recent_assistant_utterance(request.context)
+        exact_location_surfaces = (
+            tuple(_short_exact_surface_substrings(request.text))
+            if not _semantic_context_string_values(request.context)
+            else ()
+        )
         payload: dict[str, Any] = {
             "model": self.model,
             "stream": False,
@@ -2640,6 +2701,7 @@ class OllamaGoalInterpreter:
                     prior["text"] if prior is not None else None
                 ),
                 admitted_turn=request.text,
+                exact_location_surfaces=exact_location_surfaces,
             ),
         }
         if self.keep_alive:
@@ -2669,6 +2731,11 @@ class OllamaGoalInterpreter:
                 prior["text"] if prior is not None else None
             ),
             admitted_turn=request.text,
+            exact_location_surfaces=(
+                tuple(_short_exact_surface_substrings(request.text))
+                if not _semantic_context_string_values(request.context)
+                else ()
+            ),
         )
         bound_uncertainty_repair = (
             " The rejected DTO copied already-resolved binding values into top-level "
@@ -2823,7 +2890,7 @@ class OllamaGoalInterpreter:
             )
             if exact_surfaces and isinstance(responsibility_schema, dict):
                 binding_schema = responsibility_schema.get("properties", {}).get(
-                    "bindings"
+                    "binding_items"
                 )
                 if isinstance(binding_schema, dict):
                     binding_properties = binding_schema.setdefault("properties", {})

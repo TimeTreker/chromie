@@ -1,179 +1,136 @@
 # Chromie Development Checkpoint
 
-Status: streaming Planner/prompt architecture and immutable source-turn provenance are implemented; canonical local gate and live model qualification remain open
-Updated: 2026-08-29
-Starting baseline: `e13a30405bf9b7d58976d2de8121038aa2ae5955`
-(`feat: frame fast planner presentation and terminal plan`)
-Resume branch: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
+Status: vLLM transport is qualified on RTX 4090 Laptop; production promotion is blocked by model semantics or authority compatibility
+Updated: 2026-08-30
+Pre-delivery baseline: `main` at `f5a49c6b0a48358566805a73dc58e311958143d2`
+Expected resume revision: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
 
-Read [Project Charter](docs/PROJECT_CHARTER.md),
-[Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
-[Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md),
-[Acceptance](docs/ACCEPTANCE.md), and [Latest Handoff](HANDOFF.md).
-Source, tests, and retained executable evidence win over this summary.
+Read [Project Charter](docs/PROJECT_CHARTER.md), [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
+[Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md), [Acceptance](docs/ACCEPTANCE.md),
+and [Latest Handoff](HANDOFF.md). Source, tests, and retained executable evidence win.
 
-## Active issue and boundary
+## Active delivery line
 
-This is the current Goal-driven single-semantic-authority delivery line.
-Charter principles 30–31 require each semantic authority to produce its complete
-grounding/conservation evidence in its primary model result. GI, Goal Association,
-and Fast/Deep Planner now follow that source contract. Do not treat whole-pipeline
-source closure as target-model or live behavior qualification.
-
-The maintained GI workflow is now:
+Keep the current Goal-driven single-authority path intact:
 
 ```text
-admitted turn + bounded semantic context + closed source-token table
-  -> one primary WHAT-only GI result
-     (Responsibilities + modes + bindings + relations + source_evidence)
-  -> trusted mechanical validation
-  -> accept resolved valid meaning
-     OR one same-stage DTO repair for malformed shape
-     OR one source-based Deep GI delegation for genuine unresolved meaning
-     OR fail closed for semantic/authority contradiction
-  -> GA / Planner
+admitted turn -> GI WHAT/Responsibilities -> concurrent GA + Fast Planner
+  -> immutable presentation commit + terminal Plan -> canonical validation
+  -> confirmation/Work -> Runtime Evidence -> scoped Planner re-entry
 ```
 
-There is no GI coverage auditor, critic, reviewer, or resegmentation call.
+- One semantic authority produces its complete primary result. Do not restore semantic
+  reviewers, Host resegmentation, or same-owner repair calls.
+- GI owns current-turn WHAT; GA owns Goal identity/continuity; Planner owns HOW and exact
+  Communicative/Capability Activities.
+- Raw model tokens never reach TTS. Goal Work waits for the terminal Planner result,
+  GA binding, and canonical validation.
+- Keep validation fail-closed and keep stop/cancel/emergency deterministic.
 
-The maintained GA workflow is now:
+## Current worktree
 
-```text
-accepted GI Responsibilities + bounded Goal/dialogue state
-  -> one primary Goal identity/continuity result
-  -> optional one mechanical JSON repair only for a Pydantic-invalid DTO
-  -> deterministic closed-reference/provenance/binding/conservation validation
-  -> canonical Goal commit or fail closed
-```
+- The stale scenario fixtures now declare explicit communicative `delivery_phase` values;
+  the stale prompt-literal test protects the live WHAT contract instead of old wording.
+- The new delivery-handoff skill is indexed and owned; checkpoint length remains within
+  the repository documentation budget.
+- RTX 4090 Laptop assigns every LLM selector to `qwen3.5:4b`, one resident model, GI
+  16K/512, and downstream 32K stage contracts.
+- Ollama 0.32.14 logs that `qwen35` does not support parallel requests and starts
+  `n_seq_max=1` even with `OLLAMA_NUM_PARALLEL=2`. The profile truthfully declares
+  `OLLAMA_NUM_PARALLEL=1`; two provider sequence slots are not available.
+- CognitiveRuntime cleanup now gathers a concurrent Goal Association task even when it
+  already finished. This contains its exception when Fast Planner fails at the same time
+  and prevents `Task exception was never retrieved` without changing semantic authority.
+- The current GI prompt now matches its fresh-turn schema, and immutable source provenance
+  explicitly identifies user -> Chromie. Short fresh turns with no continuity context close
+  location spelling to exact source surfaces in the primary schema; continuity turns retain
+  context plus fail-closed Host validation. The Deep mechanical constraint now targets the
+  model-facing `binding_items` field rather than the removed legacy wire name.
+- `scripts/qualify_vllm_provider.py` is a no-deadline qualification probe for identity,
+  strict JSON, SSE streaming, two-sequence overlap, cancellation isolation, GPU/TTS
+  contention, and the current primary GI contract. It removes only vLLM-unsupported
+  `uniqueItems` decoder hints and retains canonical Host revalidation.
+- A no-HTTP-deadline Ollama follow-up screened four cached recommended controls plus
+  `gpt-oss:20b`. GPT-OSS fit only with TTS stopped, cannot disable its reasoning trace,
+  and reached 3/5 only in a non-production `think: low` diagnostic; no model was promoted.
+- The current GI prompt/schema now gives `unresolved[]` and the easily-confused binding
+  dimensions explicit decoder-visible contracts, and runs decomposition/binding coverage
+  as the final preflight. This keeps one primary semantic call and adds no Host classifier.
+  Production Qwen3.5-4B reached 3/5 once but a fresh same-source rerun scored 2/5;
+  weather temporal scope and compound duration/atomicity remain unstable hard failures.
+  A typed-array wire prototype was discarded after manual and holdout review.
 
-There is no GA coverage certificate, reviewer, fresh interpretation, final audit, or
-semantic repair call. Grounding or conservation rejection is terminal.
+## Root-cause workflow
 
-The maintained initial Fast Planner workflow is now:
-```text
-immutable GI Responsibilities
-  -> concurrently:
-       GA continuity transaction
-       one Fast Planner stream
-          -> closed/validated <presentation_commit> (speech/silence + anchored auxiliary)
-          -> closed <terminal_plan> payload or typed pre/post-commit failure
-  -> terminal result + GA mapping + accepted commit identity
-  -> canonical Plan validation
-  -> confirmation / Work dispatch / Deep escalation / silence / fail closed
-```
+| Boundary | Actual current-source episode | Expected | Judgment |
+|---|---|---|---|
+| Gateway/GI | Admitted text reached one Qwen GI call; 18/48 timed out, 16/48 returned mechanically invalid provenance/authority/structure, 14/48 were accepted low-confidence outputs | One valid complete Responsibility result or typed fail-closed outcome | Model/provider blocker; validators correct |
+| GI fan-out | Each accepted result started GA and Fast concurrently | Both authorities make progress under their stage budgets | Architecture correct; provider has only one sequence slot |
+| Ollama/Qwen | One request ran while the other queued; Fast timed out in all 14 accepted-GI cases | Concurrent GA/Fast inference | Resource-profile blocker |
+| Fast transport | Current Agent emitted a typed `fast_planner_stream:timeout` failure | Typed pre/post-commit failure | Correct after rebuild |
+| Runtime cleanup | A GA task that failed just before Fast was done and therefore was not canceled or gathered | Every child task is joined on exit | Earliest software defect; fixed |
+| Capability/Provider | No plan reached canonical dispatch | No effect after hard failure | Correct fail-closed containment |
+| vLLM transport | v0.24.0 served two overlapping sequences, isolated cancellation, strict structured output, and remained healthy | Preserve concurrent/cancel/schema contracts | Qualified in isolated provider evidence |
+| Primary GI models | Revised object-wire Qwen3.5-4B observed 3/5 once and 2/5 on the fresh final rerun. A typed-array/source-closed prototype gave Ministral-3-14B mechanical 5/5, but manual review found false temporal typing; focused reruns duplicated duration and an unseen holdout was 6/8 mechanical, about 4/8 after manual review. Ministral-8B 1/5, Qwen3.5-9B 3/5, Gemma4-12B 3/5, and Gemma4-26B 3/5 on that experimental wire | Stable 5/5 plus manual review and current non-thinking authority contract before workflow/profile promotion | Model-facing array experiment discarded; no screened model is semantically qualified |
 
-Re-entry planning remains:
-
-```text
-Goal + bounded Situation/Work/Evidence
-  -> one Fast or Deep primary HOW result
-     (complete Goal coverage + truth strength + exact wording + provenance + satisfaction
-      + optional non-Goal auxiliary_activities[])
-  -> trusted schema/provenance/integrity validation
-  -> accept the Plan
-     OR one semantics-preserving DTO repair where that pass already permits it
-     OR distinct deeper-cognition escalation from Fast to Deep
-     OR fail closed
-```
-
-There is no same-owner Planner truth qualifier, coverage reviewer, communication
-reviewer, Social Attention model, or audit model call. `PresentationCommit`, terminal
-Fast output, and canonical Fast/Deep planning make optional decoration decisions only
-under exact primary anchors. Raw tokens never reach TTS and Goal-owned Work never starts
-before the complete terminal result, canonical Goal binding, and full validation.
-
-## Implemented in the current worktree
-
-- `UserTurnEnvelope.original_input.text` remains the only stored admitted source.
-  GI receives the exact original wording once; GA and Planner receive a compact
-  read-only projection; scoped Planner re-entry carries digest-validated original
-  wording while its current request, Responsibilities, Goals, Plan, and Evidence stay
-  restricted to the affected Goal subset. Runtime IDs and the full Gateway envelope
-  are not duplicated into model prompts.
-- Downstream source visibility does not move authority: GI owns current-turn WHAT,
-  GA owns longitudinal association/canonical Goal continuity, and Planner owns HOW.
-  Invalid source projections fall back to scoped normalized transport text rather
-  than accepting spoofed provenance.
-
-- GI now requires per-Responsibility source evidence in its primary result. Trusted
-  code validates closed mechanics; the former coverage/resegmentation model chain is
-  removed, and only one DTO repair or one genuine Deep delegation remains eligible.
-- GA now owns continuity in one primary result plus at most one mechanical DTO repair.
-  Its coverage, fresh-interpretation, final-audit, and semantic-repair calls are gone.
-- Fast/Deep Planner primary results now own Goal/Evidence truth, exact wording, step
-  ownership, and satisfaction. Same-owner truth/coverage reviewers and their dedicated
-  model/runtime surfaces are removed; existing DTO repair and Fast-to-Deep escalation
-  retain their narrower contracts.
-- The Agent `/fast-advance` endpoint makes one Ollama text stream containing exactly two
-  closed tagged JSON-payload frames (`presentation_commit`, then `terminal_plan`), validates
-  them, and emits typed NDJSON externally. The Host starts that stream and GA concurrently, launches only
-  a complete validated `PresentationCommit`, and requires the same commit identity in the
-  terminal Fast result and CanonicalPlan.
-- Failures before commit are silent; failures after commit preserve the already-launched
-  truthful communication but dispatch no Goal Work. No read/effect Capability starts
-  before the terminal result, GA binding, and canonical validation.
-- The independent `SocialAttentionPlanner`, endpoint/client, model/config role, and
-  background opportunity queue/worker are removed. `CanonicalPlan.auxiliary_activities[]`
-  is fingerprinted separately from Goal-owned `steps[]`; it carries no Goal IDs or
-  completion authority.
-- Runtime validates, suppresses, or executes only the exact Planner-authored auxiliary
-  Capability. It cannot reselect or retarget. Auxiliary-only changes/results never create
-  `CognitiveOpportunity` or borrow its required Goal scope.
-- Focused regressions cover Planner schema/candidate binding, canonical fingerprint and
-  anchors, exact Runtime materialization, Goal isolation, and suppression without
-  reselection. Repository guards reject restoration of the retired second writer.
+Initiating condition: all roles share one Qwen3.5 runner. Root model/resource causes are
+GI contract weakness and Ollama's one sequence slot. The downstream user-visible symptom
+is bounded failure speech with no Work. The separate software cause of the asyncio warning
+was cleanup joining only non-terminal tasks; gathering every terminal state restores task
+ownership without changing any model decision.
 
 ## Evidence ledger
 
-| Evidence | Result | Qualification limit |
+| Evidence | Result | Limit |
 |---|---|---|
-| Pre-fix focused GI matrix at baseline | 110 passed | Reproduced the nonconforming extra coverage call; not target evidence |
-| Current focused GI matrix | 38 passed | Automated module/contract evidence |
-| Current retained GI + dialogue scenarios | 31/31 passed | Automated scripted module/dialogue evidence |
-| Current focused Planner matrix | 308 passed, 9 subtests passed | Automated primary-result/call-budget evidence |
-| Issue #32 focused stream matrix | Ordered commit/terminal, one-call, failure containment, exact commit identity, no early Work, auxiliary anchoring, client/Runtime/scenario regressions pass | Automated source/contract evidence |
-| Superseded structured-JSON provider probe | Ollama 0.32.14 + `qwen3.5:9b` emitted the former ordered JSON members normally | Historical protocol evidence only; the current tagged-frame text stream requires a fresh probe |
-| Resource-admission regression | 147 cognitive/runtime/interaction/TTS/Social tests passed | Automated invocation-order evidence only |
-| Repository engineering policy gate | 15 rule families passed, 0 exceptions | Mechanical source-policy evidence |
-| Current focused source-provenance/prompt/re-entry matrix | 331 passed, 10 subtests passed | Automated module/contract evidence |
-| Current canonical full local gate | 2,012 tests ran; 4 failures remain | Not closed: three existing Level A multi-Goal/order failure surfaces and one stale GI prompt-string assertion |
-| Level A general abilities for this amendment | 18/18 distinct cases passed: composable planning 5/5; multi-Goal daily life 10/10; Planner/Goal semantic quality 4/4 | Deterministic Level A only; one case belongs to two classes |
-| Documentation authority gate | 96 Markdown files passed | Current documentation consistency only |
-| Pre-default qwen3.5:4b comparison cohort | 2/50 hard-pass; 18/48 GI turns accepted, 25 timed out, 5 failed closed validation; 16/18 accepted results retained spurious unresolved meaning | GI-only model override with one resident Ollama model; diagnostic C-preview only |
-| Post-default qwen3.5:4b residency cohort | 2/50 mechanical hard-pass, 0/50 after manual semantic review; top-level retained GI results increased 17 -> 29 and explicit GI `ReadTimeout` cases fell 25 -> 6; 26/29 retained results carried false unresolved meaning | Dirty source-tree-bound C-preview identity; proves the residency fix but not semantic or end-to-end qualification |
+| Final canonical local gate | repository/static/docs gates passed; 122 benchmark cases; 2,026 main tests; 20 legacy Agent tests | Automated source evidence |
+| Focused changed runtime file | 67/67 passed | Cleanup/concurrency regression only |
+| Level A composable + multi-Goal | 15/15 passed | Deterministic Level A only |
+| RTX profile/provider probe | RTX 4090 Laptop 16,376 MiB; one Qwen3.5 32K runner; CosyVoice and Qwen fit; configured parallel 2 still created `n_seq_max=1` | Resource evidence, not semantics |
+| Current-source live-text must-pass cohort | 0/50; core 15 and challenge 8 gated off | Diagnostic C-preview; no execution/audio/hardware claim |
+| vLLM 0.24.0 / Qwen3.5-4B provider contract | strict JSON, SSE, real two-sequence overlap, cancellation isolation passed; peak 14,953 MiB with TTS | TTS first-audio slowed 2.37x under two long decode streams; no playback claim |
+| Isolated primary-GI model screen | Qwen3.5-4B 1/5, Qwen3.5-9B 2/5, Gemma-3-12B 0/5, Qwen3-8B 1/5 | Provider transport passed; no candidate is semantically qualified |
+| Recommended Ollama follow-up | Ministral-3-14B 2/5, Ministral-3-8B 1/5, Gemma4-e4B 1/5, Gemma4-12B 2/5; GPT-OSS `think:false` 0/5 empty content, `think:low` diagnostic 3/5 | No HTTP deadline; isolated GI only. GPT-OSS used 12,951/16,376 MiB without TTS and cannot disable reasoning |
+| Revised prompt/model screen | Object wire: Qwen3.5-4B best 3/5, fresh final 2/5 at 9,275 MiB with TTS. Discarded typed wire: Ministral-14B 5/5 mechanical but manual failure and 6/8 unseen holdout mechanical/about 4/8 manual; all other cached candidates <=3/5 | No HTTP deadline; direct GI only. No candidate passed manual review and no model/profile was promoted |
+
+Current cohort:
+
+- evidence: `.chromie/acceptance/general-ability/qwen35-all-roles-current-20260829T133621Z/live-text`
+- identity: `2ab46a7cb42053391fe9fc0acbef77bc8d562bc3e9f6fd30c70f7f9becbeee91`
+- source tree: `428c51bb87cffe96d42f3f20f324eccfa0ec44a64c3f99e8cfbb7d50d4186c42`
+- one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260829_214253.tar.gz`
+- exclusive failures: 18 GI read timeouts; 8 invalid location provenance; 5 numeric
+  binding loss/rewrite; 2 overlapping source spans; 1 invented duration; 14 typed Fast
+  stream timeouts after accepted GI; 2 preview-only reflex limitations.
+- all 14 accepted GI outputs were low confidence; 10 retained unresolved meaning.
+- no Capability was dispatched; no simulator/audio/physical behavior was qualified.
+
+The earlier `.chromie/acceptance/general-ability/qwen35-all-roles-20260829T1323Z/live-text`
+cohort exposed a stale Agent image. Its pre-stream `/fast-advance` payload did not match
+the checkout, so it is deployment-mismatch diagnostics only. The rebuilt Agent image
+matches the current checkout file hashes and current failures use typed stream frames.
 
 ## Exact resume point
 
-1. Keep the source-closed Planner-owned auxiliary boundary and immutable source-turn
-   provenance intact. Do not restore
-   compatibility environment fields, endpoint shims, or the retired social decision worker
-   while tuning Prompt/model behavior.
-2. Keep the removed review chains absent and keep atomicity, mode, non-overlap, and
-   source-provenance validation fail-closed.
-3. The RTX 4090 Laptop profile now uses `qwen3.5:4b` only for GI, with a bounded 16K/512
-   runner and two-model residency. Every other cognition model remains unchanged. This
-   removes the reproduced GI eviction boundary; it does not qualify qwen3.5 semantics.
-4. The complete post-change must-pass cohort is retained under
-   `.chromie/acceptance/general-ability/gi-qwen35-default-fixed`, bound to runtime identity
-   `78847784d3ff08df8b606fb921eb28010a0e87f34b146da41c4fabe1cc9341b8`.
-   Its exactly one post-cohort bundle is
-   `/home/chromie/Downloads/chromie_debug_bundle_20260829_063447.tar.gz`. Mechanical
-   scoring reported 2/50, but both passes carried invented unresolved meaning, so manual
-   semantic review is 0/50. The remaining gaps are qwen3.5 false ambiguity/Deep-GI
-   amplification and single-slot GA/Fast contention; do not weaken validation, resegment
-   in Host, or add a same-authority repair call.
-5. Close the current local gate before another qualification claim. The last observed
-   `./scripts/run_tests.sh` ran 2,012 tests and failed four: three related Level A
-   multi-Goal/order test surfaces and one stale assertion expecting the older GI prompt
-   phrase. Diagnose the Level A failures at their earliest shared boundary; do not update
-   scenario expectations to hide changed behavior. Align the prompt-string assertion only
-   after confirming it protects a live contract rather than incidental wording.
+1. Preserve the green canonical local gate; the current run passed all required checks.
+2. Do not rerun or append to the retained current-source cohort and do not collect another
+   bundle for it.
+3. Treat all-Qwen target qualification as blocked, not passed. Do not weaken validators,
+   add a semantic repair/reviewer, or inflate timeouts around a single provider slot.
+4. Do not promote a production provider yet. The revised prompt reached 3/5 once but the
+   fresh final Qwen3.5-4B run returned to 2/5; the same weather temporal-scope and compound
+   duration/atomicity classes still fail across larger models. The next semantic
+   change must improve primary-result binding coverage generally; do not add phrase rules,
+   a reviewer/repair call, or reasoning-only authority without explicit owner authorization.
+5. Retain `qwen3.5:4b` for all deployed roles until a model passes the primary screen and
+   the complete current workflow. After a material deployment/model change, rebuild
+   `chromie-agent`, verify deployed
+   source hashes, capture a fresh identity, then run one complete directory-discovered
+   cohort and collect exactly one post-cohort bundle.
 
 ## Claim boundary
 
-The implementation is development-only. Automated source evidence does not qualify
-live model quality, audible voice, physical microphone behavior, simulator behavior,
-or robot hardware. Historical iteration 50 proves the old coverage-chain failure and
-must not be represented as proof of the new primary-result implementation.
+This remains development-only. Local tests and C-preview evidence do not qualify audible
+voice, microphone, simulator execution, target robot behavior, or release readiness.

@@ -99,6 +99,7 @@
             "text": "为什么机器人不怕冷？因为它有很多缓存。",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "immediate",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-joke"
@@ -112,6 +113,7 @@
             "text": "我也会眨三下眼睛。",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "pre_action",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-blink"

@@ -150,7 +150,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0`, keeps `qwen3.5:4b` resident for Goal Interpretation beside the unchanged 32K `qwen3:4b-instruct-2507-q4_K_M` downstream runner, and retains one provider request slot because two 32K Qwen3 slots exceed the shared CosyVoice GPU envelope. The maintained RTX 5090 profile also sets `0` and uses its declared Qwen/Gemma role split. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` runner. Ollama 0.32.14 exposes only one sequence slot for the `qwen35` architecture even when configured for two, so the maintained profile truthfully retains one provider request slot. The maintained RTX 5090 profile also sets `0` and uses its declared Qwen/Gemma role split. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -158,9 +158,8 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `chromie_mixed` is the catalog default; `speaker_id=default` routes `zh` and
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
-The RTX 4090 Laptop profile uses that compact policy with one 32768-token Qwen
-runner and quantized KV cache. Compact cognition selects the shared model and
-uses that context only as a fallback; generated role contexts remain
+The RTX 4090 Laptop profile uses one shared 32768-token `qwen3.5:4b` model with
+one provider request slot and quantized KV cache. Generated role contexts remain
 authoritative, including the qualification-only Deep Planner context. The RTX
 5090 profile opts out and keeps its declared Qwen/Gemma role split resident when
 memory permits.
@@ -765,11 +764,13 @@ Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
 `OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`, `OLLAMA_TEMPERATURE`, and
 `OLLAMA_TOP_P`. Hardware profiles own the normal model and context defaults.
 Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
-`OLLAMA_NUM_PARALLEL=1`, which lets the fast Goal Interpreter model and larger Agent
-model stay resident together when memory allows without increasing per-model
-parallel KV-cache pressure. The RTX 4090 Laptop profile deliberately lowers the
-resident-runner limit to `1`: model roles remain distinct, but Qwen and Gemma are
-swapped rather than retained together while CosyVoice shares the 16 GB GPU.
+`OLLAMA_NUM_PARALLEL=1`, which lets distinct role models stay resident when memory
+allows without increasing per-model parallel KV-cache pressure. The RTX 4090 Laptop
+profile instead assigns every LLM role to `qwen3.5:4b` and sets the resident-runner
+limit to `1`. Ollama 0.32.14 reports that the `qwen35` architecture does not support
+parallel requests and creates `n_seq_max=1`, so this profile retains one honest
+provider slot. The laptop-specific topology remains subject to retained GPU and
+latency qualification while CosyVoice shares the 16 GB GPU.
 
 `scripts/warm_ollama.sh` performs a real `/api/generate` request for every model
 that must be ready before the microphone opens. If Ollama is reachable but the
@@ -846,7 +847,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses `gemma4:e4b` and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `8000` in maintained interactive modes; endpoint model-call timeout. Goal Association runs behind the latency-critical first response and may emit a materially larger structured DTO, so the acknowledgement target is not reused as a cognition kill switch. Failure still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -879,7 +880,7 @@ or certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around the Agent Goal Association watchdog. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
-| `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b`; compact model for complete common-goal coverage. |
+| `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `8000` in maintained interactive modes; watchdog for the one structured streaming Fast Planner invocation. A validated presentation commit may arrive much earlier, but timeout ownership remains with the complete terminal result. |
 Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
@@ -888,7 +889,7 @@ Fast/Deep depth is selected from material uncertainty, complexity, consequence, 
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around full Fast planning. |
 | `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
-| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses `qwen3:8b` after Fast Planner escalation. |
+| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model after Fast Planner escalation. |
 | `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. Qualification mode and the architecture-validation overlay use `40960` so the retained full-catalog post-Evidence prompt plus the 4096-token structured-output reserve fits without changing the maintained interactive profile. |

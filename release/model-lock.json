@@ -13,7 +13,7 @@
     "agent_models": [
       "gemma4:e2b",
       "gemma4:12b",
-      "qwen3:4b-instruct-2507-q4_K_M"
+      "qwen3.5:4b"
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
     "goal_interpreter_models": [

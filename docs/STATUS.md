@@ -95,15 +95,8 @@ read-only source projection; and scoped Planner re-entry carries the same digest
 original wording while keeping `request.text`, Responsibilities, Goals, Plan, and Evidence
 restricted to the affected Goal subset. The source is visible for fidelity and correlation
 but grants no downstream authority to reinterpret or repair WHAT.
-This is source and automated-contract closure, not qualified target behavior. A current
-RTX 4090 Laptop/Qwen3 4B C-preview must-pass aggregate on dirty identity
-`86a04a8da490c02918545d2dfe01674800b516e5cf0b80e838b34a06c9906546` completed all
-50 cases with zero hard-passes. Its mutually exclusive earliest failures were 24 GI
-source-span overlaps, eight GI transport timeouts, one GI whole-turn binding rejection,
-six GA timeouts, three foreground deadlines, four other Runtime timeouts, two preview-only
-reflex limitations, one Fast timeout, and one speech-only semantic miss. Raw GI results
-also duplicated atomic effects, invented temporal Responsibilities, and labeled embodied
-requests as speech. The current source starts Goal Association and one Fast Planner stream
+This is source and automated-contract closure, not qualified target behavior. The current
+source starts Goal Association and one Fast Planner stream
 concurrently from the immutable GI result. The internal model output is one text stream
 with a closed `<presentation_commit>` payload followed by a closed `<terminal_plan>`
 payload, not one top-level JSON object. The Agent exposes only a fully parsed typed
@@ -118,33 +111,67 @@ This amendment is source/contract closure, not target behavior, audible voice, e
 simulation, or hardware evidence.
 Core/challenge did not start; release readiness remains development only.
 
-A later GI-only `qwen3.5:4b` comparison cohort hard-passed 2/50 cases. Of the 48
-GI-invoked cases, 18 reached an accepted interpretation, 25 timed out, and five failed
-closed validation; 16 of the accepted results retained spurious unresolved meaning. The
-RTX 4090 Laptop profile now assigns only GI to `qwen3.5:4b`, bounds it at 16K/512, and
-allows it to remain resident beside the unchanged downstream Qwen3 runner. This closes
-the reproduced alternating model-eviction mechanism, not semantic or end-to-end target
-qualification. Two provider request slots are not retained because they expand the 32K
-downstream runner beyond the shared 16GB CosyVoice envelope.
+The RTX 4090 Laptop profile now assigns every LLM role to one `qwen3.5:4b` runner.
+GI retains its 16K/512 request budget; GA, Fast, and Deep retain their declared 32K
+contexts and stage output limits. Ollama 0.32.14 reports that `qwen35` does not support
+parallel requests and creates `n_seq_max=1` even when `OLLAMA_NUM_PARALLEL=2`; the
+maintained profile therefore declares one provider slot and one resident model. This
+fits beside CosyVoice on the 16 GB laptop GPU, but it cannot realize the architecture's
+concurrent GA/Fast inference.
 
-The post-default cohort at
-`.chromie/acceptance/general-ability/gi-qwen35-default-fixed` mechanically hard-passed
-2/50 and is bound to runtime identity
-`78847784d3ff08df8b606fb921eb28010a0e87f34b146da41c4fabe1cc9341b8`.
-Manual review rejects both passes because they retain invented unresolved meaning, so the
-strict semantic result is 0/50. Top-level retained GI results improved from 17 to 29 and
-explicit GI `ReadTimeout` cases fell from 25 to six, confirming the residency fix. However,
-26/29 retained results still contain false unresolved meaning, frequently invoking the one
-allowed Deep GI pass and exhausting the outer deadline. The 48 mechanical failures divide
-into 13 GI availability/outer-deadline cases, three GI numeric-binding authority rejections,
-30 downstream single-slot failures including multi-turn predecessors, and two preview-only
-reflex limitations. Its exactly one debug bundle is
-`/home/chromie/Downloads/chromie_debug_bundle_20260829_063447.tar.gz`.
+The current-source aggregate is retained at
+`.chromie/acceptance/general-ability/qwen35-all-roles-current-20260829T133621Z/live-text`,
+bound to runtime identity
+`2ab46a7cb42053391fe9fc0acbef77bc8d562bc3e9f6fd30c70f7f9becbeee91` and dirty
+source-tree SHA-256
+`428c51bb87cffe96d42f3f20f324eccfa0ec44a64c3f99e8cfbb7d50d4186c42`.
+It hard-passed 0/50 must-pass cases; core/challenge were gated off. Mutually exclusive
+earliest failures were 18 GI `ReadTimeout`s, eight invalid location-provenance outputs,
+five dropped/rewritten numeric bindings, two overlapping independent source spans, one
+invented duration, 14 typed Fast-stream timeouts after accepted GI, and two preview-only
+reflex limitations. All 14 accepted GI outputs were low confidence and ten retained
+unresolved meaning. The exactly one post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260829_214253.tar.gz`. This is diagnostic
+C-preview evidence only; no Capability was dispatched and no simulator, audio, or physical
+behavior is qualified.
+
+An isolated RTX 4090 Laptop vLLM 0.24.0 qualification now proves the candidate transport
+can enforce strict JSON, stream SSE, overlap two short sequences, isolate cancellation,
+and remain healthy. It does not yet qualify a production model. The unchanged five-case
+primary GI screen scored Qwen3.5-4B 1/5, Qwen3.5-9B 2/5, Gemma-3-12B 0/5, and Qwen3-8B
+1/5. Short fresh-turn location spelling is now decoder-constrained to exact source
+surfaces, source provenance identifies user -> Chromie, and the Deep mechanical constraint
+uses wire `binding_items`; the remaining failures are model-authored semantic omissions,
+misclassification, invented ambiguity/location, or duplicate outcomes. Qwen3.5-4B plus
+TTS peaked at 14,953 MiB, while two long decode streams slowed generated-but-unplayed TTS
+first audio by 2.37x. Production remains on Ollama and the current profile.
+
+A no-HTTP-deadline Ollama follow-up used the same five-case current-checkout GI screen.
+Ministral-3-14B scored 2/5, Ministral-3-8B 1/5, Gemma4-e4B 1/5, and Gemma4-12B 2/5.
+GPT-OSS-20B returned empty content for all five required non-thinking requests; the
+provider documents that its reasoning cannot be disabled. A diagnostic `think: low` run
+scored 3/5 but still misbound the weather time scope and dropped an explicit duration.
+It used 12,951/16,376 MiB with TTS stopped, so it also lacks the measured resident budget
+to coexist with TTS. This is isolated provider/GI evidence, not authority approval or
+workflow qualification, and production remains unchanged.
+
+The primary GI prompt/schema has now been corrected at the shared semantic boundary:
+`unresolved[]` and overlapping binding dimensions carry explicit decoder-visible
+contracts, and final preflight performs atomic decomposition, typed modifier coverage,
+and uncertainty audit in that order. This remains one primary model invocation; no Host
+phrase classifier, semantic reviewer, or repair call was added. On the unchanged
+no-deadline screen, production Qwen3.5-4B reached 3/5 once by fixing filler ambiguity but
+a fresh same-source final rerun scored 2/5. It still drops the weather `time_scope` and
+compound duration/action split. A typed-array/source-closed wire prototype was discarded:
+Ministral-3-14B reached 5/5 mechanically, but manual review and focused reruns exposed
+false temporal typing and duplicate duration; its unseen holdout was 6/8 mechanically and
+about 4/8 after manual review. Every other cached candidate scored at most 3/5. No
+model/profile was promoted.
 
 | Area | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|---|
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |
-| Goal Interpretation / Goal Association | GI is WHAT-only and its one primary result owns atomic Responsibilities, exact output modes, bindings, relations, and per-item source-token evidence. Trusted code validates closed source/reference/order/non-overlap/value-provenance mechanics and cannot resegment or call a semantic reviewer. RTX 4090 Laptop now assigns only GI to `qwen3.5:4b` in a resident 16K/512 runner; every other model role is unchanged. GA separately owns canonical Goal identity and continuity in one primary result, with at most one Pydantic-only mechanical DTO repair; grounding or conservation rejection is terminal. | Focused GI/GA regressions cover primary evidence, atomic siblings, exact modes/bindings, one-call resolved meaning, bounded mechanical repair, genuine Deep GI delegation, fail-closed semantic violations, GA conservation, and configuration ownership. | The post-default cohort retained 29 top-level GI results versus 17 before residency and reduced explicit GI `ReadTimeout` cases from 25 to six. It still produced false unresolved meaning in 26/29 retained results and strict semantic review passed 0/50 end-to-end cases. | Development only. |
+| Goal Interpretation / Goal Association | GI is WHAT-only and its one primary result owns atomic Responsibilities, exact output modes, bindings, relations, and per-item source-token evidence. Trusted code validates closed source/reference/order/non-overlap/value-provenance mechanics and cannot resegment or call a semantic reviewer. Fresh source provenance identifies user -> Chromie; short turns without continuity Context close location spelling to exact source surfaces. The primary schema now explicitly contrasts uncertainty and easily-confused binding dimensions; final preflight orders decomposition, modifier coverage, then uncertainty. RTX 4090 Laptop assigns all LLM roles to one `qwen3.5:4b` runner; GI retains 16K/512 while downstream authorities retain their 32K request contracts. GA separately owns canonical Goal identity and continuity in one primary result, with at most one Pydantic-only mechanical DTO repair; grounding or conservation rejection is terminal. | Focused GI/GA regressions cover primary evidence, atomic siblings, exact modes/bindings, source-closed locations, one-call resolved meaning, bounded mechanical repair, genuine Deep GI delegation, fail-closed semantic violations, GA conservation, configuration ownership, and retrieval of a concurrently failed GA task. The vLLM probe covers provider identity/schema/stream/overlap/cancellation and isolated primary GI. | The current-source cohort accepted GI in 14/48 LLM-routed cases. The revised prompt reached 3/5 once but a fresh final Qwen3.5-4B run scored 2/5; temporal-scope and compound binding coverage remain hard failures. A typed-array prototype improved Ministral mechanically but failed manual and holdout review, so it was discarded. No provider/model was promoted. | Development only. |
 | Planner / communication | One Planner authority owns HOW, exact Communicative Activities, Capability choice, args, realization, per-Goal satisfaction, and optional auxiliary social Activities. The model-side `/fast-advance` invocation is one text stream with exactly two closed tagged payload frames: `presentation_commit`, then `terminal_plan`. The Agent validates those payloads and exposes typed NDJSON: validated `PresentationCommit`, then terminal result or typed failure from that same invocation. GA starts concurrently; all Goal Work waits for terminal result, GA binding, and canonical validation. The terminal Fast result and CanonicalPlan reference the same immutable commit. Canonical Communicative Acts retain immediate/pre-action/progress/final delivery phase; mixed Response Projection covers only communicative Goal IDs, and an independent context-grounded final speech Goal may remain ordered after Work without becoming completion evidence for an executable Goal. `CanonicalPlan.auxiliary_activities[]` remains fingerprinted but structurally outside Goal-owned `steps[]`; Runtime validates, executes, or suppresses exact proposals and cannot reselect. The independent Social Attention and separate Fast First Response endpoint/model/config paths are removed. | Focused protocol, Planner, client, Runtime, scenario, and repository-policy tests cover one-call ownership, ordered typed frames, exact commit reference, before/after-commit failure, no early Goal Work, auxiliary anchor/catalog/Goal isolation, post-primary scheduling, communicative-only mixed-Goal coverage, context-grounded after-Work speech, provenance, cancellation, and terminal Evidence. The previous Ollama structured-JSON probe is superseded by the owner-approved tagged-frame protocol and cannot qualify the new wire path. | Current tagged-frame provider protocol, semantic quality, accepted-commit latency, TTS first PCM, playback start, complete-Plan latency, commit/terminal consistency under load, GPU residency/contention, target validity, restraint, and live execution require current-revision qualification. | Development only. |
 | WorkDAG / DAGEngine | Planner is the sole ordinary semantic author/modifier of revisioned WorkDAG topology. GA changes Goal continuity only. DAGEngine owns acyclicity/contract checks, readiness, bounded parallel dispatch, dependency/blocked/cancellation state, trace, and immutable completed-node inheritance; normal completion advances mechanically while material change returns Evidence to Planner. Provider-local DAGs remain provider internals. | Focused WorkDAG revision tests prove exact `revision + 1`, stable `dag_id`, completed-node immutability and no redispatch; DAGEngine/Planner/capability tests guard removal of `residual_replan` and engine-authored outcome meaning. | Current-model quality of Planner-authored DAG topology and live multi-Goal revision/merge behavior still requires target qualification. | Development only. |
 | Async Runtime / Evidence/Situation re-entry | Terminal Runtime events are correlated into Evidence and may create bounded `CognitiveOpportunity` re-entry. Every Planner re-entry now carries an immutable `PlannerReentryScope` with exact trigger, affected Goals, Evidence refs/opportunity, and optional source Plan fingerprint; Fast/Deep prompt projection and decoder Goal sets are restricted to that scope, so closed siblings are not silently reintroduced. `SituationProjection` v3 carries bounded current interpretations plus exact authority-owned source refs. Meaningful live provider progress is the first production trusted Situation ingress: blocked/waiting/degraded/paused/recovering or material phase/member-state transitions become typed `SituationRevisionObservation` input and may raise `situation_revision`; running heartbeats and percentage churn are ignored. Provider Runtime state is explicitly **not Evidence**, so provider-state and restart revalidation no longer fabricate Evidence refs or `post_evidence` speech truth. Restored open Goals retain exact Responsibility provenance and may re-enter from fresh provider truth without replaying the old Plan or fabricating a UserTurn. Structured Goal/Plan-bound `time_condition` state is production-wired to a mechanical wall-clock wake loop and likewise may re-enter with zero Evidence refs. A Situation-digest opportunity is accepted only with the exact validated Situation/Goal binding. Generic scene/body/environment Situation ingress remains an **implementation gap**. Planner-authored structured time conditions are part of the canonical Plan: Planner supplies exact Goal/time semantics, while ConversationState adds current Plan identity plus original Responsibility provenance before durable registration. Host never polls the world semantically or parses free-form deadlines into timers. Situation re-entry readiness is selective: no semantic delta creates no opportunity; benign waiting/recovering/running or phase-only changes are local and do not call an LLM; ordinary revisions use Fast Planner; blocked/degraded/failed/unsafe state requests Slow cognition and enters Deep Planner without spending a Fast pass. | Focused regressions cover exact two-of-three Goal re-entry projection, incremental terminal Evidence, Situation v3 reconstruction/source binding, provider Runtime-state Situation ingress without Evidence promotion, follow-up Work while siblings continue, cancellation/supersession containment, duplicate-execution prevention, missing-provenance rejection, durable restart revalidation, one-shot due-time wake/re-entry, and shutdown cancellation of the long-lived mechanical wake task. | Provider-backed weather/body episodes should be retained on the exact current revision; live blocked/waiting Situation-revision and restart-revalidation episodes still require target qualification. Generic camera/scene/body/environment ingress cannot be qualified until its production source adapters exist; Planner-authored time-condition quality still needs current-model target qualification. | Development only. |
@@ -157,11 +184,16 @@ reflex limitations. Its exactly one debug bundle is
 
 ## Current open work
 
-1. **Close the reproduced qwen3.5 GI and downstream resource-profile blockers.** The
-   complete post-change must-pass cohort is retained and manually judged. Address false
-   unresolved meaning/Deep-GI deadline amplification separately from unchanged single-slot
-   GA/Fast contention. Do not use Host resegmentation, another semantic call, validator
-   weakening, or a non-GI model substitution.
+1. **Close the reproduced all-Qwen resource and semantic blockers.** The complete
+   current-source must-pass cohort is retained and mechanically judged. Qwen3.5 still
+   fails GI availability/provenance/authority contracts, while Ollama exposes one sequence
+   slot for concurrent GA/Fast work. Do not use Host resegmentation, another semantic call,
+   validator weakening, or timeout inflation to conceal either failure class. A different
+   vLLM transport is now qualified in isolation, but all screened laptop-fit candidates
+   failed primary GI semantics or the current non-thinking authority contract. Do not
+   promote a provider until primary-result binding coverage passes the frozen screen,
+   then the complete workflow, TTS contention, and directory-discovered live cohort pass
+   on one revision. Do not substitute phrase rules or a second semantic call for coverage.
 2. **Close Issue #32 source gates and target evidence before final Fast-Planner
    Prompt/model promotion.** The one typed production path is implemented and the
    superseded endpoint/DTO/model/config surface is removed. Retain ordered-frame,

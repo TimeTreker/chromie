@@ -104,6 +104,7 @@
             "text": "我现在没有可靠的拿杯子能力。",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "immediate",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-pickup"
@@ -117,6 +118,7 @@
             "text": "我可以先点一下头。",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "pre_action",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-nod"

@@ -7,15 +7,15 @@ Output one compact JSON object matching the supplied schema. Emit one responsibi
 - outcome: exactly one concrete provider-neutral human-facing predicate that Chromie owes; name the requested observable effect or communicative obligation, never only a broad category such as “perform a body action” or “speech”;
 - binding_items: one sparse object keyed by semantic dimension; values are material semantic facts entailed by the admitted turn or bounded semantic Context, all modifiers of one predicate stay on that one Responsibility, and omitted dimensions are absent rather than null;
 - output_mode: the exact provider-neutral WHAT modality, not the eventual response transport and not a readiness decision;
-- relationship: exactly one canonical JSON token from `new`, `continue`, `modify`, `clarify`, `confirm`, `reject`, `cancel`, `pause`, `resume`, `merge`, `split`, or `reference`;
-- target_goal_ids: exact supplied Goal IDs for a non-new relationship, otherwise [];
+- relationship and target_goal_ids: emit these keys only when the supplied schema exposes them because bounded candidate Goals exist. Then copy exactly one canonical relationship token from `new`, `continue`, `modify`, `clarify`, `confirm`, `reject`, `cancel`, `pause`, `resume`, `merge`, `split`, or `reference`, and use exact supplied Goal IDs for a non-new relationship, otherwise [];
+- when the schema omits relationship and target_goal_ids, omit both keys. No candidate Goal exists in that request, so trusted construction applies the mechanical defaults relationship=`new` and target_goal_ids=[] after validating the model-authored WHAT;
 - confidence: confidence in this interpretation;
 - source_evidence: the inclusive start/end token refs for the smallest complete coherent source span that grounds this one positive outcome.
 - coordination: typed `parallel` or ordered `sequence` groups of at least two unique emitted local_refs; use [] when the source requests no cross-Responsibility timing.
 
 The supplied source-token table is the authoritative admitted turn. Cite it in this primary result; never retype a source excerpt. Source refs are evidence, not Goal or Responsibility identities. Every Responsibility span must contain its own complete positive predicate, and independent Responsibility spans must not overlap. For coordinated “A then B”, “A while B”, or Chinese “边A边B” meaning, emit separate A and B siblings, cite only each sibling's own predicate tokens, and do not share conjunction, ordering, or punctuation tokens between their spans. If the source tokens are t0=A, t1=and, t2=B, cite A as t0–t0 and B as t2–t2, never t0–t2 for either sibling. Completeness, atomic decomposition, modality, bindings, and sibling relations are all part of this one primary semantic decision. Do not expect or rely on a later coverage auditor, critic, reviewer, or resegmentation pass.
 
-Relationship tokens are protocol values: never inflect, pluralize, conjugate, translate, or paraphrase them. Use `new` for a genuinely new Responsibility even when recent Goal IDs are visible. Use another relationship only when the current turn actually refers to the same supplied Goal; never attach an unrelated request merely because a Goal ID is available.
+Relationship tokens, when exposed by the supplied schema, are protocol values: never inflect, pluralize, conjugate, translate, or paraphrase them. Use `new` for a genuinely new Responsibility even when recent Goal IDs are visible. Use another relationship only when the current turn actually refers to the same supplied Goal; never attach an unrelated request merely because a Goal ID is available.
 
 Output modes
 
@@ -44,6 +44,8 @@ A Responsibility that continues or resumes one supplied Goal preserves that Goal
 Semantic fidelity and bindings
 
 Preserve speaker, experiencer, actor, addressee, and pronoun perspective. The user's “I” remains the user and “you” addressed to Chromie remains Chromie. A person's reported feeling remains about that person and does not imply a body action. An addressee name is a vocative, not an independently satisfiable outcome, location, or body action; keep a greeting and its addressee in one conversational Responsibility unless another effect is requested.
+
+The immutable source-turn provenance identifies the current-turn speaker and addressee. Ordinary fillers, hesitation, politeness, and disfluency do not make that supplied identity unresolved. Only quoted, reported, or explicitly reassigned speech changes who an embedded statement is about.
 
 A question phrased as “can you X?”, “are you able to X?”, Chinese “你能X吗”, or an equivalent construction expresses one requested X outcome; ability-question grammar is not a second Responsibility and does not authorize GI to inspect or predict Capability availability. If X's referent is materially ambiguous, keep that one Responsibility and report the referent uncertainty in unresolved[].
 
@@ -86,12 +88,13 @@ Goal Interpretation must never author or expose:
 
 When the person asks what Chromie just said, create a new conversational Responsibility to repeat or report the most recent accepted assistant/Chromie utterance and bind its exact delivered text as `prior_assistant_utterance`. Never use the user's utterance, current question, an unavailable marker, paraphrase, or truncation. Referring to old speech as the subject of a new question does not continue, resume, or modify the old Goal.
 
-Final mechanical preflight before returning JSON:
-1. Preserve each material source-entitled modifier once under its actual semantic dimension on its owning predicate. Do not drop a constraint, duplicate it across dimensions, or turn it into another Responsibility.
-2. Every coordination group contains at least two unique emitted sibling refs. For generic simultaneous A and B, emit `{"kind":"parallel","refs":["r1","r2"]}`; for generic A then B, emit `{"kind":"sequence","refs":["r1","r2"]}`. A singleton or self-edge is structurally invalid.
-3. Every independent source span is the smallest disjoint predicate span for that outcome. Never reuse one span for two Responsibilities and never cite the whole coordinated clause for each sibling.
-4. `unresolved[]` records uncertainty; uncertainty or a possible typo is not an extra speech Responsibility asking for clarification.
-5. Remove every binding that is merely plausible, defaulted, explanatory, or copied from the schema rather than entailed by source/Context.
-6. Every outcome names its one requested effect precisely enough to distinguish it from sibling effects; replace broad labels such as “body action” or “speech” with the provider-neutral predicate actually expressed by the source.
+Final decision order before returning JSON:
+1. Scan the whole source for independently observable predicates before writing any item. Coordination words such as then, after, while, simultaneously, and their equivalents relate predicates but never merge them. Emit one Responsibility for each A, B, C effect even when A has several modifiers; never place B inside A's outcome or source span.
+2. Attach every modifier to its owning predicate under exactly one semantic dimension. Use `time_scope` for a calendar/relative interval, `time` for an instant or clock point, `duration` for elapsed length, `speed` for pace/velocity, `count` for repetitions/items, `threshold` only for an explicit comparison cutoff, and `subtype` only for an explicit category. Missing provider units or implementation details do not erase an explicit scalar and do not create unresolved meaning.
+3. Preserve an unfamiliar proper-name-like surface as `entity` and add one genuine referent uncertainty. Conversely, a clearly used place remains `location`; never call a correctly bound place or other already-preserved value unresolved.
+4. Ignore discourse-only fillers, hesitation, politeness, sentence particles, and disfluency. They are neither Responsibilities nor unresolved meaning. If the requested predicates and referents are clear, return `unresolved: []`.
+5. Every coordination group contains at least two unique emitted sibling refs. For generic simultaneous A and B, emit `{"kind":"parallel","refs":["r1","r2"]}`; for generic A then B, emit `{"kind":"sequence","refs":["r1","r2"]}`. A singleton or self-edge is structurally invalid.
+6. Every independent source span is the smallest disjoint predicate span for that outcome. Never reuse one span for two Responsibilities and never cite a whole coordinated clause for each sibling.
+7. Remove every binding that is merely plausible, defaulted, explanatory, or copied from the schema. Every outcome names its one effect precisely. A body-action outcome names the actual source predicate—locomote, turn, gaze, blink, nod, gesture, carry, hand over, or its language equivalent—never “perform a body action”. An information outcome names the proposition or subject to determine, never only “provide information”.
 
 Return JSON only: no markdown, explanations, hidden reasoning, or fields outside the schema.

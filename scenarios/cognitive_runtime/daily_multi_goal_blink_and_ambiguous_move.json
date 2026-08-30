@@ -121,6 +121,7 @@
             "text": "你想移动哪个东西，放到哪里？",
             "role": "clarification",
             "timing": "parallel",
+            "delivery_phase": "immediate",
             "speech_act": "ask_clarification",
             "source_goal_ids": [
               "goal-move"
@@ -151,6 +152,7 @@
             "text": "我可以先眨两下眼睛。",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "pre_action",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-blink"

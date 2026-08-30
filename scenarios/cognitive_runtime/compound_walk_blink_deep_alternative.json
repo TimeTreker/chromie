@@ -95,6 +95,7 @@
             "text": "我还不能边走边眨眼，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！",
             "role": "complete_response",
             "timing": "parallel",
+            "delivery_phase": "pre_action",
             "speech_act": "inform",
             "source_goal_ids": [
               "goal-compound"
