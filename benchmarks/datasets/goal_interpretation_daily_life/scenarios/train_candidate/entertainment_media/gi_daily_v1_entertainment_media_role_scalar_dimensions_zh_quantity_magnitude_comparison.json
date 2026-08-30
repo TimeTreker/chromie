@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_entertainment_media_role_scalar_dimensions_zh_quantity_magnitude_comparison",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "entertainment_media",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_entertainment_media_role_scalar_dimensions_zh",
+    "variant": "quantity_magnitude_comparison",
+    "size": 4
+  },
+  "input": {
+    "language": "zh-CN",
+    "text": "把250毫升的汽水和多20%的分量作比较。",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "比较250毫升的汽水与多20%的分量",
+          "binding_items": {
+            "comparison": "和多20%的分量",
+            "entity": "汽水",
+            "magnitude": "20%",
+            "quantity": "250毫升"
+          },
+          "output_mode": "information",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t16"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "information",
+          "outcome_contains_any": [
+            "比较"
+          ],
+          "required_bindings": {
+            "comparison": "和多20%的分量",
+            "entity": "汽水",
+            "magnitude": "20%",
+            "quantity": "250毫升"
+          },
+          "forbidden_binding_keys": [
+            "count",
+            "duration",
+            "threshold"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "binding_dimension_coverage",
+      "binding_dimension_coverage",
+      "quantity_with_unit",
+      "comparative_magnitude"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "role_confusion",
+        "description": "Swap actor, addressee, experiencer, and recipient roles."
+      },
+      {
+        "type": "scalar_dimension_confusion",
+        "description": "Move quantity, severity, magnitude, or comparison into count, duration, threshold, or free-form prose."
+      },
+      {
+        "type": "dropped_cross_clause_binding",
+        "description": "Lose a material role or state value stated before the request clause."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

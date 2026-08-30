@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_routines_reminders_delivery_zh_recipient_correction",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "routines_reminders",
+  "difficulty": "medium",
+  "contrast_set": {
+    "id": "gi_daily_v1_routines_reminders_delivery_zh",
+    "variant": "recipient_correction",
+    "size": 4
+  },
+  "input": {
+    "language": "zh-CN",
+    "text": "把门卡拿给姐姐——不对，是哥哥。",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "把门卡拿给哥哥",
+          "binding_items": {
+            "entity": "门卡",
+            "recipient": "哥哥"
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t6"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "拿",
+            "递",
+            "交给"
+          ],
+          "required_bindings": {
+            "entity": "门卡",
+            "recipient": "哥哥"
+          },
+          "forbidden_binding_keys": [
+            "actor",
+            "location"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "acquire_and_deliver_atomicity",
+      "binding_provenance",
+      "correction_scope"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "provider_local_decomposition",
+        "description": "Split one bring obligation into search, navigation, grasp, carry, and handover stages."
+      },
+      {
+        "type": "dropped_binding",
+        "description": "Lose the object, recipient, location, direction, or distance supplied outside the request clause."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

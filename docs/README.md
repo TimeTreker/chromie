@@ -77,6 +77,7 @@ When documents disagree, correct the lower-authority document.
 | How are stress workloads and behavior distributions executed and compared? | `docs/STRESS_BENCHMARK_EVALUATION.md` |
 | How are semantic scenarios executed at distinct E2E evidence levels? | `docs/E2E_BENCHMARK_EXECUTION.md` |
 | Where is the reviewed Social Attention benchmark dataset? | `benchmarks/datasets/social_attention/README.md` |
+| Where are the isolated daily-life Goal Interpretation candidate scenarios and their review boundary? | `benchmarks/datasets/goal_interpretation_daily_life/README.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
 | Which facts belong to behavior, architecture-policy, or generated-artifact tests? | `docs/TEST_OWNERSHIP.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
@@ -133,6 +134,7 @@ mechanical-contract owner.
 - [Benchmark Suite](../benchmarks/README.md)
 - [Benchmark E2E Adapter Contract](../benchmarks/e2e/README.md)
 - [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
+- [Goal Interpretation Daily-Life Dataset](../benchmarks/datasets/goal_interpretation_daily_life/README.md)
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
 - [Agent](../agent/README.md)

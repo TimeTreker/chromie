@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_work_study_dialogue_context_en_repeat_prior_assistant",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "work_study",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_work_study_dialogue_context_en",
+    "variant": "repeat_prior_assistant",
+    "size": 4
+  },
+  "input": {
+    "language": "en-US",
+    "text": "What did you just say?",
+    "context": {
+      "history": [
+        {
+          "role": "assistant",
+          "text": "The meeting moved to room three."
+        }
+      ]
+    }
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "repeat the most recent accepted Chromie utterance",
+          "binding_items": {
+            "prior_assistant_utterance": "The meeting moved to room three."
+          },
+          "output_mode": "speech",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t4"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "speech",
+          "outcome_contains_any": [
+            "repeat",
+            "say"
+          ],
+          "required_bindings": {
+            "prior_assistant_utterance": "The meeting moved to room three."
+          },
+          "forbidden_binding_keys": [
+            "entity",
+            "location"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "multi_turn_semantic_continuity",
+      "prior_assistant_provenance"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "context_ignored",
+        "description": "Ignore an exact bounded referent, prior utterance, or pending clarification context."
+      },
+      {
+        "type": "context_overreach",
+        "description": "Guess among multiple context candidates instead of retaining genuine ambiguity."
+      },
+      {
+        "type": "relationship_loss",
+        "description": "Turn a clarification answer into an unrelated new Responsibility."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

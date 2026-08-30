@@ -7,7 +7,7 @@ Authority: operational snapshot only; source, tests, retained evidence, and the 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Pre-delivery branch/base: `main` at `f5a49c6b0a48358566805a73dc58e311958143d2`
+- Pre-delivery branch/base: `main` at `c55ce694f46ade547844c1ebceebea8a0342b2c9`
 - Expected resume revision: latest `origin/main` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
 - Delivery scope: all project changes listed below are committed together; retained
@@ -34,32 +34,87 @@ raw-token TTS, or Work before terminal Plan + GA binding + canonical validation.
 
 ## Worktree changes
 
-- Six cognitive-runtime scenario fixtures now set the intended communicative
-  `delivery_phase` after that field became authoritative; the old implicit immediate
-  default had made existing ordering/confirmation cases stale.
-- `tests/test_semantic_task_continuity.py` now asserts the live WHAT-only prompt contract
-  instead of an incidental superseded sentence.
-- The project delivery-handoff skill is indexed in `docs/README.md` and `CONTRIBUTING.md`;
-  the checkpoint was compacted within the repository line budget.
-- `env/profiles/rtx4090_laptop.env` assigns all LLM selectors, Agent Skill selection,
-  and CosyVoice compact-model identity to `qwen3.5:4b`. `release/model-lock.json`, profile
-  tests, `HARDWARE_PROFILES.md`, `docs/CONFIGURATION.md`, and `docs/STATUS.md` match.
-- The profile retains one resident Ollama model. `OLLAMA_NUM_PARALLEL=1` is deliberate:
-  Ollama 0.32.14 logs `qwen35` parallel requests as unsupported and starts `n_seq_max=1`
-  even when configured for two.
-- `GoalDrivenRuntimeCoordinator` now always gathers its concurrent Goal Association task
-  during fail-closed cleanup, including a task already terminal. The regression verifies
-  that simultaneous GA/Fast failure produces no unhandled asyncio task exception.
-- The GI primary schema/prompt now agree on omitted fresh-turn Goal relationship fields;
-  source provenance identifies the user and Chromie, short context-free location values
-  are decoder-closed to exact source surfaces, and the Deep mechanical location constraint
-  addresses wire `binding_items`.
-- `scripts/qualify_vllm_provider.py` adds retained, no-HTTP-deadline vLLM transport and
-  primary-GI qualification without changing the deployed provider or profile.
+- `goal_interpreter_system.txt` is now a 10,225-character general decision procedure rather
+  than repeated schema/validator prose. It covers atomic Responsibilities, all 25 binding
+  dimensions, cross-clause collection, complete acquire-and-deliver outcomes, exact output
+  modes, typed coordination, uncertainty, source perspective, lexicographic decoder order,
+  and minimal predicate evidence without candidate-model or reported-case literals.
+- `OllamaGoalInterpreter.build_system_prompt()` projects Goal-continuity and accepted
+  prior-assistant-utterance instructions only when supplied bounded Context exposes those
+  schema surfaces. Primary, one permitted mechanical DTO repair, and Deep GI use the same
+  projection; no extra semantic call or authority was introduced.
+- `benchmarks/manifests/goal_interpreter_primary_v1.json` freezes 15 source-linked semantic
+  probes. `scripts/qualify_goal_interpreter_model_potential.py` uses a simplified V2 wire to
+  measure decomposition, outcome, output mode, bindings, coordination, and unresolved
+  separately from production prompt/schema/Host compatibility. The existing vLLM probe now
+  shares manifest loading and dimension scoring with this diagnostic.
+- `benchmarks/datasets/goal_interpretation_daily_life/` contains 1,496 checked-in scenario
+  JSON files, one per file, in 374 bilingual four-case contrast sets across 17 daily-life
+  categories. Whole contrast sets stay in `train_candidate` (896), `validation` (220), or
+  `frozen_test` (380). The corpus covers all 25 binding dimensions, all ten concrete output
+  modes, Goal continuity, 306 context turns, and 102 genuine-unresolved cases.
+- The corpus ships its manifest, owner README, validator, and regression test; it does not
+  ship a scenario generator. Every scenario remains assistant-authored candidate evidence
+  with `independent_semantic_review=false` and `training_eligible=false`.
+- The Host transport-echo validator now keeps a binding equal to the complete short turn
+  only when the validated DTO has one `relationship=clarify` Responsibility, exactly one
+  supplied target Goal, and that Goal owns an unresolved blocking `ask_user` information
+  gap. This repairs 34 elliptical-clarification false rejections while ordinary, compound,
+  closed-gap, and trusted-service-gap whole-turn echoes still fail closed.
+- `docs/STATUS.md`, `docs/ACCEPTANCE.md`, and the documentation index now distinguish raw
+  model potential, assistant-reference prompt clarity, corpus mechanics, exact production
+  transaction qualification, and live robot evidence.
 
-No environment variable, architecture term, compatibility path, or current document was
-added. The only new repository surfaces are the isolated qualification script and its test;
-production profile/provider ownership remains unchanged by the vLLM work.
+Repository surface delta: 1,504 new files and ten modified existing files in this delivery,
+including this checkpoint/handoff pair. The net-new surface is required to retain 1,496
+independently addressable scenarios plus one dataset owner/manifest/validator/test and one
+frozen primary manifest/model-potential probe/test. It adds one current document (the dataset
+README, indexed under its dataset owner), no environment variable, architecture term,
+compatibility path, provider integration, or runtime profile. Consolidation opportunity:
+future corpus revisions should update these same owners and shared validators rather than add
+another GI dataset format or qualification script.
+
+## RTX 5090 GI prompt and dataset evidence
+
+The active development host reported `NVIDIA GeForce RTX 5090`, 32,607 MiB, driver 595.84.
+The generated local `.env.runtime` selects `CHROMIE_HARDWARE_PROFILE=rtx5090`,
+`OLLAMA_MODEL=gemma4:12b`, GI context 32,768, and GI output budget 2,048. It was inspected,
+not edited. No production service/profile was changed or qualified on this host.
+
+The simplified model-potential probe retained dirty-checkout diagnostic evidence at:
+
+```text
+.chromie/acceptance/model-qualification/gi-model-potential/selection-ministral-3-14b-v2-repeat2-20260830T1055Z.json
+.chromie/acceptance/model-qualification/gi-model-potential/selection-granite4.2-8b-v2-official-20260830T1052Z.json
+```
+
+- Ministral-3-14B: 8/30 complete trials over two repeats; among 28 evaluable trials,
+  decomposition and output mode were 28/28, outcome and unresolved 26/28, coordination
+  24/28, and bindings 16/28.
+- Granite4.2-8B digest
+  `f586c02fdecdf151b656207c339aa003997345774a41768bac1fd6d2fb85913b`:
+  1/15 complete trials; decomposition, outcome, and output mode 15/15, coordination 11/15,
+  unresolved 14/15, and bindings 3/15.
+
+Both reports use simplified prompt digest
+`69b21610e7a8c6c63e80163f9cfa7eb2e23ce670cc8c9002a4c54b7849aac578`, schema digest
+`dc10ff1283f1982417552f4ba3bf72908d972f769709b1dcc9d41912022847fb`, manifest digest
+`ea99089a3f739b8cbe11ef44f59d970b25330886aa279b5f35a6e70e5d4fe9e1`, and dirty base
+`c55ce694f46ade547844c1ebceebea8a0342b2c9`. They select candidates only; neither tests
+the exact production prompt/decoder/Host transaction nor qualifies a model or robot.
+
+The current production prompt digest is
+`835a0a0ef3273e96e6dc3504ab8798d21b794f6505fb3b3a630ccdbb91568b25`.
+The 16-case assistant-reference audit is retained at:
+
+```text
+.chromie/acceptance/model-qualification/assistant-reference-gi-prompt-audit-20260830T050000Z.json
+```
+
+It passed 16/16 generated schemas, Host validation, and six semantic dimensions without an
+external model/provider call. The 1,496-case corpus validator then passed all generated
+schemas and Host validation, including the 34 repaired elliptical clarification cases.
+Neither result is independent semantic adjudication or live-model performance.
 
 ## vLLM qualification on this laptop
 
@@ -285,28 +340,38 @@ Final canonical evidence:
 
 ```text
 python scripts/check_repository_policies.py
-passed
+15 rule families, 0 reviewed exceptions; passed
 
 ./scripts/run_tests.sh
-122 benchmark cases; 2,026 main tests; 20 legacy Agent tests; passed
+122 benchmark cases; 2,041 main tests; 20 legacy Agent tests; passed
 
 python scripts/check_docs.py
-97 Markdown files; passed
+98 Markdown files; passed
 
-python scripts/general_ability_acceptance.py --mode level-a \
-  --ability-class composable_action_planning \
-  --ability-class multi_goal_daily_life --no-write
-15/15 passed, Level A
+python scripts/check_test_ownership.py
+passed
 ```
 
-Cleanup-focused evidence:
+GI corpus and focused evidence:
 
 ```text
-python -m unittest tests.test_cognitive_runtime_pr7
-67/67 passed
+python benchmarks/datasets/goal_interpretation_daily_life/validate.py
+1,496/1,496 dynamic-schema passed; 1,496/1,496 Host passed; 0 known Host gaps
+
+python -m pytest -q \
+  benchmarks/tests/test_goal_interpretation_daily_life_dataset.py \
+  tests/test_goal_interpreter_llm_prompt.py
+67 passed, 10 subtests passed
+
+python scripts/general_ability_acceptance.py --mode level-a \
+  --ability-class robust_intent_understanding \
+  --ability-class planner_goal_semantic_quality --no-write
+12/12 passed, Level A
 ```
 
-Do not convert Level A or C-preview evidence into live robot behavior.
+`git diff --check` and `git diff --cached --check` passed before delivery preparation.
+Do not convert corpus mechanics, assistant reference, Level A, dirty-checkout model-potential,
+or historical C-preview evidence into deployed model, live voice, simulator, or robot claims.
 
 ## Resume commands
 
@@ -318,17 +383,27 @@ python scripts/check_repository_policies.py
 python scripts/check_docs.py
 ```
 
-Do not rerun or append to the current-source cohort and do not collect another bundle for
-it. The next qualification run requires a material model/runtime/profile change, a rebuilt
-current Agent image, deployed-source hash verification, and a fresh runtime identity.
+Validate the checked-in candidate corpus separately with:
 
-The current all-Qwen choice remains in the profile as requested, but it is not qualified.
-Do not hide the blockers with longer deadlines, sequentializing the architecture, weaker
-validators, Host semantic repair, or another same-authority model call. The next model
-topology change should start by freezing the current five-case screen into a broader
-prompt/eval contract, then compare only models that can satisfy the non-thinking primary
-authority and coexist with TTS. A reasoning-only model or vendor runtime fork requires an
-explicit owner architecture/runtime decision before integration.
+```bash
+python benchmarks/datasets/goal_interpretation_daily_life/validate.py
+```
+
+Do not train on the corpus until independent semantic review promotes individual retained
+assets. The next useful evidence is a blind exact-production-prompt run: each invocation
+must receive only its immutable input/context, current prompt, and request-specific schema;
+store raw output before grading, pin the model/digest/parameters/repeats, and attribute
+Prompt, model, schema/decoder, validator, and label failures separately. The discussed
+Codex-strength 1,496-case self-evaluation was not run because this task had no callable
+isolated self-inference endpoint.
+
+Do not rerun or append to the retained all-Qwen current-source cohort and do not collect
+another bundle for it. The current all-Qwen production profile remains unqualified. Do not
+hide blockers with longer deadlines, sequential architecture, weaker validators, Host
+semantic repair, phrase rules, or another same-authority model call. A production
+model/provider change still requires exact-prompt qualification, coexistence/resource
+evidence, a rebuilt current Agent image, deployed-source hash verification, a fresh runtime
+identity, and one complete directory-discovered cohort with exactly one post-cohort bundle.
 
 Typical safe deployment inspection:
 

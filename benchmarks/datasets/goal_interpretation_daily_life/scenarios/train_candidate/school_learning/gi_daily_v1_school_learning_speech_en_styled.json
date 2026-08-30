@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_school_learning_speech_en_styled",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "school_learning",
+  "difficulty": "medium",
+  "contrast_set": {
+    "id": "gi_daily_v1_school_learning_speech_en",
+    "variant": "styled",
+    "size": 4
+  },
+  "input": {
+    "language": "en-US",
+    "text": "Please tell Lina patiently like a teacher that the group assignment is due Friday.",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "tell Lina patiently like a teacher that the group assignment is due Friday",
+          "binding_items": {
+            "proposition": "the group assignment is due Friday",
+            "recipient": "Lina",
+            "subtype": "patiently like a teacher"
+          },
+          "output_mode": "styled_speech",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t13"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "styled_speech",
+          "outcome_contains_any": [
+            "tell"
+          ],
+          "required_bindings": {
+            "proposition": "the group assignment is due Friday",
+            "recipient": "Lina",
+            "subtype": "patiently like a teacher"
+          },
+          "forbidden_binding_keys": [
+            "location",
+            "time_scope"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "speech_vs_state_change",
+      "recipient_binding",
+      "styled_speech_boundary"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "send_vs_draft",
+        "description": "Turn a request to draft words into a claim that a message should be sent."
+      },
+      {
+        "type": "recipient_role_confusion",
+        "description": "Put the receiver under location, actor, or addressee instead of recipient."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

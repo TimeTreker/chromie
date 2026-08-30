@@ -1447,6 +1447,73 @@ def _strip_redundant_conversational_turn_echo_bindings(
             bindings[binding_name] = filtered
 
 
+def _goal_ids_awaiting_user_clarification(context: dict[str, Any]) -> set[str]:
+    """Return Goal IDs with an explicit unresolved ask-user information gap."""
+
+    snapshots: list[Any] = []
+    for key in (
+        "active_goal_snapshots",
+        "recent_goal_snapshots",
+        "active_task_snapshots",
+        "active_task_contexts",
+    ):
+        value = context.get(key)
+        if isinstance(value, list):
+            snapshots.extend(value)
+    current = context.get("current_task_context")
+    if isinstance(current, dict):
+        snapshots.append(current)
+
+    goal_ids: set[str] = set()
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        gaps = snapshot.get("open_information_gaps")
+        if not isinstance(gaps, list) or not any(
+            isinstance(gap, dict)
+            and gap.get("resolved") is not True
+            and gap.get("blocking") is not False
+            and str(gap.get("preferred_resolution") or "").strip()
+            == "ask_user"
+            for gap in gaps
+        ):
+            continue
+        semantic_goal = (
+            snapshot.get("semantic_goal")
+            if isinstance(snapshot.get("semantic_goal"), dict)
+            else {}
+        )
+        goal = (
+            snapshot.get("goal")
+            if isinstance(snapshot.get("goal"), dict)
+            else {}
+        )
+        for candidate in (
+            snapshot.get("goal_id"),
+            semantic_goal.get("goal_id"),
+            goal.get("goal_id"),
+        ):
+            goal_id = " ".join(str(candidate or "").strip().split())
+            if goal_id:
+                goal_ids.add(goal_id)
+    return goal_ids
+
+
+def _is_atomic_context_backed_clarification(
+    request: GoalInterpretationRequest,
+    responsibilities: list[Any],
+    item: dict[str, Any],
+) -> bool:
+    """Recognize the DTO shape where the whole short turn may be one binding."""
+
+    if len(responsibilities) != 1 or item.get("relationship") != "clarify":
+        return False
+    target_goal_ids = item.get("target_goal_ids")
+    if not isinstance(target_goal_ids, list) or len(target_goal_ids) != 1:
+        return False
+    target_goal_id = " ".join(str(target_goal_ids[0] or "").strip().split())
+    return target_goal_id in _goal_ids_awaiting_user_clarification(request.context)
+
 
 def _reject_transport_echo_bindings(
     request: GoalInterpretationRequest,
@@ -1455,8 +1522,12 @@ def _reject_transport_echo_bindings(
     """Reject a whole admitted turn masquerading as an atomic semantic binding.
 
     Whole-turn copying can conceal collapsed multi-effect meaning, so it remains
-    a fail-closed semantic-structure violation. Exact request-language echoes are
-    sanitized separately as mechanically removable envelope noise.
+    a fail-closed semantic-structure violation. The one mechanical exception is
+    a single ``relationship=clarify`` Responsibility targeting exactly one Goal
+    whose bounded Context contains an unresolved ask-user information gap. A short
+    elliptical answer can then legitimately be identical to one binding surface.
+    Exact request-language echoes are sanitized separately as mechanically
+    removable envelope noise.
     """
 
     turn_echo = _normalized_turn_echo(request.text or "")
@@ -1469,6 +1540,9 @@ def _reject_transport_echo_bindings(
         bindings = item.get("bindings")
         if not isinstance(bindings, dict):
             continue
+        atomic_clarification = _is_atomic_context_backed_clarification(
+            request, responsibilities, item
+        )
         for binding_name, value in bindings.items():
             values = value if isinstance(value, list) else [value]
             for value_index, scalar in enumerate(values):
@@ -1476,6 +1550,8 @@ def _reject_transport_echo_bindings(
                     continue
                 normalized = _normalized_turn_echo(scalar)
                 if not (turn_echo and normalized == turn_echo):
+                    continue
+                if atomic_clarification:
                     continue
                 suffix = f"[{value_index}]" if isinstance(value, list) else ""
                 raise _GoalInterpretationSemanticStructureViolation(
@@ -2006,6 +2082,42 @@ class OllamaGoalInterpreter:
                 "human means and return provider-neutral responsibilities, confidence, "
                 "and unresolved semantic uncertainty as JSON."
             )
+
+    def build_system_prompt(self, request: GoalInterpretationRequest) -> str:
+        """Project only contract sections made relevant by supplied Context.
+
+        This projection follows already-authoritative schema/context presence. It
+        neither classifies the utterance nor chooses semantic fields, so the model
+        remains the sole WHAT authority while common new turns avoid unrelated
+        Goal-continuity and prior-utterance instructions.
+        """
+
+        sections = [self.load_system_prompt()]
+        if _canonical_goal_ids_from_context(request.context):
+            sections.append(
+                "Goal continuity is exposed for this request. Copy one exact "
+                "schema-allowed relationship token and exact supplied Goal IDs. "
+                "Use new for an independent Responsibility; use another relationship "
+                "only when the current turn semantically targets supplied Goal meaning. "
+                "Never attach an unrelated outcome because a Goal is visible. Preserve "
+                "negation and lifecycle meaning: ceasing, rejecting, cancelling, or "
+                "pausing supplied active Goal meaning is not a new positive performance "
+                "or an invented opposite action. Continuation or resumption preserves "
+                "the supplied Goal's output mode. Pending clarification Context may "
+                "resolve an elliptical reply, but Goal Interpretation never creates or "
+                "resolves a Planner InformationGap."
+            )
+        prior = _most_recent_assistant_utterance(request.context)
+        if prior is not None:
+            sections.append(
+                "The schema exposes prior_assistant_utterance for this request. When the "
+                "person asks what Chromie most recently said, create a new speech "
+                "Responsibility to repeat or report the exact accepted assistant "
+                "utterance supplied in Context and bind it as prior_assistant_utterance. "
+                "Never substitute the current user turn, an unavailable marker, a "
+                "paraphrase, or an old Goal relationship."
+            )
+        return "\n\n".join(sections)
 
     def build_interpretation_user_prompt(
         self, request: GoalInterpretationRequest
@@ -2683,7 +2795,7 @@ class OllamaGoalInterpreter:
             "stream": False,
             "think": False,
             "messages": [
-                {"role": "system", "content": self.load_system_prompt()},
+                {"role": "system", "content": self.build_system_prompt(request)},
                 {"role": "user", "content": self.build_interpretation_user_prompt(request)},
             ],
             "options": {
@@ -2748,7 +2860,7 @@ class OllamaGoalInterpreter:
             {
                 "role": "system",
                 "content": (
-                    self.load_system_prompt()
+                    self.build_system_prompt(request)
                     + "\n\nDTO Repair: return one corrected WHAT-only Goal Interpretation JSON object. "
                     "For every closed string field, copy one exact protocol token from "
                     "the schema; never inflect, conjugate, translate, or paraphrase it. "
@@ -2812,7 +2924,7 @@ class OllamaGoalInterpreter:
             {
                 "role": "system",
                 "content": (
-                    self.load_system_prompt()
+                    self.build_system_prompt(request)
                     + "\n\nDeep Goal Interpretation: use broader reasoning over the "
                     "authoritative turn and bounded semantic context, but keep exactly "
                     "the same WHAT-only authority and output schema. Reconsider only "

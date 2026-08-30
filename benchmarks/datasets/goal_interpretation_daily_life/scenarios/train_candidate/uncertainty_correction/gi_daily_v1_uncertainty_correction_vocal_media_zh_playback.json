@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_uncertainty_correction_vocal_media_zh_playback",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "uncertainty_correction",
+  "difficulty": "medium",
+  "contrast_set": {
+    "id": "gi_daily_v1_uncertainty_correction_vocal_media_zh",
+    "variant": "playback",
+    "size": 4
+  },
+  "input": {
+    "language": "zh-CN",
+    "text": "请播放《答案》。",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "播放《答案》",
+          "binding_items": {
+            "entity": "答案"
+          },
+          "output_mode": "media_playback",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t6"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "media_playback",
+          "outcome_contains_any": [
+            "播放"
+          ],
+          "required_bindings": {
+            "entity": "答案"
+          },
+          "forbidden_binding_keys": [
+            "location",
+            "recipient"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "output_mode_minimal_pair",
+      "vocal_performance_vs_media"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "mode_collapse",
+        "description": "Collapse singing, humming, recitation, and recorded-media playback into speech or one generic mode."
+      },
+      {
+        "type": "media_performance_swap",
+        "description": "Treat Chromie's own vocal performance as media playback, or a recording as singing."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

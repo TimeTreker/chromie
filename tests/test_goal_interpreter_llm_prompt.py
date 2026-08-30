@@ -174,6 +174,143 @@ class GoalInterpreterContractTests(unittest.TestCase):
             [item.local_ref for item in decision.responsibilities], ["r1", "r2"]
         )
 
+    def test_context_backed_elliptical_clarification_keeps_whole_turn_binding(
+        self,
+    ) -> None:
+        request = GoalInterpretationRequest(
+            text="Tomorrow afternoon.",
+            context={
+                "active_task_snapshots": [
+                    {
+                        "goal_id": "goal-reminder",
+                        "open_information_gaps": [
+                            {
+                                "gap_id": "gap-time",
+                                "blocking": True,
+                                "preferred_resolution": "ask_user",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        parsed = {
+            "confidence": 1.0,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "remind the user tomorrow afternoon",
+                    "bindings": {"time_scope": "Tomorrow afternoon"},
+                    "output_mode": "stateful_effect",
+                    "relationship": "clarify",
+                    "target_goal_ids": ["goal-reminder"],
+                    "confidence": 1.0,
+                    "source_evidence": {
+                        "source_start_token_ref": "t0",
+                        "source_end_token_ref": "t2",
+                    },
+                }
+            ],
+            "unresolved": [],
+        }
+
+        decision = OllamaGoalInterpreter._validate_interpretation_content(
+            request, json.dumps(parsed)
+        )
+
+        self.assertEqual(
+            decision.responsibilities[0].bindings,
+            {"time_scope": "Tomorrow afternoon"},
+        )
+
+    def test_whole_turn_binding_without_pending_user_gap_remains_rejected(
+        self,
+    ) -> None:
+        request = GoalInterpretationRequest(
+            text="Tomorrow afternoon.",
+            context={
+                "active_task_snapshots": [
+                    {
+                        "goal_id": "goal-reminder",
+                        "open_information_gaps": [],
+                    }
+                ]
+            },
+        )
+        parsed = {
+            "confidence": 1.0,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "clarify the reminder time as tomorrow afternoon",
+                    "bindings": {"time_scope": "Tomorrow afternoon"},
+                    "output_mode": "stateful_effect",
+                    "relationship": "clarify",
+                    "target_goal_ids": ["goal-reminder"],
+                    "confidence": 1.0,
+                    "source_evidence": {
+                        "source_start_token_ref": "t0",
+                        "source_end_token_ref": "t2",
+                    },
+                }
+            ],
+            "unresolved": [],
+        }
+
+        with self.assertRaisesRegex(
+            _GoalInterpretationSemanticStructureViolation,
+            "copied the whole admitted turn",
+        ):
+            OllamaGoalInterpreter._validate_interpretation_content(
+                request, json.dumps(parsed)
+            )
+
+    def test_whole_turn_binding_with_non_user_gap_remains_rejected(self) -> None:
+        request = GoalInterpretationRequest(
+            text="Tomorrow afternoon.",
+            context={
+                "active_task_snapshots": [
+                    {
+                        "goal_id": "goal-reminder",
+                        "open_information_gaps": [
+                            {
+                                "gap_id": "gap-weather",
+                                "blocking": True,
+                                "preferred_resolution": "query_trusted_service",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        parsed = {
+            "confidence": 1.0,
+            "responsibilities": [
+                {
+                    "local_ref": "r1",
+                    "outcome": "clarify the reminder time as tomorrow afternoon",
+                    "bindings": {"time_scope": "Tomorrow afternoon"},
+                    "output_mode": "stateful_effect",
+                    "relationship": "clarify",
+                    "target_goal_ids": ["goal-reminder"],
+                    "confidence": 1.0,
+                    "source_evidence": {
+                        "source_start_token_ref": "t0",
+                        "source_end_token_ref": "t2",
+                    },
+                }
+            ],
+            "unresolved": [],
+        }
+
+        with self.assertRaisesRegex(
+            _GoalInterpretationSemanticStructureViolation,
+            "copied the whole admitted turn",
+        ):
+            OllamaGoalInterpreter._validate_interpretation_content(
+                request, json.dumps(parsed)
+            )
+
     def test_hidden_effect_and_how_binding_names_are_rejected(self) -> None:
         for binding_name in ("concurrent_action", "capability", "agent_skill"):
             with self.subTest(binding_name=binding_name):
@@ -352,11 +489,54 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         self.assertNotIn("relationship", responsibility["properties"])
         self.assertNotIn("target_goal_ids", responsibility["properties"])
-        self.assertIn(
-            "when the schema omits relationship and target_goal_ids, omit both keys",
-            system_text,
+        self.assertNotIn("Goal continuity is exposed for this request", system_text)
+
+    def test_primary_prompt_projects_goal_continuity_only_when_schema_exposes_it(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="continue that",
+                context={
+                    "active_goal_snapshots": [
+                        {"goal_id": "goal-active", "outcome": "continue walking"}
+                    ]
+                },
+            )
         )
-        self.assertIn("trusted construction applies the mechanical defaults", system_text)
+        system_text, _, _ = _payload_message_texts(payload)
+        responsibility = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]
+
+        self.assertIn("relationship", responsibility["properties"])
+        self.assertIn("target_goal_ids", responsibility["properties"])
+        self.assertIn("Goal continuity is exposed for this request", system_text)
+        self.assertIn("exact supplied Goal IDs", system_text)
+        self.assertIn("Preserve negation and lifecycle meaning", system_text)
+
+    def test_primary_prompt_projects_prior_utterance_rule_only_when_available(
+        self,
+    ) -> None:
+        plain = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="hello")
+        )
+        contextual = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="what did you say?",
+                context={
+                    "history": [
+                        {"role": "assistant", "text": "Hello there."}
+                    ]
+                },
+            )
+        )
+
+        plain_system, _, _ = _payload_message_texts(plain)
+        contextual_system, _, _ = _payload_message_texts(contextual)
+        self.assertNotIn("schema exposes prior_assistant_utterance", plain_system)
+        self.assertIn("schema exposes prior_assistant_utterance", contextual_system)
+        self.assertIn("exact accepted assistant utterance", contextual_system)
 
     def test_primary_prompt_does_not_expose_runtime_sid(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
@@ -469,7 +649,7 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             GoalInterpretationRequest(text="look at me while blinking")
         )
         system_text, user_text, _ = _payload_message_texts(payload)
-        self.assertIn("A singleton or self-edge is structurally invalid", system_text)
+        self.assertIn("at least two unique emitted sibling local_refs", system_text)
         self.assertNotIn("FINAL SPARSE-OUTPUT CHECK", user_text)
         self.assertIn("one complete schema-valid JSON decision", user_text)
 
@@ -502,12 +682,135 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         system_text, _, _ = _payload_message_texts(payload)
 
-        self.assertIn("Scan the whole source for independently observable predicates", system_text)
-        self.assertIn("Use `time_scope` for a calendar/relative interval", system_text)
-        self.assertIn("Missing provider units or implementation details", system_text)
-        self.assertIn("discourse-only fillers", system_text)
-        self.assertIn("return `unresolved: []`", system_text)
-        self.assertIn("body-action outcome names the actual source predicate", system_text)
+        self.assertIn("one responsibilities[] item for each independently", system_text)
+        self.assertIn("time_scope is a calendar or relative period", system_text)
+        self.assertIn("Missing tools, units, providers", system_text)
+        self.assertIn("Ignore fillers, hesitation, politeness", system_text)
+        self.assertIn("Use [] when meaning is clear", system_text)
+        self.assertIn("outcome names exactly that requested predicate", system_text)
+
+    def test_primary_prompt_collects_cross_clause_bindings_without_widening_predicate_evidence(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text=(
+                    "A package is thirty meters behind you. "
+                    "Please bring it to Morgan."
+                ),
+                language="en-US",
+            )
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn(
+            "words that request an effect and the words that bind it may occur "
+            "in different clauses",
+            system_text,
+        )
+        self.assertIn("including declarative circumstance clauses", system_text)
+        self.assertIn(
+            "does not need to contain binding surfaces stated in other clauses",
+            system_text,
+        )
+        self.assertIn(
+            "including any object or recipient stated inside that request clause",
+            system_text,
+        )
+        self.assertIn(
+            "source_evidence remains on the request clause and never expands to "
+            "the antecedent clause",
+            system_text,
+        )
+        self.assertIn(
+            "Treat a lexical acquire-and-deliver request",
+            system_text,
+        )
+        self.assertIn(
+            "outcome: `bring the parcel to Alex`",
+            system_text,
+        )
+        self.assertIn(
+            "span starts with any modal or request-form words",
+            system_text,
+        )
+        self.assertIn(
+            "ends after every object, complement, or recipient",
+            system_text,
+        )
+        self.assertIn(
+            "start at the current turn's token ref whose surface is `Could`",
+            system_text,
+        )
+        self.assertIn("Example token-ref numbers are never reusable", system_text)
+        self.assertNotIn('"source_start_token_ref":"t', system_text)
+        self.assertNotIn("bottle of water", system_text)
+        self.assertNotIn("50 meters", system_text)
+
+    def test_primary_prompt_makes_binding_semantics_and_decoder_order_visible(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="bring the parcel to me")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn(
+            "Emit selected binding_items keys in lexicographic key order",
+            system_text,
+        )
+        self.assertLess(
+            system_text.index('"direction":"behind you"'),
+            system_text.index('"distance":"twenty meters"'),
+        )
+        self.assertLess(
+            system_text.index('"distance":"twenty meters"'),
+            system_text.index('"entity":"A parcel"'),
+        )
+        self.assertLess(
+            system_text.index('"entity":"A parcel"'),
+            system_text.index('"recipient":"Alex"'),
+        )
+        for semantic_rule in (
+            "actor is the performer",
+            "addressee is the addressed entity",
+            "experiencer is the holder",
+            "quantity is a non-repetition amount",
+            "severity is seriousness or impact level",
+            "preference is an expressed preference",
+            "attribute is an explicitly requested property",
+        ):
+            self.assertIn(semantic_rule, system_text)
+        self.assertIn(
+            "merely plausible values such as normal speed, immediate time",
+            system_text,
+        )
+        self.assertIn(
+            "remain in the source perspective instead of becoming generic role labels",
+            system_text,
+        )
+
+    def test_primary_prompt_exposes_every_model_facing_binding_dimension_without_model_tuning(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="one representative request")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+        binding_properties = payload["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["binding_items"]["properties"]
+
+        for binding_name in binding_properties:
+            self.assertIn(binding_name, system_text)
+        for model_or_provider_name in (
+            "granite",
+            "gemma",
+            "ministral",
+            "ollama",
+            "llama.cpp",
+        ):
+            self.assertNotIn(model_or_provider_name, system_text.casefold())
 
     def test_primary_schema_closes_source_token_refs(self) -> None:
         text = "今天晚上重庆热不热"
@@ -625,8 +928,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         self.assertNotIn("never classify a person target as location", user_text)
         self.assertNotIn("concrete requested predicate", user_text)
-        self.assertIn("person is not a `location`", all_text)
-        self.assertIn("Each semantic dimension is one object key", all_text)
+        self.assertIn("person targeted by gaze is entity, not location", all_text)
+        self.assertIn("These dimensions are exclusive", all_text)
 
     def test_primary_schema_keeps_context_backed_location_open_to_host_validation(self) -> None:
         text = "What time is it now?"

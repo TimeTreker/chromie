@@ -32,6 +32,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+DEFAULT_GOAL_INTERPRETER_MANIFEST = (
+    ROOT / "benchmarks" / "manifests" / "goal_interpreter_primary_v1.json"
+)
+
 
 class QualificationFailure(RuntimeError):
     """A required provider contract was not observed."""
@@ -414,17 +418,291 @@ async def _observe_tts(
     return observation
 
 
-def _binding_value_present(
-    decisions: list[dict[str, Any]],
-    key: str,
-    accepted_values: list[Any],
-) -> bool:
+def _normalized_binding_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return " ".join(value.strip().casefold().split())
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+def _binding_value_matches(actual: Any, accepted_values: list[Any]) -> bool:
+    normalized_actual = _normalized_binding_value(actual)
     return any(
-        item.get("binding_items", item.get("bindings", {})).get(key) in accepted_values
-        for item in decisions
-        if isinstance(item, dict)
-        and isinstance(item.get("binding_items", item.get("bindings", {})), dict)
+        normalized_actual == _normalized_binding_value(candidate) for candidate in accepted_values
     )
+
+
+def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
+    resolved = path.expanduser().resolve()
+    try:
+        payload = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise QualificationFailure(
+            f"could not load Goal Interpreter qualification manifest {resolved}: {exc}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise QualificationFailure("Goal Interpreter qualification manifest is not an object")
+    if payload.get("schema_version") != 1:
+        raise QualificationFailure(
+            "Goal Interpreter qualification manifest schema_version must be 1"
+        )
+    qualification_id = payload.get("qualification_id")
+    if not isinstance(qualification_id, str) or not qualification_id.strip():
+        raise QualificationFailure("Goal Interpreter qualification manifest lacks qualification_id")
+    cases = payload.get("cases")
+    if not isinstance(cases, list) or len(cases) < 10:
+        raise QualificationFailure(
+            "Goal Interpreter qualification manifest requires at least 10 cases"
+        )
+    seen_ids: set[str] = set()
+    seen_groups: set[str] = set()
+    for index, case in enumerate(cases):
+        if not isinstance(case, dict):
+            raise QualificationFailure(f"Goal Interpreter case {index} is not an object")
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id.strip():
+            raise QualificationFailure(f"Goal Interpreter case {index} lacks id")
+        if case_id in seen_ids:
+            raise QualificationFailure(f"duplicate Goal Interpreter case id: {case_id}")
+        seen_ids.add(case_id)
+        group = case.get("group")
+        if not isinstance(group, str) or not group.strip():
+            raise QualificationFailure(f"Goal Interpreter case {case_id} lacks group")
+        seen_groups.add(group)
+        if not isinstance(case.get("text"), str) or not str(case["text"]).strip():
+            raise QualificationFailure(f"Goal Interpreter case {case_id} lacks text")
+        expected = case.get("expected")
+        if not isinstance(expected, dict):
+            raise QualificationFailure(f"Goal Interpreter case {case_id} lacks expected")
+        responsibilities = expected.get("responsibilities")
+        if not isinstance(responsibilities, list) or not responsibilities:
+            raise QualificationFailure(
+                f"Goal Interpreter case {case_id} requires expected responsibilities"
+            )
+        for responsibility_index, responsibility in enumerate(responsibilities):
+            if not isinstance(responsibility, dict):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} responsibility "
+                    f"{responsibility_index} is not an object"
+                )
+            if not isinstance(responsibility.get("output_mode"), str):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} responsibility "
+                    f"{responsibility_index} lacks output_mode"
+                )
+            outcome_contains_any = responsibility.get("outcome_contains_any")
+            if (
+                not isinstance(outcome_contains_any, list)
+                or not outcome_contains_any
+                or any(
+                    not isinstance(value, str) or not value.strip()
+                    for value in outcome_contains_any
+                )
+            ):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} responsibility "
+                    f"{responsibility_index} has invalid outcome_contains_any"
+                )
+            required_bindings = responsibility.get("required_bindings", {})
+            if not isinstance(required_bindings, dict) or any(
+                not isinstance(values, list) or not values for values in required_bindings.values()
+            ):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} responsibility "
+                    f"{responsibility_index} has invalid required_bindings"
+                )
+            forbidden = responsibility.get("forbidden_binding_keys", [])
+            if not isinstance(forbidden, list) or any(
+                not isinstance(value, str) or not value for value in forbidden
+            ):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} responsibility "
+                    f"{responsibility_index} has invalid forbidden_binding_keys"
+                )
+        coordination = expected.get("coordination")
+        if not isinstance(coordination, list):
+            raise QualificationFailure(
+                f"Goal Interpreter case {case_id} coordination must be an array"
+            )
+        for relation in coordination:
+            if not isinstance(relation, dict) or relation.get("kind") not in {
+                "parallel",
+                "sequence",
+            }:
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} has invalid coordination"
+                )
+            indexes = relation.get("responsibility_indexes")
+            if (
+                not isinstance(indexes, list)
+                or len(indexes) < 2
+                or len(set(indexes)) != len(indexes)
+                or any(
+                    not isinstance(value, int) or value < 0 or value >= len(responsibilities)
+                    for value in indexes
+                )
+            ):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} has invalid coordination indexes"
+                )
+        if not isinstance(expected.get("unresolved"), bool):
+            raise QualificationFailure(
+                f"Goal Interpreter case {case_id} unresolved must be boolean"
+            )
+        source_scenario = case.get("source_scenario")
+        if source_scenario is not None:
+            scenario_path = (ROOT / str(source_scenario)).resolve()
+            if ROOT not in scenario_path.parents or not scenario_path.is_file():
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} source_scenario is missing"
+                )
+            scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
+            if scenario.get("text") != case["text"]:
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} text differs from source_scenario"
+                )
+            if scenario.get("language") not in (None, case.get("language")):
+                raise QualificationFailure(
+                    f"Goal Interpreter case {case_id} language differs from source_scenario"
+                )
+    if len(seen_groups) < 5:
+        raise QualificationFailure(
+            "Goal Interpreter qualification manifest requires at least 5 semantic groups"
+        )
+    payload["manifest_path"] = str(resolved.relative_to(ROOT))
+    payload["manifest_sha256"] = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    return payload
+
+
+def _evaluate_goal_interpreter_case(
+    case: dict[str, Any],
+    decision_payload: dict[str, Any],
+    wire_payload: dict[str, Any],
+) -> list[str]:
+    dimensions = _evaluate_goal_interpreter_case_dimensions(
+        case,
+        decision_payload,
+        wire_payload,
+    )
+    return [error for errors in dimensions.values() if errors is not None for error in errors]
+
+
+def _evaluate_goal_interpreter_case_dimensions(
+    case: dict[str, Any],
+    decision_payload: dict[str, Any],
+    wire_payload: dict[str, Any],
+) -> dict[str, list[str] | None]:
+    dimensions: dict[str, list[str] | None] = {
+        "decomposition": [],
+        "outcome": [],
+        "output_mode": [],
+        "bindings": [],
+        "coordination": [],
+        "unresolved": [],
+    }
+
+    def add_error(dimension: str, message: str) -> None:
+        errors = dimensions[dimension]
+        if errors is not None:
+            errors.append(message)
+
+    expected = case["expected"]
+    expected_responsibilities = expected["responsibilities"]
+    responsibilities = decision_payload.get("responsibilities") or []
+    wire_responsibilities = wire_payload.get("responsibilities") or []
+    if len(responsibilities) != len(expected_responsibilities):
+        dimensions["decomposition"] = [
+            f"responsibility count {len(responsibilities)} != {len(expected_responsibilities)}"
+        ]
+        dimensions["outcome"] = None
+        dimensions["output_mode"] = None
+        dimensions["bindings"] = None
+    if len(wire_responsibilities) != len(expected_responsibilities):
+        add_error(
+            "decomposition",
+            f"wire responsibility count {len(wire_responsibilities)} != "
+            f"{len(expected_responsibilities)}",
+        )
+        dimensions["outcome"] = None
+        dimensions["output_mode"] = None
+        dimensions["bindings"] = None
+        dimensions["coordination"] = None
+    if not dimensions["decomposition"]:
+        for index, (actual, wire, wanted) in enumerate(
+            zip(
+                responsibilities,
+                wire_responsibilities,
+                expected_responsibilities,
+                strict=True,
+            )
+        ):
+            if not isinstance(actual, dict) or not isinstance(wire, dict):
+                add_error("decomposition", f"responsibility {index} is not an object")
+                dimensions["outcome"] = None
+                dimensions["output_mode"] = None
+                dimensions["bindings"] = None
+                continue
+            if actual.get("output_mode") != wanted["output_mode"]:
+                add_error(
+                    "output_mode",
+                    f"responsibility {index} output_mode "
+                    f"{actual.get('output_mode')!r} != {wanted['output_mode']!r}",
+                )
+            normalized_outcome = str(actual.get("outcome") or "").casefold()
+            accepted_outcome_terms = [
+                str(term).casefold() for term in wanted["outcome_contains_any"]
+            ]
+            if not any(term in normalized_outcome for term in accepted_outcome_terms):
+                add_error(
+                    "outcome",
+                    f"responsibility {index} outcome {actual.get('outcome')!r} lacks "
+                    f"one of {wanted['outcome_contains_any']!r}",
+                )
+            bindings = wire.get("binding_items", actual.get("bindings", {}))
+            if not isinstance(bindings, dict):
+                add_error("bindings", f"responsibility {index} bindings are not an object")
+                continue
+            for key, accepted_values in wanted.get("required_bindings", {}).items():
+                if key not in bindings:
+                    add_error(
+                        "bindings",
+                        f"responsibility {index} missing required binding {key}",
+                    )
+                elif not _binding_value_matches(bindings[key], accepted_values):
+                    add_error(
+                        "bindings",
+                        f"responsibility {index} binding {key}={bindings[key]!r} "
+                        f"not in {accepted_values!r}",
+                    )
+            for key in wanted.get("forbidden_binding_keys", []):
+                if key in bindings:
+                    add_error(
+                        "bindings",
+                        f"responsibility {index} contains forbidden binding {key}="
+                        f"{bindings[key]!r}",
+                    )
+    actual_refs = [str(item.get("local_ref") or "") for item in wire_responsibilities]
+    if dimensions["coordination"] is not None:
+        expected_relations = [
+            {
+                "kind": relation["kind"],
+                "refs": [actual_refs[index] for index in relation["responsibility_indexes"]],
+            }
+            for relation in expected["coordination"]
+        ]
+        actual_relations = wire_payload.get("coordination") or []
+        if actual_relations != expected_relations:
+            add_error(
+                "coordination",
+                f"coordination {actual_relations!r} != {expected_relations!r}",
+            )
+    if bool(decision_payload.get("unresolved")) != expected["unresolved"]:
+        add_error(
+            "unresolved",
+            "unresolved presence did not equal " + str(expected["unresolved"]),
+        )
+    return dimensions
 
 
 def _vllm_compatible_schema(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
@@ -467,6 +745,7 @@ async def _qualify_goal_interpreter(
     endpoint: str,
     *,
     model: str,
+    manifest_path: Path = DEFAULT_GOAL_INTERPRETER_MANIFEST,
 ) -> dict[str, Any]:
     from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
         OllamaGoalInterpreter,
@@ -485,66 +764,8 @@ async def _qualify_goal_interpreter(
         num_ctx=16384,
         num_predict=512,
     )
-    cases = [
-        {
-            "id": "weather_exact_location",
-            "text": "今晚重庆会不会下雨哦？",
-            "language": "zh-CN",
-            "count": 1,
-            "modes": ["information"],
-            "bindings": {
-                "location": ["重庆"],
-                "time_scope": ["今晚"],
-            },
-            "unresolved": False,
-        },
-        {
-            "id": "compound_numeric_sequence",
-            "text": (
-                "walk ahead at 0.2 speed for 10 seconds and then nod your "
-                "head twice, then turn left"
-            ),
-            "language": "en-US",
-            "count": 3,
-            "modes": ["body_action", "body_action", "body_action"],
-            "bindings": {
-                "speed": [0.2],
-                "duration": [10, "10 seconds"],
-                "count": [2],
-                "direction": ["left"],
-            },
-            "coordination": "sequence",
-            "unresolved": False,
-        },
-        {
-            "id": "filler_blink_twice",
-            "text": "嗯，那个……先眨两下眼睛吧。",
-            "language": "zh-CN",
-            "count": 1,
-            "modes": ["body_action"],
-            "bindings": {"count": [2]},
-            "unresolved": False,
-        },
-        {
-            "id": "parallel_gaze_blink",
-            "text": "看着我三秒，同时眨两下眼睛。",
-            "language": "zh-CN",
-            "count": 2,
-            "modes": ["body_action", "body_action"],
-            "bindings": {"duration": [3, "三秒"], "count": [2]},
-            "coordination": "parallel",
-            "unresolved": False,
-        },
-        {
-            "id": "ambiguous_bare_referent",
-            "text": "你能查天信吗？",
-            "language": "zh-CN",
-            "count": 1,
-            "modes": ["information"],
-            "bindings": {"entity": ["天信"]},
-            "unresolved": True,
-        },
-    ]
+    manifest = _load_goal_interpreter_manifest(manifest_path)
+    cases = manifest["cases"]
     results: list[dict[str, Any]] = []
     for case in cases:
         request = GoalInterpretationRequest(
@@ -604,33 +825,15 @@ async def _qualify_goal_interpreter(
                 raise QualificationFailure("Goal Interpreter wire output is not an object")
             decision = interpreter._validate_interpretation_content(request, content)
             decision_payload = decision.model_dump(mode="json", exclude_none=True)
-            responsibilities = decision_payload["responsibilities"]
             if reasoning_seen:
                 raise QualificationFailure("reasoning channel exposed")
-            if len(responsibilities) != int(case["count"]):
-                raise QualificationFailure(
-                    f"responsibility count {len(responsibilities)} != {case['count']}"
-                )
-            modes = sorted(str(item["output_mode"]) for item in responsibilities)
-            if modes != sorted(str(value) for value in case["modes"]):
-                raise QualificationFailure(f"output modes {modes!r} != {sorted(case['modes'])!r}")
-            for key, accepted_values in case["bindings"].items():
-                if not _binding_value_present(responsibilities, str(key), list(accepted_values)):
-                    raise QualificationFailure(
-                        f"required binding {key} absent from accepted values {accepted_values!r}"
-                    )
-            expected_coordination = case.get("coordination")
-            if expected_coordination and not _wire_coordination_satisfies(
-                wire_payload, str(expected_coordination), int(case["count"])
-            ):
-                raise QualificationFailure(
-                    f"missing {expected_coordination} coordination over all refs"
-                )
-            expected_unresolved = bool(case["unresolved"])
-            if bool(decision_payload.get("unresolved")) != expected_unresolved:
-                raise QualificationFailure(
-                    f"unresolved presence did not equal {expected_unresolved}"
-                )
+            case_errors = _evaluate_goal_interpreter_case(
+                case,
+                decision_payload,
+                wire_payload,
+            )
+            if case_errors:
+                raise QualificationFailure("; ".join(case_errors))
             result["status"] = "pass"
             result["decision"] = decision_payload
             result["wire_coordination"] = wire_payload.get("coordination") or []
@@ -644,7 +847,11 @@ async def _qualify_goal_interpreter(
         "case_count": len(results),
         "passed": len(results) - len(failures),
         "failed": len(failures),
-        "prompt_contract": "current_checkout_after_schema_alignment_fix",
+        "qualification_id": manifest["qualification_id"],
+        "manifest_path": manifest["manifest_path"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "groups": sorted({str(case["group"]) for case in cases}),
+        "prompt_contract": "current_checkout_primary_goal_interpretation",
         "cases": results,
     }
 
@@ -915,6 +1122,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 client,
                 endpoint,
                 model=args.model,
+                manifest_path=args.goal_interpreter_manifest,
             )
             evidence.phases["goal_interpreter_semantics"] = goal_interpreter
             if goal_interpreter["status"] != "pass":
@@ -932,6 +1140,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tts-url")
     parser.add_argument("--tts-speaker", default="chromie_mixed")
     parser.add_argument("--goal-interpreter-probe", action="store_true")
+    parser.add_argument(
+        "--goal-interpreter-manifest",
+        type=Path,
+        default=DEFAULT_GOAL_INTERPRETER_MANIFEST,
+    )
     return parser
 
 

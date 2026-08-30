@@ -595,6 +595,30 @@ evidence and cannot close independent semantic adjudication or release
 qualification. The authoritative workflow and multi-model commands are in
 [Chromie-specific semantic qualification workflow](CHROMIE_BENCHMARK_SUITE.md#chromie-specific-semantic-qualification-workflow).
 
+### Goal Interpreter model-potential screening
+
+Model selection and production-contract qualification are separate claims. Use
+`scripts/qualify_goal_interpreter_model_potential.py` to compare a candidate's
+atomic decomposition, outcome, output mode, binding, coordination, and uncertainty
+potential through a simplified model-neutral wire. The probe uses native Ollama
+structured decoding but deliberately excludes the production GI prompt, DTO
+normalizer, Host validator, GA, Planner, and execution path:
+
+```bash
+python scripts/qualify_goal_interpreter_model_potential.py \
+  --model ministral-3:14b \
+  --temperature 0 --top-p 0.9 --repeats 2
+```
+
+Retain the model digest, prompt/schema digests, generation settings, raw output,
+per-dimension results, and repeat index. A high model-potential result only selects
+a candidate for prompt/schema engineering. It never promotes a runtime profile or
+qualifies the current production GI transaction. Production qualification must then
+run the same source-bound cohort through the exact deployed prompt, schema, canonical
+Host validation, timeout, and provider settings. Do not combine the two evidence
+classes into one score, and do not turn qualification findings into phrase-specific
+Host semantic rules.
+
 The target organization, common case contract, distribution metrics, and staged
 rollout are defined in the
 [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) and its

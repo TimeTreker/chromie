@@ -3,11 +3,16 @@ from __future__ import annotations
 import unittest
 
 from scripts.qualify_vllm_provider import (
+    DEFAULT_GOAL_INTERPRETER_MANIFEST,
     QualificationFailure,
     StreamObservation,
     _assert_complete_stream,
+    _binding_value_matches,
     _chat_payload,
+    _evaluate_goal_interpreter_case,
+    _evaluate_goal_interpreter_case_dimensions,
     _extract_stream_delta,
+    _load_goal_interpreter_manifest,
     _vllm_compatible_schema,
     _wire_coordination_satisfies,
 )
@@ -119,6 +124,81 @@ class VllmProviderQualificationTests(unittest.TestCase):
         payload = {"coordination": [{"kind": "sequence", "refs": ["r1", "r1"]}]}
 
         self.assertFalse(_wire_coordination_satisfies(payload, "sequence", 2))
+
+    def test_primary_goal_interpreter_manifest_freezes_broader_contract(self) -> None:
+        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        case_ids = {str(case["id"]) for case in manifest["cases"]}
+        groups = {str(case["group"]) for case in manifest["cases"]}
+
+        self.assertEqual(manifest["qualification_id"], "chromie.goal_interpreter.primary.v1")
+        self.assertEqual(len(manifest["cases"]), 16)
+        self.assertGreaterEqual(len(groups), 6)
+        self.assertTrue(
+            {
+                "weather_exact_location",
+                "compound_numeric_sequence",
+                "filler_blink_twice",
+                "parallel_gaze_blink",
+                "ambiguous_bare_referent",
+                "cross_clause_acquire_delivery",
+            }.issubset(case_ids)
+        )
+        self.assertEqual(len(manifest["manifest_sha256"]), 64)
+
+    def test_binding_match_normalizes_text_and_integral_float(self) -> None:
+        self.assertTrue(_binding_value_matches("  Tonight  ", ["tonight"]))
+        self.assertTrue(_binding_value_matches(3.0, [3]))
+        self.assertFalse(_binding_value_matches("three", [3]))
+
+    def test_case_evaluator_binds_modifiers_to_their_own_responsibility(self) -> None:
+        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        case = next(item for item in manifest["cases"] if item["id"] == "parallel_gaze_blink")
+        decision = {
+            "responsibilities": [
+                {
+                    "local_ref": "gaze",
+                    "outcome": "look at the user",
+                    "output_mode": "body_action",
+                    "bindings": {},
+                },
+                {
+                    "local_ref": "blink",
+                    "outcome": "blink eyes",
+                    "output_mode": "body_action",
+                    "bindings": {},
+                },
+            ],
+            "unresolved": [],
+        }
+        wire = {
+            "responsibilities": [
+                {
+                    "local_ref": "gaze",
+                    "output_mode": "body_action",
+                    "binding_items": {"entity": "我", "duration": 3},
+                },
+                {
+                    "local_ref": "blink",
+                    "output_mode": "body_action",
+                    "binding_items": {"count": 2},
+                },
+            ],
+            "coordination": [{"kind": "parallel", "refs": ["gaze", "blink"]}],
+        }
+
+        self.assertEqual(_evaluate_goal_interpreter_case(case, decision, wire), [])
+        dimensions = _evaluate_goal_interpreter_case_dimensions(case, decision, wire)
+        self.assertTrue(all(errors == [] for errors in dimensions.values()))
+
+        wire["responsibilities"][0]["binding_items"] = {"entity": "我", "count": 2}
+        wire["responsibilities"][1]["binding_items"] = {"duration": 3}
+        errors = _evaluate_goal_interpreter_case(case, decision, wire)
+        dimensions = _evaluate_goal_interpreter_case_dimensions(case, decision, wire)
+
+        self.assertTrue(any("missing required binding duration" in error for error in errors))
+        self.assertTrue(any("contains forbidden binding count" in error for error in errors))
+        self.assertTrue(dimensions["bindings"])
+        self.assertEqual(dimensions["outcome"], [])
 
 
 if __name__ == "__main__":

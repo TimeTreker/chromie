@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_pets_garden_embodied_zh_pace_distance",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "frozen_test",
+  "category": "pets_garden",
+  "difficulty": "medium",
+  "contrast_set": {
+    "id": "gi_daily_v1_pets_garden_embodied_zh",
+    "variant": "pace_distance",
+    "size": 4
+  },
+  "input": {
+    "language": "zh-CN",
+    "text": "轻轻地向前移动两米。",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "向前移动",
+          "binding_items": {
+            "direction": "向前",
+            "distance": "两米",
+            "intensity": "轻轻地"
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t8"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "移动",
+            "走"
+          ],
+          "required_bindings": {
+            "direction": "向前",
+            "distance": "两米",
+            "intensity": "轻轻地"
+          },
+          "forbidden_binding_keys": [
+            "count",
+            "duration",
+            "location",
+            "speed"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "binding_dimension_separation",
+      "numeric_preservation",
+      "single_predicate_modifiers"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "dimension_confusion",
+        "description": "Move count, duration, distance, direction, or speed into the wrong binding dimension."
+      },
+      {
+        "type": "effect_merge_or_split",
+        "description": "Merge sibling effects or split one predicate's modifiers into extra Responsibilities."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

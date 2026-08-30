@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_friends_communication_compound_en_parallel",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "validation",
+  "category": "friends_communication",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_friends_communication_compound_en",
+    "variant": "parallel",
+    "size": 4
+  },
+  "input": {
+    "language": "en-US",
+    "text": "Walk left for 5 seconds while singing Lean on Me.",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "walk left",
+          "binding_items": {
+            "direction": "left",
+            "duration": 5
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t4"
+          }
+        },
+        {
+          "local_ref": "r2",
+          "outcome": "sing Lean on Me",
+          "binding_items": {
+            "entity": "Lean on Me"
+          },
+          "output_mode": "singing",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t6",
+            "source_end_token_ref": "t9"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": [
+        {
+          "kind": "parallel",
+          "refs": [
+            "r1",
+            "r2"
+          ]
+        }
+      ]
+    },
+    "semantic_expectations": {
+      "responsibility_count": 2,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "walk",
+            "move"
+          ],
+          "required_bindings": {
+            "direction": "left",
+            "duration": 5
+          },
+          "forbidden_binding_keys": []
+        },
+        {
+          "local_ref": "r2",
+          "output_mode": "singing",
+          "outcome_contains_any": [
+            "sing"
+          ],
+          "required_bindings": {
+            "entity": "Lean on Me"
+          },
+          "forbidden_binding_keys": []
+        }
+      ],
+      "coordination": [
+        {
+          "kind": "parallel",
+          "refs": [
+            "r1",
+            "r2"
+          ]
+        }
+      ],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "atomic_decomposition",
+      "typed_coordination",
+      "numeric_preservation",
+      "parallel_cross_mode_siblings"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "merged_effect",
+        "description": "Hide a vocal, speech, or gesture effect inside another Responsibility."
+      },
+      {
+        "type": "modifier_split",
+        "description": "Turn duration, count, speed, direction, or distance into a sibling effect."
+      },
+      {
+        "type": "coordination_loss",
+        "description": "Drop, reverse, or over-broaden an explicit sequence or parallel relation."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

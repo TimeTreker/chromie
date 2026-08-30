@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "description": "One-file-per-scenario adversarial daily-life Goal Interpretation assets with current primary-wire references and semantic invariants.",
+  "claim_boundary": "Synthetic assistant-authored candidate evidence for isolated GI prompt/schema/model evaluation only; not independent semantic qualification, deployed service, voice, simulator, target, or robot evidence.",
+  "authoring": {
+    "origin": "assistant_authored_contrast_sets",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "release_qualification": "independent_human_review_and_frozen_execution_required"
+  },
+  "coverage_contract": {
+    "scenario_count": 1496,
+    "contrast_set_count": 374,
+    "scenarios_per_contrast_set": 4,
+    "splits": {
+      "frozen_test": 380,
+      "train_candidate": 896,
+      "validation": 220
+    },
+    "languages": {
+      "en-US": 748,
+      "zh-CN": 748
+    },
+    "categories": {
+      "embodied_movement": 88,
+      "entertainment_media": 88,
+      "family_home": 88,
+      "friends_communication": 88,
+      "health_wellbeing": 88,
+      "household_objects_handover": 88,
+      "meals_kitchen": 88,
+      "multi_turn_continuity": 88,
+      "pets_garden": 88,
+      "routines_reminders": 88,
+      "school_learning": 88,
+      "shopping_errands": 88,
+      "social_emotional_conversation": 88,
+      "travel_navigation": 88,
+      "uncertainty_correction": 88,
+      "weather_local_information": 88,
+      "work_study": 88
+    },
+    "builders": {
+      "compound": 136,
+      "delivery": 136,
+      "dialogue_context": 136,
+      "embodied": 136,
+      "goal_continuity": 136,
+      "information": 136,
+      "role_scalar_dimensions": 136,
+      "speech": 136,
+      "stateful": 136,
+      "uncertainty_context": 136,
+      "vocal_media": 136
+    },
+    "known_host_validation_gaps": 0,
+    "semantic_coverage": {
+      "context_scenarios": 306,
+      "unresolved_scenarios": 102,
+      "binding_dimensions": {
+        "actor": 34,
+        "addressee": 34,
+        "attribute": 170,
+        "comparison": 34,
+        "count": 186,
+        "direction": 272,
+        "distance": 102,
+        "duration": 204,
+        "entity": 698,
+        "experiencer": 34,
+        "intensity": 6,
+        "item": 34,
+        "location": 306,
+        "magnitude": 34,
+        "polarity": 34,
+        "preference": 34,
+        "prior_assistant_utterance": 34,
+        "proposition": 306,
+        "quantity": 34,
+        "recipient": 714,
+        "severity": 34,
+        "speed": 60,
+        "subtype": 36,
+        "threshold": 68,
+        "time": 92,
+        "time_scope": 146
+      },
+      "output_modes": {
+        "body_action": 850,
+        "humming": 34,
+        "information": 204,
+        "media_playback": 34,
+        "nonverbal_vocalization": 16,
+        "recitation": 18,
+        "singing": 68,
+        "speech": 204,
+        "stateful_effect": 204,
+        "styled_speech": 34
+      },
+      "relationships": {
+        "cancel": 34,
+        "clarify": 34,
+        "continue": 34,
+        "modify": 34,
+        "new": 1496,
+        "resume": 34
+      }
+    }
+  },
+  "split_policy": {
+    "unit": "contrast_set",
+    "cross_split_contrast_sets_allowed": false,
+    "frozen_test_mutation": "owner_review_required",
+    "train_candidate_note": "Training remains prohibited until independent review promotes individual cases."
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_meals_kitchen_embodied_en_sequence",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "frozen_test",
+  "category": "meals_kitchen",
+  "difficulty": "medium",
+  "contrast_set": {
+    "id": "gi_daily_v1_meals_kitchen_embodied_en",
+    "variant": "sequence",
+    "size": 4
+  },
+  "input": {
+    "language": "en-US",
+    "text": "First walk left for 4 seconds, then nod 2 times.",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "walk left",
+          "binding_items": {
+            "direction": "left",
+            "duration": 4
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t1",
+            "source_end_token_ref": "t5"
+          }
+        },
+        {
+          "local_ref": "r2",
+          "outcome": "nod",
+          "binding_items": {
+            "count": 2
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t8",
+            "source_end_token_ref": "t10"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": [
+        {
+          "kind": "sequence",
+          "refs": [
+            "r1",
+            "r2"
+          ]
+        }
+      ]
+    },
+    "semantic_expectations": {
+      "responsibility_count": 2,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "walk",
+            "move"
+          ],
+          "required_bindings": {
+            "direction": "left",
+            "duration": 4
+          },
+          "forbidden_binding_keys": [
+            "count",
+            "location"
+          ]
+        },
+        {
+          "local_ref": "r2",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "nod"
+          ],
+          "required_bindings": {
+            "count": 2
+          },
+          "forbidden_binding_keys": [
+            "duration",
+            "location"
+          ]
+        }
+      ],
+      "coordination": [
+        {
+          "kind": "sequence",
+          "refs": [
+            "r1",
+            "r2"
+          ]
+        }
+      ],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "binding_dimension_separation",
+      "numeric_preservation",
+      "atomic_decomposition"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "dimension_confusion",
+        "description": "Move count, duration, distance, direction, or speed into the wrong binding dimension."
+      },
+      {
+        "type": "effect_merge_or_split",
+        "description": "Merge sibling effects or split one predicate's modifiers into extra Responsibilities."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

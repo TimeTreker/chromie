@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_family_home_dialogue_context_zh_elliptical_clarification",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "frozen_test",
+  "category": "family_home",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_family_home_dialogue_context_zh",
+    "variant": "elliptical_clarification",
+    "size": 4
+  },
+  "input": {
+    "language": "zh-CN",
+    "text": "明天下午。",
+    "context": {
+      "active_task_snapshots": [
+        {
+          "task_id": "task-family_home-zh-reminder",
+          "goal_id": "goal-family_home-zh-reminder",
+          "semantic_goal": {
+            "goal_id": "goal-family_home-zh-reminder",
+            "description": "提醒我出门前关窗",
+            "beneficiary": "我",
+            "object": {
+              "proposition": "出门前关窗"
+            },
+            "constraints": {}
+          },
+          "status": "open",
+          "open_information_gaps": [
+            {
+              "gap_id": "gap-family_home-zh-time",
+              "description": "什么时候提醒？",
+              "preferred_resolution": "ask_user"
+            }
+          ],
+          "last_user_update": "提醒我出门前关窗"
+        }
+      ]
+    }
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "明天下午提醒我出门前关窗",
+          "binding_items": {
+            "proposition": "出门前关窗",
+            "recipient": "我",
+            "time_scope": "明天下午"
+          },
+          "output_mode": "stateful_effect",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t3"
+          },
+          "relationship": "clarify",
+          "target_goal_ids": [
+            "goal-family_home-zh-reminder"
+          ]
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "stateful_effect",
+          "outcome_contains_any": [
+            "提醒"
+          ],
+          "required_bindings": {
+            "proposition": "出门前关窗",
+            "recipient": "我",
+            "time_scope": "明天下午"
+          },
+          "forbidden_binding_keys": [
+            "duration",
+            "time"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    },
+    "host_validation_expectation": {
+      "status": "accept"
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "multi_turn_semantic_continuity",
+      "pending_clarification_context",
+      "elliptical_reply"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "context_ignored",
+        "description": "Ignore an exact bounded referent, prior utterance, or pending clarification context."
+      },
+      {
+        "type": "context_overreach",
+        "description": "Guess among multiple context candidates instead of retaining genuine ambiguity."
+      },
+      {
+        "type": "relationship_loss",
+        "description": "Turn a clarification answer into an unrelated new Responsibility."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_school_learning_compound_zh_mixed_coordination",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "school_learning",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_school_learning_compound_zh",
+    "variant": "mixed_coordination",
+    "size": 4
+  },
+  "input": {
+    "language": "zh-CN",
+    "text": "向后走3秒，然后举手2次，同时告诉小林小组作业周五交。",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "向后走",
+          "binding_items": {
+            "direction": "向后",
+            "duration": 3
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t4"
+          }
+        },
+        {
+          "local_ref": "r2",
+          "outcome": "举手",
+          "binding_items": {
+            "count": 2
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t8",
+            "source_end_token_ref": "t11"
+          }
+        },
+        {
+          "local_ref": "r3",
+          "outcome": "告诉小林小组作业周五交",
+          "binding_items": {
+            "proposition": "小组作业周五交",
+            "recipient": "小林"
+          },
+          "output_mode": "speech",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t15",
+            "source_end_token_ref": "t25"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": [
+        {
+          "kind": "sequence",
+          "refs": [
+            "r1",
+            "r2"
+          ]
+        },
+        {
+          "kind": "parallel",
+          "refs": [
+            "r2",
+            "r3"
+          ]
+        }
+      ]
+    },
+    "semantic_expectations": {
+      "responsibility_count": 3,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "走",
+            "移动"
+          ],
+          "required_bindings": {
+            "direction": "向后",
+            "duration": 3
+          },
+          "forbidden_binding_keys": []
+        },
+        {
+          "local_ref": "r2",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "举手"
+          ],
+          "required_bindings": {
+            "count": 2
+          },
+          "forbidden_binding_keys": []
+        },
+        {
+          "local_ref": "r3",
+          "output_mode": "speech",
+          "outcome_contains_any": [
+            "告诉"
+          ],
+          "required_bindings": {
+            "proposition": "小组作业周五交",
+            "recipient": "小林"
+          },
+          "forbidden_binding_keys": []
+        }
+      ],
+      "coordination": [
+        {
+          "kind": "sequence",
+          "refs": [
+            "r1",
+            "r2"
+          ]
+        },
+        {
+          "kind": "parallel",
+          "refs": [
+            "r2",
+            "r3"
+          ]
+        }
+      ],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "atomic_decomposition",
+      "typed_coordination",
+      "numeric_preservation",
+      "mixed_sequence_parallel"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "merged_effect",
+        "description": "Hide a vocal, speech, or gesture effect inside another Responsibility."
+      },
+      {
+        "type": "modifier_split",
+        "description": "Turn duration, count, speed, direction, or distance into a sibling effect."
+      },
+      {
+        "type": "coordination_loss",
+        "description": "Drop, reverse, or over-broaden an explicit sequence or parallel relation."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

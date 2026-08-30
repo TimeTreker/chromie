@@ -1,0 +1,413 @@
+{
+  "schema_version": 1,
+  "qualification_id": "chromie.goal_interpreter.primary.v1",
+  "authority": "goal_interpretation",
+  "claim_boundary": "Isolated current-checkout primary Goal Interpretation semantics only; not Goal Association, Planner, Agent workflow, voice, simulator, target, or robot evidence.",
+  "cases": [
+    {
+      "id": "weather_exact_location",
+      "group": "temporal_and_location_binding",
+      "text": "今晚重庆会不会下雨哦？",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "information",
+            "outcome_contains_any": ["rain", "下雨", "降雨"],
+            "required_bindings": {
+              "location": ["重庆"],
+              "time_scope": ["今晚"]
+            },
+            "forbidden_binding_keys": ["time", "duration", "threshold"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "weather_tomorrow_location",
+      "group": "temporal_and_location_binding",
+      "source_scenario": "scenarios/general_ability/must_pass/tool_and_conversation_lane_discipline/shanghai_tomorrow_temperature.json",
+      "text": "明天上海冷不冷？",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "information",
+            "outcome_contains_any": ["cold", "temperature", "冷", "气温", "温度"],
+            "required_bindings": {
+              "location": ["上海"],
+              "time_scope": ["明天"]
+            },
+            "forbidden_binding_keys": ["time", "duration", "threshold"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "weather_explicit_threshold",
+      "group": "binding_dimension_separation",
+      "text": "重庆今天会超过30度吗？",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "information",
+            "outcome_contains_any": ["temperature", "exceed", "above", "超过", "气温", "温度"],
+            "required_bindings": {
+              "location": ["重庆"],
+              "time_scope": ["今天"],
+              "threshold": [30]
+            },
+            "forbidden_binding_keys": ["time", "duration", "count"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "compound_numeric_sequence",
+      "group": "atomic_decomposition_and_coordination",
+      "source_scenario": "scenarios/general_ability/must_pass/composable_action_planning/compound_walk_nod_turn.json",
+      "text": "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
+      "language": "en-US",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["walk", "locomot", "move", "前进", "行走", "走"],
+            "required_bindings": {
+              "speed": [0.2],
+              "duration": [10, "10 seconds"]
+            },
+            "forbidden_binding_keys": ["count"]
+          },
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["nod", "点头"],
+            "required_bindings": {
+              "count": [2]
+            },
+            "forbidden_binding_keys": ["duration", "speed", "direction"]
+          },
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["turn", "转"],
+            "required_bindings": {
+              "direction": ["left"]
+            },
+            "forbidden_binding_keys": ["duration", "speed", "count"]
+          }
+        ],
+        "coordination": [
+          {
+            "kind": "sequence",
+            "responsibility_indexes": [0, 1, 2]
+          }
+        ],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "filler_blink_twice",
+      "group": "spoken_language_robustness",
+      "source_scenario": "scenarios/general_ability/must_pass/robust_intent_understanding/filler_blink_twice.json",
+      "text": "嗯，那个……先眨两下眼睛吧。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["blink", "眨"],
+            "required_bindings": {
+              "count": [2]
+            },
+            "forbidden_binding_keys": ["duration"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "mixed_language_nod_twice",
+      "group": "spoken_language_robustness",
+      "source_scenario": "scenarios/general_ability/must_pass/robust_intent_understanding/mixed_language_nod_twice.json",
+      "text": "请 nod 两下。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["nod", "点头"],
+            "required_bindings": {
+              "count": [2]
+            },
+            "forbidden_binding_keys": ["duration"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "polite_walk_three_seconds",
+      "group": "spoken_language_robustness",
+      "source_scenario": "scenarios/general_ability/must_pass/robust_intent_understanding/polite_walk_three_seconds.json",
+      "text": "麻烦你往前走三秒，谢谢。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["walk", "locomot", "move", "前进", "行走", "走"],
+            "required_bindings": {
+              "direction": ["往前", "forward", "ahead"],
+              "duration": [3, "三秒"]
+            },
+            "forbidden_binding_keys": ["count", "time_scope"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "approximate_walk_duration",
+      "group": "binding_dimension_separation",
+      "source_scenario": "scenarios/general_ability/must_pass/stable_capability_grounding/colloquial_walk_about_five_seconds.json",
+      "text": "往前走个五秒左右。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["walk", "locomot", "move", "前进", "行走", "走"],
+            "required_bindings": {
+              "duration": [5, "五秒左右"],
+              "direction": ["往前", "forward", "ahead"]
+            },
+            "forbidden_binding_keys": ["count", "time_scope"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "parallel_gaze_blink",
+      "group": "atomic_decomposition_and_coordination",
+      "source_scenario": "scenarios/general_ability/must_pass/composable_action_planning/look_while_blinking_twice.json",
+      "text": "看着我三秒，同时眨两下眼睛。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["gaze", "look", "看"],
+            "required_bindings": {
+              "entity": ["我", "me"],
+              "duration": [3, "三秒"]
+            },
+            "forbidden_binding_keys": ["location", "count", "time_scope"]
+          },
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["blink", "眨"],
+            "required_bindings": {
+              "count": [2]
+            },
+            "forbidden_binding_keys": ["duration", "entity", "location"]
+          }
+        ],
+        "coordination": [
+          {
+            "kind": "parallel",
+            "responsibility_indexes": [0, 1]
+          }
+        ],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "person_target_is_not_location",
+      "group": "binding_dimension_separation",
+      "source_scenario": "scenarios/general_ability/must_pass/stable_capability_grounding/look_at_me_three_seconds.json",
+      "text": "看着我三秒。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["gaze", "look", "看"],
+            "required_bindings": {
+              "entity": ["我", "me"],
+              "duration": [3, "三秒"]
+            },
+            "forbidden_binding_keys": ["location", "count", "time_scope"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "ambiguous_bare_referent",
+      "group": "referent_uncertainty",
+      "source_scenario": "scenarios/general_ability/must_pass/natural_uncertainty_handling/tianxin_ambiguous_tool.json",
+      "text": "你能查天信吗？",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "information",
+            "outcome_contains_any": ["天信"],
+            "required_bindings": {
+              "entity": ["天信"]
+            },
+            "forbidden_binding_keys": ["location"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": true
+      }
+    },
+    {
+      "id": "ambiguous_deictic_object",
+      "group": "referent_uncertainty",
+      "source_scenario": "scenarios/general_ability/must_pass/natural_uncertainty_handling/ambiguous_object_bring_that.json",
+      "text": "把那个拿给我。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["bring", "hand", "拿", "递", "交给"],
+            "required_bindings": {
+              "entity": ["那个"],
+              "recipient": ["我", "me"]
+            },
+            "forbidden_binding_keys": ["location"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": true
+      }
+    },
+    {
+      "id": "mixed_vocal_body_parallel",
+      "group": "atomic_decomposition_and_coordination",
+      "text": "Sing a short song while waving.",
+      "language": "en-US",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "singing",
+            "outcome_contains_any": ["sing", "song", "唱", "歌"],
+            "required_bindings": {},
+            "forbidden_binding_keys": ["duration", "count"]
+          },
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["wave", "挥"],
+            "required_bindings": {},
+            "forbidden_binding_keys": ["duration", "count"]
+          }
+        ],
+        "coordination": [
+          {
+            "kind": "parallel",
+            "responsibility_indexes": [0, 1]
+          }
+        ],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "speech_and_body_siblings",
+      "group": "modality_separation",
+      "source_scenario": "scenarios/general_ability/must_pass/multi_goal_daily_life/nod_and_say_hello.json",
+      "text": "点两下头，再跟我说声你好。",
+      "language": "zh-CN",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["nod", "点头"],
+            "required_bindings": {
+              "count": [2]
+            },
+            "forbidden_binding_keys": ["duration"]
+          },
+          {
+            "output_mode": "speech",
+            "outcome_contains_any": ["greet", "hello", "say", "你好", "问候"],
+            "required_bindings": {},
+            "forbidden_binding_keys": ["count", "duration"]
+          }
+        ],
+        "coordination": [
+          {
+            "kind": "sequence",
+            "responsibility_indexes": [0, 1]
+          }
+        ],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "distance_and_direction_single_predicate",
+      "group": "binding_dimension_separation",
+      "text": "Walk forward five meters.",
+      "language": "en-US",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["walk", "locomot", "move", "前进", "行走", "走"],
+            "required_bindings": {
+              "direction": ["forward"],
+              "distance": [5, "five meters"]
+            },
+            "forbidden_binding_keys": ["duration", "count", "location"]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    },
+    {
+      "id": "cross_clause_acquire_delivery",
+      "group": "binding_dimension_separation",
+      "text": "Hello, I am thirsty and there is a bottle of water 50 meters ahead of you. Can you bring it to me? Thank you.",
+      "language": "en-US",
+      "expected": {
+        "responsibilities": [
+          {
+            "output_mode": "body_action",
+            "outcome_contains_any": ["bring", "deliver"],
+            "required_bindings": {
+              "direction": ["ahead", "ahead of you"],
+              "distance": [50, "50 meters"],
+              "entity": ["a bottle of water", "bottle of water"],
+              "recipient": ["me"]
+            },
+            "forbidden_binding_keys": [
+              "count",
+              "duration",
+              "location",
+              "speed",
+              "time_scope"
+            ]
+          }
+        ],
+        "coordination": [],
+        "unresolved": false
+      }
+    }
+  ]
+}

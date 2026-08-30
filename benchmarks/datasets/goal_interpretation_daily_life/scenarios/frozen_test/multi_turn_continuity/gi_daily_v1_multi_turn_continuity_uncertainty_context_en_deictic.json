@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_multi_turn_continuity_uncertainty_context_en_deictic",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "frozen_test",
+  "category": "multi_turn_continuity",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_multi_turn_continuity_uncertainty_context_en",
+    "variant": "deictic",
+    "size": 4
+  },
+  "input": {
+    "language": "en-US",
+    "text": "I checked two routes. Bring that to Mom.",
+    "context": {}
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 0.75,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "bring that to Mom",
+          "binding_items": {
+            "entity": "that",
+            "recipient": "Mom"
+          },
+          "output_mode": "body_action",
+          "confidence": 0.75,
+          "source_evidence": {
+            "source_start_token_ref": "t5",
+            "source_end_token_ref": "t8"
+          }
+        }
+      ],
+      "unresolved": [
+        "The object referred to by 'that' is not identified."
+      ],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "bring",
+            "hand"
+          ],
+          "required_bindings": {
+            "entity": "that",
+            "recipient": "Mom"
+          },
+          "forbidden_binding_keys": [
+            "location"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": true
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "uncertainty_calibration",
+      "source_perspective",
+      "genuine_referent_ambiguity",
+      "declarative_background"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "ambiguity_guess",
+        "description": "Guess the referent or category of an unresolved deictic or unfamiliar name."
+      },
+      {
+        "type": "filler_ambiguity",
+        "description": "Treat a discourse filler as an unresolved entity."
+      },
+      {
+        "type": "context_ignored",
+        "description": "Ignore an exact bounded discourse referent and ask again unnecessarily."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

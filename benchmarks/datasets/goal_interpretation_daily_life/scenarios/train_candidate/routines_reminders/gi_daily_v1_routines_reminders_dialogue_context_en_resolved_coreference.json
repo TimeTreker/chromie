@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "id": "gi_daily_v1_routines_reminders_dialogue_context_en_resolved_coreference",
+  "dataset_id": "chromie.goal_interpretation_daily_life.v1",
+  "split": "train_candidate",
+  "category": "routines_reminders",
+  "difficulty": "hard",
+  "contrast_set": {
+    "id": "gi_daily_v1_routines_reminders_dialogue_context_en",
+    "variant": "resolved_coreference",
+    "size": 4
+  },
+  "input": {
+    "language": "en-US",
+    "text": "Please bring the one we discussed to my brother.",
+    "context": {
+      "history": [
+        {
+          "role": "user",
+          "text": "The key card is on the top of the shoe cabinet."
+        }
+      ],
+      "discourse_referents": [
+        {
+          "entity": "key card",
+          "location": "the top of the shoe cabinet"
+        }
+      ]
+    }
+  },
+  "target": {
+    "reference_wire_output": {
+      "confidence": 1.0,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "outcome": "bring the key card to my brother",
+          "binding_items": {
+            "entity": "key card",
+            "location": "the top of the shoe cabinet",
+            "recipient": "my brother"
+          },
+          "output_mode": "body_action",
+          "confidence": 1.0,
+          "source_evidence": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t8"
+          }
+        }
+      ],
+      "unresolved": [],
+      "coordination": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 1,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "bring",
+            "hand",
+            "deliver"
+          ],
+          "required_bindings": {
+            "entity": "key card",
+            "location": "the top of the shoe cabinet",
+            "recipient": "my brother"
+          },
+          "forbidden_binding_keys": [
+            "actor"
+          ]
+        }
+      ],
+      "coordination": [],
+      "unresolved": false
+    }
+  },
+  "invariants": {
+    "one_semantic_authority_call": true,
+    "bindings_are_sparse_and_source_or_context_grounded": true,
+    "source_evidence_is_current_turn_only": true,
+    "binding_keys_lexicographic": true,
+    "must_not_emit_fields": [
+      "actions",
+      "activities",
+      "capability_id",
+      "execution_lane",
+      "goal_id",
+      "information_gaps",
+      "plan",
+      "provider_id",
+      "response_text",
+      "route",
+      "skill_id",
+      "task_id",
+      "tool_name",
+      "work_items"
+    ]
+  },
+  "adversarial_design": {
+    "phenomena": [
+      "multi_turn_semantic_continuity",
+      "bounded_context_coreference"
+    ],
+    "negative_hypotheses": [
+      {
+        "type": "context_ignored",
+        "description": "Ignore an exact bounded referent, prior utterance, or pending clarification context."
+      },
+      {
+        "type": "context_overreach",
+        "description": "Guess among multiple context candidates instead of retaining genuine ambiguity."
+      },
+      {
+        "type": "relationship_loss",
+        "description": "Turn a clarification answer into an unrelated new Responsibility."
+      },
+      {
+        "type": "how_leakage",
+        "description": "Emit a Capability, tool, provider, plan, or execution argument."
+      },
+      {
+        "type": "invented_ambiguity",
+        "description": "Report an execution or evidence limitation as unresolved human meaning."
+      }
+    ]
+  },
+  "review": {
+    "origin": "assistant_authored_contrast_set",
+    "reviewer_kind": "assistant_reference_model",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "qualification_required": "independent_human_review_and_frozen_execution"
+  }
+}

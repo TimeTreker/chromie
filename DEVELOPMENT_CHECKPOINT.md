@@ -1,8 +1,8 @@
 # Chromie Development Checkpoint
 
-Status: vLLM transport is qualified on RTX 4090 Laptop; production promotion is blocked by model semantics or authority compatibility
+Status: GI prompt and 1,496-case corpus are mechanically validated; production model/prompt qualification remains open
 Updated: 2026-08-30
-Pre-delivery baseline: `main` at `f5a49c6b0a48358566805a73dc58e311958143d2`
+Pre-delivery baseline: `main` at `c55ce694f46ade547844c1ebceebea8a0342b2c9`
 Expected resume revision: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
@@ -29,65 +29,71 @@ admitted turn -> GI WHAT/Responsibilities -> concurrent GA + Fast Planner
   GA binding, and canonical validation.
 - Keep validation fail-closed and keep stop/cancel/emergency deterministic.
 
-## Current worktree
+## Current delivery scope
 
-- The stale scenario fixtures now declare explicit communicative `delivery_phase` values;
-  the stale prompt-literal test protects the live WHAT contract instead of old wording.
-- The new delivery-handoff skill is indexed and owned; checkpoint length remains within
-  the repository documentation budget.
-- RTX 4090 Laptop assigns every LLM selector to `qwen3.5:4b`, one resident model, GI
-  16K/512, and downstream 32K stage contracts.
-- Ollama 0.32.14 logs that `qwen35` does not support parallel requests and starts
-  `n_seq_max=1` even with `OLLAMA_NUM_PARALLEL=2`. The profile truthfully declares
-  `OLLAMA_NUM_PARALLEL=1`; two provider sequence slots are not available.
-- CognitiveRuntime cleanup now gathers a concurrent Goal Association task even when it
-  already finished. This contains its exception when Fast Planner fails at the same time
-  and prevents `Task exception was never retrieved` without changing semantic authority.
-- The current GI prompt now matches its fresh-turn schema, and immutable source provenance
-  explicitly identifies user -> Chromie. Short fresh turns with no continuity context close
-  location spelling to exact source surfaces in the primary schema; continuity turns retain
-  context plus fail-closed Host validation. The Deep mechanical constraint now targets the
-  model-facing `binding_items` field rather than the removed legacy wire name.
-- `scripts/qualify_vllm_provider.py` is a no-deadline qualification probe for identity,
-  strict JSON, SSE streaming, two-sequence overlap, cancellation isolation, GPU/TTS
-  contention, and the current primary GI contract. It removes only vLLM-unsupported
-  `uniqueItems` decoder hints and retains canonical Host revalidation.
-- A no-HTTP-deadline Ollama follow-up screened four cached recommended controls plus
-  `gpt-oss:20b`. GPT-OSS fit only with TTS stopped, cannot disable its reasoning trace,
-  and reached 3/5 only in a non-production `think: low` diagnostic; no model was promoted.
-- The current GI prompt/schema now gives `unresolved[]` and the easily-confused binding
-  dimensions explicit decoder-visible contracts, and runs decomposition/binding coverage
-  as the final preflight. This keeps one primary semantic call and adds no Host classifier.
-  Production Qwen3.5-4B reached 3/5 once but a fresh same-source rerun scored 2/5;
-  weather temporal scope and compound duration/atomicity remain unstable hard failures.
-  A typed-array wire prototype was discarded after manual and holdout review.
+- The production GI system prompt is now a 10,225-character provider-neutral decision
+  procedure covering all 25 model-facing binding dimensions, atomic decomposition,
+  complete acquire-and-deliver outcomes, cross-clause collection, output modes,
+  coordination, uncertainty, source perspective, decoder-safe key order, and minimal
+  predicate evidence. It contains no candidate-model or reported-case literals.
+- `build_system_prompt()` conditionally projects Goal-continuity and accepted prior-
+  assistant-utterance rules only when authoritative bounded Context exposes those schema
+  surfaces. Primary, one mechanical DTO repair, and Deep GI use the same projection; no
+  model call, semantic reviewer, or authority owner was added.
+- A new frozen 15-case `goal_interpreter_primary_v1` manifest plus
+  `qualify_goal_interpreter_model_potential.py` separates raw model semantic potential from
+  production prompt/schema/Host compatibility and reports six dimensions independently.
+- RTX 5090 diagnostic evidence remains model-potential only. Ministral-3-14B retained
+  28/28 evaluable decomposition and output-mode passes across two repeats but only 16/28
+  binding passes; Granite4.2-8B retained all 15 outcomes/modes but passed 3/15 bindings.
+  Neither model, provider, nor runtime profile was promoted.
+- The checked-in `goal_interpretation_daily_life` corpus contains 1,496 one-file bilingual
+  daily-life scenarios in 374 four-case contrast sets, with whole-set train-candidate,
+  validation, and frozen-test splits. It covers all 25 binding dimensions, all ten concrete
+  output modes, continuity relationships, 306 context turns, and 102 genuine-unresolved
+  cases. It ships no scenario generator.
+- Every corpus reference passes its request-specific decoder schema and current Host
+  validator. Review fields remain `independent_semantic_review=false` and
+  `training_eligible=false`; this is mechanically checked candidate evidence, not model
+  inference or training qualification.
+- The Host whole-turn echo guard no longer rejects one atomic context-backed elliptical
+  clarification such as `Tomorrow afternoon.`. The exception requires one Responsibility,
+  `relationship=clarify`, exactly one supplied target Goal, and an unresolved blocking
+  `ask_user` information gap. All other whole-turn echoes remain fail-closed.
+- Repository profile truth remains unchanged. The current generated local runtime selects
+  `rtx5090`, GI `gemma4:12b`, 32,768 context, and 2,048 output tokens; `.env.runtime` was
+  inspected but not edited. Retained RTX 4090 all-Qwen evidence remains historical and
+  unqualified. No provider integration or deployment was changed.
 
 ## Root-cause workflow
 
 | Boundary | Actual current-source episode | Expected | Judgment |
 |---|---|---|---|
-| Gateway/GI | Admitted text reached one Qwen GI call; 18/48 timed out, 16/48 returned mechanically invalid provenance/authority/structure, 14/48 were accepted low-confidence outputs | One valid complete Responsibility result or typed fail-closed outcome | Model/provider blocker; validators correct |
-| GI fan-out | Each accepted result started GA and Fast concurrently | Both authorities make progress under their stage budgets | Architecture correct; provider has only one sequence slot |
-| Ollama/Qwen | One request ran while the other queued; Fast timed out in all 14 accepted-GI cases | Concurrent GA/Fast inference | Resource-profile blocker |
-| Fast transport | Current Agent emitted a typed `fast_planner_stream:timeout` failure | Typed pre/post-commit failure | Correct after rebuild |
-| Runtime cleanup | A GA task that failed just before Fast was done and therefore was not canceled or gathered | Every child task is joined on exit | Earliest software defect; fixed |
-| Capability/Provider | No plan reached canonical dispatch | No effect after hard failure | Correct fail-closed containment |
-| vLLM transport | v0.24.0 served two overlapping sequences, isolated cancellation, strict structured output, and remained healthy | Preserve concurrent/cancel/schema contracts | Qualified in isolated provider evidence |
-| Primary GI models | Revised object-wire Qwen3.5-4B observed 3/5 once and 2/5 on the fresh final rerun. A typed-array/source-closed prototype gave Ministral-3-14B mechanical 5/5, but manual review found false temporal typing; focused reruns duplicated duration and an unseen holdout was 6/8 mechanical, about 4/8 after manual review. Ministral-8B 1/5, Qwen3.5-9B 3/5, Gemma4-12B 3/5, and Gemma4-26B 3/5 on that experimental wire | Stable 5/5 plus manual review and current non-thinking authority contract before workflow/profile promotion | Model-facing array experiment discarded; no screened model is semantically qualified |
+| Dataset authoring | Assistant authored 1,496 exact inputs, semantic regions, wire references, and adversarial hypotheses | Reusable candidate corpus with explicit review limits | Correct candidate evidence; independent review still open |
+| Dynamic schema | All 1,496 references were validated against each request-specific model-facing schema | Closed DTO shape for every retained reference | Correct |
+| Host provenance/structure | Before the fix, 34 one-phrase clarification replies failed because their only new binding equaled the whole admitted turn | Context-backed binding must survive without weakening opaque-turn protection | Earliest current software defect; fixed |
+| Host echo fix | Allows the whole-turn binding only for one exact clarify target with a blocking unresolved `ask_user` gap | Mechanical exception, no semantic retyping or repair | Correct; 1,496/1,496 Host accepted |
+| Model-potential probe | Ministral and Granite preserved much of decomposition/modality but failed binding coverage | Select candidates without conflating raw semantics with production transaction | Diagnostic only; no promotion |
+| Production workflow | The new prompt/corpus was not run through a deployed current-revision GI/GA/Planner workflow | Exact prompt + schema + decoder + model + profile qualification | Unproven and still blocked |
 
-Initiating condition: all roles share one Qwen3.5 runner. Root model/resource causes are
-GI contract weakness and Ollama's one sequence slot. The downstream user-visible symptom
-is bounded failure speech with no Work. The separate software cause of the asyncio warning
-was cleanup joining only non-terminal tasks; gathering every terminal state restores task
-ownership without changing any model decision.
+Initiating trigger for the 34-case defect was a valid short clarification answer whose only
+new surface fact occupied the complete turn. The root cause was the Host echo guard treating
+all non-speech whole-turn bindings as envelope copies without consulting already-validated
+Goal relationship and pending-gap shape. The fix changes only that validator decision;
+downstream GA/Planner/Runtime were not invoked in the reproduced failure and no authority
+moved. Separately, weak binding accuracy remains a model/prompt/decoder qualification issue,
+not evidence for weakening Host validation.
 
 ## Evidence ledger
 
 | Evidence | Result | Limit |
 |---|---|---|
-| Final canonical local gate | repository/static/docs gates passed; 122 benchmark cases; 2,026 main tests; 20 legacy Agent tests | Automated source evidence |
-| Focused changed runtime file | 67/67 passed | Cleanup/concurrency regression only |
-| Level A composable + multi-Goal | 15/15 passed | Deterministic Level A only |
+| Final canonical local gate | repository/static/docs gates passed; 122 benchmark cases; 2,041 main tests; 20 legacy Agent tests | Automated source evidence on dirty pre-delivery tree |
+| Daily-life GI corpus validator | 1,496 schema passes; 1,496 Host passes; zero known Host gaps | Reference/corpus mechanics only; not live model inference |
+| Focused GI prompt/dataset tests | 67 passed plus 10 subtests | Prompt/schema/validator/corpus regression only |
+| Level A robust intent + Planner/Goal semantics | 12/12 passed | Deterministic Level A only |
+| Assistant-reference prompt audit | 16/16 schema, Host, and six-dimension passes | One strong assistant reference; no external model/provider call |
+| RTX 5090 model-potential probe | Ministral-3-14B 8/30 whole trials over two repeats; Granite4.2-8B 1/15; dimension details retained | Simplified wire, dirty checkout, isolated model evidence only |
 | RTX profile/provider probe | RTX 4090 Laptop 16,376 MiB; one Qwen3.5 32K runner; CosyVoice and Qwen fit; configured parallel 2 still created `n_seq_max=1` | Resource evidence, not semantics |
 | Current-source live-text must-pass cohort | 0/50; core 15 and challenge 8 gated off | Diagnostic C-preview; no execution/audio/hardware claim |
 | vLLM 0.24.0 / Qwen3.5-4B provider contract | strict JSON, SSE, real two-sequence overlap, cancellation isolation passed; peak 14,953 MiB with TTS | TTS first-audio slowed 2.37x under two long decode streams; no playback claim |
@@ -114,21 +120,22 @@ matches the current checkout file hashes and current failures use typed stream f
 
 ## Exact resume point
 
-1. Preserve the green canonical local gate; the current run passed all required checks.
-2. Do not rerun or append to the retained current-source cohort and do not collect another
-   bundle for it.
-3. Treat all-Qwen target qualification as blocked, not passed. Do not weaken validators,
-   add a semantic repair/reviewer, or inflate timeouts around a single provider slot.
-4. Do not promote a production provider yet. The revised prompt reached 3/5 once but the
-   fresh final Qwen3.5-4B run returned to 2/5; the same weather temporal-scope and compound
-   duration/atomicity classes still fail across larger models. The next semantic
-   change must improve primary-result binding coverage generally; do not add phrase rules,
-   a reviewer/repair call, or reasoning-only authority without explicit owner authorization.
-5. Retain `qwen3.5:4b` for all deployed roles until a model passes the primary screen and
-   the complete current workflow. After a material deployment/model change, rebuild
-   `chromie-agent`, verify deployed
-   source hashes, capture a fresh identity, then run one complete directory-discovered
-   cohort and collect exactly one post-cohort bundle.
+1. Preserve the green canonical local gate and the 1,496/1,496 schema/Host corpus result.
+2. Keep every corpus split non-training: independent semantic review and frozen execution
+   remain required before promoting any scenario to training evidence.
+3. Run a blind exact-production-prompt evaluation over the corpus only through a callable,
+   revision-bound model endpoint. Store raw output before grading and keep model, prompt,
+   schema, decoder, parameters, repeats, latency, and failure attribution separate. The
+   proposed Codex-strength 1,496-case self-evaluation was discussed but not run.
+4. Treat Ministral/Granite model-potential results as candidate-selection diagnostics only.
+   Do not attribute a combined transaction failure solely to model or prompt, and do not
+   promote a production provider/profile until the exact production screen and complete
+   workflow pass.
+5. Preserve the narrow clarification exception and its negative regressions. Do not expand
+   it into substring semantics, phrase rules, Host resegmentation, or a semantic repair call.
+6. Do not rerun or append to the retained all-Qwen current-source cohort. After a material
+   deployment/model change, rebuild `chromie-agent`, verify source hashes, capture a fresh
+   identity, run one complete directory-discovered cohort, and retain exactly one bundle.
 
 ## Claim boundary
 
