@@ -1,8 +1,8 @@
 # Chromie Development Checkpoint
 
-Status: GI prompt and 1,496-case corpus are mechanically validated; production model/prompt qualification remains open
-Updated: 2026-08-30
-Pre-delivery baseline: `main` at `c55ce694f46ade547844c1ebceebea8a0342b2c9`
+Status: selected fixed-v4 GI prompt passes the complete 1,496-case offline diagnostic; exact production provider/model qualification remains open
+Updated: 2026-08-31
+Pre-delivery baseline: `main` at `ae250dd8ae40a01f58eb415b3f6e84e7bceed553`
 Expected resume revision: the latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
@@ -31,67 +31,69 @@ admitted turn -> GI WHAT/Responsibilities -> concurrent GA + Fast Planner
 
 ## Current delivery scope
 
-- The production GI system prompt is now a 10,225-character provider-neutral decision
-  procedure covering all 25 model-facing binding dimensions, atomic decomposition,
-  complete acquire-and-deliver outcomes, cross-clause collection, output modes,
-  coordination, uncertainty, source perspective, decoder-safe key order, and minimal
-  predicate evidence. It contains no candidate-model or reported-case literals.
-- `build_system_prompt()` conditionally projects Goal-continuity and accepted prior-
-  assistant-utterance rules only when authoritative bounded Context exposes those schema
-  surfaces. Primary, one mechanical DTO repair, and Deep GI use the same projection; no
-  model call, semantic reviewer, or authority owner was added.
-- A new frozen 15-case `goal_interpreter_primary_v1` manifest plus
-  `qualify_goal_interpreter_model_potential.py` separates raw model semantic potential from
-  production prompt/schema/Host compatibility and reports six dimensions independently.
-- RTX 5090 diagnostic evidence remains model-potential only. Ministral-3-14B retained
-  28/28 evaluable decomposition and output-mode passes across two repeats but only 16/28
-  binding passes; Granite4.2-8B retained all 15 outcomes/modes but passed 3/15 bindings.
-  Neither model, provider, nor runtime profile was promoted.
-- The checked-in `goal_interpretation_daily_life` corpus contains 1,496 one-file bilingual
-  daily-life scenarios in 374 four-case contrast sets, with whole-set train-candidate,
-  validation, and frozen-test splits. It covers all 25 binding dimensions, all ten concrete
-  output modes, continuity relationships, 306 context turns, and 102 genuine-unresolved
-  cases. It ships no scenario generator.
-- Every corpus reference passes its request-specific decoder schema and current Host
-  validator. Review fields remain `independent_semantic_review=false` and
-  `training_eligible=false`; this is mechanically checked candidate evidence, not model
-  inference or training qualification.
-- The Host whole-turn echo guard no longer rejects one atomic context-backed elliptical
-  clarification such as `Tomorrow afternoon.`. The exception requires one Responsibility,
-  `relationship=clarify`, exactly one supplied target Goal, and an unresolved blocking
-  `ask_user` information gap. All other whole-turn echoes remain fail-closed.
-- Repository profile truth remains unchanged. The current generated local runtime selects
-  `rtx5090`, GI `gemma4:12b`, 32,768 context, and 2,048 output tokens; `.env.runtime` was
-  inspected but not edited. Retained RTX 4090 all-Qwen evidence remains historical and
-  unqualified. No provider integration or deployment was changed.
+- The selected fixed-v4 GI system prompt and request-specific schema descriptions now agree
+  that directly supplied Arabic-digit duration, speed, distance, threshold, quantity, and
+  magnitude values are JSON numbers when no conversion is required. The prior prompt/schema
+  contradiction was the earliest shared boundary behind the largest residual cluster.
+- Existing role and mode owners are clearer without adding terms or calls: `recipient` is
+  the actual receiver of transferred/communicated content, a named third party asked a
+  supplied question is `speech` with `addressee`, a question Chromie must answer from unknown
+  truth is `information`, and ordinary breathing remains `body_action` unless an audible
+  nonverbal sound is explicitly requested.
+- A separate circumstance, correction, replacement, or binding-only clause may provide a
+  final binding without automatically widening the positive predicate's source evidence.
+  An anaphoric continuation that only adds duration/extent remains one Responsibility.
+- Dynamic schema descriptions carry the same numeric, role, output-mode, proposition,
+  preference, subtype, and evidence-span distinctions. No Host semantic resegmentation,
+  phrase rule, compatibility path, runtime flag, provider integration, or semantic owner was
+  added. GI still authors one complete primary result; the retained post-hoc evaluator never
+  participates in production inference or repair.
+- The complete 1,496-case directory-discovered corpus was run on one fixed-v4 source/prompt
+  identity using isolated `gpt-5.6-sol`/high Codex calls. All 1,496 calls completed; generated
+  schema and current production Host validation passed 1,496/1,496; mechanical reference
+  equality was 789/1,496 versus the 461-case baseline.
+- A single same-model post-hoc semantic self-audit judged 1,355/1,496 v4 candidates valid,
+  141 invalid, and recommended no further prompt change. It judged only 1,078 assistant
+  references valid and produced inconsistent count/schema judgments, so it is diagnostic,
+  non-independent, and ineligible for training or production promotion.
+- A broader fixed-v5 wording experiment completed the same full run but regressed to 761
+  mechanical and 1,338 self-adjudicated semantic passes. It was rejected; the prompt and
+  implementation/test patch were restored exactly to v4 before final gates.
+- `docs/STATUS.md` now records this evidence and its limits. Repository runtime/profile truth
+  is otherwise unchanged; no model, provider, profile, service, deployment, audio, simulator,
+  or robot behavior was promoted.
 
 ## Root-cause workflow
 
-| Boundary | Actual current-source episode | Expected | Judgment |
+| Boundary | Actual fixed-v4 episode | Expected | Judgment |
 |---|---|---|---|
-| Dataset authoring | Assistant authored 1,496 exact inputs, semantic regions, wire references, and adversarial hypotheses | Reusable candidate corpus with explicit review limits | Correct candidate evidence; independent review still open |
-| Dynamic schema | All 1,496 references were validated against each request-specific model-facing schema | Closed DTO shape for every retained reference | Correct |
-| Host provenance/structure | Before the fix, 34 one-phrase clarification replies failed because their only new binding equaled the whole admitted turn | Context-backed binding must survive without weakening opaque-turn protection | Earliest current software defect; fixed |
-| Host echo fix | Allows the whole-turn binding only for one exact clarify target with a blocking unresolved `ask_user` gap | Mechanical exception, no semantic retyping or repair | Correct; 1,496/1,496 Host accepted |
-| Model-potential probe | Ministral and Granite preserved much of decomposition/modality but failed binding coverage | Select candidates without conflating raw semantics with production transaction | Diagnostic only; no promotion |
-| Production workflow | The new prompt/corpus was not run through a deployed current-revision GI/GA/Planner workflow | Exact prompt + schema + decoder + model + profile qualification | Unproven and still blocked |
+| Target-blind prepare | Parsed scenario identity/input/context and retained request packets without `target`, `reference_wire_output`, or `semantic_expectations` markers | Inference cannot see labels | Correct; 0 marker files |
+| GI payload builder | Exact fixed-v4 system/user bodies plus each request-specific schema | One complete WHAT contract per case | Correct; prompt SHA retained |
+| Codex transport | Wrapped both production message bodies and schema in one read-only Codex envelope; 8 independent workers | One raw result per case | 1,496/1,496 completed; role/strict-decoder fidelity remains unproven |
+| Raw evidence store | Retained raw JSON and stdout/stderr before grading | Immutable evidence before attribution | Correct; all manifest/state/request/raw hashes matched |
+| Schema/Host boundary | Validated each raw result with generated schema and production Host mechanics | Hard failures cannot be averaged | 1,496/1,496; no hard failure |
+| Mechanical oracle | Compared candidate to assistant-authored references | Narrow difference signal only | 789 exact; reference defects remain common |
+| Post-hoc self-audit | Examined frozen candidates after inference; never repaired or re-called GI | Diagnostic attribution only | 1,355 valid; non-independent and internally inconsistent |
+| Version selection | Compared complete v4 and v5 cohorts | Reject net regression | v4 selected; v5 reverted |
 
-Initiating trigger for the 34-case defect was a valid short clarification answer whose only
-new surface fact occupied the complete turn. The root cause was the Host echo guard treating
-all non-speech whole-turn bindings as envelope copies without consulting already-validated
-Goal relationship and pending-gap shape. The fix changes only that validator decision;
-downstream GA/Planner/Runtime were not invoked in the reproduced failure and no authority
-moved. Separately, weak binding accuracy remains a model/prompt/decoder qualification issue,
-not evidence for weakening Host validation.
+The initiating condition was the full bilingual corpus exposing repeated binding/type and
+evidence-span disagreements. The confirmed root cause was a contradiction and ambiguity in
+the primary model-facing prompt/schema contract; the downstream mechanical oracle amplified
+symptoms because many assistant references were also defective. The v4 fix changes only the
+primary GI contract presented to the existing semantic authority. Schema/Host validation,
+GA, Planner, Capability Runtime, live services, and robot execution were not invoked to
+reinterpret or repair these offline cases.
 
 ## Evidence ledger
 
 | Evidence | Result | Limit |
 |---|---|---|
-| Final canonical local gate | repository/static/docs gates passed; 122 benchmark cases; 2,041 main tests; 20 legacy Agent tests | Automated source evidence on dirty pre-delivery tree |
+| Final canonical local gate | repository/static/docs gates passed; 2,045 main tests; 20 legacy Agent tests | Automated source evidence on dirty pre-delivery tree |
 | Daily-life GI corpus validator | 1,496 schema passes; 1,496 Host passes; zero known Host gaps | Reference/corpus mechanics only; not live model inference |
-| Focused GI prompt/dataset tests | 67 passed plus 10 subtests | Prompt/schema/validator/corpus regression only |
-| Level A robust intent + Planner/Goal semantics | 12/12 passed | Deterministic Level A only |
+| Focused GI prompt tests | 68 passed plus 10 subtests | Prompt/schema regression only |
+| Level A robust intent + Planner/Goal semantics | 12/12 passed; `.chromie/acceptance/general-ability/20260830T161609Z-level-a/` | Deterministic Level A only |
+| Fixed-v4 target-blind Codex cohort | 1,496/1,496 calls; 789 mechanical; 1,496 schema/Host; 1,355 same-model semantic self-passes | Codex text envelope, not exact production roles/decoder; reviewer non-independent |
+| Fixed-v5 rejection cohort | 1,496/1,496 calls; 761 mechanical; 1,338 semantic self-passes; one unstable prompt-gap judgment | Rejected experiment; source restored to v4 |
 | Assistant-reference prompt audit | 16/16 schema, Host, and six-dimension passes | One strong assistant reference; no external model/provider call |
 | RTX 5090 model-potential probe | Ministral-3-14B 8/30 whole trials over two repeats; Granite4.2-8B 1/15; dimension details retained | Simplified wire, dirty checkout, isolated model evidence only |
 | RTX profile/provider probe | RTX 4090 Laptop 16,376 MiB; one Qwen3.5 32K runner; CosyVoice and Qwen fit; configured parallel 2 still created `n_seq_max=1` | Resource evidence, not semantics |
@@ -101,7 +103,18 @@ not evidence for weakening Host validation.
 | Recommended Ollama follow-up | Ministral-3-14B 2/5, Ministral-3-8B 1/5, Gemma4-e4B 1/5, Gemma4-12B 2/5; GPT-OSS `think:false` 0/5 empty content, `think:low` diagnostic 3/5 | No HTTP deadline; isolated GI only. GPT-OSS used 12,951/16,376 MiB without TTS and cannot disable reasoning |
 | Revised prompt/model screen | Object wire: Qwen3.5-4B best 3/5, fresh final 2/5 at 9,275 MiB with TTS. Discarded typed wire: Ministral-14B 5/5 mechanical but manual failure and 6/8 unseen holdout mechanical/about 4/8 manual; all other cached candidates <=3/5 | No HTTP deadline; direct GI only. No candidate passed manual review and no model/profile was promoted |
 
-Current cohort:
+Retained selected/rejected offline evidence (local ignored artifacts):
+
+- selected: `.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v4/`
+- selected report: `.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v4/ANALYSIS.zh-CN.md`
+- rejected experiment: `.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v5/`
+- v4 qualification identity: `chromie.codex_gi_reference_full.fixed_v4`
+- model/effort: `gpt-5.6-sol`, `high`; production options are metadata only
+- prompt SHA-256: `2d0ce9814d3b8e882b925800225b152aaf0f0f3c6b5f838a5d9e7196eebb62ad`
+- pre-status-update v4 worktree diff SHA-256:
+  `bf365f0a2e251f548a1953ab1f2e4abc95a9606004119b14e76821a59543f3a9`
+
+Historical deployed current-source cohort remains unchanged:
 
 - evidence: `.chromie/acceptance/general-ability/qwen35-all-roles-current-20260829T133621Z/live-text`
 - identity: `2ab46a7cb42053391fe9fc0acbef77bc8d562bc3e9f6fd30c70f7f9becbeee91`
@@ -120,17 +133,18 @@ matches the current checkout file hashes and current failures use typed stream f
 
 ## Exact resume point
 
-1. Preserve the green canonical local gate and the 1,496/1,496 schema/Host corpus result.
+1. Preserve the green canonical local gate, the selected fixed-v4 prompt identity, and the
+   1,496/1,496 schema/Host corpus result. Do not reintroduce rejected v5 wording merely to
+   match a stochastic self-review judgment.
 2. Keep every corpus split non-training: independent semantic review and frozen execution
    remain required before promoting any scenario to training evidence.
-3. Run a blind exact-production-prompt evaluation over the corpus only through a callable,
-   revision-bound model endpoint. Store raw output before grading and keep model, prompt,
-   schema, decoder, parameters, repeats, latency, and failure attribution separate. The
-   proposed Codex-strength 1,496-case self-evaluation was discussed but not run.
-4. Treat Ministral/Granite model-potential results as candidate-selection diagnostics only.
-   Do not attribute a combined transaction failure solely to model or prompt, and do not
-   promote a production provider/profile until the exact production screen and complete
-   workflow pass.
+3. The next qualification step is an exact deployed provider/model/strict-decoder run bound
+   to a committed revision and runtime identity. Keep prompt, schema, decoder, model,
+   parameters, latency, and failure attribution separate; the Codex envelope cannot close
+   that claim.
+4. Seek independent semantic review before changing training eligibility or treating 1,355
+   as truth. Correct evaluator/reference defects in their owning evidence, not by tuning the
+   production prompt to a reviewer.
 5. Preserve the narrow clarification exception and its negative regressions. Do not expand
    it into substring semantics, phrase rules, Host resegmentation, or a semantic repair call.
 6. Do not rerun or append to the retained all-Qwen current-source cohort. After a material

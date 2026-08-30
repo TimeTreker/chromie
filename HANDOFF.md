@@ -7,7 +7,7 @@ Authority: operational snapshot only; source, tests, retained evidence, and the 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Pre-delivery branch/base: `main` at `c55ce694f46ade547844c1ebceebea8a0342b2c9`
+- Pre-delivery branch/base: `main` at `ae250dd8ae40a01f58eb415b3f6e84e7bceed553`
 - Expected resume revision: latest `origin/main` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
 - Delivery scope: all project changes listed below are committed together; retained
@@ -34,45 +34,69 @@ raw-token TTS, or Work before terminal Plan + GA binding + canonical validation.
 
 ## Worktree changes
 
-- `goal_interpreter_system.txt` is now a 10,225-character general decision procedure rather
-  than repeated schema/validator prose. It covers atomic Responsibilities, all 25 binding
-  dimensions, cross-clause collection, complete acquire-and-deliver outcomes, exact output
-  modes, typed coordination, uncertainty, source perspective, lexicographic decoder order,
-  and minimal predicate evidence without candidate-model or reported-case literals.
-- `OllamaGoalInterpreter.build_system_prompt()` projects Goal-continuity and accepted
-  prior-assistant-utterance instructions only when supplied bounded Context exposes those
-  schema surfaces. Primary, one permitted mechanical DTO repair, and Deep GI use the same
-  projection; no extra semantic call or authority was introduced.
-- `benchmarks/manifests/goal_interpreter_primary_v1.json` freezes 15 source-linked semantic
-  probes. `scripts/qualify_goal_interpreter_model_potential.py` uses a simplified V2 wire to
-  measure decomposition, outcome, output mode, bindings, coordination, and unresolved
-  separately from production prompt/schema/Host compatibility. The existing vLLM probe now
-  shares manifest loading and dimension scoring with this diagnostic.
-- `benchmarks/datasets/goal_interpretation_daily_life/` contains 1,496 checked-in scenario
-  JSON files, one per file, in 374 bilingual four-case contrast sets across 17 daily-life
-  categories. Whole contrast sets stay in `train_candidate` (896), `validation` (220), or
-  `frozen_test` (380). The corpus covers all 25 binding dimensions, all ten concrete output
-  modes, Goal continuity, 306 context turns, and 102 genuine-unresolved cases.
-- The corpus ships its manifest, owner README, validator, and regression test; it does not
-  ship a scenario generator. Every scenario remains assistant-authored candidate evidence
-  with `independent_semantic_review=false` and `training_eligible=false`.
-- The Host transport-echo validator now keeps a binding equal to the complete short turn
-  only when the validated DTO has one `relationship=clarify` Responsibility, exactly one
-  supplied target Goal, and that Goal owns an unresolved blocking `ask_user` information
-  gap. This repairs 34 elliptical-clarification false rejections while ordinary, compound,
-  closed-gap, and trusted-service-gap whole-turn echoes still fail closed.
-- `docs/STATUS.md`, `docs/ACCEPTANCE.md`, and the documentation index now distinguish raw
-  model potential, assistant-reference prompt clarity, corpus mechanics, exact production
-  transaction qualification, and live robot evidence.
+- `agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt` now carries
+  the selected fixed-v4 general contract: Arabic-digit scalar normalization, exact role/mode
+  distinctions, anaphoric modifier ownership, and correction/binding-only source-evidence
+  boundaries. It contains no case-specific phrase rule.
+- `agent/app/cognitive_core/goal_interpreter/model_interpreter.py` projects matching dynamic
+  schema descriptions for numeric dimensions, recipient/addressee, proposition/preference,
+  subtype/intensity, output modes, and source-token boundaries. It does not add a call,
+  reviewer, repair chain, runtime switch, or authority.
+- `tests/test_goal_interpreter_llm_prompt.py` adds regressions for those prompt/schema
+  contracts. The final selected source has 68 focused passes plus 10 subtests.
+- `docs/STATUS.md` records the complete fixed-v4/fixed-v5 offline evidence and its claim
+  limits. `DEVELOPMENT_CHECKPOINT.md` and this handoff carry the exact Git resume boundary.
+- A broader fixed-v5 prompt/schema wording experiment was run on all 1,496 cases, regressed,
+  and was fully reverted. Before updating evidence-only status/handoff documents, the prompt
+  SHA and complete tracked diff matched the retained v4 manifest. The current prompt still
+  matches v4 exactly.
 
-Repository surface delta: 1,504 new files and ten modified existing files in this delivery,
-including this checkpoint/handoff pair. The net-new surface is required to retain 1,496
-independently addressable scenarios plus one dataset owner/manifest/validator/test and one
-frozen primary manifest/model-potential probe/test. It adds one current document (the dataset
-README, indexed under its dataset owner), no environment variable, architecture term,
-compatibility path, provider integration, or runtime profile. Consolidation opportunity:
-future corpus revisions should update these same owners and shared validators rather than add
-another GI dataset format or qualification script.
+Repository surface delta for this delivery: zero new tracked files and six modified tracked
+owners, including the checkpoint/handoff pair. It adds no current document, environment
+variable, architecture term, compatibility path, provider integration, or runtime profile.
+The ignored `.chromie` analysis report is local retained evidence, not repository surface.
+Consolidation opportunity: any future evaluator/reference correction belongs in the existing
+corpus/evidence tooling rather than another production prompt layer or dataset format.
+
+## Fixed-v4 full-corpus evidence
+
+The complete target-blind inference and post-hoc audit are local ignored artifacts:
+
+```text
+.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v4/
+.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v4/ANALYSIS.zh-CN.md
+.chromie/acceptance/model-qualification/codex-gi-reference-full-fixed-v5/
+.chromie/acceptance/general-ability/20260830T161609Z-level-a/
+```
+
+The first two paths are the selected v4 evidence/report; fixed-v5 is retained only as the
+rejected regression experiment. These ignored paths are available on this development host
+but will not be transferred by Git push. On another machine, use the committed checkpoint,
+handoff, source, and status as the resume truth unless the artifacts are copied separately.
+
+Selected identity and results:
+
+- qualification: `chromie.codex_gi_reference_full.fixed_v4`
+- fixed source revision: `ae250dd8ae40a01f58eb415b3f6e84e7bceed553` plus the retained
+  dirty implementation/test/status patch recorded by the manifest
+- model: `gpt-5.6-sol`; reasoning effort `high`; one semantic inference call per case
+- prompt SHA-256: `2d0ce9814d3b8e882b925800225b152aaf0f0f3c6b5f838a5d9e7196eebb62ad`
+- manifest worktree diff SHA-256:
+  `bf365f0a2e251f548a1953ab1f2e4abc95a9606004119b14e76821a59543f3a9`
+- inference: 1,496/1,496 completed, 0 failed, 0 timed out
+- request/raw integrity: 1,496 request directories and raw JSON files; request/schema/raw
+  hashes matched; target/reference markers in request packets: 0
+- generated schema and production Host acceptance: 1,496/1,496
+- mechanical assistant-reference equality: 789/1,496; initial baseline was 461
+- same-model one-reviewer self-audit: 1,355 valid, 141 invalid, no recommended prompt
+  change; only 1,078 assistant-authored references judged valid
+- fixed-v5: 761 mechanical and 1,338 self-adjudicated semantic passes; rejected
+
+Transport limit: Codex CLI carried the two exact production message bodies and exact schema
+inside one user envelope and did not provide production strict-decoder/role fidelity. The
+post-hoc reviewer used the same model and made inconsistent count/schema judgments. Neither
+cohort is exact production-model qualification, independent semantic review, training
+approval, live service evidence, audio evidence, simulator evidence, or robot evidence.
 
 ## RTX 5090 GI prompt and dataset evidence
 
@@ -103,8 +127,8 @@ Both reports use simplified prompt digest
 `c55ce694f46ade547844c1ebceebea8a0342b2c9`. They select candidates only; neither tests
 the exact production prompt/decoder/Host transaction nor qualifies a model or robot.
 
-The current production prompt digest is
-`835a0a0ef3273e96e6dc3504ab8798d21b794f6505fb3b3a630ccdbb91568b25`.
+The selected current production prompt digest is
+`2d0ce9814d3b8e882b925800225b152aaf0f0f3c6b5f838a5d9e7196eebb62ad`.
 The 16-case assistant-reference audit is retained at:
 
 ```text
@@ -343,7 +367,7 @@ python scripts/check_repository_policies.py
 15 rule families, 0 reviewed exceptions; passed
 
 ./scripts/run_tests.sh
-122 benchmark cases; 2,041 main tests; 20 legacy Agent tests; passed
+2,045 main tests; 20 legacy Agent tests; passed
 
 python scripts/check_docs.py
 98 Markdown files; passed
@@ -358,18 +382,18 @@ GI corpus and focused evidence:
 python benchmarks/datasets/goal_interpretation_daily_life/validate.py
 1,496/1,496 dynamic-schema passed; 1,496/1,496 Host passed; 0 known Host gaps
 
-python -m pytest -q \
-  benchmarks/tests/test_goal_interpretation_daily_life_dataset.py \
-  tests/test_goal_interpreter_llm_prompt.py
-67 passed, 10 subtests passed
+python -m pytest tests/test_goal_interpreter_llm_prompt.py -q
+68 passed, 10 subtests passed
 
 python scripts/general_ability_acceptance.py --mode level-a \
   --ability-class robust_intent_understanding \
-  --ability-class planner_goal_semantic_quality --no-write
-12/12 passed, Level A
+  --ability-class planner_goal_semantic_quality --json
+12/12 passed, Level A; evidence at
+.chromie/acceptance/general-ability/20260830T161609Z-level-a/
 ```
 
-`git diff --check` and `git diff --cached --check` passed before delivery preparation.
+`git diff --check` passed before delivery preparation. `git diff --cached --check` must run
+after staging and before the commit.
 Do not convert corpus mechanics, assistant reference, Level A, dirty-checkout model-potential,
 or historical C-preview evidence into deployed model, live voice, simulator, or robot claims.
 
@@ -390,12 +414,11 @@ python benchmarks/datasets/goal_interpretation_daily_life/validate.py
 ```
 
 Do not train on the corpus until independent semantic review promotes individual retained
-assets. The next useful evidence is a blind exact-production-prompt run: each invocation
-must receive only its immutable input/context, current prompt, and request-specific schema;
-store raw output before grading, pin the model/digest/parameters/repeats, and attribute
-Prompt, model, schema/decoder, validator, and label failures separately. The discussed
-Codex-strength 1,496-case self-evaluation was not run because this task had no callable
-isolated self-inference endpoint.
+assets. The target-blind Codex-strength 1,496-case self-evaluation has now run and is retained
+locally at the fixed-v4 path above. The next useful evidence is an exact deployed
+provider/model/strict-decoder run bound to the committed revision and runtime identity;
+store raw output before grading and keep prompt, schema, decoder, parameters, repeats,
+latency, and failure attribution separate.
 
 Do not rerun or append to the retained all-Qwen current-source cohort and do not collect
 another bundle for it. The current all-Qwen production profile remains unqualified. Do not

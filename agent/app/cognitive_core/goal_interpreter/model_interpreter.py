@@ -2242,7 +2242,9 @@ class OllamaGoalInterpreter:
                     "or rejected on its own requires a sibling Responsibility. For "
                     "one predicate, duration, speed, direction, distance, count, intensity, "
                     "and other modifiers belong in bindings and never become sibling "
-                    "outcomes. Mentioning a modifier in outcome prose does not preserve "
+                    "outcomes. An anaphoric continuation that only extends that same "
+                    "predicate's duration or extent is still one outcome. Mentioning a "
+                    "supported modifier in outcome prose does not preserve "
                     "it: every material modifier must also appear under its typed "
                     "binding_items key. For "
                     "body_action, name the actual source predicate such as locomote, "
@@ -2300,11 +2302,17 @@ class OllamaGoalInterpreter:
                         field_schema.pop("maxLength", None)
                         field_schema["enum"] = source_token_refs
                         field_schema["description"] = (
-                            "First token of only this Responsibility's positive "
-                            "predicate; exclude shared coordination and sibling tokens."
+                            "First token of only this Responsibility's positive request "
+                            "clause, including a clause-opening modal or request marker "
+                            "such as please/请; exclude a separate circumstance, correction, "
+                            "replacement, or binding-only clause and exclude shared "
+                            "coordination and sibling tokens."
                             if field_name == "source_start_token_ref"
                             else "Last token of only this Responsibility's positive "
-                            "predicate; exclude shared coordination and sibling tokens."
+                            "predicate. A later correction may supply the final binding "
+                            "without widening this span; exclude separate circumstance, "
+                            "correction, replacement, binding-only, shared coordination, "
+                            "and sibling tokens."
                         )
             bindings = responsibility.get("properties", {}).get("bindings")
             if isinstance(bindings, dict):
@@ -2341,6 +2349,14 @@ class OllamaGoalInterpreter:
                 }
                 schema_definitions = schema.setdefault("$defs", {})
                 schema_definitions["SourceBackedBindingString"] = source_backed_string
+                numeric_scalar_rule = (
+                    "If the source surface directly contains an Arabic digit and reading "
+                    "it requires no conversion or guess, emit only that JSON number, "
+                    "without its unit or surrounding words; never emit it as a string or "
+                    "single-item list. Use an exact source/context string only for "
+                    "non-digit wording or when normalization would require guessing or "
+                    "conversion."
+                )
                 binding_properties["location"] = {
                     "$ref": "#/$defs/SourceBackedBindingString",
                     "description": (
@@ -2365,8 +2381,9 @@ class OllamaGoalInterpreter:
                     ],
                     "description": (
                         "Elapsed length only, such as a source expression meaning for N "
-                        "seconds/minutes. Use the normalized JSON number N or one exact "
-                        "source/context string; this value owns the complete elapsed-span meaning. "
+                        "seconds/minutes. "
+                        + numeric_scalar_rule
+                        + " This value owns the complete elapsed-span meaning. "
                         "Whenever the source explicitly supplies elapsed length, emit duration; "
                         "outcome prose alone is not binding evidence. "
                         "Never put elapsed length in count, time, time_scope, threshold, "
@@ -2379,8 +2396,9 @@ class OllamaGoalInterpreter:
                         {"type": "number"},
                     ],
                     "description": (
-                        "Explicit pace or velocity only, represented as a JSON number or "
-                        "exact source/context string. A missing physical unit does not "
+                        "Explicit pace or velocity only. "
+                        + numeric_scalar_rule
+                        + " A missing physical unit does not "
                         "make an explicitly supplied speed scalar unresolved."
                     ),
                 }
@@ -2404,6 +2422,15 @@ class OllamaGoalInterpreter:
                     ],
                 }
                 dimension_descriptions = {
+                    "actor": (
+                        "A materially assigned or contrasted performer only. Never infer "
+                        "actor=Chromie from the ordinary you/你 subject of a direct request."
+                    ),
+                    "addressee": (
+                        "The named person explicitly asked for an answer. Asking that person "
+                        "a supplied question is speech, not information. For a tell/deliver "
+                        "communication, use recipient for the receiver instead."
+                    ),
                     "entity": (
                         "Exact person, organization, object, product, service, title, or "
                         "unknown proper-name-like referent that the predicate is about. "
@@ -2414,9 +2441,9 @@ class OllamaGoalInterpreter:
                         "ahead, toward, or an equivalent source-grounded direction."
                     ),
                     "time": (
-                        "One source-grounded instant or clock point, such as now or at a "
-                        "stated clock time. Never use for an interval, elapsed duration, "
-                        "comparison cutoff, or category."
+                        "One source-grounded instant, clock point, or event-relative trigger "
+                        "at which the effect activates. Never use for a period, elapsed "
+                        "duration, comparison cutoff, or category."
                     ),
                     "time_scope": (
                         "One exact source/context calendar, relative-time, or interval scope, "
@@ -2426,20 +2453,67 @@ class OllamaGoalInterpreter:
                         "threshold, or comparison."
                     ),
                     "threshold": (
-                        "An explicit cutoff for a comparison or condition only, such as "
-                        "at least N, above N, below N, or until a stated condition. "
+                        "Only the explicit cutoff for a comparison or condition. "
+                        "Keep above/below/exceed or another relation in comparison rather "
+                        "than fusing that relation into threshold. "
+                        + numeric_scalar_rule
+                        + " "
                         "Never use for a time scope, duration, speed, count, category, "
                         "or ordinary value."
                     ),
                     "subtype": (
-                        "An explicitly supplied categorical kind of the predicate or "
-                        "entity only. Never use for time, duration, speed, count, a whole "
-                        "action, or an inferred provider category."
+                        "An explicitly supplied categorical kind of the predicate/entity, "
+                        "including authored speech or vocal style/manner only for styled "
+                        "speech, singing, humming, or recitation. A nonverbal-vocal or "
+                        "body-action manner with no "
+                        "supported dimension stays in outcome instead. "
+                        "Never use for time, duration, speed, count, a whole action, or an "
+                        "inferred provider category."
+                    ),
+                    "intensity": (
+                        "An explicitly scaled strength of an action or experience only; "
+                        "never use for general manner or authored speech/vocal style."
+                    ),
+                    "polarity": (
+                        "Explicit positive or negative proposition force only. Never use "
+                        "interrogative/declarative mood or labels such as question/疑问."
+                    ),
+                    "comparison": (
+                        "The explicit comparative relation only, separate from its numeric "
+                        "threshold or magnitude."
                     ),
                     "recipient": (
-                        "The explicitly named beneficiary or receiver of a transferred or "
-                        "communicated result. Never use a place, action actor, gaze target, "
-                        "or Chromie itself unless the source explicitly names it as receiver."
+                        "The explicitly named receiver of a transferred or communicated "
+                        "result. A person helped by a draft request is not a second "
+                        "recipient unless that person will receive the drafted communication. "
+                        "Never use a place, action actor, gaze target, or Chromie itself "
+                        "unless the source explicitly names it as receiver."
+                    ),
+                    "proposition": (
+                        "Bounded claim/content owned inside a communication, reminder, or "
+                        "similar predicate, never the whole governing request. Do not create "
+                        "proposition merely because an information source is a question; "
+                        "the information outcome and typed attribute/place/time/comparison "
+                        "bindings own that query. For speech, do not duplicate proposition-"
+                        "internal entity, location, time, preference, attribute, polarity, "
+                        "or comparison as outer bindings."
+                    ),
+                    "attribute": (
+                        "The property an information request explicitly asks to determine, "
+                        "not the object/place whose property it is and not question mood."
+                    ),
+                    "preference": (
+                        "An explicitly expressed preference owned by a stateful preference "
+                        "effect. Use preference rather than proposition for that value."
+                    ),
+                    "distance": (
+                        "Explicit spatial extent only. " + numeric_scalar_rule
+                    ),
+                    "quantity": (
+                        "Explicit non-repetition amount only. " + numeric_scalar_rule
+                    ),
+                    "magnitude": (
+                        "Explicit non-count scale only. " + numeric_scalar_rule
                     ),
                 }
                 for semantic_name in (
@@ -2559,20 +2633,28 @@ class OllamaGoalInterpreter:
                     },
                     {
                         "const": "body_action",
-                        "description": "Locomotion, gaze, blink, gesture, or posture.",
+                        "description": (
+                            "Locomotion, gaze, blink, gesture, posture, manipulation, or "
+                            "an ordinary request to breathe/take a breath when no audible "
+                            "voice sound is explicitly requested."
+                        ),
                     },
                     {
                         "const": "speech",
                         "description": (
                             "An immediate conversational answer requiring no absent "
-                            "external, private, runtime, observed, or changing evidence."
+                            "external, private, runtime, observed, or changing evidence; "
+                            "also asking an explicitly named third party a supplied "
+                            "question or proposition."
                         ),
                     },
                     {
                         "const": "information",
                         "description": (
-                            "The person wants Chromie to determine or provide information; "
-                            "this does not decide whether fresh acquisition is needed."
+                            "The person wants Chromie to determine or provide an unknown "
+                            "fact. Asking a named third party a supplied question is speech, "
+                            "not information. This does not decide whether fresh acquisition "
+                            "is needed."
                         ),
                     },
                     {
@@ -2602,8 +2684,10 @@ class OllamaGoalInterpreter:
                     {
                         "const": "nonverbal_vocalization",
                         "description": (
-                            "A non-speech voice sound such as laughing, sighing, or "
-                            "coughing; excludes singing, songs, melody, lyrics, and humming."
+                            "An explicitly requested audible non-speech voice sound such as "
+                            "laughing, sighing, coughing, or yawning; excludes an ordinary "
+                            "request to breathe/take a breath unless audible sound is "
+                            "explicit, and excludes singing, melody, lyrics, and humming."
                         ),
                     },
                     {

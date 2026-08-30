@@ -689,6 +689,78 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("Use [] when meaning is clear", system_text)
         self.assertIn("outcome names exactly that requested predicate", system_text)
 
+    def test_primary_prompt_disambiguates_full_audit_failure_boundaries(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="Please ask Lee whether the value is below 5.")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn("never interrogative/declarative mood", system_text)
+        self.assertIn("proposition owns the communicated content", system_text)
+        self.assertIn("including a clause-opening “please/请”", system_text)
+        self.assertIn("An anaphoric continuation", system_text)
+        self.assertIn("never infer actor=Chromie", system_text)
+        self.assertIn("speech/vocal style or manner", system_text)
+        self.assertIn(
+            "Do not create proposition merely because the source is a question",
+            system_text,
+        )
+
+    def test_primary_schema_disambiguates_full_audit_binding_boundaries(self) -> None:
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="Please ask Lee whether the value is below 5.")
+        )["format"]
+        responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
+        bindings = responsibility["properties"]["binding_items"]["properties"]
+        evidence = schema["$defs"]["ResponsibilitySourceEvidence"]["properties"]
+
+        self.assertIn("Never infer actor=Chromie", bindings["actor"]["description"])
+        self.assertIn("interrogative/declarative mood", bindings["polarity"]["description"])
+        self.assertIn("proposition-internal", bindings["proposition"]["description"])
+        self.assertIn(
+            "Do not create proposition merely because an information source is a question",
+            bindings["proposition"]["description"],
+        )
+        self.assertIn("authored speech or vocal style", bindings["subtype"]["description"])
+        self.assertIn(
+            "clause-opening modal or request marker",
+            evidence["source_start_token_ref"]["description"],
+        )
+
+    def test_primary_prompt_disambiguates_iterative_audit_boundaries(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="Please help me draft a question for Lee, not Sam, in 5 minutes."
+            )
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn("emit only the JSON number itself", system_text)
+        self.assertIn("not a second recipient", system_text)
+        self.assertIn("asking a named third party", system_text)
+        self.assertIn("correction, replacement, or binding-only clause", system_text)
+        self.assertIn("ordinary request to breathe", system_text)
+
+    def test_primary_schema_disambiguates_iterative_audit_boundaries(self) -> None:
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(
+                text="Please help me draft a question for Lee, not Sam, in 5 minutes."
+            )
+        )["format"]
+        responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
+        bindings = responsibility["properties"]["binding_items"]["properties"]
+        evidence = schema["$defs"]["ResponsibilitySourceEvidence"]["properties"]
+        modes = responsibility["properties"]["output_mode"]["oneOf"]
+        mode_descriptions = {item["const"]: item["description"] for item in modes}
+
+        for name in ("duration", "speed", "distance", "threshold"):
+            self.assertIn("emit only that JSON number", bindings[name]["description"])
+        self.assertIn("not a second recipient", bindings["recipient"]["description"])
+        self.assertIn("speech, not information", bindings["addressee"]["description"])
+        self.assertIn("later correction", evidence["source_end_token_ref"]["description"])
+        self.assertIn("ordinary request to breathe", mode_descriptions["body_action"])
+        self.assertIn("named third party", mode_descriptions["speech"])
+
     def test_primary_prompt_collects_cross_clause_bindings_without_widening_predicate_evidence(
         self,
     ) -> None:

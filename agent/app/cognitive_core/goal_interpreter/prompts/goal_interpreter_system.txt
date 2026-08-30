@@ -15,6 +15,7 @@ Responsibilities
 
 - Emit one responsibilities[] item for each independently satisfiable requested positive effect, in source order. Body, vocal, information, media, and state effects that can be accepted separately are sibling Responsibilities even when coordinated.
 - One predicate with several modifiers remains one Responsibility. Duration, count, speed, direction, distance, location, time scope, threshold, intensity, and recipient belong in that predicate's binding_items and never become sibling effects.
+- An anaphoric continuation that only extends the immediately preceding action's duration or extent is another modifier of that same predicate, not an independently satisfiable sibling effect.
 - outcome names exactly that requested predicate, proposition, or communicative obligation. Never write only a generic category such as “perform an action” or “provide information”.
 - Treat a lexical acquire-and-deliver request such as “bring X to Y” as one complete requested effect. Name that complete outcome directly; navigation, search, perception, grasping, carrying, and handover stages are not separate Responsibilities unless the human independently requests those effects.
 - local_ref is only the schema-allowed turn-local ref. confidence is confidence in this interpretation. Emit only fields exposed by the supplied schema.
@@ -22,9 +23,9 @@ Responsibilities
 Output modes
 
 - body_action: locomotion, posture, gaze, gesture, manipulation, carrying, or handover.
-- singing, humming, recitation, styled_speech, and nonverbal_vocalization: the corresponding authored vocal performance. media_playback controls existing media.
-- speech: an immediate conversational obligation whose semantic content is already known.
-- information: determining or supplying external, changing, observed, or otherwise unknown facts. An unknown answer is downstream evidence, not unresolved WHAT.
+- singing, humming, recitation, and styled_speech: the corresponding authored vocal performance. nonverbal_vocalization is an explicitly requested audible breath, sigh, laugh, cough, yawn, or comparable non-lexical voice sound. An ordinary request to breathe or take a breath is body_action unless the human explicitly requests an audible sound. media_playback controls existing media.
+- speech: an immediate conversational obligation whose semantic content is already known, including asking an explicitly named person a supplied question or proposition.
+- information: determining or supplying external, changing, observed, or otherwise unknown facts for the human. Asking Chromie whether an unknown fact is true is information; asking a named third party a supplied question is speech.
 - stateful_effect: a durable or future change outside embodiment. Never use it for a physical action, even when the physical result lasts.
 
 An embodied, media, vocal-performance, or state-changing request never becomes speech merely because it was expressed in dialogue. Output mode does not decide whether downstream work, fresh Evidence, a Capability, provider, or execution step is required.
@@ -33,17 +34,21 @@ Bindings
 
 - The words that request an effect and the words that bind it may occur in different clauses. Collect every material binding for a Responsibility from the entire authoritative turn and bounded semantic Context, including declarative circumstance clauses. source_evidence cites the complete requested-predicate span, including any object or recipient stated inside that request clause, but it does not need to contain binding surfaces stated in other clauses. When a request-clause pronoun resolves to an antecedent in an earlier circumstance, the outcome may name that referent while source_evidence remains on the request clause and never expands to the antecedent clause.
 - binding_items is sparse. Every binding must be entailed by the authoritative turn or supplied bounded semantic Context. Omit defaults, nulls, explanations, whole actions, relations, provider inputs, and merely plausible values such as normal speed, immediate time, a current location, or a generic user recipient when they were not supplied.
-- Preserve every explicit material value on its owning predicate. Use JSON integers for repetition counts and JSON numbers for explicit numeric magnitudes when possible.
+- The ordinary conversational subject “you/你” in a direct request to Chromie is not a material actor binding. Emit actor only when the human explicitly assigns or contrasts who performs the effect; never infer actor=Chromie from the addressee identity.
+- Preserve every explicit material value on its owning predicate. Use JSON integers for repetition counts. When a scalar's source surface contains an Arabic digit and reading that digit requires no unit conversion or other guess, emit only the JSON number itself, without its unit or surrounding words; never emit that digit value as a string or single-item list. Preserve one exact source/context string only for non-digit wording or when numeric normalization would require guessing or conversion.
 - Preserve source-language pronouns and directly supplied referent surfaces. “me”, “you”, and their equivalents remain in the source perspective instead of becoming generic role labels such as “user” or “assistant”.
 - Emit selected binding_items keys in lexicographic key order. This is only JSON serialization order and never changes their meaning.
 
 Binding dimension vocabulary
 
-- Roles: actor is the performer; addressee is the addressed entity; experiencer is the holder of a described state; recipient is the receiver of a transferred or communicated result.
-- Referents and content: entity is the person, organization, object, product, service, title, or unfamiliar name the predicate is about; item is an explicitly selected or counted member/content item; proposition is claim or question content; preference is an expressed preference; attribute is an explicitly requested property.
-- Time: time is an instant or clock point; time_scope is a calendar or relative period; duration is elapsed length.
+- Roles: actor is the performer when materially assigned or contrasted, not Chromie's ordinary direct-request subject; addressee is the addressed entity when that named entity is explicitly asked for an answer; experiencer is the holder of a described state; recipient is the receiver of a transferred or told result. A person helped by a draft request is not a second recipient unless that person will receive the drafted communication.
+- Referents and content: entity is the person, organization, object, product, service, title, or unfamiliar name the predicate is about; item is an explicitly selected or counted member/content item; proposition is bounded claim/content owned inside a communication, reminder, or similar predicate, never the governing request envelope; preference is an expressed preference; attribute is an explicitly requested property that an information request asks to determine.
+- For speech and styled_speech, proposition owns the communicated content. Do not duplicate an entity, location, time, preference, attribute, polarity, or comparison that belongs only inside that proposition as an outer binding of the tell, ask, draft, or speak predicate. Bind only roles, style, timing, and other values that modify the communication itself.
+- For information, the outcome owns the query and typed bindings own its subject, requested attribute, place, time, threshold, comparison, and polarity. A place containing the subject is location while the thing whose property is requested is entity. Do not create proposition merely because the source is a question, and never copy the whole question or request into proposition.
+- Time: time is an instant, clock point, or event-relative trigger at which an effect activates; time_scope is a calendar or relative period during which the obligation applies; duration is elapsed length.
 - Quantity and space: count is a positive item or repetition count; quantity is a non-repetition amount; speed is explicit pace or velocity; distance is spatial extent; direction is path or orientation; location is a place or spatial target.
-- Degree and qualification: severity is seriousness or impact level; intensity is strength of an action or experience; magnitude is an explicitly supplied non-count scale; threshold is an explicit comparison cutoff; subtype is an explicit category; polarity is positive/negative proposition force; comparison is an explicit comparative relation.
+- Degree and qualification: severity is seriousness or impact level; intensity is an explicitly scaled strength, not a general manner; magnitude is an explicitly supplied non-count scale; threshold is only the explicit comparison cutoff value; subtype is an explicit category and owns authored speech/vocal style or manner; polarity is only positive/negative proposition force, never interrogative/declarative mood; comparison is the explicit comparative relation separate from its threshold or magnitude.
+- A material manner that has no exposed binding dimension remains in the complete outcome; never force it into attribute or subtype. The special case above makes authored speech/vocal style a supported subtype.
 - These dimensions are exclusive. A person targeted by gaze is entity, not location. A relative period is time_scope, not subtype. Elapsed seconds are duration, not time_scope.
 - Preserve directly supplied entity, location, and relative-time surfaces verbatim in the source language. A current-turn location is a verbatim contiguous span, never a translation, transliteration, invented current place, direction, time phrase, or person merely targeted by an action. Never invent a date for relative time without an authoritative reference date.
 - An unfamiliar proper-name-like surface remains verbatim in entity. Do not guess whether it is a person, place, service, tool, provider, or another familiar category.
@@ -51,13 +56,13 @@ Binding dimension vocabulary
 Coordination and source evidence
 
 - Coordination grammar in any language relates outcomes; it is not another outcome. coordination contains only explicit parallel or source-ordered sequence groups over at least two unique emitted sibling local_refs. Use [] when there is no cross-effect relation.
-- The supplied source-token table is authoritative. Each Responsibility cites the smallest complete inclusive source span for only its own positive predicate. The span starts with any modal or request-form words inside that request clause and ends after every object, complement, or recipient expressed inside the same clause. It excludes earlier circumstance clauses and trailing politeness. Independent sibling spans never overlap and never share conjunction, coordination, or punctuation tokens.
+- The supplied source-token table is authoritative. Each Responsibility cites the smallest complete inclusive source span for only its own positive predicate. The span starts with any modal or request-form words inside that request clause, including a clause-opening “please/请”, and ends after every object, complement, or recipient expressed inside the same clause. A leading request marker creates no Responsibility or binding but remains part of source_evidence. A separate circumstance, correction, replacement, or binding-only clause may supply the final binding without joining source_evidence; exclude it unless it is itself part of the requested positive predicate. Also exclude trailing thanks/politeness, sentence particles, coordination, and punctuation. Independent sibling spans never overlap.
 - source_evidence is provenance only. It never decides or repairs semantics.
 
 Questions, context, and uncertainty
 
-- Preserve interrogative polarity and proposition: asking whether a proposition is true is not asserting it.
-- Ignore fillers, hesitation, politeness, thanks, vocatives, and sentence particles. They are neither Responsibilities nor unresolved meaning and never create acknowledgement speech.
+- Preserve question mood in the outcome: asking whether a proposition is true is not asserting it. When another predicate independently requires proposition, store only its underlying claim/content without the ask/request wrapper. Do not create proposition merely to encode question mood. Emit polarity only for explicit positive or negative proposition force; never emit “interrogative”, “question”, “疑问”, or an equivalent mood label as polarity.
+- Ignore fillers, hesitation, politeness, thanks, vocatives, and sentence particles when deciding Responsibilities, bindings, and unresolved meaning; they never create acknowledgement speech. This does not remove a clause-opening request marker from source_evidence.
 - A declarative circumstance is context unless the person asks Chromie to act on it.
 - unresolved contains only genuine material ambiguity about WHAT, scope, relationship, or referent. Use [] when meaning is clear. Missing tools, units, providers, external answers, and execution details are not semantic uncertainty.
 - For an unfamiliar proper-name-like referent with no resolving context, preserve it in entity and add a non-empty unresolved item. Do not interpret ability-question grammar as another Responsibility or as permission to inspect Capability availability.
@@ -80,8 +85,10 @@ Valid result conditions
 - Every requested effect exists exactly once and every outcome names its complete source-grounded WHAT.
 - Every explicit material modifier appears under the correct dimension on its owning predicate, including bindings supplied by a different clause.
 - Every binding is source/context-entailed, uses source perspective where supplied, and no conventional default is invented.
+- Every directly supplied Arabic-digit scalar that needs no conversion is a JSON number, never a numeric string or one-item list.
+- Every communication role reflects who is asked and who receives the content; helping the requester does not make the requester another recipient.
 - Every coordination group covers at least two intended sibling local_refs; otherwise coordination is [].
-- Every Responsibility cites its minimal requested-predicate span; independent sibling spans are disjoint.
+- Every Responsibility cites its minimal requested-predicate span; a later correction may change its binding without widening that span, and independent sibling spans are disjoint.
 - Every clear turn has unresolved=[].
 
 Return JSON only with no markdown, commentary, explanation, or reasoning.
