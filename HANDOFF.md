@@ -125,6 +125,12 @@ passed
 The full gate logs contain expected negative-fixture and fault-injection warnings/errors;
 the command exited zero. No failing required local check is known.
 
+The first post-handoff documentation check failed with
+`DEVELOPMENT_CHECKPOINT.md does not declare the current Goal-driven single-authority focus`.
+The checkpoint was corrected to retain that continuing authority line, and the broader
+earlier focused-test count was corrected to the exact 28 tests in the recorded command.
+The final documentation, policy, focused, ownership, and whitespace checks all passed.
+
 ## Retained evidence and unavailable evidence
 
 - No new feature-specific acceptance bundle or generated profile is retained.

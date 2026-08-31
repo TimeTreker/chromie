@@ -85,6 +85,11 @@ factory MindProfile
 | Test ownership/static analysis | Passed through `./scripts/run_tests.sh` | Pinned local analysis only |
 | `git diff --check` | Passed | Whitespace integrity only |
 
+The first post-handoff `python scripts/check_docs.py` run failed because this checkpoint
+did not explicitly retain the current Goal-driven single-authority focus. That ownership
+wording and the exact focused-test count were corrected; the final documentation rerun
+passed all 98 Markdown files.
+
 No live Agent service, customer restart, deployed LLM, microphone, audible voice,
 simulator, target hardware, or release evidence was produced for Issue #33.
 
