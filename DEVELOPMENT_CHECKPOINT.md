@@ -1,148 +1,118 @@
 # Chromie Development Checkpoint
 
-Status: GI/GA prompt work distilled into the required project-level qualification method; Fast then Deep Planner prompt qualification is the next session, while 100 GA mixed-decision cases retain an explicit global DTO gap
+Status: Fast Planner prompt qualification authoring checkpoint is incomplete; 10 of
+the intended 1,000 model-authored scenarios are tracked, the corpus is not frozen,
+and no current-tree qualification or optimization claim exists
+
 Updated: 2026-08-31
-Pre-delivery baseline: `codex/ga-prompt-qualification-1500` at `7d314cbdf13cc4360f5120d5f568a82850a10878`
-Expected resume revision: latest `origin/codex/ga-prompt-qualification-1500` commit containing this checkpoint and `HANDOFF.md`
-Active Issue: [#34 — qualify the Goal Association prompt on 1,500 daily-life scenarios](https://github.com/TimeTreker/chromie/issues/34)
 
-Current focus: preserve Chromie's Goal-driven single-authority architecture while
-starting a separately owned Planner qualification Issue with Fast first and Deep
-second. The GA global contract limit remains visible and is not Planner work.
+Pre-delivery baseline: `codex/ga-prompt-qualification-1500` at
+`ac83e4677d67014f3d547823d9568abf95c09834`
 
-## Read first
+Expected resume revision: latest
+`origin/codex/ga-prompt-qualification-1500` commit containing this checkpoint and
+`HANDOFF.md`
 
-Read [Project Charter](docs/PROJECT_CHARTER.md),
-[Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
-[Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md),
-[Acceptance](docs/ACCEPTANCE.md), the
-[LLM Prompt Qualification Method](docs/LLM_PROMPT_QUALIFICATION_METHOD.md), the
-[GA corpus guide](benchmarks/datasets/goal_association_daily_life/README.md), and
-[Latest Handoff](HANDOFF.md). Current source, tests, retained executable evidence,
-and the Issue win.
+Active Issue: [#35 — Fast/Deep Planner prompt qualification and optimization](https://github.com/TimeTreker/chromie/issues/35)
 
-## Active delivery line
+## Stable authority boundary
+
+Planner owns HOW: complete per-Goal Activity planning, Capability and argument
+selection, parameter provenance, ordering/concurrency, exact Communicative Acts,
+truth/Evidence scope, satisfaction, and bounded revision. Fast and Deep are depth
+passes of that one authority.
+
+Planner must not reinterpret GI-owned WHAT, commit GA-owned Goal continuity,
+authorize its own effects, invent Runtime/Evidence truth, or use Fast/Deep as mutual
+reviewers or semantic repair calls. Identity, worldview, values, and stable Mind were
+not changed.
+
+The production transaction under qualification remains:
 
 ```text
-accepted GI Responsibilities + bounded existing/recent Goals
-  -> one primary GA semantic decision
-  -> generated decoder Schema enforces DTO/Host invariants
-  -> deterministic GoalAssociationResolver
-  -> canonical Goal continuity, or fail closed
+accepted GI Responsibilities + exact source provenance
+  + GA Goals / current Plan and Work / Evidence / Situation / re-entry scope
+  + Capability and Agent Skill projections / safety and resource state
+  -> global truth projection + Planner-local prompt
+  -> runtime-variant dynamic Schema
+  -> one declared Fast Planner call
+  -> stream parser or canonical DTO parser
+  -> deterministic Planner and Host validation
+  -> accepted presentation/Plan, Deep delegation for genuine complex HOW, or fail closed
 ```
 
-- GA remains the sole Goal identity/continuity authority. Do not add a second model
-  critic, judge, semantic repair, or phrase-based relationship selector.
-- `reason_summary` is rationale only. It cannot carry a Goal mutation that is absent
-  from `updated_description` or the supplied `resolved_gap_ids`.
-- The current exclusive `associate | create_goals` decision cannot express one turn
-  that both continues an existing Goal and creates an independent Goal. The 100
-  retained probes are a global contract blocker, not prompt failures to hide.
-- Changing that discriminant is a Project Charter semantic-authority boundary and
-  requires explicit project-owner authorization plus same-change contract truth.
+Fast variants in scope are `streaming_advance`, `canonical_primary`, and
+`canonical_reentry`. Deep qualification has not started.
 
-## Completed delivery scope
+## Implemented checkpoint scope
 
-- Added 1,500 independently reviewable scenario JSON files: 100 bilingual daily-life
-  semantic seeds crossed with 15 Goal-continuity families. Inputs include accepted GI
-  Responsibilities and bounded existing/recent Goal state; no generator or combined
-  scenario source was added.
-- Added a static aggregate manifest, tree digest, validator, corpus README, and focused
-  dataset test. All cases remain `training_eligible=false` and lack independent review.
-- Used Codex `gpt-5.6-sol` with high reasoning for the frozen target-blind inference
-  cohort. No Gemma/Ollama result is qualification evidence.
-- Moved the existing modify/clarify semantic-update invariant into the dynamic decoder
-  Schema and placed the same rule next to GA relationship selection in the compact
-  prompt. No new call, runtime flag, environment variable, compatibility path, or
-  semantic authority was introduced.
-- Added a regression proving a modify output containing only `reason_summary` is
-  rejected by the generated Schema and becomes valid with `updated_description`.
-- Indexed the corpus in the existing benchmark and documentation owners.
-- Distilled the GI/GA workflow into the required project-level
-  `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`: authority audit, global-versus-local
-  prompt ownership, frozen target-blind cohorts, deterministic/semantic adjudication,
-  root-cause classification, minimal iteration, full rerun, stop conditions, and a
-  new-session Fast/Deep Planner protocol. `AGENTS.md`, `CONTRIBUTING.md`, and the
-  documentation index point to this single method owner.
+- Added an in-progress Fast Planner daily-life work area with a catalog fixture and
+  qualification/validation harness scaffolding.
+- Added 10 independently reviewable `streaming_advance` direct-conversation probes:
+  five family/home conditions paired in `en-US` and `zh-CN`. They were authored in
+  one retained `gpt-5.6-sol` high-reasoning call, not by a scenario generator.
+- Kept targets and semantic review material outside the candidate-input portion of
+  each scenario and marked every tracked probe non-independent and
+  `training_eligible=false`.
+- Indexed the work area in existing benchmark/documentation owners.
+- Removed the premature 1,000-case completion test and corrected documentation that
+  had described the unfinished corpus as frozen and complete.
+- Stopped the interrupted background authoring process. Seventy-eight additional
+  completed model-call envelopes remain ignored local material; they are not
+  reviewed, split into tracked scenario files, frozen, validated, or transferred by
+  Git.
+- No production Planner prompt, context projection, DTO, Schema, validator, Host
+  workflow, model profile, or runtime architecture was changed.
 
-## Reconstructed defect workflow
-
-| Boundary/owner | Authoritative input and correlation | Baseline output | Expected/final output | Judgment |
-|---|---|---|---|---|
-| GI handoff | Accepted immutable Responsibilities keyed by `local_ref`, including output mode and source evidence | Correct frozen GA input | Same | Correct |
-| Primary GA | Responsibilities plus bounded existing/recent Goals, compact prompt, dynamic Schema | 36 `modify_active` results put the change only in `reason_summary` | One complete primary decision with structured Goal update | Model exposed an inconsistent decoder boundary |
-| Dynamic decoder Schema | Contract generated for the exact candidate Goals/refs | Allowed modify/clarify without a material update | Require non-empty `updated_description` or supplied `resolved_gap_ids` | Earliest responsible mechanical boundary fixed |
-| GA DTO/Host resolver | Parsed primary result and exact source/Goal identifiers | Rejected all 36 incomplete modify results and failed closed | Accept structurally complete semantic update without repair | Correct containment retained |
-| Canonical Goals/Planner | Only reached after Host acceptance | Not reached for the 36 baseline failures | Receive accepted canonical Goal continuity; Planner still owns HOW | Downstream authority unchanged |
-
-The initiating probes were ordinary Goal refinements. The root cause was a mismatch:
-the generated decoder Schema permitted a shape the DTO/Host already rejected, while
-the relevant prompt rule was remote from relationship selection. The downstream
-symptom was correct intent stranded in non-authoritative rationale. The fix changes
-the earliest structured-output boundary and its local instruction, not downstream
-Goal reconstruction.
+Tracked project surface grows by 15 files under
+`benchmarks/datasets/fast_planner_daily_life/` (10 scenarios and five support
+files) and updates two existing indexes plus the two required delivery owners. No
+environment variable, runtime switch, compatibility path, semantic authority, or
+architectural term was added. The intended consolidation point is the existing
+cross-role qualification method and existing Planner owners; do not add a parallel
+reviewer or benchmark framework.
 
 ## Evidence ledger
 
-| Evidence | Result | Limit |
+| Evidence | Result | Qualification limit |
 |---|---|---|
-| Baseline full Codex cohort | 1,364/1,400 current-contract passes; 36 Host failures, all `modify_active`; 1,500/1,500 then-current Schema passes | Offline Codex role/decoder envelope; same-authority adjudication, not deployed provider |
-| Exact focused rerun | 36/36 baseline failures passed changed Schema and Host; contract repair attempts 0 | Only the isolated failure cohort |
-| Changed-prompt full Codex cohort | 1,400/1,400 current-contract passes; English 700/700; Chinese 700/700; Schema 1,500/1,500; unexpected failures 0; source stable | Offline prompt/Schema/DTO/Host qualification only |
-| Retained global probes | 100/100 exposed the exclusive-decision contract gap | Requires global DTO/Schema design and owner authorization |
-| Dataset validator | 1,500 discovered and validated; 1,400 Host accepted; 100 known gaps; 0 errors | Candidate corpus, no independent semantic review |
-| Focused tests | 78 passed | Source-level regression only |
-| Canonical local gate on methodology delivery tree | policy 15 families/0 exceptions; 2,048 main tests and 20 legacy Agent tests; docs 100; passed | Automated pre-commit source/document evidence; no Planner model inference or behavior qualification |
+| Retained probe authoring | One `gpt-5.6-sol` high-reasoning envelope materialized as 10 tracked bilingual scenarios | Model-authored candidate material only; no independent review or current-tree validation |
+| Interrupted authoring batch | 78 additional completed envelopes retained locally; 21 assigned calls did not complete before the batch was stopped | Incomplete authoring output only; no aggregate execution record, review, manifest, or Git transfer |
+| Current tracked corpus | 10/1,000 intended cases; no `dataset.json` manifest or scenario-tree digest | Not frozen and not runnable as a qualification cohort |
+| Earlier script-generated corpus check | A discarded script-generated corpus previously reached a local validator and 3-test pass, then was removed from the tracked work after the owner rejected script-generated semantics | Invalidated and must not be cited for the current model-authored corpus |
+| Current final tree tests and gates | Not run at the owner's explicit request | Source, docs, harness, corpus, and behavior are unverified on this checkpoint |
+| Baseline inference/adjudication | Not run | No prompt, contract, workflow, architecture, or model diagnosis exists yet |
 
-Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do
-not transfer with the commit.
+## Ordered resume work
 
-## Prompt and corpus identity
-
-- Scenario count: 1,500 separate files; `en-US=750`, `zh-CN=750`.
-- Scenario-tree SHA-256:
-  `264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab`.
-- Changed prompt SHA-256:
-  `3d68272a0612a4a7079ba15c272c5ea17d2101bc27e98c6a15975d70628c3a26`.
-- Changed dynamic Schema SHA-256:
-  `5162f8d03c74e339eeffec7312cccc3fadcc8da1d07a6bc931224593f96fb482`.
-- Model: Codex `gpt-5.6-sol`, reasoning effort `high`; references excluded from
-  candidate inference packets.
-
-## Exact resume point
-
-1. Fetch the delivery branch and reproduce source truth:
-
-   ```bash
-   git fetch origin codex/ga-prompt-qualification-1500
-   git switch codex/ga-prompt-qualification-1500
-   git pull --ff-only
-   python scripts/check_repository_policies.py
-   ./scripts/run_tests.sh
-   python scripts/check_docs.py
-   python benchmarks/datasets/goal_association_daily_life/validate.py
-   ```
-
-2. Read `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`, create a separate Planner prompt
-   qualification Issue, and audit the real Fast/Deep prompt, context, dynamic Schema,
-   model, validator, and downstream boundaries before editing. Propose the bilingual
-   contrast corpus count/matrix and evidence ceiling; qualify Fast before Deep. Do not
-   reuse GA Issue #34 for Planner work.
-
-3. Review Issue #34 and the 100
-   `mixed_continue_and_new_contract_gap` cases. Before changing the global DTO,
-   obtain explicit owner authorization for the new complete-result shape, then update
-   the canonical authority, dynamic Schema, resolver, corpus references, and tests in
-   one change. Do not solve it with a second LLM call or split semantic authority.
-
-4. To make a deployed-model claim, bind an exact provider/model digest, prompt and
-   Schema hashes, strict decoder, parameters, revision, latency, GPU/TTS coexistence,
-   and runtime identity; rerun the complete frozen cohort without source edits.
+1. On the same machine, review the retained authoring contract, the tracked 10-case
+   contrast set, and each completed envelope under
+   `.chromie/benchmarks/fast-planner/llm-authoring-v1/`. Reject semantic repetition,
+   malformed production inputs, oracle leakage, or authority drift before tracking
+   any additional case.
+2. Complete the missing model-authored contrast sets with direct LLM authorship; do
+   not use a script or semantic template to generate scenarios. Mechanical tooling
+   may only retain and split accepted model output unchanged.
+3. Materialize exactly one reviewed scenario per file, keep whole contrast sets in
+   one split, then create `dataset.json` with final counts, provenance, coverage,
+   and deterministic tree digest. Add the completion/contract test only after the
+   corpus actually satisfies it.
+4. Validate every reference through the exact production prompt, runtime-variant
+   dynamic Schema, DTO, and Host boundary. Fix scenario or harness defects before
+   freezing.
+5. Freeze source/corpus/prompt/Schema/model identities and run one immutable,
+   target-blind Fast baseline without edits between cases. Adjudicate every case and
+   cluster failures by earliest boundary.
+6. Only then make one evidenced minimal workflow, contract, architecture, prompt,
+   context, provider/profile, model, or oracle fix. Run the focused failure cohort,
+   the full frozen Fast cohort, applicable ability class, and canonical gates.
+7. Qualify Deep complex/blocked/degraded/unsafe/revision paths separately, then rerun
+   both Fast and Deep cohorts before any Planner-level claim.
 
 ## Claim boundary
 
-The GA local prompt/schema remains good enough for the declared current-contract
-offline qualification boundary. This delivery adds process documentation only; it
-does not qualify or change Fast/Deep Planner behavior. No production model/profile was
-promoted, and no live service, microphone, audible voice, simulator, target hardware,
-physical safety, or release claim was made. The 100 global DTO cases remain open.
+This commit is a recoverable work-in-progress checkpoint, not a qualification
+delivery. Fast Planner workflow, contract, architecture, prompt, model quality, and
+behavior remain unqualified. No production model/profile was promoted, no user-visible
+behavior was changed, and no live service, voice, simulator, robot, physical safety,
+or release evidence was established.

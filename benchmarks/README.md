@@ -475,6 +475,26 @@ See the corpus
 [Issue #34](https://github.com/TimeTreker/chromie/issues/34) for its ownership,
 claim boundary, and retained prompt-qualification evidence.
 
+## Fast Planner daily-life qualification work area
+
+`datasets/fast_planner_daily_life/scenarios/` currently contains the first 10
+model-authored, production-shaped Fast Planner probes: five family/home direct-
+conversation conditions paired in English and Chinese. Issue #35 still targets
+1,000 cases across streaming advance, canonical primary planning, bounded re-entry,
+Capability/argument grounding, multi-Goal ownership, retained Work, and terminal,
+cancellation, Situation, and time state.
+
+The checked-in qualification code is unfinished harness scaffolding. The corpus
+has no frozen manifest or digest, and no current-tree validation, baseline inference,
+or adjudication result exists. Do not cite this checkpoint as prompt, contract,
+workflow, architecture, model, or behavior qualification.
+
+See the corpus
+[README](datasets/fast_planner_daily_life/README.md) and
+[Issue #35](https://github.com/TimeTreker/chromie/issues/35). The tracked probes and
+retained local authoring envelopes remain same-model-authored, non-independent,
+unreviewed, and ineligible for training.
+
 
 ## End-to-end evidence profiles
 

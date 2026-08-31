@@ -1,234 +1,125 @@
 # Chromie Latest Handoff
 
-Audience: coding agent beginning Fast/Deep Planner prompt qualification, or operator resuming GA global-contract/deployed-model review.
-Owner: project owner. Replace this snapshot when `DEVELOPMENT_CHECKPOINT.md` advances.
-Authority: operational snapshot only; current source, tests, retained evidence, the
-checkpoint, and Issue #34 win.
+Audience: coding agent resuming Issue #35 Fast/Deep Planner prompt qualification.
+
+Owner: project owner. Replace this volatile snapshot when the checkpoint advances.
+Current source, tests, retained evidence, `DEVELOPMENT_CHECKPOINT.md`, and Issue #35
+win.
 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Delivery branch: `codex/ga-prompt-qualification-1500`
-- Pre-delivery base: `codex/ga-prompt-qualification-1500` at
-  `7d314cbdf13cc4360f5120d5f568a82850a10878`
-- Expected resume revision: latest
-  `origin/codex/ga-prompt-qualification-1500` commit containing this handoff and
+- Upstream: `origin/codex/ga-prompt-qualification-1500`
+- Pre-delivery base: `ac83e4677d67014f3d547823d9568abf95c09834`
+- Expected resume revision: latest upstream commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
-- Active completed-evidence Issue: [#34](https://github.com/TimeTreker/chromie/issues/34)
-- Next Issue: create a separate Fast/Deep Planner prompt-qualification Issue; do not
-  reuse #34 or silently combine the GA global DTO decision with Planner work
-- Delivery scope: required project-level LLM prompt qualification/optimization method,
-  coding-agent/contributor entrypoints, documentation ownership, and next-session handoff
-- No provider, model profile, deployment, Runtime switch, Capability, voice, simulator,
-  or hardware behavior changed
+- Active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35)
+- Delivery scope: incomplete Fast Planner LLM-authored scenario checkpoint and
+  unfinished qualification harness scaffolding; no production Planner change
 
-After this delivery, the local worktree is expected to retain pre-existing, unrelated architecture-diagram work in
-`README.md` and `docs/assets/`. Those paths are deliberately excluded from this
-delivery commit and remain the project owner's uncommitted work.
+The worktree is expected to remain dirty after delivery because the project owner's
+unrelated architecture-diagram work in `README.md` and `docs/assets/` is deliberately
+excluded from this commit. Do not discard, stage, or rewrite those paths.
 
-## Prompt-qualification method delivered
+## Tracked checkpoint
 
-`docs/LLM_PROMPT_QUALIFICATION_METHOD.md` is the single method owner distilled from
-the GI and GA investigations. It requires:
+`benchmarks/datasets/fast_planner_daily_life/` contains:
 
-- explicit semantic authority and global-versus-role-local prompt ownership;
-- reconstruction of the real production prompt/context/Schema/model/Host transaction;
-- one independently reviewable scenario per file in a frozen digest-bound contrast corpus;
-- target-blind immutable full-batch inference with the owner-declared model authority;
-- deterministic hard gates before retained semantic judgment;
-- earliest-boundary classification across scenario/oracle, prompt/profile,
-  context/harness, contract/schema, runtime/provider, model inference, mixed, and
-  unresolved causes;
-- one minimal general fix, exact focused proof, then complete frozen-cohort rerun;
-- explicit stop conditions, evidence ceiling, blockers, and cross-session delivery.
+- 10 separate scenario JSON files under
+  `scenarios/train_candidate/stream_direct_conversation/`;
+- five paired `en-US`/`zh-CN` family/home conditions authored by retained call
+  `fp-author-001` using `gpt-5.6-sol`, high reasoning;
+- `catalogs/common_v1.json`;
+- incomplete `qualification.py` and `validate.py` harness scaffolding;
+- a README that explicitly marks the corpus as incomplete; and
+- no `dataset.json`, frozen digest, complete-corpus test, baseline inference, or
+  adjudication summary.
 
-The method includes a copy-ready Planner session protocol. Fast and Deep remain depth
-passes of the same Planner HOW authority; qualify Fast primary/streaming/re-entry first,
-then Deep complex/blocked/revision paths, then rerun both cohorts. Neither may review or
-semantically repair the other.
+`benchmarks/README.md` and `docs/README.md` index the in-progress work area. No
+production file under `agent/`, `orchestrator/`, `shared/`, profiles, or runtime
+configuration changed.
 
-## Delivered authority flow
+## Retained local authoring material
+
+These ignored paths do not transfer with the Git push:
 
 ```text
-accepted GI Responsibilities + existing/recent Goal candidates
-  -> one primary GA invocation
-       -> exact dynamic decoder Schema
-            modify/clarify must carry structured semantic update
-       -> GoalAssociationModelOutput validation
-       -> GoalAssociationResolver
-  -> canonical Goal continuity -> Planner owns HOW
+.chromie/benchmarks/fast-planner/llm-authoring-v1/
+.chromie/benchmarks/fast-planner/llm-authoring-v1/fp-author-001-envelope.json
+.chromie/benchmarks/fast-planner/llm-authoring-v1/authoring-calls/
+.chromie/benchmarks/fast-planner/llm-authoring-v1/authoring-logs/
 ```
 
-The fix does not add a same-authority repair, reviewer, scorer, or semantic retry.
-`reason_summary` stays non-authoritative rationale. The current decision discriminant
-is still exclusive: `associate` carries associations and `create_goals` carries new
-Goals. It cannot truthfully carry both in one result.
+Observed at handoff:
 
-## Material changes
+- 78 additional completed output envelopes and 78 corresponding logs exist for
+  calls `fp-author-002` through `fp-author-078`, plus `fp-author-080`;
+- calls `fp-author-079` and `fp-author-081` through `fp-author-087` were running
+  when the exact authoring process group was terminated;
+- the remaining assigned calls had not started;
+- the interrupted process did not write `authoring-executions.json`; and
+- none of those envelopes has been accepted as tracked corpus or qualification
+  evidence.
 
-Methodology-only delivery additions:
-
-- `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`: new required owner for the complete
-  prompt-qualification method and Planner new-session protocol.
-- `AGENTS.md`: makes the method required reading before model-role prompt optimization.
-- `CONTRIBUTING.md`: links the method to the existing authoritative LLM-versus-workflow
-  root-cause categories.
-- `docs/README.md`: indexes the new owner and its governance question.
-
-The previously delivered GA scope remains unchanged:
-
-- `agent/app/goal_association_prompt.py`: places modify/clarify structured-update
-  requirements next to relationship selection.
-- `agent/app/goal_association_schema.py`: exposes the existing DTO/Host update invariant
-  at the earliest decoder boundary with conditional JSON Schema.
-- `tests/test_goal_association_pr2.py`: rejects a modify association whose meaning is
-  present only in `reason_summary` and accepts the structured update.
-- `benchmarks/datasets/goal_association_daily_life/`: 1,500 separate scenario JSON
-  files plus README, static manifest, validator, and package marker. There is no
-  generator or combined scenario file.
-- `benchmarks/tests/test_goal_association_daily_life_dataset.py`: checks counts,
-  per-file identity/path alignment, manifest digest, references, real Schema, and Host.
-- `benchmarks/README.md` and `docs/README.md`: index the new corpus in existing owners.
-
-Prior GA delivery surface delta: 1,505 new tracked files (1,500 scenarios,
-four corpus support files, one dataset test) and five existing implementation/test/doc
-owners plus the two required delivery owners modified. No environment variable, public
-switch, first-class architecture term, compatibility path, or evidence format was added.
-Consolidation opportunity: if the global mixed decision is authorized, evolve the existing
-GA result discriminant rather than adding a parallel model stage or new association service.
-
-Methodology-delivery surface delta: current Markdown-document count grows from 99 to
-100; one method owner is added, three existing governance/index documents are updated,
-and the two required delivery owners advance. The new document is necessary because no
-existing owner composes authority audit, frozen target-blind inference, adjudication,
-iteration, stop, and Planner handoff into one protocol. Consolidation opportunity: keep
-all role-independent prompt method changes in this owner and replace any future duplicate
-component procedure with a link rather than adding another methodology document.
-
-## Actual defect and repaired workflow
-
-| Module/owner | Material input | Baseline actual output | Required/final output | Correlation/judgment |
-|---|---|---|---|---|
-| Primary GA | Accepted GI refs plus candidate Goals | 36 ordinary modify decisions described the change only in `reason_summary` | Structured, complete Goal update in the same primary decision | Prompt exposed decoder mismatch |
-| Dynamic Schema | Exact allowed refs/Goal IDs | Accepted missing update fields | Reject modify/clarify unless structured update exists | Earliest wrong mechanical boundary fixed |
-| DTO/Host | Primary structured result | Failed closed on all 36 incomplete updates | Resolve complete update without another LLM call | Correct containment retained |
-| Canonical Goal/Planner | Host-accepted continuity | Not invoked for failures | Receives accepted Goal truth; Planner alone authors HOW | Downstream ownership unchanged |
-
-The prompt was not treated as the only cause. The generated Schema contradicted the
-already stricter DTO/Host contract, so the fix aligns both earliest input surfaces. No
-Host reconstruction or downstream semantic reinterpretation was added.
-
-## Frozen cohort and model identity
-
-- Dataset: `chromie.goal_association_daily_life.v1`
-- Cases: 1,500; languages: 750 `en-US`, 750 `zh-CN`
-- Contrast construction: 100 semantic seeds × 15 continuity families
-- Current-contract references: 1,400
-- Known global-contract probes: 100
-- Scenario-tree SHA-256:
-  `264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab`
-- Model: Codex `gpt-5.6-sol`, reasoning effort `high`, invoked with `codex exec`
-- Reference targets were excluded from inference packets
-- Changed prompt SHA-256:
-  `3d68272a0612a4a7079ba15c272c5ea17d2101bc27e98c6a15975d70628c3a26`
-- Changed Schema SHA-256:
-  `5162f8d03c74e339eeffec7312cccc3fadcc8da1d07a6bc931224593f96fb482`
-
-## Retained local evidence
-
-Baseline full Codex cohort:
+Discarded script-generated material is retained only as provenance that must not be
+reintroduced or cited:
 
 ```text
-.chromie/benchmarks/goal-association/20260831T023604Z_ga_daily_v1_codex-gpt-5.6-sol/
-.chromie/benchmarks/goal-association/20260831T023604Z_ga_daily_v1_codex-gpt-5.6-sol/adjudication-summary.json
+.chromie/benchmarks/fast-planner/discarded-script-generated-corpus-20260831T092909Z/
+.chromie/benchmarks/fast-planner/20260831T092450Z_fp_daily_v1_discarded_no_inference_harness-path/
+.chromie/benchmarks/fast-planner/20260831T092621Z_fp_daily_v1_discarded_no_inference_codex-schema-mismatch/
+.chromie/benchmarks/fast-planner/20260831T092909Z_fp_daily_v1_discarded_partial_freeze_script_corpus/
 ```
 
-- 1,364/1,400 current-contract passes
-- 36 Host failures, all `modify_active`
-- 1,500/1,500 passed the baseline dynamic Schema
-
-Exact focused rerun:
+## Actual workflow state
 
 ```text
-.chromie/benchmarks/goal-association/20260831T045338Z_ga_modify_local_prompt_codex-gpt-5.6-sol/
-.chromie/benchmarks/goal-association/20260831T045338Z_ga_modify_local_prompt_codex-gpt-5.6-sol/summary.json
+authority/workflow audit
+  -> intended 100 bilingual contrast sets / 1,000 scenarios
+  -> one accepted 10-scenario LLM-authored probe tracked
+  -> 78 additional LLM envelopes retained but unreviewed
+  -> authoring interrupted and stopped
+  -> corpus freeze NOT reached
+  -> immutable Fast baseline NOT run
+  -> failure diagnosis / optimization NOT started
+  -> Deep qualification NOT started
 ```
 
-- exact baseline failures: 36/36 changed-Schema and Host passes
-- contract repair attempts: 0
+The harness is intended to reconstruct the real production prompt and dynamic
+Schema, prepare target-blind packets, invoke one declared Codex call per scenario,
+and replay raw output through the Fast parser and Host validator with same-tier
+semantic repair disabled. That intended behavior is untested on this checkpoint.
 
-Full changed-prompt rerun:
+## Validation ledger
+
+No tests or gates were run on the final tracked tree because the owner explicitly
+requested immediate commit/push without testing.
+
+Earlier in the work, before the owner rejected script-generated scenarios, the now-
+discarded corpus produced these observations:
 
 ```text
-.chromie/benchmarks/goal-association/20260831T045812Z_ga_daily_v1_local-prompt-v2_codex-gpt-5.6-sol/
-.chromie/benchmarks/goal-association/20260831T045812Z_ga_daily_v1_local-prompt-v2_codex-gpt-5.6-sol/adjudication-summary.json
+python -m pytest -q benchmarks/tests/test_fast_planner_daily_life_dataset.py
+3 passed in 50.06s
 ```
 
-- current-contract cases: 1,400/1,400
-- English supported cases: 700/700; Chinese supported cases: 700/700
-- changed dynamic Schema: 1,500/1,500
-- `modify_active`: 100/100, up from 64/100
-- unexpected failures: 0; contract repair attempts: 0
-- source stable during the batch
-- 100 mixed association-plus-creation probes retain `known_contract_gap`
+A direct `pytest -q` invocation of that test failed during import because it did not
+use the repository's module invocation. Both observations apply only to removed,
+script-generated material and provide no evidence for the final model-authored
+checkpoint.
 
-An early local Gemma run was stopped after the user corrected the inference authority:
+Not run on the final tree:
 
 ```text
-.chromie/benchmarks/goal-association/20260831T023009Z_ga_daily_v1_gemma4-12b/
-```
-
-It is aborted diagnostic residue only and must never be cited as qualification evidence.
-All `.chromie` artifacts are ignored by Git and do not transfer with the push.
-
-## Automated gates
-
-Previously delivered GA qualification evidence at `7d314cbd`:
-
-```text
-python benchmarks/datasets/goal_association_daily_life/validate.py --json
-1,500 validated; 1,400 Host accepted; 100 known contract gaps; 0 errors
-
-python -m pytest -q \
-  benchmarks/tests/test_goal_association_daily_life_dataset.py \
-  tests/test_goal_association_pr2.py
-78 passed
-
+python -m benchmarks.datasets.fast_planner_daily_life.qualification validate
 python scripts/check_repository_policies.py
-15 rule families, 0 reviewed exceptions; passed
-
 ./scripts/run_tests.sh
-2,048 main tests and 20 legacy Agent tests; passed
-
 python scripts/check_docs.py
-99 Markdown files; passed
-
 git diff --check
-passed
 ```
 
-The first GA complete gate attempt stopped because `docs/README.md` did not index the new
-corpus README. The missing existing-owner index was added; the complete gate was rerun
-and passed. No failing gate is hidden.
-
-Final observed methodology-delivery pre-commit results:
-
-```text
-python scripts/check_repository_policies.py
-15 rule families, 0 reviewed exceptions; passed
-
-./scripts/run_tests.sh
-2,048 main tests and 20 legacy Agent tests; passed
-
-python scripts/check_docs.py
-100 Markdown files; passed
-
-git diff --check
-passed
-```
-
-This delivery changes documentation and agent/contributor process only. It adds no
-Planner scenario corpus, inference run, prompt change, runtime result, or model evidence.
+The current work must therefore be treated as untested and unqualified.
 
 ## Cross-machine resume
 
@@ -236,52 +127,22 @@ Planner scenario corpus, inference run, prompt change, runtime result, or model 
 git fetch origin codex/ga-prompt-qualification-1500
 git switch codex/ga-prompt-qualification-1500
 git pull --ff-only
-python scripts/check_repository_policies.py
-./scripts/run_tests.sh
-python scripts/check_docs.py
-python benchmarks/datasets/goal_association_daily_life/validate.py
 ```
 
-Start Planner prompt work by reading `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`, then
-audit these real owners before editing:
+The ignored LLM envelopes are available only on the originating machine. On that
+machine, resume from `.chromie/benchmarks/fast-planner/llm-authoring-v1/`; on another
+machine, re-author missing scenario sets through new retained LLM calls. Do not
+replace LLM authorship with a scenario generator.
 
-```text
-agent/app/planner_prompt.py
-agent/app/planner_context.py
-agent/app/planner_model_contract.py
-agent/app/planner_validation.py
-agent/app/fast_planner.py
-agent/app/deep_planner.py
-tests/test_planner_prompt_module.py
-tests/test_fast_planner_pr3.py
-tests/test_deep_planner_pr4.py
-tests/test_fast_planner_streaming_commit.py
-tests/test_planner_reentry_policy.py
-```
-
-Create a new Issue and a new `codex/` branch after preserving any unrelated dirty
-worktree state. Before implementation, report Planner authority/non-authority, every
-Fast/Deep invocation variant, the real boundary workflow, proposed bilingual contrast
-matrix/count/splits, adjudication dimensions, evidence level, and any global decision
-requiring owner authorization. Use Codex `gpt-5.6-sol` high reasoning for offline
-inference unless the owner explicitly selects another model; never silently substitute
-Gemma/Ollama. Store one scenario per file, hide targets from inference, complete one
-immutable baseline before editing, and do not commit/push without explicit authorization.
-
-Review Issue #34 before changing the 100 global contract-gap cases. A mixed complete
-result must preserve one semantic authority and Responsibility conservation; do not add
-a second GA call, split the turn into unrelated authorities, or make Host infer missing
-meaning. Obtain explicit project-owner authorization before changing the canonical DTO.
-
-For deployed-provider qualification, retain the exact model digest, transport, strict
-decoder, prompt/Schema hashes, parameters, revision, runtime profile, latency, and
-GPU/TTS coexistence evidence. Run the complete frozen directory-discovered cohort without
-source edits between cases.
+After completing and freezing the corpus, run the validator, focused corpus test,
+immutable baseline, adjudication, applicable General Ability class, and canonical
+gates before changing the Planner prompt or making any qualification claim. If a
+case exposes a global identity/worldview/value or semantic-authority change, retain
+the blocker and obtain explicit owner authorization first.
 
 ## Claim boundary
 
-The local GA prompt/schema is qualified only for the 1,400 cases expressible by the
-current contract. The added methodology is documentation/process evidence and does not
-qualify Fast/Deep Planner behavior. No production model/profile, live service,
-microphone, audible voice, simulator, target robot, physical safety, or release claim
-was established. The 100 global mixed-decision cases remain open.
+This handoff records a partial authoring checkpoint only. It does not qualify or
+optimize Fast/Deep Planner workflow, contract, architecture, prompt, context, Schema,
+Host validation, model quality, or robot behavior. It establishes no deployed,
+voice, simulator, hardware, safety, release, or independent-review evidence.
