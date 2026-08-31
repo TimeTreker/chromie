@@ -1,0 +1,182 @@
+{
+  "adversarial_design": {
+    "negative_hypotheses": [
+      "lexical overlap selects the wrong Goal",
+      "terminal or paused lifecycle is ignored",
+      "one GI Responsibility is dropped or duplicated",
+      "GA changes GI output_mode or invents Planner HOW",
+      "mixed continuity is hidden by the exclusive discriminant"
+    ],
+    "phenomena": [
+      "continue_active",
+      "media_playback",
+      "bounded_goal_state",
+      "gi_responsibility_conservation"
+    ]
+  },
+  "category": "continue_active",
+  "contrast_set": {
+    "distinguishing_factor": "Goal lifecycle and continuity relation; base semantic domain is held constant.",
+    "id": "ga_daily_v1_contrast_04_01",
+    "member": "continue_active"
+  },
+  "dataset_id": "chromie.goal_association_daily_life.v1",
+  "difficulty": "medium",
+  "id": "ga_daily_v1_04_01_continue_active",
+  "input": {
+    "language": "en-US",
+    "request": {
+      "context": {
+        "active_goal_snapshots": [
+          {
+            "goal": {
+              "beneficiary": "user",
+              "constraints": {},
+              "description": "Play Ocean Sounds.",
+              "goal_id": "goal_04_01_a",
+              "metadata": {
+                "media_operation": "play",
+                "output_mode": "media_playback"
+              },
+              "object": {
+                "bindings": {
+                  "media_title": {
+                    "confidence": 1.0,
+                    "entity_type": "media",
+                    "name": "media_title",
+                    "value": "Ocean Sounds"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "prior_r1"
+              ],
+              "source_text": "Play Ocean Sounds.",
+              "success_criteria": [
+                "Play Ocean Sounds."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            },
+            "goal_id": "goal_04_01_a",
+            "goal_version": 1,
+            "last_user_update": "Play Ocean Sounds.",
+            "metadata": {},
+            "open_information_gaps": [],
+            "responsibility_status": "open",
+            "schema_version": 1,
+            "source_task_id": "task_goal_04_01_a",
+            "updated_ms": 1700000000401,
+            "work_status": "running"
+          }
+        ],
+        "discourse_referents": [],
+        "history": [
+          {
+            "role": "user",
+            "text": "Play Ocean Sounds."
+          },
+          {
+            "role": "assistant",
+            "text": "I retained the Goal context."
+          }
+        ],
+        "interaction_context": {
+          "turn_relation": "follow_up"
+        },
+        "recent_goal_snapshots": []
+      },
+      "history": [],
+      "interpretation_confidence": 1.0,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 1.0,
+          "local_ref": "r1",
+          "outcome": "Continue: Play Ocean Sounds.",
+          "output_mode": "media_playback",
+          "relationship": "continue",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "tok_r1_end",
+            "source_start_token_ref": "tok_r1_start"
+          },
+          "target_goal_ids": [
+            "goal_04_01_a"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "sid": "ga_daily_v1_04_01_continue_active",
+      "text": "Please continue that unfinished goal."
+    }
+  },
+  "invariants": {
+    "deterministic_validation_cannot_repair_meaning": true,
+    "gi_what_is_immutable": true,
+    "no_production_semantic_reviewer": true,
+    "one_primary_semantic_authority_call": true,
+    "planner_how_is_forbidden": true
+  },
+  "review": {
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_contrast_matrix",
+    "qualification_required": "owner_review_and_frozen_one_batch_execution",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "assistant_reference_model",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "validation",
+  "target": {
+    "contract_gap": null,
+    "reference_model_output": {
+      "associations": [
+        {
+          "confidence": 1.0,
+          "reason_summary": "The accepted GI relationship is continue.",
+          "relationship": "continue",
+          "resolved_gap_ids": [],
+          "source_responsibility_refs": [
+            "r1"
+          ],
+          "target_goal_ids": [
+            "goal_04_01_a"
+          ],
+          "updated_description": ""
+        }
+      ],
+      "confidence": 1.0,
+      "decision": "associate",
+      "new_goals": [],
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": []
+    },
+    "schema_expectation": "accept",
+    "semantic_expectations": {
+      "candidate_goal_ids": [
+        "goal_04_01_a"
+      ],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_gi_output_mode": true,
+      "responsibility_count": 1,
+      "responsibility_map": [
+        {
+          "operation": "association",
+          "relationship": "continue",
+          "source_ref": "r1",
+          "target_goal_ids": [
+            "goal_04_01_a"
+          ]
+        }
+      ]
+    }
+  }
+}

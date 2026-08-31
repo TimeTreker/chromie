@@ -1,224 +1,199 @@
 # Chromie Latest Handoff
 
-Audience: coding agent or operator resuming provider qualification and target-evidence closure.
+Audience: coding agent or operator resuming GA global-contract review or deployed-model qualification.
 Owner: project owner. Replace this snapshot when `DEVELOPMENT_CHECKPOINT.md` advances.
-Authority: operational snapshot only; current source, tests, retained evidence, and the
-checkpoint win.
+Authority: operational snapshot only; current source, tests, retained evidence, the
+checkpoint, and Issue #34 win.
 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Pre-delivery branch/base: `main` at
-  `c07dc3e4baa76b73008907d3d1fefb0e39178d68`
-- Expected resume revision: latest `origin/main` commit containing this handoff and
+- Delivery branch: `codex/ga-prompt-qualification-1500`
+- Pre-delivery base: `main` at
+  `7596ee06f693b08918fde99063fbf24018a4e2dc`
+- Expected resume revision: latest
+  `origin/codex/ga-prompt-qualification-1500` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
-- Delivery scope: GI authority/prompt/data/test/documentation corrections only; no model,
-  runtime profile, provider integration, deployment, feature, or hardware change
-- Active line: reproduce the canonical local gate, qualify an exact deployed provider/model,
-  then retain current-revision live evidence; do not add unrelated architecture
+- Active Issue: [#34](https://github.com/TimeTreker/chromie/issues/34)
+- Delivery scope: GA prompt/dynamic-Schema alignment, 1,500-file bilingual corpus,
+  deterministic validation/tests, benchmark documentation, and retained evidence
+- No provider, model profile, deployment, Runtime switch, Capability, voice, simulator,
+  or hardware behavior changed
 
-## Current authority flow
+The local worktree also contains pre-existing, unrelated architecture-diagram work in
+`README.md` and `docs/assets/`. Those paths are deliberately excluded from this
+delivery commit and remain the project owner's uncommitted work.
+
+## Delivered authority flow
 
 ```text
-Gateway admitted source
-  -> one primary GI WHAT DTO
-       -> deterministic Schema/source/reference validation
-       -> accept resolved meaning
-       -> or one source-based Deep GI for genuine unresolved meaning
-            -> deterministic validation -> accept or fail closed
-  -> GA preserves Responsibilities/output_mode and owns Goal identity/continuity
-  -> Host derives execution projections; Planner owns HOW
+accepted GI Responsibilities + existing/recent Goal candidates
+  -> one primary GA invocation
+       -> exact dynamic decoder Schema
+            modify/clarify must carry structured semantic update
+       -> GoalAssociationModelOutput validation
+       -> GoalAssociationResolver
+  -> canonical Goal continuity -> Planner owns HOW
 ```
 
-GI has only two model stages in source: `goal_interpretation` and the conditional
-`goal_interpretation_deep`. There is no primary/Deep contract-repair call. Repository policy
-guards reject restoration of the removed repair payload and stage markers. Do not restore a
-semantic reviewer, resegmentation call, Host source interpretation, or phrase-rule lane.
+The fix does not add a same-authority repair, reviewer, scorer, or semantic retry.
+`reason_summary` stays non-authoritative rationale. The current decision discriminant
+is still exclusive: `associate` carries associations and `create_goals` carries new
+Goals. It cannot truthfully carry both in one result.
 
-## Delivered changes
+## Material changes
 
-- Removed source-based primary DTO regeneration and the Deep location retry. Invalid primary
-  or Deep output now fails closed after that authority's single invocation.
-- Preserved explicit measured values and units as one exact source/context surface. The
-  candidate corpus pins 406 digit measurement surfaces; final inference retained all 406.
-- Reconciled standalone social acts with the required non-empty Responsibility inventory:
-  greetings, thanks, feelings, evaluations, practical decisions, and reassurance requests
-  are one speech Responsibility when they stand alone.
-- Made unfamiliar-name uncertainty materiality-based. A clear `look up X` or `tell X ...`
-  role does not become unresolved merely because the name is unfamiliar.
-- Corrected Charter principle 31: Goal Interpretation is the sole `output_mode` author;
-  Goal Association preserves it under decoder `const` and conservation validation; Host
-  derives responsibility kind, execution lane, and provider requirement afterwards.
-- Corrected 338 existing bilingual corpus scenarios: 270 unit representations, 34 minimal
-  cancellation source spans, and 34 unfamiliar-name unresolved references. The dataset
-  remains 1,496 cases, 68 genuinely unresolved cases, and not training eligible.
-- Replaced three Level-A fixtures that expected the removed GI repair with one valid primary
-  result; updated the dataset coverage test and current owner documents.
+- `agent/app/goal_association_prompt.py`: places modify/clarify structured-update
+  requirements next to relationship selection.
+- `agent/app/goal_association_schema.py`: exposes the existing DTO/Host update invariant
+  at the earliest decoder boundary with conditional JSON Schema.
+- `tests/test_goal_association_pr2.py`: rejects a modify association whose meaning is
+  present only in `reason_summary` and accepts the structured update.
+- `benchmarks/datasets/goal_association_daily_life/`: 1,500 separate scenario JSON
+  files plus README, static manifest, validator, and package marker. There is no
+  generator or combined scenario file.
+- `benchmarks/tests/test_goal_association_daily_life_dataset.py`: checks counts,
+  per-file identity/path alignment, manifest digest, references, real Schema, and Host.
+- `benchmarks/README.md` and `docs/README.md`: index the new corpus in existing owners.
 
-Repository surface delta: zero new tracked files; 338 modified corpus scenario files and
-24 other existing source/test/config/document/scenario files (362 total). No new environment
-variable, public switch, architecture term, compatibility path, provider, runtime profile,
-or evidence format. Consolidation opportunity: if an exact deployed decoder proves prompt
-length is a blocker, reduce duplicated field descriptions inside the existing prompt/schema
-owners; do not create another prompt authority or repair stage.
+Repository surface delta for this delivery: 1,505 new tracked files (1,500 scenarios,
+four corpus support files, one dataset test) and five existing implementation/test/doc
+owners plus the two required delivery owners modified. No environment variable, public
+switch, first-class architecture term, compatibility path, or evidence format was added.
+Consolidation opportunity: if the global mixed decision is authorized, evolve the existing
+GA result discriminant rather than adding a parallel model stage or new association service.
 
-## Actual defect workflow and root cause
+## Actual defect and repaired workflow
 
-Representative probes: invalid primary DTO, `Walk forward for 5 seconds`, `Thank you`,
-`I am tired`, `Tell Nova the meeting moved`, and lifecycle cancel/resume turns.
-
-| Module/owner | Authoritative input/material values | Actual output before fix | Required/final output | Correlation and judgment |
+| Module/owner | Material input | Baseline actual output | Required/final output | Correlation/judgment |
 |---|---|---|---|---|
-| Gateway | Exact admitted text, source token table, bounded semantic Context | Immutable handoff | Same | Correct; source refs identify each GI Responsibility |
-| Primary GI | Gateway source + 15,212-char base/conditional prompt + exact decoder Schema | Could emit `duration: 5`, omit standalone social Responsibility, or mark every unfamiliar name unresolved | Preserve `5 seconds`; one social speech Responsibility; unresolved only for consequential meaning | Earliest semantic-contract boundary fixed |
-| GI validator | One raw DTO + exact source/reference/order mechanics | Invalid DTO could start a second full source interpretation mislabeled repair | Accept one DTO or fail closed | Earliest authority violation fixed; no model handoff follows rejection |
-| Deep GI | Same source/Context, only after accepted primary `unresolved`; prior DTO absent | Invalid location provenance could start a third GI call | One Deep decision, then accept or terminal failure | Retry chain removed |
-| GA | Accepted immutable Responsibilities, local refs, source evidence, GI mode | Runtime already constrained mode, but Charter said GA authored it | Preserve exact GI mode; own only Goal identity/continuity | Canonical wording corrected |
-| Host/Planner | Accepted Responsibilities + canonical Goals | No defect observed here; offline cohort does not invoke them | Host projects mechanics; Planner authors HOW | Not invoked by primary/Deep model cohort; Level A checks conservation only |
+| Primary GA | Accepted GI refs plus candidate Goals | 36 ordinary modify decisions described the change only in `reason_summary` | Structured, complete Goal update in the same primary decision | Prompt exposed decoder mismatch |
+| Dynamic Schema | Exact allowed refs/Goal IDs | Accepted missing update fields | Reject modify/clarify unless structured update exists | Earliest wrong mechanical boundary fixed |
+| DTO/Host | Primary structured result | Failed closed on all 36 incomplete updates | Resolve complete update without another LLM call | Correct containment retained |
+| Canonical Goal/Planner | Host-accepted continuity | Not invoked for failures | Receives accepted Goal truth; Planner alone authors HOW | Downstream ownership unchanged |
 
-Initiating triggers exposed four root causes: same-authority source regeneration, unit-dropping
-scalar instructions, conflicting social/name contracts, and contradictory `output_mode`
-documentation. Downstream symptoms were unit loss, missing natural conversation, unnecessary
-Deep/clarification, and ambiguous semantic ownership. The patch fixes the first wrong
-GI/document/data boundaries; GA, Planner, and Host do not recover or reinterpret missing WHAT.
+The prompt was not treated as the only cause. The generated Schema contradicted the
+already stricter DTO/Host contract, so the fix aligns both earliest input surfaces. No
+Host reconstruction or downstream semantic reinterpretation was added.
 
-## Final prompt and cohort identity
+## Frozen cohort and model identity
 
-- Base revision at cohort preparation:
-  `c07dc3e4baa76b73008907d3d1fefb0e39178d68` plus dirty delivery patch
-- Cohort-bound worktree diff SHA-256:
-  `0659aedfbcf5e12746ff22a6f9e6e7a48eb0855f32c5a9eb9cbb7f27f91063e4`
-- Base prompt SHA-256:
-  `73729710f5baef12ba690ff13ef949aeef00017643fb188e143ed3cc76626df6`
-- Model: `gpt-5.6-sol`, reasoning effort `high`; production payload temperature request
-  retained only as metadata because Codex CLI controls decoding
-- Partition seed `20260831`; six whole-contrast-set batches:
-  `252 / 248 / 248 / 252 / 248 / 248`
-- Qualification: `chromie.codex_gi_reference_full_authority_v5_final`
-
-Only the dataset coverage assertion and evidence/current-state/checkpoint/handoff text changed
-after the final cohort; prompt, Schema, runtime, corpus inputs/targets, and GI implementation
-did not. The assertion change mirrors already cohort-bound manifest truth (`68`, `406`).
+- Dataset: `chromie.goal_association_daily_life.v1`
+- Cases: 1,500; languages: 750 `en-US`, 750 `zh-CN`
+- Contrast construction: 100 semantic seeds × 15 continuity families
+- Current-contract references: 1,400
+- Known global-contract probes: 100
+- Scenario-tree SHA-256:
+  `264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab`
+- Model: Codex `gpt-5.6-sol`, reasoning effort `high`, invoked with `codex exec`
+- Reference targets were excluded from inference packets
+- Changed prompt SHA-256:
+  `3d68272a0612a4a7079ba15c272c5ea17d2101bc27e98c6a15975d70628c3a26`
+- Changed Schema SHA-256:
+  `5162f8d03c74e339eeffec7312cccc3fadcc8da1d07a6bc931224593f96fb482`
 
 ## Retained local evidence
 
-Primary final cohort:
+Baseline full Codex cohort:
 
 ```text
-.chromie/acceptance/model-qualification/codex-gi-reference-full-authority-v5-final/
-.chromie/acceptance/model-qualification/codex-gi-reference-full-authority-v5-final/ANALYSIS.zh-CN.md
+.chromie/benchmarks/goal-association/20260831T023604Z_ga_daily_v1_codex-gpt-5.6-sol/
+.chromie/benchmarks/goal-association/20260831T023604Z_ga_daily_v1_codex-gpt-5.6-sol/adjudication-summary.json
 ```
 
-- 1,496/1,496 calls completed; no call failure/timeout
-- generated Schema and production Host: 1,496/1,496
-- mechanical full-dimensional matches: 835
-- exact decomposition 1,496; output mode 1,490; relationship 1,496; unresolved 1,474
-- exact explicit digit measurement surfaces 406/406
-- exact Goal-continuity output mode and relationship 136/136
-- same-model post-hoc semantic review: 1,366 valid, 130 invalid
-- reviewer root causes: candidate oracle 360, grader convention 345, model inference 130
-- assistant references judged valid: 1,136; prompt-change recommendations: 0
+- 1,364/1,400 current-contract passes
+- 36 Host failures, all `modify_active`
+- 1,500/1,500 passed the baseline dynamic Schema
 
-Deep final subset:
+Exact focused rerun:
 
 ```text
-.chromie/acceptance/model-qualification/codex-gi-reference-deep-authority-v5-final/
+.chromie/benchmarks/goal-association/20260831T045338Z_ga_modify_local_prompt_codex-gpt-5.6-sol/
+.chromie/benchmarks/goal-association/20260831T045338Z_ga_modify_local_prompt_codex-gpt-5.6-sol/summary.json
 ```
 
-- all 68 candidate-reference genuinely unresolved scenarios
-- 68/68 calls, Schema, Host, decomposition, mode, relationship, and source evidence
-- mechanical full-dimensional matches 42; same-model semantic review 55 valid/13 invalid
-- assistant references judged valid 52; prompt-change recommendations: 0
+- exact baseline failures: 36/36 changed-Schema and Host passes
+- contract repair attempts: 0
 
-Focused evidence:
+Full changed-prompt rerun:
 
 ```text
-.chromie/acceptance/model-qualification/codex-gi-authority-v1-probes-v2/results.json
-.chromie/acceptance/general-ability/20260831-gi-single-authority-final-level-a/
+.chromie/benchmarks/goal-association/20260831T045812Z_ga_daily_v1_local-prompt-v2_codex-gpt-5.6-sol/
+.chromie/benchmarks/goal-association/20260831T045812Z_ga_daily_v1_local-prompt-v2_codex-gpt-5.6-sol/adjudication-summary.json
 ```
 
-- bilingual thanks/feelings/harmless-name/unit probes: 8/8
-- Level A: `planner_goal_semantic_quality` 4/4 and
-  `robust_intent_understanding` 8/8
+- current-contract cases: 1,400/1,400
+- English supported cases: 700/700; Chinese supported cases: 700/700
+- changed dynamic Schema: 1,500/1,500
+- `modify_active`: 100/100, up from 64/100
+- unexpected failures: 0; contract repair attempts: 0
+- source stable during the batch
+- 100 mixed association-plus-creation probes retain `known_contract_gap`
 
-The four primary reviewer failures that cite `schema_version` are known reviewer mistakes:
-each case's exact decoder Schema allowed `schema_version=1` and Host validation passed. All
-evidence is diagnostic and non-independent. Ignored `.chromie` paths remain only on this host
-and are not transferred by Git push.
+An early local Gemma run was stopped after the user corrected the inference authority:
 
-## Prompt/core-principle audit
+```text
+.chromie/benchmarks/goal-association/20260831T023009Z_ga_daily_v1_gemma4-12b/
+```
 
-- Static layer order is clear: authority -> decision procedure -> Responsibilities ->
-  output modes -> bindings/dimensions -> coordination/source evidence -> uncertainty ->
-  worked example -> result conditions.
-- Runtime generated three system variants only: base 15,212 chars/1,292 cases,
-  prior-assistant 15,592/34, and Goal-continuity 16,171/170. Projection follows already
-  authoritative Context/Schema and does not select a semantic lane.
-- Main user payload contains immutable source/tokens and bounded Context only. Schema is a
-  closed decoder contract. Deep adds broader reasoning only after genuine unresolved meaning.
-- Charter 30/31/33 are satisfied: one primary semantic source, no same-authority audit/repair,
-  one permitted source-based Deep delegation, and terminal Deep rejection.
-- Iterations stopped at 5 of the authorized maximum 20. Iterations 2 and 3 broadened wording
-  and regressed decomposition/source semantics; final primary and Deep audits both recommended
-  zero prompt changes. Remaining errors are model inference or imperfect candidate oracles.
+It is aborted diagnostic residue only and must never be cited as qualification evidence.
+All `.chromie` artifacts are ignored by Git and do not transfer with the push.
 
 ## Automated gates
 
-Final observed pre-commit gate:
+Final observed pre-commit results:
 
 ```text
+python benchmarks/datasets/goal_association_daily_life/validate.py --json
+1,500 validated; 1,400 Host accepted; 100 known contract gaps; 0 errors
+
+python -m pytest -q \
+  benchmarks/tests/test_goal_association_daily_life_dataset.py \
+  tests/test_goal_association_pr2.py
+78 passed
+
 python scripts/check_repository_policies.py
 15 rule families, 0 reviewed exceptions; passed
 
 ./scripts/run_tests.sh
-2,048 main tests; 20 legacy Agent tests; passed
+2,048 main tests and 20 legacy Agent tests; passed
 
 python scripts/check_docs.py
-98 Markdown files; passed
+99 Markdown files; passed
 
-python scripts/check_test_ownership.py
+git diff --check
 passed
-
-python benchmarks/datasets/goal_interpretation_daily_life/validate.py
-1,496 generated-schema and 1,496 Host passes; 68 unresolved; 406 digit measurement surfaces
 ```
 
-The first full gate run exposed one stale dataset test assertion (`102`); it was corrected to
-the manifest/validator truth (`68`) and augmented with `406`, then the complete gate passed.
+The first complete gate attempt stopped because `docs/README.md` did not index the new
+corpus README. The missing existing-owner index was added; the complete gate was rerun
+and passed. No failing gate is hidden.
 
-## Resume commands
-
-Reproduce source truth:
+## Cross-machine resume
 
 ```bash
-git fetch origin main
-git switch main
-git pull --ff-only origin main
+git fetch origin codex/ga-prompt-qualification-1500
+git switch codex/ga-prompt-qualification-1500
+git pull --ff-only
 python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py
-python benchmarks/datasets/goal_interpretation_daily_life/validate.py
+python benchmarks/datasets/goal_association_daily_life/validate.py
 ```
 
-Next useful evidence is an exact deployed provider/model/strict-decoder transaction, not
-another broad prompt edit:
+Review Issue #34 before changing the 100 global contract-gap cases. A mixed complete
+result must preserve one semantic authority and Responsibility conservation; do not add
+a second GA call, split the turn into unrelated authorities, or make Host infer missing
+meaning. Obtain explicit project-owner authorization before changing the canonical DTO.
 
-```bash
-python scripts/qualify_vllm_provider.py \
-  --base-url http://127.0.0.1:8000/v1 \
-  --model <exact-model-id> \
-  --output .chromie/acceptance/model-qualification/<new-id>.json \
-  --goal-interpreter-probe \
-  --goal-interpreter-manifest benchmarks/manifests/goal_interpreter_primary_v1.json
-```
-
-Bind the exact model digest, prompt, Schema, strict decoder, parameters, revision, latency,
-GPU/TTS coexistence, and runtime identity. Do not promote from Codex or Level-A evidence.
-After a material deployed change, rebuild/verify the Agent image, run one complete
-directory-discovered live-text cohort without source edits between cases, collect exactly one
-debug bundle, and inspect every case before another broad change.
+For deployed-provider qualification, retain the exact model digest, transport, strict
+decoder, prompt/Schema hashes, parameters, revision, runtime profile, latency, and
+GPU/TTS coexistence evidence. Run the complete frozen directory-discovered cohort without
+source edits between cases.
 
 ## Claim boundary
 
-Development only. No production model/profile was promoted. There is no new deployed-service,
-audible voice, microphone, simulator, target robot, physical safety, or release evidence.
+The local GA prompt/schema is qualified only for the 1,400 cases expressible by the
+current contract. No production model/profile, live service, microphone, audible voice,
+simulator, target robot, physical safety, or release claim was established. The 100
+global mixed-decision cases remain open.

@@ -208,6 +208,49 @@ def goal_association_response_schema(
                 constrain(value)
 
     constrain(schema)
+    association_schema = schema.get("$defs", {}).get(
+        "GoalAssociationModelAssociation"
+    )
+    if isinstance(association_schema, dict):
+        # Pydantic rejects a modify/clarify association whose semantic update
+        # exists only in reason_summary, but the generated decoder schema used
+        # to permit exactly that shape.  Expose the existing DTO invariant at
+        # the earliest structured-output boundary so the primary invocation
+        # must author the update instead of relying on a semantic repair call.
+        association_schema.setdefault("allOf", []).append(
+            {
+                "if": {
+                    "properties": {
+                        "relationship": {
+                            "enum": ["modify", "clarify"],
+                        }
+                    },
+                    "required": ["relationship"],
+                },
+                "then": {
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "updated_description": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                }
+                            },
+                            "required": ["updated_description"],
+                        },
+                        {
+                            "properties": {
+                                "resolved_gap_ids": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                }
+                            },
+                            "required": ["resolved_gap_ids"],
+                        },
+                    ]
+                },
+            }
+        )
     recipient_schema = schema.get("$defs", {}).get(
         "GoalAssociationModelResourceRecipient"
     )

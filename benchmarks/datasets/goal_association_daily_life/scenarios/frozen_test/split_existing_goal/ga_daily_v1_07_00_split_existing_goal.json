@@ -1,0 +1,231 @@
+{
+  "adversarial_design": {
+    "negative_hypotheses": [
+      "lexical overlap selects the wrong Goal",
+      "terminal or paused lifecycle is ignored",
+      "one GI Responsibility is dropped or duplicated",
+      "GA changes GI output_mode or invents Planner HOW",
+      "mixed continuity is hidden by the exclusive discriminant"
+    ],
+    "phenomena": [
+      "split_existing_goal",
+      "learning_support",
+      "bounded_goal_state",
+      "gi_responsibility_conservation"
+    ]
+  },
+  "category": "split_existing_goal",
+  "contrast_set": {
+    "distinguishing_factor": "Goal lifecycle and continuity relation; base semantic domain is held constant.",
+    "id": "ga_daily_v1_contrast_07_00",
+    "member": "split_existing_goal"
+  },
+  "dataset_id": "chromie.goal_association_daily_life.v1",
+  "difficulty": "hard",
+  "id": "ga_daily_v1_07_00_split_existing_goal",
+  "input": {
+    "language": "en-US",
+    "request": {
+      "context": {
+        "active_goal_snapshots": [
+          {
+            "goal": {
+              "beneficiary": "user",
+              "constraints": {},
+              "description": "Provide a simple explanation of fractions.",
+              "goal_id": "goal_07_00_a",
+              "metadata": {
+                "media_operation": "none",
+                "output_mode": "information"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "resource_responsibility": {
+                "delivery_mode": "spoken_explanation",
+                "metadata": {},
+                "recipient": {
+                  "description": "requester"
+                },
+                "resource": {
+                  "attributes": {
+                    "information_domain": {
+                      "confidence": 1.0,
+                      "entity_type": "information_domain",
+                      "name": "information_domain",
+                      "value": "external_grounded_information"
+                    },
+                    "topic": {
+                      "confidence": 1.0,
+                      "entity_type": "topic",
+                      "name": "topic",
+                      "value": "fractions"
+                    }
+                  },
+                  "description": "Provide a simple explanation of fractions.",
+                  "kind": "information",
+                  "quantity": ""
+                },
+                "responsibility_type": "acquire_and_deliver_resource",
+                "schema_version": 1,
+                "source": {
+                  "bindings": {},
+                  "description": "",
+                  "status": "provider_resolved"
+                }
+              },
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "prior_r1"
+              ],
+              "source_text": "Explain fractions in simple terms.",
+              "success_criteria": [
+                "Provide a simple explanation of fractions."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            },
+            "goal_id": "goal_07_00_a",
+            "goal_version": 1,
+            "last_user_update": "Explain fractions in simple terms.",
+            "metadata": {},
+            "open_information_gaps": [],
+            "responsibility_status": "open",
+            "schema_version": 1,
+            "source_task_id": "task_goal_07_00_a",
+            "updated_ms": 1700000000700,
+            "work_status": "open"
+          }
+        ],
+        "discourse_referents": [],
+        "history": [
+          {
+            "role": "user",
+            "text": "Explain fractions in simple terms."
+          },
+          {
+            "role": "assistant",
+            "text": "I retained the Goal context."
+          }
+        ],
+        "interaction_context": {
+          "turn_relation": "follow_up"
+        },
+        "recent_goal_snapshots": []
+      },
+      "history": [],
+      "interpretation_confidence": 1.0,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 1.0,
+          "local_ref": "r1",
+          "outcome": "First separated outcome for Provide a simple explanation of fractions.",
+          "output_mode": "information",
+          "relationship": "split",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "tok_r1_end",
+            "source_start_token_ref": "tok_r1_start"
+          },
+          "target_goal_ids": [
+            "goal_07_00_a"
+          ]
+        },
+        {
+          "bindings": {},
+          "confidence": 1.0,
+          "local_ref": "r2",
+          "outcome": "Second separated outcome for Provide a simple explanation of fractions.",
+          "output_mode": "information",
+          "relationship": "split",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "tok_r2_end",
+            "source_start_token_ref": "tok_r2_start"
+          },
+          "target_goal_ids": [
+            "goal_07_00_a"
+          ]
+        }
+      ],
+      "schema_version": 1,
+      "sid": "ga_daily_v1_07_00_split_existing_goal",
+      "text": "Split this goal into two separately owed outcomes."
+    }
+  },
+  "invariants": {
+    "deterministic_validation_cannot_repair_meaning": true,
+    "gi_what_is_immutable": true,
+    "no_production_semantic_reviewer": true,
+    "one_primary_semantic_authority_call": true,
+    "planner_how_is_forbidden": true
+  },
+  "review": {
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_contrast_matrix",
+    "qualification_required": "owner_review_and_frozen_one_batch_execution",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "assistant_reference_model",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "frozen_test",
+  "target": {
+    "contract_gap": null,
+    "reference_model_output": {
+      "associations": [
+        {
+          "confidence": 1.0,
+          "reason_summary": "The accepted GI relationship is split.",
+          "relationship": "split",
+          "resolved_gap_ids": [],
+          "source_responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "target_goal_ids": [
+            "goal_07_00_a"
+          ],
+          "updated_description": ""
+        }
+      ],
+      "confidence": 1.0,
+      "decision": "associate",
+      "new_goals": [],
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": []
+    },
+    "schema_expectation": "accept",
+    "semantic_expectations": {
+      "candidate_goal_ids": [
+        "goal_07_00_a"
+      ],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_gi_output_mode": true,
+      "responsibility_count": 2,
+      "responsibility_map": [
+        {
+          "operation": "association",
+          "relationship": "split",
+          "source_ref": "r1",
+          "target_goal_ids": [
+            "goal_07_00_a"
+          ]
+        },
+        {
+          "operation": "association",
+          "relationship": "split",
+          "source_ref": "r2",
+          "target_goal_ids": [
+            "goal_07_00_a"
+          ]
+        }
+      ]
+    }
+  }
+}

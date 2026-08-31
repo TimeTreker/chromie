@@ -1,0 +1,150 @@
+{
+  "adversarial_design": {
+    "negative_hypotheses": [
+      "lexical overlap selects the wrong Goal",
+      "terminal or paused lifecycle is ignored",
+      "one GI Responsibility is dropped or duplicated",
+      "GA changes GI output_mode or invents Planner HOW",
+      "mixed continuity is hidden by the exclusive discriminant"
+    ],
+    "phenomena": [
+      "create_without_candidates",
+      "embodied_movement",
+      "bounded_goal_state",
+      "gi_responsibility_conservation"
+    ]
+  },
+  "category": "create_without_candidates",
+  "contrast_set": {
+    "distinguishing_factor": "Goal lifecycle and continuity relation; base semantic domain is held constant.",
+    "id": "ga_daily_v1_contrast_03_08",
+    "member": "create_without_candidates"
+  },
+  "dataset_id": "chromie.goal_association_daily_life.v1",
+  "difficulty": "medium",
+  "id": "ga_daily_v1_03_08_create_without_candidates",
+  "input": {
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "active_goal_snapshots": [],
+        "discourse_referents": [],
+        "history": [
+          {
+            "role": "user",
+            "text": "请朝我这边移动6秒。"
+          },
+          {
+            "role": "assistant",
+            "text": "我保留了这个目标的上下文。"
+          }
+        ],
+        "interaction_context": {
+          "turn_relation": "new_turn"
+        },
+        "recent_goal_snapshots": []
+      },
+      "history": [],
+      "interpretation_confidence": 1.0,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "direction": "朝我这边",
+            "duration": "6秒"
+          },
+          "confidence": 1.0,
+          "local_ref": "r1",
+          "outcome": "朝我这边移动6秒。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "tok_r1_end",
+            "source_start_token_ref": "tok_r1_start"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "ga_daily_v1_03_08_create_without_candidates",
+      "text": "请朝我这边移动6秒。"
+    }
+  },
+  "invariants": {
+    "deterministic_validation_cannot_repair_meaning": true,
+    "gi_what_is_immutable": true,
+    "no_production_semantic_reviewer": true,
+    "one_primary_semantic_authority_call": true,
+    "planner_how_is_forbidden": true
+  },
+  "review": {
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_contrast_matrix",
+    "qualification_required": "owner_review_and_frozen_one_batch_execution",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "assistant_reference_model",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "train_candidate",
+  "target": {
+    "contract_gap": null,
+    "reference_model_output": {
+      "confidence": 1.0,
+      "decision": "create_goals",
+      "new_goals": [
+        {
+          "bindings": [
+            {
+              "confidence": 1.0,
+              "entity_type": "direction",
+              "name": "direction",
+              "referent_id": "",
+              "value": "朝我这边"
+            },
+            {
+              "confidence": 1.0,
+              "entity_type": "duration",
+              "name": "duration",
+              "referent_id": "",
+              "value": "6秒"
+            }
+          ],
+          "description": "朝我这边移动6秒。",
+          "media_operation": "none",
+          "output_mode": "body_action",
+          "related_goal_ids": [],
+          "resource_kind": "none",
+          "resource_responsibility": null,
+          "source_responsibility_refs": [
+            "r1"
+          ],
+          "supersedes_goal_ids": []
+        }
+      ],
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": []
+    },
+    "schema_expectation": "accept",
+    "semantic_expectations": {
+      "candidate_goal_ids": [],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_gi_output_mode": true,
+      "responsibility_count": 1,
+      "responsibility_map": [
+        {
+          "operation": "new_goal",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "source_ref": "r1",
+          "supersedes_goal_ids": [],
+          "target_goal_ids": []
+        }
+      ]
+    }
+  }
+}

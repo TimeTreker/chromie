@@ -448,6 +448,33 @@ reorganizing scenario data never requires a Python change. Keep scenario IDs
 unique and update the dataset and migration manifest counts when intentionally
 changing the maintained cohort size.
 
+## Goal Association daily-life corpus v1
+
+`datasets/goal_association_daily_life/scenarios/` contains 1,500 independently
+reviewable GA inputs, split evenly between Chinese and English. Every JSON file
+supplies accepted GI Responsibilities together with bounded existing and recent
+Goal state. The fifteen continuity families cover creation, association, Goal
+lifecycle operations, replacement, merge/split decisions, and the deliberately
+retained mixed association-plus-creation contract gap.
+
+The corpus has no generator or combined scenario source: one scenario file is
+the authoritative unit. `dataset.json` owns aggregate counts and the complete
+scenario-tree digest. Reference decisions remain qualification oracles rather
+than Runtime policy, all cases are ineligible for training, and the corpus does
+not claim independent semantic review or deployed behavior evidence.
+
+Validate the directory-discovered corpus and its real Host contracts with:
+
+```bash
+python benchmarks/datasets/goal_association_daily_life/validate.py
+python -m pytest -q benchmarks/tests/test_goal_association_daily_life_dataset.py
+```
+
+See the corpus
+[README](datasets/goal_association_daily_life/README.md) and
+[Issue #34](https://github.com/TimeTreker/chromie/issues/34) for its ownership,
+claim boundary, and retained prompt-qualification evidence.
+
 
 ## End-to-end evidence profiles
 

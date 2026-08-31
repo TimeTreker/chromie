@@ -2053,6 +2053,29 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("confidence", association_schema["required"])
         self.assertIn("target_goal_ids", association_schema["required"])
 
+        validator = Draft202012Validator(schema)
+        missing_modify_update = {
+            "decision": "associate",
+            "associations": [
+                {
+                    "relationship": "modify",
+                    "source_responsibility_refs": ["r1"],
+                    "target_goal_ids": ["goal-walk"],
+                    "confidence": 1.0,
+                }
+            ],
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+            "reason_summary": "The requested refinement is understood.",
+        }
+        self.assertTrue(list(validator.iter_errors(missing_modify_update)))
+        missing_modify_update["associations"][0]["updated_description"] = (
+            "Walk forward for ten seconds, then stop quietly."
+        )
+        self.assertEqual(list(validator.iter_errors(missing_modify_update)), [])
+
 
 
     def test_temporal_binding_preserves_human_semantic_surface(self):

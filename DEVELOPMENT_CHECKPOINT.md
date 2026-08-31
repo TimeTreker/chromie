@@ -1,129 +1,134 @@
 # Chromie Development Checkpoint
 
-Status: Goal-driven GI single-authority contract fixed; five-round 1,496-case offline audit selected the final prompt; exact deployed-provider qualification remains open
+Status: GA local prompt/schema qualified on all 1,400 current-contract cases; 100 mixed continuity-plus-creation cases retain an explicit global DTO gap
 Updated: 2026-08-31
-Pre-delivery baseline: `main` at `c07dc3e4baa76b73008907d3d1fefb0e39178d68`
-Expected resume revision: latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
+Pre-delivery baseline: `main` at `7596ee06f693b08918fde99063fbf24018a4e2dc`
+Expected resume revision: latest `origin/codex/ga-prompt-qualification-1500` commit containing this checkpoint and `HANDOFF.md`
+Active Issue: [#34 — qualify the Goal Association prompt on 1,500 daily-life scenarios](https://github.com/TimeTreker/chromie/issues/34)
+
+Current focus: preserve Chromie's Goal-driven single-authority architecture while
+qualifying GA Goal-continuity inference and exposing, rather than hiding, global
+contract limits.
 
 ## Read first
 
 Read [Project Charter](docs/PROJECT_CHARTER.md),
 [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
 [Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md),
-[Acceptance](docs/ACCEPTANCE.md), and [Latest Handoff](HANDOFF.md).
-Current source, tests, and retained executable evidence win.
+[Acceptance](docs/ACCEPTANCE.md), the
+[GA corpus guide](benchmarks/datasets/goal_association_daily_life/README.md), and
+[Latest Handoff](HANDOFF.md). Current source, tests, retained executable evidence,
+and the Issue win.
 
 ## Active delivery line
 
 ```text
-admitted turn -> one primary GI WHAT result
-  -> deterministic validation
-  -> accept, or one source-based Deep GI for genuine unresolved meaning
-  -> GA preserves WHAT/output_mode and owns Goal continuity
-  -> Planner owns HOW -> Runtime -> correlated Evidence
+accepted GI Responsibilities + bounded existing/recent Goals
+  -> one primary GA semantic decision
+  -> generated decoder Schema enforces DTO/Host invariants
+  -> deterministic GoalAssociationResolver
+  -> canonical Goal continuity, or fail closed
 ```
 
-- Do not restore a GI DTO repair, semantic reviewer, coverage call, Host
-  resegmentation, or phrase-based semantic lane selector.
-- GI is the sole `output_mode` author. GA may carry only the decoder-constant value
-  while committing Goal identity/continuity; the Host derives execution projections.
-- Invalid primary or Deep GI output fails closed. Stop/cancel/emergency remain
-  deterministic and no downstream owner may reconstruct missing WHAT.
+- GA remains the sole Goal identity/continuity authority. Do not add a second model
+  critic, judge, semantic repair, or phrase-based relationship selector.
+- `reason_summary` is rationale only. It cannot carry a Goal mutation that is absent
+  from `updated_description` or the supplied `resolved_gap_ids`.
+- The current exclusive `associate | create_goals` decision cannot express one turn
+  that both continues an existing Goal and creates an independent Goal. The 100
+  retained probes are a global contract blocker, not prompt failures to hide.
+- Changing that discriminant is a Project Charter semantic-authority boundary and
+  requires explicit project-owner authorization plus same-change contract truth.
 
 ## Completed delivery scope
 
-- Removed the primary GI source-regeneration path and Deep location retry. Added a
-  repository-policy guard against all three obsolete repair markers.
-- Preserved explicit measured values as exact number-plus-unit source/context surfaces.
-  The corpus pins 406 such digit measurement bindings; all final outputs preserve them.
-- Made standalone greetings, thanks, feelings, evaluations, and comparable social acts
-  one speech Responsibility; politeness attached to another request adds no sibling.
-- Limited unfamiliar-name uncertainty to consequential referent/category choices.
-- Corrected Charter principle 31: GI authors `output_mode`, GA preserves it, Host
-  derives execution lane/provider requirement after validation.
-- Updated 338 existing corpus scenarios: 270 unit representations, 34 cancellation
-  source spans, and 34 unfamiliar-name unresolved references. Scenario count remains
-  1,496; `unresolved_scenarios` is now 68 and training remains prohibited.
-- Updated three maintained Level-A scripts that encoded the removed GI repair call.
-  No new tracked file, environment variable, architecture term, compatibility path,
-  runtime flag, provider integration, or profile was added.
+- Added 1,500 independently reviewable scenario JSON files: 100 bilingual daily-life
+  semantic seeds crossed with 15 Goal-continuity families. Inputs include accepted GI
+  Responsibilities and bounded existing/recent Goal state; no generator or combined
+  scenario source was added.
+- Added a static aggregate manifest, tree digest, validator, corpus README, and focused
+  dataset test. All cases remain `training_eligible=false` and lack independent review.
+- Used Codex `gpt-5.6-sol` with high reasoning for the frozen target-blind inference
+  cohort. No Gemma/Ollama result is qualification evidence.
+- Moved the existing modify/clarify semantic-update invariant into the dynamic decoder
+  Schema and placed the same rule next to GA relationship selection in the compact
+  prompt. No new call, runtime flag, environment variable, compatibility path, or
+  semantic authority was introduced.
+- Added a regression proving a modify output containing only `reason_summary` is
+  rejected by the generated Schema and becomes valid with `updated_description`.
+- Indexed the corpus in the existing benchmark and documentation owners.
 
 ## Reconstructed defect workflow
 
-| Boundary/owner | Authoritative input and correlation | Observed wrong output | Expected/final output | Judgment |
+| Boundary/owner | Authoritative input and correlation | Baseline output | Expected/final output | Judgment |
 |---|---|---|---|---|
-| Gateway | Exact admitted turn, source tokens, bounded Context | Correct immutable source handoff | Same | Correct |
-| Primary GI | Source + static/dynamic prompt + closed Schema | Unit-bearing values could lose units; standalone social turns could be empty; invalid DTO triggered another full interpretation | One complete WHAT DTO with units/social/name materiality; invalid DTO terminal | Earliest semantic/authority boundary fixed |
-| Trusted GI validation | Primary DTO + exact source/reference mechanics | Validation failure could start `goal_interpretation_contract_repair` | Validate mechanically, accept or fail closed | Repair authority leak removed |
-| Deep GI | Accepted primary result with genuine `unresolved`; source is re-read once, prior DTO absent | Invalid location provenance could trigger another Deep call | One Deep source decision, then accept or fail closed | Recursive retry removed |
-| GA | Immutable accepted Responsibilities keyed by `local_ref` | Charter wording implied GA could author mode | Preserve GI mode under decoder `const`; own only Goal identity/continuity | Documentation and runtime agree |
-| Host/Planner | Accepted Responsibilities + Goals | No confirmed defect in this episode; not invoked by offline model cohort | Host projects mechanics; Planner alone authors HOW | Authority containment retained |
+| GI handoff | Accepted immutable Responsibilities keyed by `local_ref`, including output mode and source evidence | Correct frozen GA input | Same | Correct |
+| Primary GA | Responsibilities plus bounded existing/recent Goals, compact prompt, dynamic Schema | 36 `modify_active` results put the change only in `reason_summary` | One complete primary decision with structured Goal update | Model exposed an inconsistent decoder boundary |
+| Dynamic decoder Schema | Contract generated for the exact candidate Goals/refs | Allowed modify/clarify without a material update | Require non-empty `updated_description` or supplied `resolved_gap_ids` | Earliest responsible mechanical boundary fixed |
+| GA DTO/Host resolver | Parsed primary result and exact source/Goal identifiers | Rejected all 36 incomplete modify results and failed closed | Accept structurally complete semantic update without repair | Correct containment retained |
+| Canonical Goals/Planner | Only reached after Host acceptance | Not reached for the 36 baseline failures | Receive accepted canonical Goal continuity; Planner still owns HOW | Downstream authority unchanged |
 
-Initiating probes were invalid GI DTOs, `5 seconds`, standalone thanks/feelings,
-direct unfamiliar names, and Goal lifecycle turns. The root causes were same-authority
-source regeneration plus contradictory prompt/schema/document/data contracts. Downstream
-symptoms were unit loss, missing conversation, unnecessary clarification, and mode-authority
-ambiguity. The fix changes the first wrong GI/document/data boundaries rather than asking
-GA, Planner, or Host to reinterpret the turn.
+The initiating probes were ordinary Goal refinements. The root cause was a mismatch:
+the generated decoder Schema permitted a shape the DTO/Host already rejected, while
+the relevant prompt rule was remote from relationship selection. The downstream
+symptom was correct intent stranded in non-authoritative rationale. The fix changes
+the earliest structured-output boundary and its local instruction, not downstream
+Goal reconstruction.
 
 ## Evidence ledger
 
 | Evidence | Result | Limit |
 |---|---|---|
-| Final target-blind primary Codex cohort | 1,496/1,496 calls, generated Schema, and Host; 835 mechanical; 1,366 same-model semantic passes; prompt changes recommended: 0 | Codex role/decoder envelope, not deployed provider; reviewer non-independent |
-| Final source-based Deep subset | 68/68 calls, Schema, Host, decomposition, mode, relation, and source; 55 semantic passes; prompt changes: 0 | Only genuine-unresolved reference subset; same transport/reviewer limits |
-| Critical exact dimensions | Units 406/406; Goal-continuity mode and relationship 136/136 | Offline primary output only |
-| Bilingual probes | Thanks, feelings, harmless names, units 8/8 | Codex diagnostic, not live robot |
-| Relevant Level A | `planner_goal_semantic_quality` 4/4; `robust_intent_understanding` 8/8 | Evidence level A, not services/audio/hardware |
-| Canonical local gate | 2,048 main tests and 20 legacy Agent tests; policy 15 families/0 exceptions; docs 98; test ownership passed | Automated source evidence on pre-commit tree |
+| Baseline full Codex cohort | 1,364/1,400 current-contract passes; 36 Host failures, all `modify_active`; 1,500/1,500 then-current Schema passes | Offline Codex role/decoder envelope; same-authority adjudication, not deployed provider |
+| Exact focused rerun | 36/36 baseline failures passed changed Schema and Host; contract repair attempts 0 | Only the isolated failure cohort |
+| Changed-prompt full Codex cohort | 1,400/1,400 current-contract passes; English 700/700; Chinese 700/700; Schema 1,500/1,500; unexpected failures 0; source stable | Offline prompt/Schema/DTO/Host qualification only |
+| Retained global probes | 100/100 exposed the exclusive-decision contract gap | Requires global DTO/Schema design and owner authorization |
+| Dataset validator | 1,500 discovered and validated; 1,400 Host accepted; 100 known gaps; 0 errors | Candidate corpus, no independent semantic review |
+| Focused tests | 78 passed | Source-level regression only |
+| Canonical local gate | policy 15 families/0 exceptions; 2,048 main tests and 20 legacy Agent tests; docs 99; passed | Automated pre-commit source evidence |
 
-Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do not
-transfer with the commit.
+Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do
+not transfer with the commit.
 
-## Prompt/core-principle audit
+## Prompt and corpus identity
 
-- Base prompt: 15,212 characters, SHA-256
-  `73729710f5baef12ba690ff13ef949aeef00017643fb188e143ed3cc76626df6`.
-- Three system variants only: base, prior-assistant context, Goal-continuity context.
-  Context projection adds no semantic classifier and no extra call.
-- Layer order is authority -> decision procedure -> Responsibilities -> modes ->
-  bindings -> coordination/provenance -> uncertainty -> example -> result conditions.
-- Main and Deep paths comply with Charter 30/31/33. Four final reviewer failures that
-  cite `schema_version` are reviewer errors: the exact decoder Schema allowed the field
-  and production Host accepted it.
-- Iteration stopped at 5/20 because iterations 2/3 regressed other abilities and both
-  final primary/Deep audits recommended zero prompt changes. Remaining failures are
-  model inference or candidate-oracle/grader differences, not a shared prompt boundary.
+- Scenario count: 1,500 separate files; `en-US=750`, `zh-CN=750`.
+- Scenario-tree SHA-256:
+  `264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab`.
+- Changed prompt SHA-256:
+  `3d68272a0612a4a7079ba15c272c5ea17d2101bc27e98c6a15975d70628c3a26`.
+- Changed dynamic Schema SHA-256:
+  `5162f8d03c74e339eeffec7312cccc3fadcc8da1d07a6bc931224593f96fb482`.
+- Model: Codex `gpt-5.6-sol`, reasoning effort `high`; references excluded from
+  candidate inference packets.
 
 ## Exact resume point
 
-1. Fetch the delivery revision and reproduce the canonical gates:
+1. Fetch the delivery branch and reproduce source truth:
 
    ```bash
+   git fetch origin codex/ga-prompt-qualification-1500
+   git switch codex/ga-prompt-qualification-1500
+   git pull --ff-only
    python scripts/check_repository_policies.py
    ./scripts/run_tests.sh
    python scripts/check_docs.py
-   python benchmarks/datasets/goal_interpretation_daily_life/validate.py
+   python benchmarks/datasets/goal_association_daily_life/validate.py
    ```
 
-2. Select an exact candidate provider/model, then run its transport plus current primary
-   GI manifest without weakening Schema/Host validation:
+2. Review Issue #34 and the 100
+   `mixed_continue_and_new_contract_gap` cases. Before changing the global DTO,
+   obtain explicit owner authorization for the new complete-result shape, then update
+   the canonical authority, dynamic Schema, resolver, corpus references, and tests in
+   one change. Do not solve it with a second LLM call or split semantic authority.
 
-   ```bash
-   python scripts/qualify_vllm_provider.py \
-     --base-url http://127.0.0.1:8000/v1 \
-     --model <exact-model-id> \
-     --output .chromie/acceptance/model-qualification/<new-id>.json \
-     --goal-interpreter-probe \
-     --goal-interpreter-manifest benchmarks/manifests/goal_interpreter_primary_v1.json
-   ```
-
-3. Do not promote from the offline Codex counts. Bind prompt, schema, strict decoder,
-   model digest, parameters, revision, latency, GPU/TTS coexistence, and runtime identity.
-   After a material deployment change, run one fresh complete directory-discovered
-   live-text cohort and collect exactly one debug bundle.
+3. To make a deployed-model claim, bind an exact provider/model digest, prompt and
+   Schema hashes, strict decoder, parameters, revision, latency, GPU/TTS coexistence,
+   and runtime identity; rerun the complete frozen cohort without source edits.
 
 ## Claim boundary
 
-This remains development-only. No new production model/profile was promoted, and no
-microphone, audible voice, simulator execution, target hardware, or release claim was made.
+The GA local prompt/schema is good enough for the declared current-contract offline
+qualification boundary. No production model/profile was promoted, and no live service,
+microphone, audible voice, simulator, target hardware, physical safety, or release claim
+was made. The 100 global DTO cases remain open.

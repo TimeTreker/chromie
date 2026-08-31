@@ -1,0 +1,51 @@
+{
+  "authority": "offline qualification evidence only; never production Goal policy",
+  "claim_boundary": "Mechanically validated assistant-authored candidate corpus; not independent semantic truth, deployed-model, service, voice, simulator, hardware, or release evidence.",
+  "coverage_contract": {
+    "categories": {
+      "cancel_active": 100,
+      "clarify_open_gap": 100,
+      "confirm_pending": 100,
+      "continue_active": 100,
+      "create_without_candidates": 100,
+      "merge_existing_goals": 100,
+      "mixed_continue_and_new_contract_gap": 100,
+      "modify_active": 100,
+      "pause_running": 100,
+      "reference_terminal": 100,
+      "reject_pending": 100,
+      "resume_paused": 100,
+      "split_existing_goal": 100,
+      "supersede_existing": 100,
+      "unrelated_new_goal": 100
+    },
+    "independent_semantic_review": false,
+    "languages": {
+      "en-US": 750,
+      "zh-CN": 750
+    },
+    "scenario_count": 1500,
+    "schema_expectations": {
+      "accept": 1400,
+      "known_contract_gap": 100
+    },
+    "splits": {
+      "frozen_test": 450,
+      "train_candidate": 600,
+      "validation": 450
+    },
+    "training_eligible": false
+  },
+  "dataset_id": "chromie.goal_association_daily_life.v1",
+  "asset_contract": {
+    "continuity_family_count": 15,
+    "contrast_set_size": 15,
+    "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
+    "scenario_count": 1500,
+    "scenario_tree_sha256": "264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab",
+    "semantic_seed_count": 100
+  },
+  "issue": "https://github.com/TimeTreker/chromie/issues/34",
+  "schema_version": 1,
+  "title": "Goal Association Daily-Life Continuity Corpus"
+}
