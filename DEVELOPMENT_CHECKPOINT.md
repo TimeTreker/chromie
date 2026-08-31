@@ -1,14 +1,14 @@
 # Chromie Development Checkpoint
 
-Status: GA local prompt/schema qualified on all 1,400 current-contract cases; 100 mixed continuity-plus-creation cases retain an explicit global DTO gap
+Status: GI/GA prompt work distilled into the required project-level qualification method; Fast then Deep Planner prompt qualification is the next session, while 100 GA mixed-decision cases retain an explicit global DTO gap
 Updated: 2026-08-31
-Pre-delivery baseline: `main` at `7596ee06f693b08918fde99063fbf24018a4e2dc`
+Pre-delivery baseline: `codex/ga-prompt-qualification-1500` at `7d314cbdf13cc4360f5120d5f568a82850a10878`
 Expected resume revision: latest `origin/codex/ga-prompt-qualification-1500` commit containing this checkpoint and `HANDOFF.md`
 Active Issue: [#34 — qualify the Goal Association prompt on 1,500 daily-life scenarios](https://github.com/TimeTreker/chromie/issues/34)
 
 Current focus: preserve Chromie's Goal-driven single-authority architecture while
-qualifying GA Goal-continuity inference and exposing, rather than hiding, global
-contract limits.
+starting a separately owned Planner qualification Issue with Fast first and Deep
+second. The GA global contract limit remains visible and is not Planner work.
 
 ## Read first
 
@@ -16,6 +16,7 @@ Read [Project Charter](docs/PROJECT_CHARTER.md),
 [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
 [Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md),
 [Acceptance](docs/ACCEPTANCE.md), the
+[LLM Prompt Qualification Method](docs/LLM_PROMPT_QUALIFICATION_METHOD.md), the
 [GA corpus guide](benchmarks/datasets/goal_association_daily_life/README.md), and
 [Latest Handoff](HANDOFF.md). Current source, tests, retained executable evidence,
 and the Issue win.
@@ -57,6 +58,12 @@ accepted GI Responsibilities + bounded existing/recent Goals
 - Added a regression proving a modify output containing only `reason_summary` is
   rejected by the generated Schema and becomes valid with `updated_description`.
 - Indexed the corpus in the existing benchmark and documentation owners.
+- Distilled the GI/GA workflow into the required project-level
+  `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`: authority audit, global-versus-local
+  prompt ownership, frozen target-blind cohorts, deterministic/semantic adjudication,
+  root-cause classification, minimal iteration, full rerun, stop conditions, and a
+  new-session Fast/Deep Planner protocol. `AGENTS.md`, `CONTRIBUTING.md`, and the
+  documentation index point to this single method owner.
 
 ## Reconstructed defect workflow
 
@@ -85,7 +92,7 @@ Goal reconstruction.
 | Retained global probes | 100/100 exposed the exclusive-decision contract gap | Requires global DTO/Schema design and owner authorization |
 | Dataset validator | 1,500 discovered and validated; 1,400 Host accepted; 100 known gaps; 0 errors | Candidate corpus, no independent semantic review |
 | Focused tests | 78 passed | Source-level regression only |
-| Canonical local gate | policy 15 families/0 exceptions; 2,048 main tests and 20 legacy Agent tests; docs 99; passed | Automated pre-commit source evidence |
+| Canonical local gate on methodology delivery tree | policy 15 families/0 exceptions; 2,048 main tests and 20 legacy Agent tests; docs 100; passed | Automated pre-commit source/document evidence; no Planner model inference or behavior qualification |
 
 Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do
 not transfer with the commit.
@@ -116,19 +123,26 @@ not transfer with the commit.
    python benchmarks/datasets/goal_association_daily_life/validate.py
    ```
 
-2. Review Issue #34 and the 100
+2. Read `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`, create a separate Planner prompt
+   qualification Issue, and audit the real Fast/Deep prompt, context, dynamic Schema,
+   model, validator, and downstream boundaries before editing. Propose the bilingual
+   contrast corpus count/matrix and evidence ceiling; qualify Fast before Deep. Do not
+   reuse GA Issue #34 for Planner work.
+
+3. Review Issue #34 and the 100
    `mixed_continue_and_new_contract_gap` cases. Before changing the global DTO,
    obtain explicit owner authorization for the new complete-result shape, then update
    the canonical authority, dynamic Schema, resolver, corpus references, and tests in
    one change. Do not solve it with a second LLM call or split semantic authority.
 
-3. To make a deployed-model claim, bind an exact provider/model digest, prompt and
+4. To make a deployed-model claim, bind an exact provider/model digest, prompt and
    Schema hashes, strict decoder, parameters, revision, latency, GPU/TTS coexistence,
    and runtime identity; rerun the complete frozen cohort without source edits.
 
 ## Claim boundary
 
-The GA local prompt/schema is good enough for the declared current-contract offline
-qualification boundary. No production model/profile was promoted, and no live service,
-microphone, audible voice, simulator, target hardware, physical safety, or release claim
-was made. The 100 global DTO cases remain open.
+The GA local prompt/schema remains good enough for the declared current-contract
+offline qualification boundary. This delivery adds process documentation only; it
+does not qualify or change Fast/Deep Planner behavior. No production model/profile was
+promoted, and no live service, microphone, audible voice, simulator, target hardware,
+physical safety, or release claim was made. The 100 global DTO cases remain open.

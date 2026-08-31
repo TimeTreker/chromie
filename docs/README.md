@@ -65,6 +65,7 @@ When documents disagree, correct the lower-authority document.
 | What governs terminal Fast Planner multi-goal planning? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` and `docs/API_REFERENCE.md` |
 | Which component owns semantic planning for each entrypoint? | `docs/SEMANTIC_AUTHORITY.md` |
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
+| What method governs LLM prompt qualification and optimization across Chromie roles? | `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` |
 | What causal explanation, prompt/output inspection, and LLM-versus-workflow attribution must accompany every defect fix? | `CONTRIBUTING.md`, grounded in `docs/PROJECT_CHARTER.md`; interaction-specific detail lives in `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
 | Which tests use exact fixture truth and which require reviewed semantic judgment? | `docs/CHROMIE_BENCHMARK_SUITE.md` Section 7.3 |
@@ -169,6 +170,7 @@ mechanical-contract owner.
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
+- [LLM Prompt Qualification and Optimization Method](LLM_PROMPT_QUALIFICATION_METHOD.md)
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
 - [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
 - [Maintained Scenario Migration](../benchmarks/scenarios/README.md)

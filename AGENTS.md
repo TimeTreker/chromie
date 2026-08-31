@@ -14,6 +14,7 @@ Guidance for coding agents working on Chromie.
 8. `docs/ACCEPTANCE.md` — required validation level
 9. `docs/README.md` — documentation ownership and update rules
 10. `CONTRIBUTING.md` — required defect-analysis, implementation, and delivery process
+11. `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` — required frozen-cohort method before optimizing a model-role prompt
 
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
