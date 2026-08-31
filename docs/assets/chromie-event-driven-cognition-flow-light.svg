@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1280" viewBox="0 0 1800 1280" role="img" aria-labelledby="title desc">
+  <title id="title">Chromie Cognitive and Capability Flow — Detailed Reference</title>
+  <desc id="desc">A light, event-driven architecture diagram showing Goal Interpretation, Planner and Goal Association, the Trusted Capability Runtime, Providers, runtime events, trusted Evidence, bounded state, CognitiveOpportunity, Planner re-entry, and deterministic Protective Reflex.</desc>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/></marker>
+    <marker id="arrow-violet" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/></marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#0f766e"/></marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#d97706"/></marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#dc2626"/></marker>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #172033; }
+      .title { font-size: 42px; font-weight: 750; letter-spacing: -0.8px; }
+      .subtitle { font-size: 18px; fill: #5b6474; }
+      .band-title { font-size: 20px; font-weight: 750; letter-spacing: 1.2px; }
+      .node-title { font-size: 22px; font-weight: 740; text-anchor: middle; }
+      .node-sub { font-size: 16px; fill: #475569; text-anchor: middle; }
+      .small { font-size: 15px; fill: #475569; text-anchor: middle; }
+      .chip { font-size: 16px; font-weight: 650; text-anchor: middle; }
+      .legend { font-size: 17px; }
+      .label { font-size: 16px; font-weight: 650; }
+      .box { fill: #ffffff; stroke-width: 2.5; rx: 12; }
+      .blue-box { stroke: #2563eb; }
+      .violet-box { stroke: #7c3aed; }
+      .teal-box { stroke: #0f766e; }
+      .amber-box { stroke: #d97706; }
+      .red-box { stroke: #dc2626; }
+      .blue-line, .violet-line, .teal-line, .amber-line, .red-line, .gray-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .blue-line { stroke: #2563eb; marker-end: url(#arrow-blue); }
+      .violet-line { stroke: #7c3aed; marker-end: url(#arrow-violet); }
+      .teal-line { stroke: #0f766e; marker-end: url(#arrow-teal); }
+      .amber-line { stroke: #d97706; marker-end: url(#arrow-amber); }
+      .red-line { stroke: #dc2626; marker-end: url(#arrow-red); }
+      .gray-line { stroke: #94a3b8; }
+      .dotted { stroke-dasharray: 7 8; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1280" fill="#fbfcfe"/>
+  <text class="title" x="42" y="60">Chromie Cognitive &amp; Capability Flow — Detailed</text>
+  <text class="subtitle" x="43" y="91">Technical reference for execution, Evidence, safety, and Planner re-entry.</text>
+
+  <rect x="20" y="112" width="1760" height="398" rx="18" fill="#f7faff" stroke="#cbdcf8" stroke-width="2"/>
+  <text class="band-title" x="45" y="150" fill="#1d4ed8">UNDERSTAND &amp; PLAN</text>
+
+  <rect class="box blue-box" x="735" y="128" width="430" height="52"/>
+  <text class="node-title" x="950" y="161">PERSON / WORLD</text>
+
+  <path class="blue-line" d="M950 180 V198"/>
+  <rect class="box blue-box" x="735" y="200" width="430" height="52"/>
+  <text class="node-title" x="950" y="233">COGNITIVE GATEWAY</text>
+
+  <path class="blue-line" d="M950 252 V271"/>
+  <rect class="box blue-box" x="735" y="273" width="430" height="70"/>
+  <text class="node-title" x="950" y="302">GOAL INTERPRETATION</text>
+  <text class="node-sub" x="950" y="328">WHAT · Responsibility</text>
+
+  <path class="blue-line" d="M950 343 V361 H670 V374"/>
+  <path class="teal-line" d="M950 343 V361 H1230 V374"/>
+  <rect class="box violet-box" x="480" y="376" width="380" height="70"/>
+  <text class="node-title" x="670" y="405">PLANNER</text>
+  <text class="node-sub" x="670" y="431">HOW · Fast; Deep if needed</text>
+  <rect class="box teal-box" x="1040" y="376" width="380" height="70"/>
+  <text class="node-title" x="1230" y="405">GOAL ASSOCIATION</text>
+  <text class="node-sub" x="1230" y="431">Canonical Goal continuity</text>
+
+  <path class="blue-line" d="M670 446 V451 H950 V452"/>
+  <path class="teal-line" d="M1230 446 V451 H950 V452"/>
+  <rect class="box blue-box" x="735" y="454" width="430" height="52"/>
+  <text class="node-title" x="950" y="478">GOAL-BOUND PLAN / ACTIVITIES</text>
+  <text class="node-sub" x="950" y="500">Communication · information · body · tool</text>
+
+  <rect x="48" y="188" width="315" height="142" rx="14" fill="#fff7f7" stroke="#dc2626" stroke-width="2.5"/>
+  <text class="node-title" x="206" y="226" fill="#b91c1c">PROTECTIVE REFLEX</text>
+  <text class="node-sub" x="206" y="257">Stop · cancel · emergency</text>
+  <text class="small" x="206" y="290">Deterministic · pre-semantic</text>
+  <text class="small" x="206" y="313">No model wait</text>
+  <path class="red-line" d="M735 226 H363"/>
+
+  <rect x="20" y="525" width="1760" height="407" rx="18" fill="#fffaf3" stroke="#f3d6a7" stroke-width="2"/>
+  <text class="band-title" x="45" y="565" fill="#b45309">EXECUTE &amp; OBSERVE</text>
+
+  <path class="amber-line" d="M950 506 V558"/>
+  <rect class="box amber-box" x="735" y="560" width="430" height="58"/>
+  <text class="node-title" x="950" y="597">TRUSTED CAPABILITY RUNTIME</text>
+
+  <path class="amber-line" d="M950 618 V637"/>
+  <rect class="box amber-box" x="480" y="639" width="940" height="102"/>
+  <text class="node-title" x="950" y="670">PROVIDERS / REALIZATION</text>
+  <rect x="510" y="687" width="200" height="36" rx="8" fill="#fffdf8" stroke="#d97706" stroke-width="1.8"/>
+  <rect x="725" y="687" width="215" height="36" rx="8" fill="#fffdf8" stroke="#d97706" stroke-width="1.8"/>
+  <rect x="955" y="687" width="240" height="36" rx="8" fill="#fffdf8" stroke="#d97706" stroke-width="1.8"/>
+  <rect x="1210" y="687" width="180" height="36" rx="8" fill="#fffdf8" stroke="#d97706" stroke-width="1.8"/>
+  <text class="chip" x="610" y="711">Vocal / TTS</text>
+  <text class="chip" x="832" y="711">Information / Tool</text>
+  <text class="chip" x="1075" y="711">Soridormi / Embodied</text>
+  <text class="chip" x="1300" y="711">Peer Providers</text>
+
+  <path class="amber-line" d="M950 741 V758"/>
+  <rect class="box amber-box" x="735" y="760" width="430" height="66"/>
+  <text class="node-title" x="950" y="789">ASYNCHRONOUS RUNTIME EVENT</text>
+  <text class="node-sub" x="950" y="814">What happened</text>
+
+  <path class="amber-line" d="M950 826 V843 H550 V852"/>
+  <path class="amber-line" d="M950 826 V843 H990 V852"/>
+  <rect class="box amber-box" x="370" y="854" width="360" height="64"/>
+  <text class="node-title" x="550" y="883">CURRENT WORK</text>
+  <text class="node-sub" x="550" y="907">Queued · running · terminal</text>
+  <rect class="box amber-box" x="790" y="854" width="400" height="64"/>
+  <text class="node-title" x="990" y="883">HOST VALIDATION</text>
+  <text class="node-sub" x="990" y="907">Request · Activity · Goal · schema · provenance</text>
+  <path class="teal-line" d="M1190 886 H1314"/>
+  <rect class="box teal-box" x="1316" y="854" width="330" height="64"/>
+  <text class="node-title" x="1481" y="883">TRUSTED EVIDENCE</text>
+  <text class="node-sub" x="1481" y="907">What is true</text>
+
+  <path class="red-line" d="M206 330 V575 H735"/>
+  <text class="label" x="390" y="563" fill="#b91c1c">Stop / cancel</text>
+  <path class="red-line" d="M206 330 V690 H480"/>
+  <text class="label" x="302" y="679" fill="#b91c1c">Stop / cancel</text>
+
+  <rect x="20" y="947" width="1760" height="240" rx="18" fill="#faf8ff" stroke="#d9ccf5" stroke-width="2"/>
+  <text class="band-title" x="45" y="980" fill="#6d28d9">RE-ENTER</text>
+  <text class="band-title" x="45" y="1007" fill="#6d28d9">WHEN MEANINGFUL</text>
+
+  <rect x="350" y="963" width="210" height="44" rx="9" fill="#ffffff" stroke="#0f766e" stroke-width="1.8"/>
+  <rect x="578" y="963" width="210" height="44" rx="9" fill="#ffffff" stroke="#0f766e" stroke-width="1.8"/>
+  <rect x="806" y="963" width="180" height="44" rx="9" fill="#ffffff" stroke="#0f766e" stroke-width="1.8"/>
+  <rect x="1004" y="963" width="190" height="44" rx="9" fill="#ffffff" stroke="#0f766e" stroke-width="1.8"/>
+  <rect x="1212" y="963" width="230" height="44" rx="9" fill="#ffffff" stroke="#0f766e" stroke-width="1.8"/>
+  <text class="chip" x="455" y="991">Responsibility</text>
+  <text class="chip" x="683" y="991">Canonical Goals</text>
+  <text class="chip" x="896" y="991">Situation</text>
+  <text class="chip" x="1099" y="991">Actual Work</text>
+  <text class="chip" x="1327" y="991">Trusted Evidence</text>
+
+  <path class="gray-line" d="M455 1007 V1025 H760"/>
+  <path class="gray-line" d="M683 1007 V1025 H760"/>
+  <path class="gray-line" d="M896 1007 V1025 H760"/>
+  <path class="gray-line" d="M1099 1007 V1025 H760"/>
+  <path class="gray-line" d="M1327 1007 V1025 H760"/>
+  <path class="teal-line" d="M550 918 V947 H1099 V963"/>
+  <path class="teal-line" d="M1481 918 V938 H1327 V963"/>
+
+  <rect class="box violet-box" x="500" y="1030" width="520" height="70"/>
+  <text class="node-title" x="760" y="1059">CURRENT BOUNDED STATE</text>
+  <text class="node-sub" x="760" y="1085">Planner view · not a new truth store</text>
+
+  <path class="violet-line dotted" d="M1020 1065 H1088"/>
+  <rect class="box violet-box" x="1090" y="1030" width="300" height="70"/>
+  <text class="node-title" x="1240" y="1059">CognitiveOpportunity</text>
+  <text class="node-sub" x="1240" y="1085">Meaningful transition · trigger only</text>
+
+  <path class="violet-line" d="M1390 1065 H1428"/>
+  <rect class="box violet-box" x="1430" y="1030" width="310" height="70"/>
+  <text class="node-title" x="1585" y="1059">PLANNER RE-ENTRY</text>
+  <text class="node-sub" x="1585" y="1085">What to do now</text>
+
+  <path class="violet-line" d="M1585 1100 V1110 H1240 V1116"/>
+  <path class="violet-line" d="M1585 1100 V1110 H1565 V1116"/>
+  <rect class="box violet-box" x="1070" y="1118" width="340" height="72"/>
+  <text class="node-title" x="1240" y="1146">0..N ACTIVITY CHANGES</text>
+  <text class="small" x="1240" y="1168">Answer · act · query · reuse</text>
+  <text class="small" x="1240" y="1187">cancel · replace · clarify</text>
+  <rect class="box violet-box" x="1440" y="1118" width="250" height="72"/>
+  <text class="node-title" x="1565" y="1146">NO NEW ACTIVITY</text>
+  <text class="small" x="1565" y="1168">Act · wait · listen</text>
+  <text class="small" x="1565" y="1187">remain silent</text>
+  <path class="violet-line" d="M1070 1154 H330 V606 H735"/>
+  <path class="gray-line" d="M1690 1154 H1750"/>
+  <text class="label" x="1750" y="1183" text-anchor="end" fill="#64748b">TERMINATES</text>
+
+  <rect x="20" y="1207" width="1760" height="54" rx="14" fill="#ffffff" stroke="#d8dee9" stroke-width="2"/>
+  <circle cx="306" cy="1234" r="7" fill="#d97706"/><text class="legend" x="325" y="1241"><tspan font-weight="700" fill="#b45309">Event</tspan><tspan> = what happened</tspan></text>
+  <circle cx="665" cy="1234" r="7" fill="#0f766e"/><text class="legend" x="684" y="1241"><tspan font-weight="700" fill="#0f766e">Evidence</tspan><tspan> = what is true</tspan></text>
+  <circle cx="1015" cy="1234" r="7" fill="#2563eb"/><text class="legend" x="1034" y="1241"><tspan font-weight="700" fill="#1d4ed8">Goal</tspan><tspan> = what is still owed</tspan></text>
+  <circle cx="1375" cy="1234" r="7" fill="#7c3aed"/><text class="legend" x="1394" y="1241"><tspan font-weight="700" fill="#6d28d9">Planner</tspan><tspan> = what to do now</tspan></text>
+</svg>

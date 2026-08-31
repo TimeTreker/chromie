@@ -8,23 +8,18 @@ checkpoint, and Issue #34 win.
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Delivery branch: `codex/ga-prompt-qualification-1500`
-- Pre-delivery base: `codex/ga-prompt-qualification-1500` at
-  `7d314cbdf13cc4360f5120d5f568a82850a10878`
-- Expected resume revision: latest
-  `origin/codex/ga-prompt-qualification-1500` commit containing this handoff and
+- Integration parents: `codex/ga-prompt-qualification-1500` at `ac83e467` and
+  `origin/main` at `f3d14792`
+- Expected resume revision: latest `origin/main` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
 - Active completed-evidence Issue: [#34](https://github.com/TimeTreker/chromie/issues/34)
 - Next Issue: create a separate Fast/Deep Planner prompt-qualification Issue; do not
   reuse #34 or silently combine the GA global DTO decision with Planner work
-- Delivery scope: required project-level LLM prompt qualification/optimization method,
-  coding-agent/contributor entrypoints, documentation ownership, and next-session handoff
+- Integrated scope: GA prompt/Schema qualification and 1,500-file corpus; required
+  project-level prompt-qualification method; reusable repository Skill; README
+  architecture overview/detail assets; and truthful combined handoff
 - No provider, model profile, deployment, Runtime switch, Capability, voice, simulator,
   or hardware behavior changed
-
-After this delivery, the local worktree is expected to retain pre-existing, unrelated architecture-diagram work in
-`README.md` and `docs/assets/`. Those paths are deliberately excluded from this
-delivery commit and remain the project owner's uncommitted work.
 
 ## Prompt-qualification method delivered
 
@@ -46,6 +41,35 @@ The method includes a copy-ready Planner session protocol. Fast and Deep remain 
 passes of the same Planner HOW authority; qualify Fast primary/streaming/re-entry first,
 then Deep complex/blocked/revision paths, then rerun both cohorts. Neither may review or
 semantically repair the other.
+
+## Reusable Skill delivered
+
+- `.agents/skills/optimize-chromie-llm-prompt/SKILL.md` turns the committed method into
+  an executable Codex workflow for audit, qualification, optimization, model comparison,
+  and global-change review.
+- `.agents/skills/optimize-chromie-llm-prompt/agents/openai.yaml` provides the
+  user-facing Skill metadata and invocation example.
+- The Skill points back to `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` as authority; it does
+  not create another project method owner, prompt authority, model call, or Runtime path.
+
+## Homepage architecture visualization delivery
+
+- `README.md` now displays the sparse overview in its Architecture section. The PNG is
+  the robust GitHub preview and links to the editable scalable SVG.
+- The complete original ASCII diagram remains immediately below in a collapsible
+  `Text fallback: canonical ownership path` block.
+- The README links a detailed reference that expands the same canonical flow into
+  Runtime events, Current Work, Host validation, trusted Evidence, Protective Reflex,
+  bounded state, and Planner re-entry.
+- `docs/assets/chromie-cognitive-diagrams-manifest.json` binds the two SVG sources and
+  two PNG exports to dimensions, SHA-256 hashes, authority sources, and provenance notes.
+
+Repository surface delta for this delivery: five new asset files under `docs/assets/`
+and three modified existing documentation owners (`README.md`,
+`DEVELOPMENT_CHECKPOINT.md`, and `HANDOFF.md`). No new architectural term,
+environment variable, runtime switch, compatibility path, provider, or evidence format was
+added. Consolidation opportunity: keep future homepage architecture visuals in this same
+overview/detailed pair and manifest rather than adding a third diagram owner.
 
 ## Delivered authority flow
 
@@ -74,6 +98,13 @@ Methodology-only delivery additions:
 - `CONTRIBUTING.md`: links the method to the existing authoritative LLM-versus-workflow
   root-cause categories.
 - `docs/README.md`: indexes the new owner and its governance question.
+
+Prior GI delivery surface delta: zero new tracked files; 338 modified corpus scenario files and
+24 other existing source/test/config/document/scenario files (362 total). No new environment
+variable, public switch, architecture term, compatibility path, provider, runtime profile,
+or evidence format. Consolidation opportunity: if an exact deployed decoder proves prompt
+length is a blocker, reduce duplicated field descriptions inside the existing prompt/schema
+owners; do not create another prompt authority or repair stage.
 
 The previously delivered GA scope remains unchanged:
 
@@ -104,6 +135,11 @@ existing owner composes authority audit, frozen target-blind inference, adjudica
 iteration, stop, and Planner handoff into one protocol. Consolidation opportunity: keep
 all role-independent prompt method changes in this owner and replace any future duplicate
 component procedure with a link rather than adding another methodology document.
+
+Skill-delivery surface delta: two new agent-tooling files under one existing Skill owner
+surface. No product document, environment variable, Runtime switch, compatibility path,
+semantic authority, evidence format, or model call was added. Consolidation opportunity:
+keep role-specific procedures in the method/Skill pair rather than adding sibling Skills.
 
 ## Actual defect and repaired workflow
 
@@ -211,7 +247,7 @@ The first GA complete gate attempt stopped because `docs/README.md` did not inde
 corpus README. The missing existing-owner index was added; the complete gate was rerun
 and passed. No failing gate is hidden.
 
-Final observed methodology-delivery pre-commit results:
+Final observed methodology-delivery pre-commit results at `b9f5550a`:
 
 ```text
 python scripts/check_repository_policies.py
@@ -227,15 +263,35 @@ git diff --check
 passed
 ```
 
-This delivery changes documentation and agent/contributor process only. It adds no
-Planner scenario corpus, inference run, prompt change, runtime result, or model evidence.
+Previously observed architecture-documentation gate at `f3d14792`:
+
+```text
+manifest/XML verification
+2 SVG files valid; 4 asset hashes match manifest
+
+python scripts/check_repository_policies.py
+15 rule families, 0 reviewed exceptions; passed
+
+./scripts/run_tests.sh
+2,048 main tests and 20 legacy Agent tests; passed
+
+python scripts/check_docs.py
+98 Markdown files; passed
+
+git diff --check
+passed
+```
+
+No tests or validation commands were run for the repository Skill commit or this `main`
+integration, by explicit project-owner instruction. The prior gates above remain historical
+evidence on their exact revisions and are not claimed as current-run evidence.
 
 ## Cross-machine resume
 
 ```bash
-git fetch origin codex/ga-prompt-qualification-1500
-git switch codex/ga-prompt-qualification-1500
-git pull --ff-only
+git fetch origin main
+git switch main
+git pull --ff-only origin main
 python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py
@@ -281,7 +337,8 @@ source edits between cases.
 ## Claim boundary
 
 The local GA prompt/schema is qualified only for the 1,400 cases expressible by the
-current contract. The added methodology is documentation/process evidence and does not
-qualify Fast/Deep Planner behavior. No production model/profile, live service,
-microphone, audible voice, simulator, target robot, physical safety, or release claim
-was established. The 100 global mixed-decision cases remain open.
+current contract. The methodology and Skill are process/agent-tooling evidence and do not
+qualify Fast/Deep Planner behavior. The homepage assets are explanatory views of existing
+authority truth. No production model/profile, live service, audible voice, microphone,
+simulator, target robot, physical safety, or release evidence was established. The 100
+global mixed-decision cases remain open.

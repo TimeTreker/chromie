@@ -1,10 +1,12 @@
 # Chromie Development Checkpoint
 
-Status: GI/GA prompt work distilled into the required project-level qualification method; Fast then Deep Planner prompt qualification is the next session, while 100 GA mixed-decision cases retain an explicit global DTO gap
+Status: GI/GA prompt qualification and its reusable project Skill are delivered; homepage architecture diagrams are retained; Fast then Deep Planner qualification is next, while 100 GA mixed-decision cases remain a global DTO gap
 Updated: 2026-08-31
-Pre-delivery baseline: `codex/ga-prompt-qualification-1500` at `7d314cbdf13cc4360f5120d5f568a82850a10878`
-Expected resume revision: latest `origin/codex/ga-prompt-qualification-1500` commit containing this checkpoint and `HANDOFF.md`
-Active Issue: [#34 — qualify the Goal Association prompt on 1,500 daily-life scenarios](https://github.com/TimeTreker/chromie/issues/34)
+Pre-delivery parents: `codex/ga-prompt-qualification-1500` at `ac83e467` and
+`origin/main` at `f3d14792`
+Expected resume revision: latest `origin/main` commit containing this checkpoint and
+`HANDOFF.md`
+Active completed-evidence Issue: [#34 — qualify the Goal Association prompt on 1,500 daily-life scenarios](https://github.com/TimeTreker/chromie/issues/34)
 
 Current focus: preserve Chromie's Goal-driven single-authority architecture while
 starting a separately owned Planner qualification Issue with Fast first and Deep
@@ -64,6 +66,22 @@ accepted GI Responsibilities + bounded existing/recent Goals
   root-cause classification, minimal iteration, full rerun, stop conditions, and a
   new-session Fast/Deep Planner protocol. `AGENTS.md`, `CONTRIBUTING.md`, and the
   documentation index point to this single method owner.
+- Added `.agents/skills/optimize-chromie-llm-prompt/` as a reusable execution
+  entrypoint for the committed method. It adds no independent methodology owner,
+  model call, Runtime path, or product behavior.
+
+## Homepage architecture visualization
+
+- Replaced the README's primary ASCII presentation with a sparse light overview
+  rendered from a deterministic SVG; the full original text diagram remains in a
+  collapsible fallback for accessibility, review, and text-only clients.
+- Added a linked detailed reference that expands Runtime events, Work state, Host
+  validation, trusted Evidence, Protective Reflex, and Planner re-entry without
+  changing the canonical ownership path.
+- Retained editable SVG sources, PNG exports, and one hash/provenance manifest under
+  `docs/assets/`. This is documentation presentation only: no implementation,
+  architecture authority, runtime behavior, provider, evidence claim, active Issue,
+  or ordered resume work changed.
 
 ## Reconstructed defect workflow
 
@@ -93,6 +111,14 @@ Goal reconstruction.
 | Dataset validator | 1,500 discovered and validated; 1,400 Host accepted; 100 known gaps; 0 errors | Candidate corpus, no independent semantic review |
 | Focused tests | 78 passed | Source-level regression only |
 | Canonical local gate on methodology delivery tree | policy 15 families/0 exceptions; 2,048 main tests and 20 legacy Agent tests; docs 100; passed | Automated pre-commit source/document evidence; no Planner model inference or behavior qualification |
+| Final target-blind primary Codex cohort | 1,496/1,496 calls, generated Schema, and Host; 835 mechanical; 1,366 same-model semantic passes; prompt changes recommended: 0 | Codex role/decoder envelope, not deployed provider; reviewer non-independent |
+| Final source-based Deep subset | 68/68 calls, Schema, Host, decomposition, mode, relation, and source; 55 semantic passes; prompt changes: 0 | Only genuine-unresolved reference subset; same transport/reviewer limits |
+| Critical exact dimensions | Units 406/406; Goal-continuity mode and relationship 136/136 | Offline primary output only |
+| Bilingual probes | Thanks, feelings, harmless names, units 8/8 | Codex diagnostic, not live robot |
+| Relevant Level A | `planner_goal_semantic_quality` 4/4; `robust_intent_understanding` 8/8 | Evidence level A, not services/audio/hardware |
+| Canonical local gate | 2,048 main tests and 20 legacy Agent tests; policy 15 families/0 exceptions; docs 98; test ownership passed | Automated source evidence on pre-commit tree |
+| Homepage diagram delivery | Two SVG sources parse; four SVG/PNG hashes match the manifest; README targets exist; canonical gate remains 2,048 main tests plus 20 legacy Agent tests | Documentation/export verification only; no runtime or target evidence |
+| Skill/main integration delivery | Tests not run, by explicit owner instruction | Text/agent-tooling and Git integration only; prior evidence is not reclassified as current-run evidence |
 
 Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do
 not transfer with the commit.
@@ -111,12 +137,12 @@ not transfer with the commit.
 
 ## Exact resume point
 
-1. Fetch the delivery branch and reproduce source truth:
+1. Fetch `main` and reproduce source truth:
 
    ```bash
-   git fetch origin codex/ga-prompt-qualification-1500
-   git switch codex/ga-prompt-qualification-1500
-   git pull --ff-only
+   git fetch origin main
+   git switch main
+   git pull --ff-only origin main
    python scripts/check_repository_policies.py
    ./scripts/run_tests.sh
    python scripts/check_docs.py
@@ -142,7 +168,8 @@ not transfer with the commit.
 ## Claim boundary
 
 The GA local prompt/schema remains good enough for the declared current-contract
-offline qualification boundary. This delivery adds process documentation only; it
-does not qualify or change Fast/Deep Planner behavior. No production model/profile was
-promoted, and no live service, microphone, audible voice, simulator, target hardware,
-physical safety, or release claim was made. The 100 global DTO cases remain open.
+offline qualification boundary. The reusable Skill operationalizes the committed method;
+it does not qualify or change Fast/Deep Planner behavior. The homepage diagrams visualize
+already-authoritative architecture only. No production model/profile was promoted, and no
+live service, microphone, audible voice, simulator, target hardware, physical safety, or
+release claim was made. The 100 global DTO cases remain open.

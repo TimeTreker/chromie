@@ -61,6 +61,14 @@ experience artifacts. See
 
 ## Architecture
 
+[![Chromie cognitive and capability architecture overview](docs/assets/chromie-cognitive-capability-overview.png)](docs/assets/chromie-cognitive-capability-overview.svg)
+
+[Open the scalable overview](docs/assets/chromie-cognitive-capability-overview.svg)
+· [Open the detailed architecture reference](docs/assets/chromie-event-driven-cognition-flow-light.svg)
+
+<details>
+<summary>Text fallback: canonical ownership path</summary>
+
 ```text
 Person / World
       │
@@ -107,7 +115,12 @@ Vocal/TTS is one Activity realization; Soridormi is a peer embodied Provider.
 Protective Reflex stays deterministic and may stop/cancel without model wait.
 ```
 
-The diagram above is the canonical ownership path. The complementary
+</details>
+
+The overview and text fallback above show the same canonical ownership path. The
+detailed reference expands the Runtime-event, Work-state, Host-validation, Evidence,
+safety, and Planner re-entry boundaries without adding another semantic authority. The
+complementary
 [episode-centered Continuous Mind workflow](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#41412-human-like-behavior-emerges-across-time)
 shows how conversation, Work, Evidence, correction, waiting, and reactivation overlap
 over time to produce coherent human-like interaction without adding another semantic
