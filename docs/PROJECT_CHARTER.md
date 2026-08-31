@@ -885,10 +885,13 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Development must improve the primary prompt, schema, model choice, or
    deterministic mechanics when that primary result is unreliable instead of
    inserting a semantic confirmation or repair chain into the live robot path.
-   Goal Association therefore authors `output_mode` as the sole execution
-   discriminant; the Host derives responsibility kind, execution lane, and
-   provider requirement only after validation and may retain those projections in
-   canonical metadata for downstream use. Missing `output_mode` or model-authored
+   Goal Interpretation therefore authors `output_mode` once as the provider-neutral
+   completion category of each current-turn Responsibility. Goal Association must
+   preserve that accepted value while owning only canonical Goal identity and
+   continuity; it must not re-author or reinterpret the mode. The Host derives
+   responsibility kind, execution lane, and provider requirement only after
+   validation and may retain those projections in canonical metadata for downstream
+   use. Missing `output_mode`, a conflicting Goal-Association value, or model-authored
    copies of those Host projections are schema defects, not invitations for
    compatibility inference. Do not accept a reverse mapping that can silently
    manufacture or downgrade semantic intent.

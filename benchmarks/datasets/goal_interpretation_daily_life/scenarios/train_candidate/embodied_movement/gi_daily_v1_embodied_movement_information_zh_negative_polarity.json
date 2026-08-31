@@ -26,7 +26,7 @@
             "attribute": "地面温度",
             "location": "室内跑道",
             "polarity": "negative",
-            "threshold": 40,
+            "threshold": "40度",
             "time_scope": "训练前"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "地面温度",
             "location": "室内跑道",
             "polarity": "negative",
-            "threshold": 40,
+            "threshold": "40度",
             "time_scope": "训练前"
           },
           "forbidden_binding_keys": [

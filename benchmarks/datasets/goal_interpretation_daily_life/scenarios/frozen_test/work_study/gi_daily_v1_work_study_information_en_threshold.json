@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "room temperature",
             "location": "the shared office",
-            "threshold": 26,
+            "threshold": "26 degrees",
             "time_scope": "this afternoon"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "room temperature",
             "location": "the shared office",
-            "threshold": 26,
+            "threshold": "26 degrees",
             "time_scope": "this afternoon"
           },
           "forbidden_binding_keys": [

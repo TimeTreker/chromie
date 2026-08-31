@@ -40,7 +40,18 @@ Each scenario contains:
 The retained coverage includes every one of the 25 normal model-facing binding
 dimensions, all ten concrete GI output modes, and the `new`, `continue`,
 `modify`, `clarify`, `cancel`, and `resume` relationship paths. There are 306
-context-bearing scenarios and 102 cases with genuine unresolved meaning.
+context-bearing scenarios and 68 cases with genuine unresolved meaning. A directly
+supplied unfamiliar name remains resolved when its role in the requested outcome is
+clear; unfamiliarity alone is not a user-resolvable WHAT ambiguity.
+
+Reference bindings preserve human-semantic measurement surfaces. Repetition
+counts are positive JSON integers. A measured scalar with an explicit unit is
+one exact contiguous source-language string containing the number and unit
+(for example, `15 seconds`, `0.2 meters per second`, `30%`, or `5秒`); a
+direct Arabic-digit scalar with no explicit unit remains a JSON number. This is
+the GI contract, not a provider argument or normalized execution quantity.
+The manifest pins 406 reference bindings that retain an Arabic digit inside an
+exact measurement surface, and the validator rejects coverage drift.
 
 ## Validation
 

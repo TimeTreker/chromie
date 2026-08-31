@@ -26,7 +26,7 @@
             "attribute": "等位时间",
             "location": "街角咖啡店",
             "polarity": "negative",
-            "threshold": 10,
+            "threshold": "10分钟",
             "time_scope": "周六下午"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "等位时间",
             "location": "街角咖啡店",
             "polarity": "negative",
-            "threshold": 10,
+            "threshold": "10分钟",
             "time_scope": "周六下午"
           },
           "forbidden_binding_keys": [

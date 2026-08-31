@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "等车时间",
             "location": "北门公交站",
-            "threshold": 15,
+            "threshold": "15分钟",
             "time_scope": "明早"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "等车时间",
             "location": "北门公交站",
-            "threshold": 15,
+            "threshold": "15分钟",
             "time_scope": "明早"
           },
           "forbidden_binding_keys": [

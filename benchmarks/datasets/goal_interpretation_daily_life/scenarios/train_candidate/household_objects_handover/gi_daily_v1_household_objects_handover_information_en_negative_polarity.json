@@ -26,7 +26,7 @@
             "attribute": "humidity",
             "location": "the living room",
             "polarity": "negative",
-            "threshold": 70,
+            "threshold": "70 percent",
             "time": "right now"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "humidity",
             "location": "the living room",
             "polarity": "negative",
-            "threshold": 70,
+            "threshold": "70 percent",
             "time": "right now"
           },
           "forbidden_binding_keys": [

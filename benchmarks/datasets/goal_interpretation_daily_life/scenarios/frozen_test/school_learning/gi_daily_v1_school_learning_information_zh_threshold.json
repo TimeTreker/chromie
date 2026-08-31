@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "自习区噪声",
             "location": "社区图书馆",
-            "threshold": 50,
+            "threshold": "50分贝",
             "time_scope": "明天下午"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "自习区噪声",
             "location": "社区图书馆",
-            "threshold": 50,
+            "threshold": "50分贝",
             "time_scope": "明天下午"
           },
           "forbidden_binding_keys": [

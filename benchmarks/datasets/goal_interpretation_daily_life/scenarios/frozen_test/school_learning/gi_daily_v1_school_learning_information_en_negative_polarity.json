@@ -26,7 +26,7 @@
             "attribute": "study-area noise level",
             "location": "the community library",
             "polarity": "negative",
-            "threshold": 50,
+            "threshold": "50 decibels",
             "time_scope": "tomorrow afternoon"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "study-area noise level",
             "location": "the community library",
             "polarity": "negative",
-            "threshold": 50,
+            "threshold": "50 decibels",
             "time_scope": "tomorrow afternoon"
           },
           "forbidden_binding_keys": [

@@ -58,6 +58,16 @@ FORBIDDEN_WIRE_KEYS = {
     "tool_name",
     "work_items",
 }
+DIGIT_MEASUREMENT_DIMENSIONS = {
+    "distance",
+    "duration",
+    "intensity",
+    "magnitude",
+    "quantity",
+    "severity",
+    "speed",
+    "threshold",
+}
 
 
 def scenario_paths(dataset_root: Path = DATASET_ROOT) -> list[Path]:
@@ -309,17 +319,26 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
     actual_relationships: Counter[str] = Counter()
     context_scenarios = 0
     unresolved_scenarios = 0
+    digit_measurement_surface_bindings = 0
     for case in cases:
         context_scenarios += bool(case["input"]["context"])
         wire = case["target"]["reference_wire_output"]
         unresolved_scenarios += bool(wire["unresolved"])
         for responsibility in wire["responsibilities"]:
-            actual_dimensions.update(responsibility["binding_items"].keys())
+            binding_items = responsibility["binding_items"]
+            actual_dimensions.update(binding_items.keys())
+            digit_measurement_surface_bindings += sum(
+                name in DIGIT_MEASUREMENT_DIMENSIONS
+                and isinstance(value, str)
+                and any(character.isdigit() for character in value)
+                for name, value in binding_items.items()
+            )
             actual_modes[responsibility["output_mode"]] += 1
             actual_relationships[responsibility.get("relationship", "new")] += 1
     actual_semantic_coverage = {
         "context_scenarios": context_scenarios,
         "unresolved_scenarios": unresolved_scenarios,
+        "digit_measurement_surface_bindings": digit_measurement_surface_bindings,
         "binding_dimensions": dict(sorted(actual_dimensions.items())),
         "output_modes": dict(sorted(actual_modes.items())),
         "relationships": dict(sorted(actual_relationships.items())),
@@ -346,6 +365,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
         "relationships": dict(sorted(actual_relationships.items())),
         "context_scenarios": context_scenarios,
         "unresolved_scenarios": unresolved_scenarios,
+        "digit_measurement_surface_bindings": digit_measurement_surface_bindings,
         "dynamic_schema_passed": len(cases),
         "host_validation_passed": host_accepted,
         "known_host_validation_gaps": known_host_gaps,

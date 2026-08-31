@@ -26,7 +26,7 @@
             "attribute": "waiting time",
             "location": "platform three",
             "polarity": "negative",
-            "threshold": 15,
+            "threshold": "15 minutes",
             "time_scope": "this evening"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "waiting time",
             "location": "platform three",
             "polarity": "negative",
-            "threshold": 15,
+            "threshold": "15 minutes",
             "time_scope": "this evening"
           },
           "forbidden_binding_keys": [

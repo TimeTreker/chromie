@@ -3,7 +3,7 @@
   "id": "compound_walk_blink_joke_while_walking",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "Regression from the compound walk/blink/joke request: Fast Goal Interpretation must preserve all three human responsibilities and their concurrency meaning without turning speech or body behavior into Capability actions; Planner owns the executable decomposition.",
+  "description": "Regression from the compound walk/blink/joke request: one primary Goal Interpretation result must preserve all three human responsibilities and their coordination without a same-authority repair; Planner owns executable decomposition.",
   "tags": [
     "voice-log",
     "cognitive-core-agent-contract",
@@ -24,21 +24,13 @@
         "stage": "goal_interpretation",
         "decision": {
           "confidence": 0.87,
-          "responsibilities": [],
-          "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_contract_repair",
-        "decision": {
-          "confidence": 0.87,
           "responsibilities": [
             {
               "local_ref": "r1",
               "outcome": "walk forward for 20 seconds",
-              "bindings": {
+              "binding_items": {
                 "direction": "forward",
-                "duration_s": 20
+                "duration": "20 seconds"
               },
               "output_mode": "body_action",
               "confidence": 0.91,
@@ -52,8 +44,7 @@
             {
               "local_ref": "r2",
               "outcome": "blink six times after walking",
-              "bindings": {
-                "after": "r1",
+              "binding_items": {
                 "count": 6
               },
               "output_mode": "body_action",
@@ -68,9 +59,7 @@
             {
               "local_ref": "r3",
               "outcome": "tell a joke while walking",
-              "bindings": {
-                "coordinate_with": "r1"
-              },
+              "binding_items": {},
               "output_mode": "speech",
               "confidence": 0.88,
               "relationship": "new",
@@ -81,17 +70,32 @@
               }
             }
           ],
-          "unresolved": []
+          "unresolved": [],
+          "coordination": [
+            {
+              "kind": "sequence",
+              "refs": [
+                "r1",
+                "r2"
+              ]
+            },
+            {
+              "kind": "parallel",
+              "refs": [
+                "r1",
+                "r3"
+              ]
+            }
+          ]
         }
       }
     ]
   },
   "expect": {
     "confidence": 0.87,
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_contract_repair"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [
@@ -100,7 +104,10 @@
         "outcome": "walk forward for 20 seconds",
         "bindings": {
           "direction": "forward",
-          "duration_s": 20
+          "duration": "20 seconds",
+          "parallel_with": [
+            "r3"
+          ]
         },
         "output_mode": "body_action",
         "confidence": 0.91,
@@ -111,7 +118,9 @@
         "local_ref": "r2",
         "outcome": "blink six times after walking",
         "bindings": {
-          "after": "r1",
+          "after": [
+            "r1"
+          ],
           "count": 6
         },
         "output_mode": "body_action",
@@ -123,7 +132,9 @@
         "local_ref": "r3",
         "outcome": "tell a joke while walking",
         "bindings": {
-          "coordinate_with": "r1"
+          "parallel_with": [
+            "r1"
+          ]
         },
         "output_mode": "speech",
         "confidence": 0.88,

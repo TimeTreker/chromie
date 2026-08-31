@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "checkout waiting time",
             "location": "the neighborhood supermarket",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tonight"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "checkout waiting time",
             "location": "the neighborhood supermarket",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tonight"
           },
           "forbidden_binding_keys": [

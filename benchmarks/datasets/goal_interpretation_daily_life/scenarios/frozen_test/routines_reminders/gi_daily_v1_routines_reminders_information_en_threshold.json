@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "commute waiting time",
             "location": "the neighborhood entrance",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tomorrow morning"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "commute waiting time",
             "location": "the neighborhood entrance",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tomorrow morning"
           },
           "forbidden_binding_keys": [

@@ -26,7 +26,7 @@
             "attribute": "噪声",
             "location": "一楼走廊",
             "polarity": "negative",
-            "threshold": 60,
+            "threshold": "60分贝",
             "time": "现在"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "噪声",
             "location": "一楼走廊",
             "polarity": "negative",
-            "threshold": 60,
+            "threshold": "60分贝",
             "time": "现在"
           },
           "forbidden_binding_keys": [

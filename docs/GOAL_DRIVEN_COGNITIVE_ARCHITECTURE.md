@@ -1868,7 +1868,6 @@ The maintained GI transaction is deliberately bounded:
 
 ```text
 primary Fast Goal Interpretation from the authoritative admitted turn
-  -> optional one same-stage mechanical DTO repair when schema shape is malformed
   -> deterministic validation of primary-result source/coverage evidence
   -> accept when WHAT is sufficiently resolved
   -> otherwise at most one source-based Deep Goal Interpretation when consequential
@@ -2163,10 +2162,10 @@ Completeness and independence remain one model-authored semantic decision in the
 primary result. If that decision is unreliable, development improves the primary
 prompt, schema, model choice, or deterministic representation and reruns the
 aggregate semantic cohort. Production does not add a critic, coverage auditor,
-resegmentation reviewer, or semantic repair call. A mechanically malformed DTO may
-receive the one same-stage shape regeneration allowed by the Charter without
-changing semantic claims. Genuine unresolved meaning follows the single Deep-GI,
-user-clarification, or fail-closed path.
+resegmentation reviewer, or semantic repair call. The maintained GI implementation
+fails a malformed primary or Deep DTO closed rather than attempting the Charter's
+optional semantics-preserving same-stage regeneration. Genuine unresolved meaning
+follows the single Deep-GI, user-clarification, or fail-closed path.
 
 Goal Association consumes the accepted GI inventory and must conserve it while
 deciding canonical Goal identity and continuity. Its primary result may be checked

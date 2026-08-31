@@ -26,7 +26,7 @@
             "attribute": "气温",
             "location": "重庆",
             "polarity": "negative",
-            "threshold": 30,
+            "threshold": "30度",
             "time_scope": "明天白天"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "气温",
             "location": "重庆",
             "polarity": "negative",
-            "threshold": 30,
+            "threshold": "30度",
             "time_scope": "明天白天"
           },
           "forbidden_binding_keys": [

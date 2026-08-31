@@ -26,7 +26,7 @@
             "attribute": "拥挤程度",
             "location": "社区活动室",
             "polarity": "negative",
-            "threshold": 100,
+            "threshold": "100人",
             "time_scope": "周日下午"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "拥挤程度",
             "location": "社区活动室",
             "polarity": "negative",
-            "threshold": 100,
+            "threshold": "100人",
             "time_scope": "周日下午"
           },
           "forbidden_binding_keys": [

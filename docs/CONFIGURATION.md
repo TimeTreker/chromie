@@ -258,7 +258,7 @@ Capabilities, or delegate HOW.
 | `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `gemma4:12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
-| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for WHAT-only Fast interpretation, its optional mechanical DTO repair, or one allowed source-based Deep GI interpretation. |
+| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for one WHAT-only Fast interpretation or one allowed source-based Deep GI interpretation. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
 | `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained GI request still excludes Capability catalog entries and canonical lifecycle IDs. |
 | `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
 | `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
@@ -993,8 +993,8 @@ Host semantic fallback.
 
 Cognitive Gateway owns deterministic protective filtering and focused addressedness review
 before Core entry. Interrupt, silence, and unusable-audio handling remain deterministic.
-Goal Interpretation receives only admitted input/context and may use one Fast pass, one
-mechanical DTO repair when needed, and at most one source-based Deep GI pass for genuine
+Goal Interpretation receives only admitted input/context and may use one Fast pass and at
+most one source-based Deep GI pass for genuine
 consequential ambiguity in intended outcome, scope, Goal relation, or referent. Fast/Deep GI
 share the same Responsibility-only authority. Planning input gaps, source/default policy,
 Capability selection, and clarification for HOW belong to Planner.

@@ -24,7 +24,7 @@
           "outcome": "walk backward",
           "binding_items": {
             "direction": "backward",
-            "duration": 5
+            "duration": "5 seconds"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -49,7 +49,7 @@
           ],
           "required_bindings": {
             "direction": "backward",
-            "duration": 5
+            "duration": "5 seconds"
           },
           "forbidden_binding_keys": [
             "count",

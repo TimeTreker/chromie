@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "排队时间",
             "location": "社区超市",
-            "threshold": 20,
+            "threshold": "20分钟",
             "time_scope": "今晚"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "排队时间",
             "location": "社区超市",
-            "threshold": 20,
+            "threshold": "20分钟",
             "time_scope": "今晚"
           },
           "forbidden_binding_keys": [

@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "crowd size",
             "location": "the community activity room",
-            "threshold": 100,
+            "threshold": "100 people",
             "time_scope": "Sunday afternoon"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "crowd size",
             "location": "the community activity room",
-            "threshold": 100,
+            "threshold": "100 people",
             "time_scope": "Sunday afternoon"
           },
           "forbidden_binding_keys": [

@@ -33,9 +33,7 @@
           }
         }
       ],
-      "unresolved": [
-        "“续桥”所指的对象或主题不明确。"
-      ],
+      "unresolved": [],
       "coordination": []
     },
     "semantic_expectations": {
@@ -57,7 +55,7 @@
         }
       ],
       "coordination": [],
-      "unresolved": true
+      "unresolved": false
     }
   },
   "invariants": {

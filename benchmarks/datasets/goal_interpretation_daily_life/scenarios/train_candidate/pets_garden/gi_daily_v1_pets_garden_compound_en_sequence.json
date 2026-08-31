@@ -24,7 +24,7 @@
           "outcome": "walk forward",
           "binding_items": {
             "direction": "forward",
-            "duration": 4
+            "duration": "4 seconds"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -70,7 +70,7 @@
           ],
           "required_bindings": {
             "direction": "forward",
-            "duration": 4
+            "duration": "4 seconds"
           },
           "forbidden_binding_keys": [
             "count"

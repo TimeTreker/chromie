@@ -26,7 +26,7 @@
             "attribute": "noise level",
             "location": "the ground-floor hallway",
             "polarity": "negative",
-            "threshold": 60,
+            "threshold": "60 decibels",
             "time": "right now"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "noise level",
             "location": "the ground-floor hallway",
             "polarity": "negative",
-            "threshold": 60,
+            "threshold": "60 decibels",
             "time": "right now"
           },
           "forbidden_binding_keys": [

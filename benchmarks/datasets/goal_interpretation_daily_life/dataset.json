@@ -58,7 +58,8 @@
     "known_host_validation_gaps": 0,
     "semantic_coverage": {
       "context_scenarios": 306,
-      "unresolved_scenarios": 102,
+      "unresolved_scenarios": 68,
+      "digit_measurement_surface_bindings": 406,
       "binding_dimensions": {
         "actor": 34,
         "addressee": 34,

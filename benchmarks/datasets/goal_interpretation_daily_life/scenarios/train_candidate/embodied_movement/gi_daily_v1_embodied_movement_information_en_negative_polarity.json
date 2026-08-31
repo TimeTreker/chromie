@@ -26,7 +26,7 @@
             "attribute": "floor temperature",
             "location": "the indoor track",
             "polarity": "negative",
-            "threshold": 40,
+            "threshold": "40 degrees",
             "time_scope": "before practice"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "floor temperature",
             "location": "the indoor track",
             "polarity": "negative",
-            "threshold": 40,
+            "threshold": "40 degrees",
             "time_scope": "before practice"
           },
           "forbidden_binding_keys": [

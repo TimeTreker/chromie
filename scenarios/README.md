@@ -81,22 +81,34 @@ behavior belongs in maintained suites that exercise the current typed owners dir
 Goal Interpretation fixtures may use `stub.llm_script` instead of one final
 `stub.llm_decision`. The scenario runner then executes the real bounded
 `OllamaGoalInterpreter.route()` normalization and validation transaction while
-replacing only external model completions. A script contains one primary stage
-and, only when that output is mechanically invalid, one DTO-repair stage:
+replacing only external model completions. A script contains one primary stage.
+When that accepted result retains genuine consequential `unresolved` meaning, it
+may contain one source-based `goal_interpretation_deep` stage; an invalid primary
+or Deep DTO fails closed without a same-authority repair stage:
 
 ```json
 {
   "llm_script": [
     {
       "stage": "goal_interpretation",
-      "content": "{not valid JSON"
-    },
-    {
-      "stage": "goal_interpretation_contract_repair",
       "decision": {
         "confidence": 0.85,
-        "responsibilities": [],
-        "unresolved": ["ambiguous reference"]
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "identify the referenced object",
+            "bindings": {"entity": "that"},
+            "output_mode": "information",
+            "confidence": 0.75,
+            "relationship": "new",
+            "target_goal_ids": [],
+            "source_evidence": {
+              "source_start_token_ref": "t0",
+              "source_end_token_ref": "t1"
+            }
+          }
+        ],
+        "unresolved": ["which object 'that' denotes"]
       }
     }
   ]

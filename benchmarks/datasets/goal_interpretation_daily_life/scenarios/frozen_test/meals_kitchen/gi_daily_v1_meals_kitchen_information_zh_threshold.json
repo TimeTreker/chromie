@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "温度",
             "location": "冰箱冷藏室",
-            "threshold": 5,
+            "threshold": "5度",
             "time": "现在"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "温度",
             "location": "冰箱冷藏室",
-            "threshold": 5,
+            "threshold": "5度",
             "time": "现在"
           },
           "forbidden_binding_keys": [

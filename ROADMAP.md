@@ -648,9 +648,9 @@ Exit criteria:
   pending-clarification continuity. Keep clear weather, missing lookup input, ambiguous
   referent, and movement regressions in the relevant general-ability classes.
 - Preserve one Fast Goal Interpretation transaction: one primary interpretation,
-  at most one mechanical DTO repair, then accept, delegate low-confidence
-  `tool`, `memory`, or `robot_action` work once to Deep Thinking, or fail closed.
-  Schema-valid benign chat remains on the fast conversational path.
+  then accept, delegate genuine consequential unresolved WHAT once to source-based
+  Deep GI, or fail closed. Invalid primary or Deep DTOs receive no same-authority
+  repair. Schema-valid benign chat remains on the fast conversational path.
 - Treat non-empty interpretation failure as `interpretation_unavailable`; never
   rewrite it into plausible chat, tool, memory, or motion intent.
 - Keep semantic reconsideration source-based. Do not restore intent reviewers,

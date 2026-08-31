@@ -218,11 +218,16 @@ The primary GI result owns its complete Responsibility inventory and cites the
 authoritative admitted turn directly. Each Responsibility carries the inclusive
 source-token span grounding its complete positive predicate, its provider-neutral
 `output_mode`, material bindings, Goal relationship, and typed sibling relations.
+GI authors that completion category once; GA preserves it while owning canonical
+Goal identity and continuity, and the Host derives execution projections only after
+validation. A measured binding with an explicit unit preserves the exact contiguous
+number-and-unit source/context surface; downstream planning may normalize execution
+quantities without rewriting GI's human-semantic value.
 Trusted code checks only closed references, source membership and ordering,
 non-overlap, explicit-value provenance, and DTO shape. It does not use
 conjunction/action phrase rules, a second model auditor, or source resegmentation to
-reinterpret WHAT. A mechanically malformed primary DTO may receive one same-stage
-shape regeneration. A semantic/authority contradiction fails closed; only genuine
+reinterpret WHAT. Any malformed, semantic, or authority-invalid primary DTO fails
+closed without a second same-authority call; only genuine
 unresolved outcome, scope, Goal-relationship, or referent meaning may delegate once
 to source-based Deep GI under the same WHAT-only contract.
 

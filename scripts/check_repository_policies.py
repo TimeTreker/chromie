@@ -766,8 +766,11 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "GoalInterpretationCoverageCertificate",
                 "build_responsibility_coverage_payload",
                 "_ensure_atomic_responsibility_coverage",
+                "build_interpretation_repair_payload",
+                "goal_interpretation_contract_repair",
+                "goal_interpretation_deep_contract_repair",
             ),
-            "Goal Interpretation may not contain domain routing, punctuation/alias semantic fallbacks, or a second same-authority coverage/resegmentation call",
+            "Goal Interpretation may not contain domain routing, punctuation/alias semantic fallbacks, or a second same-authority repair/coverage/resegmentation call",
         ),
         "agent/app/goal_association.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,

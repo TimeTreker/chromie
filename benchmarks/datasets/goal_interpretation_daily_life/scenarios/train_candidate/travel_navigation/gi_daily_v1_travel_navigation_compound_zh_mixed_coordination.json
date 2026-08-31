@@ -24,7 +24,7 @@
           "outcome": "向前走",
           "binding_items": {
             "direction": "向前",
-            "duration": 8
+            "duration": "8秒"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -91,7 +91,7 @@
           ],
           "required_bindings": {
             "direction": "向前",
-            "duration": 8
+            "duration": "8秒"
           },
           "forbidden_binding_keys": []
         },

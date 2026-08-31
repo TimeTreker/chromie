@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "humidity",
             "location": "the living room",
-            "threshold": 70,
+            "threshold": "70 percent",
             "time": "right now"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "humidity",
             "location": "the living room",
-            "threshold": 70,
+            "threshold": "70 percent",
             "time": "right now"
           },
           "forbidden_binding_keys": [

@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "study-area noise level",
             "location": "the community library",
-            "threshold": 50,
+            "threshold": "50 decibels",
             "time_scope": "tomorrow afternoon"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "study-area noise level",
             "location": "the community library",
-            "threshold": 50,
+            "threshold": "50 decibels",
             "time_scope": "tomorrow afternoon"
           },
           "forbidden_binding_keys": [

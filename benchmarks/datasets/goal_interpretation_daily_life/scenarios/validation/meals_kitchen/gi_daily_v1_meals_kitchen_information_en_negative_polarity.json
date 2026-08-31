@@ -26,7 +26,7 @@
             "attribute": "temperature",
             "location": "the refrigerator compartment",
             "polarity": "negative",
-            "threshold": 5,
+            "threshold": "5 degrees",
             "time": "right now"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "temperature",
             "location": "the refrigerator compartment",
             "polarity": "negative",
-            "threshold": 5,
+            "threshold": "5 degrees",
             "time": "right now"
           },
           "forbidden_binding_keys": [

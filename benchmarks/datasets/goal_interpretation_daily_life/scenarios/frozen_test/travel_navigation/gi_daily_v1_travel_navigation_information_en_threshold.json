@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "waiting time",
             "location": "platform three",
-            "threshold": 15,
+            "threshold": "15 minutes",
             "time_scope": "this evening"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "waiting time",
             "location": "platform three",
-            "threshold": 15,
+            "threshold": "15 minutes",
             "time_scope": "this evening"
           },
           "forbidden_binding_keys": [

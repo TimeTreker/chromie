@@ -26,7 +26,7 @@
             "attribute": "commute waiting time",
             "location": "the neighborhood entrance",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tomorrow morning"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "commute waiting time",
             "location": "the neighborhood entrance",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tomorrow morning"
           },
           "forbidden_binding_keys": [

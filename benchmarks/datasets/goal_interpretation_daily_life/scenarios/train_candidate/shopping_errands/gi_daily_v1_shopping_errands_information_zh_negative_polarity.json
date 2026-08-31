@@ -26,7 +26,7 @@
             "attribute": "排队时间",
             "location": "社区超市",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20分钟",
             "time_scope": "今晚"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "排队时间",
             "location": "社区超市",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20分钟",
             "time_scope": "今晚"
           },
           "forbidden_binding_keys": [

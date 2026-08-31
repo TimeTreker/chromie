@@ -26,7 +26,7 @@
             "attribute": "通勤等待时间",
             "location": "小区门口",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20分钟",
             "time_scope": "明早"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "通勤等待时间",
             "location": "小区门口",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20分钟",
             "time_scope": "明早"
           },
           "forbidden_binding_keys": [

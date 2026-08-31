@@ -278,50 +278,6 @@ def _normalize_mechanical_goal_interpretation_dto(
     return parsed
 
 
-def _strip_bound_values_from_unresolved(parsed: dict[str, Any]) -> None:
-    """Remove exact DTO self-contradictions without interpreting user meaning.
-
-    A scalar value cannot simultaneously be a resolved binding and unresolved
-    meaning in the same model-owned decision.  Removing only byte-equivalent
-    normalized duplicates is a mechanical projection of that closed contract;
-    every other unresolved item remains untouched.
-    """
-
-    responsibilities = parsed.get("responsibilities")
-    unresolved = parsed.get("unresolved")
-    if not isinstance(responsibilities, list) or not isinstance(unresolved, list):
-        return
-
-    def scalar_texts(value: Any) -> set[str]:
-        if isinstance(value, str):
-            normalized = " ".join(value.strip().casefold().split())
-            return {normalized} if normalized else set()
-        if isinstance(value, dict):
-            return {
-                text
-                for nested in value.values()
-                for text in scalar_texts(nested)
-            }
-        if isinstance(value, (list, tuple)):
-            return {
-                text for nested in value for text in scalar_texts(nested)
-            }
-        return set()
-
-    bound_values = {
-        text
-        for item in responsibilities
-        if isinstance(item, dict)
-        for text in scalar_texts(item.get("bindings") or {})
-    }
-    parsed["unresolved"] = [
-        item
-        for item in unresolved
-        if " ".join(str(item or "").strip().casefold().split())
-        not in bound_values
-    ]
-
-
 def _strip_redundant_outcome_echo_bindings(parsed: dict[str, Any]) -> None:
     """Remove fields that duplicate the Responsibility's authoritative outcome.
 
@@ -419,7 +375,7 @@ def _normalize_corrupted_count_binding_names(parsed: dict[str, Any]) -> None:
 
     Some constrained decoders have returned a JSON object whose key contains the
     intended scalar, for example ``count”: 2, // ...`` with a null object value.
-    This repair does not infer a count from language or accept aliases: it only
+    This mechanical normalization does not infer a count from language or accept aliases: it only
     separates the literal positive integer already embedded after the canonical
     ``count:`` prefix. The existing source-number and typed-count validators then
     prove that the recovered value is both requested and representable.
@@ -454,9 +410,9 @@ def _reject_malformed_binding_names(parsed: dict[str, Any]) -> None:
 
     Binding names identify semantic dimensions; JSON punctuation, quote marks,
     comment delimiters, and embedded field syntax cannot be part of that
-    identifier.  Rejecting this mechanical corruption at Goal Interpretation
-    lets its single DTO-repair attempt regenerate the object before malformed
-    keys reach Goal Association as apparently meaningful semantics.
+    identifier. Rejecting this mechanical corruption at Goal Interpretation
+    prevents malformed keys from reaching Goal Association as apparently
+    meaningful semantics.
     """
 
     responsibilities = parsed.get("responsibilities")
@@ -483,9 +439,8 @@ def _reject_malformed_binding_values(parsed: dict[str, Any]) -> None:
     Human-semantic values may contain ordinary punctuation, including numeric
     times such as ``12:30``.  A quote immediately followed by a field separator
     or a comment opener, however, is mechanically leaked serialization syntax,
-    not a semantic surface.  Failing this at the DTO boundary lets the existing
-    one-shot contract repair regenerate the object before the corrupt field can
-    become a canonical Goal binding.
+    not a semantic surface. Failing closed at this DTO boundary prevents the
+    corrupt field from becoming a canonical Goal binding.
     """
 
     responsibilities = parsed.get("responsibilities")
@@ -732,8 +687,7 @@ def _reject_noncanonical_count_bindings(parsed: dict[str, Any]) -> None:
     Goal Interpretation owns the semantic reading of a count expression. Once it
     chooses a count binding, the binding name supplies the type and its value has
     one canonical representation. This gate does not interpret source wording; it
-    only rejects a mechanically malformed typed DTO so the model's single allowed
-    same-stage repair can regenerate the semantic value.
+    only rejects a mechanically malformed typed DTO.
     """
 
     legacy_count_names = {"item_count", "repetition_count"}
@@ -986,9 +940,8 @@ def _reject_unprovenanced_location_bindings(
 
     This gate does not resolve or repair a location. It only verifies that the
     model copied a current-turn surface or a value already present in bounded
-    semantic continuity context. A primary violation fails closed; the one
-    designated Deep interpretation may use a same-stage mechanical decoder
-    constraint, never a semantic review of rejected wording.
+    semantic continuity context. Primary and Deep violations both fail closed;
+    location grounding is not mechanically repairable at the same stage.
     """
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
@@ -2102,8 +2055,12 @@ class OllamaGoalInterpreter:
                 "Never attach an unrelated outcome because a Goal is visible. Preserve "
                 "negation and lifecycle meaning: ceasing, rejecting, cancelling, or "
                 "pausing supplied active Goal meaning is not a new positive performance "
-                "or an invented opposite action. Continuation or resumption preserves "
-                "the supplied Goal's output mode. Pending clarification Context may "
+                "or an invented opposite action. A lifecycle relationship does not by "
+                "itself change the supplied Goal's completion category: cancellation, "
+                "cessation, pause, continuation, and resumption preserve the target "
+                "Goal's output mode. Modification or clarification also preserves it "
+                "unless the current turn explicitly changes the desired completion "
+                "modality. Pending clarification Context may "
                 "resolve an elliptical reply, but Goal Interpretation never creates or "
                 "resolves a Planner InformationGap."
             )
@@ -2163,7 +2120,6 @@ class OllamaGoalInterpreter:
     @staticmethod
     def _goal_interpretation_response_schema(
         *,
-        forbidden_unresolved_values: tuple[str, ...] = (),
         new_relationship_only: bool = False,
         allowed_goal_ids: tuple[str, ...] = (),
         prior_assistant_utterance: str | None = None,
@@ -2199,13 +2155,6 @@ class OllamaGoalInterpreter:
                 "Required confidence evidence selected from the bounded numeric "
                 "scale 0, 0.25, 0.5, 0.75, or 1."
             )
-        if forbidden_unresolved_values:
-            unresolved = schema.get("properties", {}).get("unresolved")
-            if isinstance(unresolved, dict):
-                unresolved["items"] = {
-                    "type": "string",
-                    "not": {"enum": list(forbidden_unresolved_values)},
-                }
         responsibility = schema.get("$defs", {}).get(
             "CognitiveResponsibilityProposal"
         )
@@ -2350,12 +2299,14 @@ class OllamaGoalInterpreter:
                 schema_definitions = schema.setdefault("$defs", {})
                 schema_definitions["SourceBackedBindingString"] = source_backed_string
                 numeric_scalar_rule = (
-                    "If the source surface directly contains an Arabic digit and reading "
-                    "it requires no conversion or guess, emit only that JSON number, "
-                    "without its unit or surrounding words; never emit it as a string or "
-                    "single-item list. Use an exact source/context string only for "
-                    "non-digit wording or when normalization would require guessing or "
-                    "conversion."
+                    "If the source explicitly supplies a measurement unit, preserve one "
+                    "exact contiguous source/context string containing both number and "
+                    "unit; never discard, translate, normalize, or reconstruct the unit. "
+                    "If an Arabic-digit scalar has no explicit unit and reading it requires "
+                    "no conversion or guess, emit only that JSON number; never emit a "
+                    "unitless digit as a numeric string or single-item list. Use an exact "
+                    "source/context string for non-digit wording or whenever normalization "
+                    "would lose meaning."
                 )
                 binding_properties["location"] = {
                     "$ref": "#/$defs/SourceBackedBindingString",
@@ -2817,54 +2768,6 @@ class OllamaGoalInterpreter:
             schema["required"].append("coordination")
         return schema
 
-    @staticmethod
-    def _already_bound_unresolved_values(
-        validation_error: Exception,
-    ) -> tuple[str, ...]:
-        if not isinstance(validation_error, ValidationError):
-            return ()
-
-        def scalar_texts(value: Any) -> set[str]:
-            if isinstance(value, str):
-                normalized = " ".join(value.strip().casefold().split())
-                return {normalized} if normalized else set()
-            if isinstance(value, dict):
-                return {
-                    text
-                    for item in value.values()
-                    for text in scalar_texts(item)
-                }
-            if isinstance(value, (list, tuple)):
-                return {
-                    text
-                    for item in value
-                    for text in scalar_texts(item)
-                }
-            return set()
-
-        rejected_values: set[str] = set()
-        for error in validation_error.errors(include_url=False):
-            if "already-bound semantic values are not unresolved" not in str(
-                error.get("msg") or ""
-            ):
-                continue
-            rejected = error.get("input")
-            if not isinstance(rejected, dict):
-                continue
-            bound_values = {
-                text
-                for item in rejected.get("responsibilities") or []
-                if isinstance(item, dict)
-                for text in scalar_texts(item.get("bindings") or {})
-            }
-            rejected_values.update(
-                value
-                for item in rejected.get("unresolved") or []
-                if (value := " ".join(str(item or "").strip().split()))
-                and value.casefold() in bound_values
-            )
-        return tuple(sorted(rejected_values))
-
     def build_interpretation_payload(
         self, request: GoalInterpretationRequest
     ) -> dict[str, Any]:
@@ -2904,90 +2807,9 @@ class OllamaGoalInterpreter:
             payload["keep_alive"] = self.keep_alive
         return payload
 
-    def build_interpretation_repair_payload(
-        self,
-        request: GoalInterpretationRequest,
-        *,
-        previous_content: str,
-        validation_error: Exception,
-    ) -> dict[str, Any]:
-        del previous_content
-        forbidden_unresolved_values = self._already_bound_unresolved_values(
-            validation_error
-        )
-        prior = _most_recent_assistant_utterance(request.context)
-        payload = self.build_interpretation_payload(request)
-        payload["format"] = self._goal_interpretation_response_schema(
-            forbidden_unresolved_values=forbidden_unresolved_values,
-            new_relationship_only=not bool(
-                _canonical_goal_ids_from_context(request.context)
-            ),
-            allowed_goal_ids=_canonical_goal_ids_from_context(request.context),
-            prior_assistant_utterance=(
-                prior["text"] if prior is not None else None
-            ),
-            admitted_turn=request.text,
-            exact_location_surfaces=(
-                tuple(_short_exact_surface_substrings(request.text))
-                if not _semantic_context_string_values(request.context)
-                else ()
-            ),
-        )
-        bound_uncertainty_repair = (
-            " The rejected DTO copied already-resolved binding values into top-level "
-            "unresolved. Preserve those bindings and remove those exact values from "
-            "unresolved; retain only genuine uncertainty about WHAT the user means."
-            if forbidden_unresolved_values
-            else ""
-        )
-        payload["messages"] = [
-            {
-                "role": "system",
-                "content": (
-                    self.build_system_prompt(request)
-                    + "\n\nDTO Repair: return one corrected WHAT-only Goal Interpretation JSON object. "
-                    "For every closed string field, copy one exact protocol token from "
-                    "the schema; never inflect, conjugate, translate, or paraphrase it. "
-                    "Remove every field outside the schema. Never translate a rejected "
-                    "route/intent/Capability/Activity/Work/Plan/provider field into another "
-                    "implementation hint. Preserve only the human outcome, material semantic "
-                    "bindings, supplied Goal relationships, "
-                    "the exact provider-neutral output_mode, confidence, and genuine "
-                    "semantic uncertainty. Never create/resolve an InformationGap or "
-                    "choose input-source/default/clarification policy. A directly named "
-                    "entity binding must copy the exact "
-                    "current-turn surface; never translate or transliterate it. Provider timezone "
-                    "or clock-range choices for an already-preserved relative time are not semantic "
-                    "uncertainty. Any place or spatial-location meaning must use the canonical "
-                    "binding name location; never rename the dimension to a location alias. "
-                    "The request-envelope language tag and the whole Latest "
-                    "user input are not semantic bindings. Decompose each independently "
-                    "observable requested effect into a sibling Responsibility and bind "
-                    "only its atomic material facts."
-                    + bound_uncertainty_repair
-                    + " Return JSON only."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    self.build_interpretation_user_prompt(request)
-                    + "\n\nThe previous output violated the WHAT-only typed contract. "
-                    "Regenerate from the authoritative user meaning and bounded semantic "
-                    "context above. Copy identities only from supplied Context; do not copy "
-                    "any field, identifier, wording, or implementation hint from the "
-                    "rejected output. Return only the new "
-                    "schema object."
-                ),
-            },
-        ]
-        return payload
-
     def build_deep_interpretation_payload(
         self,
         request: GoalInterpretationRequest,
-        *,
-        constrain_location_provenance: bool = False,
     ) -> dict[str, Any]:
         """Build one source-based Deep GI escalation with unchanged authority.
 
@@ -3050,10 +2872,13 @@ class OllamaGoalInterpreter:
                     "when their result changes physical state. Never decide here whether "
                     "work, fresh Evidence, a Capability, "
                     "or provider is required. "
-                    "Classify declarative context before counting outcomes: an explanation, "
-                    "personal situation, or stated future plan is not another "
-                    "Responsibility unless the source actually asks Chromie to confirm, "
-                    "acknowledge, remember, record, schedule, monitor, or act on it. "
+                    "Classify declarative context before counting outcomes: an explanation "
+                    "or stated future plan attached to another request is not another "
+                    "Responsibility unless the source asks Chromie to confirm, remember, "
+                    "record, schedule, monitor, or act on it. A standalone greeting, thanks, "
+                    "casual check-in, reaction, personal feeling, evaluation, practical "
+                    "decision, reassurance request, or comparable social act is one speech "
+                    "Responsibility for a natural conversational response. "
                     "Preserve negation as negation. A cessation or prohibition that "
                     "targets supplied active work may relate to that exact Goal, but "
                     "never becomes a new positive embodiment or an invented opposite "
@@ -3077,28 +2902,6 @@ class OllamaGoalInterpreter:
             },
         ]
 
-        if constrain_location_provenance:
-            exact_surfaces = _short_exact_surface_substrings(request.text)
-            responsibility_schema = (
-                payload.get("format", {})
-                .get("$defs", {})
-                .get("CognitiveResponsibilityProposal", {})
-            )
-            if exact_surfaces and isinstance(responsibility_schema, dict):
-                binding_schema = responsibility_schema.get("properties", {}).get(
-                    "binding_items"
-                )
-                if isinstance(binding_schema, dict):
-                    binding_properties = binding_schema.setdefault("properties", {})
-                    if constrain_location_provenance:
-                        binding_properties["location"] = {
-                            "type": "string",
-                            "enum": exact_surfaces,
-                            "description": (
-                                "If location is present, copy one exact contiguous source "
-                                "surface; never translate or transliterate it."
-                            ),
-                        }
         return payload
 
 
@@ -3124,15 +2927,12 @@ class OllamaGoalInterpreter:
         parsed = _extract_json_object(content)
         _normalize_model_interpretation_projection(parsed)
         _normalize_mechanical_goal_interpretation_dto(parsed)
-        _strip_bound_values_from_unresolved(parsed)
         # Planner/route fields are an authority violation rather than a generic
-        # malformed DTO and therefore fail closed without a semantic repair call.
+        # malformed DTO and therefore fail closed.
         _reject_planner_shaped_goal_interpretation(parsed)
-        # Validate the model DTO's closed mechanical shape before semantic
-        # provenance checks choose an escalation path.  Otherwise one response
-        # containing both an envelope echo and an out-of-range confidence value
-        # is misreported as a semantic violation and cannot use the one permitted
-        # same-stage DTO repair.
+        # Validate the closed DTO before provenance checks. Any rejection remains
+        # terminal at this authority boundary; trusted code never asks the same
+        # model stage to reinterpret the source.
         GoalInterpretationDecision.model_validate(parsed)
         _validate_primary_source_evidence(request, parsed)
         _reject_canonical_goal_identity_refs(request, parsed)
@@ -3175,28 +2975,10 @@ class OllamaGoalInterpreter:
                 stage="goal_interpretation_deep",
                 request=request,
             )
-            try:
-                decision = self._validate_interpretation_content(
-                    request,
-                    str(data.get("message", {}).get("content") or ""),
-                )
-            except _GoalInterpretationLocationProvenanceViolation:
-                # Deep GI already owns the semantic delegation. A translated or
-                # otherwise unprovenanced location is a mechanically invalid DTO,
-                # so use the one permitted same-stage repair with an exact-source
-                # decoder constraint. No semantic state has been accepted yet.
-                repaired = await self._chat_logged(
-                    self.build_deep_interpretation_payload(
-                        request,
-                        constrain_location_provenance=True,
-                    ),
-                    stage="goal_interpretation_deep_contract_repair",
-                    request=request,
-                )
-                decision = self._validate_interpretation_content(
-                    request,
-                    str(repaired.get("message", {}).get("content") or ""),
-                )
+            decision = self._validate_interpretation_content(
+                request,
+                str(data.get("message", {}).get("content") or ""),
+            )
             return decision
         except Exception as exc:
             raise InterpretationUnavailableError(
@@ -3248,31 +3030,16 @@ class OllamaGoalInterpreter:
 
         except (ValueError, ValidationError) as exc:
             logger.warning(
-                "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s content=%r",
+                "Invalid WHAT-only Goal Interpretation DTO sid=%s error=%s "
+                "content=%r; failing closed",
                 request.sid,
                 exc,
                 content[:500],
             )
-            try:
-                repaired = await self._chat_logged(
-                    self.build_interpretation_repair_payload(
-                        request,
-                        previous_content=content,
-                        validation_error=exc,
-                    ),
-                    stage="goal_interpretation_contract_repair",
-                    request=request,
-                )
-                decision = self._validate_interpretation_content(
-                    request,
-                    str(repaired.get("message", {}).get("content") or ""),
-                )
-                return await self._accept_or_deepen_interpretation(request, decision)
-            except Exception as repair_exc:
-                raise InterpretationUnavailableError(
-                    "invalid_goal_interpretation_after_one_dto_repair: "
-                    f"{type(repair_exc).__name__}: {repair_exc}"
-                ) from repair_exc
+            raise InterpretationUnavailableError(
+                "invalid_primary_goal_interpretation_contract: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
 
     def _log_payload_profile(
         self,

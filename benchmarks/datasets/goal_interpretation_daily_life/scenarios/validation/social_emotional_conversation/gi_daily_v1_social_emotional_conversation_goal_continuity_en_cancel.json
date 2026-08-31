@@ -51,7 +51,7 @@
           "output_mode": "body_action",
           "confidence": 1.0,
           "source_evidence": {
-            "source_start_token_ref": "t0",
+            "source_start_token_ref": "t6",
             "source_end_token_ref": "t7"
           },
           "relationship": "cancel",

@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "等位时间",
             "location": "街角咖啡店",
-            "threshold": 10,
+            "threshold": "10分钟",
             "time_scope": "周六下午"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "等位时间",
             "location": "街角咖啡店",
-            "threshold": 10,
+            "threshold": "10分钟",
             "time_scope": "周六下午"
           },
           "forbidden_binding_keys": [

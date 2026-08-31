@@ -186,7 +186,9 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             )
             interpreter.parent.mkdir(parents=True)
             interpreter.write_text(
-                "weather_semantics_require_tool_route = True\n", encoding="utf-8"
+                "weather_semantics_require_tool_route = True\n"
+                "goal_interpretation_contract_repair = True\n",
+                encoding="utf-8",
             )
             coordinator = root / "orchestrator" / "runtime" / "interaction_coordinator.py"
             coordinator.parent.mkdir(parents=True, exist_ok=True)
@@ -254,6 +256,7 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         self.assertIn("normalize_enum_string", symbols)
         self.assertIn("reject_contract_marker_as_spoken_text", symbols)
         self.assertIn("ACTION_PHRASES", symbols)
+        self.assertIn("goal_interpretation_contract_repair", symbols)
 
     def test_obsolete_assets_and_copied_mechanisms_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

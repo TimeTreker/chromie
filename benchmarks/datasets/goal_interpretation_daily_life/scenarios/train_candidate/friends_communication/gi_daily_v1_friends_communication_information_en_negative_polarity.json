@@ -26,7 +26,7 @@
             "attribute": "table waiting time",
             "location": "the corner cafe",
             "polarity": "negative",
-            "threshold": 10,
+            "threshold": "10 minutes",
             "time_scope": "Saturday afternoon"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "table waiting time",
             "location": "the corner cafe",
             "polarity": "negative",
-            "threshold": 10,
+            "threshold": "10 minutes",
             "time_scope": "Saturday afternoon"
           },
           "forbidden_binding_keys": [

@@ -26,7 +26,7 @@
             "attribute": "soil moisture",
             "location": "the balcony plant shelf",
             "polarity": "negative",
-            "threshold": 30,
+            "threshold": "30 percent",
             "time_scope": "this morning"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "soil moisture",
             "location": "the balcony plant shelf",
             "polarity": "negative",
-            "threshold": 30,
+            "threshold": "30 percent",
             "time_scope": "this morning"
           },
           "forbidden_binding_keys": [

@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "湿度",
             "location": "客厅",
-            "threshold": 70,
+            "threshold": "70%",
             "time": "现在"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "湿度",
             "location": "客厅",
-            "threshold": 70,
+            "threshold": "70%",
             "time": "现在"
           },
           "forbidden_binding_keys": [

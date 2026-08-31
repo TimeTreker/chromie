@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "bus waiting time",
             "location": "the north-gate bus stop",
-            "threshold": 15,
+            "threshold": "15 minutes",
             "time_scope": "tomorrow morning"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "bus waiting time",
             "location": "the north-gate bus stop",
-            "threshold": 15,
+            "threshold": "15 minutes",
             "time_scope": "tomorrow morning"
           },
           "forbidden_binding_keys": [

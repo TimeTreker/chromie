@@ -26,7 +26,7 @@
             "attribute": "室温",
             "location": "共享办公区",
             "polarity": "negative",
-            "threshold": 26,
+            "threshold": "26度",
             "time_scope": "今天下午"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "室温",
             "location": "共享办公区",
             "polarity": "negative",
-            "threshold": 26,
+            "threshold": "26度",
             "time_scope": "今天下午"
           },
           "forbidden_binding_keys": [

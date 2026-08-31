@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "noise level",
             "location": "the bedroom",
-            "threshold": 40,
+            "threshold": "40 decibels",
             "time_scope": "tonight"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "noise level",
             "location": "the bedroom",
-            "threshold": 40,
+            "threshold": "40 decibels",
             "time_scope": "tonight"
           },
           "forbidden_binding_keys": [

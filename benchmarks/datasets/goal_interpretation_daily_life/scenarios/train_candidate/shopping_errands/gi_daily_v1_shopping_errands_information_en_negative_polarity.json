@@ -26,7 +26,7 @@
             "attribute": "checkout waiting time",
             "location": "the neighborhood supermarket",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tonight"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "checkout waiting time",
             "location": "the neighborhood supermarket",
             "polarity": "negative",
-            "threshold": 20,
+            "threshold": "20 minutes",
             "time_scope": "tonight"
           },
           "forbidden_binding_keys": [

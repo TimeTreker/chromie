@@ -130,19 +130,6 @@
       ]
     },
     {
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Fail closed after one mechanically invalid primary Goal Interpretation DTO repair; never accept malformed output or add another semantic reviewer.",
-      "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.interpret_goal",
-      "ordinal": 2,
-      "body_sha256": "26fdefcac95c3cebfc18d38a28f735638bf203cbdfa90483ac8dbf29dfe15f77",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
       "path": "agent/app/cognitive_gateway/attention_review.py",
       "symbol": "AttentionReviewer.review",
       "ordinal": 1,

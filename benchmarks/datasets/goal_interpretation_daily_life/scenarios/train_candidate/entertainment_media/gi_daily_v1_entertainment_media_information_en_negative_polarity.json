@@ -26,7 +26,7 @@
             "attribute": "evening ticket price",
             "location": "the nearby cinema",
             "polarity": "negative",
-            "threshold": 80,
+            "threshold": "80 yuan",
             "time_scope": "tonight"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "evening ticket price",
             "location": "the nearby cinema",
             "polarity": "negative",
-            "threshold": 80,
+            "threshold": "80 yuan",
             "time_scope": "tonight"
           },
           "forbidden_binding_keys": [

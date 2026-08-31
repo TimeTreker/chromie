@@ -24,9 +24,9 @@
           "outcome": "向前移动",
           "binding_items": {
             "direction": "向前",
-            "distance": 2,
-            "duration": 9,
-            "speed": 0.2
+            "distance": "2米",
+            "duration": "9秒",
+            "speed": "0.2米每秒"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -50,9 +50,9 @@
           ],
           "required_bindings": {
             "direction": "向前",
-            "distance": 2,
-            "duration": 9,
-            "speed": 0.2
+            "distance": "2米",
+            "duration": "9秒",
+            "speed": "0.2米每秒"
           },
           "forbidden_binding_keys": [
             "count",

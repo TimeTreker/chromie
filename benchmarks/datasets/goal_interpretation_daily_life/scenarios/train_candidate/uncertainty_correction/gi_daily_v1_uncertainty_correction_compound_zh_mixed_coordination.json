@@ -24,7 +24,7 @@
           "outcome": "向后走",
           "binding_items": {
             "direction": "向后",
-            "duration": 5
+            "duration": "5秒"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -91,7 +91,7 @@
           ],
           "required_bindings": {
             "direction": "向后",
-            "duration": 5
+            "duration": "5秒"
           },
           "forbidden_binding_keys": []
         },

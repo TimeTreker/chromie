@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "噪声",
             "location": "卧室",
-            "threshold": 40,
+            "threshold": "40分贝",
             "time_scope": "今晚"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "噪声",
             "location": "卧室",
-            "threshold": 40,
+            "threshold": "40分贝",
             "time_scope": "今晚"
           },
           "forbidden_binding_keys": [

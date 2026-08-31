@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "晚场票价",
             "location": "附近电影院",
-            "threshold": 80,
+            "threshold": "80元",
             "time_scope": "今晚"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "晚场票价",
             "location": "附近电影院",
-            "threshold": 80,
+            "threshold": "80元",
             "time_scope": "今晚"
           },
           "forbidden_binding_keys": [

@@ -24,7 +24,7 @@
           "outcome": "walk left",
           "binding_items": {
             "direction": "left",
-            "duration": 7
+            "duration": "7 seconds"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -70,7 +70,7 @@
           ],
           "required_bindings": {
             "direction": "left",
-            "duration": 7
+            "duration": "7 seconds"
           },
           "forbidden_binding_keys": []
         },

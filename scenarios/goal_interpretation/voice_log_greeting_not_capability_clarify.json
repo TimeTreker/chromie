@@ -3,7 +3,7 @@
   "id": "voice_log_greeting_not_capability_clarify",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "A capability-shaped GI DTO receives one mechanical repair into a provider-neutral greeting Responsibility.",
+  "description": "One primary GI DTO preserves a standalone greeting as a provider-neutral speech Responsibility.",
   "tags": [
     "voice-log",
     "greeting",
@@ -17,14 +17,6 @@
     "llm_script": [
       {
         "stage": "goal_interpretation",
-        "decision": {
-          "confidence": 0.86,
-          "responsibilities": [],
-          "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_contract_repair",
         "decision": {
           "confidence": 0.94,
           "responsibilities": [
@@ -49,10 +41,9 @@
   },
   "expect": {
     "confidence": 0.94,
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_contract_repair"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [

@@ -25,7 +25,6 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _reject_unprovenanced_duration_bindings,
     _reject_unprovenanced_speed_bindings,
     _source_tokens,
-    _strip_bound_values_from_unresolved,
     _strip_mechanically_unprovenanced_speed_bindings,
     _without_goal_interpretation_authority,
 )
@@ -329,7 +328,7 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 {
                     "local_ref": "r1",
                     "outcome": "move forward for 15 seconds",
-                    "bindings": {"duration": 15, "location": "forward"},
+                    "bindings": {"duration": "15 seconds", "location": "forward"},
                     "output_mode": "body_action",
                     "relationship": "new",
                     "target_goal_ids": [],
@@ -434,11 +433,16 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 request, _valid_output("continue", local_ref="goal-previous")
             )
 
-    def test_bound_unresolved_duplicate_is_removed(self) -> None:
+    def test_bound_unresolved_duplicate_fails_closed(self) -> None:
         parsed = _valid_output()
         parsed["unresolved"] = ["Chongqing", "which forecast provider"]
-        _strip_bound_values_from_unresolved(parsed)
-        self.assertEqual(parsed["unresolved"], ["which forecast provider"])
+        with self.assertRaisesRegex(ValueError, "already-bound semantic values"):
+            OllamaGoalInterpreter._validate_interpretation_content(
+                GoalInterpretationRequest(
+                    text="What's the weather in Chongqing today?"
+                ),
+                json.dumps(parsed),
+            )
 
     def test_prior_assistant_binding_requires_exact_evidence(self) -> None:
         request = GoalInterpretationRequest(
@@ -514,6 +518,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("Goal continuity is exposed for this request", system_text)
         self.assertIn("exact supplied Goal IDs", system_text)
         self.assertIn("Preserve negation and lifecycle meaning", system_text)
+        self.assertIn("cancellation, cessation, pause, continuation", system_text)
+        self.assertIn("preserve the target Goal's output mode", system_text)
 
     def test_primary_prompt_projects_prior_utterance_rule_only_when_available(
         self,
@@ -618,6 +624,41 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("IMMUTABLE SOURCE TURN JSON", user_text)
         self.assertIn('"original_text":"walk forward for 15 seconds"', user_text)
 
+    def test_primary_prompt_preserves_measured_value_and_unit(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="walk forward for 15 seconds")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+        duration = payload["format"]["$defs"]["CognitiveResponsibilityProposal"][
+            "properties"
+        ]["binding_items"]["properties"]["duration"]
+
+        self.assertIn("number and unit", system_text)
+        self.assertIn("15 seconds", system_text)
+        self.assertIn("both number and unit", duration["description"])
+        self.assertNotIn("without its unit", system_text)
+
+    def test_primary_prompt_keeps_standalone_social_acts(self) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="Thank you.")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn("standalone greeting, thanks", system_text)
+        self.assertIn("one speech Responsibility", system_text)
+        self.assertIn("politeness framing attached to a substantive request", system_text)
+
+    def test_primary_prompt_limits_unfamiliar_name_uncertainty_to_materiality(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="Tell Nova the meeting moved.")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+
+        self.assertIn("unfamiliarity alone is not unresolved meaning", system_text)
+        self.assertIn("harmless directly supplied name", system_text)
+
     def test_primary_prompt_preserves_exact_gateway_wording_once(self) -> None:
         exact = "  今晚，重庆热不热？  "
         payload = self._interpreter().build_interpretation_payload(
@@ -664,12 +705,13 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         self.assertNotIn("never sibling effects", user_text)
 
-    def test_primary_prompt_requires_unknown_name_referent_uncertainty(self) -> None:
+    def test_primary_prompt_requires_material_unknown_name_uncertainty(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(text="你能查天信吗？", language="zh-CN")
         )
         system_text, user_text, _ = _payload_message_texts(payload)
-        self.assertIn("a non-empty unresolved item", system_text)
+        self.assertIn("consequential referent/category choice", system_text)
+        self.assertIn("materially change the intended outcome", system_text)
         self.assertNotIn("unresolved must include a bare name", user_text)
 
     def test_primary_prompt_preflight_prioritizes_decomposition_and_binding_dimensions(
@@ -685,7 +727,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("one responsibilities[] item for each independently", system_text)
         self.assertIn("time_scope is a calendar or relative period", system_text)
         self.assertIn("Missing tools, units, providers", system_text)
-        self.assertIn("Ignore fillers, hesitation, politeness", system_text)
+        self.assertIn("Ignore fillers, hesitation, vocatives", system_text)
+        self.assertIn("politeness framing attached to a substantive request", system_text)
         self.assertIn("Use [] when meaning is clear", system_text)
         self.assertIn("outcome names exactly that requested predicate", system_text)
 
@@ -735,7 +778,8 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         system_text, _, _ = _payload_message_texts(payload)
 
-        self.assertIn("emit only the JSON number itself", system_text)
+        self.assertIn("emit the JSON number itself", system_text)
+        self.assertIn("preserve the exact contiguous source/context surface", system_text)
         self.assertIn("not a second recipient", system_text)
         self.assertIn("asking a named third party", system_text)
         self.assertIn("correction, replacement, or binding-only clause", system_text)
@@ -1050,18 +1094,6 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("重庆", location["enum"])
         self.assertNotIn("Chongqing", location["enum"])
 
-    def test_deep_location_constraint_targets_wire_binding_items(self) -> None:
-        payload = self._interpreter().build_deep_interpretation_payload(
-            GoalInterpretationRequest(text="今晚重庆会不会下雨哦？"),
-            constrain_location_provenance=True,
-        )
-        location = payload["format"]["$defs"][
-            "CognitiveResponsibilityProposal"
-        ]["properties"]["binding_items"]["properties"]["location"]
-
-        self.assertIn("重庆", location["enum"])
-        self.assertNotIn("Chongqing", location["enum"])
-
     def test_decoder_rejects_removed_readiness_fields(self) -> None:
         text = "weather in Chongqing"
         schema = self._interpreter().build_interpretation_payload(
@@ -1083,16 +1115,10 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         for name in ("capability", "provider", "concurrent_action", "agent_skill"):
             self.assertNotIn(name, names)
 
-    def test_repair_payload_does_not_replay_rejected_output(self) -> None:
-        payload = self._interpreter().build_interpretation_repair_payload(
-            GoalInterpretationRequest(text="bring water"),
-            previous_content='{"capability_id":"soridormi.acquire_water"}',
-            validation_error=ValueError("forbidden capability"),
+    def test_goal_interpreter_exposes_no_same_stage_repair_payload(self) -> None:
+        self.assertFalse(
+            hasattr(self._interpreter(), "build_interpretation_repair_payload")
         )
-        _, user_text, all_text = _payload_message_texts(payload)
-        self.assertIn("Regenerate from the authoritative user meaning", user_text)
-        self.assertNotIn("soridormi.acquire_water", all_text)
-        self.assertNotIn("forbidden capability", all_text)
 
     def test_deep_payload_is_source_based_without_prior_dto(self) -> None:
         payload = self._interpreter().build_deep_interpretation_payload(
@@ -1130,23 +1156,50 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(interpreter._chat.await_count, 1)
         self.assertEqual(interpreter._chat.await_args.kwargs["stage"], "goal_interpretation")
 
-    async def test_one_dto_repair_restores_missing_source_evidence(self) -> None:
+    async def test_missing_source_evidence_fails_closed_without_second_call(self) -> None:
         interpreter = self._interpreter()
         malformed = _valid_output()
         del malformed["responsibilities"][0]["source_evidence"]  # type: ignore[index]
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            return_value={"message": {"content": json.dumps(malformed)}}
+        )
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "invalid_primary_goal_interpretation_contract",
+        ):
+            await interpreter.interpret_goal(
+                GoalInterpretationRequest(
+                    text="What's the weather in Chongqing today?"
+                )
+            )
+        self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_deep_location_provenance_failure_has_no_same_stage_retry(
+        self,
+    ) -> None:
+        interpreter = self._interpreter()
+        text = "今晚重庆会不会下雨？"
+        primary = _valid_output(text, unresolved=["whether 重庆 is the intended place"])
+        primary_item = primary["responsibilities"][0]  # type: ignore[index]
+        primary_item["bindings"] = {"location": "重庆", "time_scope": "今晚"}
+        primary_item["outcome"] = "determine whether it will rain in 重庆 tonight"
+        deep = copy.deepcopy(primary)
+        deep["responsibilities"][0]["bindings"]["location"] = "Chongqing"  # type: ignore[index]
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
             side_effect=[
-                {"message": {"content": json.dumps(malformed)}},
-                {"message": {"content": json.dumps(_valid_output())}},
+                {"message": {"content": json.dumps(primary, ensure_ascii=False)}},
+                {"message": {"content": json.dumps(deep, ensure_ascii=False)}},
             ]
         )
-        result = await interpreter.interpret_goal(
-            GoalInterpretationRequest(text="What's the weather in Chongqing today?")
-        )
-        self.assertIsNotNone(result.responsibilities[0].source_evidence)
+
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "invalid_deep_goal_interpretation",
+        ):
+            await interpreter.interpret_goal(GoalInterpretationRequest(text=text))
         self.assertEqual(
             [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
-            ["goal_interpretation", "goal_interpretation_contract_repair"],
+            ["goal_interpretation", "goal_interpretation_deep"],
         )
 
     async def test_semantic_source_overlap_fails_closed_without_reviewer(self) -> None:

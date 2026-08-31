@@ -67,7 +67,8 @@ def test_goal_interpretation_daily_life_dataset_passes_current_contract() -> Non
         "styled_speech",
     }
     assert summary["context_scenarios"] == 306
-    assert summary["unresolved_scenarios"] == 102
+    assert summary["unresolved_scenarios"] == 68
+    assert summary["digit_measurement_surface_bindings"] == 406
 
 
 def test_goal_interpretation_daily_life_stores_one_scenario_per_file() -> None:

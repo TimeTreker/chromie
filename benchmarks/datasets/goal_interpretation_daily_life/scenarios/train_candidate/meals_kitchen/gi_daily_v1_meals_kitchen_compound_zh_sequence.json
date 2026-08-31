@@ -24,7 +24,7 @@
           "outcome": "向左走",
           "binding_items": {
             "direction": "向左",
-            "duration": 4
+            "duration": "4秒"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -70,7 +70,7 @@
           ],
           "required_bindings": {
             "direction": "向左",
-            "duration": 4
+            "duration": "4秒"
           },
           "forbidden_binding_keys": [
             "count"

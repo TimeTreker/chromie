@@ -26,7 +26,7 @@
             "attribute": "停电风险指数",
             "location": "家附近",
             "polarity": "negative",
-            "threshold": 3,
+            "threshold": "3级",
             "time_scope": "今晚"
           },
           "output_mode": "information",
@@ -55,7 +55,7 @@
             "attribute": "停电风险指数",
             "location": "家附近",
             "polarity": "negative",
-            "threshold": 3,
+            "threshold": "3级",
             "time_scope": "今晚"
           },
           "forbidden_binding_keys": [

@@ -128,6 +128,8 @@ class CognitiveResponsibilityProposal(BaseModel):
         description=(
             "Material user-semantic facts from the authoritative turn or bounded "
             "semantic context only; never runtime/session identifiers or HOW fields. "
+            "Preserve an explicitly measured value and its unit together as one exact "
+            "source/context surface; execution-unit normalization belongs downstream. "
             "Cross-Responsibility order uses before/after with exact sibling local_ref "
             "values; requested concurrency uses parallel_with with exact sibling "
             "local_ref values."
@@ -149,7 +151,9 @@ class CognitiveResponsibilityProposal(BaseModel):
     ] = Field(
         default="unspecified",
         description=(
-            "Provider-neutral WHAT category for this one human outcome. information "
+            "Goal Interpretation's provider-neutral WHAT category for this one human "
+            "outcome. Goal Association preserves the accepted value and must not "
+            "re-author it. information "
             "means the person wants Chromie to determine or provide information; "
             "stateful_effect means the person wants a durable or future state change "
             "outside embodiment. Physical locomotion, posture, gaze, gesture, manipulation, "

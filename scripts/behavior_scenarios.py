@@ -126,8 +126,9 @@ class _GoalInterpretationLlm:
 class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
     """Run the bounded Goal Interpretation transaction with scripted model output.
 
-    The primary interpretation, optional one DTO repair, normalization, and
-    deterministic validators run through ``OllamaGoalInterpreter.interpret_goal()``.
+    The primary interpretation, normalization, and deterministic validators run
+    through ``OllamaGoalInterpreter.interpret_goal()``. Invalid primary DTOs fail
+    closed without a second same-authority model call.
     Only the external model completion is replaced by a file-backed script.
     """
 

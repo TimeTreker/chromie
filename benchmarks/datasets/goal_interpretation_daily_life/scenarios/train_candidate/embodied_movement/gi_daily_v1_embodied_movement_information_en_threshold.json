@@ -25,7 +25,7 @@
           "binding_items": {
             "attribute": "floor temperature",
             "location": "the indoor track",
-            "threshold": 40,
+            "threshold": "40 degrees",
             "time_scope": "before practice"
           },
           "output_mode": "information",
@@ -53,7 +53,7 @@
           "required_bindings": {
             "attribute": "floor temperature",
             "location": "the indoor track",
-            "threshold": 40,
+            "threshold": "40 degrees",
             "time_scope": "before practice"
           },
           "forbidden_binding_keys": [

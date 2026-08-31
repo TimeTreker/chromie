@@ -3,7 +3,7 @@
   "id": "voice_log_chinese_blink_wrong_walk_not_catalog_corrected",
   "suite": "goal_interpretation",
   "level": "module",
-  "description": "A malformed GI DTO receives one mechanical repair into provider-neutral blink meaning; the Host never chooses a substitute Capability.",
+  "description": "One primary GI DTO preserves provider-neutral blink meaning; the Host never repairs it or chooses a substitute Capability.",
   "tags": [
     "voice-log",
     "zh-CN",
@@ -20,14 +20,6 @@
     "llm_script": [
       {
         "stage": "goal_interpretation",
-        "decision": {
-          "confidence": 0.9,
-          "responsibilities": [],
-          "unresolved": []
-        }
-      },
-      {
-        "stage": "goal_interpretation_contract_repair",
         "decision": {
           "confidence": 0.93,
           "responsibilities": [
@@ -52,10 +44,9 @@
   },
   "expect": {
     "confidence": 0.93,
-    "llm_calls": 2,
+    "llm_calls": 1,
     "llm_stages": [
-      "goal_interpretation",
-      "goal_interpretation_contract_repair"
+      "goal_interpretation"
     ],
     "unresolved": [],
     "responsibilities": [

@@ -24,9 +24,9 @@
           "outcome": "move backward",
           "binding_items": {
             "direction": "backward",
-            "distance": 2,
-            "duration": 3,
-            "speed": 0.2
+            "distance": "2 meters",
+            "duration": "3 seconds",
+            "speed": "0.2 meters per second"
           },
           "output_mode": "body_action",
           "confidence": 1.0,
@@ -50,9 +50,9 @@
           ],
           "required_bindings": {
             "direction": "backward",
-            "distance": 2,
-            "duration": 3,
-            "speed": 0.2
+            "distance": "2 meters",
+            "duration": "3 seconds",
+            "speed": "0.2 meters per second"
           },
           "forbidden_binding_keys": [
             "count",
