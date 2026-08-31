@@ -1,0 +1,4 @@
+interface:
+  display_name: "Optimize Chromie LLM Prompt"
+  short_description: "Qualify and improve Chromie model-role prompts"
+  default_prompt: "Use $optimize-chromie-llm-prompt to qualify and optimize the Fast Planner prompt with a frozen target-blind cohort."
