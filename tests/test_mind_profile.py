@@ -12,12 +12,15 @@ from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 from shared.chromie_contracts.mind import (
+    CustomerMindPersonalization,
     CorePrinciple,
     MindProfile,
     SocialInteractionStyle,
     MindUpdateProposal,
+    apply_customer_mind_personalization,
     default_mind_profile,
     default_mind_profile_path,
+    validate_customer_mind_profile,
 )
 
 
@@ -30,7 +33,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "girl identity")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.6.3")
+        self.assertEqual(profile.version, "0.7.0")
         self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
         self.assertIn("family's little secretary", profile.identity.short_self_description)
         self.assertIn("six-year-old girl", profile.identity.model_identity_boundary)
@@ -97,6 +100,8 @@ class MindProfileTests(unittest.TestCase):
             "generalization_first_ai",
             {item["id"] for item in profile.prompt_context()["core_principles"]},
         )
+        self.assertIn("knowledge_boundary", context["worldview"])
+        self.assertIn("authority_boundary", context["household_values"])
 
 
 
@@ -165,6 +170,8 @@ class MindProfileTests(unittest.TestCase):
             MindProfile(
                 identity=default_mind_profile().identity,
                 personality_expression=default_mind_profile().personality_expression,
+                worldview=default_mind_profile().worldview,
+                household_values=default_mind_profile().household_values,
                 core_principles=[
                     CorePrinciple(
                         principle_id="bad",
@@ -173,6 +180,40 @@ class MindProfileTests(unittest.TestCase):
                     )
                 ]
             )
+
+    def test_customer_personalization_changes_only_bounded_mind_fields(self) -> None:
+        factory = default_mind_profile()
+        personalization = CustomerMindPersonalization(
+            display_name="Nova",
+            pronouns=["she", "her"],
+            family_role="our household helper",
+            social_style_preset="neutral",
+            worldview_perspectives=["Treat learning as something the family does together."],
+            household_values=["Prefer calm explanations when someone is confused."],
+        )
+
+        active = apply_customer_mind_personalization(factory, personalization)
+        validate_customer_mind_profile(active, factory)
+
+        self.assertEqual(active.identity.name, "Nova")
+        self.assertEqual(active.identity.family_role, "our household helper")
+        self.assertEqual(active.social_interaction_style.preset, "neutral")
+        self.assertEqual(
+            active.worldview.household_perspectives,
+            ["Treat learning as something the family does together."],
+        )
+        self.assertEqual(
+            active.household_values.statements,
+            ["Prefer calm explanations when someone is confused."],
+        )
+        self.assertEqual(active.core_principles, factory.core_principles)
+        self.assertEqual(active.reflex_policy, factory.reflex_policy)
+
+        tampered = active.model_copy(
+            update={"core_principles": active.core_principles[1:]}
+        )
+        with self.assertRaisesRegex(ValueError, "locked or non-personalizable"):
+            validate_customer_mind_profile(tampered, factory)
 
     def test_mind_manager_loads_owner_profile_from_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

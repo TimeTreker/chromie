@@ -1,7 +1,8 @@
 # User Manual
 
-This manual is for an operator using Chromie with Soridormi in simulation. It
-keeps the day-to-day commands in one place while the detailed authority remains
+This manual is for a household owner or operator setting up Chromie and using
+Chromie with Soridormi in simulation. It keeps the day-to-day commands in one
+place while the detailed authority remains
 in [Status](STATUS.md), [Acceptance](ACCEPTANCE.md), and the
 [Operations Runbook](../CHROMIE_RUNBOOK.md).
 
@@ -16,6 +17,43 @@ in [Status](STATUS.md), [Acceptance](ACCEPTANCE.md), and the
 - Use deterministic stop, cancel, and emergency paths for interruption.
 - Do not expose raw motor, joint, torque, actuator, or controller-array values
   to the model-facing contracts.
+
+## Customer Mind Setup
+
+Chromie ships with the reviewed factory identity, worldview, values, and social
+style. A household owner can preview bounded personalization before the first
+startup:
+
+```bash
+python scripts/configure_chromie_mind.py \
+  --name Nova \
+  --pronoun she \
+  --pronoun her \
+  --family-role "our household helper" \
+  --social-style neutral \
+  --worldview-perspective "Learning is something we do together." \
+  --household-value "Prefer calm explanations."
+```
+
+The command initially prints a preview and changes nothing. After reviewing it,
+repeat the command with `--apply`. The active profile is stored locally at
+`.chromie/mind/active_profile.json` with owner-only permissions and takes effect
+after Chromie restarts. Existing customer profiles receive a versioned backup.
+
+Customer setup cannot change Core principles, physical or information safety,
+privacy, consent, authorization, truthful embodiment, Capability evidence,
+providers, prompts, models, permissions, or runtime feature gates. Household
+worldview perspectives and values guide preference and expression only and are
+always subordinate to those locked boundaries.
+
+Return to the factory profile without destroying the previous customer profile:
+
+```bash
+python scripts/configure_chromie_mind.py --reset
+```
+
+The reset command moves the active profile to a recoverable timestamped archive;
+restart Chromie to activate the factory profile.
 
 ## Daily Startup
 

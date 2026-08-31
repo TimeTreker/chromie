@@ -8,8 +8,10 @@ from .clients.ollama_client import LayeredPrompt
 from .cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
+    STABLE_MIND_SEMANTIC_CONTRACT,
     bounded_identity_json,
     bounded_personality_json,
+    bounded_stable_mind_json,
     owner_approved_identity_context,
     owner_approved_personality_context,
 )
@@ -190,6 +192,7 @@ def fast_plan_prompt(
     skill_section += auxiliary_social_planning_prompt_section(context)
     identity_json = bounded_identity_json(context)
     personality_json = bounded_personality_json(context)
+    stable_mind_json = bounded_stable_mind_json(context)
     association = goal_association_prompt_projection(
         context,
         goal_ids=(
@@ -344,6 +347,7 @@ def fast_plan_prompt(
             f"Goal association advisory JSON:\n{bounded_json(association, 3000)}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+            f"Owner-approved Stable Mind worldview/values JSON:\n{stable_mind_json}\n\n"
             f"{skill_section}"
             f"Executable common capability catalog JSON:\n{bounded_json(capabilities, 9000)}\n\n"
             f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
@@ -367,6 +371,7 @@ def fast_plan_prompt(
             f"{current_turn_communication_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
+            f"{STABLE_MIND_SEMANTIC_CONTRACT}"
             f"{result_evidence_contract}{control_evidence_contract}{goal_execution_contract}"
             f"{concise_output_contract}"
             f"{provisional_work_contract}"
@@ -392,6 +397,7 @@ def fast_plan_prompt(
         f"Goal association advisory JSON:\n{bounded_json(association, 3000)}\n\n"
         f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
         f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+        f"Owner-approved Stable Mind worldview/values JSON:\n{stable_mind_json}\n\n"
         f"{skill_section}"
         f"Executable common capability catalog JSON:\n{bounded_json(capabilities, 9000)}\n\n"
         f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
@@ -419,6 +425,7 @@ def fast_plan_prompt(
         f"{current_turn_communication_contract}"
         f"{IDENTITY_SEMANTIC_CONTRACT}"
         f"{PERSONALITY_SEMANTIC_CONTRACT}"
+        f"{STABLE_MIND_SEMANTIC_CONTRACT}"
         f"{result_evidence_contract}{control_evidence_contract}{goal_execution_contract}"
         f"{concise_output_contract}"
         f"{provisional_work_contract}"
@@ -966,6 +973,8 @@ def fast_layered_prompt(
         f"{bounded_identity_json(context)}\n\n"
         "Owner-approved Personality Expression JSON:\n"
         f"{bounded_personality_json(context)}\n\n"
+        "Owner-approved Stable Mind worldview/values JSON:\n"
+        f"{bounded_stable_mind_json(context)}\n\n"
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="fast_planner")
@@ -988,6 +997,7 @@ def fast_layered_prompt(
         operating_contract=(
             IDENTITY_SEMANTIC_CONTRACT,
             PERSONALITY_SEMANTIC_CONTRACT,
+            STABLE_MIND_SEMANTIC_CONTRACT,
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         ),
         capability_contract=(capability_contract,),
@@ -1037,6 +1047,7 @@ def deep_plan_prompt(
     ]
     identity_json = bounded_identity_json(context)
     personality_json = bounded_personality_json(context)
+    stable_mind_json = bounded_stable_mind_json(context)
     skill_section = agent_skill_prompt_section(
         context,
         agent_role="deep_planner",
@@ -1132,6 +1143,7 @@ def deep_plan_prompt(
         f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{bounded_json(situation_prompt_projection(context), 3600)}\n\n"
         f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
         f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
+        f"Owner-approved Stable Mind worldview/values JSON:\n{stable_mind_json}\n\n"
         f"{skill_section}"
         + (
             f"Executable capability catalog JSON:\n{bounded_json(prompt_capabilities, 12000)}\n\n"
@@ -1174,6 +1186,7 @@ def deep_plan_prompt(
         f"{goal_execution_contract}"
         f"{IDENTITY_SEMANTIC_CONTRACT}"
         f"{PERSONALITY_SEMANTIC_CONTRACT}"
+        f"{STABLE_MIND_SEMANTIC_CONTRACT}"
         f"{EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT}"
         "Response text is audible language, never a stage direction or a substitute "
         "execution channel. In mixed speech with body or tool work, a respond outcome "
@@ -1243,6 +1256,8 @@ def deep_layered_prompt(
         f"{bounded_identity_json(context)}\n\n"
         "Owner-approved Personality Expression JSON:\n"
         f"{bounded_personality_json(context)}\n\n"
+        "Owner-approved Stable Mind worldview/values JSON:\n"
+        f"{bounded_stable_mind_json(context)}\n\n"
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="deep_planner")
@@ -1266,6 +1281,7 @@ def deep_layered_prompt(
         operating_contract=(
             IDENTITY_SEMANTIC_CONTRACT,
             PERSONALITY_SEMANTIC_CONTRACT,
+            STABLE_MIND_SEMANTIC_CONTRACT,
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         ),
         capability_contract=(capability_contract,),

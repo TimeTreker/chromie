@@ -11,17 +11,24 @@ from agent.app.clients.ollama_client import LayeredPrompt
 from agent.app.cognitive_identity import (
     IDENTITY_SEMANTIC_CONTRACT,
     PERSONALITY_SEMANTIC_CONTRACT,
+    STABLE_MIND_SEMANTIC_CONTRACT,
     bounded_identity_json,
     bounded_personality_json,
+    bounded_stable_mind_json,
     owner_approved_identity_context,
     owner_approved_personality_context,
+    owner_approved_stable_mind_context,
 )
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from tests.cognitive_work_test_support import cognitive_work_request
-from shared.chromie_contracts.mind import default_mind_profile
+from shared.chromie_contracts.mind import (
+    CustomerMindPersonalization,
+    apply_customer_mind_personalization,
+    default_mind_profile,
+)
 
 
 class _Dummy:
@@ -82,6 +89,36 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         encoded = bounded_personality_json(self.context)
         self.assertIn('"answer_style"', encoded)
         self.assertIn('"internal_language_boundary"', encoded)
+
+    def test_stable_mind_projection_keeps_worldview_values_independent(self) -> None:
+        projected = owner_approved_stable_mind_context(self.context)
+        self.assertTrue(projected["owner_approved"])
+        self.assertIn("knowledge_boundary", projected["worldview"])
+        self.assertIn("authority_boundary", projected["household_values"])
+        self.assertIn("core_principles", projected)
+        encoded = bounded_stable_mind_json(self.context)
+        self.assertIn('"worldview"', encoded)
+        self.assertIn('"household_values"', encoded)
+
+    def test_customer_name_reaches_planner_without_factory_name_restoration(self) -> None:
+        active = apply_customer_mind_personalization(
+            default_mind_profile(),
+            CustomerMindPersonalization(display_name="Nova"),
+        )
+        request = self.request.model_copy(
+            update={
+                "context": {
+                    **self.context,
+                    "mind": active.prompt_context(max_chars=5000),
+                }
+            }
+        )
+
+        prompt = planner_prompt.fast_plan_prompt(request, [], response_schema={})
+
+        self.assertIn('"name":"Nova"', prompt)
+        self.assertNotIn("social identity is Chromie", prompt)
+        self.assertIn("Use the supplied active identity values", prompt)
 
     def test_unapproved_or_missing_identity_is_not_prompt_evidence(self) -> None:
         self.assertEqual(owner_approved_identity_context({}), {})
@@ -155,6 +192,8 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             self.assertIn("biological", prompt)
             self.assertIn("Owner-approved Personality Expression JSON", prompt)
             self.assertIn(PERSONALITY_SEMANTIC_CONTRACT, prompt)
+            self.assertIn("Owner-approved Stable Mind worldview/values JSON", prompt)
+            self.assertIn(STABLE_MIND_SEMANTIC_CONTRACT, prompt)
 
     def test_cognitive_role_layers_stay_stable_when_only_turn_text_changes(
         self,

@@ -1,9 +1,9 @@
 # Chromie Development Checkpoint
 
-Status: Goal-driven GI single-authority contract fixed; five-round 1,496-case offline audit selected the final prompt; exact deployed-provider qualification remains open
+Status: Issue #33 customer-configurable Stable Mind source implementation complete; customer UI/authentication and deployed-model qualification remain open
 Updated: 2026-08-31
-Pre-delivery baseline: `main` at `c07dc3e4baa76b73008907d3d1fefb0e39178d68`
-Expected resume revision: latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
+Pre-delivery baseline: `main` at `7596ee06f693b08918fde99063fbf24018a4e2dc`
+Expected resume revision: latest `origin/codex/customer-mind-personalization` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
 
@@ -13,117 +13,119 @@ Read [Project Charter](docs/PROJECT_CHARTER.md),
 [Acceptance](docs/ACCEPTANCE.md), and [Latest Handoff](HANDOFF.md).
 Current source, tests, and retained executable evidence win.
 
-## Active delivery line
+## Active Issue and delivery boundary
+
+- Issue [#33](https://github.com/TimeTreker/chromie/issues/33) owns bounded
+  customer configuration of Chromie's Stable Mind.
+- The project owner explicitly authorized this product feature and delivery as an
+  exception to the current qualification-only line.
+- The implementation reuses the existing `MindProfile`/Stable Mind authority. It adds
+  no model call, semantic manager, environment variable, runtime switch, compatibility
+  path, or parallel per-model personality.
+- This patch does not close the pre-existing requirement to qualify an exact deployed
+  provider/model and retain current-revision live and target evidence. After review of
+  Issue #33, return to that qualification sequence unless the owner reprioritizes it.
+- The continuing canonical focus remains the Goal-driven single-authority path documented
+  in `docs/STATUS.md`; customer personalization supplies bounded Stable Mind context and
+  does not move semantic authority out of GI, GA, Planner, or their existing owners.
+
+## Implemented contract
 
 ```text
-admitted turn -> one primary GI WHAT result
-  -> deterministic validation
-  -> accept, or one source-based Deep GI for genuine unresolved meaning
-  -> GA preserves WHAT/output_mode and owns Goal continuity
-  -> Planner owns HOW -> Runtime -> correlated Evidence
+factory MindProfile
+  + owner-confirmed bounded CustomerMindPersonalization
+  -> one deterministically derived complete active MindProfile
+  -> strict comparison with the current factory profile
+  -> Host/Agent load the same profile
+  -> one bounded projection for Fast Planner, Deep Planner, and Reflection
 ```
 
-- Do not restore a GI DTO repair, semantic reviewer, coverage call, Host
-  resegmentation, or phrase-based semantic lane selector.
-- GI is the sole `output_mode` author. GA may carry only the decoder-constant value
-  while committing Goal identity/continuity; the Host derives execution projections.
-- Invalid primary or Deep GI output fails closed. Stop/cancel/emergency remain
-  deterministic and no downstream owner may reconstruct missing WHAT.
+- `Worldview`, `HouseholdValues`, and `CustomerMindPersonalization` are independent
+  typed sections inside the existing Stable Mind owner.
+- Customer-editable fields are display name, pronouns, family role, one reviewed social
+  style preset, up to eight worldview perspectives, and up to eight household values.
+- Customer settings cannot edit or override core safety principles, privacy, consent,
+  truthfulness, embodiment facts, evidence requirements, current user intent, or any
+  other non-personalizable factory field.
+- `apply_customer_mind_personalization()` derives a complete profile from the current
+  factory profile. `validate_customer_mind_profile()` recomputes that result and rejects
+  any difference, so editing the generated JSON cannot widen the authority surface.
+- When `ORCH_MIND_PROFILE_PATH` is not explicit, Host and Agent use
+  `.chromie/mind/active_profile.json` if it exists and passes customer-profile validation;
+  otherwise they use the factory profile. Explicit profile-path behavior is preserved.
+- Fast Planner, Deep Planner, and Selective Reflection receive the same bounded Stable
+  Mind projection. The semantic contract establishes active configured name/role
+  precedence while preserving the factory identity category and protected principles.
+- `scripts/configure_chromie_mind.py` previews by default. `--apply` uses an atomic
+  replacement, mode `0600`, monotonic customer versioning, and backup of an existing
+  profile. `--reset` moves the active profile to a timestamped recoverable backup.
+- Factory profile version is `0.7.0`. No active customer profile was written during this
+  delivery; the preview path was exercised and remained absent.
 
-## Completed delivery scope
+## Repository surface delta
 
-- Removed the primary GI source-regeneration path and Deep location retry. Added a
-  repository-policy guard against all three obsolete repair markers.
-- Preserved explicit measured values as exact number-plus-unit source/context surfaces.
-  The corpus pins 406 such digit measurement bindings; all final outputs preserve them.
-- Made standalone greetings, thanks, feelings, evaluations, and comparable social acts
-  one speech Responsibility; politeness attached to another request adds no sibling.
-- Limited unfamiliar-name uncertainty to consequential referent/category choices.
-- Corrected Charter principle 31: GI authors `output_mode`, GA preserves it, Host
-  derives execution lane/provider requirement after validation.
-- Updated 338 existing corpus scenarios: 270 unit representations, 34 cancellation
-  source spans, and 34 unfamiliar-name unresolved references. Scenario count remains
-  1,496; `unresolved_scenarios` is now 68 and training remains prohibited.
-- Updated three maintained Level-A scripts that encoded the removed GI repair call.
-  No new tracked file, environment variable, architecture term, compatibility path,
-  runtime flag, provider integration, or profile was added.
-
-## Reconstructed defect workflow
-
-| Boundary/owner | Authoritative input and correlation | Observed wrong output | Expected/final output | Judgment |
-|---|---|---|---|---|
-| Gateway | Exact admitted turn, source tokens, bounded Context | Correct immutable source handoff | Same | Correct |
-| Primary GI | Source + static/dynamic prompt + closed Schema | Unit-bearing values could lose units; standalone social turns could be empty; invalid DTO triggered another full interpretation | One complete WHAT DTO with units/social/name materiality; invalid DTO terminal | Earliest semantic/authority boundary fixed |
-| Trusted GI validation | Primary DTO + exact source/reference mechanics | Validation failure could start `goal_interpretation_contract_repair` | Validate mechanically, accept or fail closed | Repair authority leak removed |
-| Deep GI | Accepted primary result with genuine `unresolved`; source is re-read once, prior DTO absent | Invalid location provenance could trigger another Deep call | One Deep source decision, then accept or fail closed | Recursive retry removed |
-| GA | Immutable accepted Responsibilities keyed by `local_ref` | Charter wording implied GA could author mode | Preserve GI mode under decoder `const`; own only Goal identity/continuity | Documentation and runtime agree |
-| Host/Planner | Accepted Responsibilities + Goals | No confirmed defect in this episode; not invoked by offline model cohort | Host projects mechanics; Planner alone authors HOW | Authority containment retained |
-
-Initiating probes were invalid GI DTOs, `5 seconds`, standalone thanks/feelings,
-direct unfamiliar names, and Goal lifecycle turns. The root causes were same-authority
-source regeneration plus contradictory prompt/schema/document/data contracts. Downstream
-symptoms were unit loss, missing conversation, unnecessary clarification, and mode-authority
-ambiguity. The fix changes the first wrong GI/document/data boundaries rather than asking
-GA, Planner, or Host to reinterpret the turn.
+- New tracked files: two (`scripts/configure_chromie_mind.py` and its focused test).
+- New current documents: zero. Existing configuration, mind, status, and user-manual
+  owners were updated.
+- New environment variables, runtime switches, architecture terms, compatibility paths,
+  provider profiles, and model authorities: zero.
+- The two-file growth is required for an executable customer/operator entry point and
+  its independently owned regression coverage. No equivalent current script or test
+  owner was available to consolidate.
 
 ## Evidence ledger
 
 | Evidence | Result | Limit |
 |---|---|---|
-| Final target-blind primary Codex cohort | 1,496/1,496 calls, generated Schema, and Host; 835 mechanical; 1,366 same-model semantic passes; prompt changes recommended: 0 | Codex role/decoder envelope, not deployed provider; reviewer non-independent |
-| Final source-based Deep subset | 68/68 calls, Schema, Host, decomposition, mode, relation, and source; 55 semantic passes; prompt changes: 0 | Only genuine-unresolved reference subset; same transport/reviewer limits |
-| Critical exact dimensions | Units 406/406; Goal-continuity mode and relationship 136/136 | Offline primary output only |
-| Bilingual probes | Thanks, feelings, harmless names, units 8/8 | Codex diagnostic, not live robot |
-| Relevant Level A | `planner_goal_semantic_quality` 4/4; `robust_intent_understanding` 8/8 | Evidence level A, not services/audio/hardware |
-| Canonical local gate | 2,048 main tests and 20 legacy Agent tests; policy 15 families/0 exceptions; docs 98; test ownership passed | Automated source evidence on pre-commit tree |
+| Focused Mind/identity/configuration tests | 28 passed in 0.51s | Source/runtime contract only; no deployed model |
+| Configuration preview | Produced `chromie_default_mind.customer` version `0.7.0+customer.1`; active path remained absent | Preview only; no persistent customer profile or restart |
+| Repository policy gate | 15 rule families, 0 reviewed exceptions; passed | Static repository policy evidence |
+| Canonical local gate | 2,051 main tests and 20 legacy Agent tests; passed | Automated source evidence on the pre-commit worktree |
+| Documentation gate | 98 Markdown files; passed | Documentation structure/ownership only |
+| Test ownership/static analysis | Passed through `./scripts/run_tests.sh` | Pinned local analysis only |
+| `git diff --check` | Passed | Whitespace integrity only |
 
-Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do not
-transfer with the commit.
-
-## Prompt/core-principle audit
-
-- Base prompt: 15,212 characters, SHA-256
-  `73729710f5baef12ba690ff13ef949aeef00017643fb188e143ed3cc76626df6`.
-- Three system variants only: base, prior-assistant context, Goal-continuity context.
-  Context projection adds no semantic classifier and no extra call.
-- Layer order is authority -> decision procedure -> Responsibilities -> modes ->
-  bindings -> coordination/provenance -> uncertainty -> example -> result conditions.
-- Main and Deep paths comply with Charter 30/31/33. Four final reviewer failures that
-  cite `schema_version` are reviewer errors: the exact decoder Schema allowed the field
-  and production Host accepted it.
-- Iteration stopped at 5/20 because iterations 2/3 regressed other abilities and both
-  final primary/Deep audits recommended zero prompt changes. Remaining failures are
-  model inference or candidate-oracle/grader differences, not a shared prompt boundary.
+No live Agent service, customer restart, deployed LLM, microphone, audible voice,
+simulator, target hardware, or release evidence was produced for Issue #33.
 
 ## Exact resume point
 
-1. Fetch the delivery revision and reproduce the canonical gates:
+1. Fetch and review the Issue #33 delivery revision:
+
+   ```bash
+   git fetch origin codex/customer-mind-personalization
+   git switch codex/customer-mind-personalization
+   git pull --ff-only origin codex/customer-mind-personalization
+   git show --stat --oneline HEAD
+   ```
+
+2. Reproduce the local evidence:
 
    ```bash
    python scripts/check_repository_policies.py
    ./scripts/run_tests.sh
    python scripts/check_docs.py
-   python benchmarks/datasets/goal_interpretation_daily_life/validate.py
+   python scripts/configure_chromie_mind.py \
+     --name Nova \
+     --family-role "our household helper" \
+     --social-style neutral \
+     --worldview-perspective "Learning is something the household does together." \
+     --household-value "Prefer calm explanations."
    ```
 
-2. Select an exact candidate provider/model, then run its transport plus current primary
-   GI manifest without weakening Schema/Host validation:
+3. Review the Issue #33 contract before adding a GUI. A future customer-facing setup
+   surface must authenticate the household owner, call the same bounded derivation and
+   validation boundary, preserve preview/confirmation/recovery semantics, and must not
+   expose raw profile JSON or protected factory fields.
 
-   ```bash
-   python scripts/qualify_vllm_provider.py \
-     --base-url http://127.0.0.1:8000/v1 \
-     --model <exact-model-id> \
-     --output .chromie/acceptance/model-qualification/<new-id>.json \
-     --goal-interpreter-probe \
-     --goal-interpreter-manifest benchmarks/manifests/goal_interpreter_primary_v1.json
-   ```
-
-3. Do not promote from the offline Codex counts. Bind prompt, schema, strict decoder,
-   model digest, parameters, revision, latency, GPU/TTS coexistence, and runtime identity.
-   After a material deployment change, run one fresh complete directory-discovered
-   live-text cohort and collect exactly one debug bundle.
+4. Qualify the profile through an exact deployed model and a real service restart before
+   claiming customer-visible behavior. Retain revision, factory-profile digest, generated
+   customer-profile digest/version, model/runtime identity, prompts, outputs, and restart
+   evidence. Then resume the pre-existing provider/live/target-evidence delivery line.
 
 ## Claim boundary
 
-This remains development-only. No new production model/profile was promoted, and no
-microphone, audible voice, simulator execution, target hardware, or release claim was made.
+Issue #33 is source-complete and locally validated. It provides a real preview/apply/reset
+CLI and shared runtime contract, but remains development-only. No graphical onboarding,
+household authentication, deployed-model behavior, live voice, robot, or release claim is
+made.

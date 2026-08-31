@@ -7,6 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .prompt_projection import bounded_json
 from .clients.ollama_client import OllamaClient
+from .cognitive_identity import (
+    STABLE_MIND_SEMANTIC_CONTRACT,
+    bounded_stable_mind_json,
+)
 try:
     from chromie_contracts.reflection import (
         ReflectionRequest,
@@ -154,6 +158,9 @@ class ReflectionResolver:
             "personality, values, safety policy, shared Fast/Deep policy, provider capability, "
             "permissions, prompts, or models. Memory proposals are task/session only; trusted "
             "runtime, not this model, bounds their lifetime and persistence.\n\n"
+            f"{STABLE_MIND_SEMANTIC_CONTRACT}\n\n"
+            "Owner-approved Stable Mind worldview/values JSON:\n"
+            f"{bounded_stable_mind_json(context)}\n\n"
             f"Authoritative user text:\n{request.text}\n\n"
             f"Cognitive opportunity JSON:\n{self._bounded(opportunity.prompt_projection(), 3000)}\n\n"
             f"Recorded execution outcome JSON:\n{self._bounded(context.get('execution_outcome_bundle') or {}, 9000)}\n\n"

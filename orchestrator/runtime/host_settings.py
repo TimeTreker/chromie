@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+from shared.chromie_contracts.mind import active_customer_mind_profile_path
+
 
 class HostConfigurationError(ValueError):
     """One invalid operator/profile setting with its owning variable."""
@@ -377,9 +379,15 @@ class HostSettingsSnapshot:
             or ollama_model
         )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
-        mind_profile_path = _optional_path(
+        configured_mind_profile_path = _optional_path(
             values, "ORCH_MIND_PROFILE_PATH", project_root=project_root
-        ) or (project_root / "config" / "mind" / "chromie_default.json").resolve()
+        )
+        customer_mind_profile_path = active_customer_mind_profile_path(project_root)
+        mind_profile_path = configured_mind_profile_path or (
+            customer_mind_profile_path
+            if customer_mind_profile_path.is_file()
+            else (project_root / "config" / "mind" / "chromie_default.json").resolve()
+        )
         playback = PlaybackSettings(
             tts_url=_text(values, "TTS_URL", "ws://localhost:5000"),
             output_mode=_choice(
