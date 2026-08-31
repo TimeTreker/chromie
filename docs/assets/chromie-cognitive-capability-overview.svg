@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Chromie Cognitive and Capability Flow — Overview</title>
+  <desc id="desc">A concise overview of Chromie's event-driven cognitive flow from person and world input through Goal Interpretation, Planner and Goal Association, Goal-bound Activities, Trusted Capability Runtime and Providers, Runtime Event, Trusted Evidence, bounded state, CognitiveOpportunity, and Planner re-entry. Protective Reflex remains deterministic.</desc>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L10 5 L0 10 Z" fill="#2563eb"/></marker>
+    <marker id="arrow-violet" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L10 5 L0 10 Z" fill="#7c3aed"/></marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L10 5 L0 10 Z" fill="#0f766e"/></marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L10 5 L0 10 Z" fill="#d97706"/></marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L10 5 L0 10 Z" fill="#dc2626"/></marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #172033; }
+      .title { font-size: 40px; font-weight: 760; letter-spacing: -0.7px; }
+      .subtitle { font-size: 18px; fill: #596579; }
+      .section { font-size: 15px; font-weight: 760; letter-spacing: 1.5px; }
+      .node-title { font-size: 20px; font-weight: 740; text-anchor: middle; }
+      .node-sub { font-size: 15px; fill: #536174; text-anchor: middle; }
+      .small { font-size: 14px; fill: #536174; text-anchor: middle; }
+      .label { font-size: 15px; font-weight: 680; }
+      .box { fill: #ffffff; stroke-width: 2.4; rx: 12; }
+      .blue-box { stroke: #2563eb; }
+      .violet-box { stroke: #7c3aed; }
+      .teal-box { stroke: #0f766e; }
+      .amber-box { stroke: #d97706; }
+      .red-box { stroke: #dc2626; }
+      .blue, .violet, .teal, .amber, .red, .gray { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .blue { stroke: #2563eb; marker-end: url(#arrow-blue); }
+      .violet { stroke: #7c3aed; marker-end: url(#arrow-violet); }
+      .teal { stroke: #0f766e; marker-end: url(#arrow-teal); }
+      .amber { stroke: #d97706; marker-end: url(#arrow-amber); }
+      .red { stroke: #dc2626; marker-end: url(#arrow-red); }
+      .gray { stroke: #94a3b8; marker-end: url(#arrow-gray); }
+      .dotted { stroke-dasharray: 7 8; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#fbfcfe"/>
+  <text class="title" x="44" y="58">Chromie Cognitive &amp; Capability Flow</text>
+  <text class="subtitle" x="45" y="90">Overview · WHAT stays separate from HOW; execution returns through trusted Evidence.</text>
+
+  <rect x="42" y="118" width="138" height="30" rx="15" fill="#eaf2ff"/>
+  <text class="section" x="111" y="139" text-anchor="middle" fill="#1d4ed8">UNDERSTAND</text>
+  <rect x="42" y="514" width="154" height="30" rx="15" fill="#fff1d9"/>
+  <text class="section" x="119" y="535" text-anchor="middle" fill="#b45309">ACT &amp; OBSERVE</text>
+  <rect x="42" y="790" width="122" height="30" rx="15" fill="#f1eaff"/>
+  <text class="section" x="103" y="811" text-anchor="middle" fill="#6d28d9">RE-ENTER</text>
+
+  <rect class="box blue-box" x="620" y="120" width="360" height="50"/>
+  <text class="node-title" x="800" y="152">PERSON / WORLD</text>
+  <path class="blue" d="M800 170 V187"/>
+
+  <rect class="box blue-box" x="620" y="190" width="360" height="50"/>
+  <text class="node-title" x="800" y="222">COGNITIVE GATEWAY</text>
+  <path class="blue" d="M800 240 V257"/>
+
+  <rect class="box blue-box" x="620" y="260" width="360" height="64"/>
+  <text class="node-title" x="800" y="287">GOAL INTERPRETATION</text>
+  <text class="node-sub" x="800" y="311">WHAT · Responsibility</text>
+
+  <path class="blue" d="M800 324 V345 H555 V359"/>
+  <path class="teal" d="M800 324 V345 H1045 V359"/>
+  <rect class="box violet-box" x="375" y="362" width="360" height="66"/>
+  <text class="node-title" x="555" y="389">PLANNER</text>
+  <text class="node-sub" x="555" y="413">HOW · Fast; Deep if needed</text>
+  <rect class="box teal-box" x="865" y="362" width="360" height="66"/>
+  <text class="node-title" x="1045" y="389">GOAL ASSOCIATION</text>
+  <text class="node-sub" x="1045" y="413">Canonical Goal continuity</text>
+
+  <path class="blue" d="M555 428 V447 H800 V458"/>
+  <path class="teal" d="M1045 428 V447 H800 V458"/>
+  <rect class="box blue-box" x="600" y="460" width="400" height="62"/>
+  <text class="node-title" x="800" y="487">GOAL-BOUND ACTIVITIES</text>
+  <text class="node-sub" x="800" y="510">Communication · information · body · tool</text>
+
+  <rect x="70" y="205" width="250" height="118" rx="12" fill="#fff8f8" stroke="#dc2626" stroke-width="2.4"/>
+  <text class="node-title" x="195" y="239" fill="#b91c1c">PROTECTIVE REFLEX</text>
+  <text class="node-sub" x="195" y="267">Stop · cancel · emergency</text>
+  <text class="small" x="195" y="295">Deterministic · no model wait</text>
+  <path class="red" d="M620 215 H320"/>
+
+  <path class="amber" d="M800 522 V548"/>
+  <rect class="box amber-box" x="600" y="550" width="400" height="56"/>
+  <text class="node-title" x="800" y="585">TRUSTED CAPABILITY RUNTIME</text>
+
+  <path class="amber" d="M800 606 V625"/>
+  <rect class="box amber-box" x="470" y="628" width="660" height="76"/>
+  <text class="node-title" x="800" y="657">PROVIDERS / REALIZATION</text>
+  <text class="node-sub" x="800" y="683">Vocal / TTS · Information / Tool · Soridormi / Embodied</text>
+
+  <path class="amber" d="M800 704 V728 H580 V741"/>
+  <rect class="box amber-box" x="400" y="744" width="360" height="64"/>
+  <text class="node-title" x="580" y="771">RUNTIME EVENT</text>
+  <text class="node-sub" x="580" y="795">What happened</text>
+  <path class="teal" d="M760 776 H840"/>
+  <text class="small" x="800" y="760">Host validation</text>
+  <rect class="box teal-box" x="842" y="744" width="360" height="64"/>
+  <text class="node-title" x="1022" y="771">TRUSTED EVIDENCE</text>
+  <text class="node-sub" x="1022" y="795">What is true</text>
+
+  <path class="red" d="M195 323 V578 H600"/>
+  <text class="label" x="340" y="566" fill="#b91c1c">Stop / cancel</text>
+  <path class="red" d="M195 323 V666 H470"/>
+
+  <path class="teal" d="M1022 808 V835 H500 V850"/>
+  <rect class="box violet-box" x="290" y="852" width="420" height="72"/>
+  <text class="node-title" x="500" y="880">CURRENT BOUNDED STATE</text>
+  <text class="node-sub" x="500" y="906">Responsibility · Goals · Situation · Work · Evidence</text>
+
+  <path class="violet dotted" d="M710 888 H778"/>
+  <rect class="box violet-box" x="780" y="852" width="300" height="72"/>
+  <text class="node-title" x="930" y="880">CognitiveOpportunity</text>
+  <text class="node-sub" x="930" y="906">Meaningful readiness trigger only</text>
+
+  <path class="violet" d="M1080 888 H1128"/>
+  <rect class="box violet-box" x="1130" y="852" width="300" height="72"/>
+  <text class="node-title" x="1280" y="880">PLANNER RE-ENTRY</text>
+  <text class="node-sub" x="1280" y="906">What to do now</text>
+
+  <path class="violet" d="M1280 924 V952 H1510 V578 H1000"/>
+  <rect x="1120" y="943" width="250" height="32" rx="16" fill="#f2ebff"/>
+  <text class="label" x="1245" y="965" text-anchor="middle" fill="#6d28d9">0..N Activity changes</text>
+  <path class="gray" d="M1430 888 H1570"/>
+  <rect x="1444" y="842" width="142" height="30" rx="15" fill="#eef1f5"/>
+  <text class="label" x="1515" y="863" text-anchor="middle" fill="#64748b">No new Activity</text>
+</svg>

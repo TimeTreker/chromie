@@ -1,8 +1,8 @@
 # Chromie Development Checkpoint
 
-Status: Goal-driven GI single-authority contract fixed; five-round 1,496-case offline audit selected the final prompt; exact deployed-provider qualification remains open
+Status: Goal-driven GI single-authority contract fixed; homepage architecture now has overview and detailed diagrams while retaining the text fallback; exact deployed-provider qualification remains open
 Updated: 2026-08-31
-Pre-delivery baseline: `main` at `c07dc3e4baa76b73008907d3d1fefb0e39178d68`
+Pre-delivery baseline: `main` at `7596ee06f693b08918fde99063fbf24018a4e2dc`
 Expected resume revision: latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 
 ## Read first
@@ -48,6 +48,19 @@ admitted turn -> one primary GI WHAT result
   No new tracked file, environment variable, architecture term, compatibility path,
   runtime flag, provider integration, or profile was added.
 
+## Homepage architecture visualization
+
+- Replaced the README's primary ASCII presentation with a sparse light overview
+  rendered from a deterministic SVG; the full original text diagram remains in a
+  collapsible fallback for accessibility, review, and text-only clients.
+- Added a linked detailed reference that expands Runtime events, Work state, Host
+  validation, trusted Evidence, Protective Reflex, and Planner re-entry without
+  changing the canonical ownership path.
+- Retained editable SVG sources, PNG exports, and one hash/provenance manifest under
+  `docs/assets/`. This is documentation presentation only: no implementation,
+  architecture authority, runtime behavior, provider, evidence claim, active Issue,
+  or ordered resume work changed.
+
 ## Reconstructed defect workflow
 
 | Boundary/owner | Authoritative input and correlation | Observed wrong output | Expected/final output | Judgment |
@@ -76,6 +89,7 @@ GA, Planner, or Host to reinterpret the turn.
 | Bilingual probes | Thanks, feelings, harmless names, units 8/8 | Codex diagnostic, not live robot |
 | Relevant Level A | `planner_goal_semantic_quality` 4/4; `robust_intent_understanding` 8/8 | Evidence level A, not services/audio/hardware |
 | Canonical local gate | 2,048 main tests and 20 legacy Agent tests; policy 15 families/0 exceptions; docs 98; test ownership passed | Automated source evidence on pre-commit tree |
+| Homepage diagram delivery | Two SVG sources parse; four SVG/PNG hashes match the manifest; README targets exist; canonical gate remains 2,048 main tests plus 20 legacy Agent tests | Documentation/export verification only; no runtime or target evidence |
 
 Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do not
 transfer with the commit.
@@ -127,3 +141,5 @@ transfer with the commit.
 
 This remains development-only. No new production model/profile was promoted, and no
 microphone, audible voice, simulator execution, target hardware, or release claim was made.
+The homepage diagrams visualize the already-authoritative architecture and establish no
+new runtime, target-validation, or release evidence.

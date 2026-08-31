@@ -9,13 +9,34 @@ checkpoint win.
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Pre-delivery branch/base: `main` at
-  `c07dc3e4baa76b73008907d3d1fefb0e39178d68`
+  `7596ee06f693b08918fde99063fbf24018a4e2dc`
 - Expected resume revision: latest `origin/main` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
-- Delivery scope: GI authority/prompt/data/test/documentation corrections only; no model,
-  runtime profile, provider integration, deployment, feature, or hardware change
+- Delivery scope: README homepage architecture visualization, retained text fallback,
+  overview/detailed SVG and PNG assets, and deterministic export manifest only
+- No model, prompt, Schema, runtime profile, provider integration, deployment, feature,
+  evidence, simulator, voice, or hardware behavior changed
 - Active line: reproduce the canonical local gate, qualify an exact deployed provider/model,
   then retain current-revision live evidence; do not add unrelated architecture
+
+## Homepage architecture visualization delivery
+
+- `README.md` now displays the sparse overview in its Architecture section. The PNG is
+  the robust GitHub preview and links to the editable scalable SVG.
+- The complete original ASCII diagram remains immediately below in a collapsible
+  `Text fallback: canonical ownership path` block.
+- The README links a detailed reference that expands the same canonical flow into
+  Runtime events, Current Work, Host validation, trusted Evidence, Protective Reflex,
+  bounded state, and Planner re-entry.
+- `docs/assets/chromie-cognitive-diagrams-manifest.json` binds the two SVG sources and
+  two PNG exports to dimensions, SHA-256 hashes, authority sources, and provenance notes.
+
+Repository surface delta for this delivery: five new asset files under `docs/assets/`
+and three modified existing documentation owners (`README.md`,
+`DEVELOPMENT_CHECKPOINT.md`, and `HANDOFF.md`). No new architectural term,
+environment variable, runtime switch, compatibility path, provider, or evidence format was
+added. Consolidation opportunity: keep future homepage architecture visuals in this same
+overview/detailed pair and manifest rather than adding a third diagram owner.
 
 ## Current authority flow
 
@@ -35,7 +56,7 @@ GI has only two model stages in source: `goal_interpretation` and the conditiona
 guards reject restoration of the removed repair payload and stage markers. Do not restore a
 semantic reviewer, resegmentation call, Host source interpretation, or phrase-rule lane.
 
-## Delivered changes
+## Previously delivered GI changes retained
 
 - Removed source-based primary DTO regeneration and the Deep location retry. Invalid primary
   or Deep output now fails closed after that authority's single invocation.
@@ -55,7 +76,7 @@ semantic reviewer, resegmentation call, Host source interpretation, or phrase-ru
 - Replaced three Level-A fixtures that expected the removed GI repair with one valid primary
   result; updated the dataset coverage test and current owner documents.
 
-Repository surface delta: zero new tracked files; 338 modified corpus scenario files and
+Prior GI delivery surface delta: zero new tracked files; 338 modified corpus scenario files and
 24 other existing source/test/config/document/scenario files (362 total). No new environment
 variable, public switch, architecture term, compatibility path, provider, runtime profile,
 or evidence format. Consolidation opportunity: if an exact deployed decoder proves prompt
@@ -164,9 +185,12 @@ and are not transferred by Git push.
 
 ## Automated gates
 
-Final observed pre-commit gate:
+Current architecture-documentation delivery gate:
 
 ```text
+manifest/XML verification
+2 SVG files valid; 4 asset hashes match manifest
+
 python scripts/check_repository_policies.py
 15 rule families, 0 reviewed exceptions; passed
 
@@ -179,12 +203,18 @@ python scripts/check_docs.py
 python scripts/check_test_ownership.py
 passed
 
-python benchmarks/datasets/goal_interpretation_daily_life/validate.py
-1,496 generated-schema and 1,496 Host passes; 68 unresolved; 406 digit measurement surfaces
+git diff --check
+passed
 ```
 
-The first full gate run exposed one stale dataset test assertion (`102`); it was corrected to
-the manifest/validator truth (`68`) and augmented with `406`, then the complete gate passed.
+The diagram delivery changed no source, test, Schema, profile, or runtime contract. Expected
+warning/error-path logs appeared inside negative-path tests; the suite exit was successful.
+The Goal Interpretation dataset validator was not rerun for this documentation-only
+delivery; the retained baseline result remains 1,496 generated-Schema and Host passes,
+68 unresolved cases, and 406 digit measurement surfaces.
+The earlier GI delivery's first full gate run exposed one stale dataset assertion (`102`);
+that historical defect was corrected to manifest/validator truth (`68`) and augmented with
+`406` before the current baseline.
 
 ## Resume commands
 
@@ -222,3 +252,5 @@ debug bundle, and inspect every case before another broad change.
 
 Development only. No production model/profile was promoted. There is no new deployed-service,
 audible voice, microphone, simulator, target robot, physical safety, or release evidence.
+The new homepage assets are explanatory views of existing authority truth and do not
+qualify implementation or behavior.

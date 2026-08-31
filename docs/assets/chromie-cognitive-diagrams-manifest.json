@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "created_at": "2026-08-31",
+  "purpose": "A coordinated overview and detailed-reference pair for Chromie's event-driven cognitive and capability architecture.",
+  "authoritative_architecture_sources": [
+    "docs/PROJECT_CHARTER.md",
+    "docs/STATUS.md"
+  ],
+  "provenance_notes": [
+    "Exact labels, connectors, dimensions, and exports were composed deterministically as SVG.",
+    "PNG files were rendered from the matching SVG sources with Sharp 0.35.4.",
+    "The overview intentionally collapses provider, Work-state, validation, and bounded-state detail while preserving authority boundaries.",
+    "The detailed reference retains the execution, Evidence, safety, and Planner re-entry decomposition."
+  ],
+  "assets": [
+    {
+      "role": "overview",
+      "svg": "chromie-cognitive-capability-overview.svg",
+      "png": "chromie-cognitive-capability-overview.png",
+      "dimensions": "1600x1000",
+      "sha256": {
+        "svg": "9bdd3febf8fa581beaaf7d5efdea23c7ed71ff94244ba574451978cfaea93cf0",
+        "png": "8075dea8fbbfa6562a61d9a96ebefc31be8245676249a24f49b42687a4e9cfea"
+      }
+    },
+    {
+      "role": "detailed_reference",
+      "svg": "chromie-event-driven-cognition-flow-light.svg",
+      "png": "chromie-event-driven-cognition-flow-light.png",
+      "dimensions": "1800x1280",
+      "sha256": {
+        "svg": "563ad198c17058a2ff4119b92dfa5edf2715b2f17df13633a7902de8a01820fa",
+        "png": "409e952d39270825609a80ad469cc3b5db1b034d960e254394eb2103f60df5b1"
+      }
+    }
+  ]
+}
