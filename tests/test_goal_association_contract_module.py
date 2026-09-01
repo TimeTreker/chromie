@@ -24,6 +24,37 @@ def test_goal_association_model_contract_has_one_definition_owner() -> None:
     )
 
 
+def test_candidate_aware_contract_has_no_exclusive_branch_discriminant() -> None:
+    properties = (
+        goal_association_contract.GoalAssociationModelOutput.model_json_schema()
+        ["properties"]
+    )
+
+    assert "decision" not in properties
+    parsed = goal_association_contract.GoalAssociationModelOutput.model_validate(
+        {
+            "associations": [
+                {
+                    "relationship": "continue",
+                    "source_responsibility_refs": ["r1"],
+                    "target_goal_ids": ["goal-existing"],
+                    "confidence": 1.0,
+                }
+            ],
+            "new_goals": [
+                {
+                    "source_responsibility_refs": ["r2"],
+                    "description": "Tell the user a joke.",
+                    "output_mode": "speech",
+                }
+            ],
+            "confidence": 1.0,
+        }
+    )
+    assert len(parsed.associations) == 1
+    assert len(parsed.new_goals) == 1
+
+
 def test_goal_association_contract_module_stays_model_only() -> None:
     namespace = vars(goal_association_contract)
     for forbidden in (

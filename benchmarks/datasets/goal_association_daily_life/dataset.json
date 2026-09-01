@@ -26,8 +26,7 @@
     },
     "scenario_count": 1500,
     "schema_expectations": {
-      "accept": 1400,
-      "known_contract_gap": 100
+      "accept": 1500
     },
     "splits": {
       "frozen_test": 450,
@@ -42,7 +41,7 @@
     "contrast_set_size": 15,
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 1500,
-    "scenario_tree_sha256": "264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab",
+    "scenario_tree_sha256": "e13861a0a5d963f5f2bb86353c63d6ecd7806128b429a2b4212111f0331023d0",
     "semantic_seed_count": 100
   },
   "issue": "https://github.com/TimeTreker/chromie/issues/34",

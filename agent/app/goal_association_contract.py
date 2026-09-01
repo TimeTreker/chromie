@@ -26,7 +26,6 @@ except ImportError:  # pragma: no cover - repository development path
 
 
 GoalSegmentationDecision = Literal["create_goals"]
-GoalAssociationDecision = Literal["associate", "create_goals"]
 InformationResourceDomain = Literal[
     "local_clock",
     "weather_forecast",
@@ -708,13 +707,23 @@ class GoalSegmentationModelOutput(BaseModel):
         return self
 
 class GoalAssociationModelOutput(BaseModel):
-    """Small discriminated semantic DTO returned by Goal Association."""
+    """One complete candidate-aware semantic result from Goal Association.
+
+    Associations and new Goals are independent per-Responsibility outcomes, not
+    mutually exclusive branches.  The dynamic decoder and trusted Host conserve
+    every accepted GI Responsibility across the union of both collections.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    decision: GoalAssociationDecision | None = None
-    associations: list[GoalAssociationModelAssociation] = Field(default_factory=list)
-    new_goals: list[GoalAssociationModelGoal] = Field(default_factory=list)
+    associations: list[GoalAssociationModelAssociation] = Field(
+        default_factory=list,
+        max_length=8,
+    )
+    new_goals: list[GoalAssociationModelGoal] = Field(
+        default_factory=list,
+        max_length=8,
+    )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
         default_factory=list,
         max_length=12,
@@ -726,51 +735,7 @@ class GoalAssociationModelOutput(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def select_branch(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        decision = str(normalized.get("decision") or "").strip()
-        if decision not in {"associate", "create_goals"}:
-            if normalized.get("associations"):
-                decision = "associate"
-            else:
-                decision = "create_goals"
-        elif (
-            decision == "create_goals"
-            and not normalized.get("new_goals")
-            and normalized.get("associations")
-        ):
-            decision = "associate"
-        elif (
-            decision == "associate"
-            and not normalized.get("associations")
-            and normalized.get("new_goals")
-        ):
-            decision = "create_goals"
-        normalized["decision"] = decision
-        if decision == "create_goals":
-            normalized["associations"] = []
-        else:
-            # ``decision`` is the sole semantic branch authority. Decoder-small
-            # models can populate an inactive branch even after selecting
-            # association; discard it mechanically just as the create branch
-            # already discards inactive associations. It must never double-map one
-            # Responsibility and exhaust the one allowed DTO repair.
-            normalized["new_goals"] = []
-        return normalized
-
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
-
-    @model_validator(mode="after")
-    def validate_shape(self) -> "GoalAssociationModelOutput":
-        if self.decision == "associate" and not self.associations:
-            raise ValueError("decision=associate requires associations")
-        if self.decision == "create_goals" and not self.new_goals:
-            raise ValueError("decision=create_goals requires new_goals")
-        return self

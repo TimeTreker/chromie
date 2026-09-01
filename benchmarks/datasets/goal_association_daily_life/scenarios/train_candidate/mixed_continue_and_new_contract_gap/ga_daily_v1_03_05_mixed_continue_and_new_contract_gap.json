@@ -5,7 +5,7 @@
       "terminal or paused lifecycle is ignored",
       "one GI Responsibility is dropped or duplicated",
       "GA changes GI output_mode or invents Planner HOW",
-      "mixed continuity is hidden by the exclusive discriminant"
+      "mixed continuity is dropped or duplicated across association and creation"
     ],
     "phenomena": [
       "mixed_continue_and_new_contract_gap",
@@ -157,7 +157,7 @@
   "schema_version": 1,
   "split": "train_candidate",
   "target": {
-    "contract_gap": "mixed_association_and_creation_discriminant",
+    "contract_gap": null,
     "reference_model_output": {
       "associations": [
         {
@@ -175,7 +175,6 @@
         }
       ],
       "confidence": 1.0,
-      "decision": "associate",
       "new_goals": [
         {
           "bindings": [
@@ -203,7 +202,7 @@
       "referent_updates": [],
       "resolved_references": []
     },
-    "schema_expectation": "known_contract_gap",
+    "schema_expectation": "accept",
     "semantic_expectations": {
       "candidate_goal_ids": [
         "goal_03_05_a"

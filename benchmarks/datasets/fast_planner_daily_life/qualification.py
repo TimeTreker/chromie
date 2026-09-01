@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Prepare, execute, and adjudicate Fast Planner qualification batches.
+"""Validate, prepare, execute, and adjudicate Fast Planner qualification batches.
 
-This is incomplete harness scaffolding until the model-authored corpus is reviewed,
-materialized, and bound by ``dataset.json``. Its presence is not qualification
-evidence and the current tracked checkpoint is not executable as a frozen batch.
+The manifest-bound model-authored corpus is mechanically executable but remains
+semantically unreviewed. Its presence and mechanical validation are not prompt,
+model, deployment, or behavior qualification evidence.
 
 Candidate calls are target-blind and one Codex invocation is used per scenario.
 Codex receives the exact rendered production system/user prompt and the exact
@@ -40,6 +40,7 @@ from agent.app.fast_planner import (  # noqa: E402
 )
 from agent.app.planner_context import (  # noqa: E402
     auxiliary_social_capability_payloads,
+    expected_goal_ids,
     fast_capability_payload,
 )
 from agent.app.planner_model_contract import is_planner_step_capability  # noqa: E402
@@ -72,6 +73,51 @@ HARNESS_FILES = (
     Path(__file__).resolve(),
     DATASET_ROOT / "validate.py",
 )
+DATASET_ID = "chromie.fast_planner_daily_life.v1"
+RUNTIME_BY_CATEGORY = {
+    "stream_direct_conversation": "streaming_advance",
+    "stream_single_capability": "streaming_advance",
+    "stream_multi_responsibility": "streaming_advance",
+    "stream_parameter_grounding": "streaming_advance",
+    "stream_boundary_handling": "streaming_advance",
+    "canonical_single_goal": "canonical_primary",
+    "canonical_multi_goal": "canonical_primary",
+    "canonical_retained_work": "canonical_primary",
+    "canonical_confirmation_boundary": "canonical_primary",
+    "canonical_unavailable_capability": "canonical_primary",
+    "reentry_terminal_evidence": "canonical_reentry",
+    "reentry_cancellation_evidence": "canonical_reentry",
+    "reentry_situation_revision": "canonical_reentry",
+    "reentry_time_condition": "canonical_reentry",
+    "reentry_provider_revalidation": "canonical_reentry",
+}
+REENTRY_TRIGGER_BY_CATEGORY = {
+    "reentry_terminal_evidence": "capability_result_reentry",
+    "reentry_cancellation_evidence": "goal_cancellation_reentry",
+    "reentry_situation_revision": "situation_revision_reentry",
+    "reentry_time_condition": "time_condition_reentry",
+    "reentry_provider_revalidation": "restored_provider_state_revalidation",
+}
+DAILY_LIFE_DOMAINS = {
+    "family_home",
+    "work_study",
+    "school_learning",
+    "shopping_errands",
+    "travel_navigation",
+    "health_wellbeing",
+    "entertainment_media",
+    "friends_communication",
+    "pets_garden",
+    "personal_organization",
+}
+REQUIRED_INVARIANTS = {
+    "one_primary_semantic_invocation": True,
+    "no_same_tier_semantic_repair": True,
+    "source_scope_conserved": True,
+    "no_executable_partial_result": True,
+    "no_untrusted_completion_claim": True,
+    "candidate_packet_excludes_targets": True,
+}
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -125,13 +171,6 @@ def production_source_identity() -> dict[str, Any]:
         path.relative_to(ROOT).as_posix(): _sha256(path.read_bytes())
         for path in PRODUCTION_TRANSACTION_FILES
     }
-
-
-def harness_file_identity() -> dict[str, str]:
-    return {
-        path.relative_to(ROOT).as_posix(): _sha256(path.read_bytes())
-        for path in HARNESS_FILES
-    }
     aggregate = _sha256(_json_bytes(files))
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"],
@@ -151,6 +190,13 @@ def harness_file_identity() -> dict[str, str]:
         "production_files": files,
         "production_files_sha256": aggregate,
         "production_tracked_diff_sha256": _sha256(diff),
+    }
+
+
+def harness_file_identity() -> dict[str, str]:
+    return {
+        path.relative_to(ROOT).as_posix(): _sha256(path.read_bytes())
+        for path in HARNESS_FILES
     }
 
 
@@ -323,6 +369,20 @@ def _case_ref(case_id: str) -> str:
     return f"case_{_sha256(case_id)[:24]}"
 
 
+def _activity_ids(value: Any) -> set[str]:
+    found: set[str] = set()
+    if isinstance(value, dict):
+        activity_id = value.get("activity_id")
+        if isinstance(activity_id, str) and activity_id.strip():
+            found.add(activity_id.strip())
+        for nested in value.values():
+            found.update(_activity_ids(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            found.update(_activity_ids(nested))
+    return found
+
+
 async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
     errors: list[str] = []
     counts: Counter[str] = Counter()
@@ -336,43 +396,117 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
         try:
             if case.get("schema_version") != 1:
                 raise ValueError("unknown scenario schema version")
+            if case.get("dataset_id") != DATASET_ID:
+                raise ValueError("dataset id drift")
             if case_id in seen_ids or not case_id:
                 raise ValueError("missing or duplicate scenario id")
             seen_ids.add(case_id)
+            category = str(case.get("category") or "")
+            runtime_variant = str(case.get("input", {}).get("runtime_variant") or "")
+            if category not in RUNTIME_BY_CATEGORY:
+                raise ValueError("unknown category")
+            if runtime_variant != RUNTIME_BY_CATEGORY[category]:
+                raise ValueError("category/runtime variant drift")
             request = CognitiveWorkRequest.model_validate(case["input"]["request"])
             catalog = StaticCatalog(materialize_catalog(case["input"]))
             if not catalog.items:
                 raise ValueError("empty Capability catalog")
+            if request.sid != case_id:
+                raise ValueError("scenario/request id drift")
             request_key = _sha256(_json_bytes(request.model_dump(mode="json")))
             if request_key in seen_requests:
                 raise ValueError("duplicate complete Planner request")
             seen_requests.add(request_key)
             if request.language != case["input"]["language"]:
                 raise ValueError("language/request drift")
+            language = str(case["input"]["language"])
+            if language not in {"en-US", "zh-CN"}:
+                raise ValueError("unsupported corpus language")
             if case["review"]["training_eligible"] is not False:
                 raise ValueError("generated scenario became training eligible")
             if case["review"]["independent_semantic_review"] is not False:
                 raise ValueError("unreviewed scenario claims independent review")
+            if case["review"].get("review_status") != "mechanically_validated_dataset_candidate":
+                raise ValueError("scenario does not declare mechanical validation")
+            if case["review"].get("author_model") != "gpt-5.6-sol":
+                raise ValueError("author model provenance drift")
+            if not str(case["review"].get("authoring_call_ref") or "").strip():
+                raise ValueError("missing authoring call reference")
+            if case.get("invariants") != REQUIRED_INVARIANTS:
+                raise ValueError("scenario invariant contract drift")
+            design = case.get("adversarial_design") or {}
+            domain = str(design.get("domain") or "")
+            condition_index = design.get("condition_index")
+            if design.get("ability_class") != category:
+                raise ValueError("adversarial ability/category drift")
+            if domain not in DAILY_LIFE_DOMAINS:
+                raise ValueError("unknown daily-life domain")
+            if not isinstance(condition_index, int) or not 1 <= condition_index <= 5:
+                raise ValueError("invalid contrast condition index")
+            paired_language = "zh-CN" if language == "en-US" else "en-US"
+            if design.get("paired_language") != paired_language:
+                raise ValueError("paired language drift")
             contrast_id = str(case["contrast_set"]["id"])
-            contrast_members[contrast_id].add(str(case["contrast_set"]["member"]))
+            language_suffix = "en" if language == "en-US" else "zh"
+            expected_contrast_id = f"fpdl_v1_{category}_{domain}"
+            expected_member = f"condition-{condition_index:02d}-{language_suffix}"
+            expected_case_id = f"{expected_contrast_id}_c{condition_index:02d}_{language_suffix}"
+            if contrast_id != expected_contrast_id or case_id != expected_case_id:
+                raise ValueError("scenario/contrast matrix identity drift")
+            if case["contrast_set"].get("member") != expected_member:
+                raise ValueError("contrast member drift")
+            if case["contrast_set"].get("controlled_axes") != ["condition", "language"]:
+                raise ValueError("contrast controlled-axis drift")
+            contrast_members[contrast_id].add(expected_member)
             contrast_splits[contrast_id].add(str(case["split"]))
             expectation = case["target"]["reference_region"]
             expected_refs = [item.local_ref for item in request.responsibilities]
             if expectation["expected_responsibility_refs"] != expected_refs:
                 raise ValueError("Responsibility reference oracle drift")
-            expected_goals = [
-                str(item.get("goal_id") or "")
-                for item in request.context.get("goal_association_resolution", {}).get("new_goals", [])
-            ]
+            expected_goals = expected_goal_ids(request.context)
             if expectation["expected_goal_ids"] != expected_goals:
                 raise ValueError("Goal reference oracle drift")
+            required_capabilities = expectation["required_capability_ids"]
+            forbidden_capabilities = expectation["forbidden_capability_ids"]
+            if len(required_capabilities) != len(set(required_capabilities)):
+                raise ValueError("duplicate required Capability target")
+            if len(forbidden_capabilities) != len(set(forbidden_capabilities)):
+                raise ValueError("duplicate forbidden Capability target")
+            if set(required_capabilities) & set(forbidden_capabilities):
+                raise ValueError("required/forbidden Capability target overlap")
+            catalog_ids = {item.capability_id for item in catalog.items}
+            if (set(required_capabilities) | set(forbidden_capabilities)) - catalog_ids:
+                raise ValueError("target references Capability outside frozen catalog")
+            required_reuse = set(expectation["required_reuse_activity_ids"])
+            if not required_reuse.issubset(_activity_ids(request.context)):
+                raise ValueError("required Work reuse target is absent from input context")
+            scope = request.planner_reentry_scope
+            if runtime_variant == "streaming_advance":
+                if request.context or scope is not None or expected_goals:
+                    raise ValueError("streaming scenario carries canonical Goal/re-entry state")
+            elif runtime_variant == "canonical_primary":
+                if scope is not None:
+                    raise ValueError("canonical primary scenario carries re-entry scope")
+                if expectation["required_evidence_refs"]:
+                    raise ValueError("primary scenario requires unavailable re-entry Evidence")
+            else:
+                if scope is None:
+                    raise ValueError("canonical re-entry scenario lacks scope")
+                if scope.trigger != REENTRY_TRIGGER_BY_CATEGORY[category]:
+                    raise ValueError("category/re-entry trigger drift")
+                if list(scope.goal_ids) != expectation["expected_goal_ids"]:
+                    raise ValueError("re-entry scope/Goal oracle drift")
+                if list(scope.evidence_refs) != expectation["required_evidence_refs"]:
+                    raise ValueError("re-entry scope/Evidence oracle drift")
+            if "target" in case["input"] or "reference_region" in case["input"]:
+                raise ValueError("target leaked into scenario input")
             transaction = await build_transaction(case)
             if "target" in transaction or "reference_region" in transaction:
                 raise ValueError("target leaked into candidate transaction")
-            counts[f"language:{case['input']['language']}"] += 1
+            counts[f"language:{language}"] += 1
             counts[f"split:{case['split']}"] += 1
-            counts[f"category:{case['category']}"] += 1
-            counts[f"runtime:{case['input']['runtime_variant']}"] += 1
+            counts[f"category:{category}"] += 1
+            counts[f"runtime:{runtime_variant}"] += 1
             counts["validated"] += 1
         except Exception as exc:
             errors.append(f"{case_id}: {type(exc).__name__}: {exc}")

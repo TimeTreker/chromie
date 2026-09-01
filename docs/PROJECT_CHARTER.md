@@ -851,10 +851,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
    Goal Interpretation therefore carries its own Responsibility-coverage evidence
    in the primary WHAT result. Goal Association must conserve those accepted
-   Responsibilities while owning only canonical Goal identity and continuity, and
-   Planner must consume them while owning only HOW. Neither downstream authority
-   may reinterpret or repair GI meaning. Provider availability never erases a
-   requested Responsibility. Material cross-Responsibility order remains in
+   Responsibilities while owning only canonical Goal identity and continuity. A
+   candidate-aware GA result writes existing-Goal associations and independent new
+   Goals directly as two non-exclusive collections; every accepted Responsibility
+   appears exactly once across their union. It has no separate mutually exclusive
+   model-authored branch decision that can erase mixed continuity-plus-creation
+   meaning. Planner must consume the committed Goals while owning only HOW. Neither
+   downstream authority may reinterpret or repair GI meaning. Provider availability
+   never erases a requested Responsibility. Material cross-Responsibility order remains in
    `before`/`after` sibling-`local_ref` bindings and requested concurrency in
    `parallel_with`; these are WHAT relations, not Runtime scheduling permission.
 

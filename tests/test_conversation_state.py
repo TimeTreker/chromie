@@ -59,6 +59,66 @@ class ConversationStateTests(unittest.TestCase):
         self.assertEqual(manager.conversation_id, original_id)
         self.assertNotEqual(manager.get_history(), [])
 
+    def test_atomic_goal_resolution_applies_continuity_and_creation_together(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="mixed-goal-resolution")
+        manager.apply_goal_association_resolution(
+            {
+                "resolution_status": "resolved",
+                "turn_id": "turn-create-existing",
+                "new_goals": [
+                    {
+                        "goal_id": "goal-existing",
+                        "description": "Explain fractions simply.",
+                        "source_text": "Explain fractions simply.",
+                        "source_responsibility_refs": ["prior-r1"],
+                    }
+                ],
+                "confidence": 1.0,
+            },
+            sid="sid-create-existing",
+            user_text="Explain fractions simply.",
+            atomic=True,
+        )
+
+        results = manager.apply_goal_association_resolution(
+            {
+                "resolution_status": "resolved",
+                "turn_id": "turn-mixed",
+                "associations": [
+                    {
+                        "association_id": "assoc-continue-existing",
+                        "relationship": "continue",
+                        "source_responsibility_refs": ["r1"],
+                        "target_goal_ids": ["goal-existing"],
+                        "confidence": 1.0,
+                    }
+                ],
+                "new_goals": [
+                    {
+                        "goal_id": "goal-joke",
+                        "description": "Tell the user a joke.",
+                        "source_text": "Continue that and tell me a joke.",
+                        "source_responsibility_refs": ["r2"],
+                    }
+                ],
+                "confidence": 1.0,
+            },
+            sid="sid-mixed",
+            user_text="Continue that and tell me a joke.",
+            atomic=True,
+        )
+
+        self.assertTrue(results)
+        self.assertTrue(all(item.get("applied") for item in results))
+        self.assertTrue(
+            any(item.get("state_change") == "continuity_marker" for item in results)
+        )
+        self.assertTrue(any(item.get("operation") == "create" for item in results))
+        self.assertEqual(
+            {item["goal_id"] for item in manager.active_goal_snapshots()},
+            {"goal-existing", "goal-joke"},
+        )
+
     def test_scoped_referents_coexist_and_correction_only_backgrounds_target(self) -> None:
         manager = ConversationStateManager(base_conversation_id="discourse")
 

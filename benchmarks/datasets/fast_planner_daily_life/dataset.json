@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "dataset_id": "chromie.fast_planner_daily_life.v1",
+  "title": "Fast Planner Daily-Life Qualification Corpus",
+  "issue": "https://github.com/TimeTreker/chromie/issues/35",
+  "authority": "Offline Fast Planner qualification input and candidate oracle only; never production planning policy.",
+  "claim_boundary": "Mechanically validated direct-LLM-authored candidate corpus; not independent semantic truth, baseline inference, deployed-model, service, voice, simulator, hardware, training approval, release, or behavior evidence.",
+  "authoring": {
+    "origin": "direct_llm_authored_contrast_sets",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "semantic_generation": "Each accepted scenario was directly authored by the declared model; mechanical tooling retained calls, rejected malformed complete outputs, split accepted JSONL unchanged, and advanced review metadata after validation.",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "independent_semantic_review": false,
+    "training_eligible": false,
+    "release_qualification": "owner semantic review and immutable target-blind cohort execution required"
+  },
+  "coverage_contract": {
+    "scenario_count": 1500,
+    "contrast_set_count": 150,
+    "scenarios_per_contrast_set": 10,
+    "languages": {
+      "en-US": 750,
+      "zh-CN": 750
+    },
+    "splits": {
+      "frozen_test": 250,
+      "train_candidate": 1000,
+      "validation": 250
+    },
+    "categories": {
+      "canonical_confirmation_boundary": 100,
+      "canonical_multi_goal": 100,
+      "canonical_retained_work": 100,
+      "canonical_single_goal": 100,
+      "canonical_unavailable_capability": 100,
+      "reentry_cancellation_evidence": 100,
+      "reentry_provider_revalidation": 100,
+      "reentry_situation_revision": 100,
+      "reentry_terminal_evidence": 100,
+      "reentry_time_condition": 100,
+      "stream_boundary_handling": 100,
+      "stream_direct_conversation": 100,
+      "stream_multi_responsibility": 100,
+      "stream_parameter_grounding": 100,
+      "stream_single_capability": 100
+    },
+    "runtime_variants": {
+      "canonical_primary": 500,
+      "canonical_reentry": 500,
+      "streaming_advance": 500
+    },
+    "independent_semantic_review": false,
+    "training_eligible": false
+  },
+  "coverage_matrix": {
+    "ability_classes": 15,
+    "daily_life_domains": 10,
+    "conditions_per_set": 5,
+    "languages_per_condition": 2,
+    "daily_life_domains_list": [
+      "entertainment_media",
+      "family_home",
+      "friends_communication",
+      "health_wellbeing",
+      "personal_organization",
+      "pets_garden",
+      "school_learning",
+      "shopping_errands",
+      "travel_navigation",
+      "work_study"
+    ]
+  },
+  "asset_contract": {
+    "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
+    "scenario_count": 1500,
+    "contrast_set_size": 10,
+    "scenario_tree_sha256": "f9ef6c1269921c2910285a586c3c4b2725744b6dc4406e0e9be759f512738fc8"
+  },
+  "split_policy": {
+    "unit": "contrast_set",
+    "cross_split_contrast_sets_allowed": false,
+    "frozen_test_mutation": "owner review required",
+    "train_candidate_note": "Training remains prohibited until independent semantic review promotes individual cases."
+  }
+}

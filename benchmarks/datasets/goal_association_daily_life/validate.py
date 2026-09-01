@@ -241,6 +241,8 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
             schema_errors = list(Draft202012Validator(schema).iter_errors(reference))
             expectation = target["schema_expectation"]
             if expectation == "accept":
+                if target["contract_gap"] is not None:
+                    raise ValueError("accepted reference must not declare a contract gap")
                 if schema_errors:
                     raise ValueError(f"reference schema failure: {schema_errors[0].message}")
                 output_type.model_validate(reference)
@@ -251,15 +253,6 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
                         f"production resolver reference failed: status={resolution.resolution_status} calls={model.calls}"
                     )
                 counts["host_accepted"] += 1
-            elif expectation == "known_contract_gap":
-                if target["contract_gap"] != "mixed_association_and_creation_discriminant":
-                    raise ValueError("unknown contract gap")
-                if not schema_errors:
-                    raise ValueError("known mixed contract gap unexpectedly passed Schema")
-                parsed = GoalAssociationModelOutput.model_validate(reference)
-                if parsed.new_goals:
-                    raise ValueError("exclusive discriminant no longer drops mixed new Goals")
-                counts["known_contract_gaps"] += 1
             else:
                 raise ValueError(f"unknown schema expectation {expectation!r}")
 

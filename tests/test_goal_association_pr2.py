@@ -2052,10 +2052,17 @@ class GoalExecutionContractTests(unittest.TestCase):
         association_schema = schema["$defs"]["GoalAssociationModelAssociation"]
         self.assertIn("confidence", association_schema["required"])
         self.assertIn("target_goal_ids", association_schema["required"])
+        self.assertNotIn("decision", schema["properties"])
+        self.assertNotIn("decision=associate", prompt)
+        self.assertIn("associations and new_goals", prompt)
+        self.assertIn(
+            "Association confidence measures certainty about Goal ownership",
+            prompt,
+        )
+        self.assertIn("resolved_gap_ids empty when resolution is unproven", prompt)
 
         validator = Draft202012Validator(schema)
         missing_modify_update = {
-            "decision": "associate",
             "associations": [
                 {
                     "relationship": "modify",
@@ -2725,7 +2732,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         ollama = ScriptedOllama(
             [
                 {
-                    "decision": "associate",
                     "associations": [
                         {
                             "relationship": "continue",
@@ -2749,11 +2755,10 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(result.new_goals, [])
         self.assertEqual(len(ollama.prompts), 1)
 
-    def test_associate_discriminant_mechanically_drops_inactive_new_goal_branch(self):
+    def test_candidate_aware_result_commits_association_and_new_goal_together(self):
         ollama = ScriptedOllama(
             [
                 {
-                    "decision": "associate",
                     "associations": [
                         {
                             "relationship": "continue",
@@ -2765,10 +2770,51 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                     ],
                     "new_goals": [
                         goal(
-                            "Inactive decoder branch must not double-map r1.",
+                            "Tell the user a joke.",
                             "speech",
+                            source_responsibility_refs=["r2"],
                         )
                     ],
+                    "confidence": 0.95,
+                }
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Continue A and tell me a joke.",
+                    active_goals=[active_goal("goal-a", "Do A")],
+                    language="en-US",
+                    responsibility_outcomes=["Continue A.", "Tell me a joke."],
+                )
+            )
+        )
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.associations), 1)
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(result.new_goals[0].source_responsibility_refs, ["r2"])
+        self.assertEqual(
+            result.metadata["responsibility_conservation"]["mapped_refs"],
+            ["r1", "r2"],
+        )
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_cross_collection_duplicate_responsibility_fails_closed_without_repair(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "associations": [
+                        {
+                            "relationship": "continue",
+                            "source_responsibility_refs": ["r1"],
+                            "target_goal_ids": ["goal-a"],
+                            "confidence": 0.95,
+                            "reason_summary": "Continue the unfinished task.",
+                        }
+                    ],
+                    "new_goals": [goal("Duplicate responsibility.", "speech")],
                     "confidence": 0.95,
                 }
             ]
@@ -2780,10 +2826,12 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result.resolution_status, "resolved")
-        self.assertEqual(len(result.associations), 1)
-        self.assertEqual(result.new_goals, [])
+        self.assertEqual(result.resolution_status, "fail_closed")
         self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(
+            result.metadata["goal_semantic_transaction"]
+            ["contract_repair_attempted"]
+        )
 
     def test_explicit_location_preserves_referent_provenance(self):
         payload = create_goals(

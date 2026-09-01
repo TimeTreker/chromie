@@ -707,12 +707,7 @@ def goal_association_response_schema(
             "reason_summary",
         ]
     else:
-        properties["decision"] = {
-            "type": "string",
-            "enum": ["associate", "create_goals"],
-        }
         ordered_required = [
-            "decision",
             "associations",
             "new_goals",
             "referent_updates",
@@ -721,23 +716,29 @@ def goal_association_response_schema(
             "reason_summary",
         ]
     if responsibility_refs:
+        def source_ref_item(source_ref: str) -> dict[str, Any]:
+            return {
+                "type": "object",
+                "properties": {
+                    "source_responsibility_refs": {
+                        "type": "array",
+                        "contains": {"const": source_ref},
+                        "minContains": 1,
+                        "maxContains": 1,
+                    }
+                },
+                "required": ["source_responsibility_refs"],
+            }
+
         def contains_source_ref(source_ref: str) -> dict[str, Any]:
             return {
-                "contains": {
-                    "type": "object",
-                    "properties": {
-                        "source_responsibility_refs": {
-                            "type": "array",
-                            "contains": {"const": source_ref},
-                            "minContains": 1,
-                            "maxContains": 1,
-                        }
-                    },
-                    "required": ["source_responsibility_refs"],
-                },
+                "contains": source_ref_item(source_ref),
                 "minContains": 1,
                 "maxContains": 1,
             }
+
+        def excludes_source_ref(source_ref: str) -> dict[str, Any]:
+            return {"not": {"contains": source_ref_item(source_ref)}}
 
         new_goal_conservation = {
             "minItems": len(responsibility_refs),
@@ -755,35 +756,31 @@ def goal_association_response_schema(
             # reassociation.
             properties["new_goals"].update(new_goal_conservation)
         else:
-            # Goal Association owns the branch choice. Once it chooses
-            # create_goals, associations are inactive and every Responsibility
-            # necessarily belongs to the new-goal branch. Conversely, an
-            # association branch must conserve each supplied ref exactly once.
-            schema.setdefault("allOf", []).append(
+            # Existing-Goal continuity and independent new work can coexist in
+            # one turn.  For every accepted GI Responsibility, require exactly
+            # one owning item across the union of both semantic collections.
+            # This is request-bound conservation at the earliest decoder
+            # boundary; neither the DTO nor Host chooses the semantic owner.
+            schema.setdefault("allOf", []).extend(
                 {
-                    "if": {
-                        "properties": {"decision": {"const": "create_goals"}},
-                        "required": ["decision"],
-                    },
-                    "then": {
-                        "properties": {
-                            "associations": {"maxItems": 0},
-                            "new_goals": new_goal_conservation,
-                        }
-                    },
-                    "else": {
-                        "properties": {
-                            "new_goals": {"maxItems": 0},
-                            "associations": {
-                                "minItems": 1,
-                                "allOf": [
-                                    contains_source_ref(source_ref)
-                                    for source_ref in responsibility_refs
-                                ],
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "associations": contains_source_ref(source_ref),
+                                "new_goals": excludes_source_ref(source_ref),
                             },
-                        }
-                    },
+                            "required": ["associations", "new_goals"],
+                        },
+                        {
+                            "properties": {
+                                "associations": excludes_source_ref(source_ref),
+                                "new_goals": contains_source_ref(source_ref),
+                            },
+                            "required": ["associations", "new_goals"],
+                        },
+                    ]
                 }
+                for source_ref in responsibility_refs
             )
 
     schema["required"] = list(dict.fromkeys([*ordered_required, *required]))

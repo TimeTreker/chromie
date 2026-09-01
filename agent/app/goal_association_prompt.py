@@ -349,7 +349,10 @@ def build_association_prompt(
         "policy, or completion claim. The Host owns IDs, versions, persistence, "
         "lifecycle mechanics, and canonical construction.\n\n"
         "Map every GI local_ref exactly once to either one association or one new "
-        "Goal; never merge independent effects or add progress, acknowledgement, "
+        "Goal across the union of associations and new_goals. These collections are "
+        "not mutually exclusive: when a turn continues or updates retained work and "
+        "also adds an independent Responsibility, emit both collections in this one "
+        "complete result. Never merge independent effects or add progress, acknowledgement, "
         "delivery, personality, or implementation Goals. Verify GI relationship "
         "and target_goal_ids against the supplied candidates rather than recency or "
         "lexical overlap. For unchanged unfinished/recoverable work use continue. "
@@ -365,7 +368,11 @@ def build_association_prompt(
         "updated_description. A clarify association must put the supplied update "
         "in non-empty updated_description or name at least one supplied "
         "resolved_gap_id. Never leave the update only in reason_summary; rationale "
-        "does not mutate Goal meaning.\n\n"
+        "does not mutate Goal meaning. Association confidence measures certainty "
+        "about Goal ownership and the continuity relationship, not whether linked "
+        "Planner input gaps are resolved or the Goal is executable. Keep "
+        "resolved_gap_ids empty when resolution is unproven, but do not lower an "
+        "otherwise explicit targeted association's confidence for that reason.\n\n"
         "An association preserves the existing Goal's description, typed bindings, "
         "and output_mode. It cannot rewrite a material entity "
         "or parameter. If current meaning changes one, create one complete replacement "
@@ -388,10 +395,10 @@ def build_association_prompt(
         "timezone, or execution fact. Directly named entities preserve the exact "
         "current-turn surface. resolved_references and referent_updates may copy only "
         "supplied referent IDs.\n\n"
-        "Return only the exact GoalAssociationModelOutput JSON: decision, "
-        "associations, new_goals, referent_updates, resolved_references, confidence, "
-        "and compact reason_summary. Use decision=associate for continuity and "
-        "decision=create_goals for independent or replacement work.\n\n"
+        "Return only the exact GoalAssociationModelOutput JSON: associations, "
+        "new_goals, referent_updates, resolved_references, confidence, and compact "
+        "reason_summary. Do not emit a branch decision; the two collections directly "
+        "and completely own the per-Responsibility continuity result.\n\n"
         f"{identity_section}"
         f"{identity_contract}"
         f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
@@ -446,14 +453,13 @@ def build_prompt(
             "Resolve continuity before creation using semantic reasoning. "
             "For continuity with an existing goal, emit an associations item with source_responsibility_refs, relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, and resolved_gap_ids fields. Goal Association owns canonical Goal continuity only: do not decide whether Work must be reused, replaced, cancelled, or replanned; Fast Planner owns that judgment from the committed Goal and actual Work state. "
             "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
-            "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, return decision=create_goals with a new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When GI preserves unresolved material meaning, create or associate the narrowest source-grounded provisional Goal without inventing that meaning; Fast Planner alone decides whether and how to ask. "
+            "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, emit a complete new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When GI preserves unresolved material meaning, create or associate the narrowest source-grounded provisional Goal without inventing that meaning; Fast Planner alone decides whether and how to ask. "
             "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
             "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
-            "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and return decision=create_goals with a complete replacement Goal and authoritative bindings. "
+            "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and emit a complete replacement Goal with authoritative bindings. "
         )
         output_instructions = (
-            "Return only JSON with decision, associations, new_goals, referent_updates, resolved_references, confidence, and reason_summary. "
-            "Use decision=associate for continuity or decision=create_goals for independent work, including provisional source-grounded Goals with unresolved meaning retained outside this DTO for Planner. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
+            "Return only JSON with associations, new_goals, referent_updates, resolved_references, confidence, and reason_summary. Associations and new_goals may both be non-empty and must jointly map every accepted GI Responsibility exactly once. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
             "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
         )
     return (
@@ -543,10 +549,15 @@ def build_repair_prompt(
         if output_type is GoalSegmentationModelOutput
         else "GoalAssociationModelOutput"
     )
+    semantic_fields = (
+        "decision, new Goal ownership"
+        if output_type is GoalSegmentationModelOutput
+        else "association and new Goal ownership"
+    )
     return (
         f"The previous {contract_name} JSON object is mechanically malformed. "
         "This is the only same-stage DTO repair. Preserve every semantic claim "
-        "already present in the previous object: decision, relationship, Goal "
+        f"already present in the previous object: {semantic_fields}, relationship, Goal "
         "ownership, source Responsibility refs, target Goal IDs, descriptions, "
         "output modes, bindings and values, resource meaning, referent choices, "
         "confidence, and rationale. Do not re-read or reinterpret the user, "
@@ -634,7 +645,7 @@ def repair_system_prompt(
     return (
         f"You perform one mechanical JSON repair for {contract_name}. Preserve "
         "all authored semantics exactly; never reinterpret, resegment, review, "
-        "score, or replace the decision. Return only the corrected JSON object."
+        "score, or replace the semantic result. Return only the corrected JSON object."
     )
 
 
@@ -654,6 +665,7 @@ def system_prompt(
         )
     return (
         "You are Chromie's Goal Association and Segmentation model. Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
+        "Produce one complete candidate-aware result; existing-Goal associations and independent new Goals may coexist in that result. "
         "Apply continuity before creation. Resolve references from current user meaning, scoped discourse referents/focus, bounded candidate Goals and their bindings, and dialogue context. Candidate Goals may be active, recoverable, or recently terminal; referencing a terminal Goal does not reopen it. Tool-result memory is not reference-resolution authority. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
         "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
         "Preserve independent user responsibilities as separate goals, but never turn plan steps into goals. "

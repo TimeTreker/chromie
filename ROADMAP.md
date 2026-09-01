@@ -659,8 +659,10 @@ Exit criteria:
 - Preserve the implemented Goal Association primary-only transaction: one normal
   primary call, at most one semantics-preserving repair for a Pydantic-invalid DTO,
   then trusted closed-reference, provenance, cardinality, binding-conservation, and
-  continuity validation. Do not restore the removed coverage/resegmentation calls or
-  allow semantic rejection to enter repair.
+  continuity validation. Candidate-aware output writes associations and independent
+  new Goals as non-exclusive collections and conserves every GI Responsibility exactly
+  once across their union, without a second branch-decision fact. Do not restore the
+  removed coverage/resegmentation calls or allow semantic rejection to enter repair.
 - Revalidate capability IDs, argument schemas, confidence, confirmation policy,
   resources, and effect envelopes at trusted boundaries. Fast may escalate once
   to Deep Planner; same-tier regeneration is reserved for one mechanically malformed
@@ -782,7 +784,7 @@ module boundaries, lowering the composition root from 150 to 142 methods. Statel
 slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
-**Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and Responsibility-conservation mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
+**Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and Responsibility-conservation mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. Candidate-aware GA directly owns both existing-Goal associations and independent new Goals in one primary result; the decoder and Host conserve every accepted GI Responsibility exactly once across their union, and no exclusive model-authored branch discriminant may erase a mixed turn. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
 
 **Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, streaming presentation/truth prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain the primary model invocation, bounded mechanical repair/escalation decisions, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners. Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
 
