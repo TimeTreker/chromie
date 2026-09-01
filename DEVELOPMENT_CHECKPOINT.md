@@ -1,27 +1,18 @@
 # Chromie Development Checkpoint
 
-Status: GI/GA prompt qualification and its reusable project Skill are delivered; homepage architecture diagrams are retained; Fast then Deep Planner qualification is next, while 100 GA mixed-decision cases remain a global DTO gap
-Updated: 2026-08-31
-Pre-delivery parents: `codex/ga-prompt-qualification-1500` at `ac83e467` and
-`origin/main` at `f3d14792`
-Expected resume revision: latest `origin/main` commit containing this checkpoint and
-`HANDOFF.md`
+Status: GI/GA qualification and the clarified semantic model-role qualification Skill are delivered; homepage architecture diagrams are retained; Fast then Deep Planner qualification is next, while 100 GA mixed-decision cases remain a global DTO gap
+Updated: 2026-09-01
+Pre-delivery baseline: `main` and `origin/main` at `2b97cdc9`
+Expected resume revision: latest `origin/main` commit containing this checkpoint and `HANDOFF.md`
 Active completed-evidence Issue: [#34 — qualify the Goal Association prompt on 1,500 daily-life scenarios](https://github.com/TimeTreker/chromie/issues/34)
 
-Current focus: preserve Chromie's Goal-driven single-authority architecture while
-starting a separately owned Planner qualification Issue with Fast first and Deep
-second. The GA global contract limit remains visible and is not Planner work.
+Current focus: preserve Chromie's Goal-driven single-authority architecture while starting a separately owned Planner qualification Issue with Fast first and Deep second. The GA global contract limit remains visible and is not Planner work.
 
 ## Read first
 
-Read [Project Charter](docs/PROJECT_CHARTER.md),
-[Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
-[Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md),
-[Acceptance](docs/ACCEPTANCE.md), the
-[LLM Prompt Qualification Method](docs/LLM_PROMPT_QUALIFICATION_METHOD.md), the
-[GA corpus guide](benchmarks/datasets/goal_association_daily_life/README.md), and
-[Latest Handoff](HANDOFF.md). Current source, tests, retained executable evidence,
-and the Issue win.
+Read [Project Charter](docs/PROJECT_CHARTER.md), [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md),
+[Current Status](docs/STATUS.md), [Roadmap](ROADMAP.md), [Acceptance](docs/ACCEPTANCE.md), the [Semantic Model-Role Qualification and Prompt Optimization Method](docs/LLM_PROMPT_QUALIFICATION_METHOD.md),
+the [GA corpus guide](benchmarks/datasets/goal_association_daily_life/README.md), and [Latest Handoff](HANDOFF.md). Current source, tests, retained executable evidence, and the Issue win.
 
 ## Active delivery line
 
@@ -33,24 +24,15 @@ accepted GI Responsibilities + bounded existing/recent Goals
   -> canonical Goal continuity, or fail closed
 ```
 
-- GA remains the sole Goal identity/continuity authority. Do not add a second model
-  critic, judge, semantic repair, or phrase-based relationship selector.
-- `reason_summary` is rationale only. It cannot carry a Goal mutation that is absent
-  from `updated_description` or the supplied `resolved_gap_ids`.
-- The current exclusive `associate | create_goals` decision cannot express one turn
-  that both continues an existing Goal and creates an independent Goal. The 100
-  retained probes are a global contract blocker, not prompt failures to hide.
-- Changing that discriminant is a Project Charter semantic-authority boundary and
-  requires explicit project-owner authorization plus same-change contract truth.
+- GA remains the sole Goal identity/continuity authority. Do not add a second model critic, judge, semantic repair, or phrase-based relationship selector.
+- `reason_summary` is rationale only. It cannot carry a Goal mutation absent from `updated_description` or the supplied `resolved_gap_ids`.
+- The exclusive `associate | create_goals` decision cannot both continue an existing Goal and create an independent Goal. The 100 retained probes are a global contract blocker, not prompt failures to hide.
+- Changing that discriminant is a Project Charter semantic-authority boundary requiring explicit project-owner authorization plus same-change contract truth.
 
 ## Completed delivery scope
 
-- Added 1,500 independently reviewable scenario JSON files: 100 bilingual daily-life
-  semantic seeds crossed with 15 Goal-continuity families. Inputs include accepted GI
-  Responsibilities and bounded existing/recent Goal state; no generator or combined
-  scenario source was added.
-- Added a static aggregate manifest, tree digest, validator, corpus README, and focused
-  dataset test. All cases remain `training_eligible=false` and lack independent review.
+- Added 1,500 independently reviewable scenario JSON files: 100 bilingual daily-life semantic seeds crossed with 15 Goal-continuity families. Inputs include accepted GI Responsibilities and bounded existing/recent Goal state; no generator or combined scenario source was added.
+- Added a static aggregate manifest, tree digest, validator, corpus README, and focused dataset test. All cases remain `training_eligible=false` and lack independent review.
 - Used Codex `gpt-5.6-sol` with high reasoning for the frozen target-blind inference
   cohort. No Gemma/Ollama result is qualification evidence.
 - Moved the existing modify/clarify semantic-update invariant into the dynamic decoder
@@ -60,15 +42,14 @@ accepted GI Responsibilities + bounded existing/recent Goals
 - Added a regression proving a modify output containing only `reason_summary` is
   rejected by the generated Schema and becomes valid with `updated_description`.
 - Indexed the corpus in the existing benchmark and documentation owners.
-- Distilled the GI/GA workflow into the required project-level
-  `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`: authority audit, global-versus-local
-  prompt ownership, frozen target-blind cohorts, deterministic/semantic adjudication,
-  root-cause classification, minimal iteration, full rerun, stop conditions, and a
-  new-session Fast/Deep Planner protocol. `AGENTS.md`, `CONTRIBUTING.md`, and the
-  documentation index point to this single method owner.
-- Added `.agents/skills/optimize-chromie-llm-prompt/` as a reusable execution
-  entrypoint for the committed method. It adds no independent methodology owner,
-  model call, Runtime path, or product behavior.
+- Clarified the required project-level `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` to
+  qualify the complete semantic model-role transaction before selecting a repair.
+  It now makes no-Prompt-change a valid result, separates mechanical realization
+  from global architecture decisions, designs coverage before case count, and preserves
+  one Fast/Deep Planner authority with only designated deeper-cognition delegation.
+- Updated the existing `.agents/skills/optimize-chromie-llm-prompt/` entrypoint and UI
+  metadata to execute that contract while retaining its identifier and method owner.
+  It adds no model call, Runtime path, semantic authority, or product behavior.
 
 ## Homepage architecture visualization
 
@@ -118,7 +99,7 @@ Goal reconstruction.
 | Relevant Level A | `planner_goal_semantic_quality` 4/4; `robust_intent_understanding` 8/8 | Evidence level A, not services/audio/hardware |
 | Canonical local gate | 2,048 main tests and 20 legacy Agent tests; policy 15 families/0 exceptions; docs 98; test ownership passed | Automated source evidence on pre-commit tree |
 | Homepage diagram delivery | Two SVG sources parse; four SVG/PNG hashes match the manifest; README targets exist; canonical gate remains 2,048 main tests plus 20 legacy Agent tests | Documentation/export verification only; no runtime or target evidence |
-| Skill/main integration delivery | Tests not run, by explicit owner instruction | Text/agent-tooling and Git integration only; prior evidence is not reclassified as current-run evidence |
+| Model-role method/Skill clarification delivery | Skill valid; policy 15 families/0 exceptions; docs 101; benchmark checks 128; 2,048 main tests and 20 legacy Agent tests; Ruff, Mypy, configuration, and structure gates passed | Automated source/document/agent-tooling evidence only; no Planner inference or live behavior qualification |
 
 Retained local artifacts are listed in `HANDOFF.md`. They are ignored by Git and do
 not transfer with the commit.
@@ -168,8 +149,8 @@ not transfer with the commit.
 ## Claim boundary
 
 The GA local prompt/schema remains good enough for the declared current-contract
-offline qualification boundary. The reusable Skill operationalizes the committed method;
-it does not qualify or change Fast/Deep Planner behavior. The homepage diagrams visualize
+offline qualification boundary. The clarified method and Skill operationalize complete
+transaction qualification; they do not qualify or change Fast/Deep Planner behavior. The homepage diagrams visualize
 already-authoritative architecture only. No production model/profile was promoted, and no
 live service, microphone, audible voice, simulator, target hardware, physical safety, or
 release claim was made. The 100 global DTO cases remain open.

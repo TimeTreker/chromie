@@ -176,12 +176,15 @@ model assignment, DTO, or workflow in response to model-driven behavior. The
 goal is to locate the first incorrect boundary, not to infer causality from the
 last spoken sentence.
 
-For a planned model-role prompt qualification or optimization, follow the complete
-[LLM Prompt Qualification and Optimization Method](docs/LLM_PROMPT_QUALIFICATION_METHOD.md).
+For a planned semantic model-role qualification or any resulting prompt optimization,
+follow the complete
+[Semantic Model-Role Qualification and Prompt Optimization Method](docs/LLM_PROMPT_QUALIFICATION_METHOD.md).
 It composes this root-cause classification with authority audit, frozen contrast
 corpora, target-blind inference, adjudication, bounded iteration, full reruns, stop
 conditions, and cross-session handoff. This section remains authoritative for the
 failure categories used by that method.
+The repository [Semantic Model-Role Qualification Skill](.agents/skills/optimize-chromie-llm-prompt/SKILL.md)
+is its executable coding-agent entrypoint; the method document remains authoritative.
 
 1. Retain the original single- or multi-turn scenario, the expected contract,
    the observed user-visible result, the current Git revision, and the runtime

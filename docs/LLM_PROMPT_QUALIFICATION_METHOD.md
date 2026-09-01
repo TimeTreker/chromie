@@ -1,32 +1,32 @@
-# LLM Prompt Qualification and Optimization Method
+# Semantic Model-Role Qualification and Prompt Optimization Method
 
-Status: Required method for qualifying or optimizing a Chromie semantic-model role
+Status: Required method for qualifying a complete Chromie semantic-model-role
+transaction and optimizing only its evidenced defective owner
 
 Audience: project owners, coding agents, prompt reviewers, benchmark authors, and
 operators qualifying Goal Interpretation, Goal Association, Fast/Deep Planner, or
 another bounded LLM authority
 
-Owner: Chromie prompt-qualification methodology. The component prompt, DTO, Schema,
-Host validator, benchmark corpus, and acceptance documents remain authoritative for
-their own facts.
+Owner: Chromie model-role qualification methodology. The component prompt, DTO,
+Schema, Host validator, benchmark corpus, and acceptance documents remain
+authoritative for their own facts.
 
 This document is the reusable method distilled from the completed Goal
-Interpretation (GI) and Goal Association (GA) prompt investigations. It exists as a
-separate owner because no existing document owns the complete cross-component
+Interpretation (GI) and Goal Association (GA) model-role investigations. It exists
+as a separate owner because no existing document owns the complete cross-component
 sequence from authority audit through frozen-corpus inference, adjudication,
 root-cause classification, minimal iteration, full rerun, and handoff. It does not
 replace [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md), the
 [Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md), the
 [LLM-versus-workflow root-cause method](../CONTRIBUTING.md#llm-versus-workflow-root-cause-method),
-or [Acceptance and Evidence](ACCEPTANCE.md); it composes them into one prompt-specific
+or [Acceptance and Evidence](ACCEPTANCE.md); it composes them into one qualification-specific
 operating protocol.
 
 ## 1. Objective
 
-Prompt work is complete only when evidence shows that the exact model transaction
-produces the role's intended semantic result through its real structured-output and
-Host boundaries. The objective is not to make a sample answer look better. It is to
-qualify a complete model-role transaction:
+The objective is not to make a sample answer look better or to force a prompt edit.
+It is to qualify a complete model-role transaction and, only when evidence exposes a
+defect, route the smallest repair to the owner of the earliest wrong boundary:
 
 ```text
 authoritative input and bounded context
@@ -49,6 +49,13 @@ A mechanically valid JSON object does not qualify semantics. A good semantic ans
 that the DTO cannot express does not prove the prompt is wrong. A downstream success
 after semantic repair does not qualify the primary result.
 
+A qualification that concludes `NO PROMPT CHANGE RECOMMENDED` is successful when the
+declared transaction and evidence claim are qualified or when every remaining failure
+is truthfully classified outside an unresolved prompt boundary. If the correct repair
+belongs to context, contract, Host, runtime/provider, model selection, or the oracle,
+perform it only when the current task authorizes that owner and no global boundary is
+crossed; otherwise retain the case and report the owner or authorization blocker.
+
 ## 2. Binding principles
 
 1. **Declare one semantic authority.** State exactly what the role may decide and
@@ -70,7 +77,7 @@ after semantic repair does not qualify the primary result.
    Meaning and naturalness use declared semantic dimensions.
 7. **Fix the earliest responsible boundary.** A prompt edit is justified only for
    a prompt defect. Context, Schema, DTO, Host, provider, model, or oracle defects
-   are fixed at their own owners.
+   are fixed at their own owners when authorized, or retained as explicit blockers.
 8. **Optimize an ability class, not a phrase.** Scenarios are probes into general
    reasoning and continuity. Runtime phrase tables and scenario-ID branches are
    forbidden.
@@ -80,6 +87,21 @@ after semantic repair does not qualify the primary result.
     simulator evidence, voice evidence, and physical-robot evidence are different
     claims.
 
+### One primary result and bounded depth
+
+An owner-approved Fast-to-Deep path is permitted only as the role's designated,
+source-based cognition-depth delegation before semantic commitment for the unresolved
+scope. Deep receives authoritative source/context, not a Fast candidate answer to judge
+or rewrite. Once a semantic fact is accepted or committed, Deep cannot reopen it. A
+Planner stream whose typed presentation and terminal frames come from the same declared
+invocation is likewise one primary transaction, not a reviewer chain.
+
+A post-hoc model reviewer used during offline adjudication is evaluation evidence, not
+part of the production transaction. Its judgment must never be fed back as a repaired
+candidate result or mutate Runtime state, and same-model review remains explicitly
+non-independent. The exact permitted depth, streaming, and mechanical-regeneration
+variants must be declared per role before the cohort is frozen.
+
 ## 3. Global truth and role-local prompt ownership
 
 Chromie's identity, worldview, value boundaries, robotic embodiment truth, safety
@@ -87,7 +109,7 @@ principles, and stable Mind are global facts. They must remain independent of on
 model role. A role prompt may receive a bounded projection of those facts, but it
 must not redefine them locally.
 
-Classify every proposed prompt change before editing:
+Classify every proposed repair before editing:
 
 | Change class | Owner and required action |
 |---|---|
@@ -102,6 +124,22 @@ One role's cohort may expose a global defect, but it does not authorize silently
 changing shared truth. Record the conflict in the active Issue, preserve the failing
 case, and obtain owner authorization before crossing the global boundary.
 
+Treat a change as a mechanical realization of existing authority only when the
+authoritative invariant is already explicit and the change does not alter who authors
+the fact, the valid semantic meanings or their cardinality/composability, the fact's
+lifecycle or state transitions, or downstream interpretation/effect authority. Examples
+include making a dynamic Schema reject a shape the current DTO/Host already forbids,
+projecting an existing authoritative context fact without creating new truth, or deriving
+a non-model-writable field deterministically from one accepted source.
+
+Treat a change as an architecture/global-contract change when it adds or re-authors a
+semantic fact, makes a previously unrepresentable valid outcome expressible, changes
+decision cardinality or composability, transfers ownership, changes lifecycle/state
+transition meaning, or adds another model decision. A small DTO field addition is not
+automatically local, and a large mechanical Schema diff is not automatically global. If
+the existing authorities do not decide the classification unambiguously, use global
+change review and obtain project-owner authorization before editing.
+
 ## 4. Required artifacts
 
 Every qualification must retain or identify:
@@ -112,8 +150,9 @@ Every qualification must retain or identify:
 - production prompt source and all runtime prompt variants;
 - dynamic response Schema and DTO/Host validation path;
 - one authoritative scenario per file;
-- aggregate manifest with counts, language/category/split coverage, provenance,
-  training eligibility, and a deterministic scenario-tree digest;
+- aggregate manifest with counts, language/category/split coverage, semantic
+  state-space matrix, declared gaps, provenance, training eligibility, and a
+  deterministic scenario-tree digest;
 - frozen candidate input packet for every case;
 - exact model, role, reasoning/decoding settings, provider/transport, timeout, and
   retry/repair policy;
@@ -171,6 +210,12 @@ Do not infer model failure from the final spoken response alone.
 
 Build the corpus from the role's real input surface, not generic chatbot questions.
 Use contrast sets so one semantic seed changes one important condition at a time.
+Design the semantic state-space and contrast matrix before choosing a case count.
+Scenario count is inventory, not evidence of coverage: duplicate scale cannot replace
+missing language, lifecycle, authority, boundary, historical-regression, or runtime-
+variant slices. The historical 1,496- and 1,500-case corpora are evidence for their own
+declared matrices, not default size targets for another role. State why the selected
+cases are sufficient for the claim and list every material uncovered dimension.
 Useful axes include:
 
 - English and Chinese;
@@ -217,8 +262,9 @@ Requirements:
 
 - use the inference authority requested by the project owner; never silently
   substitute a smaller local model;
-- execute one primary semantic invocation per scenario through the exact prompt and
-  Schema envelope;
+- execute the role's exact declared primary transaction per scenario through the exact
+  prompt and Schema envelope, including only its permitted source-based depth
+  delegation or mechanical regeneration;
 - retain all outputs, including malformed, rejected, timed-out, and seemingly
   correct results;
 - do not change source, prompt, Schema, references, or adjudication during the batch;
@@ -275,10 +321,12 @@ Also distinguish:
 
 The last visible failure is often not the root cause.
 
-### Phase 6 — select one minimal general fix
+### Phase 6 — select one minimal general fix at the correct owner
 
 Cluster failures by their earliest shared boundary. Select one cluster and one
-testable hypothesis.
+testable hypothesis. Implement the repair only when the task authorizes changes to
+that owner. Otherwise retain the failure, name the required owner/authority, and stop
+without converting it into prompt work.
 
 For a local prompt defect:
 
@@ -475,8 +523,9 @@ The project owner can start a Planner-prompt session with:
 
 ```text
 Follow docs/LLM_PROMPT_QUALIFICATION_METHOD.md as the binding method.
-Optimize the Fast Planner prompt first, then Deep Planner, while preserving one
-Planner HOW authority. Reconstruct the real production input/prompt/Schema/Host
+Qualify the complete Fast Planner transaction first, then Deep Planner, while
+preserving one Planner HOW authority. Optimize a prompt only when the earliest
+evidenced defect is prompt-owned. Reconstruct the real production input/prompt/Schema/Host
 transaction before editing. Create a frozen bilingual daily-life contrast corpus
 with one scenario per file, keep targets out of inference packets, and use Codex
 as the declared offline inference authority unless I explicitly approve another
@@ -500,7 +549,7 @@ Before implementation, the new session must report:
 
 ## 9. Definition of done
 
-A prompt-optimization delivery is complete only when:
+A model-role qualification or resulting optimization delivery is complete only when:
 
 - the real model-role transaction and earliest boundaries are documented;
 - the corpus is frozen, directory-discovered, digest-bound, and independently

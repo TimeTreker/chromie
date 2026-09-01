@@ -1,4 +1,4 @@
 interface:
-  display_name: "Optimize Chromie LLM Prompt"
-  short_description: "Qualify and improve Chromie model-role prompts"
-  default_prompt: "Use $optimize-chromie-llm-prompt to qualify and optimize the Fast Planner prompt with a frozen target-blind cohort."
+  display_name: "Qualify Chromie LLM Role"
+  short_description: "Qualify the transaction; repair its evidenced owner"
+  default_prompt: "Use $optimize-chromie-llm-prompt to qualify the complete Fast Planner model-role transaction with a frozen target-blind cohort, changing its prompt only if the earliest evidenced defect is prompt-owned."

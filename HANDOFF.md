@@ -8,49 +8,63 @@ checkpoint, and Issue #34 win.
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Integration parents: `codex/ga-prompt-qualification-1500` at `ac83e467` and
-  `origin/main` at `f3d14792`
+- Pre-delivery baseline: `main` and `origin/main` at `2b97cdc9`
 - Expected resume revision: latest `origin/main` commit containing this handoff and
   `DEVELOPMENT_CHECKPOINT.md`
 - Active completed-evidence Issue: [#34](https://github.com/TimeTreker/chromie/issues/34)
 - Next Issue: create a separate Fast/Deep Planner prompt-qualification Issue; do not
   reuse #34 or silently combine the GA global DTO decision with Planner work
-- Integrated scope: GA prompt/Schema qualification and 1,500-file corpus; required
-  project-level prompt-qualification method; reusable repository Skill; README
-  architecture overview/detail assets; and truthful combined handoff
+- Integrated scope: GA prompt/Schema qualification and 1,500-file corpus; clarified
+  project-level semantic model-role qualification method and reusable repository Skill;
+  README architecture overview/detail assets; and truthful combined handoff
 - No provider, model profile, deployment, Runtime switch, Capability, voice, simulator,
   or hardware behavior changed
 
-## Prompt-qualification method delivered
+## Semantic model-role qualification method delivered
 
 `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` is the single method owner distilled from
-the GI and GA investigations. It requires:
+the GI and GA investigations. The current clarification requires:
 
-- explicit semantic authority and global-versus-role-local prompt ownership;
+- qualification of the complete model-role transaction before selecting a repair;
+- explicit semantic authority and global-versus-role-local ownership;
 - reconstruction of the real production prompt/context/Schema/model/Host transaction;
-- one independently reviewable scenario per file in a frozen digest-bound contrast corpus;
-- target-blind immutable full-batch inference with the owner-declared model authority;
+- a coverage matrix before corpus count, with one independently reviewable scenario per
+  file in a frozen digest-bound contrast corpus;
+- target-blind immutable full-batch inference through the exact declared transaction;
 - deterministic hard gates before retained semantic judgment;
 - earliest-boundary classification across scenario/oracle, prompt/profile,
   context/harness, contract/schema, runtime/provider, model inference, mixed, and
   unresolved causes;
-- one minimal general fix, exact focused proof, then complete frozen-cohort rerun;
+- no-Prompt-change as a successful result when the Prompt is not the earliest defective
+  owner;
+- one authorized minimal repair at the evidenced owner, exact focused proof, then complete
+  frozen-cohort rerun;
 - explicit stop conditions, evidence ceiling, blockers, and cross-session delivery.
 
 The method includes a copy-ready Planner session protocol. Fast and Deep remain depth
 passes of the same Planner HOW authority; qualify Fast primary/streaming/re-entry first,
 then Deep complex/blocked/revision paths, then rerun both cohorts. Neither may review or
-semantically repair the other.
+semantically repair the other. Deep may receive the designated unresolved-scope
+delegation before commitment; post-hoc reviewer output is adjudication evidence only and
+must not feed back into the primary result.
 
 ## Reusable Skill delivered
 
 - `.agents/skills/optimize-chromie-llm-prompt/SKILL.md` turns the committed method into
-  an executable Codex workflow for audit, qualification, optimization, model comparison,
-  and global-change review.
+  an executable Codex workflow for transaction audit, qualification, owner diagnosis,
+  authorized repair, model comparison, and global-change review. Its existing identifier
+  and path are retained.
 - `.agents/skills/optimize-chromie-llm-prompt/agents/openai.yaml` provides the
-  user-facing Skill metadata and invocation example.
+  user-facing `Qualify Chromie LLM Role` metadata and invocation example.
 - The Skill points back to `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` as authority; it does
   not create another project method owner, prompt authority, model call, or Runtime path.
+
+Current clarification surface delta: zero new tracked files; six existing method, Skill,
+metadata, contribution, index, and delivery owners are modified before this handoff is
+included. No new architectural term, environment variable, Runtime switch, compatibility
+path, semantic authority, evidence format, or model call is added. Consolidation
+opportunity: keep future role-independent qualification rules in the existing method and
+Skill pair rather than adding another procedure owner.
 
 ## Homepage architecture visualization delivery
 
@@ -282,9 +296,31 @@ git diff --check
 passed
 ```
 
-No tests or validation commands were run for the repository Skill commit or this `main`
-integration, by explicit project-owner instruction. The prior gates above remain historical
-evidence on their exact revisions and are not claimed as current-run evidence.
+Current model-role method/Skill clarification delivery on the pre-commit tree:
+
+```text
+python /home/chromie/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
+  .agents/skills/optimize-chromie-llm-prompt
+Skill is valid!
+
+python scripts/check_repository_policies.py
+15 rule families, 0 reviewed exceptions; passed
+
+./scripts/run_tests.sh
+2,048 main tests and 20 legacy Agent tests; benchmark checks 128; Ruff, Mypy,
+configuration, structure, policy, ownership, and documentation gates passed
+
+python scripts/check_docs.py
+101 Markdown files; passed
+
+git diff --check
+passed
+```
+
+An independent read-only hypothetical forward-test of the Skill selected Audit mode,
+qualified the transaction before the Prompt, accepted no-Prompt-change success, and
+preserved the mechanical/global and Fast/Deep boundaries. This is agent-tooling evidence,
+not Planner model inference, deployed Runtime, or live behavior evidence.
 
 ## Cross-machine resume
 
@@ -337,8 +373,9 @@ source edits between cases.
 ## Claim boundary
 
 The local GA prompt/schema is qualified only for the 1,400 cases expressible by the
-current contract. The methodology and Skill are process/agent-tooling evidence and do not
-qualify Fast/Deep Planner behavior. The homepage assets are explanatory views of existing
+current contract. The clarified methodology and Skill qualify the transaction before
+selecting a repair; their validation is process/agent-tooling evidence and does not qualify
+Fast/Deep Planner behavior. The homepage assets are explanatory views of existing
 authority truth. No production model/profile, live service, audible voice, microphone,
 simulator, target robot, physical safety, or release evidence was established. The 100
 global mixed-decision cases remain open.

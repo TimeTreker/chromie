@@ -1,13 +1,26 @@
 ---
 name: optimize-chromie-llm-prompt
-description: Qualify and optimize Chromie semantic-model prompts through the project's authority audit, separate-file frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, minimal fixes, focused proof, full reruns, and evidence handoff. Use whenever Codex is asked to audit, evaluate, tune, qualify, or optimize Goal Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie LLM role/model prompt.
+description: Qualify complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff; optimize a prompt only when evidence identifies it as the earliest defective owner. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize Goal Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie LLM role, model, prompt, Schema, or model-facing transaction.
 ---
 
-# Optimize Chromie LLM Prompt
+# Qualify a Chromie Semantic Model Role
 
 Use the committed Chromie methodology as the authority and this Skill as its
 execution entrypoint. Do not duplicate or reinterpret project rules inside a
 component prompt.
+
+## Qualify the transaction, not the wording
+
+The task objective is to qualify the complete semantic model-role transaction. Prompt
+optimization is one possible evidenced repair, not a required output. Treat
+`NO PROMPT CHANGE RECOMMENDED` as a successful result when the declared transaction is
+qualified or all remaining failures are classified outside an unresolved prompt
+boundary.
+
+If the earliest wrong boundary belongs to context, contract, Host, runtime/provider,
+model selection, or the oracle, repair that owner only when the user's task authorizes
+it and no global contract boundary is crossed. Otherwise retain the case and report the
+required owner or authorization; never force the failure into prompt wording.
 
 ## Start from project truth
 
@@ -30,7 +43,7 @@ component prompt.
 4. Inspect `git status --short`, branch, HEAD, upstream, and active Issue.
    Preserve unrelated dirty work.
 5. Tell the user that this Skill requires an authority/workflow audit before
-   prompt editing. Pause only when a global principle/contract change needs owner
+   any prompt or boundary edit. Pause only when a global principle/contract change needs owner
    authorization or destructive/external authority is missing.
 
 The project method document wins if this Skill and the repository disagree.
@@ -44,7 +57,8 @@ Choose and state one mode:
 - **Qualify:** freeze and execute a cohort against an unchanged prompt/model
   transaction; do not optimize during the baseline.
 - **Optimize:** complete the baseline and diagnosis first, then implement one
-  evidenced minimal fix and rerun focused plus full cohorts.
+  authorized minimal fix at the evidenced owner and rerun focused plus full cohorts;
+  edit the prompt only for a `prompt_or_profile` defect.
 - **Compare models:** hold corpus, prompt, Schema, transport protocol, and
   adjudication constant; change only the declared candidate-model identity.
 - **Global change review:** retain the blocker and request explicit project-owner
@@ -99,22 +113,37 @@ Classify every proposed change:
 
 Never hide a global contract gap with local wording.
 
+Treat a change as an existing-authority mechanical realization only when the invariant
+is already explicit and the change preserves the semantic author, representable meaning
+and cardinality/composability, lifecycle/state transitions, and downstream authority.
+Schema tightening against an existing DTO/Host invariant, projection of existing
+authoritative context, and deterministic non-model-writable derivation may qualify.
+
+Use **Global change review** when a change adds or re-authors a semantic fact, makes a
+previously unrepresentable valid outcome expressible, changes decision cardinality or
+composability, transfers ownership, changes lifecycle/state-transition meaning, or adds
+another model decision. Diff size and the label “DTO field enhancement” do not decide
+the boundary; when existing authority is ambiguous, request project-owner authorization.
+
 ## Build a frozen contrast corpus
 
-1. Derive cases from the role's production-shaped input, Chromie identity and
+1. Design the semantic state-space and contrast matrix before choosing a case count;
+   scenario count alone is not coverage evidence, and historical corpus sizes are not
+   targets for another role.
+2. Derive cases from the role's production-shaped input, Chromie identity and
    body truth, Goal lifecycle, capabilities, Evidence, Situation, retained
    failures, and bilingual daily life.
-2. Store exactly one authoritative scenario per JSON file.
-3. Use contrast sets that change one material condition at a time.
-4. Keep whole contrast sets inside one split.
-5. Declare deterministic invariants, semantic dimensions, acceptable variation,
+3. Store exactly one authoritative scenario per JSON file.
+4. Use contrast sets that change one material condition at a time.
+5. Keep whole contrast sets inside one split.
+6. Declare deterministic invariants, semantic dimensions, acceptable variation,
    forbidden outcomes, and required evidence per case.
-6. Keep reference outputs, expected categories, rubrics, and adjudication labels
+7. Keep reference outputs, expected categories, rubrics, and adjudication labels
    out of candidate inference packets.
-7. Validate current-contract references through the exact dynamic Schema and Host.
-8. Mark valid but unrepresentable cases as known contract gaps.
-9. Record counts, language/category/split coverage, provenance,
-   `training_eligible=false`, and a deterministic scenario-tree digest.
+8. Validate current-contract references through the exact dynamic Schema and Host.
+9. Mark valid but unrepresentable cases as known contract gaps.
+10. Record counts, language/category/split and semantic-state coverage, declared gaps,
+    provenance, `training_eligible=false`, and a deterministic scenario-tree digest.
 
 A generator or combined report may assist execution but must not replace the
 separate scenario files as reviewable source truth.
@@ -131,8 +160,10 @@ Bind and retain:
 - target-blind candidate packets.
 
 Run the complete batch without changing source, prompt, Schema, scenarios,
-references, or adjudication. Use the model authority selected by the user; never
-silently substitute a smaller or local model. Mark interrupted batches incomplete.
+references, or adjudication. Execute the role's exact declared primary transaction,
+including only its owner-approved source-based depth delegation or mechanical
+regeneration. Use the model authority selected by the user; never silently substitute a
+smaller or local model. Mark interrupted batches incomplete.
 
 Retain per case:
 
@@ -146,6 +177,8 @@ Retain per case:
 
 When one model performs both inference and later review, keep the phases separate,
 hide targets during inference, and label the result same-model/non-independent.
+Post-hoc review is evaluation evidence only: never feed it back as a repaired candidate
+result or let it mutate Runtime state.
 
 ## Adjudicate and diagnose
 
@@ -175,9 +208,10 @@ Distinguish initiating trigger, root cause, downstream symptom, containment,
 contributing conditions, and remaining evidence gaps. Cluster failures by the
 earliest shared wrong boundary.
 
-## Optimize one evidenced boundary
+## Repair one evidenced boundary
 
-Select one cluster and one falsifiable hypothesis.
+Select one cluster and one falsifiable hypothesis. Implement it only when the task
+authorizes changes to that owner; otherwise report and retain the blocker.
 
 For a local prompt defect:
 
@@ -217,13 +251,17 @@ Stop when all declared hard gates and semantic requirements pass, no important
 slice regresses, no forbidden repair appears, remaining differences are
 evidence-classified outside an unresolved prompt boundary, identities/hashes are
 retained, and all required gates pass. Do not consume an iteration budget merely
-because it exists.
+because it exists. A supported `NO PROMPT CHANGE RECOMMENDED` conclusion is a complete
+outcome, not a failure to optimize.
 
 ## Apply Planner specialization
 
 When qualifying Planner:
 
 - Treat Fast and Deep as depth passes of one Planner HOW authority.
+- Permit Deep only as the declared source/context-based cognition-depth path before
+  commitment for the unresolved scope; never pass a Fast candidate Plan to Deep for
+  judgment or rewriting.
 - Qualify Fast primary/common, streaming advance, and bounded re-entry first.
 - Qualify Deep complex, blocked/degraded/unsafe, and revision paths second.
 - Rerun both Fast and Deep cohorts after Deep changes.
