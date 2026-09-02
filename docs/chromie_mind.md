@@ -12,6 +12,8 @@ The maintained implementation provides:
 - an owner-approved profile loaded from `config/mind/chromie_default.json`;
 - one structured self model for Chromie as the speaking, perceiving, and acting entity;
 - owner-approved personality expression and Social Interaction Style;
+- an independent owner-approved worldview separated from changing world facts;
+- bounded household values below locked Core-principle authority;
 - core principles that experience cannot change automatically;
 - reviewed long-term goals and deliberation/reflex guidance;
 - bounded prompt-safe projections for current cognition;
@@ -62,6 +64,8 @@ MindProfile or a language model.
 | Identity | Long-lived | No | Stable name, six-year-old-girl social identity, pronouns, family role, and self-reference guidance |
 | Personality Expression | Long-lived | No | Owner-approved self-concept, traits, spoken style, brevity, and truthfulness guidance |
 | Social Interaction Style | Long-lived | No | Bounded courtesy, expressiveness, initiative, restraint, cooldown, and repetition guidance |
+| Worldview | Long-lived | Household perspectives through confirmed setup | Stable self-in-world, relationship, uncertainty, and dynamic-knowledge boundaries plus bounded household perspective |
+| Household values | Long-lived | Through confirmed setup | Household preferences that never override Core principles, safety, consent, privacy, truth, or authorization |
 | Core principles | Long-lived | No | Safety, honesty, generalization-first behavior, and owner-approved boundaries |
 | Long-term goals | Long-lived | With review | Direction for usefulness, learning, and uncertainty handling |
 | Reflex/deliberation policy | Long-lived | No automatic change | Bounded guidance consumed by the appropriate existing owners |
@@ -91,8 +95,18 @@ identity-answer guidance, or personality expression without changing Python sour
 Increment the profile version and review the complete profile before retaining
 `owner_approved=true`.
 
+Customer setup uses a narrower contract than full operator editing. The local
+`scripts/configure_chromie_mind.py` command previews and applies display name,
+pronouns, household role, a reviewed social-style preset, up to eight household
+worldview perspectives, and up to eight household values. It derives a complete
+validated profile from the factory profile and cannot carry Core-principle, safety,
+permission, provider, prompt, model, or Capability fields. The runtime automatically
+selects `.chromie/mind/active_profile.json` when present; explicit
+`ORCH_MIND_PROFILE_PATH` remains the operator override. Any customer-marked profile
+that differs from the deterministic derived profile fails startup validation.
+
 `MindManager.context()` exposes a bounded prompt-safe projection containing identity,
-self model, personality expression, Social Interaction Style, core principles,
+self model, personality expression, worldview, household values, Social Interaction Style, core principles,
 long-term goals, reflex policy, deliberation policy, experience-tuning policy, and a
 bounded summary. The Host may project that immutable context to qualified cognition; it
 must not infer a user intent or write a first-person answer from profile fields itself.
@@ -130,6 +144,9 @@ owners receive only the projections they need:
 - Goal Association may use bounded context while remaining a continuity owner only;
 - Planner may use personality, principles, Situation, Goal, Work, Evidence, and capability
   context while remaining the single HOW/ordinary-communication owner; and
+- Planner and selective Reflection receive the stable worldview/value projection;
+  narrow ingress/continuity classifiers receive only the identity facts needed by
+  their authority and do not become value or response owners; and
 - Social Attention receives the applicable Social Interaction Style while remaining
   optional auxiliary expression only.
 
@@ -178,7 +195,7 @@ episode logs into prompts or mutate runtime policy automatically.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ORCH_MIND_PROFILE_PATH` | `config/mind/chromie_default.json` | Owner-editable concrete identity and complete MindProfile JSON. Relative paths resolve from the repository root. |
+| `ORCH_MIND_PROFILE_PATH` | customer active profile when present, otherwise `config/mind/chromie_default.json` | Explicit operator override for the complete MindProfile JSON. Relative paths resolve from the repository root. |
 | `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600` | Maximum bounded Mind summary/projection size used by runtime context. |
 | `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | unset | Optional reviewed `courteous`, `neutral`, or `reserved` Social Interaction Style override. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1` | Enable local experience/proposal JSONL writes. |

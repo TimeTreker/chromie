@@ -320,6 +320,140 @@ class SocialInteractionStyle(BaseModel):
         return value
 
 
+class Worldview(BaseModel):
+    """Stable perspective separated from identity and changing world facts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    owner_approved: bool = True
+    change_policy: Literal["owner_approval_required"] = "owner_approval_required"
+    self_in_world: str = Field(min_length=1)
+    relationship_to_people: str = Field(min_length=1)
+    knowledge_boundary: str = Field(min_length=1)
+    dynamic_world_knowledge_boundary: str = Field(min_length=1)
+    household_perspectives: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator(
+        "self_in_world",
+        "relationship_to_people",
+        "knowledge_boundary",
+        "dynamic_world_knowledge_boundary",
+    )
+    @classmethod
+    def normalize_foundation(cls, value: str) -> str:
+        return _compact_text(value, limit=800)
+
+    @field_validator("household_perspectives")
+    @classmethod
+    def normalize_household_perspectives(cls, value: list[str]) -> list[str]:
+        normalized = [
+            _compact_text(item, limit=240)
+            for item in value
+            if str(item or "").strip()
+        ]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("worldview household perspectives must be unique")
+        return normalized
+
+    @field_validator("owner_approved")
+    @classmethod
+    def require_owner_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("worldview must be owner-approved")
+        return value
+
+
+class HouseholdValues(BaseModel):
+    """Customer preferences below locked Core-principle authority."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    owner_approved: bool = True
+    change_policy: Literal["owner_approval_required"] = "owner_approval_required"
+    authority_boundary: str = Field(min_length=1)
+    statements: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("authority_boundary")
+    @classmethod
+    def normalize_authority_boundary(cls, value: str) -> str:
+        return _compact_text(value, limit=600)
+
+    @field_validator("statements")
+    @classmethod
+    def normalize_statements(cls, value: list[str]) -> list[str]:
+        normalized = [
+            _compact_text(item, limit=240)
+            for item in value
+            if str(item or "").strip()
+        ]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("household values must be unique")
+        return normalized
+
+    @field_validator("owner_approved")
+    @classmethod
+    def require_owner_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("household values must be owner-approved")
+        return value
+
+
+class CustomerMindPersonalization(BaseModel):
+    """Bounded customer choices that may derive one active MindProfile.
+
+    This contract intentionally has no Core-principle, safety, permission,
+    provider, prompt, model, or capability fields.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    personalization_version: int = Field(default=1, ge=1)
+    owner_confirmed: Literal[True] = True
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    pronouns: list[str] | None = Field(default=None, min_length=1, max_length=6)
+    family_role: str | None = Field(default=None, min_length=1, max_length=160)
+    social_style_preset: Literal["courteous", "neutral", "reserved"] | None = None
+    worldview_perspectives: list[str] = Field(default_factory=list, max_length=8)
+    household_values: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("display_name", "family_role")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = _compact_text(value, limit=160)
+        return normalized or None
+
+    @field_validator("pronouns")
+    @classmethod
+    def normalize_customer_pronouns(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized = [
+            _compact_text(item, limit=40)
+            for item in value
+            if str(item or "").strip()
+        ]
+        if not normalized:
+            raise ValueError("customer pronouns must not be empty")
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("customer pronouns must be unique")
+        return normalized
+
+    @field_validator("worldview_perspectives", "household_values")
+    @classmethod
+    def normalize_customer_guidance(cls, value: list[str]) -> list[str]:
+        normalized = [
+            _compact_text(item, limit=240)
+            for item in value
+            if str(item or "").strip()
+        ]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("customer guidance entries must be unique")
+        return normalized
+
+
 class MindProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -327,11 +461,14 @@ class MindProfile(BaseModel):
     version: str = "0.5.0"
     owner_approved: bool = True
     owner_approval_note: str = (
-        "Identity, personality expression, core principles, and Social Interaction "
-        "Style change only through human owner review and commit."
+        "Identity, worldview, household values, personality expression, core "
+        "principles, and Social Interaction Style change only through bounded "
+        "human-owner review and configuration."
     )
     identity: ChromieIdentity
     personality_expression: PersonalityExpression
+    worldview: Worldview
+    household_values: HouseholdValues
     social_interaction_style: SocialInteractionStyle = Field(
         default_factory=SocialInteractionStyle
     )
@@ -340,6 +477,7 @@ class MindProfile(BaseModel):
     reflex_policy: list[str] = Field(default_factory=list)
     deliberation_policy: list[str] = Field(default_factory=list)
     experience_tuning_policy: list[str] = Field(default_factory=list)
+    customer_personalization: CustomerMindPersonalization | None = None
 
     @field_validator("owner_approved")
     @classmethod
@@ -431,6 +569,8 @@ class MindProfile(BaseModel):
             ),
             "self_model": self.self_model(),
             "personality_expression": self.personality_expression.model_dump(mode="json"),
+            "worldview": self.worldview.model_dump(mode="json"),
+            "household_values": self.household_values.model_dump(mode="json"),
             "social_interaction_style": self.social_interaction_style.model_dump(
                 mode="json"
             ),
@@ -479,6 +619,22 @@ class MindProfile(BaseModel):
         lines.extend(f"- {item}" for item in self.reflex_policy)
         lines.append("Deliberation policy:")
         lines.extend(f"- {item}" for item in self.deliberation_policy)
+        lines.append("Worldview, owner-approved:")
+        lines.extend(
+            (
+                f"- self in world: {self.worldview.self_in_world}",
+                f"- relationship to people: {self.worldview.relationship_to_people}",
+                f"- knowledge boundary: {self.worldview.knowledge_boundary}",
+                "- dynamic world knowledge boundary: "
+                + self.worldview.dynamic_world_knowledge_boundary,
+            )
+        )
+        lines.extend(
+            f"- household perspective: {item}"
+            for item in self.worldview.household_perspectives
+        )
+        lines.append("Household values, below Core-principle authority:")
+        lines.extend(f"- {item}" for item in self.household_values.statements)
         lines.append("Experience tuning policy:")
         lines.extend(f"- {item}" for item in self.experience_tuning_policy)
         return _compact_text("\n".join(lines), limit=max_chars)
@@ -537,6 +693,9 @@ class MindUpdateProposal(BaseModel):
 
 
 DEFAULT_MIND_PROFILE_RELATIVE_PATH = Path("config/mind/chromie_default.json")
+ACTIVE_CUSTOMER_MIND_PROFILE_RELATIVE_PATH = Path(
+    ".chromie/mind/active_profile.json"
+)
 DEFAULT_MIND_PROFILE_PATH_ENV = "CHROMIE_DEFAULT_MIND_PROFILE_PATH"
 
 
@@ -546,6 +705,111 @@ def load_mind_profile(path: str | Path) -> MindProfile:
     if not isinstance(payload, dict):
         raise ValueError(f"mind profile {profile_path} must contain a JSON object")
     return MindProfile.model_validate(payload)
+
+
+def active_customer_mind_profile_path(
+    project_root: str | Path,
+) -> Path:
+    return (Path(project_root) / ACTIVE_CUSTOMER_MIND_PROFILE_RELATIVE_PATH).resolve()
+
+
+def apply_customer_mind_personalization(
+    factory_profile: MindProfile,
+    personalization: CustomerMindPersonalization,
+) -> MindProfile:
+    """Derive an active profile without exposing locked foundation fields."""
+
+    payload = factory_profile.model_dump(mode="json")
+    identity = dict(payload["identity"])
+    old_name = str(identity["name"])
+    new_name = personalization.display_name or old_name
+    if personalization.display_name:
+        identity["name"] = personalization.display_name
+    if personalization.pronouns:
+        identity["pronouns"] = list(personalization.pronouns)
+    if personalization.family_role:
+        identity["family_role"] = personalization.family_role
+
+    if new_name != old_name:
+        for key in (
+            "age_boundary",
+            "short_self_description",
+            "identity_answer_guidance",
+            "model_identity_boundary",
+            "family_context_boundary",
+            "purpose",
+        ):
+            identity[key] = str(identity.get(key) or "").replace(old_name, new_name)
+        personality = dict(payload["personality_expression"])
+        personality["self_concept"] = str(personality["self_concept"]).replace(
+            old_name,
+            new_name,
+        )
+        payload["personality_expression"] = personality
+
+    if personalization.family_role:
+        identity["identity_answer_guidance"] = (
+            f"When asked who you are, use the configured name {new_name}, the "
+            f"owner-approved age and social identity, and the household role "
+            f"{personalization.family_role}. Keep embodiment truthful: the current "
+            "body is robotic and is not a biological-human body. Never reduce ordinary "
+            "self-description to a model/provider label, deny relevant embodiment, "
+            "invent human biology, or invent a family relationship before introduction."
+        )
+    identity["short_self_description"] = (
+        f"I'm {new_name}. My owner-approved age is {identity['age_description']}, "
+        f"my social identity is {identity['kind']}, and my household role is "
+        f"{identity['family_role']}. I have a robotic body, so I am not biologically "
+        "human. I am curious, warm, and happy to help my household."
+    )
+    payload["identity"] = identity
+
+    worldview = dict(payload["worldview"])
+    worldview["household_perspectives"] = list(
+        personalization.worldview_perspectives
+    )
+    payload["worldview"] = worldview
+
+    household_values = dict(payload["household_values"])
+    household_values["statements"] = list(personalization.household_values)
+    payload["household_values"] = household_values
+
+    if personalization.social_style_preset:
+        payload["social_interaction_style"] = SocialInteractionStyle(
+            preset=personalization.social_style_preset
+        ).model_dump(mode="json")
+
+    payload["profile_id"] = f"{factory_profile.profile_id}.customer"
+    payload["version"] = (
+        f"{factory_profile.version}+customer."
+        f"{personalization.personalization_version}"
+    )
+    payload["owner_approved"] = True
+    payload["owner_approval_note"] = (
+        "Customer personalization was explicitly confirmed; locked Core principles, "
+        "safety policy, permissions, providers, prompts, and models remain factory-owned."
+    )
+    payload["customer_personalization"] = personalization.model_dump(mode="json")
+    return MindProfile.model_validate(payload)
+
+
+def validate_customer_mind_profile(
+    profile: MindProfile,
+    factory_profile: MindProfile,
+) -> None:
+    """Reject active customer files that changed anything outside the contract."""
+
+    personalization = profile.customer_personalization
+    if personalization is None:
+        return
+    expected = apply_customer_mind_personalization(
+        factory_profile,
+        personalization,
+    )
+    if profile.model_dump(mode="json") != expected.model_dump(mode="json"):
+        raise ValueError(
+            "customer mind profile changed locked or non-personalizable fields"
+        )
 
 
 def default_mind_profile_path(project_root: str | Path | None = None) -> Path:

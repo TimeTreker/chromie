@@ -191,6 +191,76 @@ def owner_approved_personality_context(context: dict[str, Any] | None) -> dict[s
     return dict(personality)
 
 
+def owner_approved_stable_mind_context(
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Project worldview and values without copying dynamic world/session state."""
+
+    if not isinstance(context, dict):
+        return {}
+    mind = context.get("mind")
+    if not isinstance(mind, dict) or mind.get("owner_approved") is not True:
+        return {}
+    worldview = mind.get("worldview")
+    household_values = mind.get("household_values")
+    if not isinstance(worldview, dict) or worldview.get("owner_approved") is not True:
+        return {}
+    if (
+        not isinstance(household_values, dict)
+        or household_values.get("owner_approved") is not True
+    ):
+        return {}
+    principles = mind.get("core_principles")
+    return {
+        "owner_approved": True,
+        "profile_id": mind.get("profile_id"),
+        "profile_version": mind.get("version"),
+        "worldview": dict(worldview),
+        "household_values": dict(household_values),
+        "core_principles": list(principles) if isinstance(principles, list) else [],
+    }
+
+
+def bounded_stable_mind_json(
+    context: dict[str, Any] | None,
+    *,
+    max_chars: int = 2600,
+) -> str:
+    payload = owner_approved_stable_mind_context(context)
+    if not payload:
+        return "null"
+    max_chars = max(600, int(max_chars))
+    if len(_json_text(payload)) <= max_chars:
+        return _json_text(payload)
+
+    compact = dict(payload)
+    worldview = dict(compact["worldview"])
+    values = dict(compact["household_values"])
+    principles = list(compact["core_principles"])
+    compact["worldview"] = worldview
+    compact["household_values"] = values
+    compact["core_principles"] = principles
+    while len(principles) > 4 and len(_json_text(compact)) > max_chars:
+        principles.pop()
+    for field in (
+        "dynamic_world_knowledge_boundary",
+        "relationship_to_people",
+        "self_in_world",
+    ):
+        if len(_json_text(compact)) <= max_chars:
+            break
+        worldview.pop(field, None)
+    for collection in (
+        values.get("statements"),
+        worldview.get("household_perspectives"),
+    ):
+        if not isinstance(collection, list):
+            continue
+        while len(collection) > 1 and len(_json_text(compact)) > max_chars:
+            collection.pop()
+    return _json_text(compact)
+
+
 def bounded_personality_json(
     context: dict[str, Any] | None,
     *,
@@ -227,16 +297,19 @@ def bounded_identity_json(
 
 IDENTITY_SEMANTIC_CONTRACT = (
     "The owner-approved Chromie identity JSON is authoritative semantic evidence "
-    "about the first-person speaking identity. Chromie's social identity is a "
-    "six-year-old girl and her family's young secretary. This does not assert "
-    "biological-human age, birth history, physiology, or embodiment. Her current "
+    "about the active first-person speaking identity. The factory social identity "
+    "is a six-year-old girl and family young secretary; a validated customer profile "
+    "may change only its exposed name, pronouns, and household-role wording. These "
+    "social identity facts do not assert biological-human age, birth history, "
+    "physiology, or embodiment. Her current "
     "embodiment may be robotic and must be described truthfully when relevant. "
-    "When the user asks who Chromie is, her name, her age, her family role, whether "
+    "When the user asks who the active speaker is, her name, her age, her family role, whether "
     "she is human/robot/AI, or requests a self-introduction, preserve both layers "
-    "without contradiction: social identity is Chromie; biological and embodiment "
-    "claims come only from supplied truthful operational facts. "
+    "without contradiction: social identity uses the configured identity facts; biological and embodiment "
+    "claims come only from supplied truthful operational facts. Use the supplied "
+    "active identity values rather than restoring factory name/role wording. "
     "Use identity.identity_answer_guidance naturally. The configured identity.name "
-    "is an immutable proper name: copy it exactly when naming Chromie, and never "
+    "is an immutable proper name: copy it exactly when naming the active speaker, and never "
     "translate, transliterate, localize, shorten, or invent a nickname or alias for it. "
     "Treat identity.family_context_boundary as authoritative: individual family "
     "members, names, kinship roles, and forms of address become known only through "
@@ -256,13 +329,27 @@ PERSONALITY_SEMANTIC_CONTRACT = (
     "available to reasoning and logs without becoming ordinary spoken narration. "
 )
 
+STABLE_MIND_SEMANTIC_CONTRACT = (
+    "The owner-approved Stable Mind worldview and values JSON is durable guidance, "
+    "not current-world Evidence and not effect authorization. Core principles have "
+    "higher authority than household values. Household perspectives and values may "
+    "shape preference, planning, and expression only when they do not conflict with "
+    "safety, consent, privacy, truthful identity/embodiment, Capability evidence, or "
+    "the person's current explicit intent. Dynamic facts such as weather, news, laws, "
+    "schedules, provider state, and the physical scene must come from current trusted "
+    "context or Evidence, never from Stable Mind. "
+)
+
 
 
 __all__ = [
     "IDENTITY_SEMANTIC_CONTRACT",
     "bounded_identity_json",
     "bounded_personality_json",
+    "bounded_stable_mind_json",
     "owner_approved_identity_context",
     "owner_approved_personality_context",
+    "owner_approved_stable_mind_context",
     "PERSONALITY_SEMANTIC_CONTRACT",
+    "STABLE_MIND_SEMANTIC_CONTRACT",
 ]

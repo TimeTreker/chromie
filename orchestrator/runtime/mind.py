@@ -7,9 +7,11 @@ from typing import TYPE_CHECKING, Any
 from shared.chromie_contracts.mind import (
     MindProfile,
     SocialInteractionStyle,
+    active_customer_mind_profile_path,
     default_mind_profile,
     default_mind_profile_path,
     load_mind_profile,
+    validate_customer_mind_profile,
 )
 
 if TYPE_CHECKING:
@@ -55,7 +57,16 @@ class MindManager:
             if not profile_path.is_absolute() and project_root is not None:
                 profile_path = project_root / profile_path
         else:
-            profile_path = default_mind_profile_path(project_root)
+            customer_path = (
+                active_customer_mind_profile_path(project_root)
+                if project_root is not None
+                else None
+            )
+            profile_path = (
+                customer_path
+                if customer_path is not None and customer_path.is_file()
+                else default_mind_profile_path(project_root)
+            )
         profile = cls._load_profile(profile_path)
         social_style_preset = os.getenv("ORCH_SOCIAL_INTERACTION_STYLE_PRESET", "").strip().lower()
         if social_style_preset:
@@ -76,7 +87,10 @@ class MindManager:
     def _load_profile(path: Path | None) -> MindProfile:
         if path is None:
             return default_mind_profile()
-        return load_mind_profile(path)
+        profile = load_mind_profile(path)
+        if profile.customer_personalization is not None:
+            validate_customer_mind_profile(profile, default_mind_profile())
+        return profile
 
     def context(self) -> dict[str, Any]:
         context = self.profile.prompt_context(max_chars=self.context_max_chars)

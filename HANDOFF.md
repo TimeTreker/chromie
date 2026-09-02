@@ -1,326 +1,85 @@
 # Chromie Latest Handoff
 
-Audience: coding agent beginning Fast/Deep Planner prompt qualification, or operator resuming GA global-contract/deployed-model review.
-Owner: project owner. Replace this snapshot when `DEVELOPMENT_CHECKPOINT.md` advances.
-Authority: operational snapshot only; current source, tests, retained evidence, the
-checkpoint, and Issue #34 win.
+Audience: coding agent resuming Issue #35 Fast/Deep Planner qualification or
+reviewing the integrated Stable Mind source boundary.
+
+Owner: project owner. This operational snapshot is subordinate to current
+source, tests, `DEVELOPMENT_CHECKPOINT.md`, and the active Issue.
 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
-- Pre-delivery baseline: `main` and `origin/main` at `2b97cdc9`
-- Expected resume revision: latest `origin/main` commit containing this handoff and
-  `DEVELOPMENT_CHECKPOINT.md`
-- Active completed-evidence Issue: [#34](https://github.com/TimeTreker/chromie/issues/34)
-- Next Issue: create a separate Fast/Deep Planner prompt-qualification Issue; do not
-  reuse #34 or silently combine the GA global DTO decision with Planner work
-- Integrated scope: GA prompt/Schema qualification and 1,500-file corpus; clarified
-  project-level semantic model-role qualification method and reusable repository Skill;
-  README architecture overview/detail assets; and truthful combined handoff
-- No provider, model profile, deployment, Runtime switch, Capability, voice, simulator,
-  or hardware behavior changed
+- Delivery branch: `main`
+- Pre-delivery base: `origin/main` at
+  `a10eab83379353c1e51862d319ec3decedea668a`
+- Expected resume revision: latest `origin/main` commit containing this handoff
+  and `DEVELOPMENT_CHECKPOINT.md`
+- Active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35)
+- Delivery scope: merge `codex/customer-mind-personalization` into `main`,
+  retain its bounded Stable Mind implementation and owned documentation, and
+  refresh the exact next-session handoff. The already-integrated
+  `refactor/complexity-cleanup-round2` branch required no code merge.
 
-## Semantic model-role qualification method delivered
-
-`docs/LLM_PROMPT_QUALIFICATION_METHOD.md` is the single method owner distilled from
-the GI and GA investigations. The current clarification requires:
-
-- qualification of the complete model-role transaction before selecting a repair;
-- explicit semantic authority and global-versus-role-local ownership;
-- reconstruction of the real production prompt/context/Schema/model/Host transaction;
-- a coverage matrix before corpus count, with one independently reviewable scenario per
-  file in a frozen digest-bound contrast corpus;
-- target-blind immutable full-batch inference through the exact declared transaction;
-- deterministic hard gates before retained semantic judgment;
-- earliest-boundary classification across scenario/oracle, prompt/profile,
-  context/harness, contract/schema, runtime/provider, model inference, mixed, and
-  unresolved causes;
-- no-Prompt-change as a successful result when the Prompt is not the earliest defective
-  owner;
-- one authorized minimal repair at the evidenced owner, exact focused proof, then complete
-  frozen-cohort rerun;
-- explicit stop conditions, evidence ceiling, blockers, and cross-session delivery.
-
-The method includes a copy-ready Planner session protocol. Fast and Deep remain depth
-passes of the same Planner HOW authority; qualify Fast primary/streaming/re-entry first,
-then Deep complex/blocked/revision paths, then rerun both cohorts. Neither may review or
-semantically repair the other. Deep may receive the designated unresolved-scope
-delegation before commitment; post-hoc reviewer output is adjudication evidence only and
-must not feed back into the primary result.
-
-## Reusable Skill delivered
-
-- `.agents/skills/optimize-chromie-llm-prompt/SKILL.md` turns the committed method into
-  an executable Codex workflow for transaction audit, qualification, owner diagnosis,
-  authorized repair, model comparison, and global-change review. Its existing identifier
-  and path are retained.
-- `.agents/skills/optimize-chromie-llm-prompt/agents/openai.yaml` provides the
-  user-facing `Qualify Chromie LLM Role` metadata and invocation example.
-- The Skill points back to `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` as authority; it does
-  not create another project method owner, prompt authority, model call, or Runtime path.
-
-Current clarification surface delta: zero new tracked files; six existing method, Skill,
-metadata, contribution, index, and delivery owners are modified before this handoff is
-included. No new architectural term, environment variable, Runtime switch, compatibility
-path, semantic authority, evidence format, or model call is added. Consolidation
-opportunity: keep future role-independent qualification rules in the existing method and
-Skill pair rather than adding another procedure owner.
-
-## Homepage architecture visualization delivery
-
-- `README.md` now displays the sparse overview in its Architecture section. The PNG is
-  the robust GitHub preview and links to the editable scalable SVG.
-- The complete original ASCII diagram remains immediately below in a collapsible
-  `Text fallback: canonical ownership path` block.
-- The README links a detailed reference that expands the same canonical flow into
-  Runtime events, Current Work, Host validation, trusted Evidence, Protective Reflex,
-  bounded state, and Planner re-entry.
-- `docs/assets/chromie-cognitive-diagrams-manifest.json` binds the two SVG sources and
-  two PNG exports to dimensions, SHA-256 hashes, authority sources, and provenance notes.
-
-Repository surface delta for this delivery: five new asset files under `docs/assets/`
-and three modified existing documentation owners (`README.md`,
-`DEVELOPMENT_CHECKPOINT.md`, and `HANDOFF.md`). No new architectural term,
-environment variable, runtime switch, compatibility path, provider, or evidence format was
-added. Consolidation opportunity: keep future homepage architecture visuals in this same
-overview/detailed pair and manifest rather than adding a third diagram owner.
-
-## Delivered authority flow
+## Integrated Stable Mind boundary
 
 ```text
-accepted GI Responsibilities + existing/recent Goal candidates
-  -> one primary GA invocation
-       -> exact dynamic decoder Schema
-            modify/clarify must carry structured semantic update
-       -> GoalAssociationModelOutput validation
-       -> GoalAssociationResolver
-  -> canonical Goal continuity -> Planner owns HOW
+factory MindProfile
+  + owner-confirmed bounded CustomerMindPersonalization
+  -> deterministic complete derived profile
+  -> strict recomputation/validation
+  -> Host and Agent select one active profile
+  -> bounded projection to Fast Planner, Deep Planner, and Reflection
 ```
 
-The fix does not add a same-authority repair, reviewer, scorer, or semantic retry.
-`reason_summary` stays non-authoritative rationale. The current decision discriminant
-is still exclusive: `associate` carries associations and `create_goals` carries new
-Goals. It cannot truthfully carry both in one result.
+Customer input is never raw prompt text and cannot override safety, privacy,
+consent, truthfulness, embodiment, evidence, or the person's current explicit
+intent. The configuration CLI previews by default; `--apply` uses atomic
+replacement with private mode and backup, while `--reset` retains a recoverable
+backup. No active customer profile was created by this merge.
 
-## Material changes
+The newly integrated files are the customer-profile contract/derivation,
+Host/Agent selection, bounded model-role projection, preview/apply/reset CLI,
+focused tests, and existing configuration/mind/status/user-manual owners.
+No new model invocation, semantic authority, environment variable, Runtime
+switch, compatibility path, provider, or hardware behavior was added.
 
-Methodology-only delivery additions:
+## Fast Planner qualification state
 
-- `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`: new required owner for the complete
-  prompt-qualification method and Planner new-session protocol.
-- `AGENTS.md`: makes the method required reading before model-role prompt optimization.
-- `CONTRIBUTING.md`: links the method to the existing authoritative LLM-versus-workflow
-  root-cause categories.
-- `docs/README.md`: indexes the new owner and its governance question.
+`benchmarks/datasets/fast_planner_daily_life/` holds 1,000 separate bilingual
+scenarios in 100 contrast sets. Its tree digest is
+`8b5133b32e85eebd3587f2a63fff394cd02094b798ac8948d7ca9e350175579b`.
+The prior immutable baseline in
+`.chromie/benchmarks/fast-planner/20260901T053409Z_fp_daily_v1_codex_baseline/`
+was stopped at owner request after 349 complete calls (with an interrupted 350th
+envelope). It is incomplete: do not resume or adjudicate it, and do not claim
+Fast Planner qualification from it.
 
-Prior GI delivery surface delta: zero new tracked files; 338 modified corpus scenario files and
-24 other existing source/test/config/document/scenario files (362 total). No new environment
-variable, public switch, architecture term, compatibility path, provider, runtime profile,
-or evidence format. Consolidation opportunity: if an exact deployed decoder proves prompt
-length is a blocker, reduce duplicated field descriptions inside the existing prompt/schema
-owners; do not create another prompt authority or repair stage.
+## Validation ledger
 
-The previously delivered GA scope remains unchanged:
-
-- `agent/app/goal_association_prompt.py`: places modify/clarify structured-update
-  requirements next to relationship selection.
-- `agent/app/goal_association_schema.py`: exposes the existing DTO/Host update invariant
-  at the earliest decoder boundary with conditional JSON Schema.
-- `tests/test_goal_association_pr2.py`: rejects a modify association whose meaning is
-  present only in `reason_summary` and accepts the structured update.
-- `benchmarks/datasets/goal_association_daily_life/`: 1,500 separate scenario JSON
-  files plus README, static manifest, validator, and package marker. There is no
-  generator or combined scenario file.
-- `benchmarks/tests/test_goal_association_daily_life_dataset.py`: checks counts,
-  per-file identity/path alignment, manifest digest, references, real Schema, and Host.
-- `benchmarks/README.md` and `docs/README.md`: index the new corpus in existing owners.
-
-Prior GA delivery surface delta: 1,505 new tracked files (1,500 scenarios,
-four corpus support files, one dataset test) and five existing implementation/test/doc
-owners plus the two required delivery owners modified. No environment variable, public
-switch, first-class architecture term, compatibility path, or evidence format was added.
-Consolidation opportunity: if the global mixed decision is authorized, evolve the existing
-GA result discriminant rather than adding a parallel model stage or new association service.
-
-Methodology-delivery surface delta: current Markdown-document count grows from 99 to
-100; one method owner is added, three existing governance/index documents are updated,
-and the two required delivery owners advance. The new document is necessary because no
-existing owner composes authority audit, frozen target-blind inference, adjudication,
-iteration, stop, and Planner handoff into one protocol. Consolidation opportunity: keep
-all role-independent prompt method changes in this owner and replace any future duplicate
-component procedure with a link rather than adding another methodology document.
-
-Skill-delivery surface delta: two new agent-tooling files under one existing Skill owner
-surface. No product document, environment variable, Runtime switch, compatibility path,
-semantic authority, evidence format, or model call was added. Consolidation opportunity:
-keep role-specific procedures in the method/Skill pair rather than adding sibling Skills.
-
-## Actual defect and repaired workflow
-
-| Module/owner | Material input | Baseline actual output | Required/final output | Correlation/judgment |
-|---|---|---|---|---|
-| Primary GA | Accepted GI refs plus candidate Goals | 36 ordinary modify decisions described the change only in `reason_summary` | Structured, complete Goal update in the same primary decision | Prompt exposed decoder mismatch |
-| Dynamic Schema | Exact allowed refs/Goal IDs | Accepted missing update fields | Reject modify/clarify unless structured update exists | Earliest wrong mechanical boundary fixed |
-| DTO/Host | Primary structured result | Failed closed on all 36 incomplete updates | Resolve complete update without another LLM call | Correct containment retained |
-| Canonical Goal/Planner | Host-accepted continuity | Not invoked for failures | Receives accepted Goal truth; Planner alone authors HOW | Downstream ownership unchanged |
-
-The prompt was not treated as the only cause. The generated Schema contradicted the
-already stricter DTO/Host contract, so the fix aligns both earliest input surfaces. No
-Host reconstruction or downstream semantic reinterpretation was added.
-
-## Frozen cohort and model identity
-
-- Dataset: `chromie.goal_association_daily_life.v1`
-- Cases: 1,500; languages: 750 `en-US`, 750 `zh-CN`
-- Contrast construction: 100 semantic seeds × 15 continuity families
-- Current-contract references: 1,400
-- Known global-contract probes: 100
-- Scenario-tree SHA-256:
-  `264ca6eb41b15d86f3a9906eeec37576df584b1a7b113c3590f06f3adc39d2ab`
-- Model: Codex `gpt-5.6-sol`, reasoning effort `high`, invoked with `codex exec`
-- Reference targets were excluded from inference packets
-- Changed prompt SHA-256:
-  `3d68272a0612a4a7079ba15c272c5ea17d2101bc27e98c6a15975d70628c3a26`
-- Changed Schema SHA-256:
-  `5162f8d03c74e339eeffec7312cccc3fadcc8da1d07a6bc931224593f96fb482`
-
-## Retained local evidence
-
-Baseline full Codex cohort:
+Historical customer-branch results (not integrated-tree evidence):
 
 ```text
-.chromie/benchmarks/goal-association/20260831T023604Z_ga_daily_v1_codex-gpt-5.6-sol/
-.chromie/benchmarks/goal-association/20260831T023604Z_ga_daily_v1_codex-gpt-5.6-sol/adjudication-summary.json
+python -m pytest tests/test_mind_profile.py tests/test_cognitive_identity_context.py tests/test_configure_chromie_mind.py
+28 passed in 0.51s
 ```
 
-- 1,364/1,400 current-contract passes
-- 36 Host failures, all `modify_active`
-- 1,500/1,500 passed the baseline dynamic Schema
-
-Exact focused rerun:
-
-```text
-.chromie/benchmarks/goal-association/20260831T045338Z_ga_modify_local_prompt_codex-gpt-5.6-sol/
-.chromie/benchmarks/goal-association/20260831T045338Z_ga_modify_local_prompt_codex-gpt-5.6-sol/summary.json
-```
-
-- exact baseline failures: 36/36 changed-Schema and Host passes
-- contract repair attempts: 0
-
-Full changed-prompt rerun:
-
-```text
-.chromie/benchmarks/goal-association/20260831T045812Z_ga_daily_v1_local-prompt-v2_codex-gpt-5.6-sol/
-.chromie/benchmarks/goal-association/20260831T045812Z_ga_daily_v1_local-prompt-v2_codex-gpt-5.6-sol/adjudication-summary.json
-```
-
-- current-contract cases: 1,400/1,400
-- English supported cases: 700/700; Chinese supported cases: 700/700
-- changed dynamic Schema: 1,500/1,500
-- `modify_active`: 100/100, up from 64/100
-- unexpected failures: 0; contract repair attempts: 0
-- source stable during the batch
-- 100 mixed association-plus-creation probes retain `known_contract_gap`
-
-An early local Gemma run was stopped after the user corrected the inference authority:
-
-```text
-.chromie/benchmarks/goal-association/20260831T023009Z_ga_daily_v1_gemma4-12b/
-```
-
-It is aborted diagnostic residue only and must never be cited as qualification evidence.
-All `.chromie` artifacts are ignored by Git and do not transfer with the push.
-
-## Automated gates
-
-Previously delivered GA qualification evidence at `7d314cbd`:
-
-```text
-python benchmarks/datasets/goal_association_daily_life/validate.py --json
-1,500 validated; 1,400 Host accepted; 100 known contract gaps; 0 errors
-
-python -m pytest -q \
-  benchmarks/tests/test_goal_association_daily_life_dataset.py \
-  tests/test_goal_association_pr2.py
-78 passed
-
-python scripts/check_repository_policies.py
-15 rule families, 0 reviewed exceptions; passed
-
-./scripts/run_tests.sh
-2,048 main tests and 20 legacy Agent tests; passed
-
-python scripts/check_docs.py
-99 Markdown files; passed
-
-git diff --check
-passed
-```
-
-The first GA complete gate attempt stopped because `docs/README.md` did not index the new
-corpus README. The missing existing-owner index was added; the complete gate was rerun
-and passed. No failing gate is hidden.
-
-Final observed methodology-delivery pre-commit results at `b9f5550a`:
+Canonical validation on the staged merge tree observed on 2026-09-02:
 
 ```text
 python scripts/check_repository_policies.py
-15 rule families, 0 reviewed exceptions; passed
+Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
 
 ./scripts/run_tests.sh
-2,048 main tests and 20 legacy Agent tests; passed
-
-python scripts/check_docs.py
-100 Markdown files; passed
-
-git diff --check
-passed
+exit 0; all checks passed, including policy, test ownership, Ruff, Mypy,
+configuration, documentation, scenario, and repository-structure gates
 ```
 
-Previously observed architecture-documentation gate at `f3d14792`:
+This is automated source/document evidence on the staged merge tree; it does
+not substitute for deployed, customer-visible, or target evidence.
 
-```text
-manifest/XML verification
-2 SVG files valid; 4 asset hashes match manifest
-
-python scripts/check_repository_policies.py
-15 rule families, 0 reviewed exceptions; passed
-
-./scripts/run_tests.sh
-2,048 main tests and 20 legacy Agent tests; passed
-
-python scripts/check_docs.py
-98 Markdown files; passed
-
-git diff --check
-passed
-```
-
-Current model-role method/Skill clarification delivery on the pre-commit tree:
-
-```text
-python /home/chromie/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
-  .agents/skills/optimize-chromie-llm-prompt
-Skill is valid!
-
-python scripts/check_repository_policies.py
-15 rule families, 0 reviewed exceptions; passed
-
-./scripts/run_tests.sh
-2,048 main tests and 20 legacy Agent tests; benchmark checks 128; Ruff, Mypy,
-configuration, structure, policy, ownership, and documentation gates passed
-
-python scripts/check_docs.py
-101 Markdown files; passed
-
-git diff --check
-passed
-```
-
-An independent read-only hypothetical forward-test of the Skill selected Audit mode,
-qualified the transaction before the Prompt, accepted no-Prompt-change success, and
-preserved the mechanical/global and Fast/Deep boundaries. This is agent-tooling evidence,
-not Planner model inference, deployed Runtime, or live behavior evidence.
+No deployed Agent restart, exact provider/model check, household authentication,
+voice, microphone, simulator, target hardware, physical safety, or release
+evidence was collected for the Stable Mind integration.
 
 ## Cross-machine resume
 
@@ -331,51 +90,29 @@ git pull --ff-only origin main
 python scripts/check_repository_policies.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py
-python benchmarks/datasets/goal_association_daily_life/validate.py
 ```
 
-Start Planner prompt work by reading `docs/LLM_PROMPT_QUALIFICATION_METHOD.md`, then
-audit these real owners before editing:
+Then begin the Fast Planner target-blind cohort from a fresh output directory:
 
-```text
-agent/app/planner_prompt.py
-agent/app/planner_context.py
-agent/app/planner_model_contract.py
-agent/app/planner_validation.py
-agent/app/fast_planner.py
-agent/app/deep_planner.py
-tests/test_planner_prompt_module.py
-tests/test_fast_planner_pr3.py
-tests/test_deep_planner_pr4.py
-tests/test_fast_planner_streaming_commit.py
-tests/test_planner_reentry_policy.py
+```bash
+python -m benchmarks.datasets.fast_planner_daily_life.qualification validate
+
+FP_RUN_DIR=.chromie/benchmarks/fast-planner/NEW_RUN_ID_fp_daily_v1_codex_baseline
+python -m benchmarks.datasets.fast_planner_daily_life.qualification prepare \
+  --label baseline-v1 --output-dir "$FP_RUN_DIR"
+python -m benchmarks.datasets.fast_planner_daily_life.qualification run \
+  --output-dir "$FP_RUN_DIR" --concurrency 16 --timeout-s 600
+python -m benchmarks.datasets.fast_planner_daily_life.qualification adjudicate \
+  --output-dir "$FP_RUN_DIR"
 ```
 
-Create a new Issue and a new `codex/` branch after preserving any unrelated dirty
-worktree state. Before implementation, report Planner authority/non-authority, every
-Fast/Deep invocation variant, the real boundary workflow, proposed bilingual contrast
-matrix/count/splits, adjudication dimensions, evidence level, and any global decision
-requiring owner authorization. Use Codex `gpt-5.6-sol` high reasoning for offline
-inference unless the owner explicitly selects another model; never silently substitute
-Gemma/Ollama. Store one scenario per file, hide targets from inference, complete one
-immutable baseline before editing, and do not commit/push without explicit authorization.
-
-Review Issue #34 before changing the 100 global contract-gap cases. A mixed complete
-result must preserve one semantic authority and Responsibility conservation; do not add
-a second GA call, split the turn into unrelated authorities, or make Host infer missing
-meaning. Obtain explicit project-owner authorization before changing the canonical DTO.
-
-For deployed-provider qualification, retain the exact model digest, transport, strict
-decoder, prompt/Schema hashes, parameters, revision, runtime profile, latency, and
-GPU/TTS coexistence evidence. Run the complete frozen directory-discovered cohort without
-source edits between cases.
+Keep the entire cohort source-stable. Inspect every adjudicated case and select
+one earliest-boundary cluster before editing. For future customer-visible Stable
+Mind work, use the same deterministic derivation/validation boundary and retain
+authenticated owner confirmation plus deployed-model and service-restart evidence.
 
 ## Claim boundary
 
-The local GA prompt/schema is qualified only for the 1,400 cases expressible by the
-current contract. The clarified methodology and Skill qualify the transaction before
-selecting a repair; their validation is process/agent-tooling evidence and does not qualify
-Fast/Deep Planner behavior. The homepage assets are explanatory views of existing
-authority truth. No production model/profile, live service, audible voice, microphone,
-simulator, target robot, physical safety, or release evidence was established. The 100
-global mixed-decision cases remain open.
+This is an integrated source delivery. It does not establish customer-visible
+personalization, Planner prompt quality, deployment, model, voice, simulator,
+hardware, safety, or release readiness.
