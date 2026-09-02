@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Prepare, execute, and adjudicate target-blind GA qualification batches.
 
-Codex acts as a same-model offline Goal Association surrogate.  Each candidate
-receives only the exact rendered production system/user prompt and dynamic JSON
-Schema.  Hidden corpus targets are introduced only during deterministic
-adjudication.  This does not qualify the deployed provider or model profile.
+Each candidate receives only the exact rendered production system/user prompt
+and dynamic JSON Schema. Hidden corpus targets are introduced only during
+deterministic adjudication. Codex remains the same-model offline surrogate;
+Ollama mode exercises the declared model through Chromie's production client
+and exact frozen generation options without claiming service or robot evidence.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import sys
 import time
 from typing import Any
 
+import httpx
 from jsonschema import Draft202012Validator
 
 
@@ -29,6 +31,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent.app.goal_association import GoalAssociationResolver  # noqa: E402
+from agent.app.clients.ollama_client import (  # noqa: E402
+    OllamaClient,
+    OllamaGenerationError,
+)
 from shared.chromie_contracts.core_interpretation import (  # noqa: E402
     CognitiveWorkRequest,
 )
@@ -38,7 +44,6 @@ from benchmarks.datasets.goal_association_daily_life.validate import (  # noqa: 
     DATASET_ID,
     DATASET_ROOT,
     MANIFEST_PATH,
-    _request_schema,
     load_cases,
     scenario_paths,
     scenario_tree_digest,
@@ -84,6 +89,22 @@ def _sha256(value: bytes | str) -> str:
     if isinstance(value, str):
         value = value.encode("utf-8")
     return hashlib.sha256(value).hexdigest()
+
+
+def _write_ordered_json(path: Path, value: Any) -> None:
+    """Freeze JSON without changing production-observable object key order."""
+
+    path.write_text(
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=False,
+            allow_nan=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _case_ref(case_id: str) -> str:
@@ -149,10 +170,19 @@ class ReplayModel:
         return value
 
 
-async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
+async def build_transaction(
+    case: dict[str, Any],
+    *,
+    num_ctx: int = 4096,
+    num_predict: int = 512,
+) -> dict[str, Any]:
     request = CognitiveWorkRequest.model_validate(case["input"]["request"])
     capture = CaptureModel(case["target"]["reference_model_output"])
-    resolution = await GoalAssociationResolver(capture).resolve(request)
+    resolution = await GoalAssociationResolver(
+        capture,
+        num_ctx=num_ctx,
+        num_predict=num_predict,
+    ).resolve(request)
     if resolution.resolution_status != "resolved" or len(capture.calls) != 1:
         raise ValueError(
             f"{case['id']}: production prompt capture failed: "
@@ -179,14 +209,47 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def _ollama_model_identity(base_url: str, model: str) -> dict[str, Any]:
+    async with httpx.AsyncClient(
+        base_url=base_url.rstrip("/"),
+        timeout=httpx.Timeout(30.0),
+        trust_env=False,
+    ) as client:
+        version_response = await client.get("/api/version")
+        version_response.raise_for_status()
+        tags_response = await client.get("/api/tags")
+        tags_response.raise_for_status()
+    version_payload = version_response.json()
+    tags_payload = tags_response.json()
+    for item in tags_payload.get("models") or []:
+        if isinstance(item, dict) and item.get("name") == model:
+            return {
+                "provider": "ollama",
+                "provider_version": version_payload.get("version"),
+                "name": model,
+                "digest": item.get("digest"),
+                "size_bytes": item.get("size"),
+                "modified_at": item.get("modified_at"),
+                "details": item.get("details"),
+            }
+    raise ValueError(f"model {model!r} is not installed at {base_url}")
+
+
 async def prepare_batch(
     output_dir: Path,
     *,
     label: str,
     model: str,
     reasoning_effort: str,
+    provider: str = "codex",
+    ollama_url: str = "http://127.0.0.1:11434",
+    num_ctx: int = 4096,
+    num_predict: int = 512,
+    timeout_ms: int = 120000,
     only_case_ids: list[str] | None = None,
 ) -> dict[str, Any]:
+    if provider not in {"codex", "ollama"}:
+        raise ValueError(f"unsupported qualification provider: {provider!r}")
     await asyncio.to_thread(validate_dataset)
     output_dir = output_dir.resolve()
     if output_dir.exists():
@@ -202,10 +265,11 @@ async def prepare_batch(
         "required": ["model_output_text"],
         "additionalProperties": False,
     }
-    (output_dir / "codex-envelope-schema.json").write_text(
-        json.dumps(envelope_schema, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    if provider == "codex":
+        (output_dir / "codex-envelope-schema.json").write_text(
+            json.dumps(envelope_schema, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     all_cases = load_cases()
     requested_ids = set(only_case_ids or [])
     known_ids = {case["id"] for case in all_cases}
@@ -221,21 +285,20 @@ async def prepare_batch(
     index: list[dict[str, Any]] = []
     prompt_identities: dict[str, dict[str, str]] = {}
     for position, case in enumerate(cases, start=1):
-        transaction = await build_transaction(case)
+        transaction = await build_transaction(
+            case,
+            num_ctx=num_ctx,
+            num_predict=num_predict,
+        )
         case_ref = _case_ref(case["id"])
         schema_sha = transaction["prompt_identity"]["schema_sha256"]
         schema_path = schemas_dir / f"{schema_sha}.json"
         if not schema_path.exists():
-            schema_path.write_text(
-                json.dumps(
-                    transaction["response_schema"],
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
-                )
-                + "\n",
-                encoding="utf-8",
-            )
+            # JSON object order is semantically irrelevant to a validator but
+            # observable to a constrained decoder. Preserve the exact order
+            # produced by the production Schema builder while the canonical
+            # order-insensitive digest still binds its value.
+            _write_ordered_json(schema_path, transaction["response_schema"])
         packet = {
             "schema_version": 1,
             "case_ref": case_ref,
@@ -266,6 +329,62 @@ async def prepare_batch(
         )
         prompt_identities[case_ref] = transaction["prompt_identity"]
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    if provider == "codex":
+        harness_runtime = {
+            "codex_cli": subprocess.run(
+                ["codex", "--version"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        }
+        inference = {
+            "provider": "codex",
+            "authority": "Codex CLI same-model offline GA surrogate",
+            "model": model,
+            "reasoning_effort": reasoning_effort,
+            "primary_calls_per_scenario": 1,
+            "mechanical_repair_calls": (
+                "zero or one, only when production resolver requests it"
+            ),
+            "retry_policy": "none",
+            "same_model_non_independent": True,
+            "independent_semantic_review": False,
+            "transport_limit": (
+                "Exact production prompt/Schema is projected through a strict Codex "
+                "string envelope; Codex CLI is not deployed Ollama constrained decoding."
+            ),
+        }
+    else:
+        model_identity = await _ollama_model_identity(ollama_url, model)
+        harness_runtime = {
+            "ollama_url": ollama_url.rstrip("/"),
+            "ollama_model_identity": model_identity,
+        }
+        inference = {
+            "provider": "ollama",
+            "authority": "Chromie production OllamaClient Goal Association transaction",
+            "model": model,
+            "model_digest": model_identity.get("digest"),
+            "options": {
+                "temperature": 0,
+                "top_p": 0.9,
+                "num_ctx": num_ctx,
+                "num_predict": num_predict,
+            },
+            "timeout_ms": timeout_ms,
+            "primary_calls_per_scenario": 1,
+            "mechanical_repair_calls": (
+                "zero or one, only when production resolver requests it"
+            ),
+            "retry_policy": "none",
+            "same_model_non_independent": False,
+            "independent_semantic_review": False,
+            "transport_limit": (
+                "Exact production prompt, dynamic Schema, options, and non-thinking "
+                "OllamaClient transport; this bypasses the deployed Agent HTTP service."
+            ),
+        }
     identity = {
         "schema_version": 1,
         "label": label,
@@ -283,27 +402,12 @@ async def prepare_batch(
         "harness": {
             "files": harness_file_identity(),
             "python": sys.version,
-            "codex_cli": subprocess.run(
-                ["codex", "--version"],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip(),
+            **harness_runtime,
         },
-        "inference": {
-            "authority": "Codex CLI same-model offline GA surrogate",
-            "model": model,
-            "reasoning_effort": reasoning_effort,
-            "primary_calls_per_scenario": 1,
-            "mechanical_repair_calls": "zero or one, only when production resolver requests it",
-            "retry_policy": "none",
-            "same_model_non_independent": True,
-            "transport_limit": (
-                "Exact production prompt/Schema is projected through a strict Codex "
-                "string envelope; Codex CLI is not deployed Ollama constrained decoding."
-            ),
-        },
-        "codex_envelope_schema_sha256": _sha256(_json_bytes(envelope_schema)),
+        "inference": inference,
+        "codex_envelope_schema_sha256": (
+            _sha256(_json_bytes(envelope_schema)) if provider == "codex" else None
+        ),
         "prompt_identity_index_sha256": _sha256(_json_bytes(prompt_identities)),
         "candidate_packet_policy": (
             "system/user/schema only; scenario id, target, oracle, category, split, "
@@ -452,6 +556,113 @@ async def _codex_call(
     return execution
 
 
+async def _ollama_call(
+    *,
+    output_dir: Path,
+    case_ref: str,
+    phase: str,
+    system_prompt: str,
+    user_prompt: str,
+    response_schema: dict[str, Any],
+    production_options: dict[str, Any],
+    client: OllamaClient,
+    timeout_s: float,
+) -> dict[str, Any]:
+    phase_root = output_dir / phase
+    raw_dir = phase_root / "raw-outputs"
+    logs_dir = phase_root / "call-logs"
+    executions_dir = phase_root / "call-executions"
+    for directory in (raw_dir, logs_dir, executions_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+    raw_path = raw_dir / f"{case_ref}.txt"
+    log_path = logs_dir / f"{case_ref}.log"
+    execution_path = executions_dir / f"{case_ref}.json"
+    if raw_path.exists() or execution_path.exists():
+        raise FileExistsError(f"immutable {phase} output exists for {case_ref}")
+    started = time.time()
+    timed_out = False
+    error: dict[str, Any] | None = None
+    try:
+        value = await asyncio.wait_for(
+            client.generate(
+                user_prompt,
+                system=system_prompt,
+                options=production_options,
+                response_format=response_schema,
+                prompt_family=(
+                    "goal_association.primary"
+                    if phase == "primary"
+                    else "goal_association.contract_repair"
+                ),
+                turn_id=case_ref,
+                attempt=1 if phase == "primary" else 2,
+            ),
+            timeout=timeout_s,
+        )
+        if not isinstance(value, dict):
+            raise TypeError("Ollama Goal Association output is not an object")
+        raw_path.write_text(
+            json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ),
+            encoding="utf-8",
+        )
+    except TimeoutError as exc:
+        timed_out = True
+        error = {"error_type": type(exc).__name__, "message": str(exc)}
+    except Exception as exc:
+        error = {
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+            **(
+                exc.metadata()
+                if isinstance(exc, OllamaGenerationError)
+                else {}
+            ),
+        }
+    ended = time.time()
+    log_path.write_text(
+        json.dumps(
+            {
+                "provider": "ollama",
+                "model": client.model,
+                "production_options": production_options,
+                "error": error,
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    execution = {
+        "schema_version": 1,
+        "case_ref": case_ref,
+        "phase": phase,
+        "provider": "ollama",
+        "model": client.model,
+        "started_epoch_s": started,
+        "ended_epoch_s": ended,
+        "latency_s": ended - started,
+        "exit_code": 0 if error is None else 1,
+        "timed_out": timed_out,
+        "output_present": raw_path.exists(),
+        "output_sha256": _sha256(raw_path.read_bytes()) if raw_path.exists() else "",
+        "error": error,
+        "log_sha256": _sha256(log_path.read_bytes()),
+    }
+    execution_path.write_text(
+        json.dumps(execution, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return execution
+
+
 async def _capture_repair_call(
     request: CognitiveWorkRequest,
     primary_raw: str,
@@ -490,6 +701,8 @@ async def _run_one(
     timeout_s: float,
     model: str,
     reasoning_effort: str,
+    provider: str,
+    ollama_client: OllamaClient | None,
 ) -> dict[str, Any]:
     async with semaphore:
         case_ref = item["case_ref"]
@@ -499,17 +712,32 @@ async def _run_one(
         schema = json.loads(
             (output_dir / packet["response_schema_path"]).read_text(encoding="utf-8")
         )
-        primary = await _codex_call(
-            output_dir=output_dir,
-            case_ref=case_ref,
-            phase="primary",
-            system_prompt=packet["system_prompt"],
-            user_prompt=packet["user_prompt"],
-            response_schema=schema,
-            model=model,
-            reasoning_effort=reasoning_effort,
-            timeout_s=timeout_s,
-        )
+        if provider == "ollama":
+            if ollama_client is None:
+                raise ValueError("Ollama provider has no production client")
+            primary = await _ollama_call(
+                output_dir=output_dir,
+                case_ref=case_ref,
+                phase="primary",
+                system_prompt=packet["system_prompt"],
+                user_prompt=packet["user_prompt"],
+                response_schema=schema,
+                production_options=packet["production_options"],
+                client=ollama_client,
+                timeout_s=timeout_s,
+            )
+        else:
+            primary = await _codex_call(
+                output_dir=output_dir,
+                case_ref=case_ref,
+                phase="primary",
+                system_prompt=packet["system_prompt"],
+                user_prompt=packet["user_prompt"],
+                response_schema=schema,
+                model=model,
+                reasoning_effort=reasoning_effort,
+                timeout_s=timeout_s,
+            )
         repair: dict[str, Any] | None = None
         primary_path = output_dir / "primary" / "raw-outputs" / f"{case_ref}.txt"
         if primary_path.exists():
@@ -523,17 +751,32 @@ async def _run_one(
                 primary_path.read_text(encoding="utf-8"),
             )
             if repair_call is not None:
-                repair = await _codex_call(
-                    output_dir=output_dir,
-                    case_ref=case_ref,
-                    phase="repair",
-                    system_prompt=repair_call["system_prompt"],
-                    user_prompt=repair_call["user_prompt"],
-                    response_schema=repair_call["response_schema"],
-                    model=model,
-                    reasoning_effort=reasoning_effort,
-                    timeout_s=timeout_s,
-                )
+                if provider == "ollama":
+                    if ollama_client is None:
+                        raise ValueError("Ollama provider has no production client")
+                    repair = await _ollama_call(
+                        output_dir=output_dir,
+                        case_ref=case_ref,
+                        phase="repair",
+                        system_prompt=repair_call["system_prompt"],
+                        user_prompt=repair_call["user_prompt"],
+                        response_schema=repair_call["response_schema"],
+                        production_options=packet["production_options"],
+                        client=ollama_client,
+                        timeout_s=timeout_s,
+                    )
+                else:
+                    repair = await _codex_call(
+                        output_dir=output_dir,
+                        case_ref=case_ref,
+                        phase="repair",
+                        system_prompt=repair_call["system_prompt"],
+                        user_prompt=repair_call["user_prompt"],
+                        response_schema=repair_call["response_schema"],
+                        model=model,
+                        reasoning_effort=reasoning_effort,
+                        timeout_s=timeout_s,
+                    )
         return {"primary": primary, "repair": repair}
 
 
@@ -550,12 +793,29 @@ async def run_batch(
         raise ValueError("packet index count drift")
     if (output_dir / "primary").exists() or (output_dir / "source-stability.json").exists():
         raise FileExistsError("batch has execution artifacts; interrupted batches are not resumed")
+    provider = identity["inference"].get("provider", "codex")
     source_before = production_source_identity()
     harness_before = harness_file_identity()
     if source_before != identity["source"] or harness_before != identity["harness"]["files"]:
         raise ValueError("source or harness changed after packet freeze")
+    provider_model_before: dict[str, Any] | None = None
+    if provider == "ollama":
+        provider_model_before = await _ollama_model_identity(
+            identity["harness"]["ollama_url"],
+            identity["inference"]["model"],
+        )
+        if provider_model_before != identity["harness"]["ollama_model_identity"]:
+            raise ValueError("Ollama model identity changed after packet freeze")
     model = identity["inference"]["model"]
-    reasoning_effort = identity["inference"]["reasoning_effort"]
+    reasoning_effort = identity["inference"].get("reasoning_effort", "")
+    ollama_client = None
+    if provider == "ollama":
+        ollama_client = OllamaClient(
+            identity["harness"]["ollama_url"],
+            model,
+            timeout_ms=int(identity["inference"]["timeout_ms"]),
+            purpose="goal_association",
+        )
     semaphore = asyncio.Semaphore(max(1, concurrency))
     completed = 0
     results: list[dict[str, Any]] = []
@@ -569,6 +829,8 @@ async def run_batch(
             timeout_s=timeout_s,
             model=model,
             reasoning_effort=reasoning_effort,
+            provider=provider,
+            ollama_client=ollama_client,
         )
         results.append(result)
         completed += 1
@@ -583,6 +845,12 @@ async def run_batch(
     await asyncio.gather(*(tracked(item) for item in index))
     source_after = production_source_identity()
     harness_after = harness_file_identity()
+    provider_model_after: dict[str, Any] | None = None
+    if provider == "ollama":
+        provider_model_after = await _ollama_model_identity(
+            identity["harness"]["ollama_url"],
+            identity["inference"]["model"],
+        )
     primary_results = [value["primary"] for value in results]
     repair_results = [value["repair"] for value in results if value["repair"] is not None]
     stability = {
@@ -591,9 +859,17 @@ async def run_batch(
         "source_after": source_after,
         "harness_before": harness_before,
         "harness_after": harness_after,
+        "provider_model_before": provider_model_before,
+        "provider_model_after": provider_model_after,
         "stable": (
             source_before == source_after == identity["source"]
             and harness_before == harness_after == identity["harness"]["files"]
+            and (
+                provider != "ollama"
+                or provider_model_before
+                == provider_model_after
+                == identity["harness"]["ollama_model_identity"]
+            )
         ),
         "completed_primary_calls": len(primary_results),
         "successful_primary_processes": sum(
@@ -785,6 +1061,27 @@ async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
                     "target_errors": result["target_region"]["hard_errors"],
                 }
             )
+    provider = identity["inference"].get("provider", "codex")
+    if provider == "ollama":
+        semantic_review_status = (
+            "deterministic hidden-oracle region; exact declared Ollama model and "
+            "production transport; no independent semantic review"
+        )
+        evidence_ceiling = (
+            "Declared Ollama model/digest through Chromie's production OllamaClient "
+            "over exact rendered GA prompts, dynamic Schemas, and frozen generation "
+            "options; bypasses the deployed Agent HTTP service and establishes no "
+            "voice, simulator, hardware, independent-review, or release evidence."
+        )
+    else:
+        semantic_review_status = (
+            "deterministic hidden-oracle region; same-model and non-independent"
+        )
+        evidence_ceiling = (
+            "Same-model offline Codex surrogate over exact rendered GA prompts and "
+            "dynamic Schemas; not deployed provider/model, service, voice, simulator, "
+            "hardware, independent review, or release evidence."
+        )
     summary = {
         "schema_version": 1,
         "batch_label": identity["label"],
@@ -804,12 +1101,11 @@ async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
             key: dict(value) for key, value in sorted(slices["variant"].items())
         },
         "failure_examples": failures,
-        "semantic_review_status": "deterministic hidden-oracle region; same-model and non-independent",
-        "evidence_ceiling": (
-            "Same-model offline Codex surrogate over exact rendered GA prompts and "
-            "dynamic Schemas; not deployed provider/model, service, voice, simulator, "
-            "hardware, independent review, or release evidence."
-        ),
+        "provider": provider,
+        "model": identity["inference"]["model"],
+        "model_digest": identity["inference"].get("model_digest"),
+        "semantic_review_status": semantic_review_status,
+        "evidence_ceiling": evidence_ceiling,
     }
     (output_dir / "adjudication-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -825,8 +1121,13 @@ def main() -> int:
     prepare = subparsers.add_parser("prepare")
     prepare.add_argument("--output-dir", type=Path, required=True)
     prepare.add_argument("--label", required=True)
+    prepare.add_argument("--provider", choices=("codex", "ollama"), default="codex")
     prepare.add_argument("--model", default="gpt-5.6-sol")
     prepare.add_argument("--reasoning-effort", default="high")
+    prepare.add_argument("--ollama-url", default="http://127.0.0.1:11434")
+    prepare.add_argument("--num-ctx", type=int, default=4096)
+    prepare.add_argument("--num-predict", type=int, default=512)
+    prepare.add_argument("--timeout-ms", type=int, default=120000)
     prepare.add_argument("--only-case", action="append", default=[])
     run = subparsers.add_parser("run")
     run.add_argument("--output-dir", type=Path, required=True)
@@ -844,6 +1145,11 @@ def main() -> int:
                 label=args.label,
                 model=args.model,
                 reasoning_effort=args.reasoning_effort,
+                provider=args.provider,
+                ollama_url=args.ollama_url,
+                num_ctx=args.num_ctx,
+                num_predict=args.num_predict,
+                timeout_ms=args.timeout_ms,
                 only_case_ids=args.only_case,
             )
         )

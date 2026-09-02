@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
+from typing import Any
 
 from benchmarks.datasets.goal_association_daily_life.qualification import (
     _adjudicate_one,
     _capture_repair_call,
+    _ollama_call,
+    _write_ordered_json,
     build_transaction,
 )
 from benchmarks.datasets.goal_association_daily_life.validate import (
@@ -121,3 +125,107 @@ def test_goal_association_qualification_captures_only_permitted_repair() -> None
     assert repair is not None
     assert "mechanically malformed" in repair["user_prompt"]
     assert "reinterpret" in repair["system_prompt"]
+
+
+def test_goal_association_qualification_freezes_declared_generation_options() -> None:
+    case = next(item for item in load_cases() if item["category"] == "supersede_existing")
+
+    transaction = asyncio.run(
+        build_transaction(case, num_ctx=32768, num_predict=2048)
+    )
+
+    assert transaction["options"] == {
+        "temperature": 0,
+        "top_p": 0.9,
+        "num_ctx": 32768,
+        "num_predict": 2048,
+    }
+
+
+def test_goal_association_qualification_preserves_schema_property_order(
+    tmp_path: Path,
+) -> None:
+    schema = {
+        "properties": {
+            "reason_summary": {"type": "string"},
+            "associations": {"type": "array"},
+            "new_goals": {"type": "array"},
+        },
+        "$defs": {
+            "Goal": {
+                "properties": {
+                    "source_responsibility_refs": {"type": "array"},
+                    "description": {"type": "string"},
+                    "supersedes_goal_ids": {"type": "array"},
+                }
+            }
+        },
+    }
+    path = tmp_path / "schema.json"
+
+    _write_ordered_json(path, schema)
+    frozen = json.loads(path.read_text(encoding="utf-8"))
+
+    assert list(frozen["properties"]) == list(schema["properties"])
+    assert list(frozen["$defs"]["Goal"]["properties"]) == list(
+        schema["$defs"]["Goal"]["properties"]
+    )
+
+
+class _RecordingOllama:
+    model = "qwen-test:4b"
+
+    def __init__(self, output: dict[str, Any]) -> None:
+        self.output = output
+        self.calls: list[dict[str, Any]] = []
+
+    async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append({"prompt": prompt, **kwargs})
+        return self.output
+
+
+def test_goal_association_qualification_ollama_call_uses_production_contract(
+    tmp_path: Path,
+) -> None:
+    output = {"associations": [], "new_goals": []}
+    client = _RecordingOllama(output)
+    schema = {"type": "object"}
+    options = {
+        "temperature": 0,
+        "top_p": 0.9,
+        "num_ctx": 32768,
+        "num_predict": 2048,
+    }
+
+    execution = asyncio.run(
+        _ollama_call(
+            output_dir=tmp_path,
+            case_ref="case_test",
+            phase="primary",
+            system_prompt="system",
+            user_prompt="user",
+            response_schema=schema,
+            production_options=options,
+            client=client,  # type: ignore[arg-type]
+            timeout_s=10.0,
+        )
+    )
+
+    assert execution["exit_code"] == 0
+    assert execution["provider"] == "ollama"
+    assert json.loads(
+        (tmp_path / "primary" / "raw-outputs" / "case_test.txt").read_text(
+            encoding="utf-8"
+        )
+    ) == output
+    assert client.calls == [
+        {
+            "prompt": "user",
+            "system": "system",
+            "options": options,
+            "response_format": schema,
+            "prompt_family": "goal_association.primary",
+            "turn_id": "case_test",
+            "attempt": 1,
+        }
+    ]

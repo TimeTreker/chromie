@@ -664,8 +664,8 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         ordinary_property_order = list(ordinary_body_branch["properties"])
         self.assertLess(
-            ordinary_property_order.index("resource_kind"),
             ordinary_property_order.index("bindings"),
+            ordinary_property_order.index("resource_kind"),
         )
         physical_body_branch = next(
             branch
@@ -2050,6 +2050,32 @@ class GoalExecutionContractTests(unittest.TestCase):
             },
         )
         association_schema = schema["$defs"]["GoalAssociationModelAssociation"]
+        goal_schema = schema["$defs"]["GoalAssociationModelGoal"]
+        self.assertEqual(
+            list(schema["properties"]),
+            [
+                "reason_summary",
+                "associations",
+                "new_goals",
+                "referent_updates",
+                "resolved_references",
+                "confidence",
+            ],
+        )
+        self.assertEqual(
+            list(goal_schema["oneOf"][0]["properties"]),
+            [
+                "bindings",
+                "description",
+                "media_operation",
+                "output_mode",
+                "related_goal_ids",
+                "resource_kind",
+                "resource_responsibility",
+                "source_responsibility_refs",
+                "supersedes_goal_ids",
+            ],
+        )
         self.assertIn("confidence", association_schema["required"])
         self.assertIn("target_goal_ids", association_schema["required"])
         self.assertNotIn("decision", schema["properties"])
@@ -2060,8 +2086,105 @@ class GoalExecutionContractTests(unittest.TestCase):
             prompt,
         )
         self.assertIn("resolved_gap_ids empty when resolution is unproven", prompt)
+        self.assertIn(
+            "A superseded ID belongs only in supersedes_goal_ids",
+            prompt,
+        )
+        self.assertIn(
+            "merge and split remain associations rather than replacement Goals",
+            prompt,
+        )
+        self.assertIn(
+            "Candidate presence, topic overlap, recency, or having only one candidate",
+            prompt,
+        )
+        self.assertIn(
+            "emit the default independent new_goal with empty "
+            "supersedes_goal_ids and related_goal_ids",
+            prompt,
+        )
+        self.assertIn(
+            "never reuse one ref for another",
+            prompt,
+        )
+        self.assertIn(
+            "decisive coexistence evidence",
+            prompt,
+        )
+        self.assertIn(
+            "a different entity or output_mode alone is not replacement",
+            prompt,
+        )
+        self.assertIn(
+            "if either replacement condition is missing, row (1) is forbidden",
+            prompt,
+        )
+        self.assertIn(
+            "decisive coexistence evidence and forbids replacement",
+            prompt,
+        )
+        self.assertIn(
+            "retain_old=true implies supersedes_goal_ids=[]",
+            prompt,
+        )
+        self.assertIn(
+            "copy description from that Responsibility's current GI outcome",
+            prompt,
+        )
+        self.assertIn(
+            "First write compact reason_summary",
+            prompt,
+        )
+        for goal_branch in goal_schema["oneOf"]:
+            self.assertIn(
+                "Exact current GI outcome",
+                goal_branch["properties"]["description"]["description"],
+            )
+            self.assertIn(
+                "Use [] for an additional or separate Responsibility",
+                goal_branch["properties"]["supersedes_goal_ids"]["description"],
+            )
 
         validator = Draft202012Validator(schema)
+        contradictory_replacement = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "source_responsibility_refs": ["r1"],
+                    "description": "Blink twice.",
+                    "output_mode": "body_action",
+                    "media_operation": "none",
+                    "bindings": [
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "forward",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "distance_duration",
+                            "entity_type": "duration",
+                            "value": "10 秒",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "related_goal_ids": ["goal-walk"],
+                    "supersedes_goal_ids": ["goal-walk"],
+                    "resource_kind": "none",
+                    "resource_responsibility": None,
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+            "reason_summary": "Replace the retained Goal.",
+        }
+        self.assertTrue(list(validator.iter_errors(contradictory_replacement)))
+        contradictory_replacement["new_goals"][0]["related_goal_ids"] = []
+        self.assertEqual(
+            list(validator.iter_errors(contradictory_replacement)),
+            [],
+        )
         missing_modify_update = {
             "associations": [
                 {

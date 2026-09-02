@@ -281,6 +281,31 @@ def goal_association_response_schema(
     # without the same name/type invariant enforced by runtime validation.
     schema = binding_semantic_contract_response_schema(schema)
     goal_schema = schema.get("$defs", {}).get("GoalAssociationModelGoal")
+    if isinstance(goal_schema, dict) and active_ids:
+        # Host already rejects a Goal ID that is simultaneously retained as
+        # related context and retired by the replacement Goal. Expose that
+        # mechanical contradiction to the primary constrained decoder and DTO
+        # repair boundary instead of allowing it to reach terminal Host
+        # materialization.
+        goal_schema.setdefault("allOf", []).extend(
+            {
+                "not": {
+                    "properties": {
+                        "related_goal_ids": {
+                            "contains": {"const": goal_id},
+                        },
+                        "supersedes_goal_ids": {
+                            "contains": {"const": goal_id},
+                        },
+                    },
+                    "required": [
+                        "related_goal_ids",
+                        "supersedes_goal_ids",
+                    ],
+                }
+            }
+            for goal_id in active_ids
+        )
     if isinstance(goal_schema, dict) and responsibility_refs:
         # Every writable Goal-semantic surface must be explicit in the
         # constrained model output. Defaults on these fields are Python DTO
@@ -612,28 +637,32 @@ def goal_association_response_schema(
             }
             if output_mode is not None:
                 properties["output_mode"] = {"const": output_mode}
-            # JSON property order is observable to the constrained decoder.  Put
-            # the explicit semantic discriminator before either payload branch so
-            # the model chooses resource shape before the easier empty-bindings
-            # production can select a physical-resource branch on its behalf.
-            discriminator_first = (
-                "source_responsibility_refs",
-                "output_mode",
-                "resource_kind",
-                "description",
+            # JSON property order is observable to the constrained decoder. The
+            # configured-model focused evidence showed that discriminator-first
+            # order grows malformed resource branches. This order reduced those
+            # failures in the retained focused comparison; broad qualification
+            # remains a separate gate.
+            decoder_stable_order = (
                 "bindings",
+                "description",
+                "media_operation",
+                "output_mode",
+                "related_goal_ids",
+                "resource_kind",
                 "resource_responsibility",
+                "source_responsibility_refs",
+                "supersedes_goal_ids",
             )
             return {
                 **{
                     name: properties[name]
-                    for name in discriminator_first
+                    for name in decoder_stable_order
                     if name in properties
                 },
                 **{
                     name: value
                     for name, value in properties.items()
-                    if name not in discriminator_first
+                    if name not in decoder_stable_order
                 },
             }
 
@@ -787,6 +816,48 @@ def goal_association_response_schema(
     schema.pop("oneOf", None)
     schema.pop("anyOf", None)
     schema = resource_semantic_contract_response_schema(schema)
+    # Ask the primary result to form compact evidence before emitting the semantic
+    # collections so a non-thinking constrained decoder has that evidence in its
+    # generated context. The DTO and Host still reject any later contradiction.
+    top_level_decoder_order = (
+        (
+            "reason_summary",
+            "decision",
+            "new_goals",
+            "referent_updates",
+            "resolved_references",
+            "confidence",
+        )
+        if output_type is GoalSegmentationModelOutput
+        else (
+            "reason_summary",
+            "associations",
+            "new_goals",
+            "referent_updates",
+            "resolved_references",
+            "confidence",
+        )
+    )
+    current_properties = schema.get("properties")
+    if isinstance(current_properties, dict):
+        schema["properties"] = {
+            **{
+                name: current_properties[name]
+                for name in top_level_decoder_order
+                if name in current_properties
+            },
+            **{
+                name: value
+                for name, value in current_properties.items()
+                if name not in top_level_decoder_order
+            },
+        }
+        current_required = list(schema.get("required") or [])
+        schema["required"] = [
+            name for name in top_level_decoder_order if name in current_required
+        ] + [
+            name for name in current_required if name not in top_level_decoder_order
+        ]
     # The complete oneOf branches above duplicate the Pydantic parent Goal
     # surface so constrained decoders can generate branch-local required fields.
     # Keeping the same properties on the parent makes the decoder compile two

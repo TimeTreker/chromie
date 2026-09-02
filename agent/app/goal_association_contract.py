@@ -524,7 +524,13 @@ class GoalAssociationModelGoal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_responsibility_refs: list[str] = Field(min_length=1, max_length=8)
-    description: str = Field(min_length=1)
+    description: str = Field(
+        min_length=1,
+        description=(
+            "Exact current GI outcome for this new Responsibility. Never copy a "
+            "candidate Goal description into an additional or replacement Goal."
+        ),
+    )
     output_mode: GoalOutputMode = Field(
         description=(
             "Provider-neutral human outcome modality copied from Goal Interpretation. "
@@ -548,8 +554,25 @@ class GoalAssociationModelGoal(BaseModel):
         default_factory=list,
         max_length=12,
     )
-    related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
-    supersedes_goal_ids: list[str] = Field(default_factory=list, max_length=8)
+    related_goal_ids: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "Retained non-replacement Goal context only. A Goal ID listed here "
+            "must not also appear in supersedes_goal_ids."
+        ),
+    )
+    supersedes_goal_ids: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "Active Goal identities fully replaced by this new Goal. Use [] for an "
+            "additional or separate Responsibility even when active candidates exist. "
+            "A non-empty list requires direct source evidence both that the old Goal "
+            "must stop and that this new outcome substitutes for it. A superseded Goal "
+            "is not retained context and must not also appear in related_goal_ids."
+        ),
+    )
     resource_kind: Literal["none", "physical_object", "information"] = Field(
         default="none",
         description=(
@@ -625,6 +648,14 @@ class GoalAssociationModelGoal(BaseModel):
 
     @model_validator(mode="after")
     def validate_mode_specific_fields(self) -> "GoalAssociationModelGoal":
+        overlapping_goal_ids = set(self.related_goal_ids).intersection(
+            self.supersedes_goal_ids
+        )
+        if overlapping_goal_ids:
+            raise ValueError(
+                "a superseded Goal cannot also be retained as related context: "
+                + ", ".join(sorted(overlapping_goal_ids))
+            )
         if self.output_mode == "media_playback" and self.media_operation == "none":
             raise ValueError("media_playback requires one exact media_operation")
         if self.output_mode != "media_playback" and self.media_operation != "none":
@@ -683,7 +714,13 @@ class GoalSegmentationModelOutput(BaseModel):
         max_length=12,
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    reason_summary: str = ""
+    reason_summary: str = Field(
+        default="",
+        max_length=320,
+        description=(
+            "Compact continuity decision evidence written before the result payload."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -733,7 +770,14 @@ class GoalAssociationModelOutput(BaseModel):
         max_length=12,
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    reason_summary: str = ""
+    reason_summary: str = Field(
+        default="",
+        max_length=320,
+        description=(
+            "Compact per-Responsibility continuity evidence written before the "
+            "association and new-Goal payloads."
+        ),
+    )
 
     @field_validator("reason_summary", mode="before")
     @classmethod
