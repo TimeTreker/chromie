@@ -718,7 +718,8 @@ class GoalSegmentationModelOutput(BaseModel):
         default="",
         max_length=320,
         description=(
-            "Compact continuity decision evidence written before the result payload."
+            "Non-authoritative compact rationale for the emitted segmentation result; "
+            "decision and new_goals own the semantic result."
         ),
     )
 
@@ -774,8 +775,8 @@ class GoalAssociationModelOutput(BaseModel):
         default="",
         max_length=320,
         description=(
-            "Compact per-Responsibility continuity evidence written before the "
-            "association and new-Goal payloads."
+            "Non-authoritative compact rationale for the emitted result; associations "
+            "and new_goals own each Responsibility's continuity decision."
         ),
     )
 

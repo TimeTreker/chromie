@@ -664,8 +664,8 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         ordinary_property_order = list(ordinary_body_branch["properties"])
         self.assertLess(
-            ordinary_property_order.index("bindings"),
             ordinary_property_order.index("resource_kind"),
+            ordinary_property_order.index("bindings"),
         )
         physical_body_branch = next(
             branch
@@ -2054,27 +2054,32 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             list(schema["properties"]),
             [
-                "reason_summary",
                 "associations",
                 "new_goals",
                 "referent_updates",
                 "resolved_references",
                 "confidence",
+                "reason_summary",
             ],
         )
         self.assertEqual(
             list(goal_schema["oneOf"][0]["properties"]),
             [
-                "bindings",
-                "description",
-                "media_operation",
-                "output_mode",
-                "related_goal_ids",
-                "resource_kind",
-                "resource_responsibility",
                 "source_responsibility_refs",
+                "output_mode",
+                "resource_kind",
+                "description",
+                "bindings",
+                "resource_responsibility",
+                "media_operation",
+                "related_goal_ids",
                 "supersedes_goal_ids",
             ],
+        )
+        self.assertNotIn("media_operation", goal_schema["oneOf"][0]["required"])
+        self.assertEqual(
+            goal_schema["oneOf"][0]["properties"]["media_operation"],
+            {"const": "none"},
         )
         self.assertIn("confidence", association_schema["required"])
         self.assertIn("target_goal_ids", association_schema["required"])
@@ -2132,9 +2137,11 @@ class GoalExecutionContractTests(unittest.TestCase):
             prompt,
         )
         self.assertIn(
-            "First write compact reason_summary",
+            "sole authoritative per-Responsibility continuity result",
             prompt,
         )
+        self.assertIn("non-authoritative reason_summary", prompt)
+        self.assertNotIn("First write compact reason_summary", prompt)
         for goal_branch in goal_schema["oneOf"]:
             self.assertIn(
                 "Exact current GI outcome",
@@ -2184,6 +2191,23 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(
             list(validator.iter_errors(contradictory_replacement)),
             [],
+        )
+
+        media_schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "media_playback"},
+            responsibility_bindings={"r1": {"media_title": "小星星"}},
+        )
+        media_goal_schema = media_schema["$defs"]["GoalAssociationModelGoal"]
+        media_branch = media_goal_schema["oneOf"][0]
+        self.assertIn("media_operation", media_branch["required"])
+        self.assertNotIn(
+            "none",
+            media_branch["properties"]["media_operation"]["enum"],
         )
         missing_modify_update = {
             "associations": [

@@ -1,159 +1,144 @@
 # Chromie Development Checkpoint
 
-Status: Goal Association (GA) remains **not qualified** for the configured
-`qwen3.5:4b` role after the owner-authorized maximum 10 semantic optimization
-iterations. A same-model Codex surrogate had scored 1,500/1,500 strict, but the
-first exact Ollama qualification exposed a frozen-Schema ordering defect in the
-harness and systematic deployed-model failures. After preserving production
-Schema order, the final configured-model focused gate scored 5/9 strict; a
-`qwen3.5:9b` comparison scored 4/9. No final 1,500-case run was started because the
-required focused gate did not pass.
+Status: Goal Association (GA) is **qualified for the exact current branch
+candidate at the same-model offline Codex-surrogate level**. The final frozen
+Codex cohort scored 1,500/1,500 strict with zero repair, recovery, timeout, or
+process failure. This is not deployed-provider, service, voice, simulator,
+hardware, independent-review, release, or main-branch evidence.
 
 Updated: 2026-09-02
 
 Delivery branch: `codex/ga-prompt-qualification-paused-20260901`
 
-Worktree base before this delivery:
-`5cb6977ab176044d99b1ae9007eca259c6da8377`
+Pre-delivery baseline before the qualification patch:
+`ec34652f29f7957182b0104cc1fa57a3d0050cf3`
 
-Expected resume: the latest normal commit on the delivery branch containing this
+Expected resume: the latest normal delivery commit on this branch containing this
 checkpoint and `HANDOFF.md`, pushed to
 `origin/codex/ga-prompt-qualification-paused-20260901`.
 
 Active Issue: [#34 — Goal Association semantic qualification](https://github.com/TimeTreker/chromie/issues/34)
 
-Issue #35 Fast/Deep Planner qualification remains paused. Do not resume it by
-claiming GA is qualified.
+The owner corrected the qualification target: Qwen/Ollama results are historical
+model comparisons, not the authority for deciding whether the GA prompt,
+Schema/DTO, and Host transaction are sound. Codex `gpt-5.6-sol` with high
+reasoning is the model used for the current target-blind qualification.
 
 ## Stable authority and actual workflow
 
-The current focus remains the Goal-driven single-authority architecture. GA owns
-canonical Goal identity and continuity, not Planner HOW. One
-candidate-aware primary result may associate existing Goals and create independent
-Goals together. Every admitted GI Responsibility must appear exactly once across
-the union of `associations[]` and `new_goals[]`. The no-candidate segmentation
-variant retains its fixed `decision=create_goals` wire shape.
+The current focus remains the Goal-driven single-authority architecture.
+GA owns canonical Goal identity/continuity, new Goal creation, bounded referent
+continuity, and exact conservation of every admitted GI Responsibility. It does
+not own Planner HOW, Capabilities, executable Plans, response wording, completion,
+or Host persistence/lifecycle mechanics.
 
 ```text
-immutable user turn + GI Responsibilities + bounded Goal candidates
+immutable user turn + GI Responsibilities + bounded candidates/context
   -> exact production GA system/user prompt
   -> request-bound dynamic JSON Schema
-  -> one non-thinking Ollama primary invocation
+  -> one target-blind Codex primary inference
   -> optional one-shot mechanical malformed-DTO repair only
-  -> DTO + resolver + canonical Host validation
-  -> hidden target-blind Responsibility-map adjudication
+  -> Pydantic DTO + resolver + canonical Host fail-closed validation
+  -> hidden Responsibility-map adjudication
 ```
 
-Planner remains the only HOW authority. No second model call confirms, scores,
-audits, or semantically repairs GA. The exact-provider runner uses Chromie's
-production `OllamaClient`, prompt, dynamic Schema, and generation options, but
-bypasses the deployed Agent HTTP service and establishes no service, voice,
-simulator, hardware, independent-review, or release evidence.
+No second model call confirms, criticizes, scores, or semantically repairs the
+primary result. The retained runner projects the exact prompt and Schema through a
+strict Codex transport envelope; it does not exercise the deployed Agent service or
+Ollama constrained decoder.
 
-## Actual episode and earliest wrong boundary
+## Actual episode and earliest boundaries
 
-| Module / owner | Material input and actual output | Expected contract | Judgment |
+| Module / owner | Material input and observed output | Expected contract | Judgment |
 |---|---|---|---|
-| Goal Interpretation | Frozen Responsibilities correctly distinguish targeted continuity from `relationship=new,target_goal_ids=[]` | Preserve each Responsibility and its local ref for GA adjudication | Correct in retained cases |
-| GA prompt / primary model | On the configured 4B baseline, all 100 explicit replacements and all 100 unrelated new Goals failed; the model associated new work to a candidate or confused independent work with replacement | Explicit replacement creates a new Goal with only the retired ID in `supersedes_goal_ids`; independent work creates a new Goal with empty related/superseded IDs | Incorrect primary semantic boundary |
-| Dynamic Schema / constrained decoder | The first Ollama harness serialized Schema with sorted keys, unlike production. With production order restored, 4B generated mutually exclusive association/new-Goal branches and sometimes classified blinking as a physical resource | Preserve exact production key order and emit one mechanically valid, Responsibility-conserving DTO | Harness fixed; model/Schema interaction still unqualified |
-| DTO / resolver | Rejects related/superseded overlap and malformed resource or conservation shapes; at most one mechanical repair is allowed | Validate but never reinterpret model semantics | Correct fail-closed containment |
-| Canonical Host | Commits only complete conserved results; otherwise returns fail-closed | Never repair or shift semantic authority downstream | Correct containment |
+| Goal Interpretation | Frozen Responsibilities, local refs, relationships, targets, output modes, and bindings | Preserve each admitted Responsibility for GA | Correct in retained corpus |
+| GA prompt/primary model | Baseline Codex run scored 1,500/1,500 strict, but `reason_summary` was instructed and ordered as a prior duplicate semantic decision | `associations[]`/`new_goals[]` (or segmentation `decision`) are the sole semantic result; rationale is non-authoritative | Contract authority defect fixed in iteration 1 |
+| Dynamic Schema | Iteration-1 full run allowed one media Goal to omit `media_operation`; DTO requested mechanical repair to add `play` | Decoder Schema must expose the DTO invariant: media playback requires an explicit non-`none` operation | Earliest mechanical defect fixed in iteration 2 |
+| Codex transport | Two iteration-1 processes returned no output with `Selected model is at capacity` | Retain service failure separately from semantic quality | Transient; clean at concurrency 8 and in focused replay |
+| DTO/resolver/Host | Rejected the missing media operation, allowed one mechanical repair, conserved refs, and failed closed on absent outputs | Validate without reinterpreting semantics | Correct containment |
 
-The configured-model failure is therefore not a Host or persistence defect. The
-earliest remaining wrong boundary is the primary model plus its constrained
-model-facing contract: the model can state the right continuity rationale and then
-emit contradictory ownership/resource fields.
+The final changed workflow makes the structured collections authoritative before
+the rationale and prevents a media Goal from crossing the decoder boundary without
+an explicit valid media operation.
 
-## Implemented candidate scope
+## Implemented scope
 
-- Preserved the existing mixed association-plus-creation authority and exact
-  Responsibility conservation.
-- Enforced disjoint `related_goal_ids` and `supersedes_goal_ids` in the DTO and
-  request-bound Schema, matching the Host's existing fail-closed invariant.
-- Clarified replacement, coexistence, relationship precedence, source polarity,
-  new-Goal description provenance, and per-ref conservation in the GA prompt.
-- Added compact top-level continuity evidence and a bounded `reason_summary` to
-  make the decision visible before the payload; this remains a qualification
-  candidate, not a proven production improvement.
-- Reordered constrained Goal fields to the mechanically more stable order observed
-  in the focused configured-model experiment; broad exact-provider qualification
-  remains outstanding.
-- Extended the frozen qualification runner with `--provider ollama`, exact model
-  digest/version binding, production generation options, production-client calls,
-  source/model stability checks, and order-preserving Schema freezing.
-- Added focused contract, Schema, harness, and production-transport tests.
+- Removed the Qwen-specific instruction and Schema ordering that made
+  `reason_summary` a duplicate semantic source of truth.
+- Defined top-level rationale as compact, non-authoritative evidence and restored
+  collections/decision plus semantic discriminators before descriptive payloads.
+- Preserved the already-successful replacement, coexistence, polarity,
+  relationship-precedence, exact-description, disjoint related/superseded IDs, and
+  Responsibility-conservation rules.
+- Aligned the dynamic Schema with the existing DTO invariant by requiring a
+  non-`none` `media_operation` only for `media_playback`; non-media Goals retain
+  the safe `none` default.
+- Updated focused executable assertions for authority order and media operation.
 
-No new semantic authority, extra model call, runtime switch, environment variable,
+No new semantic authority, model call, runtime switch, environment variable,
 compatibility path, architecture layer, standalone design document, or first-class
-project term was added. The configured Agent model remains `qwen3.5:4b`; the 9B
-model was evaluated only as a local comparison and was not configured or deployed.
+project term was added.
 
 ## Evidence ledger
 
 | Evidence | Observed result | Qualification limit |
 |---|---|---|
-| Same-model offline final cohort before exact-provider work | 1,500/1,500 strict, zero repair/timeout | Codex surrogate; not Ollama constrained decoding |
-| First complete 4B Ollama cohort | 1,184/1,500 hard, 1,170/1,500 strict; 22 repairs, 15 Host recoveries, four 2,048-token truncations | Later invalidated as an exact-production claim because frozen Schema keys had been sorted |
-| First exact-order focused gate | 3/9 hard; five repairs; one truncation | Exact production Schema order; exposed model/Schema mechanical instability |
-| Iteration 9 configured 4B focused gate | 5/9 strict, zero repairs/timeouts; source/model/harness stable | Final configured-model focused result; not qualified |
-| Iteration 10 9B comparison | 4/9 strict, one repair; source/model/harness stable | Comparison only; model was not configured or deployed |
-| Focused Python regression suite | 94/94 passed | Contract/harness regression evidence only |
-| Canonical local gate | `./scripts/run_tests.sh` exited 0: 138 pytest, 2,050 unittest, and 20 legacy Agent tests passed after policy, ownership, static-analysis, configuration, structure, documentation, and scenario checks | Current local candidate; does not override the failed model-role qualification gate |
-| Direct policy and documentation checks | 15 policy rule families with zero exceptions; 102 Markdown files passed | Static/documentation evidence only |
+| Frozen current-branch Codex baseline | 1,500/1,500 strict; zero repair/timeout/process failure | Exact pre-change branch transaction; same-model, non-independent offline evidence |
+| Iteration-1 focused contrasts | 6/6 strict; zero repair | Mixed continuity+creation, segmentation, replacement, coexistence, merge, split |
+| Iteration-1 full cohort | 1,498/1,500 hard; 1,497/1,500 strict | Two Codex capacity failures; one media-operation repair; no semantic-map drift among returned outputs |
+| Iteration-2 focused replay | 3/3 strict; zero repair | Missing-media-operation case plus both capacity-failed cases |
+| Final iteration-2 full cohort | **1,500/1,500 strict**; zero repair/recovery/timeout/process failure; source/harness stable | Exact current candidate; Codex surrogate only |
+| Focused referent/GA/media/corpus tests | 114/114 passed | Deterministic contract and module evidence |
+| Relevant General Ability Level A | 28/28 passed across semantic quality, intent, continuity, multi-goal, and uncertainty classes | Level A only; no live service/robot claim |
+| Canonical local gate | 138 pytest, 2,050 unittest, 20 legacy Agent tests passed | Local code/test consistency only |
+| Policy and docs checks | 15 policy families, zero exceptions; 102 Markdown files passed | Static/documentation evidence only |
 
-Configured model identity:
+Final artifact:
+`.chromie/benchmarks/goal-association/20260902T-codex-iteration-02-full/`
 
-- Ollama `0.32.14`
-- `qwen3.5:4b`, 4.7B Q4_K_M
-- digest `2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd`
-- `num_ctx=32768`, `num_predict=2048`, `temperature=0`, `top_p=0.9`
-
-Comparison identity:
-
-- `qwen3.5:9b`, 9.7B Q4_K_M
-- digest `6488c96fa5faab64bb65cbd30d4289e20e6130ef535a93ef9a49f42eda893ea7`
+Final production-files digest:
+`aedd5ea9322c3f7d7aa277f15ea0b5ae00451e91d8e1ba835ebaf2e87803b5a4`
 
 Corpus digest:
-`e13861a0a5d963f5f2bb86353c63d6ecd7806128b429a2b4212111f0331023d0`.
+`e13861a0a5d963f5f2bb86353c63d6ecd7806128b429a2b4212111f0331023d0`
 
-Retained paths and exact commands are in `HANDOFF.md`.
+The 1,500-case corpus has no independent semantic reviewer and contains no
+non-empty discourse-referent or `interpretation_unresolved` cases. Existing
+referent/unresolved module tests and relevant Level-A scenarios pass, but that does
+not turn the frozen cohort into independent whole-role evidence.
 
 ## Iteration accounting and stop condition
 
-The owner authorized at most 10 semantic optimization iterations. Iterations 1–3
-were the prior clarify, supersession contract, and relationship-precedence work.
-Iterations 4–9 refined the deployed-model decision procedure, coexistence polarity,
-field-level contract, and constrained output order. Iteration 10 compared the
-available 9B profile. The limit is exhausted. Infrastructure corrections to make
-the runner reproduce production Schema order were not counted as semantic prompt
-iterations.
+The corrected owner-authorized budget was at most 10 Codex-led semantic/contract
+iterations. Two were used:
 
-Because the final focused gate failed, no current-revision full 1,500-case cohort
-or live/service proof was run and no qualification pass may be claimed.
+1. restore single semantic authority and discriminator-first output order;
+2. align media-operation Schema and DTO invariants.
+
+The previous Qwen-focused iteration count is historical and does not consume this
+corrected task budget. The current stop condition is satisfied: focused proofs,
+the complete immutable cohort, relevant Level-A checks, and canonical local gates
+are green. No evidence justifies another iteration.
 
 ## Ordered resume work
 
-1. Treat the current production edits as an unqualified candidate. Do not merge to
-   a release line or resume Issue #35 on an inherited GA-green claim.
-2. Before another semantic change, obtain owner authorization for a new iteration
-   budget and choose one bounded direction: simplify the GA output Schema/role,
-   qualify a different model/profile, or change the model-facing resource branch
-   without moving semantic authority to the Host.
-3. Start with the retained 9-case exact-order gate. Require strict pass with zero
-   repair, recovery, timeout, or truncation before expanding to the affected
-   categories and then the full immutable 1,500-case cohort.
-4. Only after a clean full cohort, run the relevant General Ability classes and
-   canonical repository gates, then update both delivery documents again.
-5. The remote sibling `origin/codex/ga-prompt-qualification-1500` at `0f525f3a`
-   remains unmerged. Inspect it explicitly before any integration and never
-   force-push either line.
+1. Resume from the latest normal delivery commit containing this checkpoint and
+   `HANDOFF.md`; verify the branch is clean and matches its upstream.
+2. Integrate deliberately with the selected delivery line. `main` and this branch
+   have diverged, so do not inherit this evidence across a merge/rebase without
+   rerunning the transaction on the integrated revision.
+3. Issue #35 Planner qualification may resume only after the chosen revision
+   contains this GA candidate or equivalent and its GA evidence is re-bound to that
+   revision.
+4. Add independently reviewed referent/unresolved contrast coverage in a later
+   corpus revision if a broader whole-role or training-readiness claim is needed.
+5. Any deployed service, voice, simulator, or robot claim requires its own retained
+   current-revision evidence.
 
 ## Claim boundary
 
-This checkpoint establishes a reproducible exact-Ollama qualification path, fixes
-the harness's Schema-order mismatch, retains fail-closed contract improvements, and
-proves that the configured `qwen3.5:4b` GA role is **not yet good enough** on the
-focused gate. It establishes no deployed service quality, full-corpus qualification,
-independent semantic review, Fast/Deep Planner quality, training readiness, voice,
+This checkpoint qualifies the exact current GA prompt/Schema/DTO/Host candidate for
+the frozen 1,500-case Goal-continuity corpus under target-blind Codex inference. It
+does not qualify Qwen/Ollama, a deployed Agent service, the divergent `main` branch,
+independent semantic truth, training readiness, Fast/Deep Planner quality, voice,
 simulator, hardware, physical safety, release, or robot behavior.
