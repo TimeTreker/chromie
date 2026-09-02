@@ -22,6 +22,10 @@ replace [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md), the
 or [Acceptance and Evidence](ACCEPTANCE.md); it composes them into one qualification-specific
 operating protocol.
 
+Coding agents apply this method through the
+[Chromie LLM Prompt Qualification Skill](../.agents/skills/optimize-chromie-llm-prompt/SKILL.md).
+The Skill is an execution entrypoint; this document remains the binding method.
+
 ## 1. Objective
 
 The objective is not to make a sample answer look better or to force a prompt edit.
@@ -394,7 +398,7 @@ These results demonstrate the method; they are not permanent release thresholds.
 | GI genuine-unresolved subset | The 68 source-based Deep-GI cases were qualified separately from the resolved primary path. | Conditional deeper cognition needs its own input contract, corpus, and claim; do not average it into the common path. |
 | GA baseline | The target-blind Codex batch passed the then-current dynamic Schema in 1,500/1,500 cases, but 36 `modify_active` results failed the real Host because the semantic change existed only in `reason_summary`. | Schema pass alone is insufficient. Always execute the downstream DTO/Host boundary and compare authoritative field ownership. |
 | GA local fix | The existing semantic-update invariant was moved into dynamic Schema and next to relationship selection in the local prompt. The exact 36 failures passed, then the full supported cohort passed 1,400/1,400 with zero repair attempts. | Align prompt and decoder at the earliest boundary; prove the hypothesis on failures, then rerun the complete frozen cohort. |
-| GA global gap | 100 cases required continuing one Goal and creating an independent Goal in one turn, but the exclusive `associate | create_goals` DTO could not express both. They remained explicit known gaps. | Never optimize wording around an impossible output contract. Preserve the scenario and escalate the global DTO decision. |
+| GA global contract fix | 100 cases required continuing one Goal and creating an independent Goal in one turn, but the exclusive `associate | create_goals` DTO could not express both. After explicit owner authorization, the redundant discriminant was removed; candidate-aware GA now writes both non-exclusive collections directly, and decoder/Host conservation requires each GI Responsibility exactly once across their union. All 1,500 corpus references then passed the exact Schema/DTO/Host path. This is mechanical offline contract evidence; target-blind model inference was not rerun by that result. | Never optimize wording around an impossible output contract. Preserve the scenario, escalate the global DTO decision, repair the earliest representational boundary, and keep source closure distinct from model qualification. |
 | Same-model Codex review | Codex supplied strong offline inference and post-hoc judgment, but the reviewer was not independent and occasionally misread valid Schema fields. | Retain same-model judgment as diagnostic evidence and keep its errors visible; independent qualification remains a separate claim. |
 
 The retained corpora are:

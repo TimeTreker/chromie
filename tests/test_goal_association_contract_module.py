@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from agent.app import goal_association
 from agent.app import goal_association_contract
 from agent.app import goal_association_schema
@@ -22,6 +25,53 @@ def test_goal_association_model_contract_has_one_definition_owner() -> None:
     assert goal_association_contract.GoalAssociationModelGoal.__module__ == (
         "agent.app.goal_association_contract"
     )
+
+
+def test_candidate_aware_contract_has_no_exclusive_branch_discriminant() -> None:
+    properties = (
+        goal_association_contract.GoalAssociationModelOutput.model_json_schema()
+        ["properties"]
+    )
+
+    assert "decision" not in properties
+    parsed = goal_association_contract.GoalAssociationModelOutput.model_validate(
+        {
+            "associations": [
+                {
+                    "relationship": "continue",
+                    "source_responsibility_refs": ["r1"],
+                    "target_goal_ids": ["goal-existing"],
+                    "confidence": 1.0,
+                }
+            ],
+            "new_goals": [
+                {
+                    "source_responsibility_refs": ["r2"],
+                    "description": "Tell the user a joke.",
+                    "output_mode": "speech",
+                }
+            ],
+            "confidence": 1.0,
+        }
+    )
+    assert len(parsed.associations) == 1
+    assert len(parsed.new_goals) == 1
+
+
+def test_replacement_goal_cannot_retain_superseded_goal_as_related_context() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="superseded Goal cannot also be retained as related context",
+    ):
+        goal_association_contract.GoalAssociationModelGoal.model_validate(
+            {
+                "source_responsibility_refs": ["r1"],
+                "description": "Blink twice.",
+                "output_mode": "body_action",
+                "related_goal_ids": ["goal-existing"],
+                "supersedes_goal_ids": ["goal-existing"],
+            }
+        )
 
 
 def test_goal_association_contract_module_stays_model_only() -> None:

@@ -5,7 +5,7 @@
       "terminal or paused lifecycle is ignored",
       "one GI Responsibility is dropped or duplicated",
       "GA changes GI output_mode or invents Planner HOW",
-      "mixed continuity is hidden by the exclusive discriminant"
+      "mixed continuity is dropped or duplicated across association and creation"
     ],
     "phenomena": [
       "merge_existing_goals",
@@ -247,7 +247,6 @@
         }
       ],
       "confidence": 1.0,
-      "decision": "associate",
       "new_goals": [],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],

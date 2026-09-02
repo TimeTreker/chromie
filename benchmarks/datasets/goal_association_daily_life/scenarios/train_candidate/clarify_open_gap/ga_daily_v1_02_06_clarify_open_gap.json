@@ -5,7 +5,7 @@
       "terminal or paused lifecycle is ignored",
       "one GI Responsibility is dropped or duplicated",
       "GA changes GI output_mode or invents Planner HOW",
-      "mixed continuity is hidden by the exclusive discriminant"
+      "mixed continuity is dropped or duplicated across association and creation"
     ],
     "phenomena": [
       "clarify_open_gap",
@@ -166,9 +166,7 @@
           "confidence": 1.0,
           "reason_summary": "The accepted GI relationship is clarify.",
           "relationship": "clarify",
-          "resolved_gap_ids": [
-            "gap_02_06"
-          ],
+          "resolved_gap_ids": [],
           "source_responsibility_refs": [
             "r1"
           ],
@@ -179,7 +177,6 @@
         }
       ],
       "confidence": 1.0,
-      "decision": "associate",
       "new_goals": [],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],

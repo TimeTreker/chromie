@@ -2050,12 +2050,166 @@ class GoalExecutionContractTests(unittest.TestCase):
             },
         )
         association_schema = schema["$defs"]["GoalAssociationModelAssociation"]
+        goal_schema = schema["$defs"]["GoalAssociationModelGoal"]
+        self.assertEqual(
+            list(schema["properties"]),
+            [
+                "associations",
+                "new_goals",
+                "referent_updates",
+                "resolved_references",
+                "confidence",
+                "reason_summary",
+            ],
+        )
+        self.assertEqual(
+            list(goal_schema["oneOf"][0]["properties"]),
+            [
+                "source_responsibility_refs",
+                "output_mode",
+                "resource_kind",
+                "description",
+                "bindings",
+                "resource_responsibility",
+                "media_operation",
+                "related_goal_ids",
+                "supersedes_goal_ids",
+            ],
+        )
+        self.assertNotIn("media_operation", goal_schema["oneOf"][0]["required"])
+        self.assertEqual(
+            goal_schema["oneOf"][0]["properties"]["media_operation"],
+            {"const": "none"},
+        )
         self.assertIn("confidence", association_schema["required"])
         self.assertIn("target_goal_ids", association_schema["required"])
+        self.assertNotIn("decision", schema["properties"])
+        self.assertNotIn("decision=associate", prompt)
+        self.assertIn("associations and new_goals", prompt)
+        self.assertIn(
+            "Association confidence measures certainty about Goal ownership",
+            prompt,
+        )
+        self.assertIn("resolved_gap_ids empty when resolution is unproven", prompt)
+        self.assertIn(
+            "A superseded ID belongs only in supersedes_goal_ids",
+            prompt,
+        )
+        self.assertIn(
+            "merge and split remain associations rather than replacement Goals",
+            prompt,
+        )
+        self.assertIn(
+            "Candidate presence, topic overlap, recency, or having only one candidate",
+            prompt,
+        )
+        self.assertIn(
+            "emit the default independent new_goal with empty "
+            "supersedes_goal_ids and related_goal_ids",
+            prompt,
+        )
+        self.assertIn(
+            "never reuse one ref for another",
+            prompt,
+        )
+        self.assertIn(
+            "decisive coexistence evidence",
+            prompt,
+        )
+        self.assertIn(
+            "a different entity or output_mode alone is not replacement",
+            prompt,
+        )
+        self.assertIn(
+            "if either replacement condition is missing, row (1) is forbidden",
+            prompt,
+        )
+        self.assertIn(
+            "decisive coexistence evidence and forbids replacement",
+            prompt,
+        )
+        self.assertIn(
+            "retain_old=true implies supersedes_goal_ids=[]",
+            prompt,
+        )
+        self.assertIn(
+            "copy description from that Responsibility's current GI outcome",
+            prompt,
+        )
+        self.assertIn(
+            "sole authoritative per-Responsibility continuity result",
+            prompt,
+        )
+        self.assertIn("non-authoritative reason_summary", prompt)
+        self.assertNotIn("First write compact reason_summary", prompt)
+        for goal_branch in goal_schema["oneOf"]:
+            self.assertIn(
+                "Exact current GI outcome",
+                goal_branch["properties"]["description"]["description"],
+            )
+            self.assertIn(
+                "Use [] for an additional or separate Responsibility",
+                goal_branch["properties"]["supersedes_goal_ids"]["description"],
+            )
 
         validator = Draft202012Validator(schema)
+        contradictory_replacement = {
+            "associations": [],
+            "new_goals": [
+                {
+                    "source_responsibility_refs": ["r1"],
+                    "description": "Blink twice.",
+                    "output_mode": "body_action",
+                    "media_operation": "none",
+                    "bindings": [
+                        {
+                            "name": "direction",
+                            "entity_type": "direction",
+                            "value": "forward",
+                            "confidence": 1.0,
+                        },
+                        {
+                            "name": "distance_duration",
+                            "entity_type": "duration",
+                            "value": "10 秒",
+                            "confidence": 1.0,
+                        },
+                    ],
+                    "related_goal_ids": ["goal-walk"],
+                    "supersedes_goal_ids": ["goal-walk"],
+                    "resource_kind": "none",
+                    "resource_responsibility": None,
+                }
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+            "reason_summary": "Replace the retained Goal.",
+        }
+        self.assertTrue(list(validator.iter_errors(contradictory_replacement)))
+        contradictory_replacement["new_goals"][0]["related_goal_ids"] = []
+        self.assertEqual(
+            list(validator.iter_errors(contradictory_replacement)),
+            [],
+        )
+
+        media_schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput,
+            [],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "media_playback"},
+            responsibility_bindings={"r1": {"media_title": "小星星"}},
+        )
+        media_goal_schema = media_schema["$defs"]["GoalAssociationModelGoal"]
+        media_branch = media_goal_schema["oneOf"][0]
+        self.assertIn("media_operation", media_branch["required"])
+        self.assertNotIn(
+            "none",
+            media_branch["properties"]["media_operation"]["enum"],
+        )
         missing_modify_update = {
-            "decision": "associate",
             "associations": [
                 {
                     "relationship": "modify",
@@ -2725,7 +2879,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         ollama = ScriptedOllama(
             [
                 {
-                    "decision": "associate",
                     "associations": [
                         {
                             "relationship": "continue",
@@ -2749,11 +2902,10 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(result.new_goals, [])
         self.assertEqual(len(ollama.prompts), 1)
 
-    def test_associate_discriminant_mechanically_drops_inactive_new_goal_branch(self):
+    def test_candidate_aware_result_commits_association_and_new_goal_together(self):
         ollama = ScriptedOllama(
             [
                 {
-                    "decision": "associate",
                     "associations": [
                         {
                             "relationship": "continue",
@@ -2765,10 +2917,51 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
                     ],
                     "new_goals": [
                         goal(
-                            "Inactive decoder branch must not double-map r1.",
+                            "Tell the user a joke.",
                             "speech",
+                            source_responsibility_refs=["r2"],
                         )
                     ],
+                    "confidence": 0.95,
+                }
+            ]
+        )
+
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Continue A and tell me a joke.",
+                    active_goals=[active_goal("goal-a", "Do A")],
+                    language="en-US",
+                    responsibility_outcomes=["Continue A.", "Tell me a joke."],
+                )
+            )
+        )
+
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(len(result.associations), 1)
+        self.assertEqual(len(result.new_goals), 1)
+        self.assertEqual(result.new_goals[0].source_responsibility_refs, ["r2"])
+        self.assertEqual(
+            result.metadata["responsibility_conservation"]["mapped_refs"],
+            ["r1", "r2"],
+        )
+        self.assertEqual(len(ollama.prompts), 1)
+
+    def test_cross_collection_duplicate_responsibility_fails_closed_without_repair(self):
+        ollama = ScriptedOllama(
+            [
+                {
+                    "associations": [
+                        {
+                            "relationship": "continue",
+                            "source_responsibility_refs": ["r1"],
+                            "target_goal_ids": ["goal-a"],
+                            "confidence": 0.95,
+                            "reason_summary": "Continue the unfinished task.",
+                        }
+                    ],
+                    "new_goals": [goal("Duplicate responsibility.", "speech")],
                     "confidence": 0.95,
                 }
             ]
@@ -2780,10 +2973,12 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result.resolution_status, "resolved")
-        self.assertEqual(len(result.associations), 1)
-        self.assertEqual(result.new_goals, [])
+        self.assertEqual(result.resolution_status, "fail_closed")
         self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(
+            result.metadata["goal_semantic_transaction"]
+            ["contract_repair_attempted"]
+        )
 
     def test_explicit_location_preserves_referent_provenance(self):
         payload = create_goals(

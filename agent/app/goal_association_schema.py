@@ -281,6 +281,31 @@ def goal_association_response_schema(
     # without the same name/type invariant enforced by runtime validation.
     schema = binding_semantic_contract_response_schema(schema)
     goal_schema = schema.get("$defs", {}).get("GoalAssociationModelGoal")
+    if isinstance(goal_schema, dict) and active_ids:
+        # Host already rejects a Goal ID that is simultaneously retained as
+        # related context and retired by the replacement Goal. Expose that
+        # mechanical contradiction to the primary constrained decoder and DTO
+        # repair boundary instead of allowing it to reach terminal Host
+        # materialization.
+        goal_schema.setdefault("allOf", []).extend(
+            {
+                "not": {
+                    "properties": {
+                        "related_goal_ids": {
+                            "contains": {"const": goal_id},
+                        },
+                        "supersedes_goal_ids": {
+                            "contains": {"const": goal_id},
+                        },
+                    },
+                    "required": [
+                        "related_goal_ids",
+                        "supersedes_goal_ids",
+                    ],
+                }
+            }
+            for goal_id in active_ids
+        )
     if isinstance(goal_schema, dict) and responsibility_refs:
         # Every writable Goal-semantic surface must be explicit in the
         # constrained model output. Defaults on these fields are Python DTO
@@ -612,10 +637,27 @@ def goal_association_response_schema(
             }
             if output_mode is not None:
                 properties["output_mode"] = {"const": output_mode}
-            # JSON property order is observable to the constrained decoder.  Put
-            # the explicit semantic discriminator before either payload branch so
-            # the model chooses resource shape before the easier empty-bindings
-            # production can select a physical-resource branch on its behalf.
+                if output_mode == "media_playback":
+                    properties["media_operation"] = {
+                        **copy.deepcopy(
+                            branch_goal_properties.get("media_operation") or {}
+                        ),
+                        "enum": [
+                            "play",
+                            "pause",
+                            "resume",
+                            "seek",
+                            "stop",
+                            "volume",
+                            "status",
+                        ],
+                    }
+                else:
+                    properties["media_operation"] = {"const": "none"}
+            # JSON property order is observable to the constrained decoder. Put
+            # the source identity and semantic discriminators before either
+            # payload branch so the model chooses the owned result shape before
+            # filling its descriptive fields.
             discriminator_first = (
                 "source_responsibility_refs",
                 "output_mode",
@@ -623,6 +665,7 @@ def goal_association_response_schema(
                 "description",
                 "bindings",
                 "resource_responsibility",
+                "media_operation",
             )
             return {
                 **{
@@ -686,6 +729,12 @@ def goal_association_response_schema(
                                         in responsibility_output_modes
                                         else []
                                     ),
+                                    *(
+                                        ["media_operation"]
+                                        if responsibility_output_modes.get(source_ref)
+                                        == "media_playback"
+                                        else []
+                                    ),
                                 ]
                             )
                         ),
@@ -707,12 +756,7 @@ def goal_association_response_schema(
             "reason_summary",
         ]
     else:
-        properties["decision"] = {
-            "type": "string",
-            "enum": ["associate", "create_goals"],
-        }
         ordered_required = [
-            "decision",
             "associations",
             "new_goals",
             "referent_updates",
@@ -721,23 +765,29 @@ def goal_association_response_schema(
             "reason_summary",
         ]
     if responsibility_refs:
+        def source_ref_item(source_ref: str) -> dict[str, Any]:
+            return {
+                "type": "object",
+                "properties": {
+                    "source_responsibility_refs": {
+                        "type": "array",
+                        "contains": {"const": source_ref},
+                        "minContains": 1,
+                        "maxContains": 1,
+                    }
+                },
+                "required": ["source_responsibility_refs"],
+            }
+
         def contains_source_ref(source_ref: str) -> dict[str, Any]:
             return {
-                "contains": {
-                    "type": "object",
-                    "properties": {
-                        "source_responsibility_refs": {
-                            "type": "array",
-                            "contains": {"const": source_ref},
-                            "minContains": 1,
-                            "maxContains": 1,
-                        }
-                    },
-                    "required": ["source_responsibility_refs"],
-                },
+                "contains": source_ref_item(source_ref),
                 "minContains": 1,
                 "maxContains": 1,
             }
+
+        def excludes_source_ref(source_ref: str) -> dict[str, Any]:
+            return {"not": {"contains": source_ref_item(source_ref)}}
 
         new_goal_conservation = {
             "minItems": len(responsibility_refs),
@@ -755,35 +805,31 @@ def goal_association_response_schema(
             # reassociation.
             properties["new_goals"].update(new_goal_conservation)
         else:
-            # Goal Association owns the branch choice. Once it chooses
-            # create_goals, associations are inactive and every Responsibility
-            # necessarily belongs to the new-goal branch. Conversely, an
-            # association branch must conserve each supplied ref exactly once.
-            schema.setdefault("allOf", []).append(
+            # Existing-Goal continuity and independent new work can coexist in
+            # one turn.  For every accepted GI Responsibility, require exactly
+            # one owning item across the union of both semantic collections.
+            # This is request-bound conservation at the earliest decoder
+            # boundary; neither the DTO nor Host chooses the semantic owner.
+            schema.setdefault("allOf", []).extend(
                 {
-                    "if": {
-                        "properties": {"decision": {"const": "create_goals"}},
-                        "required": ["decision"],
-                    },
-                    "then": {
-                        "properties": {
-                            "associations": {"maxItems": 0},
-                            "new_goals": new_goal_conservation,
-                        }
-                    },
-                    "else": {
-                        "properties": {
-                            "new_goals": {"maxItems": 0},
-                            "associations": {
-                                "minItems": 1,
-                                "allOf": [
-                                    contains_source_ref(source_ref)
-                                    for source_ref in responsibility_refs
-                                ],
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "associations": contains_source_ref(source_ref),
+                                "new_goals": excludes_source_ref(source_ref),
                             },
-                        }
-                    },
+                            "required": ["associations", "new_goals"],
+                        },
+                        {
+                            "properties": {
+                                "associations": excludes_source_ref(source_ref),
+                                "new_goals": contains_source_ref(source_ref),
+                            },
+                            "required": ["associations", "new_goals"],
+                        },
+                    ]
                 }
+                for source_ref in responsibility_refs
             )
 
     schema["required"] = list(dict.fromkeys([*ordered_required, *required]))

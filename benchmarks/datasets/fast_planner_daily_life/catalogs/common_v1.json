@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "fixture_id": "common_v1",
+  "authority": "Frozen qualification input fixture; never production registry truth.",
+  "capabilities": [
+    {
+      "capability_id": "chromie.reminder.create",
+      "agent_id": "chromie.reminder",
+      "description": "Create one reminder from exact reminder text and due time.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "reminder_text": {
+            "type": "string",
+            "minLength": 1,
+            "x-chromie-entity-type": "reminder_text"
+          },
+          "due_at": {
+            "type": "string",
+            "minLength": 1,
+            "x-chromie-entity-type": "due_time"
+          }
+        },
+        "required": ["reminder_text", "due_at"],
+        "additionalProperties": false
+      },
+      "effects": ["persistent_state"],
+      "safety_class": "reversible_write",
+      "requires_confirmation": true,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": ["stateful", "reminder"],
+      "behavior_domains": ["personal_organization"],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "personal.reminders",
+      "resource_claims": ["personal.reminders"],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "chromie.weather.lookup",
+      "agent_id": "chromie.weather",
+      "description": "Retrieve current or short-range weather for one location.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "x-chromie-entity-type": "location"
+          },
+          "date": {"type": "string", "default": "today"},
+          "period": {
+            "type": "string",
+            "enum": ["day", "morning", "afternoon", "night"],
+            "default": "day",
+            "x-chromie-entity-type": "day_part"
+          }
+        },
+        "required": ["location"],
+        "additionalProperties": false
+      },
+      "effects": [],
+      "safety_class": "safe_read",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": ["information", "weather"],
+      "behavior_domains": ["weather"],
+      "hints": {"side_effect_free": true},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": null,
+      "resource_claims": [],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.blink_eyes",
+      "agent_id": "capability_agent",
+      "description": "Blink the robot's eyes an exact number of times.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "x-chromie-entity-type": "count"
+          }
+        },
+        "required": ["count"],
+        "additionalProperties": false
+      },
+      "effects": ["physical_motion"],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": ["embodiment", "face"],
+      "behavior_domains": ["social_attention"],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.face",
+      "resource_claims": ["body.face"],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.look_at_person",
+      "agent_id": "capability_agent",
+      "description": "Turn gaze toward a currently identified person.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "target_ref": {
+            "type": "string",
+            "minLength": 1,
+            "x-chromie-entity-type": "person_ref"
+          },
+          "duration_s": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 20.0,
+            "default": 2.0
+          }
+        },
+        "required": ["target_ref"],
+        "additionalProperties": false
+      },
+      "effects": ["physical_motion"],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": ["embodiment", "gaze"],
+      "behavior_domains": ["social_attention"],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.head",
+      "resource_claims": ["body.head"],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.walk_forward",
+      "agent_id": "capability_agent",
+      "description": "Walk forward for an exact duration in seconds.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "duration_s": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 30.0,
+            "x-chromie-entity-type": "duration_seconds"
+          }
+        },
+        "required": ["duration_s"],
+        "additionalProperties": false
+      },
+      "effects": ["physical_motion"],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": ["embodiment", "locomotion"],
+      "behavior_domains": ["locomotion"],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": false,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.primary_motion",
+      "resource_claims": ["body.primary_motion"],
+      "execution_constraints": {}
+    }
+  ]
+}

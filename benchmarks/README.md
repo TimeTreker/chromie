@@ -475,6 +475,35 @@ See the corpus
 [Issue #34](https://github.com/TimeTreker/chromie/issues/34) for its ownership,
 claim boundary, and retained prompt-qualification evidence.
 
+## Fast Planner daily-life qualification corpus
+
+`datasets/fast_planner_daily_life/scenarios/` contains 1,500 directly
+model-authored, production-shaped Fast Planner cases in 150 bilingual contrast
+sets. Coverage is balanced across streaming advance, canonical primary planning,
+bounded re-entry, 15 ability classes, 10 daily-life domains, and English/Chinese.
+The manifest owns aggregate counts and the complete scenario-tree digest.
+
+The checked-in validator reconstructs the exact production prompt and dynamic
+Schema for every case and enforces the target-blind transaction, review flags,
+coverage matrix, Goal/Evidence/Work references, and frozen Capability fixture.
+Every scenario is only a mechanically validated candidate: independent semantic
+review, immutable baseline inference, and adjudication have not run. Do not cite
+the corpus as prompt, contract, workflow, architecture, model, behavior, deployment,
+or training qualification.
+
+Validate it with:
+
+```bash
+python -m benchmarks.datasets.fast_planner_daily_life.qualification validate
+python -m pytest -q benchmarks/tests/test_fast_planner_daily_life_dataset.py
+```
+
+See the corpus
+[README](datasets/fast_planner_daily_life/README.md) and
+[Issue #35](https://github.com/TimeTreker/chromie/issues/35). The tracked scenarios
+and retained local authoring evidence remain same-model-authored, non-independent,
+semantically unreviewed, and ineligible for training.
+
 
 ## End-to-end evidence profiles
 

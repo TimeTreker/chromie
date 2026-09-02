@@ -26,7 +26,6 @@ except ImportError:  # pragma: no cover - repository development path
 
 
 GoalSegmentationDecision = Literal["create_goals"]
-GoalAssociationDecision = Literal["associate", "create_goals"]
 InformationResourceDomain = Literal[
     "local_clock",
     "weather_forecast",
@@ -525,7 +524,13 @@ class GoalAssociationModelGoal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_responsibility_refs: list[str] = Field(min_length=1, max_length=8)
-    description: str = Field(min_length=1)
+    description: str = Field(
+        min_length=1,
+        description=(
+            "Exact current GI outcome for this new Responsibility. Never copy a "
+            "candidate Goal description into an additional or replacement Goal."
+        ),
+    )
     output_mode: GoalOutputMode = Field(
         description=(
             "Provider-neutral human outcome modality copied from Goal Interpretation. "
@@ -549,8 +554,25 @@ class GoalAssociationModelGoal(BaseModel):
         default_factory=list,
         max_length=12,
     )
-    related_goal_ids: list[str] = Field(default_factory=list, max_length=8)
-    supersedes_goal_ids: list[str] = Field(default_factory=list, max_length=8)
+    related_goal_ids: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "Retained non-replacement Goal context only. A Goal ID listed here "
+            "must not also appear in supersedes_goal_ids."
+        ),
+    )
+    supersedes_goal_ids: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "Active Goal identities fully replaced by this new Goal. Use [] for an "
+            "additional or separate Responsibility even when active candidates exist. "
+            "A non-empty list requires direct source evidence both that the old Goal "
+            "must stop and that this new outcome substitutes for it. A superseded Goal "
+            "is not retained context and must not also appear in related_goal_ids."
+        ),
+    )
     resource_kind: Literal["none", "physical_object", "information"] = Field(
         default="none",
         description=(
@@ -626,6 +648,14 @@ class GoalAssociationModelGoal(BaseModel):
 
     @model_validator(mode="after")
     def validate_mode_specific_fields(self) -> "GoalAssociationModelGoal":
+        overlapping_goal_ids = set(self.related_goal_ids).intersection(
+            self.supersedes_goal_ids
+        )
+        if overlapping_goal_ids:
+            raise ValueError(
+                "a superseded Goal cannot also be retained as related context: "
+                + ", ".join(sorted(overlapping_goal_ids))
+            )
         if self.output_mode == "media_playback" and self.media_operation == "none":
             raise ValueError("media_playback requires one exact media_operation")
         if self.output_mode != "media_playback" and self.media_operation != "none":
@@ -684,7 +714,14 @@ class GoalSegmentationModelOutput(BaseModel):
         max_length=12,
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    reason_summary: str = ""
+    reason_summary: str = Field(
+        default="",
+        max_length=320,
+        description=(
+            "Non-authoritative compact rationale for the emitted segmentation result; "
+            "decision and new_goals own the semantic result."
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -708,13 +745,23 @@ class GoalSegmentationModelOutput(BaseModel):
         return self
 
 class GoalAssociationModelOutput(BaseModel):
-    """Small discriminated semantic DTO returned by Goal Association."""
+    """One complete candidate-aware semantic result from Goal Association.
+
+    Associations and new Goals are independent per-Responsibility outcomes, not
+    mutually exclusive branches.  The dynamic decoder and trusted Host conserve
+    every accepted GI Responsibility across the union of both collections.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    decision: GoalAssociationDecision | None = None
-    associations: list[GoalAssociationModelAssociation] = Field(default_factory=list)
-    new_goals: list[GoalAssociationModelGoal] = Field(default_factory=list)
+    associations: list[GoalAssociationModelAssociation] = Field(
+        default_factory=list,
+        max_length=8,
+    )
+    new_goals: list[GoalAssociationModelGoal] = Field(
+        default_factory=list,
+        max_length=8,
+    )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
         default_factory=list,
         max_length=12,
@@ -724,53 +771,16 @@ class GoalAssociationModelOutput(BaseModel):
         max_length=12,
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    reason_summary: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def select_branch(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        decision = str(normalized.get("decision") or "").strip()
-        if decision not in {"associate", "create_goals"}:
-            if normalized.get("associations"):
-                decision = "associate"
-            else:
-                decision = "create_goals"
-        elif (
-            decision == "create_goals"
-            and not normalized.get("new_goals")
-            and normalized.get("associations")
-        ):
-            decision = "associate"
-        elif (
-            decision == "associate"
-            and not normalized.get("associations")
-            and normalized.get("new_goals")
-        ):
-            decision = "create_goals"
-        normalized["decision"] = decision
-        if decision == "create_goals":
-            normalized["associations"] = []
-        else:
-            # ``decision`` is the sole semantic branch authority. Decoder-small
-            # models can populate an inactive branch even after selecting
-            # association; discard it mechanically just as the create branch
-            # already discards inactive associations. It must never double-map one
-            # Responsibility and exhaust the one allowed DTO repair.
-            normalized["new_goals"] = []
-        return normalized
+    reason_summary: str = Field(
+        default="",
+        max_length=320,
+        description=(
+            "Non-authoritative compact rationale for the emitted result; associations "
+            "and new_goals own each Responsibility's continuity decision."
+        ),
+    )
 
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
-
-    @model_validator(mode="after")
-    def validate_shape(self) -> "GoalAssociationModelOutput":
-        if self.decision == "associate" and not self.associations:
-            raise ValueError("decision=associate requires associations")
-        if self.decision == "create_goals" and not self.new_goals:
-            raise ValueError("decision=create_goals requires new_goals")
-        return self

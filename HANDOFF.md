@@ -1,85 +1,105 @@
 # Chromie Latest Handoff
 
 Audience: coding agent resuming Issue #35 Fast/Deep Planner qualification or
-reviewing the integrated Stable Mind source boundary.
+reviewing the Goal Association integration on `main`.
 
-Owner: project owner. This operational snapshot is subordinate to current
-source, tests, `DEVELOPMENT_CHECKPOINT.md`, and the active Issue.
+Owner: project owner. Current source, tests, retained artifacts,
+`DEVELOPMENT_CHECKPOINT.md`, and the active Issue win over chat history.
 
 ## Repository state
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Delivery branch: `main`
 - Pre-delivery base: `origin/main` at
-  `a10eab83379353c1e51862d319ec3decedea668a`
-- Expected resume revision: latest `origin/main` commit containing this handoff
-  and `DEVELOPMENT_CHECKPOINT.md`
-- Active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35)
-- Delivery scope: merge `codex/customer-mind-personalization` into `main`,
-  retain its bounded Stable Mind implementation and owned documentation, and
-  refresh the exact next-session handoff. The already-integrated
-  `refactor/complexity-cleanup-round2` branch required no code merge.
+  `7605466bfe61aba1fbee70df1676d2005136a9e5`
+- Merged branch: `codex/ga-prompt-qualification-paused-20260901`
+- Expected resume revision: latest normal merge commit on `origin/main`
+  containing this handoff and `DEVELOPMENT_CHECKPOINT.md`
+- Completed delivery Issue: [#34](https://github.com/TimeTreker/chromie/issues/34),
+  to be closed only after the merge push succeeds
+- Next active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35)
+- Post-push branch disposition: delete the merged feature branch locally and
+  remotely after verifying `origin/main`
 
-## Integrated Stable Mind boundary
+## Current truth
 
-```text
-factory MindProfile
-  + owner-confirmed bounded CustomerMindPersonalization
-  -> deterministic complete derived profile
-  -> strict recomputation/validation
-  -> Host and Agent select one active profile
-  -> bounded projection to Fast Planner, Deep Planner, and Reflection
-```
-
-Customer input is never raw prompt text and cannot override safety, privacy,
-consent, truthfulness, embodiment, evidence, or the person's current explicit
-intent. The configuration CLI previews by default; `--apply` uses atomic
-replacement with private mode and backup, while `--reset` retains a recoverable
-backup. No active customer profile was created by this merge.
-
-The newly integrated files are the customer-profile contract/derivation,
-Host/Agent selection, bounded model-role projection, preview/apply/reset CLI,
-focused tests, and existing configuration/mind/status/user-manual owners.
-No new model invocation, semantic authority, environment variable, Runtime
-switch, compatibility path, provider, or hardware behavior was added.
-
-## Fast Planner qualification state
-
-`benchmarks/datasets/fast_planner_daily_life/` holds 1,000 separate bilingual
-scenarios in 100 contrast sets. Its tree digest is
-`8b5133b32e85eebd3587f2a63fff394cd02094b798ac8948d7ca9e350175579b`.
-The prior immutable baseline in
-`.chromie/benchmarks/fast-planner/20260901T053409Z_fp_daily_v1_codex_baseline/`
-was stopped at owner request after 349 complete calls (with an interrupted 350th
-envelope). It is incomplete: do not resume or adjudicate it, and do not claim
-Fast Planner qualification from it.
-
-## Validation ledger
-
-Historical customer-branch results (not integrated-tree evidence):
+This `main` merge integrates the GA prompt/Schema/DTO/Host correction and both
+frozen qualification corpora. A fresh integrated Codex cohort scored
+1,500/1,500 strict with zero repair, recovery, timeout, or process failure. GA
+remains the sole Goal identity/continuity authority:
 
 ```text
-python -m pytest tests/test_mind_profile.py tests/test_cognitive_identity_context.py tests/test_configure_chromie_mind.py
-28 passed in 0.51s
+user turn + GI Responsibilities + bounded candidates/context
+  -> exact GA prompt + dynamic Schema
+  -> one target-blind primary result
+  -> optional one mechanical malformed-DTO repair
+  -> DTO / resolver / Host fail-closed validation
+  -> hidden Responsibility-map adjudication
 ```
 
-Canonical validation on the staged merge tree observed on 2026-09-02:
+Do not add a confirmation, critic, scorer, or semantic repair call. Do not move
+continuity, replacement, resource, referent, or Responsibility ownership to the
+Host.
+
+The owner explicitly corrected the qualification away from Qwen/Ollama as the
+quality authority. The final source-branch Codex `gpt-5.6-sol` high-reasoning
+cohort scored 1,500/1,500 strict with zero repair, recovery, timeout, or process
+failure. Two of the allowed 10 Codex-led iterations were used; further GA tuning
+requires new failing evidence.
+
+## Integrated correction
+
+- `reason_summary` is compact, non-authoritative, and emitted after the
+  structured semantic result.
+- Goal branches begin with source identity, output mode, and resource
+  discriminator rather than a model-specific payload-first order.
+- Replacement/coexistence/polarity, relationship precedence, description
+  provenance, overlap rejection, and conservation rules remain intact.
+- `media_playback` requires an explicit operation from the valid non-`none` set,
+  closing the dynamic-Schema/DTO mismatch.
+- The frozen GA 1,500-case and Fast Planner 1,000-case corpora, qualification
+  runners, method/skill alignment, and focused tests are part of this merge.
+- Stable Mind personalization from the pre-merge `main` line remains bounded
+  and source-level; no active customer profile is created.
+
+## Retained GA evidence
+
+All artifact paths are ignored and machine-local; Git does not transport them.
+
+- Final source-branch run:
+  `.chromie/benchmarks/goal-association/20260902T-codex-iteration-02-full/`
+  — 1,500/1,500 strict, zero repair/recovery/timeout/process failure.
+- Final integrated run:
+  `.chromie/benchmarks/goal-association/20260902T-main-integration-full/`
+  — 1,500/1,500 strict, zero repair/recovery/timeout/process failure; source
+  and harness stable.
+- Production-files SHA-256:
+  `aedd5ea9322c3f7d7aa277f15ea0b5ae00451e91d8e1ba835ebaf2e87803b5a4`
+- Prompt identity index SHA-256:
+  `6455efe3d42fa2baea2d6ca3077b9ff3147c3b204f4ae4559376e49541c03ec7`
+- Corpus SHA-256:
+  `e13861a0a5d963f5f2bb86353c63d6ecd7806128b429a2b4212111f0331023d0`
+- Provider/model: Codex / `gpt-5.6-sol`, high reasoning; Codex CLI
+  `0.148.0-alpha.9`.
+
+The corpus is assistant-authored, has no independent semantic review, and has
+no non-empty discourse-referent or `interpretation_unresolved` cases.
+Deterministic module tests cover those boundaries, but broader qualification
+requires an independently reviewed corpus revision.
+
+## Integrated validation ledger
 
 ```text
-python scripts/check_repository_policies.py
-Repository engineering policies passed (15 rule families, 0 reviewed exceptions)
-
-./scripts/run_tests.sh
-exit 0; all checks passed, including policy, test ownership, Ruff, Mypy,
-configuration, documentation, scenario, and repository-structure gates
+Integrated Codex target-blind cohort: 1,500/1,500 strict; 0 repairs,
+0 recovery calls, 0 timeouts, 0 process failures; source/harness stable
+Focused GA/referent/media/corpus tests: 114/114 passed
+Relevant General Ability Level A: 28/28 passed
+Repository policies: 15 rule families passed, 0 reviewed exceptions
+Canonical local gate: exit 0; 138 pytest, 2,053 unittest, and 20 legacy
+Agent tests passed, including policy, ownership, Ruff, Mypy, configuration,
+documentation, scenario, and repository-structure checks
+Final docs gate: 102 Markdown files passed
 ```
-
-This is automated source/document evidence on the staged merge tree; it does
-not substitute for deployed, customer-visible, or target evidence.
-
-No deployed Agent restart, exact provider/model check, household authentication,
-voice, microphone, simulator, target hardware, physical safety, or release
-evidence was collected for the Stable Mind integration.
 
 ## Cross-machine resume
 
@@ -107,12 +127,13 @@ python -m benchmarks.datasets.fast_planner_daily_life.qualification adjudicate \
 ```
 
 Keep the entire cohort source-stable. Inspect every adjudicated case and select
-one earliest-boundary cluster before editing. For future customer-visible Stable
-Mind work, use the same deterministic derivation/validation boundary and retain
-authenticated owner confirmation plus deployed-model and service-restart evidence.
+one earliest-boundary cluster before editing. The historical 349-call Fast run
+was interrupted and must not be resumed or adjudicated.
 
 ## Claim boundary
 
-This is an integrated source delivery. It does not establish customer-visible
-personalization, Planner prompt quality, deployment, model, voice, simulator,
-hardware, safety, or release readiness.
+This handoff records the integrated source delivery. GA qualification is
+same-model offline Codex evidence, not deployed or independent semantic truth.
+No Fast/Deep Planner, customer-visible Stable Mind, deployed service/model,
+voice, simulator, target hardware, safety, release, or physical-robot claim is
+established.
