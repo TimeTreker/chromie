@@ -1,0 +1,185 @@
+{
+  "adversarial_design": {
+    "cell_index": 39,
+    "changed_axis": "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+    "condition": "supported",
+    "daily_life_family": "uncertainty_repair",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "fast_completion_or_how_escalation"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+      "language"
+    ],
+    "id": "fpdl_v2_fast_completion_or_how_escalation_39",
+    "member": "supported-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_fast_completion_or_how_escalation_39_supported_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Blink exactly twice.",
+              "goal_id": "goal-fpdl_v2_fast_completion_or_how_escalation_39_supported_en-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "count": {
+                    "confidence": 1.0,
+                    "entity_type": "count",
+                    "name": "count",
+                    "value": "2"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "For the detail that was unclear, blink twice.",
+              "success_criteria": [
+                "Blink exactly twice."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_supported_en"
+        },
+        "situation": {
+          "digest": "a8bbc65fac21aefd86da0a179697780093717b6166b51b4263ac9b69a30d5f2a",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_fast_completion_or_how_escalation_39_supported_en-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_fast_completion_or_how_escalation_39_supported_en"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_supported_en",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_fast_completion_or_how_escalation_39_supported_en-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_fast_completion_or_how_escalation_39_supported_en",
+        "schema_version": 1,
+        "source_plan_fingerprint": "03520d8fafeaaaf82568a9e4731fffa846cb173ca1f8af5b7c41d1a948bc30ec",
+        "source_plan_id": "source-plan-fpdl_v2_fast_completion_or_how_escalation_39_supported_en",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "count": 2
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Blink exactly twice.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_fast_completion_or_how_escalation_39_supported_en",
+      "text": "For the detail that was unclear, blink twice."
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-39",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_fast_completion_or_how_escalation_39_supported_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "soridormi.blink_eyes"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "One complete common Fast realization exists and should not be escalated merely for caution."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

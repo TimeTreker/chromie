@@ -1,0 +1,227 @@
+{
+  "adversarial_design": {
+    "cell_index": 10,
+    "changed_axis": "completed delivered response requires no replay versus no safe capability",
+    "condition": "supported",
+    "daily_life_family": "feelings_support",
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "no_change_or_no_safe_plan"
+  },
+  "category": "deep_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "completed delivered response requires no replay versus no safe capability",
+      "language"
+    ],
+    "id": "dpdl_v1_no_change_or_no_safe_plan_10",
+    "member": "supported-en"
+  },
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "difficulty": "ordinary",
+  "id": "dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Acknowledge that the requested supportive response was already delivered without replaying it.",
+              "goal_id": "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1",
+              "metadata": {
+                "output_mode": "speech"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Thanks; you already said the supportive sentence, so don't repeat it.",
+              "success_criteria": [
+                "Acknowledge that the requested supportive response was already delivered without replaying it."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+        },
+        "interaction_context": {
+          "already_spoken": [
+            {
+              "delivery_status": "played",
+              "goal_ids": [
+                "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1"
+              ],
+              "text": "You're not alone; take one small step at a time."
+            }
+          ]
+        },
+        "result_evidence_reentry": {
+          "evidence_refs": [
+            "evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+          ],
+          "phase": "capability_result_reentry",
+          "planner_authority": "planner",
+          "source_goal_ids": [
+            "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1"
+          ]
+        },
+        "trusted_execution_outcome": {
+          "aggregate_status": "completed",
+          "evidence": [
+            {
+              "capability_id": "chromie.speak",
+              "evidence_id": "evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
+              "observation_status": "none",
+              "provider_retryability": {},
+              "reason_code": "",
+              "source_goal_ids": [
+                "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1"
+              ],
+              "status": "completed"
+            }
+          ],
+          "goal_outcomes": [
+            {
+              "completed_step_ids": [
+                "source-step-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+              ],
+              "completion_qualification": {
+                "established": false,
+                "qualifications": [],
+                "required": false
+              },
+              "evidence_ids": [
+                "evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+              ],
+              "goal_id": "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1",
+              "reason_codes": [],
+              "status": "completed",
+              "unresolved_step_ids": []
+            }
+          ],
+          "outcome_id": "deep:evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+        },
+        "trusted_terminal_evidence": [
+          {
+            "data": {
+              "delivery_status": "played"
+            },
+            "evidence_id": "evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
+            "output_sha256": "0915b094bbff8ee44821129e1937e307974e74c389ff0708dac5f248fd380619",
+            "status": "completed",
+            "tool_id": "chromie.speak"
+          }
+        ]
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": {
+        "evidence_refs": [
+          "evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+        ],
+        "goal_ids": [
+          "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1"
+        ],
+        "opportunity_id": "opportunity-dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
+        "schema_version": 1,
+        "source_plan_fingerprint": "7ea30964833b8239ef17739a606386f63e57fdadf77036a8a6222718308572e9",
+        "source_plan_id": "source-plan-dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
+        "trigger": "capability_result_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Acknowledge that the requested supportive response was already delivered without replaying it.",
+          "output_mode": "speech",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
+      "text": "Thanks; you already said the supportive sentence, so don't repeat it."
+    },
+    "runtime_variant": "deep_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "deep_input_excludes_fast_candidate": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-deep-cell-10",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-dpdl_v1_no_change_or_no_safe_plan_10_supported_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [
+        "evidence-dpdl_v1_no_change_or_no_safe_plan_10_supported_en"
+      ],
+      "required_reuse_activity_ids": [],
+      "required_step_purposes": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Deep Planner must satisfy no_change_or_no_safe_plan at the declared supported boundary without changing Goal WHAT."
+      ]
+    },
+    "schema_expectation": "accept"
+  }
+}

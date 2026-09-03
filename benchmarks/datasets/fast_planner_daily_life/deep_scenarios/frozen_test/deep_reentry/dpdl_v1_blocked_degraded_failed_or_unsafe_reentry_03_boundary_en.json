@@ -1,0 +1,264 @@
+{
+  "adversarial_design": {
+    "cell_index": 3,
+    "changed_axis": "retryable failed read versus unsafe non-retryable failure",
+    "condition": "boundary",
+    "daily_life_family": "practical_information_tools",
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "blocked_degraded_failed_or_unsafe_reentry"
+  },
+  "category": "deep_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "retryable failed read versus unsafe non-retryable failure",
+      "language"
+    ],
+    "id": "dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "difficulty": "boundary",
+  "id": "dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Acquire and deliver the requested Hangzhou weather information.",
+              "goal_id": "goal-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en-1",
+              "metadata": {
+                "output_mode": "information"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "resource_responsibility": {
+                "delivery_mode": "spoken_explanation",
+                "metadata": {},
+                "recipient": {
+                  "description": "requester"
+                },
+                "resource": {
+                  "attributes": {
+                    "date": {
+                      "confidence": 1.0,
+                      "entity_type": "date",
+                      "name": "date",
+                      "value": "today"
+                    },
+                    "information_domain": {
+                      "confidence": 1.0,
+                      "entity_type": "information_domain",
+                      "name": "information_domain",
+                      "value": "weather_forecast"
+                    },
+                    "location": {
+                      "confidence": 1.0,
+                      "entity_type": "location",
+                      "name": "location",
+                      "value": "Hangzhou"
+                    },
+                    "period": {
+                      "confidence": 1.0,
+                      "entity_type": "day_part",
+                      "name": "period",
+                      "value": "day"
+                    }
+                  },
+                  "description": "Acquire and deliver the requested Hangzhou weather information.",
+                  "kind": "information",
+                  "quantity": ""
+                },
+                "responsibility_type": "acquire_and_deliver_resource",
+                "schema_version": 1,
+                "source": {
+                  "bindings": {},
+                  "description": "",
+                  "status": "unknown"
+                }
+              },
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Retry the failed Hangzhou weather check if it is still safe.",
+              "success_criteria": [
+                "Acquire and deliver the requested Hangzhou weather information."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en"
+        },
+        "result_evidence_reentry": {
+          "evidence_refs": [
+            "evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en"
+          ],
+          "phase": "capability_result_reentry",
+          "planner_authority": "planner",
+          "source_goal_ids": [
+            "goal-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en-1"
+          ]
+        },
+        "trusted_execution_outcome": {
+          "aggregate_status": "refused",
+          "evidence": [
+            {
+              "capability_id": "chromie.weather.lookup",
+              "evidence_id": "evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en",
+              "observation_status": "none",
+              "provider_retryability": {
+                "recoverable": false,
+                "retryable": false
+              },
+              "reason_code": "provider_refused",
+              "source_goal_ids": [
+                "goal-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en-1"
+              ],
+              "status": "refused"
+            }
+          ],
+          "goal_outcomes": [
+            {
+              "completed_step_ids": [],
+              "completion_qualification": {
+                "established": false,
+                "qualifications": [],
+                "required": false
+              },
+              "evidence_ids": [
+                "evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en"
+              ],
+              "goal_id": "goal-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en-1",
+              "reason_codes": [
+                "provider_refused"
+              ],
+              "status": "refused",
+              "unresolved_step_ids": []
+            }
+          ],
+          "outcome_id": "deep:evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en"
+        },
+        "trusted_terminal_evidence": [
+          {
+            "data": {},
+            "evidence_id": "evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en",
+            "output_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "status": "refused",
+            "tool_id": "chromie.weather.lookup"
+          }
+        ]
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": {
+        "evidence_refs": [
+          "evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en"
+        ],
+        "goal_ids": [
+          "goal-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en-1"
+        ],
+        "opportunity_id": "opportunity-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en",
+        "schema_version": 1,
+        "source_plan_fingerprint": "ab2aabdca74c50db26630807c196164d66c2544336b7b44903848def60a35164",
+        "source_plan_id": "source-plan-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en",
+        "trigger": "capability_result_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "date": "today",
+            "location": "Hangzhou",
+            "period": "day"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Acquire and deliver the requested Hangzhou weather information.",
+          "output_mode": "information",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en",
+      "text": "Retry the failed Hangzhou weather check if it is still safe."
+    },
+    "runtime_variant": "deep_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "deep_input_excludes_fast_candidate": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-deep-cell-03",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond",
+        "unavailable",
+        "refused"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.weather.lookup"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [
+        "evidence-dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_boundary_en"
+      ],
+      "required_reuse_activity_ids": [],
+      "required_step_purposes": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Deep Planner must satisfy blocked_degraded_failed_or_unsafe_reentry at the declared boundary boundary without changing Goal WHAT."
+      ]
+    },
+    "schema_expectation": "accept"
+  }
+}

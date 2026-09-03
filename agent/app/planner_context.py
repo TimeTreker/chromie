@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.situation import SituationProjection
     from shared.chromie_contracts.tool_result import ToolResultEvidence
 
+
 def goal_association_prompt_projection(
     context: dict[str, Any] | None,
     *,
@@ -163,8 +164,7 @@ def goal_association_prompt_projection(
             target_goal_ids = [
                 goal_id
                 for value in item.get("target_goal_ids") or []
-                if (goal_id := " ".join(str(value or "").strip().split()))
-                in allowed
+                if (goal_id := " ".join(str(value or "").strip().split())) in allowed
             ]
             goal_update = item.get("goal_update")
             update_goal_id = (
@@ -183,8 +183,7 @@ def goal_association_prompt_projection(
         projection["new_goals"] = [
             item
             for item in projection["new_goals"]
-            if " ".join(str(item.get("goal_id") or "").strip().split())
-            in allowed
+            if " ".join(str(item.get("goal_id") or "").strip().split()) in allowed
         ]
         projection["referent_updates"] = [
             item
@@ -206,6 +205,7 @@ def goal_association_prompt_projection(
     if len(serialized) > 65_536:
         raise ValueError("Goal Association prompt projection exceeds 65536 UTF-8 bytes")
     return projection
+
 
 def expected_goal_ids(context: dict[str, Any] | None) -> list[str]:
     """Return the ordered canonical goal IDs accepted by Goal Association."""
@@ -232,6 +232,7 @@ def expected_goal_ids(context: dict[str, Any] | None) -> list[str]:
         if isinstance(item, dict):
             add(item.get("goal_id"))
     return ordered
+
 
 def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Build a compact immutable grounding block for planner prompts.
@@ -261,11 +262,7 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                 "success_criteria": goal.get("success_criteria") or [],
                 "object": goal.get("object") or {},
                 **(
-                    {
-                        "resource_responsibility": goal[
-                            "resource_responsibility"
-                        ]
-                    }
+                    {"resource_responsibility": goal["resource_responsibility"]}
                     if isinstance(goal.get("resource_responsibility"), dict)
                     and goal["resource_responsibility"]
                     else {}
@@ -300,11 +297,7 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                     "success_criteria": item.get("success_criteria") or [],
                     "object": item.get("object") or {},
                     **(
-                        {
-                            "resource_responsibility": item[
-                                "resource_responsibility"
-                            ]
-                        }
+                        {"resource_responsibility": item["resource_responsibility"]}
                         if isinstance(item.get("resource_responsibility"), dict)
                         and item["resource_responsibility"]
                         else {}
@@ -313,6 +306,7 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                 }
             )
     return result
+
 
 def _goal_output_mode(goal: dict[str, Any]) -> str:
     metadata = goal.get("metadata")
@@ -396,6 +390,73 @@ def planner_goal_execution_requirements(
     return response_only, requires_execution
 
 
+def recoverable_result_reentry_goal_ids(
+    context: dict[str, Any] | None,
+) -> frozenset[str]:
+    """Find exact result-reentry Goals whose failed safe read may be retried.
+
+    Both independent Runtime facts must agree: trusted provider outcome marks the
+    exact failed Capability retryable, and an active task binding marks its exact
+    request recoverable and safe-read. Missing or contradictory fields fail closed.
+    This opens an execution choice for Planner; it does not select the Capability.
+    """
+
+    context = context or {}
+    outcome = context.get("trusted_execution_outcome")
+    if not isinstance(outcome, dict):
+        return frozenset()
+    retryable_by_capability: dict[str, set[str]] = {}
+    for item in outcome.get("evidence") or []:
+        if not isinstance(item, dict) or item.get("status") != "failed":
+            continue
+        retryability = item.get("provider_retryability")
+        if not isinstance(retryability, dict) or not (
+            retryability.get("recoverable") is True and retryability.get("retryable") is True
+        ):
+            continue
+        capability_id = " ".join(str(item.get("capability_id") or "").strip().split())
+        if not capability_id:
+            continue
+        retryable_by_capability.setdefault(capability_id, set()).update(
+            " ".join(str(value or "").strip().split())
+            for value in item.get("source_goal_ids") or []
+            if " ".join(str(value or "").strip().split())
+        )
+
+    recoverable: set[str] = set()
+    for task in context.get("active_task_snapshots") or []:
+        if not isinstance(task, dict) or task.get("status") != "recoverable":
+            continue
+        metadata = task.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        binding = metadata.get("execution_binding")
+        if not isinstance(binding, dict) or binding.get("retryable_safe_read") is not True:
+            continue
+        recoverable_request_ids = {
+            " ".join(str(value or "").strip().split())
+            for value in binding.get("recoverable_request_ids") or []
+            if " ".join(str(value or "").strip().split())
+        }
+        for planned in binding.get("planned_capabilities") or []:
+            if not isinstance(planned, dict):
+                continue
+            request_id = " ".join(str(planned.get("request_id") or "").strip().split())
+            capability_id = " ".join(str(planned.get("capability_id") or "").strip().split())
+            if (
+                request_id not in recoverable_request_ids
+                or planned.get("retryable_safe_read") is not True
+                or str(planned.get("safety_class") or "").strip() != "safe_read"
+            ):
+                continue
+            planned_goal_ids = {
+                " ".join(str(value or "").strip().split())
+                for value in planned.get("source_goal_ids") or []
+                if " ".join(str(value or "").strip().split())
+            }
+            recoverable.update(planned_goal_ids & retryable_by_capability.get(capability_id, set()))
+    return frozenset(recoverable)
+
+
 def planner_provider_vocal_goal_ids(
     authoritative_goals: list[dict[str, Any]],
 ) -> set[str]:
@@ -429,15 +490,11 @@ def planner_provider_media_goal_operations(
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
         metadata = goal.get("metadata")
         operation = (
-            str(metadata.get("media_operation") or "").strip()
-            if isinstance(metadata, dict)
-            else ""
+            str(metadata.get("media_operation") or "").strip() if isinstance(metadata, dict) else ""
         )
         if goal_id and _goal_output_mode(goal) == "media_playback":
             if operation not in MEDIA_CAPABILITY_IDS:
-                raise ValueError(
-                    f"media_playback Goal requires exact media_operation: {goal_id}"
-                )
+                raise ValueError(f"media_playback Goal requires exact media_operation: {goal_id}")
             result[goal_id] = operation
     return result
 
@@ -479,6 +536,7 @@ def result_evidence_reentry_goal_ids(
         if (normalized := " ".join(str(value or "").strip().split()))
     }
 
+
 def goal_cancellation_evidence_reentry_goal_ids(
     context: dict[str, Any] | None,
 ) -> set[str]:
@@ -496,10 +554,7 @@ def goal_cancellation_evidence_reentry_goal_ids(
     if not isinstance(reentry, dict) or not isinstance(raw_evidence, list):
         return set()
     try:
-        evidence = [
-            GoalCancellationEvidence.model_validate(item)
-            for item in raw_evidence
-        ]
+        evidence = [GoalCancellationEvidence.model_validate(item) for item in raw_evidence]
     except (ValidationError, ValueError, TypeError):
         return set()
     if not evidence:
@@ -512,11 +567,7 @@ def goal_cancellation_evidence_reentry_goal_ids(
     }
     if referenced_ids and not referenced_ids.issubset(evidence_ids):
         return set()
-    evidence_goal_ids = {
-        goal_id
-        for item in evidence
-        for goal_id in item.target_goal_ids
-    }
+    evidence_goal_ids = {goal_id for item in evidence for goal_id in item.target_goal_ids}
     requested_goal_ids = {
         normalized
         for value in reentry.get("source_goal_ids") or []
@@ -561,9 +612,7 @@ def planner_goal_context(
     current = context if isinstance(context, dict) else {}
     full_expected = tuple(expected_goal_ids(current))
     full_goals = canonical_goal_grounding(current)
-    cancellation_goal_ids = frozenset(
-        goal_cancellation_evidence_reentry_goal_ids(current)
-    )
+    cancellation_goal_ids = frozenset(goal_cancellation_evidence_reentry_goal_ids(current))
     result_goal_ids = frozenset(result_evidence_reentry_goal_ids(current))
     if reentry_scope is not None:
         expected = tuple(reentry_scope.goal_ids)
@@ -598,9 +647,7 @@ def planner_goal_context(
             cancellation_goal_ids = frozenset()
         elif reentry_scope.trigger == "goal_cancellation_reentry":
             if cancellation_goal_ids != scope_ids:
-                raise ValueError(
-                    "Planner cancellation re-entry context does not match typed scope"
-                )
+                raise ValueError("Planner cancellation re-entry context does not match typed scope")
             cancellation_goal_ids = scope_ids
             result_goal_ids = frozenset()
         else:
@@ -610,25 +657,25 @@ def planner_goal_context(
         expected = full_expected
         goals = full_goals
     response_only, requires_execution = planner_goal_execution_requirements(goals)
-    response_goal_ids = set(planner_response_goal_ids(goals)) | set(
-        cancellation_goal_ids
-    )
+    response_goal_ids = set(planner_response_goal_ids(goals)) | set(cancellation_goal_ids)
 
     if cancellation_goal_ids:
         stateful_goal_ids = {
             str(goal.get("goal_id") or "").strip()
             for goal in goals
-            if isinstance(goal, dict)
-            and _goal_output_mode(goal) == "stateful_effect"
+            if isinstance(goal, dict) and _goal_output_mode(goal) == "stateful_effect"
         }
         requires_execution = bool(stateful_goal_ids - set(cancellation_goal_ids))
         if set(cancellation_goal_ids) == set(expected):
             response_only = True
 
     if result_goal_ids and set(result_goal_ids) == set(expected):
+        recoverable_goal_ids = set(recoverable_result_reentry_goal_ids(context)) & set(
+            result_goal_ids
+        )
         response_only = False
-        requires_execution = False
-        response_goal_ids = set(expected)
+        requires_execution = bool(recoverable_goal_ids)
+        response_goal_ids = set(expected) - recoverable_goal_ids
 
     return PlannerGoalContext(
         expected_goal_ids=expected,
@@ -652,6 +699,7 @@ def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any
         return SituationProjection.model_validate(raw).prompt_projection()
     except ValidationError:
         return {}
+
 
 def evidence_bound_dialogue(
     context: dict[str, Any] | None,
@@ -694,6 +742,7 @@ def evidence_bound_dialogue(
             }
         )
     return out[-max(1, int(limit)) :]
+
 
 def gateway_speech_act(request: Any) -> str:
     """Return immutable Gateway speech-act evidence from the admitted turn envelope."""

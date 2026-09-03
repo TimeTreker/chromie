@@ -1,0 +1,152 @@
+{
+  "adversarial_design": {
+    "cell_index": 6,
+    "changed_axis": "identified gaze target versus unresolved consequential target",
+    "condition": "boundary",
+    "daily_life_family": "friends_social_life",
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "consequential_ambiguity_clarification"
+  },
+  "category": "deep_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "identified gaze target versus unresolved consequential target",
+      "language"
+    ],
+    "id": "dpdl_v1_consequential_ambiguity_clarification_06",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "difficulty": "boundary",
+  "id": "dpdl_v1_consequential_ambiguity_clarification_06_boundary_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Look at the identified person for two seconds.",
+              "goal_id": "goal-dpdl_v1_consequential_ambiguity_clarification_06_boundary_en-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "duration": {
+                    "confidence": 1.0,
+                    "entity_type": "duration_seconds",
+                    "name": "duration",
+                    "value": "2"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Look at them for two seconds.",
+              "success_criteria": [
+                "Look at the identified person for two seconds."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-dpdl_v1_consequential_ambiguity_clarification_06_boundary_en"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "duration": 2
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Look at the identified person for two seconds.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "dpdl_v1_consequential_ambiguity_clarification_06_boundary_en",
+      "text": "Look at them for two seconds."
+    },
+    "runtime_variant": "deep_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "deep_input_excludes_fast_candidate": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-deep-cell-06",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "clarify"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-dpdl_v1_consequential_ambiguity_clarification_06_boundary_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "soridormi.look_at_person"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_step_purposes": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Deep Planner must satisfy consequential_ambiguity_clarification at the declared boundary boundary without changing Goal WHAT."
+      ]
+    },
+    "schema_expectation": "accept"
+  }
+}

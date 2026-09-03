@@ -1,0 +1,230 @@
+{
+  "adversarial_design": {
+    "cell_index": 36,
+    "changed_axis": "Goal readiness is at a known future instant versus it is ready now or has no authoritative time",
+    "condition": "supported",
+    "daily_life_family": "friends_social_life",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "temporal_readiness_planning"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "Goal readiness is at a known future instant versus it is ready now or has no authoritative time",
+      "language"
+    ],
+    "id": "fpdl_v2_temporal_readiness_planning_36",
+    "member": "supported-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_temporal_readiness_planning_36_supported_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
+              "goal_id": "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1",
+              "metadata": {
+                "output_mode": "information"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "resource_responsibility": {
+                "delivery_mode": "spoken_explanation",
+                "metadata": {},
+                "recipient": {
+                  "description": "requester"
+                },
+                "resource": {
+                  "attributes": {
+                    "date": {
+                      "confidence": 1.0,
+                      "entity_type": "date",
+                      "name": "date",
+                      "value": "2099-09-04"
+                    },
+                    "information_domain": {
+                      "confidence": 1.0,
+                      "entity_type": "information_domain",
+                      "name": "information_domain",
+                      "value": "weather_forecast"
+                    },
+                    "location": {
+                      "confidence": 1.0,
+                      "entity_type": "location",
+                      "name": "location",
+                      "value": "Hangzhou"
+                    },
+                    "period": {
+                      "confidence": 1.0,
+                      "entity_type": "day_part",
+                      "name": "period",
+                      "value": "night"
+                    },
+                    "ready_at": {
+                      "confidence": 1.0,
+                      "entity_type": "due_time",
+                      "name": "ready_at",
+                      "value": "2099-09-04T19:00:00+08:00"
+                    }
+                  },
+                  "description": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
+                  "kind": "information",
+                  "quantity": ""
+                },
+                "responsibility_type": "acquire_and_deliver_resource",
+                "schema_version": 1,
+                "source": {
+                  "bindings": {},
+                  "description": "",
+                  "status": "unknown"
+                }
+              },
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "At 7:00 p.m. on September 4, 2099, check Hangzhou weather for meeting my friend after class; do not check early.",
+              "success_criteria": [
+                "Check Hangzhou weather only when the Goal becomes ready at the specified future time."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_temporal_readiness_planning_36_supported_en"
+        },
+        "situation": {
+          "digest": "8f58a63ecef20268cfcf4679f860c8f2725348bbad0d2ee08e650c3c63ab8cfb",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_temporal_readiness_planning_36_supported_en"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_temporal_readiness_planning_36_supported_en",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_temporal_readiness_planning_36_supported_en",
+        "schema_version": 1,
+        "source_plan_fingerprint": "b81dd73383c4f00906bd4833d45dbdd8ed9648f7262bddf3397fbab0ab8efcd6",
+        "source_plan_id": "source-plan-fpdl_v2_temporal_readiness_planning_36_supported_en",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "date": "2099-09-04",
+            "location": "Hangzhou",
+            "period": "night",
+            "ready_at": "2099-09-04T19:00:00+08:00"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
+          "output_mode": "information",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_temporal_readiness_planning_36_supported_en",
+      "text": "At 7:00 p.m. on September 4, 2099, check Hangzhou weather for meeting my friend after class; do not check early."
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-36",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "validation",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "chromie.weather.lookup"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": true,
+      "response_required": null,
+      "semantic_facts": [
+        "Known future readiness belongs in a Goal-bound time condition; Planner must not pretend the weather read already happened."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

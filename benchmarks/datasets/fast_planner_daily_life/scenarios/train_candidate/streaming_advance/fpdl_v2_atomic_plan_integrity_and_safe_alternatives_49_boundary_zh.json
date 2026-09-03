@@ -1,0 +1,139 @@
+{
+  "adversarial_design": {
+    "cell_index": 49,
+    "changed_axis": "every member of a proposed compound Plan satisfies the supplied contracts versus one member has a hard safety, provenance, or schema rejection",
+    "condition": "boundary",
+    "daily_life_family": "preferences_boundaries",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "atomic_plan_integrity_and_safe_alternatives"
+  },
+  "category": "streaming_advance",
+  "contrast_set": {
+    "controlled_axes": [
+      "every member of a proposed compound Plan satisfies the supplied contracts versus one member has a hard safety, provenance, or schema rejection",
+      "language"
+    ],
+    "id": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_49",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_49_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [
+      {
+        "available": false,
+        "capability_id": "chromie.reminder.create"
+      }
+    ],
+    "language": "zh-CN",
+    "request": {
+      "context": {},
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "duration": 5
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "向前走五秒，作为原子请求的一项。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        },
+        {
+          "bindings": {
+            "due_at": "2026-09-03T20:00:00+08:00",
+            "reminder_text": "finish the shared-space check"
+          },
+          "confidence": 0.99,
+          "local_ref": "r2",
+          "outcome": "创建20:00提醒，作为原子请求的另一项。",
+          "output_mode": "stateful_effect",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_49_boundary_zh",
+      "text": "为了我希望安静互动的偏好，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。"
+    },
+    "runtime_variant": "streaming_advance"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-49",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate",
+        "unavailable"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1",
+        "r2"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "一个原子成员不可用时，任何可执行的部分子集都无效。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

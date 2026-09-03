@@ -1,0 +1,249 @@
+{
+  "adversarial_design": {
+    "cell_index": 28,
+    "changed_axis": "retained Work is still pending and semantically reusable versus the identical Activity is already completed",
+    "condition": "boundary",
+    "daily_life_family": "routines_plans",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "retained_work_revision_and_no_replay"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "retained Work is still pending and semantically reusable versus the identical Activity is already completed",
+      "language"
+    ],
+    "id": "fpdl_v2_retained_work_revision_and_no_replay_28",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "继续已有的一次眨眼 Goal，且不产生重复 Work。",
+              "goal_id": "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "count": {
+                    "confidence": 1.0,
+                    "entity_type": "count",
+                    "name": "count",
+                    "value": "1"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "继续晚间日常安排：已有的一次眨眼 Activity 已经完成。",
+              "success_criteria": [
+                "继续已有的一次眨眼 Goal，且不产生重复 Work。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh"
+        },
+        "interaction_context": {
+          "events": [
+            {
+              "event_id": "speech-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh",
+              "kind": "speech_delivery",
+              "source_goal_ids": [
+                "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1"
+              ],
+              "state": "delivered",
+              "text": "Acknowledged."
+            }
+          ]
+        },
+        "result_evidence_reentry": {
+          "evidence_refs": [
+            "evidence-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh"
+          ],
+          "phase": "capability_result_reentry",
+          "planner_authority": "planner",
+          "source_goal_ids": [
+            "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1"
+          ]
+        },
+        "situation": {
+          "digest": "6aac753758b392d06bfaae9e91e984d7278effb9b1991e30981174608b2cada2",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh",
+          "unresolved_conditions": []
+        },
+        "trusted_execution_outcome": {
+          "aggregate_status": "completed",
+          "evidence": [
+            {
+              "capability_id": "soridormi.blink_eyes",
+              "evidence_id": "evidence-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh",
+              "observation_status": "none",
+              "provider_retryability": {},
+              "reason_code": "",
+              "source_goal_ids": [
+                "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1"
+              ],
+              "status": "completed"
+            }
+          ],
+          "goal_outcomes": [
+            {
+              "completed_step_ids": [
+                "source-step-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh"
+              ],
+              "completion_qualification": {
+                "established": false,
+                "qualifications": [],
+                "required": false
+              },
+              "evidence_ids": [
+                "evidence-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh"
+              ],
+              "goal_id": "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1",
+              "reason_codes": [],
+              "status": "completed",
+              "unresolved_step_ids": []
+            }
+          ],
+          "outcome_id": "incremental:evidence-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh"
+        },
+        "trusted_terminal_evidence": [
+          {
+            "data": {
+              "count": 1
+            },
+            "evidence_id": "evidence-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh",
+            "output_sha256": "6aea6dfe6561984cdc5c54ead84d47d2cf29e48253ae282aef237404adad4661",
+            "status": "completed",
+            "tool_id": "soridormi.blink_eyes"
+          }
+        ]
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "count": 1
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "继续已有的一次眨眼 Goal，且不产生重复 Work。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh",
+      "text": "继续晚间日常安排：已有的一次眨眼 Activity 已经完成。"
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-28",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_retained_work_revision_and_no_replay_28_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "已完成的 Work 不可变，不能仅因为 Planner 重新进入而重放。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

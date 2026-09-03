@@ -117,9 +117,7 @@ CommunicativeDeliveryPhase = Literal[
     "final",
 ]
 
-_FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[
-    FastProgressKind, FastProgressSpeechAct
-] = {
+_FAST_PROGRESS_SPEECH_ACT_BY_KIND: dict[FastProgressKind, FastProgressSpeechAct] = {
     "acknowledge_work": "acknowledge",
     "check_information": "acknowledge_and_check",
     "perform_action": "acknowledge",
@@ -193,27 +191,19 @@ class PlannerInformationGap(InformationGap):
     @model_validator(mode="after")
     def validate_planner_gap(self) -> "PlannerInformationGap":
         if not self.blocking or self.resolved:
-            raise ValueError(
-                "clarification InformationGap must be blocking and unresolved"
-            )
+            raise ValueError("clarification InformationGap must be blocking and unresolved")
         if self.preferred_resolution != "ask_user":
             raise ValueError(
                 "clarification InformationGap must select preferred_resolution=ask_user"
             )
         if not self.required_for:
-            raise ValueError(
-                "Planner InformationGap must name at least one required input"
-            )
+            raise ValueError("Planner InformationGap must name at least one required input")
         if "authoritative_context" not in self.resolution_sources_considered:
-            raise ValueError(
-                "Planner clarification must first consider authoritative context"
-            )
+            raise ValueError("Planner clarification must first consider authoritative context")
         if self.source_kind == "execution_input" and (
             "capability_schema" not in self.resolution_sources_considered
         ):
-            raise ValueError(
-                "execution-input clarification must inspect the Capability schema"
-            )
+            raise ValueError("execution-input clarification must inspect the Capability schema")
         return self
 
 
@@ -247,9 +237,7 @@ class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
     progress_kind: FastProgressKind
     speech_act: str = Field(
         default="acknowledge",
-        json_schema_extra={
-            "enum": ["acknowledge", "acknowledge_and_check", "thinking"]
-        },
+        json_schema_extra={"enum": ["acknowledge", "acknowledge_and_check", "thinking"]},
     )
 
     @model_validator(mode="before")
@@ -259,16 +247,12 @@ class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
             return value
         normalized = dict(value)
         progress_kind = normalized.get("progress_kind")
-        expected = _FAST_PROGRESS_SPEECH_ACT_BY_KIND.get(
-            cast(FastProgressKind, progress_kind)
-        )
+        expected = _FAST_PROGRESS_SPEECH_ACT_BY_KIND.get(cast(FastProgressKind, progress_kind))
         if expected is None:
             return normalized
         supplied = normalized.get("speech_act")
         if supplied not in (None, "") and supplied != expected:
-            raise ValueError(
-                "Fast Planner progress speech_act must match progress_kind"
-            )
+            raise ValueError("Fast Planner progress speech_act must match progress_kind")
         normalized["speech_act"] = expected
         return normalized
 
@@ -337,13 +321,9 @@ class AuxiliaryActivityTarget(BaseModel):
     def validate_target_shape(self) -> "AuxiliaryActivityTarget":
         if self.source == "none":
             if self.target_ref != "none" or self.relative_direction or self.evidence_refs:
-                raise ValueError(
-                    "an untargeted auxiliary Activity cannot claim target semantics"
-                )
+                raise ValueError("an untargeted auxiliary Activity cannot claim target semantics")
         elif self.target_ref == "none":
-            raise ValueError(
-                "a targeted auxiliary Activity requires a semantic target_ref"
-            )
+            raise ValueError("a targeted auxiliary Activity requires a semantic target_ref")
         return self
 
 
@@ -368,9 +348,7 @@ class AuxiliaryPlanActivity(CapabilityIdentityModel):
     target: AuxiliaryActivityTarget = Field(default_factory=AuxiliaryActivityTarget)
     reason_summary: str = Field(default="", max_length=320)
 
-    @field_validator(
-        "auxiliary_activity_id", "anchor_id", "reason_summary", mode="before"
-    )
+    @field_validator("auxiliary_activity_id", "anchor_id", "reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -440,9 +418,7 @@ class PlannedCommunicativeAct(BaseModel):
                 "complete-response Communicative Act requires a complete-response function"
             )
         if self.role == "clarification" and self.speech_act != "ask_clarification":
-            raise ValueError(
-                "clarification Communicative Act requires ask_clarification"
-            )
+            raise ValueError("clarification Communicative Act requires ask_clarification")
         if self.role == "progress" and self.speech_act not in {
             "acknowledge",
             "acknowledge_and_check",
@@ -454,13 +430,9 @@ class PlannedCommunicativeAct(BaseModel):
         if self.role != "progress" and self.progress_kind is not None:
             raise ValueError("only progress Communicative Acts carry progress_kind")
         if self.role == "clarification" and not self.information_gaps:
-            raise ValueError(
-                "clarification Communicative Act requires Planner InformationGaps"
-            )
+            raise ValueError("clarification Communicative Act requires Planner InformationGaps")
         if self.role != "clarification" and self.information_gaps:
-            raise ValueError(
-                "only clarification Communicative Acts carry Planner InformationGaps"
-            )
+            raise ValueError("only clarification Communicative Acts carry Planner InformationGaps")
         return self
 
 
@@ -529,22 +501,16 @@ class PresentationCommit(BaseModel):
 
     @field_validator("metadata")
     @classmethod
-    def reject_commit_low_level_metadata(
-        cls, value: dict[str, Any]
-    ) -> dict[str, Any]:
+    def reject_commit_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
     @model_validator(mode="after")
     def validate_presentation_boundary(self) -> "PresentationCommit":
         if self.activity is None and self.auxiliary_activities:
-            raise ValueError(
-                "a silent PresentationCommit cannot carry auxiliary Activities"
-            )
+            raise ValueError("a silent PresentationCommit cannot carry auxiliary Activities")
         if self.activity is None:
             return self
-        auxiliary_ids = [
-            item.auxiliary_activity_id for item in self.auxiliary_activities
-        ]
+        auxiliary_ids = [item.auxiliary_activity_id for item in self.auxiliary_activities]
         if len(auxiliary_ids) != len(set(auxiliary_ids)):
             raise ValueError("PresentationCommit auxiliary Activity IDs must be unique")
         for auxiliary in self.auxiliary_activities:
@@ -555,10 +521,10 @@ class PresentationCommit(BaseModel):
                 )
             if auxiliary.anchor_id != self.activity.activity_id:
                 raise ValueError(
-                    "PresentationCommit auxiliary Activity references an unknown "
-                    "primary Activity"
+                    "PresentationCommit auxiliary Activity references an unknown primary Activity"
                 )
         return self
+
 
 FastPlannerActivity = Annotated[
     Union[
@@ -592,9 +558,7 @@ FastPlannerFreshEvidenceClarifiableCommunicativeAct = Annotated[
 def fast_planner_activity_request_id(turn_id: str, activity_id: str) -> str:
     """Return the stable Runtime request identity for one Fast Activity."""
 
-    digest = hashlib.sha256(
-        f"{turn_id}|{activity_id}".encode("utf-8")
-    ).hexdigest()[:20]
+    digest = hashlib.sha256(f"{turn_id}|{activity_id}".encode("utf-8")).hexdigest()[:20]
     return f"fastreq_{digest}"
 
 
@@ -677,15 +641,11 @@ class FastPlannerAdvance(BaseModel):
         activity_ids = [item.activity_id for item in self.activities]
         if len(activity_ids) != len(set(activity_ids)):
             raise ValueError("Fast Planner Activity IDs must be unique")
-        auxiliary_ids = [
-            item.auxiliary_activity_id for item in self.auxiliary_activities
-        ]
+        auxiliary_ids = [item.auxiliary_activity_id for item in self.auxiliary_activities]
         if len(auxiliary_ids) != len(set(auxiliary_ids)):
             raise ValueError("Fast Planner auxiliary Activity IDs must be unique")
         if self.disposition == "escalate" and self.auxiliary_activities:
-            raise ValueError(
-                "an escalating Fast Planner result cannot author auxiliary Activities"
-            )
+            raise ValueError("an escalating Fast Planner result cannot author auxiliary Activities")
         activity_id_set = set(activity_ids)
         capability_activity_ids = {
             item.activity_id
@@ -728,9 +688,7 @@ class FastPlannerAdvance(BaseModel):
         activity_roles_by_ref: dict[str, set[str]] = {}
         for activity in self.activities:
             for responsibility_ref in activity.source_responsibility_refs:
-                activity_roles_by_ref.setdefault(responsibility_ref, set()).add(
-                    activity.role
-                )
+                activity_roles_by_ref.setdefault(responsibility_ref, set()).add(activity.role)
         for responsibility_ref, roles in activity_roles_by_ref.items():
             terminal_roles = roles.intersection(
                 {"capability", "complete_response", "clarification"}
@@ -966,9 +924,7 @@ class PlannedGoalTimeCondition(BaseModel):
     condition_id: str = Field(min_length=1, max_length=200)
     goal_id: str = Field(min_length=1, max_length=160)
     due_at_ms: int = Field(ge=1)
-    reason_code: str = Field(
-        default="planner_time_condition", min_length=1, max_length=120
-    )
+    reason_code: str = Field(default="planner_time_condition", min_length=1, max_length=120)
 
     @field_validator("condition_id", "goal_id", "reason_code", mode="before")
     @classmethod
@@ -1091,13 +1047,9 @@ class EscalateGoalPlanOutcome(_GoalPlanOutcomeBase):
     @model_validator(mode="after")
     def validate_escalation(self) -> "EscalateGoalPlanOutcome":
         if self.response_text:
-            raise ValueError(
-                "escalate goal outcomes must not claim a user-facing answer"
-            )
+            raise ValueError("escalate goal outcomes must not claim a user-facing answer")
         if not self.unresolved and not self.rationale:
-            raise ValueError(
-                "escalate goal outcomes require an unresolved need or rationale"
-            )
+            raise ValueError("escalate goal outcomes require an unresolved need or rationale")
         return self
 
 
@@ -1114,9 +1066,7 @@ class ClarifyGoalPlanOutcome(_GoalPlanOutcomeBase):
     @model_validator(mode="after")
     def validate_clarification(self) -> "ClarifyGoalPlanOutcome":
         if not self.unresolved and not self.response_text:
-            raise ValueError(
-                "clarify goal outcomes require an unresolved need or response_text"
-            )
+            raise ValueError("clarify goal outcomes require an unresolved need or response_text")
         return self
 
 
@@ -1179,9 +1129,7 @@ class CanonicalPlan(BaseModel):
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
-    time_conditions: list[PlannedGoalTimeCondition] = Field(
-        default_factory=list, max_length=16
-    )
+    time_conditions: list[PlannedGoalTimeCondition] = Field(default_factory=list, max_length=16)
     goal_outcomes: list[GoalPlanOutcome] = Field(default_factory=list)
     goal_satisfaction: GoalSatisfactionAssessment | None = None
     selected_agent_skills: list[PlanAgentSkillProvenance] = Field(default_factory=list)
@@ -1272,9 +1220,7 @@ class CanonicalPlan(BaseModel):
         allowed = {str(item).strip() for item in goal_ids if str(item).strip()}
         narrowed: list[PlanAgentSkillProvenance] = []
         for item in self.selected_agent_skills:
-            relevant = tuple(
-                goal_id for goal_id in item.relevant_goal_ids if goal_id in allowed
-            )
+            relevant = tuple(goal_id for goal_id in item.relevant_goal_ids if goal_id in allowed)
             if not relevant:
                 continue
             narrowed.append(item.model_copy(update={"relevant_goal_ids": relevant}))
@@ -1287,13 +1233,13 @@ class CanonicalPlan(BaseModel):
                 raise ValueError("non-complete plans must not carry executable steps")
             if self.planner_tier == "fast":
                 if self.disposition not in {"escalate", "clarify"}:
-                    raise ValueError(
-                        "partial or uncertain fast plans must clarify or escalate"
-                    )
+                    raise ValueError("partial or uncertain fast plans must clarify or escalate")
                 if self.disposition == "escalate" and not self.escalation_reason:
                     raise ValueError("escalating plans require escalation_reason")
             elif self.disposition not in {"clarify", "unavailable", "refused"}:
-                raise ValueError("non-complete deep plans must clarify, report unavailable, or refuse")
+                raise ValueError(
+                    "non-complete deep plans must clarify, report unavailable, or refuse"
+                )
         if self.planner_tier == "deep" and self.disposition == "escalate":
             raise ValueError("deep plans cannot return to the fast planner")
         if self.disposition == "execute" and not self.steps:
@@ -1309,15 +1255,14 @@ class CanonicalPlan(BaseModel):
                 "Communicative Act"
             )
         if self.disposition not in {"execute", "mixed"} and self.steps:
-            raise ValueError(
-                f"{self.disposition} disposition must not carry executable steps"
-            )
+            raise ValueError(f"{self.disposition} disposition must not carry executable steps")
         if self.disposition in {"execute", "respond", "mixed"} and self.coverage != "complete":
-            raise ValueError("respond, execute, and mixed plans require complete accounting coverage")
+            raise ValueError(
+                "respond, execute, and mixed plans require complete accounting coverage"
+            )
         if self.disposition in {"execute", "respond"} and self.unresolved:
             raise ValueError(
-                "complete execute or respond plans must not retain unresolved "
-                "planning work"
+                "complete execute or respond plans must not retain unresolved planning work"
             )
         resolution_keys = [(item.step_id, item.parameter) for item in self.parameter_resolutions]
         if len(resolution_keys) != len(set(resolution_keys)):
@@ -1330,21 +1275,15 @@ class CanonicalPlan(BaseModel):
         condition_ids = [item.condition_id for item in self.time_conditions]
         if len(condition_ids) != len(set(condition_ids)):
             raise ValueError("time condition IDs must be unique")
-        unknown_time_goals = {
-            item.goal_id for item in self.time_conditions
-        } - goal_id_set
+        unknown_time_goals = {item.goal_id for item in self.time_conditions} - goal_id_set
         if unknown_time_goals:
             raise ValueError(
                 "time conditions reference unknown Goal IDs: "
                 + ",".join(sorted(unknown_time_goals))
             )
         if self.time_conditions and self.disposition not in {"execute", "mixed"}:
-            raise ValueError(
-                "time conditions require executable Work with future Goal readiness"
-            )
-        communicative_act_ids = [
-            item.activity_id for item in self.communicative_acts
-        ]
+            raise ValueError("time conditions require executable Work with future Goal readiness")
+        communicative_act_ids = [item.activity_id for item in self.communicative_acts]
         if len(communicative_act_ids) != len(set(communicative_act_ids)):
             raise ValueError("Canonical Plan Communicative Act IDs must be unique")
         for act in self.communicative_acts:
@@ -1354,16 +1293,13 @@ class CanonicalPlan(BaseModel):
                     "Communicative Act references unknown Goal IDs: "
                     + ",".join(sorted(unknown_act_goals))
                 )
-        auxiliary_ids = [
-            item.auxiliary_activity_id for item in self.auxiliary_activities
-        ]
+        auxiliary_ids = [item.auxiliary_activity_id for item in self.auxiliary_activities]
         if len(auxiliary_ids) != len(set(auxiliary_ids)):
             raise ValueError("Canonical Plan auxiliary Activity IDs must be unique")
         step_id_set_for_anchors = {item.step_id for item in self.steps}
         communicative_id_set = set(communicative_act_ids)
         has_plan_response = bool(
-            self.response_text
-            or any(item.response_text for item in self.goal_outcomes)
+            self.response_text or any(item.response_text for item in self.goal_outcomes)
         )
         primary_capability_ids = {item.capability_id for item in self.steps}
         for auxiliary in self.auxiliary_activities:
@@ -1378,9 +1314,7 @@ class CanonicalPlan(BaseModel):
                     "auxiliary Activity must reference an existing primary Plan Activity"
                 )
             if auxiliary.capability_id in primary_capability_ids:
-                raise ValueError(
-                    "an auxiliary Activity cannot duplicate a primary Plan Capability"
-                )
+                raise ValueError("an auxiliary Activity cannot duplicate a primary Plan Capability")
         provenance_keys = [
             (item.agent_skill_id, item.selected_by_agent_role)
             for item in self.selected_agent_skills
@@ -1390,9 +1324,7 @@ class CanonicalPlan(BaseModel):
                 "Canonical Plan Agent Skill provenance must be unique per Skill and planner role"
             )
         allowed_roles = (
-            {"fast_planner"}
-            if self.planner_tier == "fast"
-            else {"fast_planner", "deep_planner"}
+            {"fast_planner"} if self.planner_tier == "fast" else {"fast_planner", "deep_planner"}
         )
         for item in self.selected_agent_skills:
             if item.selected_by_agent_role not in allowed_roles:
@@ -1406,12 +1338,6 @@ class CanonicalPlan(BaseModel):
                     + ",".join(sorted(unknown_provenance_goals))
                 )
         if self.goal_satisfaction is not None:
-            if (
-                self.coverage == "complete"
-                and self.disposition != "mixed"
-                and self.goal_satisfaction.status in {"partial", "unsatisfied"}
-            ):
-                raise ValueError("complete non-mixed plans cannot report partial or unsatisfied goal coverage")
             satisfaction_goal_ids = {
                 *self.goal_satisfaction.satisfied_goal_ids,
                 *self.goal_satisfaction.unmet_goal_ids,
@@ -1432,12 +1358,12 @@ class CanonicalPlan(BaseModel):
         for step in self.steps:
             source_goal_ids = set(step.source_goal_ids)
             if not source_goal_ids:
-                raise ValueError(
-                    f"executable step {step.step_id!r} requires source_goal_ids"
-                )
+                raise ValueError(f"executable step {step.step_id!r} requires source_goal_ids")
             unknown = source_goal_ids - goal_id_set
             if unknown:
-                raise ValueError("plan step references unknown goal IDs: " + ",".join(sorted(unknown)))
+                raise ValueError(
+                    "plan step references unknown goal IDs: " + ",".join(sorted(unknown))
+                )
         for resolution in self.parameter_resolutions:
             unknown = set(resolution.source_goal_ids) - goal_id_set
             if unknown:
@@ -1458,8 +1384,7 @@ class CanonicalPlan(BaseModel):
                 if outcome.disposition == "respond" and not (
                     outcome.response_text
                     or any(
-                        act.role == "complete_response"
-                        and outcome.goal_id in act.source_goal_ids
+                        act.role == "complete_response" and outcome.goal_id in act.source_goal_ids
                         for act in self.communicative_acts
                     )
                 ):
@@ -1497,9 +1422,7 @@ class CanonicalPlan(BaseModel):
                         *outcome.satisfaction.satisfied_goal_ids,
                         *outcome.satisfaction.unmet_goal_ids,
                     }
-                    foreign_satisfaction_goals = outcome_satisfaction_goal_ids - {
-                        outcome.goal_id
-                    }
+                    foreign_satisfaction_goals = outcome_satisfaction_goal_ids - {outcome.goal_id}
                     if foreign_satisfaction_goals:
                         raise ValueError(
                             "per-goal outcome satisfaction may reference only its "
@@ -1509,7 +1432,8 @@ class CanonicalPlan(BaseModel):
                 unknown_steps = set(outcome.step_ids) - step_id_set
                 if unknown_steps:
                     raise ValueError(
-                        "goal outcome references unknown step IDs: " + ",".join(sorted(unknown_steps))
+                        "goal outcome references unknown step IDs: "
+                        + ",".join(sorted(unknown_steps))
                     )
                 referenced_steps.update(outcome.step_ids)
                 if outcome.disposition == "execute":
@@ -1559,8 +1483,7 @@ class CanonicalPlan(BaseModel):
                 if unsupported:
                     raise ValueError(
                         "fast mixed plans may contain only execute, respond, and "
-                        "clarify outcomes: "
-                        + ",".join(sorted(unsupported))
+                        "clarify outcomes: " + ",".join(sorted(unsupported))
                     )
         return self
 

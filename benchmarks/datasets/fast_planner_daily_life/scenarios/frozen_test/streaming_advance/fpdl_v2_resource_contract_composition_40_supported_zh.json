@@ -1,0 +1,113 @@
+{
+  "adversarial_design": {
+    "cell_index": 40,
+    "changed_axis": "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+    "condition": "supported",
+    "daily_life_family": "family_home",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "resource_contract_composition"
+  },
+  "category": "streaming_advance",
+  "contrast_set": {
+    "controlled_axes": [
+      "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+      "language"
+    ],
+    "id": "fpdl_v2_resource_contract_composition_40",
+    "member": "supported-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_resource_contract_composition_40_supported_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {},
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "date": "tomorrow",
+            "location": "Hangzhou",
+            "period": "morning"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "获取并交付所请求的杭州天气信息。",
+          "output_mode": "information",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_resource_contract_composition_40_supported_zh",
+      "text": "请获取杭州明早为家人准备出门所需的天气预报，并向我说明结果。"
+    },
+    "runtime_variant": "streaming_advance"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-40",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "chromie.weather.lookup"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "天气 Capability 声明了获取以及由 Planner 进行沟通交付，完整覆盖信息资源责任。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

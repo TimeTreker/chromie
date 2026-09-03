@@ -88,7 +88,6 @@ def materialize_deep_unavailable(
     metadata: dict[str, Any] | None = None,
     error: Exception | None = None,
     attempts: int = 1,
-    max_contract_repairs: int = 1,
 ) -> CanonicalPlan:
     """Return a terminal capability limitation without asking a fake question.
 
@@ -104,7 +103,6 @@ def materialize_deep_unavailable(
             "status": "unavailable",
             "authority": "advisory",
             "attempt_count": attempts,
-            "max_contract_repairs": max_contract_repairs,
             "reason": reason,
         }
     )
@@ -139,7 +137,6 @@ def materialize_deep_clarify(
     metadata: dict[str, Any] | None = None,
     error: Exception | None = None,
     attempts: int = 1,
-    max_contract_repairs: int = 1,
 ) -> CanonicalPlan:
     detail = dict(metadata or {})
     detail.update(
@@ -148,7 +145,6 @@ def materialize_deep_clarify(
             "status": "clarify",
             "authority": "advisory",
             "attempt_count": attempts,
-            "max_contract_repairs": max_contract_repairs,
             "reason": reason,
         }
     )

@@ -1,0 +1,149 @@
+{
+  "adversarial_design": {
+    "cell_index": 5,
+    "changed_axis": "a current speech-only obligation exists versus the same topic has no still-needed conversational act",
+    "condition": "supported",
+    "daily_life_family": "feelings_support",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "direct_communicative_planning"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "a current speech-only obligation exists versus the same topic has no still-needed conversational act",
+      "language"
+    ],
+    "id": "fpdl_v2_direct_communicative_planning_05",
+    "member": "supported-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_direct_communicative_planning_05_supported_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Provide one warm concise sentence about a difficult afternoon.",
+              "goal_id": "goal-fpdl_v2_direct_communicative_planning_05_supported_en-1",
+              "metadata": {
+                "output_mode": "speech"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Give me a warm, concise sentence about a difficult afternoon; do not perform any action.",
+              "success_criteria": [
+                "Provide one warm concise sentence about a difficult afternoon."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_direct_communicative_planning_05_supported_en"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Provide one warm concise sentence about a difficult afternoon.",
+          "output_mode": "speech",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_direct_communicative_planning_05_supported_en",
+      "text": "Give me a warm, concise sentence about a difficult afternoon; do not perform any action."
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-05",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_direct_communicative_planning_05_supported_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Planner owns the natural words; no Capability or speech-transport step is needed."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

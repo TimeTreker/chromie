@@ -1,0 +1,202 @@
+{
+  "adversarial_design": {
+    "cell_index": 8,
+    "changed_axis": "an open confirmation-held effect versus trusted cancellation evidence",
+    "condition": "supported",
+    "daily_life_family": "preferences_boundaries",
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "confirmation_and_cancellation_revision"
+  },
+  "category": "deep_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "an open confirmation-held effect versus trusted cancellation evidence",
+      "language"
+    ],
+    "id": "dpdl_v1_confirmation_and_cancellation_revision_08",
+    "member": "supported-en"
+  },
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "difficulty": "ordinary",
+  "id": "dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Create the 8 p.m. reminder after fresh confirmation.",
+              "goal_id": "goal-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en-1",
+              "metadata": {
+                "output_mode": "stateful_effect"
+              },
+              "object": {
+                "bindings": {
+                  "due_at": {
+                    "confidence": 1.0,
+                    "entity_type": "due_time",
+                    "name": "due_at",
+                    "value": "2026-09-03T20:00:00+08:00"
+                  },
+                  "reminder_text": {
+                    "confidence": 1.0,
+                    "entity_type": "reminder_text",
+                    "name": "reminder_text",
+                    "value": "call home"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Please keep the 8 p.m. reminder pending for fresh confirmation.",
+              "success_criteria": [
+                "Create the 8 p.m. reminder after fresh confirmation."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en"
+        },
+        "goal_cancellation_reentry": {
+          "evidence_refs": [
+            "evidence-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en"
+          ],
+          "phase": "goal_cancellation_reentry",
+          "planner_authority": "planner",
+          "source_goal_ids": [
+            "goal-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en-1"
+          ]
+        },
+        "trusted_goal_cancellation_evidence": [
+          {
+            "coaffected_goal_ids": [],
+            "confirmation_state_reconciled": true,
+            "evidence_id": "evidence-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
+            "goal_state_reconciled": false,
+            "reason_code": "stale_confirmation_released",
+            "released_confirmation_goal_ids": [
+              "goal-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en-1"
+            ],
+            "runtime_dispatch_attempted": false,
+            "schema_version": 1,
+            "source_turn_id": "dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
+            "status": "not_cancelled",
+            "target_goal_ids": [
+              "goal-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en-1"
+            ]
+          }
+        ]
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": {
+        "evidence_refs": [
+          "evidence-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en"
+        ],
+        "goal_ids": [
+          "goal-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en-1"
+        ],
+        "opportunity_id": "opportunity-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
+        "schema_version": 1,
+        "source_plan_fingerprint": "4a252460a3fa27a0a54f5f2022962435c8ebb33a7a1aeac378a86939503635b9",
+        "source_plan_id": "source-plan-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
+        "trigger": "goal_cancellation_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "due_at": "2026-09-03T20:00:00+08:00",
+            "reminder_text": "call home"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Create the 8 p.m. reminder after fresh confirmation.",
+          "output_mode": "stateful_effect",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
+      "text": "Please keep the 8 p.m. reminder pending for fresh confirmation."
+    },
+    "runtime_variant": "deep_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "deep_input_excludes_fast_candidate": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-deep-cell-08",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "validation",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": false,
+      "expected_goal_ids": [
+        "goal-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [
+        "evidence-dpdl_v1_confirmation_and_cancellation_revision_08_supported_en"
+      ],
+      "required_reuse_activity_ids": [],
+      "required_step_purposes": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Deep Planner must satisfy confirmation_and_cancellation_revision at the declared supported boundary without changing Goal WHAT."
+      ]
+    },
+    "schema_expectation": "accept"
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "adversarial_design": {
+    "cell_index": 40,
+    "changed_axis": "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+    "condition": "boundary",
+    "daily_life_family": "family_home",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "resource_contract_composition"
+  },
+  "category": "streaming_advance",
+  "contrast_set": {
+    "controlled_axes": [
+      "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+      "language"
+    ],
+    "id": "fpdl_v2_resource_contract_composition_40",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_resource_contract_composition_40_boundary_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {},
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "resource": "red mug",
+            "source": "kitchen"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Acquire the red mug from the kitchen and physically hand it to the requester.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_resource_contract_composition_40_boundary_en",
+      "text": "Fetch the red mug from the kitchen and hand it to me for the family getting ready to leave."
+    },
+    "runtime_variant": "streaming_advance"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-40",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate",
+        "unavailable"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "No advertised Capability proves the complete physical acquisition-and-handover resource contract; locomotion alone is partial and forbidden."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

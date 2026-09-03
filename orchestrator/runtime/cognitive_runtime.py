@@ -288,10 +288,6 @@ class CognitiveEvidenceRecorder:
             self.counters["fast_semantic_escalation"] += 1
         if fast_path == "contract_failure":
             self.counters["fast_contract_failure"] += 1
-        if resolution.fast_plan is not None and bool(
-            resolution.fast_plan.metadata.get("contract_repair_attempted")
-        ):
-            self.counters["fast_contract_repair"] += 1
         if bool(resolution.metadata.get("deep_planner_invoked")):
             reason = str(resolution.metadata.get("deep_planner_invocation_reason") or "unknown")
             self.counters[f"deep_planner_invoked:{reason}"] += 1
@@ -3690,12 +3686,6 @@ class GoalDrivenRuntimeCoordinator:
             return "semantic_escalation"
         return "terminal"
 
-    @staticmethod
-    def _fast_plan_context_for_deep(plan: CanonicalPlan) -> dict[str, Any]:
-        """Project only a genuine semantic Fast escalation into Deep cognition."""
-
-        return plan.prompt_projection()
-
     async def _resolve_and_commit_goal_association(
         self,
         session: Any,
@@ -4603,9 +4593,6 @@ class GoalDrivenRuntimeCoordinator:
                 deep_planner_invocation_reasons.append(deep_reason)
                 deep_context = dict(planning_context)
                 deep_context["deep_planner_invocation_reason"] = deep_reason
-                deep_context["fast_planner_advance"] = fast_advance.model_dump(
-                    mode="json", exclude_none=True
-                )
                 stage = time.perf_counter()
                 terminal_plan = await self._observe_workflow_stage(
                     sid=sid,
@@ -4613,7 +4600,6 @@ class GoalDrivenRuntimeCoordinator:
                     input_payload={
                         "user_text": text,
                         "goal_association": association,
-                        "fast_planner_advance": fast_advance,
                         "invocation_reason": deep_reason,
                     },
                     operation=self.agent_client.resolve_deep_plan(
@@ -4699,18 +4685,6 @@ class GoalDrivenRuntimeCoordinator:
                     deep_reason = "semantic_escalation"
                     deep_planner_invocation_reasons.append(deep_reason)
                     deep_context = dict(planning_context)
-                    deep_context["fast_plan_resolution"] = (
-                        self._fast_plan_context_for_deep(fast_plan)
-                    )
-                    fast_validation_feedback = fast_plan.metadata.get(
-                        "validation_feedback"
-                    )
-                    if isinstance(fast_validation_feedback, list):
-                        deep_context["runtime_validator_feedback"] = [
-                            dict(item)
-                            for item in fast_validation_feedback
-                            if isinstance(item, dict)
-                        ]
                     deep_context["deep_planner_invocation_reason"] = deep_reason
                     stage = time.perf_counter()
                     terminal_plan = await self._observe_workflow_stage(
@@ -4719,10 +4693,6 @@ class GoalDrivenRuntimeCoordinator:
                         input_payload={
                             "user_text": text,
                             "goal_association": association,
-                            "fast_plan": fast_plan,
-                            "validation_feedback": deep_context.get(
-                                "runtime_validator_feedback", []
-                            ),
                             "invocation_reason": deep_reason,
                         },
                         operation=self.agent_client.resolve_deep_plan(
@@ -4782,10 +4752,9 @@ class GoalDrivenRuntimeCoordinator:
                     metadata={"dispatch_allowed": False},
                 )
             if runtime_errors:
-                # Fast Planner already escalated to Deep Planner when needed, and
-                # Deep Planner owns its one bounded same-tier revision.  The Host
-                # validates authority and runtime contracts; it must not become a
-                # third semantic planner after rejecting the terminal plan.
+                # Fast may delegate unresolved meaning once to Deep. Each depth
+                # authors one primary result; the Host validates authority and
+                # runtime contracts without becoming another semantic planner.
                 raise ValueError(
                     "runtime validation rejected terminal canonical plan: "
                     + json.dumps(runtime_errors, ensure_ascii=False)

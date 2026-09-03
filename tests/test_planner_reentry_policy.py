@@ -36,7 +36,7 @@ def _response(*, include_interpretation: bool = True) -> InteractionResponse:
         "user_turn_envelope": {
             "turn_id": "turn-reentry-source",
             "original_input": {"text": "  Check both things.  "},
-            "normalized_input": {"text": "Check both things."}
+            "normalized_input": {"text": "Check both things."},
         },
         "goal_association": {
             "associations": [],
@@ -173,9 +173,80 @@ def test_typed_reentry_scope_bounds_full_association_to_affected_goals() -> None
         context,
         goal_ids=scope.goal_ids,
     )
-    assert [
-        item["goal_id"] for item in association_projection["new_goals"]
-    ] == ["goal-walk", "goal-blink"]
+    assert [item["goal_id"] for item in association_projection["new_goals"]] == [
+        "goal-walk",
+        "goal-blink",
+    ]
+
+
+def test_failed_safe_read_reentry_opens_execution_only_with_two_sided_recovery_truth() -> None:
+    context = {
+        "goal_association_resolution": {
+            "new_goals": [{"goal_id": "goal-weather", "metadata": {"output_mode": "information"}}]
+        },
+        "result_evidence_reentry": {
+            "source_goal_ids": ["goal-weather"],
+            "evidence_refs": ["evidence-weather"],
+        },
+        "trusted_terminal_evidence": [
+            {
+                "evidence_id": "evidence-weather",
+                "tool_id": "chromie.weather.lookup",
+                "status": "failed",
+                "data": {},
+                "output_sha256": canonical_value_sha256({}),
+            }
+        ],
+        "trusted_execution_outcome": {
+            "evidence": [
+                {
+                    "capability_id": "chromie.weather.lookup",
+                    "status": "failed",
+                    "source_goal_ids": ["goal-weather"],
+                    "provider_retryability": {"recoverable": True, "retryable": True},
+                }
+            ]
+        },
+        "active_task_snapshots": [
+            {
+                "status": "recoverable",
+                "metadata": {
+                    "execution_binding": {
+                        "retryable_safe_read": True,
+                        "recoverable_request_ids": ["request-weather"],
+                        "planned_capabilities": [
+                            {
+                                "request_id": "request-weather",
+                                "capability_id": "chromie.weather.lookup",
+                                "source_goal_ids": ["goal-weather"],
+                                "safety_class": "safe_read",
+                                "retryable_safe_read": True,
+                            }
+                        ],
+                    }
+                },
+            }
+        ],
+    }
+    scope = PlannerReentryScope(
+        trigger="capability_result_reentry",
+        goal_ids=["goal-weather"],
+        evidence_refs=["evidence-weather"],
+        source_plan_id="plan-weather",
+        source_plan_fingerprint="f" * 64,
+    )
+
+    projected = planner_goal_context(context, reentry_scope=scope)
+
+    assert projected.requires_execution is True
+    assert projected.response_goal_ids == ()
+
+    context["trusted_execution_outcome"]["evidence"][0]["provider_retryability"]["retryable"] = (
+        False
+    )
+    fail_closed = planner_goal_context(context, reentry_scope=scope)
+    assert fail_closed.requires_execution is False
+    assert fail_closed.response_goal_ids == ("goal-weather",)
 
 
 def test_fast_fail_safe_cannot_widen_typed_reentry_scope() -> None:
@@ -261,10 +332,13 @@ def test_planner_reentry_selects_only_goal_bound_responsibility() -> None:
 
 
 def test_planner_reentry_does_not_invent_missing_responsibility() -> None:
-    assert planner_reentry_responsibilities(
-        source_response=_response(include_interpretation=False),
-        goal_ids=["goal-a"],
-    ) == []
+    assert (
+        planner_reentry_responsibilities(
+            source_response=_response(include_interpretation=False),
+            goal_ids=["goal-a"],
+        )
+        == []
+    )
 
 
 def test_one_unbound_responsibility_does_not_cover_multiple_goals() -> None:
@@ -288,10 +362,13 @@ def test_one_unbound_responsibility_does_not_cover_multiple_goals() -> None:
         ],
     }
 
-    assert planner_reentry_responsibilities(
-        source_response=response,
-        goal_ids=["goal-a", "goal-b"],
-    ) == []
+    assert (
+        planner_reentry_responsibilities(
+            source_response=response,
+            goal_ids=["goal-a", "goal-b"],
+        )
+        == []
+    )
 
 
 def test_planner_reentry_rejects_exact_repeat_of_completed_activity() -> None:
@@ -431,9 +508,7 @@ def test_completed_body_followup_is_suppressed_after_delivered_sibling_response(
 
 def test_completed_information_result_is_not_suppressed_by_sibling_response() -> None:
     source = _response()
-    source.metadata["goal_association"]["new_goals"][0]["metadata"] = {
-        "output_mode": "information"
-    }
+    source.metadata["goal_association"]["new_goals"][0]["metadata"] = {"output_mode": "information"}
     plan = CanonicalPlan(
         plan_id="mixed-information-and-speech",
         planner_tier="fast",
@@ -543,9 +618,7 @@ def test_work_request_rejects_unverified_source_projection() -> None:
         "schema_version": 1,
         "turn_id": "",
         "original_text": "scoped responsibility",
-        "original_text_sha256": hashlib.sha256(
-            b"scoped responsibility"
-        ).hexdigest(),
+        "original_text_sha256": hashlib.sha256(b"scoped responsibility").hexdigest(),
         "language": "auto",
         "authority": "normalized_transport_fallback",
     }

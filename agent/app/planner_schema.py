@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime
 from itertools import product
 from typing import Any
 
@@ -33,12 +34,33 @@ from .planner_grounding import (
     _normalized_entity_type,
     semantic_numeric_values,
 )
-from .planner_validation import requires_sequential_safety_revision
 from .planner_model_contract import (
     PlannerModelOutput,
     PlannerTier,
-    ResourceResponsibilityCapabilityGroundingError,
 )
+
+
+def _canonical_binding_argument_value(argument_schema: dict[str, Any], value: Any) -> Any:
+    """Return the exact JSON value required by one provider argument schema.
+
+    Canonical Goal bindings preserve source surfaces such as ``"4"``.  Once a
+    Capability owner declares that the corresponding argument is an integer or
+    number, the decoder contract must expose the provider's JSON type rather
+    than force the model to emit a string that Host code later has to repair.
+    This conversion changes representation only; range and integrality have
+    already been checked by ``_argument_schema_accepts_canonical_binding``.
+    """
+
+    value_type = argument_schema.get("type")
+    if value_type not in {"integer", "number"}:
+        return copy.deepcopy(value)
+    numbers = semantic_numeric_values(value)
+    if len(numbers) != 1:
+        return copy.deepcopy(value)
+    number = next(iter(numbers))
+    if value_type == "integer":
+        return int(number)
+    return int(number) if number == number.to_integral_value() else float(number)
 
 
 def _constrain_auxiliary_activity_schema(
@@ -75,11 +97,7 @@ def _constrain_auxiliary_activity_schema(
     # primary presentation Activity, where it is forbidden. Planner still owns
     # every material decoration field; trusted code restores only the default.
     base_properties.pop("reason_summary", None)
-    required = [
-        name
-        for name in (definition.get("required") or [])
-        if name != "reason_summary"
-    ]
+    required = [name for name in (definition.get("required") or []) if name != "reason_summary"]
     for field_name in (
         "auxiliary_activity_id",
         "anchor_kind",
@@ -94,6 +112,18 @@ def _constrain_auxiliary_activity_schema(
         if field_name not in required:
             required.append(field_name)
     definition["required"] = required
+    definition.setdefault("allOf", []).append(
+        {
+            "if": {
+                "properties": {"anchor_kind": {"const": "plan_response"}},
+                "required": ["anchor_kind"],
+            },
+            "then": {
+                "properties": {"anchor_id": {"const": "response"}},
+                "required": ["anchor_id"],
+            },
+        }
+    )
     if not candidate_rows:
         return
     # The generic capability constraint is applied before this role-specific
@@ -121,6 +151,7 @@ def _constrain_auxiliary_activity_schema(
         )
     definition["oneOf"] = branches
 
+
 def canonical_resource_argument_response_schema(
     base_schema: dict[str, Any],
     *,
@@ -137,8 +168,7 @@ def canonical_resource_argument_response_schema(
     resource_goals = [
         goal
         for goal in authoritative_goals
-        if isinstance(goal, dict)
-        and isinstance(goal.get("resource_responsibility"), dict)
+        if isinstance(goal, dict) and isinstance(goal.get("resource_responsibility"), dict)
     ]
     if len(resource_goals) != 1 or len(authoritative_goals) != 1:
         return base_schema
@@ -175,9 +205,7 @@ def canonical_resource_argument_response_schema(
     if not constrained:
         return base_schema
 
-    parameter_resolutions = schema.get("properties", {}).get(
-        "parameter_resolutions"
-    )
+    parameter_resolutions = schema.get("properties", {}).get("parameter_resolutions")
     if isinstance(parameter_resolutions, dict):
         parameter_resolutions["maxItems"] = 0
         parameter_resolutions["description"] = (
@@ -185,6 +213,7 @@ def canonical_resource_argument_response_schema(
             "read-only projections and require no Planner-authored resolutions."
         )
     return schema
+
 
 def canonical_goal_binding_argument_response_schema(
     base_schema: dict[str, Any],
@@ -221,9 +250,7 @@ def canonical_goal_binding_argument_response_schema(
             ):
                 values_by_entity_type[entity_type].append(value)
     exact_bindings = {
-        name: values[0]
-        for name, values in values_by_name.items()
-        if len(values) == 1
+        name: values[0] for name, values in values_by_name.items() if len(values) == 1
     }
     schema = copy.deepcopy(base_schema)
     step_schema = schema.get("$defs", {}).get("PlannerModelStep")
@@ -242,9 +269,7 @@ def canonical_goal_binding_argument_response_schema(
         for argument_name, argument_schema in list(argument_properties.items()):
             if not isinstance(argument_schema, dict):
                 continue
-            entity_type = _normalized_entity_type(
-                argument_schema.pop("x-chromie-entity-type", "")
-            )
+            entity_type = _normalized_entity_type(argument_schema.pop("x-chromie-entity-type", ""))
             if not entity_type:
                 continue
             # The Capability owner, rather than Planner or Host heuristics,
@@ -257,7 +282,7 @@ def canonical_goal_binding_argument_response_schema(
                 argument_schema, values[0]
             ):
                 argument_properties[argument_name] = {
-                    "const": copy.deepcopy(values[0])
+                    "const": _canonical_binding_argument_value(argument_schema, values[0])
                 }
                 if isinstance(required, list) and argument_name not in required:
                     required.append(argument_name)
@@ -271,141 +296,47 @@ def canonical_goal_binding_argument_response_schema(
                 _argument_schema_accepts_canonical_binding(argument_schema, value)
             ):
                 continue
-            argument_properties[name] = {"const": copy.deepcopy(value)}
+            argument_properties[name] = {
+                "const": _canonical_binding_argument_value(argument_schema, value)
+            }
             if isinstance(required, list) and name not in required:
                 required.append(name)
             constrained = True
+    time_conditions = schema.get("properties", {}).get("time_conditions")
+    time_condition_definition = schema.get("$defs", {}).get("PlannerModelTimeCondition")
+    ready_conditions: list[tuple[str, int]] = []
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = str(goal.get("goal_id") or "").strip()
+        binding = _goal_binding_map(goal).get("ready_at")
+        value = binding.get("value") if isinstance(binding, dict) else None
+        if not goal_id or not isinstance(value, str):
+            continue
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            continue
+        ready_conditions.append((goal_id, int(parsed.timestamp() * 1000)))
+    if (
+        ready_conditions
+        and isinstance(time_conditions, dict)
+        and isinstance(time_condition_definition, dict)
+    ):
+        branches = []
+        for goal_id, due_at_ms in ready_conditions:
+            branch = copy.deepcopy(time_condition_definition)
+            branch_properties = branch.setdefault("properties", {})
+            branch_properties["goal_id"] = {"const": goal_id}
+            branch_properties["due_at_ms"] = {"const": due_at_ms}
+            branches.append(branch)
+        time_conditions["items"] = {"oneOf": branches}
+        time_conditions["maxItems"] = len(ready_conditions)
+        constrained = True
     return schema if constrained else base_schema
 
-def resource_grounding_repair_response_schema(
-    base_schema: dict[str, Any],
-    *,
-    error: ResourceResponsibilityCapabilityGroundingError | None,
-    authoritative_goals: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Constrain repair to validator-proven complete resource work.
-
-    The semantic choice comes from the model-authored resource Goal and catalog
-    contracts already evaluated by the grounding validator. This projection only
-    prevents a bounded repair from selecting the same incomplete Capability again
-    or rewriting canonical nested resource arguments.
-    """
-
-    if error is None or not error.complete_capability_ids:
-        return base_schema
-    goals = [goal for goal in authoritative_goals if isinstance(goal, dict)]
-    goal = next(
-        (
-            item
-            for item in goals
-            if " ".join(str(item.get("goal_id") or "").strip().split())
-            == error.goal_id
-        ),
-        None,
-    )
-    if goal is None:
-        return base_schema
-    goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
-    responsibility = goal.get("resource_responsibility")
-    if (
-        not goal_id
-        or goal_id != error.goal_id
-        or not isinstance(responsibility, dict)
-    ):
-        return base_schema
-    exact_arguments = {
-        name: copy.deepcopy(responsibility[name])
-        for name in ("resource", "source", "recipient")
-        if isinstance(responsibility.get(name), dict)
-    }
-    if not exact_arguments:
-        return base_schema
-
-    schema = copy.deepcopy(base_schema)
-    step_schema = schema.get("$defs", {}).get("PlannerModelStep")
-    if not isinstance(step_schema, dict):
-        return base_schema
-    branches = step_schema.get("oneOf")
-    if not isinstance(branches, list):
-        return base_schema
-    complete_ids = set(error.complete_capability_ids)
-    retained: list[dict[str, Any]] = []
-    complete_branches: list[dict[str, Any]] = []
-    for branch in branches:
-        if not isinstance(branch, dict):
-            continue
-        properties = branch.get("properties")
-        if not isinstance(properties, dict):
-            continue
-        capability = properties.get("capability_id")
-        identifiers = capability.get("enum") if isinstance(capability, dict) else None
-        is_complete_capability = (
-            isinstance(identifiers, list)
-            and len(identifiers) == 1
-            and identifiers[0] in complete_ids
-        )
-        if (
-            not isinstance(identifiers, list)
-            or len(identifiers) != 1
-        ):
-            continue
-        if len(goals) == 1 and not is_complete_capability:
-            continue
-        args = properties.get("args")
-        argument_properties = (
-            args.get("properties") if isinstance(args, dict) else None
-        )
-        if not isinstance(argument_properties, dict):
-            continue
-        if is_complete_capability:
-            required = args.setdefault("required", [])
-            for name, value in exact_arguments.items():
-                if name not in argument_properties:
-                    continue
-                argument_properties[name] = {"const": value}
-                if isinstance(required, list) and name not in required:
-                    required.append(name)
-            complete_branches.append(branch)
-        retained.append(branch)
-    if not retained or not complete_branches:
-        return base_schema
-    step_schema["oneOf"] = retained
-    capability_property = step_schema.get("properties", {}).get("capability_id")
-    if isinstance(capability_property, dict):
-        capability_property["enum"] = sorted(
-            {
-                branch["properties"]["capability_id"]["enum"][0]
-                for branch in retained
-            }
-        )
-    steps = schema.get("properties", {}).get("steps")
-    if isinstance(steps, dict):
-        steps["minItems"] = 1
-        if len(goals) == 1:
-            steps["maxItems"] = 1
-        else:
-            steps["contains"] = {
-                "type": "object",
-                "properties": {
-                    "capability_id": {
-                        "type": "string",
-                        "enum": sorted(complete_ids),
-                    },
-                    "source_goal_ids": {
-                        "type": "array",
-                        "contains": {"const": error.goal_id},
-                        "minContains": 1,
-                    },
-                },
-                "required": ["capability_id", "source_goal_ids"],
-            }
-            steps["minContains"] = 1
-    parameter_resolutions = schema.get("properties", {}).get(
-        "parameter_resolutions"
-    )
-    if isinstance(parameter_resolutions, dict) and len(goals) == 1:
-        parameter_resolutions["maxItems"] = 0
-    return schema
 
 def canonical_plan_response_schema(
     *,
@@ -420,19 +351,22 @@ def canonical_plan_response_schema(
     provider_vocal_goal_ids: list[str] | None = None,
     provider_media_goal_operations: dict[str, str] | None = None,
     unavailable_information_goal_ids: list[str] | None = None,
+    unavailable_resource_goal_ids: list[str] | None = None,
     single_step_goal_ids: list[str] | None = None,
     required_numeric_goal_values: dict[str, list[int | float]] | None = None,
+    confirmation_required_capability_ids: list[str] | None = None,
+    nonparallel_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
     This schema deliberately excludes the host-owned CanonicalPlan envelope.
     The host supplies its plan identity, tier, schema version, and exact Goal
     Association IDs after validating this semantic DTO. Cross-field invariants
-    remain enforced by ``PlannerModelOutput`` and ``CanonicalPlan``. A planner
-    may regenerate once only when this DTO is mechanically malformed; semantic
-    rejection is not a same-tier repair trigger. Fast Planner uses the same decoder-tight
-    per-goal shape for one or many goals so the schema never instructs the model
-    to omit fields that deterministic validation requires.
+    remain enforced by ``PlannerModelOutput`` and ``CanonicalPlan``. A malformed
+    or semantically rejected result fails closed; it is never regenerated by the
+    same Planner depth. Fast Planner uses the same decoder-tight per-goal shape
+    for one or many goals so the schema never instructs the model to omit fields
+    that deterministic validation requires.
     """
 
     if planner_tier == "fast":
@@ -444,6 +378,7 @@ def canonical_plan_response_schema(
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
+            confirmation_required_capability_ids=(confirmation_required_capability_ids),
         )
         schema["title"] = "FastPlannerModelOutput"
         return schema
@@ -465,6 +400,7 @@ def canonical_plan_response_schema(
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
+        "time_conditions",
         "goal_outcomes",
         "goal_satisfaction",
         "plan_relation",
@@ -510,22 +446,20 @@ def canonical_plan_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
-    single_step_goal_set = set(single_step_goal_ids or []).intersection(
+    single_step_goal_set = set(single_step_goal_ids or []).intersection(allowed_goals)
+    unavailable_information_goal_set = set(unavailable_information_goal_ids or []).intersection(
         allowed_goals
     )
-    unavailable_information_goal_set = set(
-        unavailable_information_goal_ids or []
-    ).intersection(allowed_goals)
+    unavailable_resource_goal_set = set(unavailable_resource_goal_ids or []).intersection(
+        allowed_goals
+    )
     if (
         planner_tier == "deep"
-        and unavailable_information_goal_set
-        and unavailable_information_goal_set == set(allowed_goals)
+        and (unavailable_information_goal_set | unavailable_resource_goal_set) == set(allowed_goals)
         and isinstance(disposition, dict)
     ):
         disposition["enum"] = ["unavailable", "refused"]
-    provider_vocal_goal_set = set(provider_vocal_goal_ids or []).intersection(
-        allowed_goals
-    )
+    provider_vocal_goal_set = set(provider_vocal_goal_ids or []).intersection(allowed_goals)
     provider_media_goal_operations = {
         goal_id: operation
         for goal_id, operation in (provider_media_goal_operations or {}).items()
@@ -548,12 +482,14 @@ def canonical_plan_response_schema(
             unavailable_provider_vocal_goal_set
             | unavailable_provider_media_goal_set
             | unavailable_information_goal_set
+            | unavailable_resource_goal_set
         )
     ]
     known_unavailable_goal_set = (
         unavailable_provider_vocal_goal_set
         | unavailable_provider_media_goal_set
         | unavailable_information_goal_set
+        | unavailable_resource_goal_set
     )
     if (
         requires_execution
@@ -722,6 +658,10 @@ def canonical_plan_response_schema(
             elif outcome_name == "clarify":
                 branch_props["coverage"] = {"enum": ["partial", "uncertain"]}
                 branch_props["step_ids"] = {"maxItems": 0}
+            elif outcome_name == "escalate":
+                branch_props["coverage"] = {"enum": ["partial", "uncertain"]}
+                branch_props["response_text"] = {"maxLength": 0}
+                branch_props["step_ids"] = {"maxItems": 0}
             else:
                 branch_props["step_ids"] = {"maxItems": 0}
             base_branches.append(branch)
@@ -768,6 +708,10 @@ def canonical_plan_response_schema(
     constrain(schema)
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     _constrain_plan_relation_confirmation(schema)
+    _constrain_capability_confirmation(
+        schema,
+        confirmation_required_capability_ids or [],
+    )
 
     # Ollama's structured decoder does not reliably apply nested ``required``
     # constraints through a dynamic object property that contains only a $ref.
@@ -1002,13 +946,13 @@ def canonical_plan_response_schema(
                                 )
                             )
                         ]
-                if goal_id in unavailable_information_goal_set:
+                if goal_id in (unavailable_information_goal_set | unavailable_resource_goal_set):
                     disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
                         disposition_field["enum"] = ["unavailable", "refused"]
                         disposition_field["description"] = (
-                            "The typed information domain has no matching declared "
-                            "provider in this turn's qualified catalog."
+                            "The typed resource responsibility has no complete declared "
+                            "provider or composable provider chain in this turn's catalog."
                         )
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
@@ -1031,9 +975,7 @@ def canonical_plan_response_schema(
                     copy.deepcopy(branch)
                     for branch in base_branches
                     if set(
-                        branch.get("properties", {})
-                        .get("disposition", {})
-                        .get("enum", [])
+                        branch.get("properties", {}).get("disposition", {}).get("enum", [])
                     ).intersection(allowed_deep_outcomes)
                 ]
                 if deep_outcome_branches:
@@ -1042,9 +984,7 @@ def canonical_plan_response_schema(
                     # $ref.  Keep its semantic choice open, but expose the DTO
                     # invariant that execute owns at least one step ID and all
                     # non-executing outcomes own none.
-                    specialized.setdefault("allOf", []).append(
-                        {"anyOf": deep_outcome_branches}
-                    )
+                    specialized.setdefault("allOf", []).append({"anyOf": deep_outcome_branches})
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -1069,16 +1009,12 @@ def canonical_plan_response_schema(
         if isinstance(unresolved_schema, dict):
             unresolved_schema["maxItems"] = max(4, len(allowed_goals) * 2)
 
-        def bound_deep_text(
-            owner: dict[str, Any], field_name: str, maximum: int
-        ) -> None:
+        def bound_deep_text(owner: dict[str, Any], field_name: str, maximum: int) -> None:
             field = owner.get(field_name)
             if isinstance(field, dict):
                 current = field.get("maxLength")
                 field["maxLength"] = (
-                    min(int(current), maximum)
-                    if isinstance(current, int)
-                    else maximum
+                    min(int(current), maximum) if isinstance(current, int) else maximum
                 )
 
         bound_deep_text(properties, "goal_summary", 240)
@@ -1137,6 +1073,7 @@ def canonical_plan_response_schema(
             step_schema,
             allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
+            nonparallel_capability_ids=nonparallel_capability_ids,
         )
     if planner_tier == "deep" and requires_execution and not response_goal_set:
         schema.setdefault("allOf", []).append(
@@ -1160,9 +1097,7 @@ def canonical_plan_response_schema(
                     },
                     {
                         "properties": {
-                            "disposition": {
-                                "enum": ["clarify", "unavailable", "refused"]
-                            },
+                            "disposition": {"enum": ["clarify", "unavailable", "refused"]},
                             "response_text": {"minLength": 1},
                             "steps": {"maxItems": 0},
                         },
@@ -1179,6 +1114,7 @@ def canonical_plan_response_schema(
     _constrain_terminal_unresolved(schema)
     return schema
 
+
 def fast_multi_goal_response_schema(
     *,
     expected_goal_ids: list[str],
@@ -1188,6 +1124,8 @@ def fast_multi_goal_response_schema(
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
+    effectful_goal_ids: list[str] | None = None,
+    confirmation_required_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
@@ -1218,6 +1156,7 @@ def fast_multi_goal_response_schema(
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
+        "time_conditions",
         "goal_outcomes",
         "goal_satisfaction",
         "plan_relation",
@@ -1241,6 +1180,7 @@ def fast_multi_goal_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
+    effectful_goal_set = set(effectful_goal_ids or []).intersection(allowed_goals)
 
     def bound_text(
         owner: dict[str, Any],
@@ -1258,15 +1198,29 @@ def fast_multi_goal_response_schema(
     bound_text(
         properties,
         "response_text",
-        0 if requires_execution and not response_goal_set else 800,
+        800,
     )
     if requires_execution:
         response_text_field = properties.get("response_text")
         if isinstance(response_text_field, dict):
             response_text_field["description"] = (
-                "Planner speech is empty for execution-only work; a separate "
-                "response owner handles communication. Mixed plans may carry only "
-                "the direct-response Goal delta."
+                "Planner speech is empty for exact execution-only work. A "
+                "safe-adjusted or alternative Plan must explain its material "
+                "change here, and a mixed Plan may carry the direct-response "
+                "Goal delta."
+            )
+        if not response_goal_set:
+            schema.setdefault("allOf", []).append(
+                {
+                    "if": {
+                        "properties": {"plan_relation": {"const": "exact"}},
+                        "required": ["plan_relation"],
+                    },
+                    "then": {
+                        "properties": {"response_text": {"maxLength": 0}},
+                        "required": ["response_text"],
+                    },
+                }
             )
     bound_text(properties, "escalation_reason", 240)
     top_unresolved = properties.get("unresolved")
@@ -1596,14 +1550,18 @@ def fast_multi_goal_response_schema(
             if goal_id in response_goal_set:
                 disposition_field = specialized_outcome_properties.get("disposition")
                 if isinstance(disposition_field, dict):
-                    disposition_field["enum"] = ["respond"]
+                    disposition_field["enum"] = [
+                        "respond",
+                        "clarify",
+                        "escalate",
+                    ]
                 response_text_field = specialized_outcome_properties.get("response_text")
                 if isinstance(response_text_field, dict):
                     response_text_field.pop("maxLength", None)
-                    response_text_field["minLength"] = 1
+                    response_text_field.pop("minLength", None)
                     response_text_field["description"] = (
-                        "Required direct response that completes this Goal "
-                        "Association-authored spoken responsibility."
+                        "Author the exact direct response for disposition=respond, "
+                        "or an empty string when the whole Fast plan escalates."
                     )
                 branches = specialized_outcome.get("oneOf")
                 if isinstance(branches, list):
@@ -1612,12 +1570,29 @@ def fast_multi_goal_response_schema(
                         for branch in branches
                         if (
                             branch.get("properties", {}).get("disposition", {}).get("enum")
-                            == ["respond"]
+                            in (["respond"], ["clarify"], ["escalate"])
                         )
                     ]
             specialized_outcome_properties["satisfaction"] = strict_satisfaction_schema(
                 specialized_satisfaction,
                 exact_satisfied_count=1,
+            )
+            specialized_outcome.setdefault("allOf", []).append(
+                {
+                    "if": {
+                        "properties": {
+                            "disposition": {"enum": ["escalate"]},
+                        },
+                        "required": ["disposition"],
+                    },
+                    "then": {
+                        "properties": {
+                            "response_text": {"maxLength": 0},
+                            "step_ids": {"maxItems": 0},
+                        },
+                        "required": ["response_text", "step_ids"],
+                    },
+                }
             )
             step_ids = specialized_outcome_properties.get("step_ids")
             if isinstance(step_ids, dict):
@@ -1651,11 +1626,13 @@ def fast_multi_goal_response_schema(
     # execute/respond assignment space avoids a host-side semantic compiler.
     # Larger turns are outside the Fast terminal surface and retain the normal
     # validator/Deep Planner path rather than exploding the response schema.
-    if 1 < len(allowed_goals) <= 6:
+    if 1 <= len(allowed_goals) <= 6:
         assignment_branches: list[dict[str, Any]] = []
         assignment_choices = [
             ("respond",)
             if goal_id in response_goal_set
+            else ("execute",)
+            if goal_id in effectful_goal_set
             else (("execute",) if requires_execution else ("execute", "respond"))
             for goal_id in allowed_goals
         ]
@@ -1677,32 +1654,106 @@ def fast_multi_goal_response_schema(
             else:
                 aggregate = "mixed"
             execute_count = sum(item == "execute" for item in assignment)
+            terminal_assignment = assignment_set.issubset({"execute", "respond"})
+            nonexact_statuses = ["substantial", "partial", "unsatisfied"]
+            outcome_properties: dict[str, Any] = {}
+            for goal_id, goal_disposition in zip(allowed_goals, assignment, strict=True):
+                terminal_outcome = goal_disposition in {"execute", "respond"}
+                outcome_properties[goal_id] = {
+                    "type": "object",
+                    "properties": {
+                        "disposition": {
+                            "type": "string",
+                            "enum": [goal_disposition],
+                        },
+                        "coverage": {
+                            "type": "string",
+                            "enum": (
+                                ["complete"] if terminal_outcome else ["partial", "uncertain"]
+                            ),
+                        },
+                        "response_text": (
+                            {"type": "string", "minLength": 1}
+                            if goal_disposition in {"respond", "clarify"}
+                            else {"type": "string", "maxLength": 0}
+                        ),
+                        "step_ids": (
+                            {"type": "array", "minItems": 1, "maxItems": 1}
+                            if goal_disposition == "execute"
+                            else {"type": "array", "maxItems": 0}
+                        ),
+                        "satisfaction": {
+                            "type": "object",
+                            "properties": {
+                                "status": {
+                                    "type": "string",
+                                    "enum": (
+                                        ["exact", "substantial"]
+                                        if terminal_outcome
+                                        else nonexact_statuses
+                                    ),
+                                }
+                            },
+                            "required": ["status"],
+                        },
+                    },
+                    "required": [
+                        "disposition",
+                        "coverage",
+                        "response_text",
+                        "step_ids",
+                        "satisfaction",
+                    ],
+                }
             branch: dict[str, Any] = {
                 "properties": {
                     "disposition": {"type": "string", "enum": [aggregate]},
+                    "coverage": {
+                        "type": "string",
+                        "enum": (["complete"] if terminal_assignment else ["partial", "uncertain"]),
+                    },
                     "steps": {
                         "type": "array",
                         "minItems": execute_count,
                         "maxItems": execute_count,
                     },
-                    "goal_outcomes": {
+                    "goal_satisfaction": {
                         "type": "object",
                         "properties": {
-                            goal_id: {
-                                "type": "object",
-                                "properties": {
-                                    "disposition": {
-                                        "type": "string",
-                                        "enum": [goal_disposition],
-                                    }
-                                },
+                            "status": {
+                                "type": "string",
+                                "enum": (
+                                    ["exact", "substantial"]
+                                    if terminal_assignment
+                                    else nonexact_statuses
+                                ),
                             }
-                            for goal_id, goal_disposition in zip(
-                                allowed_goals, assignment, strict=True
-                            )
                         },
+                        "required": ["status"],
                     },
-                }
+                    "escalation_reason": (
+                        {"type": "string", "minLength": 1}
+                        if aggregate == "escalate"
+                        else {"type": "string", "maxLength": 0}
+                    ),
+                    **(
+                        {"response_text": {"type": "string", "minLength": 1}}
+                        if aggregate == "respond"
+                        else {}
+                    ),
+                    "goal_outcomes": {
+                        "type": "object",
+                        "properties": outcome_properties,
+                    },
+                },
+                "required": [
+                    "disposition",
+                    "coverage",
+                    "steps",
+                    "goal_satisfaction",
+                    "escalation_reason",
+                    "goal_outcomes",
+                ],
             }
             assignment_branches.append(branch)
         schema.setdefault("allOf", []).append({"anyOf": assignment_branches})
@@ -1719,7 +1770,7 @@ def fast_multi_goal_response_schema(
                             "disposition": {"enum": ["execute"]},
                             "steps": {"minItems": 1, "maxItems": 1},
                             "goal_satisfaction": {
-                                "properties": {"status": {"enum": ["exact"]}}
+                                "properties": {"status": {"enum": ["exact", "substantial"]}}
                             },
                         },
                         "required": [
@@ -1755,6 +1806,41 @@ def fast_multi_goal_response_schema(
         )
 
     _constrain_plan_relation_confirmation(schema)
+    nonexact_goal_outcomes = {
+        goal_id: {
+            "properties": {
+                "satisfaction": {
+                    "properties": {"status": {"enum": ["substantial"]}},
+                    "required": ["status"],
+                }
+            }
+        }
+        for goal_id in allowed_goals
+    }
+    schema.setdefault("allOf", []).append(
+        {
+            "if": {
+                "properties": {"plan_relation": {"enum": ["safe_adjustment", "alternative"]}},
+                "required": ["plan_relation"],
+            },
+            "then": {
+                "properties": {
+                    "goal_satisfaction": {
+                        "properties": {"status": {"enum": ["substantial"]}},
+                        "required": ["status"],
+                    },
+                    "goal_outcomes": {
+                        "properties": nonexact_goal_outcomes,
+                    },
+                },
+                "required": ["goal_satisfaction", "goal_outcomes"],
+            },
+        }
+    )
+    _constrain_capability_confirmation(
+        schema,
+        confirmation_required_capability_ids or [],
+    )
 
     # The structured decoder normally emits object fields in schema order.
     # Place per-goal outcomes before steps and aggregate disposition so the
@@ -1773,6 +1859,7 @@ def fast_multi_goal_response_schema(
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
+        "time_conditions",
         "plan_relation",
         "user_confirmation_required",
     )
@@ -1783,11 +1870,13 @@ def fast_multi_goal_response_schema(
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     return schema
 
+
 def _constrain_planner_step_args(
     step_schema: dict[str, Any],
     *,
     allowed_capabilities: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None,
+    nonparallel_capability_ids: list[str] | None = None,
 ) -> None:
     """Bind each model-selected capability to its exact provider arg schema."""
 
@@ -1796,9 +1885,7 @@ def _constrain_planner_step_args(
     base_properties = step_schema.get("properties")
     if not isinstance(base_properties, dict):
         return
-    required = [
-        str(item) for item in step_schema.get("required", []) if str(item).strip()
-    ]
+    required = [str(item) for item in step_schema.get("required", []) if str(item).strip()]
     branches: list[dict[str, Any]] = []
     for capability_id in allowed_capabilities:
         input_schema = capability_input_schemas.get(capability_id)
@@ -1810,6 +1897,10 @@ def _constrain_planner_step_args(
             "enum": [capability_id],
         }
         properties["args"] = copy.deepcopy(input_schema)
+        if capability_id in set(nonparallel_capability_ids or []):
+            timing = properties.get("timing")
+            if isinstance(timing, dict):
+                timing["enum"] = ["sequential"]
         branches.append(
             {
                 "type": "object",
@@ -1820,6 +1911,7 @@ def _constrain_planner_step_args(
         )
     if branches:
         step_schema["oneOf"] = branches
+
 
 def _constrain_plan_relation_confirmation(schema: dict[str, Any]) -> None:
     """Align material plan changes with decoder-enforced confirmation."""
@@ -1832,10 +1924,6 @@ def _constrain_plan_relation_confirmation(schema: dict[str, Any]) -> None:
                         "plan_relation": {
                             "type": "string",
                             "enum": ["exact"],
-                        },
-                        "user_confirmation_required": {
-                            "type": "boolean",
-                            "enum": [False],
                         },
                     }
                 },
@@ -1858,6 +1946,72 @@ def _constrain_plan_relation_confirmation(schema: dict[str, Any]) -> None:
             ]
         }
     )
+    schema.setdefault("allOf", []).append(
+        {
+            "if": {
+                "properties": {
+                    "disposition": {
+                        "enum": [
+                            "respond",
+                            "clarify",
+                            "unavailable",
+                            "refused",
+                            "escalate",
+                        ]
+                    }
+                },
+                "required": ["disposition"],
+            },
+            "then": {
+                "properties": {
+                    "user_confirmation_required": {
+                        "type": "boolean",
+                        "enum": [False],
+                    }
+                },
+                "required": ["user_confirmation_required"],
+            },
+        }
+    )
+
+
+def _constrain_capability_confirmation(schema: dict[str, Any], capability_ids: list[str]) -> None:
+    """Require a Planner confirmation proposal for provider-gated Work.
+
+    Provider metadata determines whether authorization needs confirmation;
+    Planner still authors the proposal bit in its one semantic result, and Host
+    later owns the actual confirmation state and authorization decision.
+    """
+
+    required_ids = sorted({item for item in capability_ids if item})
+    if not required_ids:
+        return
+    schema.setdefault("allOf", []).append(
+        {
+            "if": {
+                "properties": {
+                    "steps": {
+                        "contains": {
+                            "type": "object",
+                            "properties": {"capability_id": {"enum": required_ids}},
+                            "required": ["capability_id"],
+                        }
+                    }
+                },
+                "required": ["steps"],
+            },
+            "then": {
+                "properties": {
+                    "user_confirmation_required": {
+                        "type": "boolean",
+                        "enum": [True],
+                    }
+                },
+                "required": ["user_confirmation_required"],
+            },
+        }
+    )
+
 
 def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
     """Align decoder branches with terminal unresolved-work validators."""
@@ -1873,9 +2027,7 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
                 node.setdefault("allOf", []).append(
                     {
                         "if": {
-                            "properties": {
-                                "disposition": {"enum": ["execute", "respond"]}
-                            },
+                            "properties": {"disposition": {"enum": ["execute", "respond"]}},
                             "required": ["disposition"],
                         },
                         "then": {
@@ -1895,6 +2047,7 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
 
 # Fast/Deep Planner pass-specific constrained-decoder schemas. These functions
 # project an already-owned Planner contract; they do not invoke a model or choose HOW.
+
 
 def fast_presentation_commit_response_schema(
     responsibility_refs: list[str],
@@ -1916,9 +2069,7 @@ def fast_presentation_commit_response_schema(
     intentionally omits the mechanical ``role`` tag.
     """
 
-    schema = copy.deepcopy(
-        FastPlannerPresentationCommitModelOutput.model_json_schema()
-    )
+    schema = copy.deepcopy(FastPlannerPresentationCommitModelOutput.model_json_schema())
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     required = list(schema.get("required") or [])
     for field_name in ("activity", "auxiliary_activities"):
@@ -1938,32 +2089,31 @@ def fast_presentation_commit_response_schema(
 
         def sibling_refs(value: Any) -> set[str]:
             values = value if isinstance(value, list) else [value]
-            return {
-                str(item).strip()
-                for item in values
-                if str(item).strip() in by_ref
-            }
+            return {str(item).strip() for item in values if str(item).strip() in by_ref}
 
         blocked_speech_refs: set[str] = set()
         for item in supplied_responsibilities:
             if item.output_mode != "speech":
                 continue
-            if sibling_refs(item.bindings.get("after")) or sibling_refs(
-                item.bindings.get("follows")
-            ) or sibling_refs(item.bindings.get("parallel_with")):
+            if (
+                sibling_refs(item.bindings.get("after"))
+                or sibling_refs(item.bindings.get("follows"))
+                or sibling_refs(item.bindings.get("parallel_with"))
+            ):
                 blocked_speech_refs.add(item.local_ref)
         for item in supplied_responsibilities:
-            for target_ref in sibling_refs(item.bindings.get("before")) | sibling_refs(
-                item.bindings.get("precedes")
-            ) | sibling_refs(item.bindings.get("parallel_with")):
+            for target_ref in (
+                sibling_refs(item.bindings.get("before"))
+                | sibling_refs(item.bindings.get("precedes"))
+                | sibling_refs(item.bindings.get("parallel_with"))
+            ):
                 target = by_ref.get(target_ref)
                 if target is not None and target.output_mode == "speech":
                     blocked_speech_refs.add(target_ref)
         immediately_presentable_speech_refs = [
             item.local_ref
             for item in supplied_responsibilities
-            if item.output_mode == "speech"
-            and item.local_ref not in blocked_speech_refs
+            if item.output_mode == "speech" and item.local_ref not in blocked_speech_refs
         ]
         direct_conversation = bool(supplied_responsibilities) and all(
             item.local_ref in immediately_presentable_speech_refs
@@ -1972,9 +2122,7 @@ def fast_presentation_commit_response_schema(
         has_direct_conversation = bool(immediately_presentable_speech_refs)
         activity_choices: list[dict[str, Any]] = []
         if has_direct_conversation:
-            activity_choices.append(
-                {"$ref": "#/$defs/FastPlannerCompleteResponseAct"}
-            )
+            activity_choices.append({"$ref": "#/$defs/FastPlannerCompleteResponseAct"})
         if not direct_conversation:
             activity_choices.append({"$ref": "#/$defs/FastPlannerProgressAct"})
         activity_choices.append({"type": "null"})
@@ -2012,16 +2160,12 @@ def fast_presentation_commit_response_schema(
             )
         text_contract = properties.get("text")
         if isinstance(text_contract, dict):
-            text_contract["maxLength"] = (
-                32 if str(language).casefold().startswith("zh") else 72
-            )
+            text_contract["maxLength"] = 64 if str(language).casefold().startswith("zh") else 120
             if contract_name == "FastPlannerCompleteResponseAct":
                 prior_utterances = {
                     str(item.bindings.get("prior_assistant_utterance") or "")
                     for item in (responsibilities or [])
-                    if str(
-                        item.bindings.get("prior_assistant_utterance") or ""
-                    )
+                    if str(item.bindings.get("prior_assistant_utterance") or "")
                 }
                 if len(prior_utterances) == 1:
                     # The user asked for an exact repeat of already accepted
@@ -2054,8 +2198,7 @@ def fast_presentation_commit_response_schema(
                     "For relationship=continue, preserve continuation/resumption "
                     "of the concrete resolved outcome and never use an onset or "
                     "progressive predicate before Runtime commitment. Semantic "
-                    "Responsibility context: "
-                    + bounded_json(semantic_contract, 1200)
+                    "Responsibility context: " + bounded_json(semantic_contract, 1200)
                 )
         source_refs = properties.get("source_responsibility_refs")
         if isinstance(source_refs, dict):
@@ -2081,9 +2224,7 @@ def fast_presentation_commit_response_schema(
                 )
                 enum_values = progress_kind.get("enum")
                 if isinstance(enum_values, list):
-                    progress_kind["enum"] = [
-                        value for value in enum_values if value != "think"
-                    ]
+                    progress_kind["enum"] = [value for value in enum_values if value != "think"]
         if contract_name == "FastPlannerProgressAct":
             ordered: dict[str, Any] = {}
             for field_name in ("activity_id", "progress_kind", "text"):
@@ -2121,168 +2262,6 @@ def fast_presentation_commit_response_schema(
     return schema
 
 
-def fast_advance_revision_response_schema(
-    schema: dict[str, Any],
-    initial_raw: Any,
-    *,
-    committed_communicative: bool,
-    capabilities: list[dict[str, Any]],
-    responsibilities: list[CognitiveResponsibilityProposal],
-) -> dict[str, Any]:
-    """Constrain one DTO revision to the model's initial disposition.
-
-    A malformed Activity list must not make the permitted same-stage repair
-    reconsider user meaning. In particular, an initial ``execute`` decision
-    already commits the model to Capability work; when the first Communicative
-    Activity was independently committed, the repaired list can contain only
-    Capability Activities. The model still owns which available Capability and
-    arguments satisfy the Responsibility.
-    """
-
-    if not isinstance(initial_raw, dict):
-        return schema
-    disposition_value = initial_raw.get("disposition")
-    allowed_contracts_by_disposition = {
-        "execute": ["FastPlannerCapabilityActivity"],
-        "respond": ["FastPlannerCompleteResponseAct"],
-        "clarify": ["FastPlannerClarificationAct"],
-    }
-    allowed_contracts = allowed_contracts_by_disposition.get(disposition_value)
-    if allowed_contracts is None:
-        return schema
-    initial_activities = initial_raw.get("activities")
-    initial_selected_progress = any(
-        isinstance(item, dict) and item.get("role") == "progress"
-        for item in (
-            initial_activities if isinstance(initial_activities, list) else []
-        )
-    )
-    if (
-        disposition_value == "execute"
-        and not committed_communicative
-        and initial_selected_progress
-    ):
-        allowed_contracts.append("FastPlannerProgressAct")
-
-    narrowed = copy.deepcopy(schema)
-    properties = narrowed.get("properties", {})
-    disposition = properties.get("disposition")
-    if isinstance(disposition, dict):
-        disposition["enum"] = [disposition_value]
-        disposition["description"] = (
-            "Mechanical DTO revision: preserve the initial model-authored "
-            "disposition exactly."
-        )
-    activities = properties.get("activities")
-    activity_items = activities.get("items") if isinstance(activities, dict) else None
-    if not isinstance(activity_items, dict):
-        return narrowed
-    activity_items["oneOf"] = [
-        {"$ref": f"#/$defs/{contract_name}"}
-        for contract_name in allowed_contracts
-    ]
-    discriminator = activity_items.get("discriminator")
-    if isinstance(discriminator, dict):
-        mapping = discriminator.get("mapping")
-        if isinstance(mapping, dict):
-            discriminator["mapping"] = {
-                role: ref
-                for role, ref in mapping.items()
-                if ref.rsplit("/", 1)[-1] in allowed_contracts
-            }
-    if isinstance(activities, dict):
-        activities["minItems"] = 1
-    if disposition_value == "execute":
-        definitions = narrowed.get("$defs", {})
-        capability_contract = definitions.get("FastPlannerCapabilityActivity")
-        capability_properties = (
-            capability_contract.get("properties")
-            if isinstance(capability_contract, dict)
-            else None
-        )
-        capability_required = (
-            list(capability_contract.get("required", []))
-            if isinstance(capability_contract, dict)
-            else []
-        )
-        if "args" not in capability_required:
-            capability_required.append("args")
-        branches: list[dict[str, Any]] = []
-        explicit_numbers = sorted(
-            {
-                number
-                for responsibility in responsibilities
-                for number in semantic_numeric_values(
-                    responsibility.bindings
-                )
-            }
-        )
-        if isinstance(capability_properties, dict):
-            for capability in capabilities:
-                capability_id = str(capability.get("capability_id") or "")
-                input_schema = capability.get("input_schema")
-                if not capability_id or not isinstance(input_schema, dict):
-                    continue
-                branch_properties = copy.deepcopy(capability_properties)
-                branch_properties["capability_id"] = {
-                    "type": "string",
-                    "enum": [capability_id],
-                }
-                explicit_input_schema = copy.deepcopy(input_schema)
-                explicit_required = list(
-                    explicit_input_schema.get("required", [])
-                )
-                input_properties = explicit_input_schema.get("properties")
-                if isinstance(input_properties, dict):
-                    numeric_parameter_names = [
-                        parameter_name
-                        for parameter_name, parameter_schema in input_properties.items()
-                        if isinstance(parameter_schema, dict)
-                        and parameter_schema.get("type") in {"integer", "number"}
-                    ]
-                    for parameter_name, parameter_schema in input_properties.items():
-                        if (
-                            isinstance(parameter_schema, dict)
-                            and "default" in parameter_schema
-                            and parameter_name not in explicit_required
-                        ):
-                            # A mechanical revision materializes schema defaults
-                            # explicitly. This keeps the model-selected scope in
-                            # the DTO instead of making downstream Runtime guess
-                            # whether an omitted optional temporal/behavior field
-                            # was intentional.
-                            explicit_required.append(parameter_name)
-                    if (
-                        len(explicit_numbers) == 1
-                        and len(numeric_parameter_names) == 1
-                    ):
-                        numeric_name = numeric_parameter_names[0]
-                        numeric_schema = input_properties.get(numeric_name)
-                        explicit_number = explicit_numbers[0]
-                        if isinstance(numeric_schema, dict) and (
-                            numeric_schema.get("type") == "number"
-                            or explicit_number == explicit_number.to_integral_value()
-                        ):
-                            numeric_schema["enum"] = [
-                                int(explicit_number)
-                                if numeric_schema.get("type") == "integer"
-                                else float(explicit_number)
-                            ]
-                if explicit_required:
-                    explicit_input_schema["required"] = explicit_required
-                branch_properties["args"] = explicit_input_schema
-                branches.append(
-                    {
-                        "type": "object",
-                        "properties": branch_properties,
-                        "required": capability_required,
-                        "additionalProperties": False,
-                    }
-                )
-        if isinstance(capability_contract, dict) and branches:
-            capability_contract["oneOf"] = branches
-    return narrowed
-
 def fast_advance_response_schema(
     responsibility_refs: list[str],
     *,
@@ -2305,6 +2284,15 @@ def fast_advance_response_schema(
     schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     top_properties = schema.get("properties", {})
+    disposition = top_properties.get("disposition")
+    if isinstance(disposition, dict):
+        disposition["enum"] = [
+            "respond",
+            "execute",
+            "mixed",
+            "clarify",
+            "escalate",
+        ]
     top_required = list(schema.get("required") or [])
     if "auxiliary_activities" not in top_required:
         top_required.append("auxiliary_activities")
@@ -2314,11 +2302,7 @@ def fast_advance_response_schema(
         activities_schema["maxItems"] = max(
             1,
             len(responsibility_refs)
-            if (
-                committed_communicative
-                or suppress_new_communicative
-                or suppress_new_progress
-            )
+            if (committed_communicative or suppress_new_communicative or suppress_new_progress)
             else len(responsibility_refs) * 2,
         )
     schema.setdefault("allOf", []).extend(
@@ -2330,22 +2314,28 @@ def fast_advance_response_schema(
                 },
                 "then": {
                     "properties": {
+                        "coverage": {"enum": ["partial", "uncertain"]},
+                        "activities": {
+                            "not": {
+                                "contains": {
+                                    "type": "object",
+                                    "properties": {"role": {"const": "capability"}},
+                                    "required": ["role"],
+                                }
+                            }
+                        },
                         "continuations": {
                             "items": {"const": "deep_planner"},
                             "minItems": 1,
                             "maxItems": 1,
-                        }
+                        },
                     }
                 },
-                "else": {
-                    "properties": {"continuations": {"maxItems": 0}}
-                },
+                "else": {"properties": {"continuations": {"maxItems": 0}}},
             },
             {
                 "if": {
-                    "properties": {
-                        "disposition": {"enum": ["execute", "mixed"]}
-                    },
+                    "properties": {"disposition": {"enum": ["execute", "mixed"]}},
                     "required": ["disposition"],
                 },
                 "then": {
@@ -2365,18 +2355,14 @@ def fast_advance_response_schema(
     )
     reason_summary = top_properties.get("reason_summary")
     if isinstance(reason_summary, dict):
-        reason_summary["maxLength"] = 100
+        reason_summary["maxLength"] = 160
     refs = list(dict.fromkeys(responsibility_refs))
     responsibility_items = list(responsibilities or [])
     ordinary_speech_refs = {
-        item.local_ref
-        for item in responsibility_items
-        if item.output_mode == "speech"
+        item.local_ref for item in responsibility_items if item.output_mode == "speech"
     }
     capability_refs = [ref for ref in refs if ref not in ordinary_speech_refs]
-    covered = schema.get("properties", {}).get(
-        "covered_responsibility_refs"
-    )
+    covered = schema.get("properties", {}).get("covered_responsibility_refs")
     if isinstance(covered, dict):
         covered["items"] = {"type": "string", "enum": refs}
         covered["minItems"] = len(refs)
@@ -2385,6 +2371,9 @@ def fast_advance_response_schema(
     definitions = schema.get("$defs", {})
     information_gap_contract = definitions.get("PlannerInformationGap")
     if isinstance(information_gap_contract, dict):
+        gap_required = information_gap_contract.setdefault("required", [])
+        if "required_for" not in gap_required:
+            gap_required.append("required_for")
         gap_properties = information_gap_contract.get("properties")
         if isinstance(gap_properties, dict):
             # PlannerInformationGap appears only inside a clarification Act in
@@ -2416,19 +2405,61 @@ def fast_advance_response_schema(
                 applicable_capability_ids = [
                     str(item.get("capability_id") or "").strip()
                     for item in (capabilities or [])
-                    if isinstance(item, dict)
-                    and str(item.get("capability_id") or "").strip()
+                    if isinstance(item, dict) and str(item.get("capability_id") or "").strip()
                 ]
                 if applicable_capability_ids:
                     gap_properties["source_reference"] = {
                         "type": "string",
                         "enum": applicable_capability_ids,
                     }
+                    execution_input_branches: list[dict[str, Any]] = []
+                    for capability in capabilities or []:
+                        if not isinstance(capability, dict):
+                            continue
+                        capability_id = str(capability.get("capability_id") or "").strip()
+                        input_schema = capability.get("input_schema")
+                        if not capability_id or not isinstance(input_schema, dict):
+                            continue
+                        input_properties = input_schema.get("properties") or {}
+                        required_inputs = [
+                            str(name)
+                            for name in input_schema.get("required") or []
+                            if isinstance(input_properties.get(str(name)), dict)
+                            and "default" not in input_properties[str(name)]
+                        ]
+                        if not required_inputs:
+                            continue
+                        execution_input_branches.append(
+                            {
+                                "properties": {
+                                    "source_reference": {
+                                        "const": capability_id,
+                                        "type": "string",
+                                    },
+                                    "required_for": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "enum": required_inputs,
+                                        },
+                                        "minItems": 1,
+                                        "maxItems": len(required_inputs),
+                                        "uniqueItems": True,
+                                    },
+                                },
+                                "required": [
+                                    "source_reference",
+                                    "required_for",
+                                ],
+                            }
+                        )
+                    if execution_input_branches:
+                        information_gap_contract.setdefault("allOf", []).append(
+                            {"anyOf": execution_input_branches}
+                        )
     clarification_contract = definitions.get("FastPlannerClarificationAct")
     if isinstance(clarification_contract, dict):
-        gaps = clarification_contract.get("properties", {}).get(
-            "information_gaps"
-        )
+        gaps = clarification_contract.get("properties", {}).get("information_gaps")
         if isinstance(gaps, dict):
             gaps["maxItems"] = 1
     if committed_communicative or suppress_new_communicative:
@@ -2437,17 +2468,14 @@ def fast_advance_response_schema(
         # must not manufacture substitute progress/completion speech merely because
         # execution planning is continuing.
         activities = top_properties.get("activities")
-        activity_items = (
-            activities.get("items") if isinstance(activities, dict) else None
-        )
+        activity_items = activities.get("items") if isinstance(activities, dict) else None
         allowed_activity_contracts = [
             "FastPlannerCapabilityActivity",
             "FastPlannerClarificationAct",
         ]
         if isinstance(activity_items, dict):
             activity_items["oneOf"] = [
-                {"$ref": f"#/$defs/{contract_name}"}
-                for contract_name in allowed_activity_contracts
+                {"$ref": f"#/$defs/{contract_name}"} for contract_name in allowed_activity_contracts
             ]
             discriminator = activity_items.get("discriminator")
             if isinstance(discriminator, dict):
@@ -2468,19 +2496,14 @@ def fast_advance_response_schema(
         if not isinstance(contract, dict):
             continue
         contract_properties = contract.get("properties", {})
-        source_refs = contract_properties.get(
-            "source_responsibility_refs"
-        )
+        source_refs = contract_properties.get("source_responsibility_refs")
         if isinstance(source_refs, dict):
             allowed_refs = (
                 capability_refs
                 if contract_name == "FastPlannerCapabilityActivity"
                 else (
                     [ref for ref in refs if ref in ordinary_speech_refs]
-                    if (
-                        contract_name == "FastPlannerCompleteResponseAct"
-                        and responsibility_items
-                    )
+                    if (contract_name == "FastPlannerCompleteResponseAct" and responsibility_items)
                     else refs
                 )
             )
@@ -2494,35 +2517,20 @@ def fast_advance_response_schema(
             # Capability Activities into Communicative Acts.
             contract["properties"] = {
                 "role": role,
-                **{
-                    name: value
-                    for name, value in contract_properties.items()
-                    if name != "role"
-                },
+                **{name: value for name, value in contract_properties.items() if name != "role"},
             }
-    activity_items = (
-        activities_schema.get("items")
-        if isinstance(activities_schema, dict)
-        else None
-    )
+    activity_items = activities_schema.get("items") if isinstance(activities_schema, dict) else None
     if isinstance(activity_items, dict) and responsibility_items:
         allowed_activity_contracts = [
             "FastPlannerCapabilityActivity",
             "FastPlannerClarificationAct",
         ]
-        if not (
-            committed_communicative
-            or suppress_new_communicative
-            or suppress_new_progress
-        ):
+        if not (committed_communicative or suppress_new_communicative or suppress_new_progress):
             allowed_activity_contracts.append("FastPlannerProgressAct")
-        if ordinary_speech_refs and not (
-            committed_communicative or suppress_new_communicative
-        ):
+        if ordinary_speech_refs and not (committed_communicative or suppress_new_communicative):
             allowed_activity_contracts.insert(1, "FastPlannerCompleteResponseAct")
         activity_items["oneOf"] = [
-            {"$ref": f"#/$defs/{contract_name}"}
-            for contract_name in allowed_activity_contracts
+            {"$ref": f"#/$defs/{contract_name}"} for contract_name in allowed_activity_contracts
         ]
         discriminator = activity_items.get("discriminator")
         if isinstance(discriminator, dict):
@@ -2556,14 +2564,9 @@ def fast_advance_response_schema(
         if isinstance(item, dict) and item.get("capability_id")
     ]
     if isinstance(capability_contract, dict) and allowed_capabilities:
-        capability_id = capability_contract.get("properties", {}).get(
-            "capability_id"
-        )
+        capability_id = capability_contract.get("properties", {}).get("capability_id")
         if isinstance(capability_id, dict):
-            capability_id["enum"] = [
-                str(item["capability_id"])
-                for item in allowed_capabilities
-            ]
+            capability_id["enum"] = [str(item["capability_id"]) for item in allowed_capabilities]
         capability_contract.pop("allOf", None)
         capability_properties = capability_contract.get("properties")
         if isinstance(capability_properties, dict):
@@ -2636,9 +2639,7 @@ def _namespace_local_definitions(
         definition = definitions.get(name)
         if definition is not None:
             pending.extend(local_definition_refs(definition) - reachable)
-    definitions = {
-        name: value for name, value in definitions.items() if name in reachable
-    }
+    definitions = {name: value for name, value in definitions.items() if name in reachable}
     renamed = {f"{prefix}{name}": value for name, value in definitions.items()}
 
     def rewrite(node: Any) -> None:
@@ -2823,10 +2824,55 @@ def fast_streaming_advance_response_schema(
     # Omitting decoder-only conditionals and discriminator annotations avoids
     # Ollama grammar ambiguity inside the two-member streaming object.
     terminal_schema.pop("allOf", None)
+    # Retain the small cross-field subset that prevents the decoder from
+    # producing a shape the typed Fast DTO must reject.  The full canonical
+    # condition tree is intentionally not copied into the streaming grammar.
+    terminal_schema["allOf"] = [
+        {
+            "if": {
+                "properties": {"disposition": {"enum": ["execute", "mixed"]}},
+                "required": ["disposition"],
+            },
+            "then": {
+                "properties": {
+                    "coverage": {"enum": ["complete"]},
+                    "activities": {
+                        "contains": {
+                            "type": "object",
+                            "properties": {"role": {"enum": ["capability"]}},
+                            "required": ["role"],
+                        },
+                        "minContains": 1,
+                    },
+                },
+                "required": ["coverage", "activities"],
+            },
+        },
+        {
+            "if": {
+                "properties": {"disposition": {"enum": ["escalate"]}},
+                "required": ["disposition"],
+            },
+            "then": {
+                "properties": {
+                    "coverage": {"enum": ["partial", "uncertain"]},
+                    "activities": {"maxItems": 0},
+                    "continuations": {
+                        "items": {"enum": ["deep_planner"]},
+                        "minItems": 1,
+                        "maxItems": 1,
+                    },
+                },
+                "required": ["coverage", "activities", "continuations"],
+            },
+        },
+    ]
     terminal_definitions = terminal_schema.get("$defs", {})
-    terminal_capability = terminal_definitions.get(
-        "FastPlannerCapabilityActivity"
-    ) if isinstance(terminal_definitions, dict) else None
+    terminal_capability = (
+        terminal_definitions.get("FastPlannerCapabilityActivity")
+        if isinstance(terminal_definitions, dict)
+        else None
+    )
     if isinstance(terminal_capability, dict):
         # Tagged streaming is parsed as text and then checked by the full
         # Pydantic/catalog validators. Keep one common Activity shape here and
@@ -2856,11 +2902,27 @@ def fast_streaming_advance_response_schema(
                     "entry in source.bindings."
                 ),
             }
+            nonparallel_capability_ids = [
+                str(item.get("capability_id") or "")
+                for item in (capabilities or [])
+                if str(item.get("capability_id") or "") and item.get("can_run_parallel") is False
+            ]
+            if nonparallel_capability_ids:
+                terminal_capability.setdefault("allOf", []).append(
+                    {
+                        "if": {
+                            "properties": {"capability_id": {"enum": nonparallel_capability_ids}},
+                            "required": ["capability_id"],
+                        },
+                        "then": {
+                            "properties": {"timing": {"enum": ["sequential"]}},
+                            "required": ["timing"],
+                        },
+                    }
+                )
     terminal_activities = terminal_schema.get("properties", {}).get("activities")
     terminal_items = (
-        terminal_activities.get("items")
-        if isinstance(terminal_activities, dict)
-        else None
+        terminal_activities.get("items") if isinstance(terminal_activities, dict) else None
     )
     if isinstance(terminal_items, dict):
         terminal_items.pop("discriminator", None)
@@ -2868,7 +2930,7 @@ def fast_streaming_advance_response_schema(
         terminal_schema,
         prefix="Terminal_",
     )
-    return _ollama_streaming_schema({
+    streaming_schema = {
         "type": "object",
         "properties": {
             "presentation_commit": presentation,
@@ -2877,118 +2939,33 @@ def fast_streaming_advance_response_schema(
         "required": ["presentation_commit", "terminal_result"],
         "additionalProperties": False,
         "$defs": {**presentation_defs, **terminal_defs},
-    }, retain_value_constraints=True)
-
-def fast_repair_response_schema(
-    schema: dict[str, Any],
-    initial_raw_output: Any,
-    *,
-    expected_goal_ids_for_turn: list[str],
-) -> dict[str, Any]:
-    """Narrow a redundant aggregate to the model's own goal judgments.
-
-    The initial model output remains the semantic authority for every
-    per-goal disposition.  When that complete outcome map is valid but its
-    redundant top-level aggregate is inconsistent, the bounded repair
-    grammar permits only the mechanically consistent aggregate.  The host
-    never examines user wording or chooses a goal outcome, step, or skill.
-    """
-
-    if not isinstance(initial_raw_output, dict):
-        return schema
-    outcomes = initial_raw_output.get("goal_outcomes")
-    expected = list(expected_goal_ids_for_turn)
-    if not isinstance(outcomes, dict) or set(outcomes) != set(expected):
-        return schema
-    dispositions: list[str] = []
-    for goal_id in expected:
-        outcome = outcomes.get(goal_id)
-        if not isinstance(outcome, dict):
-            return schema
-        disposition = outcome.get("disposition")
-        if disposition not in {"execute", "respond", "clarify", "escalate"}:
-            return schema
-        dispositions.append(disposition)
-    disposition_set = set(dispositions)
-    if disposition_set == {"execute"}:
-        aggregate = "execute"
-    elif disposition_set == {"respond"}:
-        aggregate = "respond"
-    elif disposition_set == {"execute", "respond"}:
-        aggregate = "mixed"
-    elif disposition_set == {"clarify"}:
-        aggregate = "clarify"
-    elif disposition_set == {"escalate"}:
-        aggregate = "escalate"
-    else:
-        return schema
-    narrowed = copy.deepcopy(schema)
-    disposition_schema = narrowed.get("properties", {}).get("disposition")
-    if not isinstance(disposition_schema, dict):
-        return schema
-    disposition_schema["enum"] = [aggregate]
-    disposition_schema["description"] = (
-        "Bounded contract repair: this is the sole aggregate consistent "
-        "with the initial model-authored per-goal dispositions."
-    )
-    narrowed_outcomes = narrowed.get("properties", {}).get("goal_outcomes")
-    outcome_properties = (
-        narrowed_outcomes.get("properties")
-        if isinstance(narrowed_outcomes, dict)
-        else None
-    )
-    if isinstance(outcome_properties, dict):
-        for goal_id, initial_disposition in zip(expected, dispositions, strict=True):
-            goal_schema = outcome_properties.get(goal_id)
-            if not isinstance(goal_schema, dict):
-                continue
-            # Retain the shared outcome contract while freezing the
-            # model-authored semantic disposition. A DTO repair may correct
-            # redundant fields but cannot change escalate into execute. An
-            # escalated outcome also has mechanically empty response/step
-            # surfaces: otherwise the repair grammar permits the exact nested
-            # contradiction that caused the original contract rejection.
-            goal_properties = goal_schema.setdefault("properties", {})
-            goal_properties["disposition"] = {
-                "type": "string",
-                "enum": [initial_disposition],
-                "description": (
-                    "Bounded DTO repair: preserve the initial model-authored "
-                    "per-Goal semantic disposition exactly."
-                ),
-            }
-            if initial_disposition == "escalate":
-                goal_properties["response_text"] = {
-                    "type": "string",
-                    "maxLength": 0,
+    }
+    streaming_schema.setdefault("allOf", []).append(
+        {
+            "if": {
+                "properties": {
+                    "terminal_result": {
+                        "properties": {"disposition": {"enum": ["escalate"]}},
+                        "required": ["disposition"],
+                    }
+                },
+                "required": ["terminal_result"],
+            },
+            "then": {
+                "properties": {
+                    "presentation_commit": {
+                        "properties": {"activity": {"type": "null"}},
+                        "required": ["activity"],
+                    }
                 }
-                goal_properties["step_ids"] = {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "maxItems": 0,
-                }
-                goal_schema["required"] = list(
-                    dict.fromkeys(
-                        [
-                            *(goal_schema.get("required") or []),
-                            "disposition",
-                            "response_text",
-                            "step_ids",
-                        ]
-                    )
-                )
-    if aggregate == "escalate":
-        properties = narrowed.get("properties", {})
-        coverage = properties.get("coverage")
-        if isinstance(coverage, dict):
-            coverage["enum"] = ["partial"]
-        steps = properties.get("steps")
-        if isinstance(steps, dict):
-            steps["maxItems"] = 0
-        response_text = properties.get("response_text")
-        if isinstance(response_text, dict):
-            response_text["maxLength"] = 0
-    return narrowed
+            },
+        }
+    )
+    return _ollama_streaming_schema(
+        streaming_schema,
+        retain_value_constraints=True,
+    )
+
 
 def deep_plan_response_schema(
     expected_goal_ids: list[str],
@@ -3002,8 +2979,11 @@ def deep_plan_response_schema(
     provider_vocal_goal_ids: list[str] | None = None,
     provider_media_goal_operations: dict[str, str] | None = None,
     unavailable_information_goal_ids: list[str] | None = None,
+    unavailable_resource_goal_ids: list[str] | None = None,
     single_step_goal_ids: list[str] | None = None,
     required_numeric_goal_values: dict[str, list[int | float]] | None = None,
+    confirmation_required_capability_ids: list[str] | None = None,
+    nonparallel_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     return canonical_plan_response_schema(
         planner_tier="deep",
@@ -3017,198 +2997,9 @@ def deep_plan_response_schema(
         provider_vocal_goal_ids=(provider_vocal_goal_ids),
         provider_media_goal_operations=(provider_media_goal_operations),
         unavailable_information_goal_ids=unavailable_information_goal_ids,
+        unavailable_resource_goal_ids=unavailable_resource_goal_ids,
         single_step_goal_ids=single_step_goal_ids,
         required_numeric_goal_values=required_numeric_goal_values,
+        confirmation_required_capability_ids=(confirmation_required_capability_ids),
+        nonparallel_capability_ids=nonparallel_capability_ids,
     )
-
-def deep_safety_revision_response_schema(
-    base_schema: dict[str, Any],
-    *,
-    feedback: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """Forbid exact execution after deterministic concurrency rejection."""
-
-    schema = copy.deepcopy(base_schema)
-    response_text = schema.get("properties", {}).get("response_text")
-    if isinstance(response_text, dict):
-        response_text.pop("maxLength", None)
-    if requires_sequential_safety_revision(list(feedback or [])):
-        # The deployed structured decoder does not reliably enforce a
-        # nested step constraint added only through a top-level allOf.
-        # Specialize the referenced step DTO itself so a concurrency
-        # rejection cannot be relabeled as a safe adjustment while the
-        # rejected parallel timing remains unchanged.  This conservative
-        # revision may still clarify or propose a confirmation-bound
-        # sequential alternative; it cannot authorize overlap.
-        step_schema = schema.get("$defs", {}).get("PlannerModelStep")
-        if isinstance(step_schema, dict):
-            timing = step_schema.get("properties", {}).get("timing")
-            if isinstance(timing, dict):
-                timing["enum"] = ["sequential"]
-                timing["default"] = "sequential"
-                timing["description"] = (
-                    "Concurrency was rejected by deterministic provider/resource "
-                    "validation; retained executable steps must be sequential."
-                )
-    schema.setdefault("allOf", []).append(
-        {
-            "anyOf": [
-                {
-                    "properties": {
-                        "disposition": {
-                            "type": "string",
-                            "enum": ["execute", "mixed"],
-                        },
-                        "plan_relation": {
-                            "type": "string",
-                            "enum": ["safe_adjustment", "alternative"],
-                        },
-                        "user_confirmation_required": {
-                            "type": "boolean",
-                            "enum": [True],
-                        },
-                        "response_text": {
-                            "type": "string",
-                            "minLength": 1,
-                        },
-                    }
-                },
-                {
-                    "properties": {
-                        "disposition": {
-                            "type": "string",
-                            "enum": ["clarify", "unavailable", "refused"],
-                        },
-                        "steps": {
-                            "type": "array",
-                            "maxItems": 0,
-                        },
-                        "plan_relation": {
-                            "type": "string",
-                            "enum": ["exact"],
-                        },
-                        "user_confirmation_required": {
-                            "type": "boolean",
-                            "enum": [False],
-                        },
-                    }
-                },
-            ]
-        }
-    )
-    return schema
-
-def deep_contract_revision_response_schema(
-    base_schema: dict[str, Any],
-    *,
-    feedback: list[dict[str, Any]] | None = None,
-    semantic_baseline: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Tighten rejected pairs without allowing a mechanical repair to replan."""
-
-    mismatches = [
-        item
-        for item in list(feedback or [])
-        if isinstance(item, dict)
-        and item.get("type") == "parameter_resolution_argument_mismatch"
-        and str(item.get("capability_id") or "").strip()
-        and str(item.get("parameter") or "").strip()
-    ]
-    missing_numeric = [
-        item
-        for item in list(feedback or [])
-        if isinstance(item, dict)
-        and item.get("type")
-        == "missing_user_supplied_parameter_resolution"
-        and str(item.get("step_id") or "").strip()
-        and str(item.get("parameter") or "").strip()
-        and list(item.get("source_goal_ids") or [])
-    ]
-    if not mismatches and not missing_numeric:
-        return base_schema
-    schema = copy.deepcopy(base_schema)
-    branches = (
-        schema.get("$defs", {})
-        .get("PlannerModelStep", {})
-        .get("oneOf", [])
-    )
-    if not isinstance(branches, list):
-        return schema
-    for mismatch in mismatches:
-        capability_id = str(mismatch["capability_id"]).strip()
-        parameter = str(mismatch["parameter"]).strip()
-        for branch in branches:
-            if not isinstance(branch, dict):
-                continue
-            properties = branch.get("properties")
-            if not isinstance(properties, dict):
-                continue
-            capability_property = properties.get("capability_id")
-            if not isinstance(capability_property, dict) or capability_property.get(
-                "enum"
-            ) != [capability_id]:
-                continue
-            args = properties.get("args")
-            if not isinstance(args, dict) or parameter not in (
-                args.get("properties") or {}
-            ):
-                continue
-            required = args.setdefault("required", [])
-            if parameter not in required:
-                required.append(parameter)
-    if missing_numeric:
-        if isinstance(semantic_baseline, dict):
-            properties = schema.get("properties")
-            if isinstance(properties, dict):
-                for field_name, field_value in semantic_baseline.items():
-                    if field_name == "parameter_resolutions":
-                        continue
-                    properties[field_name] = {
-                        "const": copy.deepcopy(field_value)
-                    }
-        resolution_array = schema.get("properties", {}).get(
-            "parameter_resolutions"
-        )
-        resolution_model = schema.get("$defs", {}).get(
-            "PlanParameterResolution"
-        )
-        if isinstance(resolution_array, dict) and isinstance(
-            resolution_model, dict
-        ):
-            resolution_branches: list[dict[str, Any]] = []
-            for obligation in missing_numeric:
-                branch = copy.deepcopy(resolution_model)
-                branch_properties = branch.setdefault("properties", {})
-                branch_properties["step_id"] = {
-                    "const": str(obligation["step_id"])
-                }
-                branch_properties["parameter"] = {
-                    "const": str(obligation["parameter"])
-                }
-                branch_properties["strategy"] = {"const": "user_supplied"}
-                branch_properties["value"] = {"const": obligation["value"]}
-                branch_properties["blocking"] = {"const": False}
-                branch_properties["source_goal_ids"] = {
-                    "const": list(obligation["source_goal_ids"])
-                }
-                required = branch.setdefault("required", [])
-                for field_name in (
-                    "step_id",
-                    "parameter",
-                    "strategy",
-                    "value",
-                    "confidence",
-                    "blocking",
-                    "rationale",
-                    "source_goal_ids",
-                ):
-                    if field_name not in required:
-                        required.append(field_name)
-                resolution_branches.append(branch)
-            resolution_array["items"] = (
-                resolution_branches[0]
-                if len(resolution_branches) == 1
-                else {"oneOf": resolution_branches}
-            )
-            resolution_array["minItems"] = len(resolution_branches)
-    return schema

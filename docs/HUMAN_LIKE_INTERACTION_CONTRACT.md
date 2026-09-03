@@ -699,13 +699,17 @@ subordinate presentation choice that may accompany a ready Main Activity; it doe
 speech mandatory and is not itself task progress.
 
 Foreground interaction deadlines and qualification watchdogs are separate concerns.
-Maintained human-facing modes use bounded interactive stage deadlines, a 15-second
-foreground Cognitive Runtime deadline, and a 3.5-second playback-start hard barrier.
+Until the selected model/profile has passed semantic workflow qualification, maintained
+development modes give Goal Association and Fast Planner 60 seconds each, Deep Planner
+120 seconds, their Host envelopes 65/65/125 seconds, and the foreground Cognitive Runtime
+300 seconds. These are workflow-completion watchdogs, not acceptable human-facing latency.
+The 3.5-second playback-start hard barrier remains separate.
 If the foreground deadline cancels cognition, Runtime cancels only provisional Fast
 Capability work that never received canonical Goal/Plan binding, preserves already
 scheduled or heard Planner speech evidence, and returns a bounded repair rather than
-waiting through a qualification watchdog. Long 120/150/900-second watchdogs belong only
-to explicit qualification/validation modes used to collect complete evidence.
+waiting indefinitely. Explicit qualification/validation mode retains its longer
+120/150/900-second evidence-collection watchdogs. In every mode, a missed 2.0/3.0-second
+target remains a measured failure; no watchdog value can convert it into a latency pass.
 
 In the qualified warm live profile, the Planner-local target is at most 2.0 seconds
 from validated GI handoff to the first valid Fast-Planner Communicative Activity
@@ -714,7 +718,10 @@ latency, cold model load, TTS first PCM, and playback startup are also retained 
 separate slices rather than hidden inside one duration. A missed
 budget is retained as interaction evidence even when the eventual sentence is
 semantically correct; it must not be repaired by moving wording authority upstream
-or skipping provenance validation.
+or skipping provenance validation. After semantic correctness is established, optimize
+the measured stage/provider bottleneck and tighten production budgets only from retained
+current-revision evidence; never shorten a watchdog first and call the resulting fallback
+or cancellation a latency improvement.
 
 The retained measurement must expose the raw anchors used to derive those budgets:
 Fast first-response stage start and finish, the stage duration, first TTS schedule,

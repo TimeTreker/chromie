@@ -179,7 +179,6 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         deep_prompt = planner_prompt.deep_plan_prompt(
             self.request,
             [],
-            feedback=[],
             response_schema={},
             expected_goal_ids=["goal-identity"],
         )
@@ -225,14 +224,12 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 planner_prompt.deep_layered_prompt(
                     self.request,
                     [],
-                    feedback=[],
                     response_schema={},
                     expected_goal_ids=["goal-identity"],
                 ),
                 planner_prompt.deep_layered_prompt(
                     changed,
                     [],
-                    feedback=[],
                     response_schema={},
                     expected_goal_ids=["goal-identity"],
                 ),

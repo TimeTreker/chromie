@@ -1,0 +1,216 @@
+{
+  "adversarial_design": {
+    "cell_index": 14,
+    "changed_axis": "requested parallel Work has compatible declared resources versus the same parallel relation has a declared resource conflict",
+    "condition": "boundary",
+    "daily_life_family": "play_creativity",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "work_topology_and_coordination"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "requested parallel Work has compatible declared resources versus the same parallel relation has a declared resource conflict",
+      "language"
+    ],
+    "id": "fpdl_v2_work_topology_and_coordination_14",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_work_topology_and_coordination_14_boundary_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Walk forward for five seconds in parallel with the sibling walk.",
+              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_14_boundary_en-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "duration": {
+                    "confidence": 1.0,
+                    "entity_type": "duration_seconds",
+                    "name": "duration",
+                    "value": "5"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "During our drawing game, walk forward for five seconds while also walking forward for eight seconds.",
+              "success_criteria": [
+                "Walk forward for five seconds in parallel with the sibling walk."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            },
+            {
+              "constraints": {},
+              "description": "Walk forward for eight seconds in parallel with the sibling walk.",
+              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_14_boundary_en-2",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "duration": {
+                    "confidence": 1.0,
+                    "entity_type": "duration_seconds",
+                    "name": "duration",
+                    "value": "8"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "source_text": "During our drawing game, walk forward for five seconds while also walking forward for eight seconds.",
+              "success_criteria": [
+                "Walk forward for eight seconds in parallel with the sibling walk."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_14_boundary_en"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "duration": 5,
+            "parallel_with": [
+              "r2"
+            ]
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Walk forward for five seconds in parallel with the sibling walk.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        },
+        {
+          "bindings": {
+            "duration": 8,
+            "parallel_with": [
+              "r1"
+            ]
+          },
+          "confidence": 0.99,
+          "local_ref": "r2",
+          "outcome": "Walk forward for eight seconds in parallel with the sibling walk.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_work_topology_and_coordination_14_boundary_en",
+      "text": "During our drawing game, walk forward for five seconds while also walking forward for eight seconds."
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-14",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate",
+        "clarify",
+        "refused"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_work_topology_and_coordination_14_boundary_en-1",
+        "goal-fpdl_v2_work_topology_and_coordination_14_boundary_en-2"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1",
+        "r2"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "The requested simultaneous uses of the exclusive non-parallel walking resource cannot leak as a sequential rewrite."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

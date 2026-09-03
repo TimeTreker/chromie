@@ -1,0 +1,201 @@
+{
+  "adversarial_design": {
+    "cell_index": 24,
+    "changed_axis": "an exact allowed Plan exists versus only a material alternative exists and therefore requires confirmation",
+    "condition": "boundary",
+    "daily_life_family": "identity_body",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "plan_relation_and_confirmation_proposal"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "an exact allowed Plan exists versus only a material alternative exists and therefore requires confirmation",
+      "language"
+    ],
+    "id": "fpdl_v2_plan_relation_and_confirmation_proposal_24",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。",
+              "goal_id": "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh-1",
+              "metadata": {
+                "output_mode": "stateful_effect"
+              },
+              "object": {
+                "bindings": {
+                  "due_at": {
+                    "confidence": 1.0,
+                    "entity_type": "due_time",
+                    "name": "due_at",
+                    "value": "2099-09-04T18:30:00+08:00"
+                  },
+                  "recurrence": {
+                    "confidence": 1.0,
+                    "entity_type": "schedule",
+                    "name": "recurrence",
+                    "value": "weekdays forever"
+                  },
+                  "reminder_text": {
+                    "confidence": 1.0,
+                    "entity_type": "reminder_text",
+                    "name": "reminder_text",
+                    "value": "带上蓝色笔记本"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "为了你的机器人身体真正能做什么，请永久在每个工作日设置那个提醒；如果不支持重复提醒，就改为提议只在2099年9月4日设置一次。",
+              "success_criteria": [
+                "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh"
+        },
+        "situation": {
+          "digest": "8a89b1a977f98f3f9f0450206f49b9b03ab75a7b59158a1df25cd9a06b7093e2",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
+        "schema_version": 1,
+        "source_plan_fingerprint": "53ac5c1b7bdeddc510790bd7d1ef5b582f5d459fbd9bd7d8dec642da392ef209",
+        "source_plan_id": "source-plan-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "due_at": "2099-09-04T18:30:00+08:00",
+            "recurrence": "weekdays forever",
+            "reminder_text": "带上蓝色笔记本"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。",
+          "output_mode": "stateful_effect",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
+      "text": "为了你的机器人身体真正能做什么，请永久在每个工作日设置那个提醒；如果不支持重复提醒，就改为提议只在2099年9月4日设置一次。"
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-24",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute"
+      ],
+      "expected_confirmation_required": true,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh-1"
+      ],
+      "expected_plan_relations": [
+        "alternative"
+      ],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "chromie.reminder.create"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "一次性提醒属于重大替代方案，不是准确实现，也不能由 Planner 自行授权。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

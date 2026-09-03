@@ -173,8 +173,11 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
 - **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at
   most 2.0 seconds from validated GI handoff to the first valid Planner Communicative
   Activity commitment and at most 3.0 seconds from that commitment to playback start.
-  Longer qualification watchdogs are diagnostic containment, not a human-facing latency
-  claim; only current-revision live evidence can qualify these targets.
+  Until a development model/profile has first completed semantic workflow qualification,
+  its watchdogs must contain one legal end-to-end transaction rather than cancel valid
+  cognition at the target latency. A latency miss remains a retained qualification
+  failure and must not be hidden by that containment budget. Only current-revision live
+  evidence can qualify these targets or justify tightening production watchdogs.
 
 ## Mission
 

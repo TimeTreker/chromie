@@ -1,0 +1,179 @@
+{
+  "adversarial_design": {
+    "cell_index": 12,
+    "changed_axis": "a material Capability input has one authoritative source versus that input has no authorized source",
+    "condition": "boundary",
+    "daily_life_family": "uncertainty_repair",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "parameter_resolution_and_provenance"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "a material Capability input has one authoritative source versus that input has no authorized source",
+      "language"
+    ],
+    "id": "fpdl_v2_parameter_resolution_and_provenance_12",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "按用户尚未指定的次数眨眼。",
+              "goal_id": "goal-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "为了刚才不清楚的那个细节，请眨合适的次数，但我还没有决定具体几次。",
+              "success_criteria": [
+                "按用户尚未指定的次数眨眼。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh"
+        },
+        "situation": {
+          "digest": "1d41714ded09fa693d26bc07402abdffe589506ebc5f7e27eedc76ed495881f6",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh",
+        "schema_version": 1,
+        "source_plan_fingerprint": "cf4f537e78e189424eaa8a31f32d53d1e62606fb3fe1b0d6e0647a123941ab4e",
+        "source_plan_id": "source-plan-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "按用户尚未指定的次数眨眼。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh",
+      "text": "为了刚才不清楚的那个细节，请眨合适的次数，但我还没有决定具体几次。"
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-12",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "clarify",
+        "escalate"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_parameter_resolution_and_provenance_12_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "所需次数没有权威来源，Planner 不得自行编造。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

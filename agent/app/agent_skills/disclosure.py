@@ -593,35 +593,15 @@ def plan_agent_skill_provenance_from_disclosure(
     )
 
 
-def inherited_plan_agent_skill_provenance(
-    context: dict[str, Any] | None,
-) -> tuple[PlanAgentSkillProvenance, ...]:
-    """Read exact Fast Plan provenance supplied to Deep Planner by the Host."""
-
-    if not isinstance(context, dict):
-        return ()
-    raw = context.get("fast_plan_resolution") or context.get(
-        "fast_planner_resolution"
-    )
-    if raw is None:
-        return ()
-    plan = raw if isinstance(raw, CanonicalPlan) else CanonicalPlan.model_validate(raw)
-    if plan.planner_tier != "fast":
-        raise ValueError("Deep Planner inherited provenance requires a Fast Plan")
-    return tuple(plan.selected_agent_skills)
-
-
 def bind_agent_skill_provenance_to_plan(
     plan: CanonicalPlan,
     resolution: AgentSkillDisclosureResolution,
-    *,
-    inherited: tuple[PlanAgentSkillProvenance, ...] = (),
 ) -> CanonicalPlan:
     """Bind exact method provenance without changing Capability execution fields."""
 
     ordered: list[PlanAgentSkillProvenance] = []
     by_key: dict[tuple[str, str], PlanAgentSkillProvenance] = {}
-    for item in (*inherited, *plan_agent_skill_provenance_from_disclosure(resolution)):
+    for item in plan_agent_skill_provenance_from_disclosure(resolution):
         key = (item.agent_skill_id, item.selected_by_agent_role)
         previous = by_key.get(key)
         if previous is not None:
@@ -653,8 +633,6 @@ def bind_agent_skill_provenance_to_plan(
 def attach_planner_disclosure_metadata_fail_closed(
     plan: CanonicalPlan,
     resolution: AgentSkillDisclosureResolution,
-    *,
-    inherited_plan_provenance: tuple[PlanAgentSkillProvenance, ...] = (),
 ) -> CanonicalPlan:
     """Attach planner provenance or return a non-executable structured Plan.
 
@@ -668,7 +646,6 @@ def attach_planner_disclosure_metadata_fail_closed(
         return bind_agent_skill_provenance_to_plan(
             plan,
             resolution,
-            inherited=inherited_plan_provenance,
         )
     except ValueError as exc:
         logger.error(
@@ -714,21 +691,17 @@ def attach_planner_disclosure_metadata_fail_closed(
 def attach_disclosure_metadata(
     result: Any,
     resolution: AgentSkillDisclosureResolution,
-    *,
-    inherited_plan_provenance: tuple[PlanAgentSkillProvenance, ...] = (),
 ) -> Any:
     if (
         resolution.status == "no_skill"
         and not resolution.projections
         and not resolution.failures
-        and not inherited_plan_provenance
     ):
         return result
     if isinstance(result, CanonicalPlan):
         return bind_agent_skill_provenance_to_plan(
             result,
             resolution,
-            inherited=inherited_plan_provenance,
         )
     metadata = dict(getattr(result, "metadata", {}) or {})
     metadata[_CONTEXT_KEY] = trace_disclosure_metadata(resolution)

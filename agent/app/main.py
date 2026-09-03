@@ -19,7 +19,6 @@ from .agent_skills import (
     AgentSkillSelectionService,
     attach_disclosure_metadata,
     attach_planner_disclosure_metadata_fail_closed,
-    inherited_plan_agent_skill_provenance,
     build_configured_agent_skill_registry,
 )
 from .clients.external_information_client import HttpExternalInformationClient
@@ -574,9 +573,6 @@ async def resolve_deep_plan(request: CognitiveWorkRequest):
     return attach_planner_disclosure_metadata_fail_closed(
         result,
         disclosure,
-        inherited_plan_provenance=inherited_plan_agent_skill_provenance(
-            prepared.context
-        ),
     )
 
 

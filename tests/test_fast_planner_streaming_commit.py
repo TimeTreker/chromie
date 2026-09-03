@@ -208,9 +208,7 @@ def _look_at_person_catalog_capability() -> CatalogCapability:
                     "planner_owned": True,
                     "arguments": ["target_ref"],
                     "minimum_arguments": 1,
-                    "contract": (
-                        "Copy target_ref only from current trusted target evidence."
-                    ),
+                    "contract": ("Copy target_ref only from current trusted target evidence."),
                 }
             }
         },
@@ -246,9 +244,7 @@ def _blink_social_catalog_capability() -> CatalogCapability:
         description="Blink as an optional visual social expression.",
         input_schema={
             "type": "object",
-            "properties": {
-                "count": {"type": "integer", "minimum": 1, "default": 2}
-            },
+            "properties": {"count": {"type": "integer", "minimum": 1, "default": 2}},
             "additionalProperties": False,
         },
         effects=["visual_expression"],
@@ -405,10 +401,7 @@ def _structured_resource_catalog_capability() -> CatalogCapability:
 def _structured_resource_request() -> CognitiveWorkRequest:
     return CognitiveWorkRequest(
         sid="turn-stream-resource",
-        text=(
-            "there is a bottle of milk ahead of you about 50 meters, "
-            "please bring it to me"
-        ),
+        text=("there is a bottle of milk ahead of you about 50 meters, please bring it to me"),
         language="en-US",
         responsibilities=[
             CognitiveResponsibilityProposal(
@@ -479,9 +472,7 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
 
     projection = fast_advance_capability_prompt_projection([capability])
     semantic_projection = fast_advance_semantic_capability_projection([capability])
-    streaming_projection = fast_advance_streaming_capability_prompt_projection(
-        [capability]
-    )
+    streaming_projection = fast_advance_streaming_capability_prompt_projection([capability])
     prompt = str(
         fast_advance_layered_prompt(
             request,
@@ -509,11 +500,14 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
     assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in prompt
     assert "<presentation_commit>" in prompt
     assert "<terminal_plan>" in prompt
-    assert json.dumps(
-        response_schema["properties"]["presentation_commit"],
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ) in prompt
+    assert (
+        json.dumps(
+            response_schema["properties"]["presentation_commit"],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        in prompt
+    )
     assert "top-level JSON document" in system
     assert "repeated frame" in system
 
@@ -625,9 +619,9 @@ def test_stream_schema_keeps_ordered_speech_in_terminal_and_compacts_args() -> N
         language="en-US",
     )
 
-    activity_choices = schema["properties"]["presentation_commit"]["properties"][
-        "activity"
-    ]["anyOf"]
+    activity_choices = schema["properties"]["presentation_commit"]["properties"]["activity"][
+        "anyOf"
+    ]
     assert not any(
         "progress_kind" not in branch.get("properties", {})
         and "text" in branch.get("properties", {})
@@ -638,8 +632,7 @@ def test_stream_schema_keeps_ordered_speech_in_terminal_and_compacts_args() -> N
     capability_branch = next(
         branch
         for branch in terminal_branches
-        if branch.get("properties", {}).get("role", {}).get("enum")
-        == ["capability"]
+        if branch.get("properties", {}).get("role", {}).get("enum") == ["capability"]
     )
     assert capability_branch["properties"]["args"] == {
         "type": "object",
@@ -648,16 +641,46 @@ def test_stream_schema_keeps_ordered_speech_in_terminal_and_compacts_args() -> N
     complete_response_branch = next(
         branch
         for branch in terminal_branches
-        if branch.get("properties", {}).get("role", {}).get("enum")
-        == ["complete_response"]
+        if branch.get("properties", {}).get("role", {}).get("enum") == ["complete_response"]
     )
-    assert complete_response_branch["properties"]["source_responsibility_refs"][
-        "items"
-    ]["enum"] == ["r2"]
+    assert complete_response_branch["properties"]["source_responsibility_refs"]["items"][
+        "enum"
+    ] == ["r2"]
     assert terminal["properties"]["auxiliary_activities"] == {
         "type": "array",
         "enum": [[]],
     }
+
+
+def test_presentation_speech_budget_preserves_natural_english_and_chinese() -> None:
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="offer brief encouragement",
+        output_mode="speech",
+        bindings={},
+        confidence=1.0,
+    )
+
+    def presentation_text_contract(language: str) -> dict[str, object]:
+        schema = fast_streaming_advance_response_schema(
+            [responsibility.local_ref],
+            responsibilities=[responsibility],
+            capabilities=[],
+            auxiliary_social_capabilities=[],
+            interpretation_unresolved=[],
+            language=language,
+        )
+        choices = schema["properties"]["presentation_commit"]["properties"]["activity"]["anyOf"]
+        complete_response = next(
+            choice
+            for choice in choices
+            if "text" in choice.get("properties", {})
+            and "progress_kind" not in choice.get("properties", {})
+        )
+        return complete_response["properties"]["text"]
+
+    assert presentation_text_contract("en-US")["maxLength"] == 120
+    assert presentation_text_contract("zh-CN")["maxLength"] == 64
 
 
 def test_ordered_terminal_speech_can_own_distinct_social_decoration() -> None:
@@ -689,9 +712,9 @@ def test_ordered_terminal_speech_can_own_distinct_social_decoration() -> None:
         language="en-US",
     )
 
-    presentation_auxiliary = schema["properties"]["presentation_commit"][
-        "properties"
-    ]["auxiliary_activities"]
+    presentation_auxiliary = schema["properties"]["presentation_commit"]["properties"][
+        "auxiliary_activities"
+    ]
     terminal_auxiliary = schema["properties"]["terminal_result"]["properties"][
         "auxiliary_activities"
     ]
@@ -722,25 +745,84 @@ def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
     assert len(serialized) < 8000
     assert "reason_summary" not in json.dumps(presentation)
     assert "reason_summary" in terminal["properties"]
-    assert "allOf" not in terminal
+    assert len(terminal["allOf"]) == 2
+    execute_branch = terminal["allOf"][0]["then"]["properties"]
+    assert execute_branch["coverage"]["enum"] == ["complete"]
+    assert execute_branch["activities"]["minContains"] == 1
+    escalation_branch = terminal["allOf"][1]["then"]["properties"]
+    assert escalation_branch["coverage"]["enum"] == ["partial", "uncertain"]
+    assert escalation_branch["activities"]["maxItems"] == 0
     assert "discriminator" not in terminal_items
     assert presentation["properties"]["auxiliary_activities"]["enum"] == [[]]
     assert terminal["properties"]["auxiliary_activities"]["enum"] == [[]]
     capability_branch = next(
         branch
         for branch in terminal_items["oneOf"]
-        if branch.get("properties", {}).get("role", {}).get("enum")
-        == ["capability"]
+        if branch.get("properties", {}).get("role", {}).get("enum") == ["capability"]
     )
     assert "timing" in capability_branch["required"]
+
+
+def test_stream_schema_forces_nonparallel_capability_timing() -> None:
+    _, responsibility = _body_request()
+    capability = {
+        **_walk_capability(),
+        "can_run_parallel": False,
+        "parallel_metadata_declared": True,
+    }
+    schema = fast_streaming_advance_response_schema(
+        [responsibility.local_ref],
+        responsibilities=[responsibility],
+        capabilities=[capability],
+        auxiliary_social_capabilities=[],
+        interpretation_unresolved=[],
+        language="en-US",
+    )
+    terminal_items = schema["properties"]["terminal_result"]["properties"]["activities"]["items"]
+    capability_branch = next(
+        branch
+        for branch in terminal_items["oneOf"]
+        if branch.get("properties", {}).get("role", {}).get("enum") == ["capability"]
+    )
+    timing_constraint = capability_branch["allOf"][0]
+
+    assert timing_constraint["if"]["properties"]["capability_id"]["enum"] == [
+        "soridormi.walk_forward"
+    ]
+    assert timing_constraint["then"]["properties"]["timing"]["enum"] == ["sequential"]
+
+
+def test_stream_schema_keeps_presentation_silent_when_terminal_escalates() -> None:
+    _, responsibility = _body_request()
+    schema = fast_streaming_advance_response_schema(
+        [responsibility.local_ref],
+        responsibilities=[responsibility],
+        capabilities=[_walk_capability()],
+        auxiliary_social_capabilities=[],
+        interpretation_unresolved=[],
+        language="en-US",
+    )
+
+    escalation_constraint = next(
+        item
+        for item in schema["allOf"]
+        if item.get("if", {})
+        .get("properties", {})
+        .get("terminal_result", {})
+        .get("properties", {})
+        .get("disposition", {})
+        .get("enum")
+        == ["escalate"]
+    )
+    assert escalation_constraint["then"]["properties"]["presentation_commit"]["properties"][
+        "activity"
+    ] == {"type": "null"}
 
 
 @pytest.mark.asyncio
 async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
     payload = _wire_output(_valid_output())
-    boundary = payload.index("</presentation_commit>") + len(
-        "</presentation_commit>"
-    )
+    boundary = payload.index("</presentation_commit>") + len("</presentation_commit>")
     model = _StreamingModel([payload[:boundary], payload[boundary:]])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
@@ -761,9 +843,7 @@ async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
 @pytest.mark.asyncio
 async def test_failure_after_commit_preserves_commit_and_blocks_terminal_work() -> None:
     payload = _wire_output(_valid_output())
-    boundary = payload.index("</presentation_commit>") + len(
-        "</presentation_commit>"
-    )
+    boundary = payload.index("</presentation_commit>") + len("</presentation_commit>")
     model = _StreamingModel([payload[:boundary], "<terminal_plan>{"])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
@@ -980,18 +1060,14 @@ async def test_declared_addressee_target_realization_accepts_exact_trusted_ref()
 
     assert isinstance(frames[0], PresentationCommit)
     assert isinstance(frames[1], FastPlannerStreamTerminal)
-    assert frames[1].advance.activities[0].args == {
-        "target_ref": "current_speaker"
-    }
+    assert frames[1].advance.activities[0].args == {"target_ref": "current_speaker"}
     assert "Trusted semantic target evidence JSON" in str(model.last_prompt)
     assert "person_addressee_target" in str(model.last_prompt)
 
 
 @pytest.mark.asyncio
 async def test_required_target_ref_uses_trusted_evidence_without_binding_mapping() -> None:
-    capability = _look_at_person_catalog_capability().model_copy(
-        update={"hints": {}}
-    )
+    capability = _look_at_person_catalog_capability().model_copy(update={"hints": {}})
     model = _StreamingModel([_wire_output(_look_output(target_ref="current_speaker"))])
     resolver = FastPlannerResolver(
         model,
@@ -1027,9 +1103,7 @@ async def test_declared_structured_resource_realization_accepts_exact_gi_values(
         _Catalog([_structured_resource_catalog_capability()]),  # type: ignore[arg-type]
     )
 
-    frames = [
-        frame async for frame in resolver.stream_advance(_structured_resource_request())
-    ]
+    frames = [frame async for frame in resolver.stream_advance(_structured_resource_request())]
 
     assert isinstance(frames[0], PresentationCommit)
     assert isinstance(frames[1], FastPlannerStreamTerminal)
@@ -1042,15 +1116,11 @@ async def test_declared_structured_resource_realization_accepts_exact_gi_values(
 @pytest.mark.asyncio
 async def test_declared_structured_resource_realization_rejects_lost_gi_value() -> None:
     resolver = FastPlannerResolver(
-        _StreamingModel(
-            [_wire_output(_structured_resource_output(recipient="requester"))]
-        ),
+        _StreamingModel([_wire_output(_structured_resource_output(recipient="requester"))]),
         _Catalog([_structured_resource_catalog_capability()]),  # type: ignore[arg-type]
     )
 
-    frames = [
-        frame async for frame in resolver.stream_advance(_structured_resource_request())
-    ]
+    frames = [frame async for frame in resolver.stream_advance(_structured_resource_request())]
 
     assert isinstance(frames[0], PresentationCommit)
     assert isinstance(frames[1], FastPlannerStreamFailure)
@@ -1096,9 +1166,8 @@ async def test_content_after_terminal_frame_fails_after_preserving_commit() -> N
 
 @pytest.mark.asyncio
 async def test_unclosed_presentation_frame_never_commits() -> None:
-    payload = (
-        "<presentation_commit>"
-        + json.dumps(_valid_output()["presentation_commit"], ensure_ascii=False)
+    payload = "<presentation_commit>" + json.dumps(
+        _valid_output()["presentation_commit"], ensure_ascii=False
     )
     resolver = FastPlannerResolver(  # type: ignore[arg-type]
         _StreamingModel([payload]),
@@ -1121,10 +1190,14 @@ async def test_duplicate_presentation_frame_is_rejected_after_first_commit() -> 
         + json.dumps(output["presentation_commit"], ensure_ascii=False)
         + "</presentation_commit>"
     )
-    payload = presentation + presentation + (
-        "<terminal_plan>"
-        + json.dumps(output["terminal_result"], ensure_ascii=False)
-        + "</terminal_plan>"
+    payload = (
+        presentation
+        + presentation
+        + (
+            "<terminal_plan>"
+            + json.dumps(output["terminal_result"], ensure_ascii=False)
+            + "</terminal_plan>"
+        )
     )
     resolver = FastPlannerResolver(  # type: ignore[arg-type]
         _StreamingModel([payload]),

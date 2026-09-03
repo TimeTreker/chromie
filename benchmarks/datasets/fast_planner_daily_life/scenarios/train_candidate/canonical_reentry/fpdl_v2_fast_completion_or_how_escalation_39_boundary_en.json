@@ -1,0 +1,217 @@
+{
+  "adversarial_design": {
+    "cell_index": 39,
+    "changed_axis": "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+    "condition": "boundary",
+    "daily_life_family": "uncertainty_repair",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "fast_completion_or_how_escalation"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+      "language"
+    ],
+    "id": "fpdl_v2_fast_completion_or_how_escalation_39",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_fast_completion_or_how_escalation_39_boundary_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Check the forecast and conditionally create the reminder only when rain is forecast.",
+              "goal_id": "goal-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en-1",
+              "metadata": {
+                "output_mode": "stateful_effect"
+              },
+              "object": {
+                "bindings": {
+                  "date": {
+                    "confidence": 1.0,
+                    "entity_type": "date",
+                    "name": "date",
+                    "value": "tomorrow"
+                  },
+                  "due_at": {
+                    "confidence": 1.0,
+                    "entity_type": "due_time",
+                    "name": "due_at",
+                    "value": "tomorrow at 07:30"
+                  },
+                  "location": {
+                    "confidence": 1.0,
+                    "entity_type": "location",
+                    "name": "location",
+                    "value": "Hangzhou"
+                  },
+                  "period": {
+                    "confidence": 1.0,
+                    "entity_type": "day_part",
+                    "name": "period",
+                    "value": "morning"
+                  },
+                  "reminder_text": {
+                    "confidence": 1.0,
+                    "entity_type": "reminder_text",
+                    "name": "reminder_text",
+                    "value": "bring an umbrella"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "For the detail that was unclear, check tomorrow morning's Hangzhou weather and create a 7:30 a.m. umbrella reminder only if rain is forecast.",
+              "success_criteria": [
+                "Check the forecast and conditionally create the reminder only when rain is forecast."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en"
+        },
+        "situation": {
+          "digest": "40e439a00a0e4627ec8f74a371c6c9c62ff0ffa602763796dc266b573bf19805",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en",
+        "schema_version": 1,
+        "source_plan_fingerprint": "43d82b5d52fb310842df36586e87911297d21b935e2a3f124718a558da28ea1a",
+        "source_plan_id": "source-plan-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "date": "tomorrow",
+            "due_at": "tomorrow at 07:30",
+            "location": "Hangzhou",
+            "period": "morning",
+            "reminder_text": "bring an umbrella"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Check the forecast and conditionally create the reminder only when rain is forecast.",
+          "output_mode": "stateful_effect",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_fast_completion_or_how_escalation_39_boundary_en",
+      "text": "For the detail that was unclear, check tomorrow morning's Hangzhou weather and create a 7:30 a.m. umbrella reminder only if rain is forecast."
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-39",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "The conditional multi-stage HOW requires broader planning; Fast must escalate the intact scope with no partial weather or reminder Work."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "adversarial_design": {
+    "cell_index": 5,
+    "changed_axis": "a current speech-only obligation exists versus the same topic has no still-needed conversational act",
+    "condition": "supported",
+    "daily_life_family": "feelings_support",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "direct_communicative_planning"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "a current speech-only obligation exists versus the same topic has no still-needed conversational act",
+      "language"
+    ],
+    "id": "fpdl_v2_direct_communicative_planning_05",
+    "member": "supported-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_direct_communicative_planning_05_supported_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "围绕一个难熬的下午说一句温暖简短的话。",
+              "goal_id": "goal-fpdl_v2_direct_communicative_planning_05_supported_zh-1",
+              "metadata": {
+                "output_mode": "speech"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "请围绕一个难熬的下午对我说一句温暖而简短的话，不要做任何动作。",
+              "success_criteria": [
+                "围绕一个难熬的下午说一句温暖简短的话。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_direct_communicative_planning_05_supported_zh"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "围绕一个难熬的下午说一句温暖简短的话。",
+          "output_mode": "speech",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_direct_communicative_planning_05_supported_zh",
+      "text": "请围绕一个难熬的下午对我说一句温暖而简短的话，不要做任何动作。"
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-05",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_direct_communicative_planning_05_supported_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Planner 负责自然措辞，不需要 Capability 或语音传输步骤。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

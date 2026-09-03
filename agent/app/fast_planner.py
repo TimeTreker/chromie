@@ -28,12 +28,12 @@ from .planner_schema import (
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
     fast_streaming_advance_response_schema,
-    fast_repair_response_schema,
 )
 from .planner_context import (
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
     fast_capability_payload,
+    planner_effectful_goal_ids,
     planner_goal_context,
 )
 from .planner_validation import (
@@ -51,9 +51,7 @@ from .planner_fast_validation import (
     AuthoritativeGroundingValidationError,
     CapabilityArgumentValidationError,
     capability_argument_errors,
-    planner_validation_error_json,
     qualify_fast_canonical_plan,
-    restore_required_capability_args_from_responsibilities,
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
@@ -102,7 +100,6 @@ from .planner_prompt import (
     fast_streaming_advance_system_prompt,
     fast_layered_prompt,
     fast_system_prompt,
-    fast_repair_system_prompt,
 )
 
 
@@ -230,12 +227,14 @@ def parse_fast_stream_document(
         )
     return presentation[0], terminal[0]
 
-def normalize_presentation_payload(
+
+def project_presentation_schema_constants(
     raw: dict[str, Any],
     *,
-    request: CognitiveWorkRequest,
     responsibility_refs: list[str],
 ) -> dict[str, Any]:
+    """Restore only constants intentionally elided by the compact wire Schema."""
+
     payload = dict(raw)
     raw_activity = payload.get("activity")
     if not isinstance(raw_activity, dict):
@@ -243,30 +242,16 @@ def normalize_presentation_payload(
     activity = dict(raw_activity)
     if len(responsibility_refs) == 1:
         activity.setdefault("source_responsibility_refs", responsibility_refs)
-    role = str(activity.get("role") or "")
-    if not role:
-        role = (
+    activity.setdefault(
+        "role",
+        (
             "progress"
             if activity.get("progress_kind") not in (None, "")
             else "complete_response"
-        )
-        activity["role"] = role
-    activity.setdefault(
-        "activity_id",
-        ("progress_" if role == "progress" else "response_")
-        + hashlib.sha256(
-            (
-                str(request.sid or "turn")
-                + "|"
-                + role
-                + "|"
-                + "|".join(responsibility_refs)
-            ).encode("utf-8")
-        ).hexdigest()[:12],
+        ),
     )
     payload["activity"] = activity
     return payload
-
 
 class FastPlannerResolver:
     """Low-latency semantic planner over the executable common catalog only."""
@@ -287,7 +272,6 @@ class FastPlannerResolver:
         num_predict: int = 2048,
         cognitive_budget_profile: str = "interactive",
         max_capabilities: int = 24,
-        max_contract_repairs: int = 1,
     ) -> None:
         self.ollama = ollama
         self.catalog = catalog
@@ -297,7 +281,6 @@ class FastPlannerResolver:
             str(cognitive_budget_profile or "interactive").strip() or "interactive"
         )
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
-        self.max_contract_repairs = max(0, min(1, int(max_contract_repairs)))
 
     async def stream_advance(
         self,
@@ -387,14 +370,13 @@ class FastPlannerResolver:
                 raw_presentation = first_presentation_frame(raw_text)
                 if raw_presentation is None:
                     continue
-                normalized_presentation = normalize_presentation_payload(
+                projected_presentation = project_presentation_schema_constants(
                     raw_presentation,
-                    request=request,
                     responsibility_refs=responsibility_refs,
                 )
                 presentation = (
                     FastPlannerPresentationCommitModelOutput.model_validate(
-                        normalized_presentation
+                        projected_presentation
                     )
                 )
                 activity = presentation.activity
@@ -437,21 +419,13 @@ class FastPlannerResolver:
                     "Fast Planner stream ended before a typed PresentationCommit"
                 )
             raw_presentation, raw_terminal = parse_fast_stream_document(raw_text)
-            normalized_presentation = normalize_presentation_payload(
+            projected_presentation = project_presentation_schema_constants(
                 raw_presentation,
-                request=request,
                 responsibility_refs=responsibility_refs,
-            )
-            raw_terminal, authoritative_arg_repairs = (
-                restore_required_capability_args_from_responsibilities(
-                    raw_terminal,
-                    responsibilities=responsibilities,
-                    capabilities=capability_payload,
-                )
             )
             output = FastPlannerStreamingModelOutput.model_validate(
                 {
-                    "presentation_commit": normalized_presentation,
+                    "presentation_commit": projected_presentation,
                     "terminal_result": raw_terminal,
                 }
             )
@@ -525,11 +499,6 @@ class FastPlannerResolver:
                     "presentation_commit_id": commit.commit_id,
                     "execution_authority": "trusted_capability_runtime",
                     "semantic_result_call_count": 1,
-                    **(
-                        {"authoritative_arg_repairs": authoritative_arg_repairs}
-                        if authoritative_arg_repairs
-                        else {}
-                    ),
                 },
             )
             yield FastPlannerStreamTerminal(
@@ -667,6 +636,14 @@ class FastPlannerResolver:
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
+                effectful_goal_ids=list(
+                    planner_effectful_goal_ids(authoritative_goals)
+                ),
+                confirmation_required_capability_ids=[
+                    item["capability_id"]
+                    for item in capability_payload
+                    if item.get("requires_confirmation")
+                ],
             )
             if multi_goal_contract
             else canonical_plan_response_schema(
@@ -681,6 +658,11 @@ class FastPlannerResolver:
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
+                confirmation_required_capability_ids=[
+                    item["capability_id"]
+                    for item in capability_payload
+                    if item.get("requires_confirmation")
+                ],
             )
         )
         response_schema = canonical_resource_argument_response_schema(
@@ -728,46 +710,21 @@ class FastPlannerResolver:
                 else self.num_predict
             ),
         }
-        previous_raw: Any = None
-        initial_raw_output: Any = None
-        initial_validation_errors = ""
-        contract_repair_attempted = False
-        for attempt in range(self.max_contract_repairs + 1):
-            raw: Any = None
-            parameter_provenance_repairs: list[dict[str, Any]] = []
-            terminal_response_repairs: list[dict[str, Any]] = []
-            try:
-                active_response_schema = (
-                    fast_repair_response_schema(
-                        response_schema,
-                        initial_raw_output,
-                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                    )
-                    if contract_repair_attempted
-                    else response_schema
-                )
+        raw: Any = None
+        parameter_provenance_repairs: list[dict[str, Any]] = []
+        try:
                 raw = await self.ollama.generate(
                     fast_layered_prompt(
                         request,
                         capability_payload,
                         response_schema=response_schema,
-                        previous_raw=previous_raw,
-                        validation_errors=initial_validation_errors,
                     ),
-                    system=(
-                        fast_repair_system_prompt()
-                        if contract_repair_attempted
-                        else fast_system_prompt()
-                    ),
+                    system=fast_system_prompt(),
                     options=options,
-                    response_format=active_response_schema,
-                    prompt_family=(
-                        "fast_planner.repair"
-                        if contract_repair_attempted
-                        else "fast_planner.primary"
-                    ),
+                    response_format=response_schema,
+                    prompt_family="fast_planner.primary",
                     turn_id=request.sid,
-                    attempt=attempt + 1,
+                    attempt=1,
                 )
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
@@ -776,16 +733,6 @@ class FastPlannerResolver:
                     authoritative_goals=authoritative_goals,
                     capability_payload=capability_payload,
                 )
-                terminal_response_repairs = common_repairs[
-                    "terminal_response_goal_outcome_accounting"
-                ]
-                if terminal_response_repairs:
-                    logger.info(
-                        "fast_planner_terminal_response_accounting_normalized "
-                        "sid=%s repairs=%s",
-                        request.sid,
-                        bounded_json(terminal_response_repairs, 2000),
-                    )
                 detached_resolution_repairs = common_repairs[
                     "detached_parameter_resolutions"
                 ]
@@ -824,7 +771,6 @@ class FastPlannerResolver:
                         planner_tier="fast",
                         plan_id=plan_id,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                        goal_summary_fallback=request.text,
                         fast_multi_goal_contract=multi_goal_contract,
                     )
                     plan = CanonicalPlan.model_validate(normalized)
@@ -888,7 +834,7 @@ class FastPlannerResolver:
                 )
                 if capability_errors:
                     raise CapabilityArgumentValidationError(capability_errors)
-            except ResourceResponsibilityRequiresCompositionError as exc:
+        except ResourceResponsibilityRequiresCompositionError as exc:
                 logger.info(
                     "fast_planner_resource_composition_required sid=%s error=%s",
                     request.sid,
@@ -905,13 +851,13 @@ class FastPlannerResolver:
                         "resource_composition_required": True,
                     },
                 )
-            except Exception as exc:
+        except Exception as exc:
                 failure = llm_failure_metadata(exc)
                 logger.warning(
                     "fast_planner_inference_failed sid=%s attempt=%s error_type=%s error=%s "
                     "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
                     request.sid,
-                    attempt + 1,
+                    1,
                     type(exc).__name__,
                     exc,
                     failure["failure_class"],
@@ -933,44 +879,12 @@ class FastPlannerResolver:
                             "resource_contract_unavailable": True,
                         },
                     )
-                if attempt < self.max_contract_repairs and isinstance(
-                    exc, (PlannerDTOContractError, json.JSONDecodeError)
-                ):
-                    contract_repair_attempted = True
-                    initial_raw_output = raw
-                    # Regenerate from authoritative grounding instead of asking
-                    # the model to edit invalid JSON in place.  In live runs,
-                    # copy-editing caused validator text to be embedded inside
-                    # rationale strings while required fields stayed missing.
-                    previous_raw = None
-                    initial_validation_errors = planner_validation_error_json(
-                        exc,
-                        raw=raw,
-                        planner_tier="fast",
-                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                    )
-                    logger.warning(
-                        "fast_planner_contract_repair_start sid=%s validation_errors=%s "
-                        "raw_output_ref=%s raw_output=%s",
-                        request.sid,
-                        initial_validation_errors,
-                        cognition_text_reference(initial_raw_output),
-                        bounded_json(initial_raw_output, 4000),
-                    )
-                    continue
                 logger.warning(
                     "fast_planner_contract_failure_evidence sid=%s "
-                    "initial_raw_output_ref=%s repair_raw_output_ref=%s "
-                    "initial_raw_output=%s repair_raw_output=%s",
+                    "raw_output_ref=%s raw_output=%s",
                     request.sid,
-                    cognition_text_reference(initial_raw_output),
-                    cognition_text_reference(raw if contract_repair_attempted else None),
-                    bounded_json(initial_raw_output, 4000)
-                    if initial_raw_output is not None
-                    else "",
-                    bounded_json(raw, 4000)
-                    if contract_repair_attempted and raw is not None
-                    else "",
+                    cognition_text_reference(raw),
+                    bounded_json(raw, 4000) if raw is not None else "",
                 )
                 integrity_metadata = cognitive_integrity_metadata(
                     stage="fast_planner", exc=exc, request=request
@@ -991,7 +905,7 @@ class FastPlannerResolver:
                     request,
                     (
                         "fast_planner_model_contract_failed"
-                        if contract_repair_attempted or mechanical_contract_error
+                        if mechanical_contract_error
                         else "fast_planner_authoritative_grounding_failed"
                         if authoritative_grounding_failure
                         else "fast_planner_semantic_validation_failed"
@@ -1008,13 +922,7 @@ class FastPlannerResolver:
                     metadata={
                         "contract_schema": contract_schema,
                         "canonical_contract": "CanonicalPlan",
-                        "contract_repair_attempted": contract_repair_attempted,
-                        "contract_repair_succeeded": False,
-                        "initial_validation_errors": initial_validation_errors,
-                        "initial_raw_output_ref": cognition_text_reference(initial_raw_output),
-                        "repair_raw_output_ref": cognition_text_reference(
-                            raw if contract_repair_attempted else None
-                        ),
+                        "initial_raw_output_ref": cognition_text_reference(raw),
                         "validation_feedback": (
                             exc.feedback
                             if isinstance(exc, CapabilityArgumentValidationError)
@@ -1031,7 +939,7 @@ class FastPlannerResolver:
                     },
                 )
 
-            qualification = qualify_fast_canonical_plan(
+        qualification = qualify_fast_canonical_plan(
                 plan,
                 capability_payload=capability_payload,
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
@@ -1040,8 +948,8 @@ class FastPlannerResolver:
                     reentry_goal_ids | cancellation_reentry_goal_ids
                 ),
             )
-            if not qualification.accepted:
-                return materialize_fast_escalation(
+        if not qualification.accepted:
+            return materialize_fast_escalation(
                     plan.plan_id,
                     request,
                     qualification.reason,
@@ -1050,40 +958,13 @@ class FastPlannerResolver:
                     metadata=qualification.metadata,
                     path_classification=qualification.path_classification,
                 )
-            validated = qualification.plan
-            if contract_repair_attempted:
-                metadata = dict(validated.metadata)
-                metadata.update(
-                    {
-                        "contract_schema": contract_schema,
-                        "canonical_contract": "CanonicalPlan",
-                        "contract_repair_attempted": True,
-                        "contract_repair_succeeded": True,
-                        "contract_repair": {
-                            "attempted": True,
-                            "succeeded": True,
-                            "strategy": "schema_constrained_model_revision",
-                            "attempt_count": 1,
-                        },
-                    }
-                )
-                validated = validated.model_copy(update={"metadata": metadata})
-                logger.info("fast_planner_contract_repair_done sid=%s status=success", request.sid)
-            if parameter_provenance_repairs:
-                metadata = dict(validated.metadata)
-                metadata["parameter_provenance_normalization"] = {
-                    "strategy": "project_mechanically_derivable_provenance",
-                    "repairs": parameter_provenance_repairs,
-                    "semantic_plan_unchanged": True,
-                }
-                validated = validated.model_copy(update={"metadata": metadata})
-            if terminal_response_repairs:
-                metadata = dict(validated.metadata)
-                metadata["terminal_response_accounting_normalization"] = {
-                    "strategy": "project_exact_per_goal_responses",
-                    "repairs": terminal_response_repairs,
-                    "semantic_outcomes_unchanged": True,
-                }
-                validated = validated.model_copy(update={"metadata": metadata})
-            return validated
-        raise AssertionError("unreachable")
+        validated = qualification.plan
+        if parameter_provenance_repairs:
+            metadata = dict(validated.metadata)
+            metadata["parameter_provenance_normalization"] = {
+                "strategy": "project_mechanically_derivable_provenance",
+                "repairs": parameter_provenance_repairs,
+                "semantic_plan_unchanged": True,
+            }
+            validated = validated.model_copy(update={"metadata": metadata})
+        return validated

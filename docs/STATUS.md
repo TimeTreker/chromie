@@ -1,7 +1,7 @@
 # Chromie Current Status
 
-**Updated:** 2026-08-31
-**Current focus:** The owner-authorized Goal-driven single-authority path is restored at the GI boundary: one primary WHAT result, at most one source-based Deep delegation for genuine unresolved meaning, and terminal validation without same-authority repair. Explicit measurement units, standalone social Responsibilities, material unfamiliar-name uncertainty, and GI-authored/GA-preserved `output_mode` now have one coherent contract. The final target-blind offline cohort is retained; exact deployed-provider qualification is next, while live voice, simulator, and physical behavior remain separate evidence claims.
+**Updated:** 2026-09-04
+**Current focus:** The Goal-driven single-authority path now covers Goal Interpretation, Goal Association, and Fast/Deep Planner. Planner same-tier repair/revision and Host semantic rewriting are removed; Deep 40 passes same-model offline qualification, while Fast's final focused repair passes and its full current-source rerun is blocked by remote provider integrity. Exact deployed `qwen3.5:4b` qualification, independent semantic review, and only then a QLoRA decision are next. Live voice, simulator, and physical behavior remain separate evidence claims.
 
 This file contains current facts only. Historical implementation narratives,
 superseded architecture, old test totals, and revision-specific diagnostics belong in
@@ -183,6 +183,8 @@ A full offline Codex GI diagnostic exercised all 1,496 bilingual daily-life scen
 
 The contract defects found by the call-path audit are now fixed. Primary and Deep GI no longer have a same-stage repair call; the repository policy checker rejects restoration of those call markers. Measured values retain an exact number-and-unit source/context surface, standalone social acts remain speech Responsibilities, and unfamiliar names become unresolved only when the category/referent choice materially changes WHAT. Charter principle 31 now agrees with runtime: GI authors `output_mode`, GA preserves it under decoder `const` plus conservation checks, and the Host derives execution projections after validation. The 1,496-case candidate corpus passes generated schema and Host validation with 68 genuine unresolved cases and a pinned 406 digit-measurement-surface count. The final changed-worktree primary and Deep diagnostics are retained under ignored `.chromie/acceptance/model-qualification/` paths; no model/profile was promoted.
 
+The Planner audit is source-closed: Fast and Deep each produce one complete primary result; Deep receives authoritative Goals/context, and Host validation cannot rewrite semantics. The design-derived Fast corpus covers 17 capacities in 51 bilingual supported/boundary contrasts across primary, re-entry, and streaming forms. The immediately prior Fast prompt passed 204/204 mechanical/target checks; its 201/204 same-model semantic review exposed two corpus defects and one prompt defect. The final focused repair passes 1/1, while the full current-source rerun is incomplete after 92/115 attempted calls timed out at the remote provider. Deep passed 40/40 plus 40/40 non-independent semantic review. Both corpora remain training-ineligible and do not qualify deployed Qwen, Ollama, vLLM, voice, or robot behavior.
+
 | Area | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|---|
 | Cognitive Gateway / Attention | Maintained configuration controls Attention Review; deterministic protective reflex remains separate. Disabled or unavailable semantic review fails open without fabricating high-confidence addressedness. | Source and focused contract regressions cover admission, fail-open behavior, temporary addressedness rules, and schema boundaries. | Current-revision open-room microphone behavior still requires live evidence. | Development only. |
@@ -203,12 +205,14 @@ The contract defects found by the call-path audit are now fixed. Primary and Dee
    current-source must-pass cohort is retained and mechanically judged. Qwen3.5 still
    fails GI availability/provenance/authority contracts, while Ollama exposes one sequence
    slot for concurrent GA/Fast work. Do not use Host resegmentation, another semantic call,
-   validator weakening, or timeout inflation to conceal either failure class. A different
-   vLLM transport is now qualified in isolation, but all screened laptop-fit candidates
-   failed primary GI semantics or the current non-thinking authority contract. Do not
-   promote a provider until primary-result binding coverage passes the frozen screen,
-   then the complete workflow, TTS contention, and directory-discovered live cohort pass
-   on one revision. Do not substitute phrase rules or a second semantic call for coverage.
+   or validator weakening to relabel either failure class. Development workflow watchdogs
+   now cover the legal concurrent workflow and are explicitly separate from latency
+   acceptance; do not treat that separation as a latency pass. A different vLLM transport
+   is qualified in isolation, but all screened laptop-fit candidates failed primary GI
+   semantics or the current non-thinking authority contract. Independently review the
+   frozen Planner corpora, run the exact deployed target transaction, and cluster failures
+   before approving any QLoRA dataset or provider. Do not substitute phrase rules or a
+   second semantic call for coverage.
 2. **Close Issue #32 source gates and target evidence before final Fast-Planner
    Prompt/model promotion.** The one typed production path is implemented and the
    superseded endpoint/DTO/model/config surface is removed. Retain ordered-frame,

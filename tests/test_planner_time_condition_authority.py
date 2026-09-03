@@ -65,7 +65,6 @@ def test_planner_model_time_condition_is_materialized_with_host_plan_identity() 
         planner_tier="fast",
         plan_id="plan-1",
         expected_goal_ids_for_turn=["goal-1"],
-        goal_summary_fallback="fallback",
     )
     plan = CanonicalPlan.model_validate(raw)
     assert len(plan.time_conditions) == 1

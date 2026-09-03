@@ -1,0 +1,289 @@
+{
+  "adversarial_design": {
+    "cell_index": 32,
+    "changed_axis": "terminal Evidence is valid and bound to the scoped Goal versus the same-shaped Evidence belongs to an excluded sibling or stale revision",
+    "condition": "boundary",
+    "daily_life_family": "practical_information_tools",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "evidence_reentry_interpretation"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "terminal Evidence is valid and bound to the scoped Goal versus the same-shaped Evidence belongs to an excluded sibling or stale revision",
+      "language"
+    ],
+    "id": "fpdl_v2_evidence_reentry_interpretation_32",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_evidence_reentry_interpretation_32_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "根据范围内的可信天气 Evidence 报告是否预计下雨。",
+              "goal_id": "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1",
+              "metadata": {
+                "output_mode": "information"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "resource_responsibility": {
+                "delivery_mode": "spoken_explanation",
+                "metadata": {},
+                "recipient": {
+                  "description": "requester"
+                },
+                "resource": {
+                  "attributes": {
+                    "date": {
+                      "confidence": 1.0,
+                      "entity_type": "date",
+                      "name": "date",
+                      "value": "tomorrow"
+                    },
+                    "information_domain": {
+                      "confidence": 1.0,
+                      "entity_type": "information_domain",
+                      "name": "information_domain",
+                      "value": "weather_forecast"
+                    },
+                    "location": {
+                      "confidence": 1.0,
+                      "entity_type": "location",
+                      "name": "location",
+                      "value": "Hangzhou"
+                    },
+                    "period": {
+                      "confidence": 1.0,
+                      "entity_type": "day_part",
+                      "name": "period",
+                      "value": "morning"
+                    }
+                  },
+                  "description": "根据范围内的可信天气 Evidence 报告是否预计下雨。",
+                  "kind": "information",
+                  "quantity": ""
+                },
+                "responsibility_type": "acquire_and_deliver_resource",
+                "schema_version": 1,
+                "source": {
+                  "bindings": {},
+                  "description": "",
+                  "status": "unknown"
+                }
+              },
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "请使用为明天的实际安排保留的天气 Evidence，告诉我是否预计会下雨。",
+              "success_criteria": [
+                "根据范围内的可信天气 Evidence 报告是否预计下雨。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+        },
+        "result_evidence_reentry": {
+          "evidence_refs": [
+            "evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+          ],
+          "phase": "capability_result_reentry",
+          "planner_authority": "planner",
+          "source_goal_ids": [
+            "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1"
+          ]
+        },
+        "situation": {
+          "digest": "2a01c33fb28a6117b079279cd4f7461b7c8a81b79079b240d72c7c0bb6e103f2",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh",
+          "unresolved_conditions": []
+        },
+        "trusted_execution_outcome": {
+          "aggregate_status": "failed",
+          "evidence": [
+            {
+              "capability_id": "chromie.weather.lookup",
+              "evidence_id": "evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh",
+              "observation_status": "none",
+              "provider_retryability": {},
+              "reason_code": "provider_failed",
+              "source_goal_ids": [
+                "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1"
+              ],
+              "status": "failed"
+            }
+          ],
+          "goal_outcomes": [
+            {
+              "completed_step_ids": [],
+              "completion_qualification": {
+                "established": false,
+                "qualifications": [],
+                "required": false
+              },
+              "evidence_ids": [
+                "evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+              ],
+              "goal_id": "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1",
+              "reason_codes": [
+                "provider_failed"
+              ],
+              "status": "failed",
+              "unresolved_step_ids": []
+            }
+          ],
+          "outcome_id": "incremental:evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+        },
+        "trusted_terminal_evidence": [
+          {
+            "data": {
+              "probability": 0.7,
+              "rain_expected": true
+            },
+            "evidence_id": "evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh",
+            "output_sha256": "ade1b153049a86bf9b95f22997623479702fd952d66a4858d67ce32b610e5f8b",
+            "status": "failed",
+            "tool_id": "chromie.weather.lookup"
+          }
+        ]
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [
+          "evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+        ],
+        "goal_ids": [
+          "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1"
+        ],
+        "opportunity_id": "",
+        "schema_version": 1,
+        "source_plan_fingerprint": "e6f279ce4e62cc24805acd270bd2ca6780ca67bee26f202a3a29b120ba638f31",
+        "source_plan_id": "source-plan-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh",
+        "trigger": "capability_result_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "date": "tomorrow",
+            "location": "Hangzhou",
+            "period": "morning"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "根据范围内的可信天气 Evidence 报告是否预计下雨。",
+          "output_mode": "information",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_evidence_reentry_interpretation_32_boundary_zh",
+      "text": "请使用为明天的实际安排保留的天气 Evidence，告诉我是否预计会下雨。"
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-32",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [
+        "evidence-fpdl_v2_evidence_reentry_interpretation_32_boundary_zh"
+      ],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "范围内的提供方失败结果不能满足所请求的天气答案；Fast 必须在完整计划的 HOW 升级中保留未解决 Goal，且不能把失败载荷改写成天气事实。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

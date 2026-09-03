@@ -1,0 +1,209 @@
+{
+  "adversarial_design": {
+    "cell_index": 42,
+    "changed_axis": "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+    "condition": "boundary",
+    "daily_life_family": "shared_space_etiquette",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "resource_contract_composition"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+      "language"
+    ],
+    "id": "fpdl_v2_resource_contract_composition_42",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_resource_contract_composition_42_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "从厨房获取红色马克杯并亲手递给请求者。",
+              "goal_id": "goal-fpdl_v2_resource_contract_composition_42_boundary_zh-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "resource_responsibility": {
+                "delivery_mode": "physical_handover",
+                "metadata": {},
+                "recipient": {
+                  "description": "requester"
+                },
+                "resource": {
+                  "attributes": {},
+                  "description": "red mug",
+                  "kind": "physical_object",
+                  "quantity": ""
+                },
+                "responsibility_type": "acquire_and_deliver_resource",
+                "schema_version": 1,
+                "source": {
+                  "bindings": {
+                    "location": {
+                      "confidence": 1.0,
+                      "entity_type": "location",
+                      "name": "location",
+                      "value": "kitchen"
+                    }
+                  },
+                  "description": "kitchen",
+                  "status": "known"
+                }
+              },
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "为了在共享房间里不打扰别人，请从厨房取来红色马克杯并递给我。",
+              "success_criteria": [
+                "从厨房获取红色马克杯并亲手递给请求者。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_resource_contract_composition_42_boundary_zh"
+        },
+        "situation": {
+          "digest": "884441e92622d01b523862779d89ccce03b02e41952a20a4c87cd6eb8299b110",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_resource_contract_composition_42_boundary_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_resource_contract_composition_42_boundary_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_resource_contract_composition_42_boundary_zh",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_resource_contract_composition_42_boundary_zh-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_resource_contract_composition_42_boundary_zh",
+        "schema_version": 1,
+        "source_plan_fingerprint": "3f6479e168b1325f8de478ed34e2914cffa94b6c52758bbd46bb4051a4619104",
+        "source_plan_id": "source-plan-fpdl_v2_resource_contract_composition_42_boundary_zh",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "resource": "red mug",
+            "source": "kitchen"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "从厨房获取红色马克杯并亲手递给请求者。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_resource_contract_composition_42_boundary_zh",
+      "text": "为了在共享房间里不打扰别人，请从厨房取来红色马克杯并递给我。"
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-42",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate",
+        "unavailable"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_resource_contract_composition_42_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "没有已公布 Capability 证明完整的实物获取与递交资源合同；仅行走属于禁止的部分实现。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

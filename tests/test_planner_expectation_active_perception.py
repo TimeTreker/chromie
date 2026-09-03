@@ -71,7 +71,6 @@ def test_active_perception_step_is_ordinary_planner_work_with_falsifiable_expect
         planner_tier="deep",
         plan_id="plan-find-cup",
         expected_goal_ids_for_turn=["goal-find-cup"],
-        goal_summary_fallback="Find the cup.",
     )
     plan = CanonicalPlan.model_validate(raw)
 
@@ -96,7 +95,6 @@ def test_expected_outcome_is_not_execution_evidence_or_goal_completion() -> None
             planner_tier="deep",
             plan_id="plan-find-cup",
             expected_goal_ids_for_turn=["goal-find-cup"],
-            goal_summary_fallback="Find the cup.",
         )
     )
 
@@ -124,7 +122,6 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
             planner_tier="deep",
             plan_id="plan-find-cup",
             expected_goal_ids_for_turn=[goal_id],
-            goal_summary_fallback="Find the cup.",
         )
     )
     satisfaction = GoalSatisfactionAssessment(
@@ -188,7 +185,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
             evidence_goal_ids=[goal_id],
             evidence_refs=["evidence-cup-visible"],
             session_id=None,
-            phase="post_observation",
+            phase="capability_result_reentry",
             context_updates={
                 "trusted_terminal_evidence": [
                     {

@@ -565,7 +565,7 @@ class HostSettingsSnapshot:
                     {"off", "report_only"},
                 ),
                 fast_planner_timeout_ms=_int(
-                    values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 3000, minimum=100
+                    values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 65000, minimum=100
                 ),
                 deep_planner_mode=_choice(
                     values,
@@ -574,7 +574,7 @@ class HostSettingsSnapshot:
                     {"off", "report_only"},
                 ),
                 deep_planner_timeout_ms=_int(
-                    values, "ORCH_DEEP_PLANNER_TIMEOUT_MS", 10000, minimum=100
+                    values, "ORCH_DEEP_PLANNER_TIMEOUT_MS", 125000, minimum=100
                 ),
                 goal_association_mode=_choice(
                     values,
@@ -585,7 +585,7 @@ class HostSettingsSnapshot:
                 goal_association_timeout_ms=_int(
                     values,
                     "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
-                    3500,
+                    65000,
                     minimum=100,
                 ),
                 runtime_mode=_choice(
@@ -597,7 +597,7 @@ class HostSettingsSnapshot:
                 runtime_timeout_ms=_int(
                     values,
                     "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
-                    15000,
+                    300000,
                     minimum=1000,
                 ),
                 capability_manifest_paths=_text(

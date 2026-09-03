@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import hashlib
 from typing import Any, Literal
 
@@ -58,10 +57,10 @@ class PlannerModelStep(CapabilityIdentityModel):
     decision can silently authorize one step for every active goal.
     """
 
-    step_id: str = ""
+    step_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any]
-    timing: PlanTiming = "sequential"
-    source_goal_ids: list[str] = Field(default_factory=list)
+    timing: PlanTiming
+    source_goal_ids: list[str] = Field(min_length=1)
     reuse_activity_id: str = ""
     step_purpose: PlanStepPurpose = "achieve_effect"
     expected_outcome: str = Field(default="", max_length=600)
@@ -82,26 +81,6 @@ class PlannerModelStep(CapabilityIdentityModel):
 
 class PlannerGoalSatisfaction(GoalSatisfactionAssessment):
     """Prospective adequacy of the proposed plan, not execution progress."""
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_redundant_status(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        score = normalized.get("score")
-        if isinstance(score, (int, float)) and not isinstance(score, bool):
-            numeric = float(score)
-            normalized["status"] = (
-                "exact"
-                if numeric >= 0.95
-                else "substantial"
-                if numeric >= 0.75
-                else "partial"
-                if numeric > 0.0
-                else "unsatisfied"
-            )
-        return normalized
 
     score: float = Field(
         ge=0.0,
@@ -246,46 +225,6 @@ class PlannerModelOutput(BaseModel):
     plan_relation: PlannerPlanRelation = "exact"
     user_confirmation_required: bool = False
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_decoder_compatibility(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        normalized = copy.deepcopy(value)
-        outcomes = normalized.get("goal_outcomes")
-        if (
-            normalized.get("disposition") in {"execute", "mixed"}
-            and normalized.get("response_text") is None
-        ):
-            normalized["response_text"] = ""
-        if isinstance(outcomes, dict):
-            for outcome_value in outcomes.values():
-                if (
-                    isinstance(outcome_value, dict)
-                    and outcome_value.get("disposition") == "execute"
-                    and outcome_value.get("response_text") is None
-                ):
-                    # Some structured decoders use JSON null for the semantic
-                    # absence that the execute-outcome contract represents as
-                    # an empty string.  This normalization carries no planning
-                    # judgment; non-execute response text remains strict.
-                    outcome_value["response_text"] = ""
-        if not isinstance(outcomes, dict) or len(outcomes) != 1:
-            return normalized
-        outcome = next(iter(outcomes.values()))
-        if not isinstance(outcome, dict):
-            return normalized
-        if normalized.get("disposition") == "clarify" and outcome.get("disposition") == "clarify":
-            if not str(outcome.get("response_text") or "").strip():
-                response_text = str(normalized.get("response_text") or "").strip()
-                if response_text:
-                    outcome["response_text"] = response_text
-            if not outcome.get("unresolved"):
-                unresolved = normalized.get("unresolved")
-                if isinstance(unresolved, list) and unresolved:
-                    outcome["unresolved"] = list(unresolved)
-        return normalized
-
     @model_validator(mode="after")
     def validate_semantic_shape(self) -> "PlannerModelOutput":
         response_transport_steps = [
@@ -417,12 +356,7 @@ class PlannerModelOutput(BaseModel):
         return self
 
 class PlannerDTOContractError(ValueError):
-    """Planner output is mechanically malformed or internally inconsistent.
-
-    This error is the only same-tier regeneration trigger. Semantic grounding,
-    capability coverage, responsibility, evidence, and safety failures must not
-    be rewritten by the same planner tier.
-    """
+    """Planner output is mechanically malformed or internally inconsistent."""
 
 class ResourceResponsibilityCapabilityGroundingError(ValueError):
     """A selected Capability does not satisfy a typed resource contract."""
@@ -491,10 +425,9 @@ def materialize_planner_output(
     planner_tier: PlannerTier,
     plan_id: str,
     expected_goal_ids_for_turn: list[str],
-    goal_summary_fallback: str,
     fast_multi_goal_contract: bool = False,
 ) -> dict[str, Any]:
-    """Materialize only host-owned CanonicalPlan envelope and redundant mechanics."""
+    """Materialize only the Host-owned CanonicalPlan envelope."""
 
     out = model_output.model_dump(mode="python")
     out.pop("plan_relation", None)
@@ -524,8 +457,8 @@ def materialize_planner_output(
         )
     out["time_conditions"] = planned_time_conditions
 
+    metadata = materialize_planner_metadata(model_output)
     if planner_tier == "fast" and fast_multi_goal_contract:
-        metadata = materialize_planner_metadata(model_output)
         metadata.update(
             {
                 "model_contract": "FastPlannerMultiGoalPlanOutput",
@@ -538,39 +471,5 @@ def materialize_planner_output(
                 "host_semantic_compilation": False,
             }
         )
-        out["metadata"] = metadata
-        return out
-
-    steps = out.get("steps")
-    if isinstance(steps, dict):
-        steps = [steps]
-    if not isinstance(steps, list):
-        steps = []
-    normalized_steps: list[dict[str, Any]] = []
-    for index, item in enumerate(steps):
-        if not isinstance(item, dict):
-            continue
-        step = dict(item)
-        if not step.get("step_id"):
-            step["step_id"] = f"{plan_id}:step:{index}"
-        normalized_steps.append(step)
-    if (
-        planner_tier == "deep"
-        and len(normalized_steps) == 1
-        and normalized_steps[0].get("timing") == "parallel"
-    ):
-        normalized_steps[0]["timing"] = "sequential"
-    out["steps"] = normalized_steps
-    out.setdefault("coverage", "uncertain")
-    out.setdefault("disposition", "escalate" if planner_tier == "fast" else "clarify")
-    out.setdefault("confidence", 0.0)
-    out.setdefault("goal_summary", goal_summary_fallback)
-    out.setdefault("response_text", "")
-    out.setdefault("escalation_reason", "")
-    out.setdefault("unresolved", [])
-    out.setdefault("parameter_resolutions", [])
-    out.setdefault("time_conditions", [])
-    out.setdefault("goal_outcomes", [])
-    out.setdefault("goal_satisfaction", None)
-    out["metadata"] = materialize_planner_metadata(model_output)
+    out["metadata"] = metadata
     return out

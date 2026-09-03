@@ -1,0 +1,163 @@
+{
+  "adversarial_design": {
+    "cell_index": 20,
+    "changed_axis": "the missing fact is a Planner-owned execution input resolvable by the user versus the unresolved fact changes intended WHAT and belongs upstream",
+    "condition": "boundary",
+    "daily_life_family": "preferences_boundaries",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "planner_uncertainty_and_limit_outcomes"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "the missing fact is a Planner-owned execution input resolvable by the user versus the unresolved fact changes intended WHAT and belongs upstream",
+      "language"
+    ],
+    "id": "fpdl_v2_planner_uncertainty_and_limit_outcomes_20",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "看向一个尚未解析的人物指代三秒。",
+              "goal_id": "goal-fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "duration": {
+                    "confidence": 1.0,
+                    "entity_type": "duration_seconds",
+                    "name": "duration",
+                    "value": "3"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "为了我希望安静互动的偏好，请看着“他们”三秒；但目前没有任何信息说明“他们”是谁。",
+              "success_criteria": [
+                "看向一个尚未解析的人物指代三秒。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [
+        "The intended referent remains unresolved upstream."
+      ],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "duration": 3
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "看向一个尚未解析的人物指代三秒。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh",
+      "text": "为了我希望安静互动的偏好，请看着“他们”三秒；但目前没有任何信息说明“他们”是谁。"
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-20",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate",
+        "clarify"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "未解析的意向指代属于上游 WHAT，Planner 不得编造目标，也不能把它仅当作提供方参数。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

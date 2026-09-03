@@ -1,0 +1,171 @@
+{
+  "adversarial_design": {
+    "cell_index": 47,
+    "changed_axis": "one fresh compatible target-grounded decoration materially supports the Main Activity versus target evidence is stale or the proposal duplicates or conflicts with Main Work",
+    "condition": "boundary",
+    "daily_life_family": "feelings_support",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "optional_social_decoration"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "one fresh compatible target-grounded decoration materially supports the Main Activity versus target evidence is stale or the proposal duplicates or conflicts with Main Work",
+      "language"
+    ],
+    "id": "fpdl_v2_optional_social_decoration_47",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_optional_social_decoration_47_boundary_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary.",
+              "goal_id": "goal-fpdl_v2_optional_social_decoration_47_boundary_en-1",
+              "metadata": {
+                "output_mode": "speech"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Give me one brief, warm sentence acknowledging my plan for a difficult afternoon; there is no current trusted target and I prefer no gesture.",
+              "success_criteria": [
+                "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_optional_social_decoration_47_boundary_en"
+        },
+        "mind": {
+          "social_interaction_style": {
+            "owner_approved": true,
+            "restraint": "no_gesture"
+          }
+        },
+        "situation": {
+          "digest": "400f00069f373a37c0c3c6ad09c8127285477f46d64d4c299816e0f38bbe97c1",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_optional_social_decoration_47_boundary_en-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_optional_social_decoration_47_boundary_en"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_optional_social_decoration_47_boundary_en",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary.",
+          "output_mode": "speech",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_optional_social_decoration_47_boundary_en",
+      "text": "Give me one brief, warm sentence acknowledging my plan for a difficult afternoon; there is no current trusted target and I prefer no gesture."
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-47",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_optional_social_decoration_47_boundary_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "soridormi.look_at_person",
+        "soridormi.blink_eyes"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "Decoration is optional, subordinate, target-grounded, and must be omitted when target evidence or user preference forbids it."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

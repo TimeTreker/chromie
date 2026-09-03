@@ -1,0 +1,494 @@
+{
+  "adversarial_design": {
+    "cell_index": 7,
+    "changed_axis": "an exact observation provider versus that provider unavailable",
+    "condition": "boundary",
+    "daily_life_family": "casual_chat_curiosity",
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "incomplete_observation_acquisition"
+  },
+  "category": "deep_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "an exact observation provider versus that provider unavailable",
+      "language"
+    ],
+    "id": "dpdl_v1_incomplete_observation_acquisition_07",
+    "member": "boundary-en"
+  },
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "difficulty": "boundary",
+  "id": "dpdl_v1_incomplete_observation_acquisition_07_boundary_en",
+  "input": {
+    "catalog_capabilities": [
+      {
+        "agent_id": "chromie.reminder",
+        "available": true,
+        "behavior_domains": [
+          "personal_organization"
+        ],
+        "can_run_parallel": true,
+        "capability_id": "chromie.reminder.create",
+        "description": "Create one reminder from exact reminder text and due time.",
+        "effects": [
+          "persistent_state"
+        ],
+        "exclusive_group": "personal.reminders",
+        "execution_constraints": {},
+        "hints": {
+          "semantic_scope": {
+            "output_modes": [
+              "stateful_effect"
+            ]
+          }
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "due_at": {
+              "minLength": 1,
+              "type": "string",
+              "x-chromie-entity-type": "due_time"
+            },
+            "reminder_text": {
+              "minLength": 1,
+              "type": "string",
+              "x-chromie-entity-type": "reminder_text"
+            }
+          },
+          "required": [
+            "reminder_text",
+            "due_at"
+          ],
+          "type": "object"
+        },
+        "interaction_executable": true,
+        "invocation_kind": "mcp_tool",
+        "metadata": {},
+        "parallel_metadata_declared": true,
+        "prompt_tier": "common",
+        "prompt_tier_locked": true,
+        "prompt_tier_source": "qualification_fixture",
+        "requires_confirmation": true,
+        "resource_claims": [
+          "personal.reminders"
+        ],
+        "safety_class": "reversible_write",
+        "source": "qualification_fixture",
+        "tags": [
+          "stateful",
+          "reminder"
+        ]
+      },
+      {
+        "agent_id": "chromie.weather",
+        "available": true,
+        "behavior_domains": [
+          "weather"
+        ],
+        "can_run_parallel": true,
+        "capability_id": "chromie.weather.lookup",
+        "description": "Retrieve current or short-range weather for one location.",
+        "effects": [],
+        "exclusive_group": null,
+        "execution_constraints": {},
+        "hints": {
+          "resource_contract": {
+            "completion_evidence": "trusted_tool_result",
+            "final_delivery_owner": "planner_communicative_activity",
+            "plan_provides": [
+              "resource_acquired"
+            ],
+            "plan_requires": [],
+            "provider_role": "acquire_information"
+          },
+          "semantic_scope": {
+            "acquisition": "structured_weather_retrieval",
+            "delivery_modes": [
+              "spoken_explanation",
+              "structured_result"
+            ],
+            "domain": "weather_forecast",
+            "provider_result": "evidence_material",
+            "resource_kinds": [
+              "information"
+            ],
+            "responsibility_type": "acquire_and_deliver_resource",
+            "scope_mismatch_policy": "clarify_or_unavailable_never_narrow",
+            "supported_temporal_scopes": [
+              "current",
+              "today",
+              "morning",
+              "afternoon",
+              "evening",
+              "night",
+              "tomorrow",
+              "near_term_forecast"
+            ],
+            "unsupported_temporal_scopes": [
+              "annual",
+              "seasonal",
+              "historical",
+              "climate_normals"
+            ]
+          },
+          "side_effect_free": true
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "date": {
+              "default": "today",
+              "type": "string"
+            },
+            "location": {
+              "minLength": 1,
+              "type": "string",
+              "x-chromie-entity-type": "location"
+            },
+            "period": {
+              "default": "day",
+              "enum": [
+                "day",
+                "morning",
+                "afternoon",
+                "night"
+              ],
+              "type": "string",
+              "x-chromie-entity-type": "day_part"
+            }
+          },
+          "required": [
+            "location"
+          ],
+          "type": "object"
+        },
+        "interaction_executable": true,
+        "invocation_kind": "mcp_tool",
+        "metadata": {},
+        "parallel_metadata_declared": true,
+        "prompt_tier": "common",
+        "prompt_tier_locked": true,
+        "prompt_tier_source": "qualification_fixture",
+        "requires_confirmation": false,
+        "resource_claims": [],
+        "safety_class": "safe_read",
+        "source": "qualification_fixture",
+        "tags": [
+          "information",
+          "weather"
+        ]
+      },
+      {
+        "agent_id": "capability_agent",
+        "available": true,
+        "behavior_domains": [
+          "social_attention"
+        ],
+        "can_run_parallel": true,
+        "capability_id": "soridormi.blink_eyes",
+        "description": "Blink the robot's eyes an exact number of times.",
+        "effects": [
+          "physical_motion"
+        ],
+        "exclusive_group": "body.face",
+        "execution_constraints": {},
+        "hints": {},
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "count": {
+              "maximum": 10,
+              "minimum": 1,
+              "type": "integer",
+              "x-chromie-entity-type": "count"
+            }
+          },
+          "required": [
+            "count"
+          ],
+          "type": "object"
+        },
+        "interaction_executable": true,
+        "invocation_kind": "mcp_tool",
+        "metadata": {},
+        "parallel_metadata_declared": true,
+        "prompt_tier": "common",
+        "prompt_tier_locked": true,
+        "prompt_tier_source": "qualification_fixture",
+        "requires_confirmation": false,
+        "resource_claims": [
+          "body.face"
+        ],
+        "safety_class": "safe_motion",
+        "source": "qualification_fixture",
+        "tags": [
+          "embodiment",
+          "face"
+        ]
+      },
+      {
+        "agent_id": "capability_agent",
+        "available": true,
+        "behavior_domains": [
+          "social_attention"
+        ],
+        "can_run_parallel": true,
+        "capability_id": "soridormi.look_at_person",
+        "description": "Turn gaze toward a currently identified person.",
+        "effects": [
+          "physical_motion"
+        ],
+        "exclusive_group": "body.head",
+        "execution_constraints": {},
+        "hints": {},
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "duration_s": {
+              "default": 2.0,
+              "maximum": 20.0,
+              "minimum": 0.1,
+              "type": "number"
+            },
+            "target_ref": {
+              "minLength": 1,
+              "type": "string",
+              "x-chromie-entity-type": "person_ref"
+            }
+          },
+          "required": [
+            "target_ref"
+          ],
+          "type": "object"
+        },
+        "interaction_executable": true,
+        "invocation_kind": "mcp_tool",
+        "metadata": {},
+        "parallel_metadata_declared": true,
+        "prompt_tier": "common",
+        "prompt_tier_locked": true,
+        "prompt_tier_source": "qualification_fixture",
+        "requires_confirmation": false,
+        "resource_claims": [
+          "body.head"
+        ],
+        "safety_class": "safe_motion",
+        "source": "qualification_fixture",
+        "tags": [
+          "embodiment",
+          "gaze"
+        ]
+      },
+      {
+        "agent_id": "capability_agent",
+        "available": true,
+        "behavior_domains": [
+          "locomotion"
+        ],
+        "can_run_parallel": false,
+        "capability_id": "soridormi.walk_forward",
+        "description": "Walk forward for an exact duration in seconds.",
+        "effects": [
+          "physical_motion"
+        ],
+        "exclusive_group": "body.primary_motion",
+        "execution_constraints": {},
+        "hints": {},
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "duration_s": {
+              "maximum": 30.0,
+              "minimum": 0.1,
+              "type": "number",
+              "x-chromie-entity-type": "duration_seconds"
+            }
+          },
+          "required": [
+            "duration_s"
+          ],
+          "type": "object"
+        },
+        "interaction_executable": true,
+        "invocation_kind": "mcp_tool",
+        "metadata": {},
+        "parallel_metadata_declared": true,
+        "prompt_tier": "common",
+        "prompt_tier_locked": true,
+        "prompt_tier_source": "qualification_fixture",
+        "requires_confirmation": false,
+        "resource_claims": [
+          "body.primary_motion"
+        ],
+        "safety_class": "safe_motion",
+        "source": "qualification_fixture",
+        "tags": [
+          "embodiment",
+          "locomotion"
+        ]
+      },
+      {
+        "agent_id": "capability_agent",
+        "available": false,
+        "can_run_parallel": true,
+        "capability_id": "soridormi.observe_doorway",
+        "description": "Observe whether one identified doorway is clear.",
+        "effects": [
+          "read_only",
+          "perception",
+          "physical_motion"
+        ],
+        "hints": {},
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "doorway_ref": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "doorway_ref"
+          ],
+          "type": "object"
+        },
+        "interaction_executable": true,
+        "parallel_metadata_declared": true,
+        "prompt_tier": "rare",
+        "requires_confirmation": false,
+        "resource_claims": [
+          "body.vision"
+        ]
+      }
+    ],
+    "language": "en-US",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "Acquire a fresh observation of whether the study-room doorway is clear.",
+              "goal_id": "goal-dpdl_v1_incomplete_observation_acquisition_07_boundary_en-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "doorway_ref": {
+                    "confidence": 1.0,
+                    "entity_type": "doorway_ref",
+                    "name": "doorway_ref",
+                    "value": "doorway:study"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "Check whether the study-room doorway is clear before deciding whether to proceed.",
+              "success_criteria": [
+                "Acquire a fresh observation of whether the study-room doorway is clear."
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-dpdl_v1_incomplete_observation_acquisition_07_boundary_en"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "doorway_ref": "doorway:study"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Acquire a fresh observation of whether the study-room doorway is clear.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "dpdl_v1_incomplete_observation_acquisition_07_boundary_en",
+      "text": "Check whether the study-room doorway is clear before deciding whether to proceed."
+    },
+    "runtime_variant": "deep_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "deep_input_excludes_fast_candidate": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-deep-cell-07",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "unavailable",
+        "refused"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-dpdl_v1_incomplete_observation_acquisition_07_boundary_en-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "soridormi.observe_doorway"
+      ],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_step_purposes": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "Deep Planner must satisfy incomplete_observation_acquisition at the declared boundary boundary without changing Goal WHAT."
+      ]
+    },
+    "schema_expectation": "accept"
+  }
+}

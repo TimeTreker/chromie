@@ -1,0 +1,183 @@
+{
+  "adversarial_design": {
+    "cell_index": 48,
+    "changed_axis": "one fresh compatible target-grounded decoration materially supports the Main Activity versus target evidence is stale or the proposal duplicates or conflicts with Main Work",
+    "condition": "supported",
+    "daily_life_family": "friends_social_life",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "optional_social_decoration"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "one fresh compatible target-grounded decoration materially supports the Main Activity versus target evidence is stale or the proposal duplicates or conflicts with Main Work",
+      "language"
+    ],
+    "id": "fpdl_v2_optional_social_decoration_48",
+    "member": "supported-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_optional_social_decoration_48_supported_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "active_user_target": {
+          "source": "conversation_context",
+          "target": {
+            "confidence": 1.0,
+            "evidence_refs": [
+              "target-evidence-fpdl_v2_optional_social_decoration_48_supported_zh"
+            ],
+            "relative_direction": "front",
+            "target_ref": "person:user"
+          }
+        },
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "温暖地回应用户所述计划，同时遵守当前社交注意边界。",
+              "goal_id": "goal-fpdl_v2_optional_social_decoration_48_supported_zh-1",
+              "metadata": {
+                "output_mode": "speech"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "请用一句简短温暖的话回应我关于课后和朋友见面的计划；我明确在你面前，而且一个轻微的专注注视会让我觉得自然。",
+              "success_criteria": [
+                "温暖地回应用户所述计划，同时遵守当前社交注意边界。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_optional_social_decoration_48_supported_zh"
+        },
+        "situation": {
+          "digest": "cbb71334441117a6773a64fa35cfce8fb88381070b417e53115c4afceac118c5",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_optional_social_decoration_48_supported_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_optional_social_decoration_48_supported_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_optional_social_decoration_48_supported_zh",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_optional_social_decoration_48_supported_zh-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_optional_social_decoration_48_supported_zh",
+        "schema_version": 1,
+        "source_plan_fingerprint": "4e978cd8f58371476c2d40d9d34cc47acfbd3d282c664ea71b23713a835615bf",
+        "source_plan_id": "source-plan-fpdl_v2_optional_social_decoration_48_supported_zh",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "温暖地回应用户所述计划，同时遵守当前社交注意边界。",
+          "output_mode": "speech",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_optional_social_decoration_48_supported_zh",
+      "text": "请用一句简短温暖的话回应我关于课后和朋友见面的计划；我明确在你面前，而且一个轻微的专注注视会让我觉得自然。"
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-48",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "respond"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_optional_social_decoration_48_supported_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": true,
+      "semantic_facts": [
+        "装饰动作是可选且从属的，必须有目标依据；目标证据缺失或用户偏好禁止时必须省略。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

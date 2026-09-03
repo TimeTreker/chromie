@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from agent.app.agent_skills import (
     attach_disclosure_metadata,
     attach_planner_disclosure_metadata_fail_closed,
-    inherited_plan_agent_skill_provenance,
 )
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 
@@ -111,18 +110,7 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
         self.assertNotIn("content", encoded["selected_agent_skills"][0])
         self.assertNotIn("source", encoded["selected_agent_skills"][0])
 
-    def test_deep_plan_preserves_fast_provenance_and_appends_its_own(self) -> None:
-        fast = attach_disclosure_metadata(
-            self._plan(tier="fast"),
-            self._disclosure(
-                "fast_planner",
-                skill_id="chromie.fast-method",
-                digest_char="a",
-            ),
-        )
-        inherited = inherited_plan_agent_skill_provenance(
-            {"fast_plan_resolution": fast.model_dump(mode="json")}
-        )
+    def test_deep_plan_binds_only_its_own_disclosed_method(self) -> None:
         deep = attach_disclosure_metadata(
             self._plan(tier="deep"),
             self._disclosure(
@@ -130,16 +118,15 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
                 skill_id="chromie.deep-method",
                 digest_char="c",
             ),
-            inherited_plan_provenance=inherited,
         )
 
         self.assertEqual(
             [item.agent_skill_id for item in deep.selected_agent_skills],
-            ["chromie.fast-method", "chromie.deep-method"],
+            ["chromie.deep-method"],
         )
         self.assertEqual(
             [item.selected_by_agent_role for item in deep.selected_agent_skills],
-            ["fast_planner", "deep_planner"],
+            ["deep_planner"],
         )
 
     def test_fast_plan_rejects_deep_planner_provenance(self) -> None:

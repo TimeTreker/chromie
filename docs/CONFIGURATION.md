@@ -848,7 +848,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
-| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `8000` in maintained interactive modes; endpoint model-call timeout. Goal Association runs behind the latency-critical first response and may emit a materially larger structured DTO, so the acknowledgement target is not reused as a cognition kill switch. Failure still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
+| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after GI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
@@ -878,25 +878,25 @@ the mechanical DTO-repair case. There is no local relationship synonym, phrase
 mapping, word-form normalization, resource-alignment workflow, coverage certificate,
 or certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
-| `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around the Agent Goal Association watchdog. |
+| `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around the 60-second Agent Goal Association watchdog. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
-| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `8000` in maintained interactive modes; watchdog for the one structured streaming Fast Planner invocation. A validated presentation commit may arrive much earlier, but timeout ownership remains with the complete terminal result. |
+| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Fast Planner invocation. A validated presentation commit may arrive much earlier, but timeout ownership remains with the complete terminal result and the 2-second commit target is measured independently. |
 Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
 | `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
-| `ORCH_FAST_PLANNER_TIMEOUT_MS` | `9000` in maintained interactive modes; Host envelope around full Fast planning. |
+| `ORCH_FAST_PLANNER_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around full Fast planning. |
 | `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
 | `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model after Fast Planner escalation. |
-| `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `9000`; Deep Planner model timeout. |
+| `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one Deep Planner model call. |
 | `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
 | `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. Qualification mode and the architecture-validation overlay use `40960` so the retained full-catalog post-Evidence prompt plus the 4096-token structured-output reserve fits without changing the maintained interactive profile. |
 | `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
 | `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
 | `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
-| `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `10000`; host timeout for report-only deep planning. |
+| `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `125000` in maintained development modes; Host envelope around Deep planning. |
 
 There is no independent response-composition or tool-result-interpretation
 model, endpoint, timeout, or profile role. Fast/Deep Planner output carries exact
@@ -927,7 +927,7 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
-| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained interactive modes and the code/common fallback use `15000`; explicit qualification mode uses `900000` as an evidence-collection watchdog. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained development modes and the code/common fallback use `300000` so an unqualified model/profile can complete one legal GA/Fast/Deep workflow; explicit qualification mode uses `900000` as an evidence-collection watchdog. Neither value is a latency pass: the 2-second Planner-commit and 3-second playback targets are measured and failed independently. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, latency, failure, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |

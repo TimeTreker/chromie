@@ -1,81 +1,760 @@
 {
   "schema_version": 1,
-  "dataset_id": "chromie.fast_planner_daily_life.v1",
-  "title": "Fast Planner Daily-Life Qualification Corpus",
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "title": "Fast Planner Design-Capacity Qualification Corpus",
   "issue": "https://github.com/TimeTreker/chromie/issues/35",
   "authority": "Offline Fast Planner qualification input and candidate oracle only; never production planning policy.",
-  "claim_boundary": "Mechanically validated direct-LLM-authored candidate corpus; not independent semantic truth, baseline inference, deployed-model, service, voice, simulator, hardware, training approval, release, or behavior evidence.",
+  "claim_boundary": "Frozen assistant-authored Fast Planner qualification candidate. It establishes design-traced, current-production-shaped corpus coverage only; it is not independent semantic truth, training data, deployed-model evidence, release evidence, or behavior evidence.",
   "authoring": {
-    "origin": "direct_llm_authored_contrast_sets",
+    "origin": "assistant_authored_design_traced_contrast_sets",
     "model": "gpt-5.6-sol",
     "reasoning_effort": "high",
-    "semantic_generation": "Each accepted scenario was directly authored by the declared model; mechanical tooling retained calls, rejected malformed complete outputs, split accepted JSONL unchanged, and advanced review metadata after validation.",
-    "review_status": "mechanically_validated_dataset_candidate",
+    "semantic_generation": "The declared model authored 51 one-axis semantic cells from the reviewed Planner capacity matrix; a mechanical expansion retained one independently reviewable JSON file for each condition and language and validated the exact production transaction.",
+    "review_status": "mechanically_validated_same_model_semantic_review_pending",
     "independent_semantic_review": false,
     "training_eligible": false,
-    "release_qualification": "owner semantic review and immutable target-blind cohort execution required"
+    "release_qualification": "execute and adjudicate a fresh immutable target-blind cohort, then obtain independent semantic review before any training or release claim",
+    "production_shape_valid": true,
+    "qualification_prepare_allowed": true
   },
   "coverage_contract": {
-    "scenario_count": 1500,
-    "contrast_set_count": 150,
-    "scenarios_per_contrast_set": 10,
+    "scenario_count": 204,
+    "contrast_set_count": 51,
+    "scenarios_per_contrast_set": 4,
     "languages": {
-      "en-US": 750,
-      "zh-CN": 750
+      "en-US": 102,
+      "zh-CN": 102
     },
     "splits": {
-      "frozen_test": 250,
-      "train_candidate": 1000,
-      "validation": 250
+      "frozen_test": 40,
+      "train_candidate": 120,
+      "validation": 44
     },
     "categories": {
-      "canonical_confirmation_boundary": 100,
-      "canonical_multi_goal": 100,
-      "canonical_retained_work": 100,
-      "canonical_single_goal": 100,
-      "canonical_unavailable_capability": 100,
-      "reentry_cancellation_evidence": 100,
-      "reentry_provider_revalidation": 100,
-      "reentry_situation_revision": 100,
-      "reentry_terminal_evidence": 100,
-      "reentry_time_condition": 100,
-      "stream_boundary_handling": 100,
-      "stream_direct_conversation": 100,
-      "stream_multi_responsibility": 100,
-      "stream_parameter_grounding": 100,
-      "stream_single_capability": 100
+      "canonical_primary": 72,
+      "canonical_reentry": 80,
+      "streaming_advance": 52
     },
     "runtime_variants": {
-      "canonical_primary": 500,
-      "canonical_reentry": 500,
-      "streaming_advance": 500
+      "canonical_primary": 72,
+      "canonical_reentry": 80,
+      "streaming_advance": 52
     },
     "independent_semantic_review": false,
     "training_eligible": false
   },
   "coverage_matrix": {
-    "ability_classes": 15,
-    "daily_life_domains": 10,
-    "conditions_per_set": 5,
+    "planner_required_capacities": 17,
+    "capacity_cells": 51,
+    "daily_life_families": 15,
+    "conditions_per_set": 2,
     "languages_per_condition": 2,
-    "daily_life_domains_list": [
-      "entertainment_media",
+    "daily_life_families_list": [
+      "greetings_presence",
       "family_home",
-      "friends_communication",
-      "health_wellbeing",
-      "personal_organization",
-      "pets_garden",
       "school_learning",
-      "shopping_errands",
-      "travel_navigation",
-      "work_study"
+      "routines_plans",
+      "meals_wellbeing",
+      "feelings_support",
+      "play_creativity",
+      "identity_body",
+      "practical_information_tools",
+      "preferences_boundaries",
+      "multi_turn_continuity",
+      "uncertainty_repair",
+      "friends_social_life",
+      "shared_space_etiquette",
+      "casual_chat_curiosity"
+    ]
+  },
+  "semantic_coverage": {
+    "capacities": {
+      "atomic_plan_integrity_and_safe_alternatives": 12,
+      "authoritative_scope_coverage_and_satisfaction": 12,
+      "capability_grounding_and_non_substitution": 12,
+      "direct_communicative_planning": 12,
+      "evidence_reentry_interpretation": 12,
+      "fast_completion_or_how_escalation": 12,
+      "optional_social_decoration": 12,
+      "outcome_mode_fidelity": 12,
+      "parameter_resolution_and_provenance": 12,
+      "per_goal_disposition_and_mixed_outcomes": 12,
+      "plan_relation_and_confirmation_proposal": 12,
+      "planner_uncertainty_and_limit_outcomes": 12,
+      "resource_contract_composition": 12,
+      "retained_work_revision_and_no_replay": 12,
+      "temporal_readiness_planning": 12,
+      "truthful_response_staging_and_deduplication": 12,
+      "work_topology_and_coordination": 12
+    },
+    "daily_life_families": {
+      "casual_chat_curiosity": 16,
+      "family_home": 12,
+      "feelings_support": 12,
+      "friends_social_life": 12,
+      "greetings_presence": 12,
+      "identity_body": 12,
+      "meals_wellbeing": 16,
+      "multi_turn_continuity": 16,
+      "play_creativity": 12,
+      "practical_information_tools": 16,
+      "preferences_boundaries": 12,
+      "routines_plans": 12,
+      "school_learning": 12,
+      "shared_space_etiquette": 16,
+      "uncertainty_repair": 16
+    },
+    "conditions": {
+      "boundary": 102,
+      "supported": 102
+    }
+  },
+  "historical_invalidated_coverage_assessment": {
+    "status": "superseded_by_v2_design_capacity_corpus",
+    "established_inventory_facts": {
+      "balanced_workflow_family_domain_cells": true,
+      "balanced_languages": true,
+      "balanced_runtime_variants": true,
+      "unique_exact_request_texts": 1500
+    },
+    "not_established": [
+      "semantic sufficiency inside each labeled daily-life domain",
+      "one-material-axis contrast isolation",
+      "coverage of the maintained daily-conversation families",
+      "coverage of every Planner output dimension and lifecycle relation",
+      "coverage of current production Capability and argument contracts",
+      "independent bilingual equivalence and oracle correctness"
+    ],
+    "observed_biases": {
+      "frozen_catalog_capability_count": 5,
+      "scenarios_with_no_required_capability": 832,
+      "required_capability_mentions": {
+        "chromie.reminder.create": 404,
+        "chromie.weather.lookup": 206,
+        "soridormi.look_at_person": 96,
+        "soridormi.blink_eyes": 66,
+        "soridormi.walk_forward": 60
+      },
+      "responsibilities_without_material_bindings": 1328,
+      "responsibility_count": 1984
+    },
+    "redesign_rule": "Define semantic, lifecycle, grounding, capability-state, evidence, coordination, language, and adversarial axes before selecting a replacement case count; retain a case only when it covers a declared cell or regression boundary."
+  },
+  "replacement_state_space_draft": {
+    "status": "authored_frozen_and_mechanically_validated",
+    "qualification_scope": "fast_planner_first_then_deep_extension",
+    "primary_coverage_unit": "planner_required_capacity",
+    "authority_statement": {
+      "planner_owns": "Planner owns HOW: complete prospective Goal coverage, exact conversational wording, selected advertised Capability Work and arguments, Work topology, Plan relations, and the still-needed semantic delta on trusted re-entry.",
+      "planner_does_not_own": "Planner does not reinterpret provider-neutral WHAT, create canonical Goal identity, schedule its own invocation, grant confirmation or authorization, execute Work, manufacture Evidence, perform deterministic emergency control, or plan provider-internal motion.",
+      "design_authorities": [
+        "docs/PROJECT_CHARTER.md",
+        "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md",
+        "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8-12 and 15",
+        "docs/LLM_PROMPT_QUALIFICATION_METHOD.md section 7",
+        "docs/AGENT_SKILLS_ARCHITECTURE.md",
+        "docs/work_dag.md",
+        "docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md",
+        "docs/RESOURCE_ACQUISITION_AND_DELIVERY.md",
+        "docs/EXECUTION_LANES_AND_COORDINATION.md",
+        "docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md",
+        "shared/chromie_contracts/plan.py",
+        "agent/app/planner_model_contract.py"
+      ]
+    },
+    "non_planner_responsibilities": [
+      {
+        "owner": "Goal Interpretation",
+        "responsibility": "provider-neutral Responsibility meaning, output mode, material human-semantic bindings, and unresolved WHAT"
+      },
+      {
+        "owner": "Goal Association",
+        "responsibility": "canonical Goal identity, relationship, continuity, and lifecycle mutation"
+      },
+      {
+        "owner": "Host and Cognitive Runtime",
+        "responsibility": "Fast/GA concurrency, Planner invocation and re-entry admission, schema and provenance validation, confirmation state, authorization, atomic commitment, stale-work containment, and fail-closed handling"
+      },
+      {
+        "owner": "Trusted Capability Runtime and providers",
+        "responsibility": "scheduling, resource arbitration, execution, provider safety, and production of trusted result Evidence"
+      },
+      {
+        "owner": "Host deterministic control",
+        "responsibility": "urgent stop, emergency, silence, unusable-input, and other deterministic protective effects"
+      },
+      {
+        "owner": "Soridormi",
+        "responsibility": "provider-internal embodied planning, controller policy, actuator detail, and physical preflight"
+      },
+      {
+        "owner": "Vocal and playback runtime",
+        "responsibility": "TTS realization, audible ordering, playback barriers, interruption, and delivery Evidence"
+      }
+    ],
+    "entry_variant_contracts": [
+      {
+        "id": "streaming_advance",
+        "authoritative_scope": "accepted GI Responsibilities and source evidence before the independent GA join",
+        "model_boundary": "one Fast invocation emits at most one early typed PresentationCommit followed by one complete FastPlannerAdvance terminal result",
+        "required_observables": [
+          "complete Responsibility-ref coverage",
+          "exact communicative wording and truth stage",
+          "common Capability Activities and arguments",
+          "sequential or parallel relation",
+          "Planner InformationGaps",
+          "optional anchored auxiliary Activities",
+          "terminal completion or deep_planner continuation",
+          "presentation-to-terminal consistency"
+        ],
+        "not_representable_at_this_boundary": [
+          "canonical Goal identity",
+          "canonical per-Goal outcome and satisfaction fields",
+          "canonical Plan relation and confirmation decision",
+          "canonical Goal time conditions"
+        ]
+      },
+      {
+        "id": "canonical_primary",
+        "authoritative_scope": "GA-committed canonical Goals, current Work/context, and the exact qualified common Capability catalog",
+        "model_boundary": "one Fast invocation emits FastPlannerModelOutput or the decoder-tight multi-Goal output before Host adds only the canonical envelope",
+        "required_observables": [
+          "complete per-Goal outcomes and prospective satisfaction",
+          "exact response text",
+          "Capability steps, arguments, timing, and source Goal ownership",
+          "parameter-resolution provenance",
+          "Plan relation and confirmation requirement",
+          "Goal-bound time conditions",
+          "optional anchored auxiliary Activities",
+          "terminal completion or semantic HOW escalation"
+        ],
+        "not_representable_at_this_boundary": [
+          "execution result truth not supplied as trusted Evidence",
+          "confirmation grant",
+          "dispatch or provider completion"
+        ]
+      },
+      {
+        "id": "canonical_reentry",
+        "authoritative_scope": "Host-scoped still-open Goals plus current Work, trusted terminal Evidence or cancellation/Situation transition, and prior delivery state",
+        "model_boundary": "one Fast canonical Planner invocation emits only the still-needed semantic response or Work delta for the admitted scope",
+        "required_observables": [
+          "exact Goal and Evidence scope preservation",
+          "epistemic-strength and execution-tense fidelity",
+          "response, follow-up Work, wait, or no-op decision",
+          "no replay of the completed Activity",
+          "no narration of excluded siblings",
+          "no duplicate delivered communication",
+          "terminal completion or semantic HOW escalation"
+        ],
+        "not_representable_at_this_boundary": [
+          "Evidence admission or correlation",
+          "widening the Host-supplied Goal set",
+          "automatic user confirmation",
+          "execution or delivery proof created by Planner"
+        ]
+      }
+    ],
+    "planner_required_capacities": [
+      {
+        "id": "authoritative_scope_coverage_and_satisfaction",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Cover every supplied authoritative Responsibility at the pre-GA streaming boundary or every supplied canonical Goal at canonical boundaries, preserve exact ownership, and judge prospective Goal satisfaction where that DTO supports it without dropping, widening, or cross-owning Work.",
+        "boundary_not_owned": "Planner may not create, merge, split, or reinterpret Responsibilities or canonical Goals, and a pre-GA stream may not invent Goal identity.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 9",
+          "docs/LLM_PROMPT_QUALIFICATION_METHOD.md section 7.2",
+          "agent/app/planner_model_contract.py PlannerModelOutput.goal_outcomes and goal_satisfaction"
+        ]
+      },
+      {
+        "id": "direct_communicative_planning",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Author the exact natural, grounded Communicative Activity for speech-only Goals without inventing Capability Work or transport steps.",
+        "boundary_not_owned": "Planner authors words and speech-act meaning; Vocal Runtime alone realizes and delivers audio.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8.1 and 15",
+          "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md Human-like turn policy",
+          "shared/chromie_contracts/plan.py FastPlannerImmediateCommunicativeAct and CanonicalPlan.response_text"
+        ]
+      },
+      {
+        "id": "capability_grounding_and_non_substitution",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Select only an exact applicable advertised Capability whose declared semantics cover the Goal, or return the truthful non-executable outcome instead of substituting an adjacent ability.",
+        "boundary_not_owned": "Catalog availability does not authorize execution and cannot redefine the Goal.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8.1 and 11.4",
+          "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md Cognitive Gateway and Cognitive Core",
+          "agent/app/planner_prompt.py Planner capability-grounding contract"
+        ]
+      },
+      {
+        "id": "parameter_resolution_and_provenance",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Compare selected Capability inputs with authoritative bindings, resolve them only from allowed sources, preserve exact values and provenance, or ask for the specific user-resolvable missing fact.",
+        "boundary_not_owned": "Planner may not rewrite human-semantic Goal meaning, invent preferences, or guess consequential values.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 10",
+          "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md Human-like turn policy",
+          "shared/chromie_contracts/plan.py PlanParameterResolution and PlannerInformationGap"
+        ]
+      },
+      {
+        "id": "work_topology_and_coordination",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Author the required Work leaves, Goal bindings, dependencies, sequential order, requested concurrency, and bounded policy using declared resource and compatibility facts.",
+        "boundary_not_owned": "Runtime validates and schedules the authored topology; Planner does not perform resource arbitration or provider-internal decomposition.",
+        "authority_refs": [
+          "docs/work_dag.md Authority boundary",
+          "docs/EXECUTION_LANES_AND_COORDINATION.md Planner and Runtime boundaries",
+          "agent/app/planner_model_contract.py PlannerModelStep"
+        ]
+      },
+      {
+        "id": "per_goal_disposition_and_mixed_outcomes",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Assign each Goal a coherent respond, execute, clarify, unavailable, refused, or escalation outcome and combine independent supported and unsupported Goals without dropping siblings or leaking invalid partial Work.",
+        "boundary_not_owned": "Aggregate disposition may summarize per-Goal decisions but cannot erase their separate ownership or lifecycle.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8.2 and 9",
+          "docs/LLM_PROMPT_QUALIFICATION_METHOD.md section 7.2",
+          "agent/app/planner_model_contract.py PlannerModelGoalOutcome"
+        ]
+      },
+      {
+        "id": "planner_uncertainty_and_limit_outcomes",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Distinguish a supplied unresolved-WHAT boundary from a Planner-owned missing execution input, unavailable provider, unsafe proposal, and insufficient planning depth, then choose a specific clarification, unavailability, refusal, or HOW escalation as applicable.",
+        "boundary_not_owned": "Consequential ambiguity in intended outcome, scope, or referent belongs to Deep Goal Interpretation; Planner must not repair it.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8.1, 8.2, and 10",
+          "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md ASR uncertainty and ambiguity",
+          "shared/chromie_contracts/plan.py PlannerInformationGap"
+        ]
+      },
+      {
+        "id": "plan_relation_and_confirmation_proposal",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Declare exact, safe-adjustment, or alternative relation; request confirmation for material alternatives; and word the proposal without claiming authorization or completion.",
+        "boundary_not_owned": "Host and Runtime own confirmation state, authorization, atomic commitment, and dispatch.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 11.1-11.4",
+          "docs/EXECUTION_LANES_AND_COORDINATION.md Playback and confirmation rules",
+          "agent/app/planner_model_contract.py plan_relation and user_confirmation_required"
+        ]
+      },
+      {
+        "id": "truthful_response_staging_and_deduplication",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Author only the still-needed immediate, pre-action, progress, or final communication from the correct truth stage and Evidence scope, without duplicate or premature claims.",
+        "boundary_not_owned": "Host validates claims and delivery state but cannot rewrite accepted Planner wording.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 15",
+          "docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md Contract",
+          "shared/chromie_contracts/plan.py CommunicativeTruthStage and CommunicativeDeliveryPhase"
+        ]
+      },
+      {
+        "id": "retained_work_revision_and_no_replay",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Decide whether supplied retained Work remains valid or needs semantic revision while preserving immutable completed Work and never replaying an already completed identical Activity.",
+        "boundary_not_owned": "Host and DAGEngine validate revision monotonicity, history integrity, and stale or duplicate dispatch.",
+        "authority_refs": [
+          "docs/work_dag.md Revision and continuity contract",
+          "docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md Contract",
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 8.5"
+        ]
+      },
+      {
+        "id": "evidence_reentry_interpretation",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Interpret trusted terminal Evidence, cancellation, Situation revision, or provider restoration only for the supplied still-open Goal scope and author the appropriate response, follow-up Work, wait, or no-op delta.",
+        "boundary_not_owned": "Host admits and scopes re-entry, correlates Evidence, rejects stale versions, and never lets Planner widen the opportunity.",
+        "authority_refs": [
+          "docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md Ownership and Contract",
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 15.2",
+          "docs/LLM_PROMPT_QUALIFICATION_METHOD.md section 7.2"
+        ]
+      },
+      {
+        "id": "temporal_readiness_planning",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Represent known future Goal readiness with an exact Goal-bound time condition instead of inventing a timer Capability or prematurely completing the Goal.",
+        "boundary_not_owned": "Host owns the clock, persistence, wake-up admission, and subsequent Planner invocation.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 10.4",
+          "shared/chromie_contracts/plan.py PlannedGoalTimeCondition",
+          "agent/app/planner_model_contract.py PlannerModelTimeCondition"
+        ]
+      },
+      {
+        "id": "fast_completion_or_how_escalation",
+        "applies_to": ["fast"],
+        "obligation": "Complete a simple common path in one Fast primary result, or emit a semantic HOW escalation with no executable partial leakage when wider planning is genuinely required.",
+        "boundary_not_owned": "Fast does not invoke Deep, pass Deep a candidate Plan for repair, or use escalation to hide a malformed contract result; Host controls the invocation.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8.1-8.3",
+          "docs/LLM_PROMPT_QUALIFICATION_METHOD.md sections 7.3-7.4",
+          "shared/chromie_contracts/plan.py FastPlannerContinuation"
+        ]
+      },
+      {
+        "id": "resource_contract_composition",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Use one exact complete resource Capability when available; otherwise Fast escalates and Deep may compose advertised plan-requires and plan-provides chains without inventing provider-internal stages or accepting partial completion.",
+        "boundary_not_owned": "Goal Interpretation owns the provider-neutral resource responsibility and providers own internal acquisition, navigation, grasp, and delivery implementation.",
+        "authority_refs": [
+          "docs/RESOURCE_ACQUISITION_AND_DELIVERY.md Planner ownership and dynamic capability granularity",
+          "docs/AGENT_SKILLS_ARCHITECTURE.md Plan and Capability contracts",
+          "agent/app/planner_model_contract.py ResourceResponsibilityCapabilityGroundingError"
+        ]
+      },
+      {
+        "id": "outcome_mode_fidelity",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Preserve provider-neutral speech, performed voice, information, stateful effect, body action, media playback, and resource-delivery outcomes without substituting a different modality.",
+        "boundary_not_owned": "Planner chooses HOW from the catalog but cannot rewrite the upstream output mode or treat one mode's delivery as Evidence for another.",
+        "authority_refs": [
+          "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md Human-like turn policy",
+          "docs/EXECUTION_LANES_AND_COORDINATION.md Planner-owned semantic lanes",
+          "agent/app/planner_prompt.py output-mode contract"
+        ]
+      },
+      {
+        "id": "optional_social_decoration",
+        "applies_to": ["fast", "deep"],
+        "obligation": "When it materially improves an existing human-observable Main Activity, optionally author one bounded, exact, target-grounded, non-duplicative social-decoration proposal; otherwise emit none.",
+        "boundary_not_owned": "Decoration never owns a Goal, creates a new planning pass, delays Main Work, or survives Runtime target, resource, safety, and freshness rejection.",
+        "authority_refs": [
+          "docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md Planner input and output",
+          "docs/EXECUTION_LANES_AND_COORDINATION.md Planner-owned Social Attention",
+          "shared/chromie_contracts/plan.py AuxiliaryPlanActivity"
+        ]
+      },
+      {
+        "id": "atomic_plan_integrity_and_safe_alternatives",
+        "applies_to": ["fast", "deep"],
+        "obligation": "Return a complete internally coherent proposal within supplied safety, capability, authorization, and resource constraints; use an explicit safe alternative, clarification, unavailable, refused, or escalation outcome instead of executable partial leakage.",
+        "boundary_not_owned": "Deterministic validation, atomic commit, emergency control, authorization, provider safety, and fail-closed enforcement remain Runtime responsibilities.",
+        "authority_refs": [
+          "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 9 and 11.2-11.4",
+          "docs/LLM_PROMPT_QUALIFICATION_METHOD.md sections 7.2 and 7.4",
+          "agent/app/planner_model_contract.py PlannerModelOutput semantic validation"
+        ]
+      }
+    ],
+    "deferred_deep_extension_capacities": [
+      {
+        "id": "complex_multi_step_and_agent_skill_composition",
+        "obligation": "Deep must compose broader multi-Goal Work and applicable Agent-Skill methods when one complete common Fast path is insufficient."
+      },
+      {
+        "id": "material_alternative_generation",
+        "obligation": "Deep must compare and author a complete safe adjustment or material alternative with the required explanation and confirmation relation."
+      },
+      {
+        "id": "degraded_failed_or_unsafe_revision",
+        "obligation": "Deep must reason over changed Goal, Work, Evidence, resource, and Situation truth to author a valid revision without replaying completed Work."
+      },
+      {
+        "id": "no_change_or_no_safe_plan",
+        "obligation": "Deep must recognize when existing Work remains correct or when no safe executable Plan exists rather than manufacturing activity."
+      }
+    ],
+    "coverage_claim_gate": {
+      "claim": "The corpus exercises the current Fast Planner design obligations across declared daily-life situations and production entry variants; it does not claim all possible human requests or deployed-model reliability.",
+      "required_before_freeze": [
+        "Every primary capacity has an authority reference, an explicit non-owned boundary, positive and boundary contrasts, and coverage in at least three materially different daily-life families unless its contract is narrower.",
+        "Every scenario names one primary capacity and one changed material axis; secondary dimensions may be observed but cannot substitute for the primary contrast.",
+        "Every semantic condition has author-paired en-US and zh-CN equivalents in the same split and contrast set; independent review remains a post-freeze requirement.",
+        "Every case is built from the exact current production input projection for its entry variant and its candidate oracle passes the exact current Schema, DTO, and Host path.",
+        "Every applicable entry-variant contract and every declared topology, outcome mode, lifecycle, grounding, capability, coordination, result, language, and adversarial value has explicit case IDs in the aggregate matrix.",
+        "Across the complete corpus, the daily-life families collectively cover direct conversation, effectful and information Work, uncertainty, and containment; no per-family coverage is inferred where the matrix does not supply it.",
+        "High-risk intersections cover confirmation, missing grounding, mixed support, Evidence mismatch, cancellation containment, target evidence, resource conflict, and requested concurrency.",
+        "Known unrepresentable valid meanings and intentionally uncovered dimensions remain listed as gaps instead of receiving distorted oracles."
+      ],
+      "required_after_inference": [
+        "The complete target-blind batch is source, prompt, Schema, model, and harness stable with zero process failure or timeout.",
+        "Every result retains raw output plus Schema, DTO, Host, and semantic adjudication, and failures are clustered by earliest responsible boundary.",
+        "Any correction is limited to the evidenced earliest owner; prompt edits are forbidden when the defect belongs to input, DTO, Schema, Host, workflow, harness, or model capacity.",
+        "Focused failures and the complete frozen cohort pass the declared hard invariants before any qualification claim; semantic quality cannot average away a safety, provenance, Goal omission, integrity, or partial-leakage failure."
+      ]
+    },
+    "planned_minimum_contrast_design": {
+      "status": "authored_frozen_same_model_semantic_review_pending",
+      "formula": "17 primary Fast/shared capacities x 3 distinct daily-life families x 2 one-axis conditions x 2 languages = 204 scenario files, plus non-duplicative retained regressions and any cells required to close declared gaps",
+      "case_count_floor": 204,
+      "case_count_is_final_target": false,
+      "condition_contract": "Each listed cell becomes one contrast set with a supported condition and one boundary condition differing only on changed_axis; both conditions receive author-paired en-US and zh-CN semantic equivalents that remain pending independent review.",
+      "capacity_cells": [
+        {
+          "capacity_id": "authoritative_scope_coverage_and_satisfaction",
+          "changed_axis": "all supplied authoritative members covered versus one supplied member omitted or cross-owned",
+          "cells": [
+            {"daily_life_family": "family_home", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "school_learning", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "multi_turn_continuity", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "direct_communicative_planning",
+          "changed_axis": "a current speech-only obligation exists versus the same topic has no still-needed conversational act",
+          "cells": [
+            {"daily_life_family": "greetings_presence", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "feelings_support", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "casual_chat_curiosity", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "capability_grounding_and_non_substitution",
+          "changed_axis": "one catalog Capability exactly covers the Goal versus only an adjacent inapplicable Capability is available",
+          "cells": [
+            {"daily_life_family": "meals_wellbeing", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "practical_information_tools", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "casual_chat_curiosity", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "parameter_resolution_and_provenance",
+          "changed_axis": "a material Capability input has one authoritative source versus that input has no authorized source",
+          "cells": [
+            {"daily_life_family": "routines_plans", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "practical_information_tools", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "uncertainty_repair", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "work_topology_and_coordination",
+          "changed_axis": "requested parallel Work has compatible declared resources versus the same parallel relation has a declared resource conflict",
+          "cells": [
+            {"daily_life_family": "family_home", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "play_creativity", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "shared_space_etiquette", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "per_goal_disposition_and_mixed_outcomes",
+          "changed_axis": "all independent Goals have one supported disposition versus one sibling becomes unsupported while another remains executable",
+          "cells": [
+            {"daily_life_family": "school_learning", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "feelings_support", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "friends_social_life", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "planner_uncertainty_and_limit_outcomes",
+          "changed_axis": "the missing fact is a Planner-owned execution input resolvable by the user versus the unresolved fact changes intended WHAT and belongs upstream",
+          "cells": [
+            {"daily_life_family": "identity_body", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "preferences_boundaries", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "uncertainty_repair", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "plan_relation_and_confirmation_proposal",
+          "changed_axis": "an exact allowed Plan exists versus only a material alternative exists and therefore requires confirmation",
+          "cells": [
+            {"daily_life_family": "preferences_boundaries", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "shared_space_etiquette", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "identity_body", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "truthful_response_staging_and_deduplication",
+          "changed_axis": "trusted terminal Evidence and undelivered response authorize a final claim versus execution is only proposed or the equivalent act is already delivered",
+          "cells": [
+            {"daily_life_family": "greetings_presence", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "multi_turn_continuity", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "casual_chat_curiosity", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "retained_work_revision_and_no_replay",
+          "changed_axis": "retained Work is still pending and semantically reusable versus the identical Activity is already completed",
+          "cells": [
+            {"daily_life_family": "routines_plans", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "multi_turn_continuity", "entry_variant": "canonical_reentry"},
+            {"daily_life_family": "uncertainty_repair", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "evidence_reentry_interpretation",
+          "changed_axis": "terminal Evidence is valid and bound to the scoped Goal versus the same-shaped Evidence belongs to an excluded sibling or stale revision",
+          "cells": [
+            {"daily_life_family": "meals_wellbeing", "entry_variant": "canonical_reentry"},
+            {"daily_life_family": "practical_information_tools", "entry_variant": "canonical_reentry"},
+            {"daily_life_family": "multi_turn_continuity", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "temporal_readiness_planning",
+          "changed_axis": "Goal readiness is at a known future instant versus it is ready now or has no authoritative time",
+          "cells": [
+            {"daily_life_family": "school_learning", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "routines_plans", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "friends_social_life", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "fast_completion_or_how_escalation",
+          "changed_axis": "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+          "cells": [
+            {"daily_life_family": "play_creativity", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "practical_information_tools", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "uncertainty_repair", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "resource_contract_composition",
+          "changed_axis": "one advertised Capability proves the complete resource outcome versus only a partial resource state or incomplete chain is advertised",
+          "cells": [
+            {"daily_life_family": "family_home", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "meals_wellbeing", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "shared_space_etiquette", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "outcome_mode_fidelity",
+          "changed_axis": "the catalog contains the exact requested output mode versus it contains only a nearby mode that cannot satisfy the Goal",
+          "cells": [
+            {"daily_life_family": "play_creativity", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "identity_body", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "casual_chat_curiosity", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "optional_social_decoration",
+          "changed_axis": "one fresh compatible target-grounded decoration materially supports the Main Activity versus target evidence is stale or the proposal duplicates or conflicts with Main Work",
+          "cells": [
+            {"daily_life_family": "greetings_presence", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "feelings_support", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "friends_social_life", "entry_variant": "canonical_reentry"}
+          ]
+        },
+        {
+          "capacity_id": "atomic_plan_integrity_and_safe_alternatives",
+          "changed_axis": "every member of a proposed compound Plan satisfies the supplied contracts versus one member has a hard safety, provenance, or schema rejection",
+          "cells": [
+            {"daily_life_family": "preferences_boundaries", "entry_variant": "streaming_advance"},
+            {"daily_life_family": "shared_space_etiquette", "entry_variant": "canonical_primary"},
+            {"daily_life_family": "meals_wellbeing", "entry_variant": "canonical_reentry"}
+          ]
+        }
+      ]
+    },
+    "daily_life_families": [
+      "greetings_presence",
+      "family_home",
+      "school_learning",
+      "routines_plans",
+      "meals_wellbeing",
+      "feelings_support",
+      "play_creativity",
+      "identity_body",
+      "practical_information_tools",
+      "preferences_boundaries",
+      "multi_turn_continuity",
+      "uncertainty_repair",
+      "friends_social_life",
+      "shared_space_etiquette",
+      "casual_chat_curiosity"
+    ],
+    "planner_entry_variants": [
+      "streaming_advance",
+      "canonical_primary",
+      "canonical_reentry"
+    ],
+    "goal_topologies": [
+      "direct_conversation_no_effect_work",
+      "single_goal",
+      "independent_multi_goal",
+      "dependent_multi_goal",
+      "mixed_conversation_and_effect_work"
+    ],
+    "outcome_modes": [
+      "speech",
+      "styled_or_performed_speech",
+      "information",
+      "stateful_effect",
+      "body_action",
+      "media_playback",
+      "physical_resource_handover"
+    ],
+    "goal_lifecycle_and_reentry": [
+      "new",
+      "continue",
+      "modify_or_correct",
+      "clarify",
+      "confirm_or_reject",
+      "cancel",
+      "pause_or_resume",
+      "supersede_merge_or_split",
+      "terminal_evidence",
+      "situation_revision",
+      "time_condition",
+      "provider_revalidation"
+    ],
+    "grounding_states": [
+      "exact_explicit_binding",
+      "capability_default",
+      "declared_semantic_realization",
+      "trusted_target_or_result_evidence",
+      "missing_material_binding",
+      "conflicting_binding",
+      "stale_or_untrusted_context"
+    ],
+    "capability_states": [
+      "exact_common_available",
+      "available_but_inapplicable",
+      "unavailable",
+      "degraded_or_failed",
+      "confirmation_required",
+      "resource_or_concurrency_conflict",
+      "no_matching_provider"
+    ],
+    "coordination_states": [
+      "single",
+      "sequential_dependency",
+      "safe_parallel",
+      "parallel_forbidden_by_resource",
+      "partial_support_without_partial_leakage"
+    ],
+    "expected_outcome_regions": [
+      "respond",
+      "execute",
+      "clarify",
+      "mixed",
+      "unavailable",
+      "refused",
+      "escalate_or_no_safe_fast_plan"
+    ],
+    "language_and_adversarial_slices": [
+      "en-US",
+      "zh-CN",
+      "ordinary",
+      "boundary",
+      "adversarial",
+      "retained_regression"
+    ],
+    "construction_rules": [
+      "Planner required capacities are the primary coverage claim; daily-life families are representative semantic situations, not proxy abilities.",
+      "Every semantic seed has a reviewed English/Chinese pair.",
+      "Every contrast set names one material axis and the exact value changed between members.",
+      "Every required capacity has positive and boundary contrasts across at least three materially different daily-life families unless its applicability contract is narrower.",
+      "Every daily-life family appears in supported and boundary conditions across at least two distinct Planner-capacity clusters; conversation-only, effectful, information, uncertainty, and containment coverage are corpus-wide axes and are not falsely claimed for every individual family.",
+      "Every dimension value appears in both languages and in every applicable Planner entry variant.",
+      "High-risk intersections cover confirmation, missing grounding, mixed support, evidence mismatch, cancellation containment, target evidence, and concurrency/resource conflicts.",
+      "Each case must add a declared state-space cell or retained regression; duplicate scale is rejected.",
+      "Unrepresentable valid meaning is retained as a contract gap rather than given a false executable oracle."
     ]
   },
   "asset_contract": {
+    "catalog_tree_sha256": "caad0b4f13e7ac9fe97aa975b6b139b273d8b2cf6f547332a9a88d88969da8bf",
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
-    "scenario_count": 1500,
-    "contrast_set_size": 10,
-    "scenario_tree_sha256": "f9ef6c1269921c2910285a586c3c4b2725744b6dc4406e0e9be759f512738fc8"
+    "scenario_count": 204,
+    "contrast_set_size": 4,
+    "scenario_tree_sha256": "b5da6e022886effd3b9618384e48914775e7a742b19cbe584f9c1826227eb669"
   },
   "split_policy": {
     "unit": "contrast_set",

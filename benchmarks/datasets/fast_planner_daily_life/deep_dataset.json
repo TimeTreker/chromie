@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "title": "Deep Planner Design-Capacity Qualification Corpus",
+  "issue": "https://github.com/TimeTreker/chromie/issues/35",
+  "authority": "Offline Deep Planner qualification input and candidate oracle only; never production planning policy.",
+  "claim_boundary": "Frozen assistant-authored, production-shaped, target-blind Deep Planner contrast corpus. It is same-model and non-independent; it is not training, deployed-model, voice, robot, release, or independent semantic evidence.",
+  "authoring": {
+    "origin": "assistant_authored_design_traced_contrast_sets",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "review_status": "mechanically_validated_same_model_semantic_review_pending",
+    "independent_semantic_review": false,
+    "training_eligible": false
+  },
+  "coverage_contract": {
+    "scenario_count": 40,
+    "contrast_set_count": 10,
+    "scenarios_per_contrast_set": 4,
+    "languages": {"en-US": 20, "zh-CN": 20},
+    "splits": {"frozen_test": 8, "validation": 8, "train_candidate": 24},
+    "runtime_variants": {"deep_primary": 24, "deep_reentry": 16},
+    "conditions": {"supported": 20, "boundary": 20}
+  },
+  "coverage_rationale": {
+    "primary_unit": "one required Deep Planner capacity from canonical design and qualification method section 7.3",
+    "matrix": "Each of ten required Deep capacities has one supported/boundary one-axis contrast in both en-US and zh-CN. The combined Fast+Deep suite covers all fifteen maintained daily-life situation families; Deep uses ten distinct families because its exceptional path is exercised by capacity, not by duplicating every common Fast situation.",
+    "covered_capacities": [
+      "compound_constrained_multi_goal_work",
+      "fast_escalation_without_candidate_leakage",
+      "blocked_degraded_failed_or_unsafe_reentry",
+      "plan_revision_after_changed_truth",
+      "resource_or_concurrency_conflict_alternative",
+      "consequential_ambiguity_clarification",
+      "incomplete_observation_acquisition",
+      "confirmation_and_cancellation_revision",
+      "complex_agent_skill_composition",
+      "no_change_or_no_safe_plan"
+    ],
+    "hard_boundaries": [
+      "one Deep primary model result with no same-tier repair",
+      "no Fast candidate or validator feedback in Deep input",
+      "exact GA Goal scope and scoped re-entry Evidence",
+      "complete per-Goal disposition and satisfaction",
+      "exact Capability IDs, arguments, timing, resource chain, and ownership",
+      "confirmation-held material alternatives",
+      "no executable partial Work on unavailable or unsafe boundaries",
+      "passive Agent Skill context cannot override Goal, catalog, or safety authority"
+    ],
+    "declared_gaps": [
+      "No independent human semantic review",
+      "No deployed qwen3.5:4b/Ollama or vLLM inference",
+      "No live service, voice, simulator, or physical robot evidence",
+      "No claim that 40 scenarios enumerate every possible household task",
+      "Training remains prohibited until independent review promotes individual cases"
+    ]
+  },
+  "asset_contract": {
+    "discovery_glob": "deep_scenarios/<split>/<category>/*.json",
+    "scenario_tree_sha256": "a0c79e38cf4055b7021a4dcc1cbd0a2caec915872174d41e9c2bf153a4a7406a"
+  }
+}

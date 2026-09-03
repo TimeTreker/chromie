@@ -1,0 +1,179 @@
+{
+  "adversarial_design": {
+    "cell_index": 45,
+    "changed_axis": "the catalog contains the exact requested output mode versus it contains only a nearby mode that cannot satisfy the Goal",
+    "condition": "boundary",
+    "daily_life_family": "casual_chat_curiosity",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "outcome_mode_fidelity"
+  },
+  "category": "canonical_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "the catalog contains the exact requested output mode versus it contains only a nearby mode that cannot satisfy the Goal",
+      "language"
+    ],
+    "id": "fpdl_v2_outcome_mode_fidelity_45",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_outcome_mode_fidelity_45_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "演唱一句愉快的话。",
+              "goal_id": "goal-fpdl_v2_outcome_mode_fidelity_45_boundary_zh-1",
+              "metadata": {
+                "output_mode": "singing"
+              },
+              "object": {},
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "请唱一句关于我刚才好奇的一件小事的愉快句子。",
+              "success_criteria": [
+                "演唱一句愉快的话。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_outcome_mode_fidelity_45_boundary_zh"
+        },
+        "situation": {
+          "digest": "1b242e424c1939b9a87c863df36c06c4b7f8342d25bf3b6bae81b5ec53531aca",
+          "discourse_focus_ids": [],
+          "focus_goal_ids": [
+            "goal-fpdl_v2_outcome_mode_fidelity_45_boundary_zh-1"
+          ],
+          "interpretations": [],
+          "revision": 2,
+          "schema_version": 3,
+          "source_refs": [
+            {
+              "kind": "runtime_state",
+              "owner": "trusted_capability_runtime",
+              "reference_id": "state-fpdl_v2_outcome_mode_fidelity_45_boundary_zh"
+            }
+          ],
+          "turn_id": "turn-fpdl_v2_outcome_mode_fidelity_45_boundary_zh",
+          "unresolved_conditions": []
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-fpdl_v2_outcome_mode_fidelity_45_boundary_zh-1"
+        ],
+        "opportunity_id": "opportunity-fpdl_v2_outcome_mode_fidelity_45_boundary_zh",
+        "schema_version": 1,
+        "source_plan_fingerprint": "7de8205c28b41dd5e3319f61b7a114d6567dd826b8cedce1993a594234dc9c82",
+        "source_plan_id": "source-plan-fpdl_v2_outcome_mode_fidelity_45_boundary_zh",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "演唱一句愉快的话。",
+          "output_mode": "singing",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_outcome_mode_fidelity_45_boundary_zh",
+      "text": "请唱一句关于我刚才好奇的一件小事的愉快句子。"
+    },
+    "runtime_variant": "canonical_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-45",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "frozen_test",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate",
+        "unavailable"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_outcome_mode_fidelity_45_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "普通 TTS、媒体播放或身体动作不能替代不可用的演唱表演。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

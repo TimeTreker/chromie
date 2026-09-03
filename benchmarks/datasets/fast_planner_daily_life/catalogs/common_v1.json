@@ -36,7 +36,11 @@
       "prompt_tier_source": "qualification_fixture",
       "tags": ["stateful", "reminder"],
       "behavior_domains": ["personal_organization"],
-      "hints": {},
+      "hints": {
+        "semantic_scope": {
+          "output_modes": ["stateful_effect"]
+        }
+      },
       "metadata": {},
       "can_run_parallel": true,
       "parallel_metadata_declared": true,
@@ -79,7 +83,41 @@
       "prompt_tier_source": "qualification_fixture",
       "tags": ["information", "weather"],
       "behavior_domains": ["weather"],
-      "hints": {"side_effect_free": true},
+      "hints": {
+        "side_effect_free": true,
+        "semantic_scope": {
+          "responsibility_type": "acquire_and_deliver_resource",
+          "resource_kinds": ["information"],
+          "delivery_modes": ["spoken_explanation", "structured_result"],
+          "acquisition": "structured_weather_retrieval",
+          "provider_result": "evidence_material",
+          "domain": "weather_forecast",
+          "supported_temporal_scopes": [
+            "current",
+            "today",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "tomorrow",
+            "near_term_forecast"
+          ],
+          "unsupported_temporal_scopes": [
+            "annual",
+            "seasonal",
+            "historical",
+            "climate_normals"
+          ],
+          "scope_mismatch_policy": "clarify_or_unavailable_never_narrow"
+        },
+        "resource_contract": {
+          "provider_role": "acquire_information",
+          "plan_requires": [],
+          "plan_provides": ["resource_acquired"],
+          "completion_evidence": "trusted_tool_result",
+          "final_delivery_owner": "planner_communicative_activity"
+        }
+      },
       "metadata": {},
       "can_run_parallel": true,
       "parallel_metadata_declared": true,

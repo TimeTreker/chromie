@@ -1,0 +1,184 @@
+{
+  "adversarial_design": {
+    "cell_index": 4,
+    "changed_axis": "retained Work remains exact versus the Goal changes its immutable argument",
+    "condition": "supported",
+    "daily_life_family": "multi_turn_continuity",
+    "paired_language": "en-US",
+    "primary_capacity_id": "plan_revision_after_changed_truth"
+  },
+  "category": "deep_reentry",
+  "contrast_set": {
+    "controlled_axes": [
+      "retained Work remains exact versus the Goal changes its immutable argument",
+      "language"
+    ],
+    "id": "dpdl_v1_plan_revision_after_changed_truth_04",
+    "member": "supported-zh"
+  },
+  "dataset_id": "chromie.deep_planner_daily_life.v1",
+  "difficulty": "ordinary",
+  "id": "dpdl_v1_plan_revision_after_changed_truth_04_supported_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "existing_work_activities": [
+          {
+            "activity_id": "retained-walk",
+            "args": {
+              "duration_s": 5
+            },
+            "capability_id": "soridormi.walk_forward",
+            "origin": "retained_runtime",
+            "runtime_binding": {
+              "canonical_plan_fingerprint": "d34f38237f57909d34c5d17a1ac0f6665a93c2491ea3fd9abd66a04ee6791fcf",
+              "canonical_plan_id": "retained-plan-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh",
+              "interaction_id": "interaction-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh"
+            },
+            "source_goal_ids": [
+              "goal-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh-1"
+            ],
+            "state": "scheduled",
+            "timing": "sequential"
+          }
+        ],
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "向前走五秒。",
+              "goal_id": "goal-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh-1",
+              "metadata": {
+                "output_mode": "body_action"
+              },
+              "object": {
+                "bindings": {
+                  "duration": {
+                    "confidence": 1.0,
+                    "entity_type": "duration_seconds",
+                    "name": "duration",
+                    "value": "5"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "保持原来的五秒行走。",
+              "success_criteria": [
+                "向前走五秒。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": {
+        "evidence_refs": [],
+        "goal_ids": [
+          "goal-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh-1"
+        ],
+        "opportunity_id": "opportunity-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh",
+        "schema_version": 1,
+        "source_plan_fingerprint": "208291454b816f95b71d096552c45b23a8c87d1ab8ecc8734678e11f7d7b31bc",
+        "source_plan_id": "source-plan-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh",
+        "trigger": "situation_revision_reentry"
+      },
+      "responsibilities": [
+        {
+          "bindings": {
+            "duration": 5
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "向前走五秒。",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "dpdl_v1_plan_revision_after_changed_truth_04_supported_zh",
+      "text": "保持原来的五秒行走。"
+    },
+    "runtime_variant": "deep_reentry"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "deep_input_excludes_fast_candidate": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-deep-cell-04",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 1,
+  "split": "validation",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-dpdl_v1_plan_revision_after_changed_truth_04_supported_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "soridormi.walk_forward"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [
+        "retained-walk"
+      ],
+      "required_step_purposes": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "Deep Planner must satisfy plan_revision_after_changed_truth at the declared supported boundary without changing Goal WHAT."
+      ]
+    },
+    "schema_expectation": "accept"
+  }
+}

@@ -14,13 +14,27 @@ from typing import Any
 from pydantic import ValidationError
 
 try:
-    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
+    from chromie_contracts.core_interpretation import (
+        CognitiveResponsibilityProposal,
+        CognitiveWorkRequest,
+    )
     from chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.plan import CanonicalPlan, FastPlannerAdvanceModelOutput, FastPlannerProgressAct
+    from chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerAdvanceModelOutput,
+        FastPlannerProgressAct,
+    )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
+    from shared.chromie_contracts.core_interpretation import (
+        CognitiveResponsibilityProposal,
+        CognitiveWorkRequest,
+    )
     from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.plan import CanonicalPlan, FastPlannerAdvanceModelOutput, FastPlannerProgressAct
+    from shared.chromie_contracts.plan import (
+        CanonicalPlan,
+        FastPlannerAdvanceModelOutput,
+        FastPlannerProgressAct,
+    )
 
 from .capabilities.validator import validate_args_for_schema
 from .planner_context import planner_goal_execution_requirements
@@ -71,15 +85,9 @@ def _contains_exact_material_value(container: Any, expected: Any) -> bool:
     if _material_values_equal(container, expected):
         return True
     if isinstance(container, dict):
-        return any(
-            _contains_exact_material_value(value, expected)
-            for value in container.values()
-        )
+        return any(_contains_exact_material_value(value, expected) for value in container.values())
     if isinstance(container, list):
-        return any(
-            _contains_exact_material_value(value, expected)
-            for value in container
-        )
+        return any(_contains_exact_material_value(value, expected) for value in container)
     return False
 
 
@@ -161,9 +169,7 @@ def planner_validation_error_json(
             raw=raw,
             planner_tier=planner_tier,
             expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-            include_canonical_plan_diagnostics=(
-                include_canonical_plan_diagnostics
-            ),
+            include_canonical_plan_diagnostics=(include_canonical_plan_diagnostics),
         ),
         limit,
     )
@@ -248,7 +254,18 @@ def qualify_fast_canonical_plan(
             }
         )
         return FastPlanQualification(True, plan.model_copy(update={"metadata": metadata}))
-    if plan.coverage != "complete":
+    if plan.disposition == "clarify":
+        missing_satisfaction = [
+            outcome.goal_id
+            for outcome in plan.goal_outcomes
+            if outcome.satisfaction is None
+        ]
+        if plan.goal_satisfaction is None or missing_satisfaction:
+            return reject(
+                "clarification_satisfaction_missing",
+                unresolved=(missing_satisfaction or list(plan.unresolved)),
+            )
+    elif plan.coverage != "complete":
         return reject(
             "coverage_not_complete",
             unresolved=list(plan.unresolved),
@@ -257,7 +274,26 @@ def qualify_fast_canonical_plan(
                 "proposed_confidence": plan.confidence,
             },
         )
-    if plan.goal_satisfaction is None or plan.goal_satisfaction.score < 0.95:
+    plan_relation = str(plan.metadata.get("plan_relation") or "exact")
+    minimum_satisfaction = (
+        0.75 if plan_relation in {"safe_adjustment", "alternative"} else 0.95
+    )
+    achieving_dispositions = {"execute", "respond"}
+    achieving_outcomes = [
+        outcome
+        for outcome in plan.goal_outcomes
+        if outcome.disposition in achieving_dispositions
+    ]
+    all_outcomes_achieving = bool(plan.goal_outcomes) and len(achieving_outcomes) == len(
+        plan.goal_outcomes
+    )
+    top_level_requires_exact_satisfaction = (
+        plan.disposition in achieving_dispositions and not plan.goal_outcomes
+    ) or all_outcomes_achieving
+    if plan.goal_satisfaction is None or (
+        top_level_requires_exact_satisfaction
+        and plan.goal_satisfaction.score < minimum_satisfaction
+    ):
         return reject(
             "goal_satisfaction_not_exact",
             unresolved=list(plan.unresolved),
@@ -271,9 +307,15 @@ def qualify_fast_canonical_plan(
         )
     incomplete_outcomes = [
         outcome.goal_id
-        for outcome in plan.goal_outcomes
-        if outcome.satisfaction is None or outcome.satisfaction.score < 0.95
+        for outcome in achieving_outcomes
+        if outcome.satisfaction is None or outcome.satisfaction.score < minimum_satisfaction
     ]
+    incomplete_outcomes.extend(
+        outcome.goal_id
+        for outcome in plan.goal_outcomes
+        if outcome.disposition not in achieving_dispositions
+        and outcome.satisfaction is None
+    )
     if incomplete_outcomes:
         return reject(
             "per_goal_satisfaction_not_exact",
@@ -311,94 +353,6 @@ def qualify_fast_canonical_plan(
     return FastPlanQualification(True, plan.model_copy(update={"metadata": metadata}))
 
 
-def restore_required_capability_args_from_responsibilities(
-    raw: dict[str, Any],
-    *,
-    responsibilities: list[CognitiveResponsibilityProposal],
-    capabilities: list[dict[str, Any]],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Restore omitted direct args when GI already owns the exact value.
-
-    The model still owns Capability selection. Once it selects a Capability,
-    copying an identically named accepted input from every cited Responsibility
-    is mechanical provenance preservation, not a new HOW decision. This includes
-    an optional provider input with a default: an explicit human value must win
-    over that default. Conflicting, partial, or transformed inputs remain
-    model-owned and fail through the normal contract boundary.
-    """
-
-    activities = raw.get("activities")
-    if not isinstance(activities, list):
-        return raw, []
-    by_ref = {item.local_ref: item for item in responsibilities}
-    by_capability = {
-        str(item.get("capability_id") or ""): item
-        for item in capabilities
-        if isinstance(item, dict) and str(item.get("capability_id") or "")
-    }
-    normalized = copy.deepcopy(raw)
-    normalized_activities = normalized.get("activities")
-    if not isinstance(normalized_activities, list):
-        return raw, []
-    repairs: list[dict[str, Any]] = []
-    for activity_index, activity in enumerate(normalized_activities):
-        if not isinstance(activity, dict) or activity.get("role") != "capability":
-            continue
-        capability_id = str(activity.get("capability_id") or "")
-        definition = by_capability.get(capability_id)
-        if not isinstance(definition, dict):
-            continue
-        input_schema = definition.get("input_schema")
-        if not isinstance(input_schema, dict):
-            continue
-        properties = input_schema.get("properties")
-        if not isinstance(properties, dict):
-            properties = {}
-        source_refs = [
-            str(item)
-            for item in activity.get("source_responsibility_refs") or []
-            if str(item) in by_ref
-        ]
-        if not source_refs:
-            continue
-        args = activity.get("args")
-        if not isinstance(args, dict):
-            args = {}
-        else:
-            args = dict(args)
-        changed = False
-        for parameter in properties:
-            if parameter in args:
-                continue
-            if not all(
-                parameter in by_ref[source_ref].bindings
-                for source_ref in source_refs
-            ):
-                continue
-            values = [
-                by_ref[source_ref].bindings[parameter]
-                for source_ref in source_refs
-            ]
-            first = values[0]
-            if any(value != first for value in values[1:]):
-                continue
-            args[parameter] = copy.deepcopy(first)
-            changed = True
-            repairs.append(
-                {
-                    "activity_index": activity_index,
-                    "activity_id": str(activity.get("activity_id") or ""),
-                    "capability_id": capability_id,
-                    "parameter": parameter,
-                    "source_responsibility_refs": source_refs,
-                    "recovery": "restored_exact_arg_from_authoritative_responsibility",
-                }
-            )
-        if changed:
-            activity["args"] = args
-    return (normalized if repairs else raw), repairs
-
-
 def validate_fast_advance_output(
     output: FastPlannerAdvanceModelOutput,
     *,
@@ -418,16 +372,10 @@ def validate_fast_advance_output(
         for item in request.interpretation_unresolved
         if " ".join(str(item or "").strip().split())
     }
-    clarification_activities = [
-        item for item in output.activities if item.role == "clarification"
-    ]
-    capability_activities = [
-        item for item in output.activities if item.role == "capability"
-    ]
+    clarification_activities = [item for item in output.activities if item.role == "clarification"]
+    capability_activities = [item for item in output.activities if item.role == "capability"]
     terminal_activities = [
-        item
-        for item in output.activities
-        if item.role in {"capability", "complete_response"}
+        item for item in output.activities if item.role in {"capability", "complete_response"}
     ]
     parallel_batch: list[Any] = []
     for activity in capability_activities:
@@ -437,15 +385,13 @@ def validate_fast_advance_output(
         if len(parallel_batch) == 1 and len(capability_activities) > 1:
             raise FastAdvanceMechanicalSchedulingError(
                 "Fast Planner parallel timing must form a contiguous group of at "
-                "least two Capability Activities; singleton="
-                + parallel_batch[0].activity_id
+                "least two Capability Activities; singleton=" + parallel_batch[0].activity_id
             )
         parallel_batch = []
     if len(parallel_batch) == 1 and len(capability_activities) > 1:
         raise FastAdvanceMechanicalSchedulingError(
             "Fast Planner parallel timing must form a contiguous group of at "
-            "least two Capability Activities; singleton="
-            + parallel_batch[0].activity_id
+            "least two Capability Activities; singleton=" + parallel_batch[0].activity_id
         )
     parallel_errors = parallel_activity_contract_errors(
         capability_activities,
@@ -462,12 +408,8 @@ def validate_fast_advance_output(
                 separators=(",", ":"),
             )
         )
-    activity_indexes_by_ref: dict[str, list[int]] = {
-        ref: [] for ref in responsibility_refs
-    }
-    terminal_by_ref: dict[str, list[Any]] = {
-        ref: [] for ref in responsibility_refs
-    }
+    activity_indexes_by_ref: dict[str, list[int]] = {ref: [] for ref in responsibility_refs}
+    terminal_by_ref: dict[str, list[Any]] = {ref: [] for ref in responsibility_refs}
     for activity_index, activity in enumerate(terminal_activities):
         for source_ref in activity.source_responsibility_refs:
             if source_ref not in activity_indexes_by_ref:
@@ -477,16 +419,15 @@ def validate_fast_advance_output(
 
     def sibling_refs(value: Any) -> list[str]:
         values = value if isinstance(value, list) else [value]
-        return [
-            str(item).strip()
-            for item in values
-            if str(item).strip() in by_ref
-        ]
+        return [str(item).strip() for item in values if str(item).strip() in by_ref]
 
     for source_ref, source in by_ref.items():
         for relation_name in ("before", "precedes"):
             for target_ref in sibling_refs(source.bindings.get(relation_name)):
-                if not activity_indexes_by_ref[source_ref] or not activity_indexes_by_ref[target_ref]:
+                if (
+                    not activity_indexes_by_ref[source_ref]
+                    or not activity_indexes_by_ref[target_ref]
+                ):
                     continue
                 if max(activity_indexes_by_ref[source_ref]) >= min(
                     activity_indexes_by_ref[target_ref]
@@ -500,7 +441,10 @@ def validate_fast_advance_output(
                     )
         for relation_name in ("after", "follows"):
             for target_ref in sibling_refs(source.bindings.get(relation_name)):
-                if not activity_indexes_by_ref[source_ref] or not activity_indexes_by_ref[target_ref]:
+                if (
+                    not activity_indexes_by_ref[source_ref]
+                    or not activity_indexes_by_ref[target_ref]
+                ):
                     continue
                 if min(activity_indexes_by_ref[source_ref]) <= max(
                     activity_indexes_by_ref[target_ref]
@@ -537,9 +481,7 @@ def validate_fast_advance_output(
                     f"Activity; source_ref={source_ref} "
                     f"output_mode={source.output_mode}"
                 )
-    numeric_args_by_ref: dict[str, set[Decimal]] = {
-        ref: set() for ref in responsibility_refs
-    }
+    numeric_args_by_ref: dict[str, set[Decimal]] = {ref: set() for ref in responsibility_refs}
     for activity in capability_activities:
         activity_numbers = semantic_numeric_values(activity.args)
         for source_ref in activity.source_responsibility_refs:
@@ -547,12 +489,9 @@ def validate_fast_advance_output(
                 numeric_args_by_ref[source_ref].update(activity_numbers)
     for source_ref, source in by_ref.items():
         required_numbers = semantic_numeric_values(source.bindings)
-        missing_numbers = sorted(
-            required_numbers - numeric_args_by_ref.get(source_ref, set())
-        )
+        missing_numbers = sorted(required_numbers - numeric_args_by_ref.get(source_ref, set()))
         if missing_numbers and any(
-            source_ref in activity.source_responsibility_refs
-            for activity in capability_activities
+            source_ref in activity.source_responsibility_refs for activity in capability_activities
         ):
             raise PlannerDTOContractError(
                 "Fast Planner Capability args omitted explicit numeric "
@@ -572,8 +511,7 @@ def validate_fast_advance_output(
             raise PlannerDTOContractError(
                 "Fast Planner must supply one terminal Activity for every "
                 "authoritative Responsibility before claiming a terminal "
-                "disposition; missing="
-                + ",".join(sorted(missing_terminal_refs))
+                "disposition; missing=" + ",".join(sorted(missing_terminal_refs))
             )
     if clarification_activities:
         expected_disposition = "mixed" if capability_activities else "clarify"
@@ -588,9 +526,7 @@ def validate_fast_advance_output(
                 "clarification outcomes without executable Work"
             )
     all_gap_ids = [
-        gap.gap_id
-        for activity in clarification_activities
-        for gap in activity.information_gaps
+        gap.gap_id for activity in clarification_activities for gap in activity.information_gaps
     ]
     if len(all_gap_ids) != len(set(all_gap_ids)):
         raise PlannerDTOContractError(
@@ -632,9 +568,7 @@ def validate_fast_advance_output(
                 }
                 for parameter in gap.required_for:
                     parameter_schema = properties.get(parameter)
-                    if parameter not in required or not isinstance(
-                        parameter_schema, dict
-                    ):
+                    if parameter not in required or not isinstance(parameter_schema, dict):
                         raise PlannerDTOContractError(
                             "execution-input clarification may name only required "
                             f"Capability inputs: {gap.source_reference}.{parameter}"
@@ -646,8 +580,7 @@ def validate_fast_advance_output(
                         )
                     if parameter in bound_names:
                         raise PlannerDTOContractError(
-                            "Planner cannot ask for an already-bound input: "
-                            f"{parameter}"
+                            f"Planner cannot ask for an already-bound input: {parameter}"
                         )
         if activity.role != "capability":
             continue
@@ -718,9 +651,7 @@ def validate_fast_advance_output(
             # argument_realization metadata so a valid live target does not look
             # like an invented required input.
             if parameter == "target_ref":
-                target_context = request.context.get(
-                    "planner_auxiliary_social_context"
-                )
+                target_context = request.context.get("planner_auxiliary_social_context")
                 target_evidence = (
                     target_context.get("target_evidence")
                     if isinstance(target_context, dict)
@@ -728,22 +659,14 @@ def validate_fast_advance_output(
                 )
                 target = (
                     target_evidence.get("target")
-                    if isinstance(target_evidence, dict)
-                    and target_evidence.get("available")
+                    if isinstance(target_evidence, dict) and target_evidence.get("available")
                     else None
                 )
                 expected_target_ref = str(
-                    target.get("target_ref")
-                    if isinstance(target, dict)
-                    else ""
+                    target.get("target_ref") if isinstance(target, dict) else ""
                 ).strip()
-                actual_target_ref = str(
-                    activity.args.get(parameter) or ""
-                ).strip()
-                if (
-                    not expected_target_ref
-                    or actual_target_ref != expected_target_ref
-                ):
+                actual_target_ref = str(activity.args.get(parameter) or "").strip()
+                if not expected_target_ref or actual_target_ref != expected_target_ref:
                     raise AuthoritativeGroundingValidationError(
                         "Fast Planner target realization must copy exact "
                         "current trusted target evidence: "
@@ -760,11 +683,7 @@ def validate_fast_advance_output(
                     )
                 )
                 is not None
-                and parameter
-                in {
-                    str(name)
-                    for name in realization.get("arguments") or []
-                }
+                and parameter in {str(name) for name in realization.get("arguments") or []}
             ]
             if realization_sources:
                 if _is_physical_resource_structured_realization(
@@ -843,9 +762,7 @@ def validate_work_reuse_selection(
     later validates canonical Goal ownership and live runtime state.
     """
 
-    raw_activities = (context or {}).get(
-        "existing_work_activities"
-    )
+    raw_activities = (context or {}).get("existing_work_activities")
     activities = (
         [item for item in raw_activities if isinstance(item, dict)]
         if isinstance(raw_activities, list)
@@ -862,9 +779,7 @@ def validate_work_reuse_selection(
         if not activity_id:
             continue
         if activity_id in cited:
-            raise PlannerDTOContractError(
-                f"reuse_activity_id is duplicated: {activity_id}"
-            )
+            raise PlannerDTOContractError(f"reuse_activity_id is duplicated: {activity_id}")
         cited.add(activity_id)
         activity = by_id.get(activity_id)
         if activity is None:
@@ -872,33 +787,24 @@ def validate_work_reuse_selection(
                 f"reuse_activity_id was not supplied by Runtime: {activity_id}"
             )
         if step.capability_id != str(activity.get("capability_id") or ""):
-            raise PlannerDTOContractError(
-                f"reuse_activity_id {activity_id} changes capability_id"
-            )
+            raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes capability_id")
         if step.args != dict(activity.get("args") or {}):
-            raise PlannerDTOContractError(
-                f"reuse_activity_id {activity_id} changes immutable args"
-            )
+            raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes immutable args")
         if step.timing != str(activity.get("timing") or "sequential"):
-            raise PlannerDTOContractError(
-                f"reuse_activity_id {activity_id} changes timing"
-            )
+            raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes timing")
 
     # The supplied reconciliation projection is one bounded snapshot.
     # Reusing any member currently requires selecting every member; extra
     # newly planned steps remain legal and execute beside the reused set.
     if cited and cited != set(by_id):
+        raise PlannerDTOContractError("Work reuse must select the complete supplied Activity set")
+    if (
+        cited
+        and any(by_id[activity_id].get("origin") == "retained_runtime" for activity_id in cited)
+        and len(output.steps) != len(cited)
+    ):
         raise PlannerDTOContractError(
-            "Work reuse must select the complete supplied "
-            "Activity set"
-        )
-    if cited and any(
-        by_id[activity_id].get("origin") == "retained_runtime"
-        for activity_id in cited
-    ) and len(output.steps) != len(cited):
-        raise PlannerDTOContractError(
-            "retained Runtime Work reuse cannot add steps to the "
-            "reconciliation-only Plan"
+            "retained Runtime Work reuse cannot add steps to the reconciliation-only Plan"
         )
 
 

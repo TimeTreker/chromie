@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agent.app import planner_validation
 from agent.app import planner_deep_validation
+from agent.app import planner_fast_validation
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
@@ -13,14 +14,13 @@ from typing import Any
 
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.planner_model_contract import PlannerModelOutput
-from agent.app.planner_fast_validation import (
-    restore_required_capability_args_from_responsibilities,
-)
 from agent.app.planner_schema import (
+    canonical_goal_binding_argument_response_schema,
     canonical_plan_response_schema,
     fast_multi_goal_response_schema,
 )
 from agent.app.planner_validation import (
+    explicit_numeric_goal_values,
     information_goal_ids_without_declared_provider,
     qualify_capability_catalog_for_information_domains,
     validate_goal_responsibility_outcomes,
@@ -68,53 +68,12 @@ def _allows_null(node: Any) -> bool:
 
 
 class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
-    def test_fast_advance_explicit_binding_overrides_optional_provider_default(self) -> None:
-        raw = {
-            "activities": [
-                {
-                    "role": "capability",
-                    "capability_id": "soridormi.blink_eyes",
-                    "activity_id": "blink-once",
-                    "args": {"intensity": 1.0},
-                    "source_responsibility_refs": ["r2"],
-                }
-            ]
-        }
-        responsibilities = [
-            CognitiveResponsibilityProposal(
-                local_ref="r2",
-                outcome="blink once",
-                bindings={"count": 1},
-                confidence=1.0,
-                relationship="new",
-                target_goal_ids=[],
-                output_mode="body_action",
+    def test_fast_validation_exposes_no_host_argument_restoration(self) -> None:
+        self.assertFalse(
+            hasattr(
+                planner_fast_validation,
+                "restore_required_capability_args_from_responsibilities",
             )
-        ]
-        capabilities = [
-            {
-                "capability_id": "soridormi.blink_eyes",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "count": {"type": "number", "default": 2},
-                        "intensity": {"type": "number", "default": 1.0},
-                    },
-                },
-            }
-        ]
-
-        restored, repairs = restore_required_capability_args_from_responsibilities(
-            raw,
-            responsibilities=responsibilities,
-            capabilities=capabilities,
-        )
-
-        self.assertEqual(restored["activities"][0]["args"]["count"], 1)
-        self.assertEqual(repairs[0]["parameter"], "count")
-        self.assertEqual(
-            repairs[0]["recovery"],
-            "restored_exact_arg_from_authoritative_responsibility",
         )
 
     def test_typed_information_domain_qualifies_deep_planner_catalog(self) -> None:
@@ -146,11 +105,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "resource": {
                         "kind": "information",
                         "attributes": {
-                            "information_domain": {
-                                "value": "direct_environment_perception"
-                            }
+                            "information_domain": {"value": "direct_environment_perception"}
                         },
-                    }
+                    },
                 },
             }
         ]
@@ -175,9 +132,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "resource": {
                         "kind": "information",
                         "attributes": {
-                            "information_domain": {
-                                "value": "external_grounded_information"
-                            }
+                            "information_domain": {"value": "external_grounded_information"}
                         },
                     },
                 },
@@ -230,9 +185,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             unavailable_schema["properties"]["disposition"]["enum"],
             ["unavailable", "refused"],
         )
-        unavailable_outcome = unavailable_schema["properties"]["goal_outcomes"][
-            "properties"
-        ]["goal-presence"]
+        unavailable_outcome = unavailable_schema["properties"]["goal_outcomes"]["properties"][
+            "goal-presence"
+        ]
         self.assertEqual(
             unavailable_outcome["properties"]["disposition"]["enum"],
             ["unavailable", "refused"],
@@ -240,6 +195,29 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             unavailable_outcome["properties"]["response_text"]["minLength"],
             1,
+        )
+
+        incomplete_resource_schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-mug"],
+            allowed_capability_ids=["soridormi.acquire_resource"],
+            requires_execution=True,
+            unavailable_resource_goal_ids=["goal-mug"],
+        )
+        self.assertEqual(
+            incomplete_resource_schema["properties"]["disposition"]["enum"],
+            ["unavailable", "refused"],
+        )
+        incomplete_resource_outcome = incomplete_resource_schema["properties"]["goal_outcomes"][
+            "properties"
+        ]["goal-mug"]
+        self.assertEqual(
+            incomplete_resource_outcome["properties"]["disposition"]["enum"],
+            ["unavailable", "refused"],
+        )
+        self.assertEqual(
+            incomplete_resource_outcome["properties"]["step_ids"]["maxItems"],
+            0,
         )
 
         mixed_schema = canonical_plan_response_schema(
@@ -253,42 +231,28 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "mixed",
             mixed_schema["properties"]["disposition"]["enum"],
         )
-        walk_outcome = mixed_schema["properties"]["goal_outcomes"][
-            "properties"
-        ]["goal-walk"]
+        walk_outcome = mixed_schema["properties"]["goal_outcomes"]["properties"]["goal-walk"]
         self.assertIn(
             "execute",
             walk_outcome["properties"]["disposition"]["enum"],
         )
-        sing_outcome = mixed_schema["properties"]["goal_outcomes"][
-            "properties"
-        ]["goal-sing"]
+        sing_outcome = mixed_schema["properties"]["goal_outcomes"]["properties"]["goal-sing"]
         self.assertNotIn(
             "execute",
             sing_outcome["properties"]["disposition"]["enum"],
         )
         self.assertTrue(
             any(
-                branch.get("properties", {})
-                .get("disposition", {})
-                .get("enum")
-                == ["execute"]
-                and branch.get("properties", {})
-                .get("step_ids", {})
-                .get("minItems")
-                == 1
+                branch.get("properties", {}).get("disposition", {}).get("enum") == ["execute"]
+                and branch.get("properties", {}).get("step_ids", {}).get("minItems") == 1
                 for clause in walk_outcome["allOf"]
                 for branch in clause.get("anyOf", [])
             )
         )
         self.assertTrue(
             any(
-                branch.get("properties", {})
-                .get("disposition", {})
-                .get("enum")
-                == ["mixed"]
-                and branch.get("properties", {}).get("steps", {}).get("minItems")
-                == 1
+                branch.get("properties", {}).get("disposition", {}).get("enum") == ["mixed"]
+                and branch.get("properties", {}).get("steps", {}).get("minItems") == 1
                 for clause in mixed_schema["allOf"]
                 for branch in clause.get("anyOf", [])
             )
@@ -301,13 +265,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(
             any(
-                branch.get("properties", {})
-                .get("disposition", {})
-                .get("enum")
+                branch.get("properties", {}).get("disposition", {}).get("enum")
                 and "escalate"
-                in branch.get("properties", {})
-                .get("disposition", {})
-                .get("enum", [])
+                in branch.get("properties", {}).get("disposition", {}).get("enum", [])
                 and "exact"
                 not in branch.get("properties", {})
                 .get("goal_satisfaction", {})
@@ -333,44 +293,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         ]
 
         self.assertFalse(planner_validation.requires_safety_revision(feedback))
-        self.assertEqual(
-            planner_deep_validation.safety_revision_contract_errors(
-                CanonicalPlan(
-                    plan_id="semantic-repair",
-                    planner_tier="deep",
-                    disposition="mixed",
-                    coverage="complete",
-                    confidence=1.0,
-                    goal_ids=["goal-walk", "goal-sing"],
-                    response_text="I cannot sing, but I can still walk.",
-                    steps=[
-                        {
-                            "step_id": "walk",
-                            "capability_id": "soridormi.walk_forward",
-                            "args": {"duration_s": 15},
-                            "timing": "sequential",
-                            "source_goal_ids": ["goal-walk"],
-                        }
-                    ],
-                    goal_outcomes=[
-                        {
-                            "goal_id": "goal-walk",
-                            "disposition": "execute",
-                            "coverage": "complete",
-                            "step_ids": ["walk"],
-                        },
-                        {
-                            "goal_id": "goal-sing",
-                            "disposition": "unavailable",
-                            "coverage": "partial",
-                            "unresolved": ["singing provider unavailable"],
-                        },
-                    ],
-                ),
-                feedback,
-            ),
-            [],
-        )
+        self.assertFalse(hasattr(planner_deep_validation, "safety_revision_contract_errors"))
+        self.assertFalse(hasattr(planner_schema, "deep_safety_revision_response_schema"))
 
     def test_planner_schema_requires_confirmation_for_material_adjustment(self) -> None:
         schema = canonical_plan_response_schema(
@@ -382,190 +306,335 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             item
             for item in schema["allOf"]
             if any(
-                "plan_relation" in branch.get("properties", {})
-                for branch in item.get("anyOf", [])
+                "plan_relation" in branch.get("properties", {}) for branch in item.get("anyOf", [])
             )
         )
         exact, adjusted = relation_constraint["anyOf"]
 
-        self.assertEqual(
-            exact["properties"]["user_confirmation_required"]["enum"],
-            [False],
+        self.assertNotIn(
+            "user_confirmation_required",
+            exact["properties"],
         )
         self.assertEqual(
             adjusted["properties"]["user_confirmation_required"]["enum"],
             [True],
         )
+        self.assertEqual(adjusted["properties"]["response_text"]["minLength"], 1)
+
+        fast = canonical_plan_response_schema(
+            planner_tier="fast",
+            expected_goal_ids=["goal-walk"],
+            allowed_capability_ids=["soridormi.walk_forward"],
+            requires_execution=True,
+        )
+        nonexact_satisfaction = next(
+            item
+            for item in fast["allOf"]
+            if item.get("if", {}).get("properties", {}).get("plan_relation", {}).get("enum")
+            == ["safe_adjustment", "alternative"]
+        )
         self.assertEqual(
-            adjusted["properties"]["response_text"]["minLength"], 1
+            nonexact_satisfaction["then"]["properties"]["goal_satisfaction"]["properties"][
+                "status"
+            ]["enum"],
+            ["substantial"],
+        )
+        self.assertEqual(
+            nonexact_satisfaction["then"]["properties"]["goal_outcomes"]["properties"]["goal-walk"][
+                "properties"
+            ]["satisfaction"]["properties"]["status"]["enum"],
+            ["substantial"],
         )
 
-    def test_deep_safety_revision_schema_forbids_exact_sequential_execution(self) -> None:
-        base = canonical_plan_response_schema(
-            planner_tier="deep",
-            expected_goal_ids=["goal-walk", "goal-blink"],
-            allowed_capability_ids=[
-                "soridormi.walk_forward",
-                "soridormi.blink_eyes",
-            ],
-        )
-        feedback = [{"type": "parallel_capability_not_declared_safe"}]
-        schema = planner_schema.deep_safety_revision_response_schema(
-            base,
-            feedback=feedback,
-        )
-        branches = schema["allOf"][-1]["anyOf"]
-        adjustment, non_execution = branches
+    def test_planner_schema_keeps_time_conditions_and_provider_confirmation(self) -> None:
+        for planner_tier in ("fast", "deep"):
+            schema = canonical_plan_response_schema(
+                planner_tier=planner_tier,
+                expected_goal_ids=["goal-reminder"],
+                allowed_capability_ids=["chromie.reminder.create"],
+                confirmation_required_capability_ids=["chromie.reminder.create"],
+            )
+            self.assertIn("time_conditions", schema["properties"])
+            self.assertIn("time_conditions", schema["required"])
+            confirmation_constraint = next(
+                item
+                for item in schema["allOf"]
+                if item.get("then", {})
+                .get("properties", {})
+                .get("user_confirmation_required", {})
+                .get("enum")
+                == [True]
+            )
+            self.assertEqual(
+                confirmation_constraint["if"]["properties"]["steps"]["contains"]["properties"][
+                    "capability_id"
+                ]["enum"],
+                ["chromie.reminder.create"],
+            )
 
-        self.assertEqual(
-            adjustment["properties"]["plan_relation"]["enum"],
-            ["safe_adjustment", "alternative"],
-        )
-        self.assertEqual(
-            adjustment["properties"]["user_confirmation_required"]["enum"],
-            [True],
-        )
-        self.assertEqual(
-            non_execution["properties"]["steps"]["maxItems"], 0
-        )
-        self.assertEqual(
-            schema["$defs"]["PlannerModelStep"]["properties"]["timing"]["enum"],
-            ["sequential"],
-        )
-        self.assertTrue(
-            planner_validation.requires_safety_revision(feedback)
-        )
-
-    def test_deep_safety_revision_is_enforced_after_decoder_output(self) -> None:
-        feedback = [{"type": "parallel_capability_not_declared_safe"}]
-        exact = CanonicalPlan(
-            plan_id="unsafe-exact-revision",
-            planner_tier="deep",
-            disposition="execute",
-            coverage="complete",
-            confidence=1.0,
-            goal_ids=["goal-walk"],
-            steps=[
-                {
-                    "step_id": "walk",
-                    "capability_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 15},
-                    "timing": "sequential",
-                    "source_goal_ids": ["goal-walk"],
+    def test_goal_binding_schema_uses_provider_numeric_json_type(self) -> None:
+        base = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-blink"],
+            allowed_capability_ids=["soridormi.blink_eyes"],
+            capability_input_schemas={
+                "soridormi.blink_eyes": {
+                    "type": "object",
+                    "properties": {
+                        "count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 10,
+                        }
+                    },
+                    "required": ["count"],
+                    "additionalProperties": False,
                 }
-            ],
-            metadata={
-                "plan_relation": "exact",
-                "user_confirmation_required": False,
             },
         )
-        adjusted = exact.model_copy(
-            update={
-                "plan_id": "safe-adjusted-revision",
-                "response_text": "I cannot verify overlap safety; may I run the actions sequentially?",
-                "metadata": {
-                    "plan_relation": "safe_adjustment",
-                    "user_confirmation_required": True,
-                },
-            }
+        schema = canonical_goal_binding_argument_response_schema(
+            base,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-blink",
+                    "object": {
+                        "bindings": {
+                            "count": {
+                                "entity_type": "count",
+                                "value": "4",
+                            }
+                        }
+                    },
+                }
+            ],
         )
-        relabeled_parallel = adjusted.model_copy(
-            update={
-                "steps": [
-                    adjusted.steps[0].model_copy(update={"timing": "parallel"})
-                ]
-            }
+        branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
+        self.assertEqual(
+            branch["properties"]["args"]["properties"]["count"]["const"],
+            4,
         )
 
-        errors = planner_deep_validation.safety_revision_contract_errors(
-            exact,
-            feedback,
+    def test_fast_escalation_outcome_schema_forbids_response_text(self) -> None:
+        schema = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-wave"],
+            allowed_capability_ids=[],
+        )
+        outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-wave"]
+        escalation = next(
+            branch["then"]
+            for branch in outcome["allOf"]
+            if branch.get("if", {}).get("properties", {}).get("disposition", {}).get("enum")
+            == ["escalate"]
+        )
+        self.assertEqual(
+            escalation["properties"]["response_text"]["maxLength"],
+            0,
         )
 
+    def test_fast_multi_goal_schema_keeps_effectful_goals_out_of_response(self) -> None:
+        schema = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-speech", "goal-blink", "goal-wave"],
+            allowed_capability_ids=["soridormi.blink_eyes"],
+            response_goal_ids=["goal-speech"],
+            effectful_goal_ids=["goal-blink", "goal-wave"],
+        )
+        assignment_clause = next(
+            clause
+            for clause in schema["allOf"]
+            if any(
+                "goal_outcomes" in branch.get("properties", {})
+                for branch in clause.get("anyOf", [])
+            )
+        )
+        branches = assignment_clause["anyOf"]
+
+        self.assertFalse(
+            any(
+                branch["properties"]["goal_outcomes"]["properties"]["goal-wave"]["properties"][
+                    "disposition"
+                ]["enum"]
+                == ["respond"]
+                for branch in branches
+            )
+        )
+        terminal = next(
+            branch
+            for branch in branches
+            if branch["properties"]["disposition"]["enum"] == ["mixed"]
+        )
+        self.assertEqual(terminal["properties"]["coverage"]["enum"], ["complete"])
         self.assertEqual(
-            errors[0]["type"],
-            "safety_revision_contract_not_satisfied",
+            terminal["properties"]["goal_outcomes"]["properties"]["goal-blink"]["properties"][
+                "coverage"
+            ]["enum"],
+            ["complete"],
+        )
+        escalation = next(
+            branch
+            for branch in branches
+            if branch["properties"]["disposition"]["enum"] == ["escalate"]
         )
         self.assertEqual(
-            planner_deep_validation.safety_revision_contract_errors(
-                adjusted,
-                feedback,
-            ),
-            [],
-        )
-        self.assertEqual(
-            planner_deep_validation.safety_revision_contract_errors(
-                relabeled_parallel,
-                feedback,
-            )[0]["parallel_step_ids"],
-            ["walk"],
+            escalation["properties"]["coverage"]["enum"],
+            ["partial", "uncertain"],
         )
 
-    def test_execute_outcome_null_response_normalizes_only_to_semantic_empty(self) -> None:
-        output = PlannerModelOutput.model_validate(
-            {
-                "disposition": "mixed",
-                "coverage": "complete",
-                "confidence": 1.0,
-                "response_text": None,
-                "steps": [
+    def test_numeric_provenance_uses_typed_bindings_not_iso_date_fragments(self) -> None:
+        self.assertEqual(
+            explicit_numeric_goal_values(
+                [
                     {
-                        "step_id": "walk",
-                        "capability_id": "soridormi.walk_forward",
-                        "args": {"duration_s": 15},
-                        "timing": "sequential",
-                        "source_goal_ids": ["goal-walk"],
+                        "goal_id": "goal-reminder",
+                        "description": "Create it at 2026-09-04T18:30:00+08:00.",
+                        "object": {
+                            "bindings": {
+                                "due_at": {
+                                    "entity_type": "due_time",
+                                    "value": "2026-09-04T18:30:00+08:00",
+                                },
+                                "count": {
+                                    "entity_type": "count",
+                                    "value": "2",
+                                },
+                            }
+                        },
                     }
-                ],
-                "goal_outcomes": {
-                    "goal-walk": {
-                        "disposition": "execute",
-                        "coverage": "complete",
-                        "response_text": None,
-                        "step_ids": ["walk"],
-                    },
-                    "goal-song": {
-                        "disposition": "respond",
-                        "coverage": "complete",
-                        "response_text": "我给你唱一段。",
-                        "step_ids": [],
-                    },
-                },
-                "goal_satisfaction": {"score": 1.0, "status": "exact"},
-            }
+                ]
+            ),
+            {"goal-reminder": [2]},
         )
 
-        self.assertEqual(output.response_text, "")
-        self.assertEqual(output.goal_outcomes["goal-walk"].response_text, "")
-        self.assertEqual(
-            output.goal_outcomes["goal-song"].response_text,
-            "我给你唱一段。",
+    def test_ready_at_binding_constrains_goal_time_condition(self) -> None:
+        base = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-weather"],
+            allowed_capability_ids=["chromie.weather.lookup"],
+            capability_input_schemas={
+                "chromie.weather.lookup": {
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
+                    "additionalProperties": False,
+                }
+            },
         )
+        schema = canonical_goal_binding_argument_response_schema(
+            base,
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-weather",
+                    "object": {
+                        "bindings": {
+                            "ready_at": {
+                                "entity_type": "due_time",
+                                "value": "2026-09-04T19:00:00+08:00",
+                            }
+                        }
+                    },
+                }
+            ],
+        )
+        condition = schema["properties"]["time_conditions"]["items"]["oneOf"][0]
+        self.assertEqual(condition["properties"]["goal_id"]["const"], "goal-weather")
+        self.assertEqual(condition["properties"]["due_at_ms"]["const"], 1788519600000)
+
+    def test_execute_outcome_null_response_is_rejected_without_normalization(self) -> None:
+        with self.assertRaises(ValueError):
+            PlannerModelOutput.model_validate(
+                {
+                    "disposition": "mixed",
+                    "coverage": "complete",
+                    "confidence": 1.0,
+                    "response_text": None,
+                    "steps": [
+                        {
+                            "step_id": "walk",
+                            "capability_id": "soridormi.walk_forward",
+                            "args": {"duration_s": 15},
+                            "timing": "sequential",
+                            "source_goal_ids": ["goal-walk"],
+                        }
+                    ],
+                    "goal_outcomes": {
+                        "goal-walk": {
+                            "disposition": "execute",
+                            "coverage": "complete",
+                            "response_text": None,
+                            "step_ids": ["walk"],
+                        },
+                        "goal-song": {
+                            "disposition": "respond",
+                            "coverage": "complete",
+                            "response_text": "我给你唱一段。",
+                            "step_ids": [],
+                        },
+                    },
+                    "goal_satisfaction": {"score": 1.0, "status": "exact"},
+                }
+            )
 
     def test_spoken_goal_schema_and_validator_forbid_executable_ownership(self) -> None:
-        for schema in (
-            fast_multi_goal_response_schema(
-                expected_goal_ids=["goal-walk", "goal-song"],
-                allowed_capability_ids=["soridormi.walk_forward"],
-                response_goal_ids=["goal-song"],
-            ),
-            canonical_plan_response_schema(
-                planner_tier="deep",
-                expected_goal_ids=["goal-walk", "goal-song"],
-                allowed_capability_ids=["soridormi.walk_forward"],
-                response_goal_ids=["goal-song"],
-            ),
-        ):
-            outcome = schema["properties"]["goal_outcomes"]["properties"][
-                "goal-song"
-            ]
-            self.assertEqual(
-                outcome["properties"]["disposition"]["enum"], ["respond"]
-            )
+        fast_schema = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-walk", "goal-song"],
+            allowed_capability_ids=["soridormi.walk_forward"],
+            response_goal_ids=["goal-song"],
+        )
+        deep_schema = canonical_plan_response_schema(
+            planner_tier="deep",
+            expected_goal_ids=["goal-walk", "goal-song"],
+            allowed_capability_ids=["soridormi.walk_forward"],
+            response_goal_ids=["goal-song"],
+        )
+        self.assertEqual(
+            fast_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
+                "disposition"
+            ]["enum"],
+            ["respond", "clarify", "escalate"],
+        )
+        for schema in (fast_schema, deep_schema):
+            outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-song"]
             self.assertEqual(outcome["properties"]["step_ids"]["maxItems"], 0)
-            self.assertEqual(
-                outcome["properties"]["response_text"]["minLength"], 1
+        self.assertEqual(
+            deep_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
+                "disposition"
+            ]["enum"],
+            ["respond"],
+        )
+        self.assertEqual(
+            deep_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
+                "response_text"
+            ]["minLength"],
+            1,
+        )
+
+    def test_single_goal_fast_schema_enforces_respond_text_before_host_dto(self) -> None:
+        schema = fast_multi_goal_response_schema(
+            expected_goal_ids=["goal-status"],
+            allowed_capability_ids=[],
+        )
+
+        aggregate_constraint = next(
+            branch
+            for branch in schema["allOf"]
+            if isinstance(branch.get("anyOf"), list)
+            and any(
+                item.get("properties", {}).get("disposition", {}).get("enum") == ["respond"]
+                for item in branch["anyOf"]
             )
+        )
+        respond_branch = next(
+            branch
+            for branch in aggregate_constraint["anyOf"]
+            if branch["properties"]["disposition"]["enum"] == ["respond"]
+        )
+        self.assertEqual(
+            respond_branch["properties"]["response_text"]["minLength"],
+            1,
+        )
+        self.assertEqual(
+            respond_branch["properties"]["goal_outcomes"]["properties"]["goal-status"][
+                "properties"
+            ]["response_text"]["minLength"],
+            1,
+        )
 
         satisfaction = {
             "score": 1.0,
@@ -603,7 +672,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "goal_satisfaction": satisfaction,
             }
         )
-        with self.assertRaisesRegex(ValueError, "provider-required vocal goal requires exact capability_id"):
+        with self.assertRaisesRegex(
+            ValueError, "provider-required vocal goal requires exact capability_id"
+        ):
             validate_goal_responsibility_outcomes(
                 output,
                 authoritative_goals=[
@@ -622,12 +693,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             response_goal_ids=["goal-joke"],
         )
         self.assertIn("mixed", tool_schema["properties"]["disposition"]["enum"])
-        joke_outcome = tool_schema["properties"]["goal_outcomes"]["properties"][
-            "goal-joke"
-        ]
-        self.assertEqual(
-            joke_outcome["properties"]["disposition"]["enum"], ["respond"]
-        )
+        joke_outcome = tool_schema["properties"]["goal_outcomes"]["properties"]["goal-joke"]
+        self.assertEqual(joke_outcome["properties"]["disposition"]["enum"], ["respond"])
         self.assertNotIn("oneOf", joke_outcome)
         self.assertEqual(
             set(joke_outcome["required"]),
@@ -640,6 +707,38 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "satisfaction",
                 "rationale",
             },
+        )
+
+    def test_deep_schema_constrains_nonparallel_timing_and_nonexecute_confirmation(
+        self,
+    ) -> None:
+        schema = planner_schema.deep_plan_response_schema(
+            ["goal-walk"],
+            allowed_capability_ids=["soridormi.walk_forward"],
+            capability_input_schemas={
+                "soridormi.walk_forward": {
+                    "type": "object",
+                    "properties": {"duration_s": {"type": "number"}},
+                    "required": ["duration_s"],
+                    "additionalProperties": False,
+                }
+            },
+            nonparallel_capability_ids=["soridormi.walk_forward"],
+        )
+        step_branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
+        self.assertEqual(
+            step_branch["properties"]["timing"]["enum"],
+            ["sequential"],
+        )
+        confirmation_constraint = next(
+            item
+            for item in schema["allOf"]
+            if item.get("if", {}).get("properties", {}).get("disposition", {}).get("enum")
+            == ["respond", "clarify", "unavailable", "refused", "escalate"]
+        )
+        self.assertEqual(
+            confirmation_constraint["then"]["properties"]["user_confirmation_required"]["enum"],
+            [False],
         )
 
     async def test_preassociation_uncertainty_does_not_give_ga_question_authority(self) -> None:
@@ -693,7 +792,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcomes["maxProperties"], 1)
         self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
 
-
     def test_tool_route_planner_schema_requires_terminal_limitation_speech(self) -> None:
         fast = fast_multi_goal_response_schema(
             expected_goal_ids=["goal-weather"],
@@ -711,8 +809,15 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             fast["properties"]["disposition"]["enum"],
             ["execute", "clarify", "escalate"],
         )
+        self.assertEqual(fast["properties"]["response_text"]["maxLength"], 800)
+        exact_response_constraint = next(
+            item
+            for item in fast["allOf"]
+            if item.get("if", {}).get("properties", {}).get("plan_relation", {}).get("const")
+            == "exact"
+        )
         self.assertEqual(
-            fast["properties"]["response_text"]["maxLength"],
+            exact_response_constraint["then"]["properties"]["response_text"]["maxLength"],
             0,
         )
         fast_outcome = fast["properties"]["goal_outcomes"]["properties"]["goal-weather"]
@@ -734,9 +839,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             item
             for item in deep["allOf"]
             if any(
-                branch.get("properties", {})
-                .get("disposition", {})
-                .get("enum")
+                branch.get("properties", {}).get("disposition", {}).get("enum")
                 == ["clarify", "unavailable", "refused"]
                 for branch in item.get("anyOf", [])
             )
@@ -755,23 +858,17 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             item
             for item in deep_outcome["allOf"]
             if any(
-                branch.get("properties", {})
-                .get("disposition", {})
-                .get("enum")
+                branch.get("properties", {}).get("disposition", {}).get("enum")
                 == ["clarify", "unavailable", "refused"]
                 for branch in item.get("anyOf", [])
             )
         )
         self.assertEqual(
-            outcome_terminal_branch["anyOf"][0]["properties"]["response_text"][
-                "maxLength"
-            ],
+            outcome_terminal_branch["anyOf"][0]["properties"]["response_text"]["maxLength"],
             0,
         )
         self.assertEqual(
-            outcome_terminal_branch["anyOf"][1]["properties"]["response_text"][
-                "minLength"
-            ],
+            outcome_terminal_branch["anyOf"][1]["properties"]["response_text"]["minLength"],
             1,
         )
         self.assertNotIn(
@@ -805,9 +902,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 },
             }
             for planner_tier in ("fast", "deep"):
-                with self.subTest(
-                    planner_tier=planner_tier, step_count=step_count
-                ), self.assertRaisesRegex(ValueError, "timing"):
+                with (
+                    self.subTest(planner_tier=planner_tier, step_count=step_count),
+                    self.assertRaisesRegex(ValueError, "timing"),
+                ):
                     planner_validation.validate_planner_model_output(
                         raw,
                         planner_tier=planner_tier,
@@ -822,9 +920,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     planner_tier=planner_tier,
                     expected_goal_ids_for_turn=["goal-blink"],
                 )
-                self.assertTrue(
-                    all(step.timing == "sequential" for step in validated.steps)
-                )
+                self.assertTrue(all(step.timing == "sequential" for step in validated.steps))
 
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
         plan = CanonicalPlan(
@@ -900,13 +996,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_wake_up_greeting_rejects_incomplete_clause(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "complete punctuated"):
-            VoiceAssistant._validate_runtime_ready_greeting_completion(
-                "六点半啦，我困了，你吃晚"
-            )
+            VoiceAssistant._validate_runtime_ready_greeting_completion("六点半啦，我困了，你吃晚")
         self.assertEqual(
-            VoiceAssistant._validate_runtime_ready_greeting_completion(
-                "嗨，我醒啦！"
-            ),
+            VoiceAssistant._validate_runtime_ready_greeting_completion("嗨，我醒啦！"),
             "嗨，我醒啦！",
         )
 
@@ -949,7 +1041,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(created, [])
 
-
     def test_tts_echo_match_rejects_concatenated_robot_speech(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant._tts_text_by_generation = {
@@ -988,9 +1079,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tts_echo_match_keeps_real_barge_in(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._tts_text_by_generation = {
-            5: ["我会先眨两下眼睛，再往前走15秒。"]
-        }
+        assistant._tts_text_by_generation = {5: ["我会先眨两下眼睛，再往前走15秒。"]}
 
         likely, _, _ = assistant._likely_tts_echo(
             "停一下，我不是让你先眨眼。",
@@ -1018,9 +1107,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,
         )
-        outcome = schema["properties"]["goal_outcomes"]["properties"][
-            "goal-weather"
-        ]
+        outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-weather"]
 
         self.assertNotIn("$ref", outcome)
         self.assertEqual(

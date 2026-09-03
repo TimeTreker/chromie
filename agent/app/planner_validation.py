@@ -14,11 +14,27 @@ from typing import Any
 
 
 try:
-    from chromie_contracts.interaction import MEDIA_CAPABILITY_IDS, VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.plan import CanonicalPlan, GoalSatisfactionStatus, PlanParameterResolution
+    from chromie_contracts.interaction import (
+        MEDIA_CAPABILITY_IDS,
+        VOCAL_MODES,
+        VOCAL_PERFORMANCE_CAPABILITY_ID,
+    )
+    from chromie_contracts.plan import (
+        CanonicalPlan,
+        GoalSatisfactionStatus,
+        PlanParameterResolution,
+    )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.interaction import MEDIA_CAPABILITY_IDS, VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.plan import CanonicalPlan, GoalSatisfactionStatus, PlanParameterResolution
+    from shared.chromie_contracts.interaction import (
+        MEDIA_CAPABILITY_IDS,
+        VOCAL_MODES,
+        VOCAL_PERFORMANCE_CAPABILITY_ID,
+    )
+    from shared.chromie_contracts.plan import (
+        CanonicalPlan,
+        GoalSatisfactionStatus,
+        PlanParameterResolution,
+    )
 
 from .planner_context import (
     _goal_output_mode,
@@ -37,6 +53,7 @@ from .planner_grounding import (
     _goal_binding_map,
     _material_values_equal,
     _normalized_entity_type,
+    semantic_numeric_values,
 )
 from .planner_model_contract import (
     PlannerDTOContractError,
@@ -47,16 +64,21 @@ from .planner_model_contract import (
     ResourceResponsibilityRequiresCompositionError,
 )
 
-_NUMERIC_LITERAL_RE = re.compile(
-    r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
-)
+_NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])")
 _LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
 _INFORMATION_TEMPORAL_ENTITY_TYPES = frozenset(
     {
-        "day_part", "date", "date_range", "time", "time_frame",
-        "time_period", "temporal_period", "temporal_scope",
+        "day_part",
+        "date",
+        "date_range",
+        "time",
+        "time_frame",
+        "time_period",
+        "temporal_period",
+        "temporal_scope",
     }
 )
+
 
 def validate_goal_responsibility_outcomes(
     output: PlannerModelOutput,
@@ -90,10 +112,12 @@ def validate_goal_responsibility_outcomes(
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
             raise ValueError(f"vocal_output goal requires an explicit outcome: {goal_id}")
-        if outcome.disposition != "respond":
+        allowed_dispositions = {"escalate"} if output.disposition == "escalate" else {"respond"}
+        if outcome.disposition not in allowed_dispositions:
             raise ValueError(
-                "vocal_output goal must use disposition=respond and no "
-                f"executable step: {goal_id}"
+                "vocal_output goal must use disposition=respond in a terminal "
+                "plan or disposition=escalate in a whole-plan Fast escalation, "
+                f"with no executable step: {goal_id}"
             )
     for goal_id in sorted(provider_vocal_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
@@ -232,6 +256,7 @@ def validate_goal_responsibility_outcomes(
             "clarify/escalate/unavailable/refused evidence: " + goal_id
         )
 
+
 def qualify_capability_catalog_for_output_modes(
     capabilities: list[dict[str, Any]],
     *,
@@ -247,11 +272,7 @@ def qualify_capability_catalog_for_output_modes(
     """
 
     output_modes = {
-        " ".join(
-            str((goal.get("metadata") or {}).get("output_mode") or "")
-            .strip()
-            .split()
-        )
+        " ".join(str((goal.get("metadata") or {}).get("output_mode") or "").strip().split())
         for goal in authoritative_goals
         if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
     }
@@ -263,16 +284,12 @@ def qualify_capability_catalog_for_output_modes(
     has_information = "information" in output_modes
     has_stateful = "stateful_effect" in output_modes
     has_media = "media_playback" in output_modes
-    has_provider_vocal = bool(
-        output_modes.intersection(set(VOCAL_MODES) - {"speech"})
-    )
+    has_provider_vocal = bool(output_modes.intersection(set(VOCAL_MODES) - {"speech"}))
     qualified: list[dict[str, Any]] = []
     for capability in capabilities:
         if not isinstance(capability, dict):
             continue
-        capability_id = " ".join(
-            str(capability.get("capability_id") or "").strip().split()
-        )
+        capability_id = " ".join(str(capability.get("capability_id") or "").strip().split())
         effects = {
             " ".join(str(item or "").strip().split()).casefold()
             for item in capability.get("effects") or []
@@ -284,12 +301,9 @@ def qualify_capability_catalog_for_output_modes(
         if not isinstance(scope, dict) or not scope:
             scope = hints.get("semantic_scope")
         scope = scope if isinstance(scope, dict) else {}
-        responsibility_type = " ".join(
-            str(scope.get("responsibility_type") or "").strip().split()
-        )
+        responsibility_type = " ".join(str(scope.get("responsibility_type") or "").strip().split())
         resource_kinds = {
-            " ".join(str(item or "").strip().split())
-            for item in scope.get("resource_kinds") or []
+            " ".join(str(item or "").strip().split()) for item in scope.get("resource_kinds") or []
         }
         declared_output_modes = {
             " ".join(str(item or "").strip().split())
@@ -346,6 +360,7 @@ def qualify_capability_catalog_for_output_modes(
         # transport/provider shape. Providers must declare the semantic scope or
         # effect that makes the capability relevant to the Goal.
     return qualified
+
 
 def qualify_capability_catalog_for_information_domains(
     capabilities: list[dict[str, Any]],
@@ -406,9 +421,7 @@ def qualify_capability_catalog_for_information_domains(
         scope = scope if isinstance(scope, dict) else {}
         domain = " ".join(str(scope.get("domain") or "").strip().split())
         if domain and domain not in required_domains:
-            capability_id = " ".join(
-                str(capability.get("capability_id") or "").strip().split()
-            )
+            capability_id = " ".join(str(capability.get("capability_id") or "").strip().split())
             # ``external_grounded_information`` is the existing provider-neutral
             # broad Goal domain.  When the earlier Fast HOW pass already authored
             # and dispatched a provisional, exactly correlated read Capability,
@@ -455,11 +468,7 @@ def qualify_capability_catalog_for_typed_binding_values(
         if not isinstance(capability, dict):
             continue
         input_schema = capability.get("input_schema")
-        properties = (
-            input_schema.get("properties")
-            if isinstance(input_schema, dict)
-            else None
-        )
+        properties = input_schema.get("properties") if isinstance(input_schema, dict) else None
         if not isinstance(properties, dict):
             qualified.append(capability)
             continue
@@ -467,9 +476,7 @@ def qualify_capability_catalog_for_typed_binding_values(
         for argument_name, argument_schema in properties.items():
             if not isinstance(argument_schema, dict):
                 continue
-            entity_type = _normalized_entity_type(
-                argument_schema.get("x-chromie-entity-type")
-            )
+            entity_type = _normalized_entity_type(argument_schema.get("x-chromie-entity-type"))
             values = (
                 required_by_type.get(entity_type, [])
                 if entity_type
@@ -484,6 +491,7 @@ def qualify_capability_catalog_for_typed_binding_values(
         if not contradicted:
             qualified.append(capability)
     return qualified
+
 
 def information_goal_ids_without_declared_provider(
     capabilities: list[dict[str, Any]],
@@ -535,9 +543,7 @@ def information_goal_ids_without_declared_provider(
             continue
         matching_provider = any(
             " ".join(str(scope.get("domain") or "").strip().split()) == domain
-            and " ".join(
-                str(scope.get("responsibility_type") or "").strip().split()
-            )
+            and " ".join(str(scope.get("responsibility_type") or "").strip().split())
             == responsibility_type
             and kind
             in {
@@ -553,6 +559,122 @@ def information_goal_ids_without_declared_provider(
         if not matching_provider:
             unavailable.add(goal_id)
     return unavailable
+
+
+def resource_goal_ids_without_complete_provider_contract(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> set[str]:
+    """Return resource Goals that the advertised catalog cannot complete.
+
+    This is deterministic catalog closure over provider-declared resource states.
+    It does not select a provider or infer semantics from names.  Its result can
+    tighten the primary model Schema so a provably incomplete acquisition chain
+    is not representable as executable work.
+    """
+
+    def normalized_values(value: Any) -> set[str]:
+        return {
+            " ".join(str(item or "").strip().split())
+            for item in (value if isinstance(value, list) else [])
+            if " ".join(str(item or "").strip().split())
+        }
+
+    unavailable: set[str] = set()
+    for goal in authoritative_goals:
+        if not isinstance(goal, dict):
+            continue
+        goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
+        responsibility = goal.get("resource_responsibility")
+        if not goal_id or not isinstance(responsibility, dict) or not responsibility:
+            continue
+        resource = responsibility.get("resource")
+        resource = resource if isinstance(resource, dict) else {}
+        expected_type = " ".join(
+            str(responsibility.get("responsibility_type") or "").strip().split()
+        )
+        expected_kind = " ".join(str(resource.get("kind") or "").strip().split())
+        expected_delivery = " ".join(str(responsibility.get("delivery_mode") or "").strip().split())
+        attributes = resource.get("attributes")
+        attributes = attributes if isinstance(attributes, dict) else {}
+        domain_binding = attributes.get("information_domain")
+        domain_binding = domain_binding if isinstance(domain_binding, dict) else {}
+        expected_domain = " ".join(str(domain_binding.get("value") or "").strip().split())
+        required_states = {"resource_acquired"}
+        if expected_kind == "physical_object":
+            required_states.add("resource_delivered")
+
+        projections: list[tuple[set[str], set[str], bool]] = []
+        for candidate in capabilities:
+            if not isinstance(candidate, dict):
+                continue
+            hints = candidate.get("hints")
+            metadata = candidate.get("metadata")
+            hints = hints if isinstance(hints, dict) else {}
+            metadata = metadata if isinstance(metadata, dict) else {}
+            scope = hints.get("semantic_scope")
+            if not isinstance(scope, dict) or not scope:
+                scope = metadata.get("semantic_scope")
+            contract = hints.get("resource_contract")
+            if not isinstance(contract, dict) or not contract:
+                contract = metadata.get("resource_contract")
+            if not isinstance(scope, dict) or not isinstance(contract, dict) or not contract:
+                continue
+            if scope.get("responsibility_type") != expected_type:
+                continue
+            if expected_kind not in normalized_values(scope.get("resource_kinds")):
+                continue
+            domain = " ".join(str(scope.get("domain") or "").strip().split())
+            if expected_kind == "information" and expected_domain and domain != expected_domain:
+                continue
+            provides = normalized_values(contract.get("plan_provides"))
+            completion = normalized_values(contract.get("completion_requires"))
+            if not provides and completion:
+                provides = completion
+            final_owner = " ".join(str(contract.get("final_delivery_owner") or "").strip().split())
+            delivery_modes = normalized_values(scope.get("delivery_modes"))
+            response_delivery = final_owner == "planner_communicative_activity"
+            if (
+                "resource_delivered" in provides or response_delivery
+            ) and expected_delivery not in delivery_modes:
+                continue
+            if not provides and not response_delivery:
+                continue
+            projections.append(
+                (
+                    normalized_values(contract.get("plan_requires")),
+                    provides,
+                    response_delivery,
+                )
+            )
+
+        reachable: set[str] = set()
+        response_delivery = False
+        remaining = list(projections)
+        while remaining:
+            progressed = False
+            deferred: list[tuple[set[str], set[str], bool]] = []
+            for requires, provides, owns_response_delivery in remaining:
+                if not requires <= reachable:
+                    deferred.append((requires, provides, owns_response_delivery))
+                    continue
+                reachable.update(provides)
+                response_delivery = response_delivery or owns_response_delivery
+                progressed = True
+            if not progressed:
+                break
+            remaining = deferred
+
+        complete = required_states <= reachable and (
+            expected_kind == "physical_object"
+            or "resource_delivered" in reachable
+            or response_delivery
+        )
+        if not complete:
+            unavailable.add(goal_id)
+    return unavailable
+
 
 def validate_resource_responsibility_capability_grounding(
     output: PlannerModelOutput,
@@ -578,8 +700,7 @@ def validate_resource_responsibility_capability_grounding(
     capability_by_id = {
         " ".join(str(item.get("capability_id") or "").strip().split()): item
         for item in capabilities
-        if isinstance(item, dict)
-        and " ".join(str(item.get("capability_id") or "").strip().split())
+        if isinstance(item, dict) and " ".join(str(item.get("capability_id") or "").strip().split())
     }
 
     def normalized_values(value: Any) -> set[str]:
@@ -601,7 +722,10 @@ def validate_resource_responsibility_capability_grounding(
         contract = hints.get("resource_contract")
         if not isinstance(contract, dict) or not contract:
             contract = metadata.get("resource_contract")
-        return (scope if isinstance(scope, dict) else {}, contract if isinstance(contract, dict) else {})
+        return (
+            scope if isinstance(scope, dict) else {},
+            contract if isinstance(contract, dict) else {},
+        )
 
     def contract_projection(
         candidate: dict[str, Any],
@@ -616,19 +740,11 @@ def validate_resource_responsibility_capability_grounding(
         if not contract:
             errors.append("missing resource_contract")
         if scope.get("responsibility_type") != expected_type:
-            errors.append(
-                "semantic_scope.responsibility_type does not match "
-                f"{expected_type!r}"
-            )
+            errors.append(f"semantic_scope.responsibility_type does not match {expected_type!r}")
         kinds = normalized_values(scope.get("resource_kinds"))
         if expected_kind not in kinds:
-            errors.append(
-                "semantic_scope.resource_kinds does not include "
-                f"{expected_kind!r}"
-            )
-        capability_domain = " ".join(
-            str(scope.get("domain") or "").strip().split()
-        )
+            errors.append(f"semantic_scope.resource_kinds does not include {expected_kind!r}")
+        capability_domain = " ".join(str(scope.get("domain") or "").strip().split())
         if (
             expected_kind == "information"
             and expected_information_domain
@@ -670,8 +786,7 @@ def validate_resource_responsibility_capability_grounding(
             and expected_delivery not in delivery_modes
         ):
             errors.append(
-                "Planner-delivery Capability must declare "
-                f"delivery mode {expected_delivery!r}"
+                f"Planner-delivery Capability must declare delivery mode {expected_delivery!r}"
             )
         if not provides and final_delivery_owner != "planner_communicative_activity":
             errors.append("resource_contract.plan_provides is empty")
@@ -701,17 +816,13 @@ def validate_resource_responsibility_capability_grounding(
         )
         expected_kind = " ".join(str(resource.get("kind") or "").strip().split())
         resource_attributes = resource.get("attributes")
-        resource_attributes = (
-            resource_attributes if isinstance(resource_attributes, dict) else {}
-        )
+        resource_attributes = resource_attributes if isinstance(resource_attributes, dict) else {}
         domain_binding = resource_attributes.get("information_domain")
         domain_binding = domain_binding if isinstance(domain_binding, dict) else {}
         expected_information_domain = " ".join(
             str(domain_binding.get("value") or "").strip().split()
         )
-        expected_delivery = " ".join(
-            str(responsibility.get("delivery_mode") or "").strip().split()
-        )
+        expected_delivery = " ".join(str(responsibility.get("delivery_mode") or "").strip().split())
         required_terminal_states = {"resource_acquired"}
         if expected_kind == "physical_object":
             required_terminal_states.add("resource_delivered")
@@ -726,20 +837,16 @@ def validate_resource_responsibility_capability_grounding(
             projections: list[tuple[str, set[str], set[str], str]] = []
             complete_capability_ids: list[str] = []
             for capability_id, candidate in capability_by_id.items():
-                errors, requires, provides, _modes, final_delivery_owner = (
-                    contract_projection(
-                        candidate,
-                        expected_type=expected_type,
-                        expected_kind=expected_kind,
-                        expected_delivery=expected_delivery,
-                        expected_information_domain=expected_information_domain,
-                    )
+                errors, requires, provides, _modes, final_delivery_owner = contract_projection(
+                    candidate,
+                    expected_type=expected_type,
+                    expected_kind=expected_kind,
+                    expected_delivery=expected_delivery,
+                    expected_information_domain=expected_information_domain,
                 )
                 if errors:
                     continue
-                projections.append(
-                    (capability_id, requires, provides, final_delivery_owner)
-                )
+                projections.append((capability_id, requires, provides, final_delivery_owner))
                 individually_complete = (
                     not requires
                     and required_terminal_states <= provides
@@ -798,41 +905,33 @@ def validate_resource_responsibility_capability_grounding(
                     f"authoritative catalog: goal_id={goal_id}, "
                     f"capability_id={step.capability_id}"
                 )
-            errors, requires, provides, _delivery_modes, final_delivery_owner = (
-                contract_projection(
-                    capability,
-                    expected_type=expected_type,
-                    expected_kind=expected_kind,
-                    expected_delivery=expected_delivery,
-                    expected_information_domain=expected_information_domain,
-                )
+            errors, requires, provides, _delivery_modes, final_delivery_owner = contract_projection(
+                capability,
+                expected_type=expected_type,
+                expected_kind=expected_kind,
+                expected_delivery=expected_delivery,
+                expected_information_domain=expected_information_domain,
             )
             if errors:
-                reachable, response_delivery, composition_ids, complete_ids = (
-                    catalog_coverage(set())
+                reachable, response_delivery, composition_ids, complete_ids = catalog_coverage(
+                    set()
                 )
                 message = (
                     "resource responsibility Capability contract mismatch: "
-                    f"goal_id={goal_id}, capability_id={step.capability_id}: "
-                    + "; ".join(errors)
+                    f"goal_id={goal_id}, capability_id={step.capability_id}: " + "; ".join(errors)
                 )
                 if complete_ids:
                     raise ResourceResponsibilityCapabilityGroundingError(
-                        message
-                        + "; complete_capability_ids="
-                        + ",".join(complete_ids),
+                        message + "; complete_capability_ids=" + ",".join(complete_ids),
                         goal_id=goal_id,
                         complete_capability_ids=complete_ids,
                     )
                 if coverage_complete(reachable, response_delivery):
                     raise ResourceResponsibilityRequiresCompositionError(
-                        message
-                        + "; composable_capability_ids="
-                        + ",".join(composition_ids)
+                        message + "; composable_capability_ids=" + ",".join(composition_ids)
                     )
                 raise ResourceResponsibilityCapabilityUnavailableError(
-                    message
-                    + "; no supplied Capability set declares the required contract"
+                    message + "; no supplied Capability set declares the required contract"
                 )
             for argument_name, expected_value in responsibility_args.items():
                 if argument_name not in step.args:
@@ -856,8 +955,7 @@ def validate_resource_responsibility_capability_grounding(
                             and (
                                 expected_kind == "physical_object"
                                 or "resource_delivered" in provides
-                                or final_delivery_owner
-                                == "planner_communicative_activity"
+                                or final_delivery_owner == "planner_communicative_activity"
                             )
                             else []
                         ),
@@ -867,8 +965,7 @@ def validate_resource_responsibility_capability_grounding(
                 raise ResourceResponsibilityCapabilityGroundingError(
                     "resource responsibility capability chain has unsatisfied "
                     f"plan_requires for goal_id={goal_id}, "
-                    f"capability_id={step.capability_id}: "
-                    + ",".join(missing_preconditions)
+                    f"capability_id={step.capability_id}: " + ",".join(missing_preconditions)
                 )
             if requires and step.timing == "parallel":
                 raise ResourceResponsibilityCapabilityGroundingError(
@@ -904,9 +1001,7 @@ def validate_resource_responsibility_capability_grounding(
         )
         if complete_ids:
             raise ResourceResponsibilityCapabilityGroundingError(
-                message
-                + "; complete_capability_ids="
-                + ",".join(complete_ids),
+                message + "; complete_capability_ids=" + ",".join(complete_ids),
                 goal_id=goal_id,
                 complete_capability_ids=complete_ids,
             )
@@ -917,13 +1012,12 @@ def validate_resource_responsibility_capability_grounding(
                 if capability_id not in selected_ids
             ]
             raise ResourceResponsibilityRequiresCompositionError(
-                message
-                + "; additional_capability_ids="
-                + ",".join(additional_ids)
+                message + "; additional_capability_ids=" + ",".join(additional_ids)
             )
         raise ResourceResponsibilityCapabilityUnavailableError(
             message + "; no supplied Capability set declares the missing resource coverage"
         )
+
 
 def parallel_activity_contract_errors(
     activities: list[Any],
@@ -946,10 +1040,7 @@ def parallel_activity_contract_errors(
     errors: list[dict[str, Any]] = []
     usable: list[tuple[Any, dict[str, Any]]] = []
     for step in parallel_steps:
-        step_id = str(
-            getattr(step, "step_id", "")
-            or getattr(step, "activity_id", "")
-        )
+        step_id = str(getattr(step, "step_id", "") or getattr(step, "activity_id", ""))
         capability = by_id.get(step.capability_id)
         if capability is None:
             continue
@@ -972,8 +1063,7 @@ def parallel_activity_contract_errors(
 
     for index, (left_step, left) in enumerate(usable):
         left_step_id = str(
-            getattr(left_step, "step_id", "")
-            or getattr(left_step, "activity_id", "")
+            getattr(left_step, "step_id", "") or getattr(left_step, "activity_id", "")
         )
         left_group = str(left.get("exclusive_group") or "").strip()
         left_resources = {
@@ -981,8 +1071,7 @@ def parallel_activity_contract_errors(
         }
         for right_step, right in usable[index + 1 :]:
             right_step_id = str(
-                getattr(right_step, "step_id", "")
-                or getattr(right_step, "activity_id", "")
+                getattr(right_step, "step_id", "") or getattr(right_step, "activity_id", "")
             )
             right_group = str(right.get("exclusive_group") or "").strip()
             if left_group and left_group == right_group:
@@ -1018,6 +1107,7 @@ def parallel_plan_contract_errors(
 
     return parallel_activity_contract_errors(list(plan.steps), capabilities)
 
+
 def retained_evidence_response_review_required(
     context: dict[str, Any] | None,
     plan: CanonicalPlan,
@@ -1048,6 +1138,7 @@ def retained_evidence_response_review_required(
         )
         for item in association.get("associations") or []
     )
+
 
 def validate_goal_binding_argument_grounding(
     output: PlannerModelOutput,
@@ -1084,6 +1175,7 @@ def validate_goal_binding_argument_grounding(
 
     bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
     information_goal_ids: set[str] = set()
+    time_condition_goal_ids = {item.goal_id for item in output.time_conditions}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
             continue
@@ -1091,11 +1183,7 @@ def validate_goal_binding_argument_grounding(
         if goal_id:
             bindings_by_goal[goal_id] = _goal_binding_map(goal)
             responsibility = goal.get("resource_responsibility")
-            resource = (
-                responsibility.get("resource")
-                if isinstance(responsibility, dict)
-                else None
-            )
+            resource = responsibility.get("resource") if isinstance(responsibility, dict) else None
             if isinstance(resource, dict) and resource.get("kind") == "information":
                 information_goal_ids.add(goal_id)
 
@@ -1165,9 +1253,7 @@ def validate_goal_binding_argument_grounding(
         capability = capabilities_by_id.get(step.capability_id) or {}
         input_schema = capability.get("input_schema")
         argument_properties = (
-            input_schema.get("properties")
-            if isinstance(input_schema, dict)
-            else None
+            input_schema.get("properties") if isinstance(input_schema, dict) else None
         )
         if isinstance(argument_properties, dict):
             values_by_entity_type: dict[str, list[Any]] = {}
@@ -1180,17 +1266,13 @@ def validate_goal_binding_argument_grounding(
                         value,
                         list_compatible=False,
                     )
-                    for existing in values_by_entity_type.setdefault(
-                        entity_type, []
-                    )
+                    for existing in values_by_entity_type.setdefault(entity_type, [])
                 ):
                     values_by_entity_type[entity_type].append(value)
             for argument_name, argument_schema in argument_properties.items():
                 if not isinstance(argument_schema, dict):
                     continue
-                entity_type = _normalized_entity_type(
-                    argument_schema.get("x-chromie-entity-type")
-                )
+                entity_type = _normalized_entity_type(argument_schema.get("x-chromie-entity-type"))
                 if not entity_type:
                     continue
                 values = values_by_entity_type.get(entity_type, [])
@@ -1242,6 +1324,11 @@ def validate_goal_binding_argument_grounding(
             for name, binding in bindings_by_goal[goal_id].items():
                 if binding["entity_type"] not in _INFORMATION_TEMPORAL_ENTITY_TYPES:
                     continue
+                if name == "ready_at" and goal_id in time_condition_goal_ids:
+                    # The dynamic decoder binds this Goal's time condition to
+                    # the exact canonical ready_at instant. It is readiness
+                    # metadata, not an argument to the information provider.
+                    continue
                 expected = binding["value"]
                 if any(
                     _material_values_equal(actual, expected, list_compatible=False)
@@ -1249,21 +1336,13 @@ def validate_goal_binding_argument_grounding(
                 ):
                     continue
                 capability = capabilities_by_id.get(step.capability_id) or {}
-                realization = _argument_realization_contract(
-                    capability, binding["entity_type"]
-                )
+                realization = _argument_realization_contract(capability, binding["entity_type"])
                 if realization is not None:
                     declared_arguments = [
-                        str(name)
-                        for name in realization.get("arguments") or []
-                        if str(name)
+                        str(name) for name in realization.get("arguments") or [] if str(name)
                     ]
-                    minimum_arguments = max(
-                        1, int(realization.get("minimum_arguments") or 1)
-                    )
-                    realized_arguments = [
-                        name for name in declared_arguments if name in step.args
-                    ]
+                    minimum_arguments = max(1, int(realization.get("minimum_arguments") or 1))
+                    realized_arguments = [name for name in declared_arguments if name in step.args]
                     if len(realized_arguments) < minimum_arguments:
                         raise PlannerDTOContractError(
                             "planner step did not realize authoritative semantic scope "
@@ -1293,25 +1372,19 @@ def validate_goal_binding_argument_grounding(
                                 f"goal_id={goal_id!r}"
                             )
                     continue
-                semantic_scope = (
-                    (capability.get("hints") or {}).get("semantic_scope") or {}
-                )
+                semantic_scope = (capability.get("hints") or {}).get("semantic_scope") or {}
                 fixed_scope = semantic_scope.get("fixed_temporal_scope") or {}
                 fixed_entity_types = {
-                    str(value).casefold()
-                    for value in fixed_scope.get("entity_types") or []
+                    str(value).casefold() for value in fixed_scope.get("entity_types") or []
                 }
                 fixed_values = list(fixed_scope.get("values") or [])
-                if (
-                    binding["entity_type"] in fixed_entity_types
-                    and any(
-                        _material_values_equal(
-                            declared,
-                            expected,
-                            list_compatible=False,
-                        )
-                        for declared in fixed_values
+                if binding["entity_type"] in fixed_entity_types and any(
+                    _material_values_equal(
+                        declared,
+                        expected,
+                        list_compatible=False,
                     )
+                    for declared in fixed_values
                 ):
                     continue
                 goal_information_domains = {
@@ -1319,17 +1392,12 @@ def validate_goal_binding_argument_grounding(
                     for candidate in bindings_by_goal[goal_id].values()
                     if candidate.get("entity_type") == "information_domain"
                 }
-                capability_domain = str(
-                    semantic_scope.get("domain") or ""
-                ).strip().casefold()
+                capability_domain = str(semantic_scope.get("domain") or "").strip().casefold()
                 if (
                     binding["entity_type"] in fixed_entity_types
                     and capability_domain
                     and goal_information_domains == {capability_domain}
-                    and any(
-                        str(value or "").strip().casefold() == "now"
-                        for value in fixed_values
-                    )
+                    and any(str(value or "").strip().casefold() == "now" for value in fixed_values)
                 ):
                     # Goal Association, rather than this validator, owns the
                     # multilingual semantic judgment that the request is for the
@@ -1367,6 +1435,7 @@ def validate_goal_binding_argument_grounding(
                         f"expected={expected!r}"
                     )
 
+
 def validate_user_supplied_parameter_provenance(
     output: PlannerModelOutput,
     *,
@@ -1395,21 +1464,15 @@ def validate_user_supplied_parameter_provenance(
         if resolution.strategy != "user_supplied":
             continue
         value = resolution.value
-        if (
-            not isinstance(value, bool)
-            and isinstance(value, (int, float, Decimal))
-        ) or (
-            isinstance(value, str)
-            and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is not None
+        if (not isinstance(value, bool) and isinstance(value, (int, float, Decimal))) or (
+            isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is not None
         ):
             # The dedicated numeric provenance validator also supports legacy
             # Goals whose numeric binding migration is still in progress.
             continue
 
         source_goal_ids = [
-            goal_id
-            for goal_id in resolution.source_goal_ids
-            if goal_id in bindings_by_goal
+            goal_id for goal_id in resolution.source_goal_ids if goal_id in bindings_by_goal
         ]
         if not source_goal_ids:
             raise ValueError(
@@ -1441,9 +1504,7 @@ def validate_user_supplied_parameter_provenance(
         else:
             preferred = cited_bindings.get(resolution.parameter, [])
             candidates = preferred or [
-                binding
-                for bindings in cited_bindings.values()
-                for binding in bindings
+                binding for bindings in cited_bindings.values() for binding in bindings
             ]
             if any(
                 _material_values_equal(
@@ -1460,6 +1521,7 @@ def validate_user_supplied_parameter_provenance(
             f"typed Goal bindings: {resolution.step_id}."
             f"{resolution.parameter}={value!r}"
         )
+
 
 def validate_external_response_evidence_boundary(
     output: PlannerModelOutput,
@@ -1578,22 +1640,20 @@ def validate_external_response_evidence_boundary(
             + ",".join(sorted(index_only_goal_ids))
         )
 
+
 def validate_explicit_numeric_parameter_grounding(
     output: PlannerModelOutput,
     *,
     authoritative_goals: list[dict[str, Any]],
 ) -> None:
-    """Verify numeric user-supplied arguments against immutable goal text.
+    """Verify numeric user-supplied arguments against typed Goal bindings.
 
     The planner remains the semantic authority for mapping a user value to a
     skill parameter.  This check enforces preservation and provenance after that
-    judgment: every numeric literal in an executable Goal must occur in an owned
-    executable argument, and a value labelled ``user_supplied`` must agree with
-    that argument and identify an authoritative source Goal containing it.  It
-    therefore catches both omission and silent default substitution without
-    introducing phrase-to-action or parameter-name rules. Stable Goal IDs carry
-    provenance; requiring the model to copy a second free-text citation adds no
-    evidence and is not part of this contract.
+    judgment: every typed numeric binding in an executable Goal must occur in an
+    owned executable argument, and a value labelled ``user_supplied`` must agree
+    with that argument and its authoritative source Goal. Prose and compound
+    date/time strings are deliberately not mined into invented scalar bindings.
     """
 
     if output.disposition not in {"execute", "mixed"}:
@@ -1609,17 +1669,6 @@ def validate_explicit_numeric_parameter_grounding(
         except InvalidOperation:
             return None
 
-    def literals(value: str) -> list[Decimal]:
-        found: list[Decimal] = []
-        for match in _NUMERIC_LITERAL_RE.finditer(value):
-            try:
-                number = Decimal(match.group(0))
-            except InvalidOperation:
-                continue
-            if number not in found:
-                found.append(number)
-        return found
-
     def resolution_location(resolution: PlanParameterResolution) -> str:
         """Render an unambiguous typed location for model repair feedback."""
 
@@ -1631,7 +1680,7 @@ def validate_explicit_numeric_parameter_grounding(
         scale = max(abs(left), abs(right), Decimal(1))
         return abs(left - right) <= Decimal("1e-12") * scale
 
-    goal_text: dict[str, str] = {}
+    goal_numeric_values: dict[str, set[Decimal]] = {}
     resource_arguments_by_goal: dict[str, dict[str, Any]] = {}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
@@ -1639,23 +1688,12 @@ def validate_explicit_numeric_parameter_grounding(
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
         if not goal_id:
             continue
-        parts: list[str] = []
-        description = str(goal.get("description") or "").strip()
-        if description:
-            parts.append(description)
-        criteria = goal.get("success_criteria")
-        if isinstance(criteria, list):
-            parts.extend(str(item).strip() for item in criteria if str(item).strip())
-        source_text = str(goal.get("source_text") or "").strip()
-        if not parts and source_text:
-            parts.append(source_text)
         bindings = _goal_binding_map(goal)
-        parts.extend(
-            str(binding.get("value")).strip()
+        goal_numeric_values[goal_id] = {
+            value
             for binding in bindings.values()
-            if binding.get("value") is not None
-            and str(binding.get("value")).strip()
-        )
+            for value in semantic_numeric_values(binding.get("value"))
+        }
         responsibility = goal.get("resource_responsibility")
         if isinstance(responsibility, dict):
             resource_arguments_by_goal[goal_id] = {
@@ -1663,7 +1701,6 @@ def validate_explicit_numeric_parameter_grounding(
                 for name in ("resource", "source", "recipient")
                 if isinstance(responsibility.get(name), dict)
             }
-        goal_text[goal_id] = " ".join(dict.fromkeys(parts))
 
     steps = {step.step_id: step for step in output.steps}
     structured_numeric_grounding: dict[str, set[Decimal]] = {}
@@ -1671,27 +1708,17 @@ def validate_explicit_numeric_parameter_grounding(
 
     def nested_numbers(value: Any) -> set[Decimal]:
         if isinstance(value, dict):
-            return {
-                number
-                for item in value.values()
-                for number in nested_numbers(item)
-            }
+            return {number for item in value.values() for number in nested_numbers(item)}
         if isinstance(value, list):
-            return {
-                number
-                for item in value
-                for number in nested_numbers(item)
-            }
+            return {number for item in value for number in nested_numbers(item)}
         if isinstance(value, str):
-            return set(literals(value))
+            return semantic_numeric_values(value)
         number = numeric(value)
         return {number} if number is not None else set()
 
     for step in output.steps:
         for goal_id in step.source_goal_ids:
-            owned_step_numeric_values.setdefault(goal_id, set()).update(
-                nested_numbers(step.args)
-            )
+            owned_step_numeric_values.setdefault(goal_id, set()).update(nested_numbers(step.args))
             expected_arguments = resource_arguments_by_goal.get(goal_id, {})
             for parameter, expected in expected_arguments.items():
                 actual = step.args.get(parameter)
@@ -1755,7 +1782,7 @@ def validate_explicit_numeric_parameter_grounding(
         unsupported_goal_ids = [
             goal_id
             for goal_id in source_goal_ids
-            if resolved_number not in literals(goal_text.get(goal_id, ""))
+            if resolved_number not in goal_numeric_values.get(goal_id, set())
         ]
         if unsupported_goal_ids:
             unsupported_user_numeric_resolutions.append(
@@ -1772,7 +1799,7 @@ def validate_explicit_numeric_parameter_grounding(
         executable_goal_ids = {goal_id for step in output.steps for goal_id in step.source_goal_ids}
     missing_numeric_grounding: list[tuple[str, Decimal]] = []
     for goal_id in sorted(executable_goal_ids):
-        for literal in literals(goal_text.get(goal_id, "")):
+        for literal in sorted(goal_numeric_values.get(goal_id, set())):
             if not any(
                 literal == value and goal_id in resolution.source_goal_ids
                 for resolution, value in user_numeric_resolutions
@@ -1786,8 +1813,7 @@ def validate_explicit_numeric_parameter_grounding(
         ]
         if absent_from_work:
             missing = "; ".join(
-                f"goal_id={goal_id!r}, value={literal}"
-                for goal_id, literal in absent_from_work
+                f"goal_id={goal_id!r}, value={literal}" for goal_id, literal in absent_from_work
             )
             raise ValueError(
                 "explicit numeric Goal value is absent from every executable "
@@ -1805,8 +1831,7 @@ def validate_explicit_numeric_parameter_grounding(
         )
     if unsupported_user_numeric_resolutions:
         unsupported = "; ".join(
-            f"{resolution_location(resolution)}, value={value}, "
-            f"source_goal_ids={goal_ids!r}"
+            f"{resolution_location(resolution)}, value={value}, source_goal_ids={goal_ids!r}"
             for resolution, value, goal_ids in unsupported_user_numeric_resolutions
         )
         raise ValueError(
@@ -1814,17 +1839,20 @@ def validate_explicit_numeric_parameter_grounding(
             f"its authoritative source Goal: {unsupported}"
         )
 
+
 def explicit_numeric_goal_values(
     authoritative_goals: list[dict[str, Any]],
     *,
     include_resource_goals: bool = False,
 ) -> dict[str, list[int | float]]:
-    """Project explicit Goal numbers for decoder-side provenance obligations.
+    """Project typed numeric Goal bindings for provenance obligations.
 
-    This is the same immutable Goal surface consumed by the runtime validator;
-    it does not decide which Capability parameter a number means. Resource Goals
-    are excluded by default because an exact structured resource argument carries
-    its own nested numeric grounding without a flat parameter resolution.
+    Goal Association's typed bindings are the numeric authority. Mining prose or
+    ISO date/time strings invents unrelated values (for example ``2026``, ``9``,
+    and ``4`` from one date) and falsely requires provider parameters for them.
+    This projection does not decide which Capability parameter a number means.
+    Resource Goals are excluded by default because an exact structured resource
+    argument carries its own nested grounding without a flat resolution.
     """
 
     projected: dict[str, list[int | float]] = {}
@@ -1834,45 +1862,22 @@ def explicit_numeric_goal_values(
         goal_id = " ".join(str(goal.get("goal_id") or "").strip().split())
         if not goal_id:
             continue
-        if (
-            not include_resource_goals
-            and isinstance(goal.get("resource_responsibility"), dict)
-        ):
+        if not include_resource_goals and isinstance(goal.get("resource_responsibility"), dict):
             continue
-        parts: list[str] = []
-        description = str(goal.get("description") or "").strip()
-        if description:
-            parts.append(description)
-        criteria = goal.get("success_criteria")
-        if isinstance(criteria, list):
-            parts.extend(
-                str(item).strip() for item in criteria if str(item).strip()
-            )
-        source_text = str(goal.get("source_text") or "").strip()
-        if not parts and source_text:
-            parts.append(source_text)
-        parts.extend(
-            str(binding.get("value")).strip()
-            for binding in _goal_binding_map(goal).values()
-            if binding.get("value") is not None
-            and str(binding.get("value")).strip()
-        )
         values: list[int | float] = []
-        for match in _NUMERIC_LITERAL_RE.finditer(" ".join(dict.fromkeys(parts))):
-            try:
-                decimal_value = Decimal(match.group(0))
-            except InvalidOperation:
-                continue
-            json_value: int | float = (
-                int(decimal_value)
-                if decimal_value == decimal_value.to_integral_value()
-                else float(decimal_value)
-            )
-            if json_value not in values:
-                values.append(json_value)
+        for binding in _goal_binding_map(goal).values():
+            for decimal_value in semantic_numeric_values(binding.get("value")):
+                json_value: int | float = (
+                    int(decimal_value)
+                    if decimal_value == decimal_value.to_integral_value()
+                    else float(decimal_value)
+                )
+                if json_value not in values:
+                    values.append(json_value)
         if values:
             projected[goal_id] = values
     return projected
+
 
 def normalize_missing_numeric_parameter_provenance(
     raw: dict[str, Any],
@@ -1896,14 +1901,9 @@ def normalize_missing_numeric_parameter_provenance(
     resolutions = resolutions if isinstance(resolutions, list) else []
 
     def numeric(value: Any) -> Decimal | None:
-        if isinstance(value, bool) or not isinstance(
-            value, (int, float, Decimal, str)
-        ):
+        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal, str)):
             return None
-        if (
-            isinstance(value, str)
-            and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None
-        ):
+        if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
             return None
         try:
             return Decimal(str(value).strip())
@@ -1915,9 +1915,7 @@ def normalize_missing_numeric_parameter_provenance(
         return abs(left - right) <= Decimal("1e-12") * scale
 
     repairs: list[dict[str, Any]] = []
-    for goal_id, values in explicit_numeric_goal_values(
-        authoritative_goals
-    ).items():
+    for goal_id, values in explicit_numeric_goal_values(authoritative_goals).items():
         outcome = outcomes.get(goal_id)
         if isinstance(outcome, dict) and outcome.get("disposition") != "execute":
             continue
@@ -1925,9 +1923,7 @@ def normalize_missing_numeric_parameter_provenance(
             expected = Decimal(str(value))
             candidates: list[tuple[str, str]] = []
             for step in steps:
-                if not isinstance(step, dict) or goal_id not in (
-                    step.get("source_goal_ids") or []
-                ):
+                if not isinstance(step, dict) or goal_id not in (step.get("source_goal_ids") or []):
                     continue
                 step_id = " ".join(str(step.get("step_id") or "").strip().split())
                 args = step.get("args")
@@ -2007,14 +2003,12 @@ def normalize_mechanically_derivable_parameter_provenance(
     goals_by_id = {
         " ".join(str(goal.get("goal_id") or "").strip().split()): goal
         for goal in authoritative_goals
-        if isinstance(goal, dict)
-        and " ".join(str(goal.get("goal_id") or "").strip().split())
+        if isinstance(goal, dict) and " ".join(str(goal.get("goal_id") or "").strip().split())
     }
     capabilities_by_id = {
         " ".join(str(item.get("capability_id") or "").strip().split()): item
         for item in capability_payload
-        if isinstance(item, dict)
-        and " ".join(str(item.get("capability_id") or "").strip().split())
+        if isinstance(item, dict) and " ".join(str(item.get("capability_id") or "").strip().split())
     }
     existing_by_key: dict[tuple[str, str], list[int]] = {}
     for index, resolution in enumerate(resolutions):
@@ -2036,17 +2030,14 @@ def normalize_mechanically_derivable_parameter_provenance(
         if not isinstance(step, dict):
             continue
         step_id = " ".join(str(step.get("step_id") or "").strip().split())
-        capability_id = " ".join(
-            str(step.get("capability_id") or "").strip().split()
-        )
+        capability_id = " ".join(str(step.get("capability_id") or "").strip().split())
         args = step.get("args")
         if not step_id or not isinstance(args, dict):
             continue
         owned_goal_ids = [
             goal_id
             for value in step.get("source_goal_ids") or []
-            if (goal_id := " ".join(str(value or "").strip().split()))
-            in goals_by_id
+            if (goal_id := " ".join(str(value or "").strip().split())) in goals_by_id
         ]
         for parameter, argument in args.items():
             key = (step_id, str(parameter))
@@ -2091,8 +2082,7 @@ def normalize_mechanically_derivable_parameter_provenance(
                         argument,
                         binding.get("value"),
                         list_compatible=(
-                            entity_type in _LIST_ENTITY_TYPES
-                            or isinstance(argument, list)
+                            entity_type in _LIST_ENTITY_TYPES or isinstance(argument, list)
                         ),
                     ):
                         # Exact values are direct provenance, not a semantic
@@ -2108,11 +2098,7 @@ def normalize_mechanically_derivable_parameter_provenance(
         strategies = {item[0] for item in unique_candidates}
         goal_ids = list(dict.fromkeys(item[1] for item in unique_candidates))
         binding_names = {item[2] for item in unique_candidates}
-        if (
-            len(strategies) != 1
-            or len(goal_ids) != 1
-            or len(binding_names) != 1
-        ):
+        if len(strategies) != 1 or len(goal_ids) != 1 or len(binding_names) != 1:
             continue
         existing_indexes = existing_by_key.get(key, [])
         if len(existing_indexes) > 1:
@@ -2195,6 +2181,7 @@ def normalize_mechanically_derivable_parameter_provenance(
     )
     return normalized, repairs
 
+
 def normalize_schema_default_parameter_provenance(
     raw: dict[str, Any],
     *,
@@ -2216,10 +2203,7 @@ def normalize_schema_default_parameter_provenance(
             (int, float, Decimal, str),
         ):
             return None
-        if (
-            isinstance(value, str)
-            and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None
-        ):
+        if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
             return None
         try:
             return Decimal(str(value).strip())
@@ -2272,10 +2256,7 @@ def normalize_schema_default_parameter_provenance(
             " ".join(str(value or "").strip().split())
             for value in resolution.get("source_goal_ids") or []
         ]
-        if any(
-            resolved_number in goal_numbers.get(goal_id, set())
-            for goal_id in source_goal_ids
-        ):
+        if any(resolved_number in goal_numbers.get(goal_id, set()) for goal_id in source_goal_ids):
             continue
         step_id = str(resolution.get("step_id") or "").strip()
         parameter = str(resolution.get("parameter") or "").strip()
@@ -2285,13 +2266,9 @@ def normalize_schema_default_parameter_provenance(
         args = step.get("args") if isinstance(step.get("args"), dict) else {}
         argument_number = numeric(args.get(parameter))
         capability_id = str(step.get("capability_id") or "").strip()
-        parameter_schema = (
-            schemas.get(capability_id, {}).get("properties", {}).get(parameter, {})
-        )
+        parameter_schema = schemas.get(capability_id, {}).get("properties", {}).get(parameter, {})
         schema_default = (
-            parameter_schema.get("default")
-            if isinstance(parameter_schema, dict)
-            else None
+            parameter_schema.get("default") if isinstance(parameter_schema, dict) else None
         )
         default_number = numeric(schema_default)
         if (
@@ -2315,6 +2292,7 @@ def normalize_schema_default_parameter_provenance(
             }
         )
     return normalized, repairs
+
 
 def normalize_detached_parameter_resolutions(
     raw: dict[str, Any],
@@ -2355,12 +2333,7 @@ def normalize_detached_parameter_resolutions(
         parameter = str(resolution.get("parameter") or "").strip()
         step = steps.get(step_id)
         args = step.get("args") if isinstance(step, dict) else None
-        if (
-            not step_id
-            or not parameter
-            or not isinstance(args, dict)
-            or parameter in args
-        ):
+        if not step_id or not parameter or not isinstance(args, dict) or parameter in args:
             retained.append(resolution)
             continue
         equivalent_arguments = sorted(
@@ -2370,8 +2343,7 @@ def normalize_detached_parameter_resolutions(
                 resolution.get("value"),
                 value,
                 list_compatible=(
-                    isinstance(resolution.get("value"), list)
-                    or isinstance(value, list)
+                    isinstance(resolution.get("value"), list) or isinstance(value, list)
                 ),
             )
         )
@@ -2392,185 +2364,6 @@ def normalize_detached_parameter_resolutions(
     return normalized, repairs
 
 
-def normalize_terminal_response_goal_outcome_accounting(
-    raw: dict[str, Any],
-    *,
-    authoritative_goals: list[dict[str, Any]],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Project an exact all-response Goal map into redundant aggregate fields.
-
-    Result-evidence re-entry asks Planner to author completion wording for a
-    scoped set of already-completed Goals. Small models reliably author the
-    individual outcomes but can retain aggregate fields or steps from the
-    historical source Plan. Once every authoritative Goal has an explicit,
-    exact ``respond`` outcome with no step reference, those outcomes are the
-    semantic authority. This normalization copies only their already-authored
-    wording and satisfaction into the aggregate and removes no semantic choice.
-    """
-
-    normalized = copy.deepcopy(raw)
-    expected_goal_ids = [
-        str(goal.get("goal_id") or "").strip()
-        for goal in authoritative_goals
-        if isinstance(goal, dict) and str(goal.get("goal_id") or "").strip()
-    ]
-    outcomes = normalized.get("goal_outcomes")
-    if (
-        not expected_goal_ids
-        or not isinstance(outcomes, dict)
-        or set(outcomes) != set(expected_goal_ids)
-    ):
-        return normalized, []
-
-    ordered_outcomes: list[dict[str, Any]] = []
-    for goal_id in expected_goal_ids:
-        outcome = outcomes.get(goal_id)
-        if not isinstance(outcome, dict):
-            return normalized, []
-        satisfaction = outcome.get("satisfaction")
-        score = satisfaction.get("score") if isinstance(satisfaction, dict) else None
-        response_text = " ".join(
-            str(outcome.get("response_text") or "").strip().split()
-        )
-        if (
-            outcome.get("disposition") != "respond"
-            or outcome.get("coverage") != "complete"
-            or not response_text
-            or list(outcome.get("step_ids") or [])
-            or list(outcome.get("unresolved") or [])
-            or not isinstance(satisfaction, dict)
-            or satisfaction.get("status") != "exact"
-            or isinstance(score, bool)
-            or not isinstance(score, (int, float))
-            or float(score) < 0.95
-            or set(satisfaction.get("satisfied_goal_ids") or []) != {goal_id}
-            or list(satisfaction.get("unmet_goal_ids") or [])
-            or list(satisfaction.get("unmet_requirements") or [])
-        ):
-            return normalized, []
-        ordered_outcomes.append(outcome)
-
-    repairs: list[dict[str, Any]] = []
-    aggregate_response_text = " ".join(
-        dict.fromkeys(
-            " ".join(str(outcome["response_text"]).strip().split())
-            for outcome in ordered_outcomes
-        )
-    )
-    projections: dict[str, Any] = {
-        "disposition": "respond",
-        "coverage": "complete",
-        "response_text": aggregate_response_text,
-        "steps": [],
-        "parameter_resolutions": [],
-        "unresolved": [],
-    }
-    for field_name, value in projections.items():
-        if normalized.get(field_name) == value:
-            continue
-        repairs.append(
-            {
-                "path": field_name,
-                "from": normalized.get(field_name),
-                "to": value,
-                "basis": "complete exact per-Goal respond outcomes",
-            }
-        )
-        normalized[field_name] = value
-
-    existing_satisfaction = normalized.get("goal_satisfaction")
-    rationale = " ".join(
-        dict.fromkeys(
-            " ".join(
-                str(outcome.get("rationale") or "").strip().split()
-            )
-            for outcome in ordered_outcomes
-            if " ".join(
-                str(outcome.get("rationale") or "").strip().split()
-            )
-        )
-    )
-    if not rationale:
-        rationale = "All scoped Goals have exact Planner-authored responses."
-    aggregate_satisfaction = {
-        "score": 1.0,
-        "status": "exact",
-        "satisfied_goal_ids": expected_goal_ids,
-        "unmet_goal_ids": [],
-        "unmet_requirements": [],
-        "rationale": rationale,
-    }
-    if existing_satisfaction != aggregate_satisfaction:
-        repairs.append(
-            {
-                "path": "goal_satisfaction",
-                "from": existing_satisfaction,
-                "to": aggregate_satisfaction,
-                "basis": "deterministic aggregate of exact per-Goal responses",
-            }
-        )
-        normalized["goal_satisfaction"] = aggregate_satisfaction
-    return normalized, repairs
-
-
-def normalize_nonexecuting_plan_mechanics(
-    raw: dict[str, Any],
-    *,
-    authoritative_goals: list[dict[str, Any]],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Remove executable mechanics from a unanimous non-executing outcome.
-
-    These fields are redundant DTO mechanics, not semantic decisions.  Once the
-    aggregate and every authoritative per-Goal outcome already agree on the same
-    non-executing disposition, confirmation, steps, timing, and parameter
-    resolution cannot be meaningful and must retain their canonical empty form.
-    """
-
-    normalized = copy.deepcopy(raw)
-    disposition = str(normalized.get("disposition") or "")
-    if disposition not in {"clarify", "escalate", "refused", "unavailable"}:
-        return normalized, []
-    expected_goal_ids = {
-        str(goal.get("goal_id") or "").strip()
-        for goal in authoritative_goals
-        if isinstance(goal, dict) and str(goal.get("goal_id") or "").strip()
-    }
-    outcomes = normalized.get("goal_outcomes")
-    if (
-        not expected_goal_ids
-        or not isinstance(outcomes, dict)
-        or set(outcomes) != expected_goal_ids
-        or any(
-            not isinstance(outcome, dict)
-            or str(outcome.get("disposition") or "") != disposition
-            for outcome in outcomes.values()
-        )
-    ):
-        return normalized, []
-
-    repairs: list[dict[str, Any]] = []
-    canonical_fields: dict[str, Any] = {
-        "plan_relation": "exact",
-        "user_confirmation_required": False,
-        "steps": [],
-        "parameter_resolutions": [],
-        "time_conditions": [],
-    }
-    for field_name, value in canonical_fields.items():
-        if normalized.get(field_name) == value:
-            continue
-        repairs.append(
-            {
-                "path": field_name,
-                "from": normalized.get(field_name),
-                "to": value,
-                "basis": f"unanimous non-executing {disposition} outcome",
-            }
-        )
-        normalized[field_name] = value
-    return normalized, repairs
-
-
 def normalize_common_planner_output(
     raw: dict[str, Any],
     *,
@@ -2580,27 +2373,14 @@ def normalize_common_planner_output(
     """Apply only cross-depth mechanical Planner DTO normalizations.
 
     Fast and Deep use the same CanonicalPlan semantics.  These adapters are
-    therefore one shared mechanism. They may project redundant aggregate fields
-    from a complete, internally exact per-Goal response map, remove detached
-    provenance, or add mechanically provable provenance metadata. They never
-    choose a Goal outcome, Capability, executable argument, timing, or wording.
+    therefore one shared mechanism. They may remove detached provenance or add
+    mechanically provable provenance metadata. They never choose or rewrite a
+    Goal outcome, Capability, executable argument, timing, or wording.
     """
 
-    normalized, capability_argument_type_repairs = (
-        normalize_mechanical_capability_argument_types(
-            raw,
-            capability_payload=capability_payload,
-        )
-    )
-    normalized, terminal_response_repairs = (
-        normalize_terminal_response_goal_outcome_accounting(
-            normalized,
-            authoritative_goals=authoritative_goals,
-        )
-    )
-    normalized, nonexecuting_repairs = normalize_nonexecuting_plan_mechanics(
-        normalized,
-        authoritative_goals=authoritative_goals,
+    normalized, capability_argument_type_repairs = normalize_mechanical_capability_argument_types(
+        raw,
+        capability_payload=capability_payload,
     )
     normalized, detached_repairs = normalize_detached_parameter_resolutions(normalized)
     normalized, schema_default_repairs = normalize_schema_default_parameter_provenance(
@@ -2617,8 +2397,6 @@ def normalize_common_planner_output(
     )
     return normalized, {
         "capability_argument_types": capability_argument_type_repairs,
-        "terminal_response_goal_outcome_accounting": terminal_response_repairs,
-        "nonexecuting_plan_mechanics": nonexecuting_repairs,
         "detached_parameter_resolutions": detached_repairs,
         "schema_default_provenance": schema_default_repairs,
         "parameter_provenance": parameter_provenance_repairs,
@@ -2658,11 +2436,7 @@ def normalize_mechanical_capability_argument_types(
         if not isinstance(capability, dict) or not isinstance(args, dict):
             continue
         input_schema = capability.get("input_schema")
-        properties = (
-            input_schema.get("properties")
-            if isinstance(input_schema, dict)
-            else None
-        )
+        properties = input_schema.get("properties") if isinstance(input_schema, dict) else None
         if not isinstance(properties, dict):
             continue
         for name, value in list(args.items()):
@@ -3119,105 +2893,6 @@ def planner_contract_diagnostics(
         unique.append(item)
     return unique
 
-def _normalize_redundant_planner_response_fields(
-    raw: dict[str, Any],
-    *,
-    expected_goal_ids_for_turn: list[str],
-) -> dict[str, Any]:
-    """Normalize transport redundancy without inventing planning semantics.
-
-    ``steps[].source_goal_ids`` is the model's semantic ownership judgment.
-    ``goal_outcomes.*.step_ids`` and the top-level disposition repeat that same
-    judgment as cross-reference and aggregate transport fields. Models regularly
-    produce stale or nonexistent step references even when capability choice,
-    arguments, and source ownership are otherwise coherent. Rebuild only those
-    redundant fields from the model-authored step ownership; never choose a
-    capability, add a step, or assign an unowned Goal. An execute outcome with no
-    owned step therefore remains invalid and must be repaired by the model.
-    """
-
-    normalized = copy.deepcopy(raw)
-    outcomes = normalized.get("goal_outcomes")
-    if not isinstance(outcomes, dict):
-        return normalized
-
-    expected = list(dict.fromkeys(expected_goal_ids_for_turn))
-    expected_set = set(expected)
-    owned_step_ids: dict[str, list[str]] = {goal_id: [] for goal_id in expected}
-    steps = normalized.get("steps")
-    ownership_is_usable = isinstance(steps, list)
-    seen_step_ids: set[str] = set()
-    if ownership_is_usable:
-        for item in steps:
-            if not isinstance(item, dict):
-                ownership_is_usable = False
-                break
-            step_id = " ".join(str(item.get("step_id") or "").strip().split())
-            source_goal_ids = item.get("source_goal_ids")
-            if not step_id or step_id in seen_step_ids or not isinstance(source_goal_ids, list):
-                ownership_is_usable = False
-                break
-            seen_step_ids.add(step_id)
-            for raw_goal_id in source_goal_ids:
-                goal_id = " ".join(str(raw_goal_id or "").strip().split())
-                if goal_id in expected_set and step_id not in owned_step_ids[goal_id]:
-                    owned_step_ids[goal_id].append(step_id)
-
-    normalized_outcomes: dict[str, Any] = {}
-    for raw_goal_id, value in outcomes.items():
-        goal_id = str(raw_goal_id)
-        if not isinstance(value, dict):
-            normalized_outcomes[goal_id] = value
-            continue
-        outcome = copy.deepcopy(value)
-        response_text = str(outcome.get("response_text") or "").strip()
-        owned = owned_step_ids.get(goal_id, []) if ownership_is_usable else []
-        if not outcome.get("disposition"):
-            if owned:
-                outcome["disposition"] = "execute"
-            elif response_text:
-                outcome["disposition"] = "respond"
-        if (
-            not outcome.get("coverage")
-            and normalized.get("coverage") == "complete"
-            and outcome.get("disposition") in {"execute", "respond"}
-        ):
-            outcome["coverage"] = "complete"
-        if ownership_is_usable and outcome.get("disposition") == "execute":
-            outcome["step_ids"] = list(owned)
-        elif outcome.get("disposition") == "respond":
-            outcome["step_ids"] = []
-        normalized_outcomes[goal_id] = outcome
-    normalized["goal_outcomes"] = normalized_outcomes
-
-    if set(normalized_outcomes) == expected_set and expected_set:
-        dispositions = {
-            str(item.get("disposition") or "")
-            for item in normalized_outcomes.values()
-            if isinstance(item, dict)
-        }
-        if "" not in dispositions:
-            aggregate = (
-                "mixed"
-                if dispositions == {"execute", "respond"}
-                else next(iter(dispositions))
-                if len(dispositions) == 1
-                else ""
-            )
-            if aggregate:
-                normalized["disposition"] = aggregate
-
-    if (
-        normalized.get("disposition") == "respond"
-        and not str(normalized.get("response_text") or "").strip()
-        and len(expected) == 1
-    ):
-        sole = normalized_outcomes.get(expected[0])
-        if isinstance(sole, dict):
-            response_text = str(sole.get("response_text") or "").strip()
-            if response_text:
-                normalized["response_text"] = response_text
-    return normalized
 
 def validate_planner_model_output(
     raw: dict[str, Any],
@@ -3227,10 +2902,7 @@ def validate_planner_model_output(
 ) -> PlannerModelOutput:
     """Validate the semantic DTO and reject conflicting legacy goal echoes."""
 
-    model_raw = _normalize_redundant_planner_response_fields(
-        dict(raw),
-        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-    )
+    model_raw = dict(raw)
     echoed_goal_ids = model_raw.pop("goal_ids", None)
     for field_name in ("schema_version", "plan_id", "planner_tier"):
         model_raw.pop(field_name, None)
@@ -3413,6 +3085,7 @@ def requires_safety_revision(feedback: list[dict[str, Any]]) -> bool:
         )
         for item in feedback
     )
+
 
 def requires_sequential_safety_revision(
     feedback: list[dict[str, Any]],

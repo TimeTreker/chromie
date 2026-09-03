@@ -1,0 +1,127 @@
+{
+  "adversarial_design": {
+    "cell_index": 16,
+    "changed_axis": "all independent Goals have one supported disposition versus one sibling becomes unsupported while another remains executable",
+    "condition": "supported",
+    "daily_life_family": "school_learning",
+    "negative_hypotheses": [
+      "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+    ],
+    "paired_language": "zh-CN",
+    "primary_capacity_id": "per_goal_disposition_and_mixed_outcomes"
+  },
+  "category": "streaming_advance",
+  "contrast_set": {
+    "controlled_axes": [
+      "all independent Goals have one supported disposition versus one sibling becomes unsupported while another remains executable",
+      "language"
+    ],
+    "id": "fpdl_v2_per_goal_disposition_and_mixed_outcomes_16",
+    "member": "supported-en"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_per_goal_disposition_and_mixed_outcomes_16_supported_en",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "en-US",
+    "request": {
+      "context": {},
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "en-US",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {},
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "Tell one light relevant joke.",
+          "output_mode": "speech",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        },
+        {
+          "bindings": {
+            "count": 1
+          },
+          "confidence": 0.99,
+          "local_ref": "r2",
+          "outcome": "Blink exactly once.",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_per_goal_disposition_and_mixed_outcomes_16_supported_en",
+      "text": "Tell me one light joke about today's study session, and blink once."
+    },
+    "runtime_variant": "streaming_advance"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-16",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "validation",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute",
+        "mixed"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1",
+        "r2"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "soridormi.blink_eyes"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "The conversational and embodied Goals retain separate respond and execute outcomes."
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

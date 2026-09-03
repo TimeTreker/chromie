@@ -1,0 +1,188 @@
+{
+  "adversarial_design": {
+    "cell_index": 38,
+    "changed_axis": "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+    "condition": "boundary",
+    "daily_life_family": "practical_information_tools",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "fast_completion_or_how_escalation"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "one complete common Fast realization exists versus complete realization requires genuinely broader multi-step or constrained HOW",
+      "language"
+    ],
+    "id": "fpdl_v2_fast_completion_or_how_escalation_38",
+    "member": "boundary-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "boundary",
+  "id": "fpdl_v2_fast_completion_or_how_escalation_38_boundary_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "查询天气，并且只有预计下雨时才有条件地创建提醒。",
+              "goal_id": "goal-fpdl_v2_fast_completion_or_how_escalation_38_boundary_zh-1",
+              "metadata": {
+                "output_mode": "stateful_effect"
+              },
+              "object": {
+                "bindings": {
+                  "date": {
+                    "confidence": 1.0,
+                    "entity_type": "date",
+                    "name": "date",
+                    "value": "tomorrow"
+                  },
+                  "due_at": {
+                    "confidence": 1.0,
+                    "entity_type": "due_time",
+                    "name": "due_at",
+                    "value": "tomorrow at 07:30"
+                  },
+                  "location": {
+                    "confidence": 1.0,
+                    "entity_type": "location",
+                    "name": "location",
+                    "value": "Hangzhou"
+                  },
+                  "period": {
+                    "confidence": 1.0,
+                    "entity_type": "day_part",
+                    "name": "period",
+                    "value": "morning"
+                  },
+                  "reminder_text": {
+                    "confidence": 1.0,
+                    "entity_type": "reminder_text",
+                    "name": "reminder_text",
+                    "value": "bring an umbrella"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "为了明天的实际安排，请查询杭州明早天气，并且只有预计下雨时才创建7:30带伞提醒。",
+              "success_criteria": [
+                "查询天气，并且只有预计下雨时才有条件地创建提醒。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_38_boundary_zh"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "date": "tomorrow",
+            "due_at": "tomorrow at 07:30",
+            "location": "Hangzhou",
+            "period": "morning",
+            "reminder_text": "bring an umbrella"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "查询天气，并且只有预计下雨时才有条件地创建提醒。",
+          "output_mode": "stateful_effect",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_fast_completion_or_how_escalation_38_boundary_zh",
+      "text": "为了明天的实际安排，请查询杭州明早天气，并且只有预计下雨时才创建7:30带伞提醒。"
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-38",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "escalate"
+      ],
+      "expected_confirmation_required": null,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_fast_completion_or_how_escalation_38_boundary_zh-1"
+      ],
+      "expected_plan_relations": [],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [
+        "chromie.reminder.create",
+        "chromie.weather.lookup",
+        "soridormi.blink_eyes",
+        "soridormi.look_at_person",
+        "soridormi.walk_forward"
+      ],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "条件式多阶段 HOW 需要更广规划；Fast 必须完整升级范围，不能泄漏部分天气或提醒 Work。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

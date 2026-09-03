@@ -249,7 +249,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"],
-            "15000",
+            "300000",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"],
@@ -326,11 +326,13 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
-        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "8000")
-        self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "8000")
-        self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "9000")
-        self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "9000")
-        self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "15000")
+        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "125000")
+        self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "300000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
 
     def test_primary_gpu_profiles_do_not_own_foreground_latency(self) -> None:
@@ -559,7 +561,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "CHROMIE_COGNITIVE_BUDGET_PROFILE: ${CHROMIE_COGNITIVE_BUDGET_PROFILE:-interactive}",
             "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
             "AGENT_DEEP_PLANNER_MODEL: ${AGENT_DEEP_PLANNER_MODEL:-gemma4:e2b}",
-            "AGENT_DEEP_PLANNER_TIMEOUT_MS: ${AGENT_DEEP_PLANNER_TIMEOUT_MS:-9000}",
+            "AGENT_DEEP_PLANNER_TIMEOUT_MS: ${AGENT_DEEP_PLANNER_TIMEOUT_MS:-120000}",
             "AGENT_DEEP_PLANNER_NUM_CTX: ${AGENT_DEEP_PLANNER_NUM_CTX:-8192}",
         ):
             self.assertIn(fragment, agent)

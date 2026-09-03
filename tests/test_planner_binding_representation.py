@@ -516,6 +516,12 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "goal_id": goal_id,
                         "description": "Walk at 0.2 speed for 10 seconds.",
                         "success_criteria": [],
+                        "object": {
+                            "bindings": {
+                                "speed": {"value": 0.2},
+                                "duration": {"value": 10.0},
+                            }
+                        },
                     }
                 ],
             )
@@ -582,6 +588,12 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "goal_id": goal_id,
                         "description": "Walk at 0.2 speed for 10 seconds.",
                         "success_criteria": [],
+                        "object": {
+                            "bindings": {
+                                "speed": {"value": 0.2},
+                                "duration": {"value": 10.0},
+                            }
+                        },
                     }
                 ],
             )

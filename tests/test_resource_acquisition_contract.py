@@ -16,7 +16,6 @@ from agent.app.planner_model_contract import (
 from agent.app.planner_context import canonical_goal_grounding
 from agent.app.planner_schema import (
     canonical_resource_argument_response_schema,
-    resource_grounding_repair_response_schema,
 )
 from agent.app.planner_validation import validate_resource_responsibility_capability_grounding
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -554,18 +553,20 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             },
             "properties": {"steps": {"type": "array", "maxItems": 4}},
         }
-        tightened = resource_grounding_repair_response_schema(
+        tightened = canonical_resource_argument_response_schema(
             base_schema,
-            error=caught.exception,
             authoritative_goals=[self._resource_goal()],
         )
         step_schema = tightened["$defs"]["PlannerModelStep"]
         self.assertEqual(
             step_schema["properties"]["capability_id"]["enum"],
-            ["soridormi.acquire_and_deliver_resource"],
+            [
+                "soridormi.walk_forward",
+                "soridormi.acquire_and_deliver_resource",
+            ],
         )
-        self.assertEqual(len(step_schema["oneOf"]), 1)
-        args_schema = step_schema["oneOf"][0]["properties"]["args"]
+        self.assertEqual(len(step_schema["oneOf"]), 2)
+        args_schema = step_schema["oneOf"][1]["properties"]["args"]
         responsibility = self._resource_goal()["resource_responsibility"]
         self.assertEqual(
             args_schema["properties"]["resource"]["const"],
@@ -575,18 +576,10 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             args_schema["properties"]["source"]["const"],
             responsibility["source"],
         )
-        self.assertEqual(
-            tightened["properties"]["steps"]["minItems"],
-            1,
-        )
-        self.assertEqual(
-            tightened["properties"]["steps"]["maxItems"],
-            1,
-        )
+        self.assertEqual(tightened["properties"]["steps"]["maxItems"], 4)
         tightened["properties"]["parameter_resolutions"] = {"maxItems": 4}
-        tightened_again = resource_grounding_repair_response_schema(
+        tightened_again = canonical_resource_argument_response_schema(
             tightened,
-            error=caught.exception,
             authoritative_goals=[self._resource_goal()],
         )
         self.assertEqual(
@@ -594,47 +587,6 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             0,
         )
 
-        movement_goal = {
-            "goal_id": "goal-movement",
-            "description": "向前走100米",
-            "success_criteria": ["向前走100米"],
-            "object": {
-                "bindings": {
-                    "distance": {
-                        "name": "distance",
-                        "entity_type": "distance",
-                        "value": "100",
-                        "confidence": 1.0,
-                    }
-                }
-            },
-        }
-        multi_goal_schema = resource_grounding_repair_response_schema(
-            base_schema,
-            error=caught.exception,
-            authoritative_goals=[movement_goal, self._resource_goal()],
-        )
-        multi_step_schema = multi_goal_schema["$defs"]["PlannerModelStep"]
-        self.assertEqual(len(multi_step_schema["oneOf"]), 2)
-        resource_branch = next(
-            branch
-            for branch in multi_step_schema["oneOf"]
-            if branch["properties"]["capability_id"]["enum"]
-            == ["soridormi.acquire_and_deliver_resource"]
-        )
-        self.assertEqual(
-            resource_branch["properties"]["args"]["properties"]["resource"][
-                "const"
-            ],
-            responsibility["resource"],
-        )
-        multi_steps = multi_goal_schema["properties"]["steps"]
-        self.assertEqual(multi_steps["maxItems"], 4)
-        self.assertEqual(multi_steps["minContains"], 1)
-        self.assertEqual(
-            multi_steps["contains"]["properties"]["source_goal_ids"]["contains"],
-            {"const": "goal-resource"},
-        )
 
     def test_resource_capability_requires_explicit_plan_coverage(self) -> None:
         canonical = {
@@ -804,7 +756,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             capabilities=[acquire, deliver, complete],
         )
 
-    def test_complete_capability_argument_conflict_enables_exact_dto_repair(self) -> None:
+    def test_complete_capability_argument_conflict_is_rejected(self) -> None:
         goal = self._resource_goal()
         responsibility = goal["resource_responsibility"]
         responsibility["resource"]["quantity"] = "1"

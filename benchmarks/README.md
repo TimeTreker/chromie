@@ -477,19 +477,20 @@ claim boundary, and retained prompt-qualification evidence.
 
 ## Fast Planner daily-life qualification corpus
 
-`datasets/fast_planner_daily_life/scenarios/` contains 1,500 directly
-model-authored, production-shaped Fast Planner cases in 150 bilingual contrast
-sets. Coverage is balanced across streaming advance, canonical primary planning,
-bounded re-entry, 15 ability classes, 10 daily-life domains, and English/Chinese.
-The manifest owns aggregate counts and the complete scenario-tree digest.
+`datasets/fast_planner_daily_life/scenarios/` contains 204 current-production-
+shaped Fast scenarios in 51 one-axis bilingual contrast sets. The case count is
+derived from 17 design-owned Planner capacities, three materially different
+daily-life families per capacity, supported/boundary conditions, and English/
+Chinese realizations. The matrix covers streaming Responsibility planning,
+canonical primary Goals, and scoped Evidence/Work re-entry. The sibling Deep tree
+contains 40 separately qualified primary/re-entry cases across ten applicable
+capacities.
 
-The checked-in validator reconstructs the exact production prompt and dynamic
-Schema for every case and enforces the target-blind transaction, review flags,
-coverage matrix, Goal/Evidence/Work references, and frozen Capability fixture.
-Every scenario is only a mechanically validated candidate: independent semantic
-review, immutable baseline inference, and adjudication have not run. Do not cite
-the corpus as prompt, contract, workflow, architecture, model, behavior, deployment,
-or training qualification.
+The manifest owns the inventory, authority exclusions, coverage dimensions, and
+tree digests. Daily-life families are representative contexts rather than proxy
+abilities. These same-model-authored cases remain semantically non-independent and
+ineligible for training; they do not establish deployed model, voice, simulator,
+hardware, safety, release, or exhaustive daily-life behavior.
 
 Validate it with:
 
@@ -502,7 +503,7 @@ See the corpus
 [README](datasets/fast_planner_daily_life/README.md) and
 [Issue #35](https://github.com/TimeTreker/chromie/issues/35). The tracked scenarios
 and retained local authoring evidence remain same-model-authored, non-independent,
-semantically unreviewed, and ineligible for training.
+and ineligible for training until an independent reviewer and owner approve them.
 
 
 ## End-to-end evidence profiles

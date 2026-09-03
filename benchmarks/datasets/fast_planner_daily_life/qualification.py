@@ -48,6 +48,7 @@ from agent.app.planner_schema import fast_streaming_advance_response_schema  # n
 from shared.chromie_contracts.core_interpretation import (  # noqa: E402
     CognitiveWorkRequest,
 )
+from shared.chromie_contracts.goal import GoalAssociationResolution  # noqa: E402
 from shared.chromie_contracts.plan import (  # noqa: E402
     FastPlannerStreamFailure,
     FastPlannerStreamTerminal,
@@ -60,6 +61,9 @@ CATALOG_ROOT = DATASET_ROOT / "catalogs"
 MANIFEST_PATH = DATASET_ROOT / "dataset.json"
 PRODUCTION_TRANSACTION_FILES = (
     ROOT / "agent" / "app" / "fast_planner.py",
+    ROOT / "agent" / "app" / "capabilities" / "catalog.py",
+    ROOT / "agent" / "app" / "planner_fallback.py",
+    ROOT / "agent" / "app" / "planner_grounding.py",
     ROOT / "agent" / "app" / "planner_prompt.py",
     ROOT / "agent" / "app" / "planner_schema.py",
     ROOT / "agent" / "app" / "planner_model_contract.py",
@@ -67,48 +71,40 @@ PRODUCTION_TRANSACTION_FILES = (
     ROOT / "agent" / "app" / "planner_fast_validation.py",
     ROOT / "agent" / "app" / "planner_context.py",
     ROOT / "shared" / "chromie_contracts" / "core_interpretation.py",
+    ROOT / "shared" / "chromie_contracts" / "discourse.py",
+    ROOT / "shared" / "chromie_contracts" / "goal.py",
     ROOT / "shared" / "chromie_contracts" / "plan.py",
+    ROOT / "shared" / "chromie_contracts" / "resource.py",
+    ROOT / "shared" / "chromie_contracts" / "semantic_task.py",
 )
 HARNESS_FILES = (
     Path(__file__).resolve(),
     DATASET_ROOT / "validate.py",
+    MANIFEST_PATH,
+    *sorted(CATALOG_ROOT.glob("*.json")),
 )
-DATASET_ID = "chromie.fast_planner_daily_life.v1"
-RUNTIME_BY_CATEGORY = {
-    "stream_direct_conversation": "streaming_advance",
-    "stream_single_capability": "streaming_advance",
-    "stream_multi_responsibility": "streaming_advance",
-    "stream_parameter_grounding": "streaming_advance",
-    "stream_boundary_handling": "streaming_advance",
-    "canonical_single_goal": "canonical_primary",
-    "canonical_multi_goal": "canonical_primary",
-    "canonical_retained_work": "canonical_primary",
-    "canonical_confirmation_boundary": "canonical_primary",
-    "canonical_unavailable_capability": "canonical_primary",
-    "reentry_terminal_evidence": "canonical_reentry",
-    "reentry_cancellation_evidence": "canonical_reentry",
-    "reentry_situation_revision": "canonical_reentry",
-    "reentry_time_condition": "canonical_reentry",
-    "reentry_provider_revalidation": "canonical_reentry",
+DATASET_ID = "chromie.fast_planner_daily_life.v2"
+RUNTIME_VARIANTS = {
+    "streaming_advance",
+    "canonical_primary",
+    "canonical_reentry",
 }
-REENTRY_TRIGGER_BY_CATEGORY = {
-    "reentry_terminal_evidence": "capability_result_reentry",
-    "reentry_cancellation_evidence": "goal_cancellation_reentry",
-    "reentry_situation_revision": "situation_revision_reentry",
-    "reentry_time_condition": "time_condition_reentry",
-    "reentry_provider_revalidation": "restored_provider_state_revalidation",
-}
-DAILY_LIFE_DOMAINS = {
+DAILY_LIFE_FAMILIES = {
+    "greetings_presence",
     "family_home",
-    "work_study",
     "school_learning",
-    "shopping_errands",
-    "travel_navigation",
-    "health_wellbeing",
-    "entertainment_media",
-    "friends_communication",
-    "pets_garden",
-    "personal_organization",
+    "routines_plans",
+    "meals_wellbeing",
+    "feelings_support",
+    "play_creativity",
+    "identity_body",
+    "practical_information_tools",
+    "preferences_boundaries",
+    "multi_turn_continuity",
+    "uncertainty_repair",
+    "friends_social_life",
+    "shared_space_etiquette",
+    "casual_chat_curiosity",
 }
 REQUIRED_INVARIANTS = {
     "one_primary_semantic_invocation": True,
@@ -166,6 +162,17 @@ def scenario_tree_digest(dataset_root: Path = DATASET_ROOT) -> str:
     return digest.hexdigest()
 
 
+def catalog_tree_digest(dataset_root: Path = DATASET_ROOT) -> str:
+    digest = hashlib.sha256()
+    catalog_root = dataset_root / "catalogs"
+    for path in sorted(catalog_root.glob("*.json")):
+        digest.update(path.relative_to(dataset_root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def production_source_identity() -> dict[str, Any]:
     files = {
         path.relative_to(ROOT).as_posix(): _sha256(path.read_bytes())
@@ -194,10 +201,7 @@ def production_source_identity() -> dict[str, Any]:
 
 
 def harness_file_identity() -> dict[str, str]:
-    return {
-        path.relative_to(ROOT).as_posix(): _sha256(path.read_bytes())
-        for path in HARNESS_FILES
-    }
+    return {path.relative_to(ROOT).as_posix(): _sha256(path.read_bytes()) for path in HARNESS_FILES}
 
 
 class StaticCatalog:
@@ -244,9 +248,7 @@ class CaptureModel:
         self.calls.append({"prompt": str(prompt), **kwargs})
         return {}
 
-    async def generate_stream(
-        self, prompt: Any, **kwargs: Any
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, prompt: Any, **kwargs: Any) -> AsyncIterator[str]:
         self.calls.append({"prompt": str(prompt), **kwargs})
         if False:  # pragma: no cover - marks this function as an async generator
             yield ""
@@ -264,9 +266,7 @@ class ReplayModel:
             raise ValueError("candidate canonical output is not an object")
         return value
 
-    async def generate_stream(
-        self, prompt: Any, **kwargs: Any
-    ) -> AsyncIterator[str]:
+    async def generate_stream(self, prompt: Any, **kwargs: Any) -> AsyncIterator[str]:
         self.calls += 1
         yield self.raw
 
@@ -285,8 +285,7 @@ def _stream_schema(
         and is_planner_step_capability(item.capability_id)
     ]
     capability_payload = [
-        fast_capability_payload(item, include_side_effect_free=True)
-        for item in available[:24]
+        fast_capability_payload(item, include_side_effect_free=True) for item in available[:24]
     ]
     auxiliary = auxiliary_social_capability_payloads(catalog.items)
     schema = fast_streaming_advance_response_schema(
@@ -314,7 +313,6 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
     resolver = FastPlannerResolver(
         capture,
         catalog,
-        max_contract_repairs=0,
     )
     runtime_variant = case["input"]["runtime_variant"]
     previous_level = logging.getLogger("chromie.agent.fast_planner").level
@@ -357,9 +355,7 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
         "options": call.get("options") or {},
         "production_prompt_family": call.get("prompt_family") or "",
         "production_response_transport": (
-            "tagged_two_frame_text"
-            if runtime_variant == "streaming_advance"
-            else "structured_json"
+            "tagged_two_frame_text" if runtime_variant == "streaming_advance" else "structured_json"
         ),
         "prompt_identity": prompt_identity,
     }
@@ -383,6 +379,100 @@ def _activity_ids(value: Any) -> set[str]:
     return found
 
 
+def validate_production_shaped_canonical_context(
+    case: dict[str, Any],
+    request: CognitiveWorkRequest,
+) -> None:
+    """Reject synthetic canonical context that production cannot emit.
+
+    Planner qualification starts after Goal Association.  Its frozen context
+    must therefore be the exact bounded projection of the current upstream DTO,
+    not an older hand-authored approximation that moves typed bindings into
+    ``constraints`` or omits the information-resource contract.
+    """
+
+    if case["input"]["runtime_variant"] == "streaming_advance":
+        return
+    raw = request.context.get("goal_association_resolution")
+    if not isinstance(raw, dict):
+        raise ValueError("canonical case lacks Goal Association resolution")
+    try:
+        resolution = GoalAssociationResolution.model_validate(raw)
+    except Exception as exc:
+        raise ValueError(
+            "canonical Goal Association context is not valid under the current "
+            f"production DTO: {exc}"
+        ) from exc
+    if raw != resolution.prompt_projection():
+        raise ValueError(
+            "canonical Goal Association context is not the exact current "
+            "production prompt projection"
+        )
+    result_reentry = request.context.get("result_evidence_reentry")
+    if isinstance(result_reentry, dict):
+        execution_truth = request.context.get("trusted_execution_outcome")
+        if not isinstance(execution_truth, dict):
+            raise ValueError("capability-result re-entry lacks Host-projected execution truth")
+        scoped_goal_ids = {str(value) for value in result_reentry.get("source_goal_ids") or []}
+        scoped_evidence_ids = {str(value) for value in result_reentry.get("evidence_refs") or []}
+        truth_goal_ids = {
+            str(item.get("goal_id") or "")
+            for item in execution_truth.get("goal_outcomes") or []
+            if isinstance(item, dict)
+        }
+        truth_evidence_ids = {
+            str(item.get("evidence_id") or "")
+            for item in execution_truth.get("evidence") or []
+            if isinstance(item, dict)
+        }
+        if truth_goal_ids != scoped_goal_ids:
+            raise ValueError("trusted execution Goal outcomes do not match re-entry scope")
+        if truth_evidence_ids != scoped_evidence_ids:
+            raise ValueError("trusted execution Evidence does not match re-entry scope")
+    responsibilities = {item.local_ref: item for item in request.responsibilities}
+    for goal in resolution.new_goals:
+        output_mode = str(goal.metadata.get("output_mode") or "").strip()
+        if output_mode == "information" and goal.resource_responsibility is None:
+            raise ValueError(f"information Goal {goal.goal_id!r} lacks resource_responsibility")
+        if goal.resource_responsibility is None and goal.constraints:
+            raise ValueError(
+                f"new non-resource Goal {goal.goal_id!r} carries legacy constraints; "
+                "current Goal Association emits typed object.bindings"
+            )
+        if goal.resource_responsibility is not None and goal.object:
+            raise ValueError(
+                f"resource Goal {goal.goal_id!r} carries a forbidden flat binding copy"
+            )
+        if goal.resource_responsibility is None:
+            object_keys = set(goal.object)
+            if object_keys - {"bindings"}:
+                raise ValueError(f"new Goal {goal.goal_id!r} does not use object.bindings")
+            typed = goal.object.get("bindings") or {}
+            if not isinstance(typed, dict):
+                raise ValueError(f"new Goal {goal.goal_id!r} object.bindings must be an object")
+            for name, binding in typed.items():
+                if not isinstance(binding, dict):
+                    raise ValueError(f"new Goal {goal.goal_id!r} binding {name!r} is not typed")
+                if binding.get("name") != name or not binding.get("entity_type"):
+                    raise ValueError(
+                        f"new Goal {goal.goal_id!r} binding {name!r} has invalid identity"
+                    )
+                if "value" not in binding or "confidence" not in binding:
+                    raise ValueError(f"new Goal {goal.goal_id!r} binding {name!r} is incomplete")
+                source_values = [
+                    responsibilities[ref].bindings.get(name)
+                    for ref in goal.source_responsibility_refs
+                    if ref in responsibilities and name in responsibilities[ref].bindings
+                ]
+                if not source_values or not any(
+                    str(value).strip() == str(binding["value"]).strip() for value in source_values
+                ):
+                    raise ValueError(
+                        f"new Goal {goal.goal_id!r} binding {name!r} is not copied "
+                        "from its GI Responsibility"
+                    )
+
+
 async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
     errors: list[str] = []
     counts: Counter[str] = Counter()
@@ -390,11 +480,12 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
     seen_requests: set[str] = set()
     contrast_members: dict[str, set[str]] = defaultdict(set)
     contrast_splits: dict[str, set[str]] = defaultdict(set)
+    cell_identities: dict[str, tuple[str, str, str]] = {}
 
     for case in cases:
         case_id = str(case.get("id") or "")
         try:
-            if case.get("schema_version") != 1:
+            if case.get("schema_version") != 2:
                 raise ValueError("unknown scenario schema version")
             if case.get("dataset_id") != DATASET_ID:
                 raise ValueError("dataset id drift")
@@ -403,11 +494,12 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
             seen_ids.add(case_id)
             category = str(case.get("category") or "")
             runtime_variant = str(case.get("input", {}).get("runtime_variant") or "")
-            if category not in RUNTIME_BY_CATEGORY:
+            if category not in RUNTIME_VARIANTS:
                 raise ValueError("unknown category")
-            if runtime_variant != RUNTIME_BY_CATEGORY[category]:
+            if runtime_variant != category:
                 raise ValueError("category/runtime variant drift")
             request = CognitiveWorkRequest.model_validate(case["input"]["request"])
+            validate_production_shaped_canonical_context(case, request)
             catalog = StaticCatalog(materialize_catalog(case["input"]))
             if not catalog.items:
                 raise ValueError("empty Capability catalog")
@@ -435,30 +527,41 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
             if case.get("invariants") != REQUIRED_INVARIANTS:
                 raise ValueError("scenario invariant contract drift")
             design = case.get("adversarial_design") or {}
-            domain = str(design.get("domain") or "")
-            condition_index = design.get("condition_index")
-            if design.get("ability_class") != category:
-                raise ValueError("adversarial ability/category drift")
-            if domain not in DAILY_LIFE_DOMAINS:
-                raise ValueError("unknown daily-life domain")
-            if not isinstance(condition_index, int) or not 1 <= condition_index <= 5:
-                raise ValueError("invalid contrast condition index")
+            primary_capacity_id = str(design.get("primary_capacity_id") or "")
+            family = str(design.get("daily_life_family") or "")
+            cell_index = design.get("cell_index")
+            condition = str(design.get("condition") or "")
+            changed_axis = str(design.get("changed_axis") or "")
+            if not primary_capacity_id:
+                raise ValueError("missing primary Planner capacity")
+            if family not in DAILY_LIFE_FAMILIES:
+                raise ValueError("unknown daily-life family")
+            if not isinstance(cell_index, int) or not 1 <= cell_index <= 51:
+                raise ValueError("invalid contrast cell index")
+            if condition not in {"supported", "boundary"}:
+                raise ValueError("invalid contrast condition")
+            if not changed_axis:
+                raise ValueError("missing one-axis contrast declaration")
             paired_language = "zh-CN" if language == "en-US" else "en-US"
             if design.get("paired_language") != paired_language:
                 raise ValueError("paired language drift")
             contrast_id = str(case["contrast_set"]["id"])
             language_suffix = "en" if language == "en-US" else "zh"
-            expected_contrast_id = f"fpdl_v1_{category}_{domain}"
-            expected_member = f"condition-{condition_index:02d}-{language_suffix}"
-            expected_case_id = f"{expected_contrast_id}_c{condition_index:02d}_{language_suffix}"
+            expected_contrast_id = f"fpdl_v2_{primary_capacity_id}_{cell_index:02d}"
+            expected_member = f"{condition}-{language_suffix}"
+            expected_case_id = f"{expected_contrast_id}_{condition}_{language_suffix}"
             if contrast_id != expected_contrast_id or case_id != expected_case_id:
                 raise ValueError("scenario/contrast matrix identity drift")
             if case["contrast_set"].get("member") != expected_member:
                 raise ValueError("contrast member drift")
-            if case["contrast_set"].get("controlled_axes") != ["condition", "language"]:
+            if case["contrast_set"].get("controlled_axes") != [changed_axis, "language"]:
                 raise ValueError("contrast controlled-axis drift")
             contrast_members[contrast_id].add(expected_member)
             contrast_splits[contrast_id].add(str(case["split"]))
+            cell_identity = (primary_capacity_id, family, runtime_variant)
+            previous_identity = cell_identities.setdefault(contrast_id, cell_identity)
+            if previous_identity != cell_identity:
+                raise ValueError("contrast set changes capacity, family, or entry variant")
             expectation = case["target"]["reference_region"]
             expected_refs = [item.local_ref for item in request.responsibilities]
             if expectation["expected_responsibility_refs"] != expected_refs:
@@ -482,8 +585,10 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
                 raise ValueError("required Work reuse target is absent from input context")
             scope = request.planner_reentry_scope
             if runtime_variant == "streaming_advance":
-                if request.context or scope is not None or expected_goals:
+                if scope is not None or expected_goals:
                     raise ValueError("streaming scenario carries canonical Goal/re-entry state")
+                if "goal_association_resolution" in request.context:
+                    raise ValueError("pre-GA streaming scenario carries GA result")
             elif runtime_variant == "canonical_primary":
                 if scope is not None:
                     raise ValueError("canonical primary scenario carries re-entry scope")
@@ -492,8 +597,6 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
             else:
                 if scope is None:
                     raise ValueError("canonical re-entry scenario lacks scope")
-                if scope.trigger != REENTRY_TRIGGER_BY_CATEGORY[category]:
-                    raise ValueError("category/re-entry trigger drift")
                 if list(scope.goal_ids) != expectation["expected_goal_ids"]:
                     raise ValueError("re-entry scope/Goal oracle drift")
                 if list(scope.evidence_refs) != expectation["required_evidence_refs"]:
@@ -503,37 +606,90 @@ async def validate_cases(cases: list[dict[str, Any]]) -> dict[str, Any]:
             transaction = await build_transaction(case)
             if "target" in transaction or "reference_region" in transaction:
                 raise ValueError("target leaked into candidate transaction")
+            transaction_contract = transaction["user_prompt"] + json.dumps(
+                transaction["response_schema"],
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            missing_required_capabilities = [
+                capability_id
+                for capability_id in required_capabilities
+                if capability_id not in transaction_contract
+            ]
+            if missing_required_capabilities:
+                raise ValueError(
+                    "required Capability target is absent from the target-blind "
+                    "production transaction: " + ",".join(missing_required_capabilities)
+                )
             counts[f"language:{language}"] += 1
             counts[f"split:{case['split']}"] += 1
             counts[f"category:{category}"] += 1
             counts[f"runtime:{runtime_variant}"] += 1
+            counts[f"capacity:{primary_capacity_id}"] += 1
+            counts[f"family:{family}"] += 1
+            counts[f"condition:{condition}"] += 1
             counts["validated"] += 1
         except Exception as exc:
             errors.append(f"{case_id}: {type(exc).__name__}: {exc}")
 
     for contrast_id, members in contrast_members.items():
-        if len(members) != 10:
-            errors.append(f"{contrast_id}: expected 10 contrast members, got {len(members)}")
+        if members != {"supported-en", "supported-zh", "boundary-en", "boundary-zh"}:
+            errors.append(
+                f"{contrast_id}: expected one bilingual two-condition contrast, "
+                f"got {sorted(members)}"
+            )
         if len(contrast_splits[contrast_id]) != 1:
             errors.append(f"{contrast_id}: contrast set crosses splits")
     if errors:
         raise ValueError("Fast Planner corpus validation failed:\n" + "\n".join(errors[:100]))
     return {
         "scenario_count": len(cases),
-        "languages": {key.split(":", 1)[1]: value for key, value in counts.items() if key.startswith("language:")},
-        "splits": {key.split(":", 1)[1]: value for key, value in counts.items() if key.startswith("split:")},
-        "categories": {key.split(":", 1)[1]: value for key, value in counts.items() if key.startswith("category:")},
-        "runtime_variants": {key.split(":", 1)[1]: value for key, value in counts.items() if key.startswith("runtime:")},
+        "languages": {
+            key.split(":", 1)[1]: value
+            for key, value in counts.items()
+            if key.startswith("language:")
+        },
+        "splits": {
+            key.split(":", 1)[1]: value for key, value in counts.items() if key.startswith("split:")
+        },
+        "categories": {
+            key.split(":", 1)[1]: value
+            for key, value in counts.items()
+            if key.startswith("category:")
+        },
+        "runtime_variants": {
+            key.split(":", 1)[1]: value
+            for key, value in counts.items()
+            if key.startswith("runtime:")
+        },
+        "capacities": {
+            key.split(":", 1)[1]: value
+            for key, value in counts.items()
+            if key.startswith("capacity:")
+        },
+        "daily_life_families": {
+            key.split(":", 1)[1]: value
+            for key, value in counts.items()
+            if key.startswith("family:")
+        },
+        "conditions": {
+            key.split(":", 1)[1]: value
+            for key, value in counts.items()
+            if key.startswith("condition:")
+        },
         "contrast_set_count": len(contrast_members),
         "validated": counts["validated"],
         "scenario_tree_sha256": scenario_tree_digest(),
+        "catalog_tree_sha256": catalog_tree_digest(),
     }
 
 
-def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
+async def validate_dataset_async(
+    dataset_root: Path = DATASET_ROOT,
+) -> dict[str, Any]:
     manifest = json.loads((dataset_root / "dataset.json").read_text(encoding="utf-8"))
     cases = load_cases(dataset_root)
-    summary = asyncio.run(validate_cases(cases))
+    summary = await validate_cases(cases)
     expected = manifest["coverage_contract"]
     if summary["scenario_count"] != expected["scenario_count"]:
         raise ValueError("manifest scenario count drift")
@@ -545,12 +701,31 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
         raise ValueError("manifest category count drift")
     if summary["runtime_variants"] != expected["runtime_variants"]:
         raise ValueError("manifest runtime count drift")
+    semantic_coverage = manifest["semantic_coverage"]
+    if summary["capacities"] != semantic_coverage["capacities"]:
+        raise ValueError("manifest Planner-capacity coverage drift")
+    if summary["daily_life_families"] != semantic_coverage["daily_life_families"]:
+        raise ValueError("manifest daily-life-family coverage drift")
+    if summary["conditions"] != semantic_coverage["conditions"]:
+        raise ValueError("manifest contrast-condition coverage drift")
     if summary["scenario_tree_sha256"] != manifest["asset_contract"]["scenario_tree_sha256"]:
         raise ValueError("manifest scenario-tree digest drift")
+    if summary["catalog_tree_sha256"] != manifest["asset_contract"]["catalog_tree_sha256"]:
+        raise ValueError("manifest catalog-tree digest drift")
     return summary
 
 
-async def prepare_batch(output_dir: Path, *, label: str) -> dict[str, Any]:
+def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
+    return asyncio.run(validate_dataset_async(dataset_root))
+
+
+async def prepare_batch(
+    output_dir: Path,
+    *,
+    label: str,
+    only_cases: list[str] | None = None,
+) -> dict[str, Any]:
+    await validate_dataset_async()
     output_dir = output_dir.resolve()
     if output_dir.exists():
         raise FileExistsError(f"output directory already exists: {output_dir}")
@@ -570,6 +745,14 @@ async def prepare_batch(output_dir: Path, *, label: str) -> dict[str, Any]:
         encoding="utf-8",
     )
     cases = load_cases()
+    requested_case_ids = list(dict.fromkeys(only_cases or []))
+    if requested_case_ids:
+        available = {case["id"] for case in cases}
+        unknown = sorted(set(requested_case_ids) - available)
+        if unknown:
+            raise ValueError("unknown --only-case IDs: " + ",".join(unknown))
+        selected = set(requested_case_ids)
+        cases = [case for case in cases if case["id"] in selected]
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     source = production_source_identity()
     index: list[dict[str, Any]] = []
@@ -582,7 +765,10 @@ async def prepare_batch(output_dir: Path, *, label: str) -> dict[str, Any]:
         schema_path = schemas_dir / f"{schema_sha}.json"
         if not schema_path.exists():
             schema_path.write_text(
-                json.dumps(transaction["response_schema"], ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                json.dumps(
+                    transaction["response_schema"], ensure_ascii=False, indent=2, sort_keys=True
+                )
+                + "\n",
                 encoding="utf-8",
             )
         packet = {
@@ -603,13 +789,15 @@ async def prepare_batch(output_dir: Path, *, label: str) -> dict[str, Any]:
             json.dumps(packet, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        index.append({
-            "position": position,
-            "case_ref": case_ref,
-            "scenario_id": case["id"],
-            "scenario_path": scenario_path_by_id[case["id"]].relative_to(ROOT).as_posix(),
-            "packet_path": packet_path.relative_to(output_dir).as_posix(),
-        })
+        index.append(
+            {
+                "position": position,
+                "case_ref": case_ref,
+                "scenario_id": case["id"],
+                "scenario_path": scenario_path_by_id[case["id"]].relative_to(ROOT).as_posix(),
+                "packet_path": packet_path.relative_to(output_dir).as_posix(),
+            }
+        )
         prompt_identities[case_ref] = transaction["prompt_identity"]
     batch_identity = {
         "schema_version": 1,
@@ -617,6 +805,7 @@ async def prepare_batch(output_dir: Path, *, label: str) -> dict[str, Any]:
         "issue": "https://github.com/TimeTreker/chromie/issues/35",
         "dataset_id": manifest["dataset_id"],
         "scenario_count": len(cases),
+        "selected_scenario_ids": [case["id"] for case in cases],
         "scenario_tree_sha256": scenario_tree_digest(),
         "source": source,
         "harness": {
@@ -638,9 +827,7 @@ async def prepare_batch(output_dir: Path, *, label: str) -> dict[str, Any]:
             "same_model_non_independent": True,
             "transport_limit": "Exact production prompt/schema content is projected through a strict Codex string envelope; Codex CLI is not the deployed Ollama structured decoder or text stream.",
         },
-        "codex_envelope_schema_sha256": _sha256(
-            _json_bytes(codex_envelope_schema)
-        ),
+        "codex_envelope_schema_sha256": _sha256(_json_bytes(codex_envelope_schema)),
         "prompt_identity_index_sha256": _sha256(_json_bytes(prompt_identities)),
         "candidate_packet_policy": "system/user/schema only; target, rubric, category, split, and expected result excluded",
     }
@@ -746,9 +933,7 @@ async def _run_one(
         )
         try:
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(
-                    _candidate_prompt(packet, response_schema).encode("utf-8")
-                ),
+                process.communicate(_candidate_prompt(packet, response_schema).encode("utf-8")),
                 timeout=timeout_s,
             )
             timed_out = False
@@ -757,9 +942,7 @@ async def _run_one(
             stdout, stderr = await process.communicate()
             timed_out = True
         ended = time.time()
-        log_path.write_bytes(
-            b"STDOUT\n" + stdout + b"\nSTDERR\n" + stderr
-        )
+        log_path.write_bytes(b"STDOUT\n" + stdout + b"\nSTDERR\n" + stderr)
         envelope_error = ""
         if envelope_path.exists():
             try:
@@ -783,7 +966,9 @@ async def _run_one(
             "output_present": output_path.exists(),
             "output_sha256": _sha256(output_path.read_bytes()) if output_path.exists() else "",
             "codex_envelope_present": envelope_path.exists(),
-            "codex_envelope_sha256": _sha256(envelope_path.read_bytes()) if envelope_path.exists() else "",
+            "codex_envelope_sha256": _sha256(envelope_path.read_bytes())
+            if envelope_path.exists()
+            else "",
             "codex_envelope_error": envelope_error,
             "log_sha256": _sha256(log_path.read_bytes()),
         }
@@ -801,7 +986,9 @@ async def run_batch(output_dir: Path, *, concurrency: int, timeout_s: float) -> 
     if len(index) != identity["scenario_count"]:
         raise ValueError("packet index count drift")
     if (output_dir / "raw-outputs").exists() or (output_dir / "call-executions").exists():
-        raise FileExistsError("batch has existing execution artifacts; interrupted batches are not resumed")
+        raise FileExistsError(
+            "batch has existing execution artifacts; interrupted batches are not resumed"
+        )
     source_before = production_source_identity()
     if source_before != identity["source"]:
         raise ValueError("production source changed after packet freeze")
@@ -861,6 +1048,10 @@ def _target_checks(
     reuse_ids: list[str],
     scope_ids: list[str],
     coverage: str,
+    has_complete_response: bool,
+    plan_relation: str,
+    confirmation_required: bool | None,
+    time_condition_count: int,
 ) -> list[str]:
     errors: list[str] = []
     if disposition not in expectation["accepted_dispositions"]:
@@ -870,7 +1061,9 @@ def _target_checks(
         errors.append("missing required capabilities: " + ",".join(sorted(missing_capabilities)))
     forbidden_capabilities = set(expectation["forbidden_capability_ids"]) & set(capability_ids)
     if forbidden_capabilities:
-        errors.append("selected forbidden capabilities: " + ",".join(sorted(forbidden_capabilities)))
+        errors.append(
+            "selected forbidden capabilities: " + ",".join(sorted(forbidden_capabilities))
+        )
     missing_reuse = set(expectation["required_reuse_activity_ids"]) - set(reuse_ids)
     if missing_reuse:
         errors.append("missing retained Work reuse: " + ",".join(sorted(missing_reuse)))
@@ -882,7 +1075,48 @@ def _target_checks(
         errors.append(f"scope drift actual={sorted(scope_ids)} expected={sorted(expected_scope)}")
     if coverage != "complete" and capability_ids:
         errors.append("non-complete result carries executable Work")
+    response_required = expectation.get("response_required")
+    if response_required is True and not has_complete_response:
+        errors.append("missing required Planner-authored complete response")
+    if response_required is False and has_complete_response:
+        errors.append("forbidden complete response is present")
+    expected_relations = expectation.get("expected_plan_relations") or []
+    if expected_relations and plan_relation not in expected_relations:
+        errors.append(f"plan_relation={plan_relation!r} outside accepted region")
+    expected_confirmation = expectation.get("expected_confirmation_required")
+    if (
+        isinstance(expected_confirmation, bool)
+        and confirmation_required is not expected_confirmation
+    ):
+        errors.append(
+            "confirmation proposal drift "
+            f"actual={confirmation_required!r} expected={expected_confirmation!r}"
+        )
+    if expectation.get("required_time_conditions") and time_condition_count < 1:
+        errors.append("missing required Goal-bound time condition")
     return errors
+
+
+def canonical_primary_result_accepted(
+    plan: Any,
+    raw_value: Any,
+) -> bool:
+    """Return whether Host accepted the model's canonical primary result.
+
+    ``authority=advisory`` is true for every Fast plan, including valid terminal
+    and semantic-escalation results, so it is not a fallback discriminator.
+    """
+
+    if plan is None or not isinstance(raw_value, dict):
+        return False
+    path_classification = str(plan.metadata.get("path_classification") or "").strip()
+    raw_disposition = str(raw_value.get("disposition") or "").strip()
+    return path_classification == "terminal" or (
+        path_classification == "semantic_escalation"
+        and raw_disposition == "escalate"
+        and not plan.metadata.get("failure_class")
+        and not plan.metadata.get("error_type")
+    )
 
 
 async def _adjudicate_one(
@@ -895,7 +1129,7 @@ async def _adjudicate_one(
     request = CognitiveWorkRequest.model_validate(case["input"]["request"])
     catalog = StaticCatalog(materialize_catalog(case["input"]))
     replay = ReplayModel(raw_text)
-    resolver = FastPlannerResolver(replay, catalog, max_contract_repairs=0)
+    resolver = FastPlannerResolver(replay, catalog)
     schema_errors: list[str] = []
     host_accepted = False
     host_error = ""
@@ -905,7 +1139,12 @@ async def _adjudicate_one(
     reuse_ids: list[str] = []
     scope_ids: list[str] = []
     normalized_fields: list[str] = []
+    has_complete_response = False
+    plan_relation = ""
+    confirmation_required: bool | None = None
+    time_condition_count = 0
     raw_value: Any = None
+    plan = None
     previous_level = logging.getLogger("chromie.agent.fast_planner").level
     logging.getLogger("chromie.agent.fast_planner").setLevel(logging.CRITICAL)
     try:
@@ -917,8 +1156,7 @@ async def _adjudicate_one(
                     "terminal_result": terminal,
                 }
                 schema_errors = [
-                    error.message
-                    for error in Draft202012Validator(schema).iter_errors(raw_value)
+                    error.message for error in Draft202012Validator(schema).iter_errors(raw_value)
                 ][:20]
             except Exception as exc:
                 schema_errors = [f"{type(exc).__name__}: {exc}"]
@@ -937,34 +1175,65 @@ async def _adjudicate_one(
                 disposition = advance.disposition
                 coverage = advance.coverage
                 capability_ids = [
-                    item.capability_id
-                    for item in advance.activities
-                    if item.role == "capability"
+                    item.capability_id for item in advance.activities if item.role == "capability"
                 ]
+                has_complete_response = any(
+                    item.role == "complete_response" for item in advance.activities
+                ) or (
+                    terminal_frame is not None
+                    and any(
+                        getattr(item, "role", "") == "complete_response"
+                        for item in (
+                            next(
+                                (
+                                    frame.activity
+                                    for frame in frames
+                                    if getattr(frame, "frame_type", "") == "presentation_commit"
+                                    and frame.activity is not None
+                                ),
+                                None,
+                            ),
+                        )
+                        if item is not None
+                    )
+                )
                 scope_ids = list(advance.covered_responsibility_refs)
                 if advance.metadata.get("authoritative_arg_repairs"):
                     normalized_fields.append("authoritative_arg_repairs")
             else:
-                host_error = failure_frame.reason if failure_frame is not None else "missing terminal frame"
+                host_error = (
+                    failure_frame.reason if failure_frame is not None else "missing terminal frame"
+                )
         else:
             try:
                 raw_value = json.loads(raw_text)
                 schema_errors = [
-                    error.message
-                    for error in Draft202012Validator(schema).iter_errors(raw_value)
+                    error.message for error in Draft202012Validator(schema).iter_errors(raw_value)
                 ][:20]
             except Exception as exc:
                 schema_errors = [f"{type(exc).__name__}: {exc}"]
             plan = await resolver.resolve(request)
-            fallback = plan.metadata.get("resolver") == "fast_planner" and plan.metadata.get("authority") == "advisory"
+            fallback = (
+                plan.metadata.get("resolver") == "fast_planner"
+                and plan.metadata.get("authority") == "advisory"
+            )
             host_accepted = not fallback
             if fallback:
-                host_error = str(plan.escalation_reason or plan.metadata.get("error") or "fast planner fallback")
+                host_error = str(
+                    plan.escalation_reason or plan.metadata.get("error") or "fast planner fallback"
+                )
             disposition = plan.disposition
             coverage = plan.coverage
             capability_ids = [item.capability_id for item in plan.steps]
             reuse_ids = [item.reuse_activity_id for item in plan.steps if item.reuse_activity_id]
             scope_ids = list(plan.goal_ids)
+            has_complete_response = bool(plan.response_text.strip()) or any(
+                item.role == "complete_response" for item in plan.communicative_acts
+            )
+            plan_relation = str(plan.metadata.get("plan_relation") or "")
+            raw_confirmation = plan.metadata.get("user_confirmation_required")
+            confirmation_required = raw_confirmation if isinstance(raw_confirmation, bool) else None
+            time_condition_count = len(plan.time_conditions)
             for key in (
                 "parameter_provenance_normalization",
                 "terminal_response_accounting_normalization",
@@ -975,6 +1244,23 @@ async def _adjudicate_one(
         host_error = f"{type(exc).__name__}: {exc}"
     finally:
         logging.getLogger("chromie.agent.fast_planner").setLevel(previous_level)
+
+    # Every accepted Fast plan is advisory because Runtime, not Planner, owns
+    # commitment.  That authority label therefore cannot distinguish a valid
+    # primary result from a fail-closed fallback.  A terminal path is an accepted
+    # primary result.  A semantic-escalation path is accepted only when the raw
+    # model itself authored the legal escalation and Host validation did not
+    # attach failure metadata.  Host-generated escalation after a rejected
+    # execute/respond result remains a failed primary result.
+    if runtime_variant != "streaming_advance" and plan is not None:
+        host_accepted = canonical_primary_result_accepted(plan, raw_value)
+        host_error = (
+            ""
+            if host_accepted
+            else str(
+                plan.escalation_reason or plan.metadata.get("error") or "fast planner fallback"
+            )
+        )
     target_errors = _target_checks(
         expectation,
         disposition=disposition,
@@ -982,12 +1268,19 @@ async def _adjudicate_one(
         reuse_ids=reuse_ids,
         scope_ids=scope_ids,
         coverage=coverage,
+        has_complete_response=has_complete_response,
+        plan_relation=plan_relation,
+        confirmation_required=confirmation_required,
+        time_condition_count=time_condition_count,
     )
+    disallowed_normalizations = [
+        item for item in normalized_fields if item != "parameter_provenance_normalization"
+    ]
     hard_pass = (
         not schema_errors
         and host_accepted
         and replay.calls == 1
-        and not normalized_fields
+        and not disallowed_normalizations
         and not target_errors
     )
     return {
@@ -1005,6 +1298,7 @@ async def _adjudicate_one(
             "error": host_error,
             "model_call_count": replay.calls,
             "normalization_fields": normalized_fields,
+            "disallowed_normalization_fields": disallowed_normalizations,
         },
         "observed": {
             "disposition": disposition,
@@ -1012,6 +1306,10 @@ async def _adjudicate_one(
             "capability_ids": capability_ids,
             "reuse_activity_ids": reuse_ids,
             "scope_ids": scope_ids,
+            "has_complete_response": has_complete_response,
+            "plan_relation": plan_relation,
+            "confirmation_required": confirmation_required,
+            "time_condition_count": time_condition_count,
         },
         "target_region": {"hard_errors": target_errors},
         "hard_pass": hard_pass,
@@ -1027,8 +1325,17 @@ async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
     output_dir = output_dir.resolve()
     identity = json.loads((output_dir / "batch-identity.json").read_text(encoding="utf-8"))
     stability = json.loads((output_dir / "source-stability.json").read_text(encoding="utf-8"))
-    if not stability.get("stable") or stability.get("completed_calls") != identity["scenario_count"]:
+    if (
+        not stability.get("stable")
+        or stability.get("completed_calls") != identity["scenario_count"]
+        or stability.get("successful_processes") != identity["scenario_count"]
+        or stability.get("timeouts")
+    ):
         raise ValueError("batch is incomplete or source-unstable")
+    if production_source_identity() != identity["source"]:
+        raise ValueError("production source changed before adjudication")
+    if harness_file_identity() != identity["harness"]["files"]:
+        raise ValueError("qualification harness changed before adjudication")
     cases_by_id = {case["id"]: case for case in load_cases()}
     index = json.loads((output_dir / "packet-index.json").read_text(encoding="utf-8"))
     adjudications_dir = output_dir / "adjudication"
@@ -1043,7 +1350,9 @@ async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
     for item in index:
         case = cases_by_id[item["scenario_id"]]
         packet = json.loads((output_dir / item["packet_path"]).read_text(encoding="utf-8"))
-        schema = json.loads((output_dir / packet["response_schema_path"]).read_text(encoding="utf-8"))
+        schema = json.loads(
+            (output_dir / packet["response_schema_path"]).read_text(encoding="utf-8")
+        )
         raw_path = output_dir / "raw-outputs" / f"{item['case_ref']}.txt"
         raw_text = raw_path.read_text(encoding="utf-8") if raw_path.exists() else ""
         result = await _adjudicate_one(case, raw_text, schema)
@@ -1063,13 +1372,15 @@ async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
         language_counts[result["language"]][verdict] += 1
         runtime_counts[result["runtime_variant"]][verdict] += 1
         if verdict == "fail" and len(failure_examples) < 100:
-            failure_examples.append({
-                "scenario_id": result["scenario_id"],
-                "schema_errors": result["schema"]["errors"],
-                "host_error": result["host"]["error"],
-                "normalization_fields": result["host"]["normalization_fields"],
-                "target_errors": result["target_region"]["hard_errors"],
-            })
+            failure_examples.append(
+                {
+                    "scenario_id": result["scenario_id"],
+                    "schema_errors": result["schema"]["errors"],
+                    "host_error": result["host"]["error"],
+                    "normalization_fields": result["host"]["normalization_fields"],
+                    "target_errors": result["target_region"]["hard_errors"],
+                }
+            )
     summary = {
         "schema_version": 1,
         "batch_label": identity["label"],
@@ -1097,6 +1408,7 @@ def main() -> int:
     prepare = subparsers.add_parser("prepare")
     prepare.add_argument("--output-dir", type=Path, required=True)
     prepare.add_argument("--label", required=True)
+    prepare.add_argument("--only-case", action="append", default=[])
     run = subparsers.add_parser("run")
     run.add_argument("--output-dir", type=Path, required=True)
     run.add_argument("--concurrency", type=int, default=4)
@@ -1107,9 +1419,17 @@ def main() -> int:
     if args.command == "validate":
         result = validate_dataset()
     elif args.command == "prepare":
-        result = asyncio.run(prepare_batch(args.output_dir, label=args.label))
+        result = asyncio.run(
+            prepare_batch(
+                args.output_dir,
+                label=args.label,
+                only_cases=args.only_case,
+            )
+        )
     elif args.command == "run":
-        result = asyncio.run(run_batch(args.output_dir, concurrency=args.concurrency, timeout_s=args.timeout_s))
+        result = asyncio.run(
+            run_batch(args.output_dir, concurrency=args.concurrency, timeout_s=args.timeout_s)
+        )
     else:
         result = asyncio.run(adjudicate_batch(args.output_dir))
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))

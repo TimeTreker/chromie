@@ -41,6 +41,10 @@ class RuntimeConfigurationTests(unittest.TestCase):
         settings = HostSettingsSnapshot.from_env(project_root=ROOT, environ={})
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
+        self.assertEqual(settings.cognition.goal_association_timeout_ms, 65000)
+        self.assertEqual(settings.cognition.fast_planner_timeout_ms, 65000)
+        self.assertEqual(settings.cognition.deep_planner_timeout_ms, 125000)
+        self.assertEqual(settings.cognition.runtime_timeout_ms, 300000)
         self.assertEqual(settings.model_generation.keep_alive, "24h")
 
     def test_asr_image_includes_every_standalone_server_module(self) -> None:

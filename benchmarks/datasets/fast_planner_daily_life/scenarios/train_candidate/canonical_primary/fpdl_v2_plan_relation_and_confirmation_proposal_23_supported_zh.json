@@ -1,0 +1,165 @@
+{
+  "adversarial_design": {
+    "cell_index": 23,
+    "changed_axis": "an exact allowed Plan exists versus only a material alternative exists and therefore requires confirmation",
+    "condition": "supported",
+    "daily_life_family": "shared_space_etiquette",
+    "negative_hypotheses": [
+      "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+    ],
+    "paired_language": "en-US",
+    "primary_capacity_id": "plan_relation_and_confirmation_proposal"
+  },
+  "category": "canonical_primary",
+  "contrast_set": {
+    "controlled_axes": [
+      "an exact allowed Plan exists versus only a material alternative exists and therefore requires confirmation",
+      "language"
+    ],
+    "id": "fpdl_v2_plan_relation_and_confirmation_proposal_23",
+    "member": "supported-zh"
+  },
+  "dataset_id": "chromie.fast_planner_daily_life.v2",
+  "difficulty": "ordinary",
+  "id": "fpdl_v2_plan_relation_and_confirmation_proposal_23_supported_zh",
+  "input": {
+    "catalog_fixture_id": "common_v1",
+    "catalog_overrides": [],
+    "language": "zh-CN",
+    "request": {
+      "context": {
+        "goal_association_resolution": {
+          "associations": [],
+          "confidence": 0.99,
+          "new_goals": [
+            {
+              "constraints": {},
+              "description": "创建准确的一次性提醒。",
+              "goal_id": "goal-fpdl_v2_plan_relation_and_confirmation_proposal_23_supported_zh-1",
+              "metadata": {
+                "output_mode": "stateful_effect"
+              },
+              "object": {
+                "bindings": {
+                  "due_at": {
+                    "confidence": 1.0,
+                    "entity_type": "due_time",
+                    "name": "due_at",
+                    "value": "2026-09-03T18:30:00+08:00"
+                  },
+                  "reminder_text": {
+                    "confidence": 1.0,
+                    "entity_type": "reminder_text",
+                    "name": "reminder_text",
+                    "value": "带上蓝色笔记本"
+                  }
+                }
+              },
+              "related_goal_ids": [],
+              "responsibility_status": "open",
+              "schema_version": 1,
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "source_text": "为了在共享房间里不打扰别人，请创建一个今天18:30的提醒，内容是“带上蓝色笔记本”。",
+              "success_criteria": [
+                "创建准确的一次性提醒。"
+              ],
+              "supersedes_goal_ids": [],
+              "version": 1
+            }
+          ],
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
+          "referent_updates": [],
+          "resolution_status": "resolved",
+          "resolved_references": [],
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_23_supported_zh"
+        }
+      },
+      "history": [],
+      "interpretation_confidence": 0.99,
+      "interpretation_unresolved": [],
+      "language": "zh-CN",
+      "planner_reentry_scope": null,
+      "responsibilities": [
+        {
+          "bindings": {
+            "due_at": "2026-09-03T18:30:00+08:00",
+            "reminder_text": "带上蓝色笔记本"
+          },
+          "confidence": 0.99,
+          "local_ref": "r1",
+          "outcome": "创建准确的一次性提醒。",
+          "output_mode": "stateful_effect",
+          "relationship": "new",
+          "schema_version": 1,
+          "source_evidence": {
+            "source_end_token_ref": "t999",
+            "source_start_token_ref": "t0"
+          },
+          "target_goal_ids": []
+        }
+      ],
+      "schema_version": 1,
+      "sid": "fpdl_v2_plan_relation_and_confirmation_proposal_23_supported_zh",
+      "text": "为了在共享房间里不打扰别人，请创建一个今天18:30的提醒，内容是“带上蓝色笔记本”。"
+    },
+    "runtime_variant": "canonical_primary"
+  },
+  "invariants": {
+    "candidate_packet_excludes_targets": true,
+    "no_executable_partial_result": true,
+    "no_same_tier_semantic_repair": true,
+    "no_untrusted_completion_claim": true,
+    "one_primary_semantic_invocation": true,
+    "source_scope_conserved": true
+  },
+  "review": {
+    "author_model": "gpt-5.6-sol",
+    "authoring_call_ref": "root-session-20260903-cell-23",
+    "independent_semantic_review": false,
+    "origin": "assistant_authored_design_traced_contrast",
+    "qualification_required": "frozen_target_blind_execution_and_same_model_review",
+    "review_status": "mechanically_validated_dataset_candidate",
+    "reviewer_kind": "same_model_pending",
+    "training_eligible": false
+  },
+  "schema_version": 2,
+  "split": "train_candidate",
+  "target": {
+    "claim_boundary": "assistant-authored candidate oracle; same-model review required",
+    "reference_region": {
+      "accepted_dispositions": [
+        "execute"
+      ],
+      "expected_confirmation_required": true,
+      "expected_goal_ids": [
+        "goal-fpdl_v2_plan_relation_and_confirmation_proposal_23_supported_zh-1"
+      ],
+      "expected_plan_relations": [
+        "exact"
+      ],
+      "expected_responsibility_refs": [
+        "r1"
+      ],
+      "forbidden_capability_ids": [],
+      "forbidden_claims": [
+        "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
+      ],
+      "forbidden_reuse_activity_ids": [],
+      "required_capability_ids": [
+        "chromie.reminder.create"
+      ],
+      "required_evidence_refs": [],
+      "required_reuse_activity_ids": [],
+      "required_time_conditions": false,
+      "response_required": null,
+      "semantic_facts": [
+        "准确的提醒计划仍只是提案，必须由 Host 确认后才能授权。"
+      ],
+      "semantic_review_required": true
+    },
+    "schema_expectation": "accept"
+  }
+}

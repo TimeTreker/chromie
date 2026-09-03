@@ -90,7 +90,7 @@ def _tagged_frame_schemas(prompt):
     )
     presentation_end = rendered.index(terminal_marker, presentation_start)
     terminal_start = presentation_end + len(terminal_marker)
-    terminal_end = rendered.index("\n\nValidation errors", terminal_start)
+    terminal_end = rendered.index("\n\nFINAL DECISION CHECKLIST", terminal_start)
     return (
         json.loads(rendered[presentation_start:presentation_end]),
         json.loads(rendered[terminal_start:terminal_end]),
@@ -1332,7 +1332,65 @@ class CanonicalPlanContractTests(unittest.TestCase):
 
 
 class PlannerStructuralNormalizationTests(unittest.TestCase):
-    def test_exact_reentry_responses_override_stale_source_plan_aggregate(self):
+    def test_fast_qualification_accepts_truthful_partial_clarification(self):
+        plan = CanonicalPlan.model_validate(
+            {
+                "plan_id": "plan-clarify-location",
+                "planner_tier": "fast",
+                "disposition": "clarify",
+                "coverage": "partial",
+                "confidence": 0.91,
+                "goal_ids": ["goal-weather"],
+                "response_text": "Which city should I check?",
+                "steps": [],
+                "unresolved": ["weather location"],
+                "goal_outcomes": [
+                    {
+                        "goal_id": "goal-weather",
+                        "disposition": "clarify",
+                        "coverage": "partial",
+                        "response_text": "Which city should I check?",
+                        "unresolved": ["weather location"],
+                        "step_ids": [],
+                        "satisfaction": {
+                            "score": 0.4,
+                            "status": "partial",
+                            "satisfied_goal_ids": [],
+                            "unmet_goal_ids": ["goal-weather"],
+                            "unmet_requirements": ["weather location"],
+                            "rationale": "The user can supply the missing location.",
+                        },
+                    }
+                ],
+                "goal_satisfaction": {
+                    "score": 0.4,
+                    "status": "partial",
+                    "satisfied_goal_ids": [],
+                    "unmet_goal_ids": ["goal-weather"],
+                    "unmet_requirements": ["weather location"],
+                    "rationale": "The location is required before weather work can be planned.",
+                },
+            }
+        )
+
+        qualification = planner_fast_validation.qualify_fast_canonical_plan(
+            plan,
+            capability_payload=[],
+            expected_goal_ids_for_turn=["goal-weather"],
+            authoritative_goals=[
+                {
+                    "goal_id": "goal-weather",
+                    "output_mode": "information",
+                }
+            ],
+            evidence_reentry_goal_ids=set(),
+        )
+
+        self.assertTrue(qualification.accepted)
+        self.assertEqual(qualification.plan.disposition, "clarify")
+        self.assertEqual(qualification.plan.metadata["path_classification"], "terminal")
+
+    def test_exact_reentry_does_not_rewrite_stale_source_plan_aggregate(self):
         raw = {
             "disposition": "mixed",
             "coverage": "complete",
@@ -1384,26 +1442,16 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
             capability_payload=[],
         )
 
-        self.assertEqual(normalized["disposition"], "respond")
-        self.assertEqual(
-            normalized["response_text"],
-            "I completed the walk. I completed the blink.",
-        )
-        self.assertEqual(
-            normalized["goal_satisfaction"]["satisfied_goal_ids"],
-            ["goal-walk", "goal-blink"],
-        )
-        self.assertEqual(normalized["goal_satisfaction"]["unmet_goal_ids"], [])
-        self.assertEqual(normalized["goal_satisfaction"]["unmet_requirements"], [])
-        self.assertTrue(repairs["terminal_response_goal_outcome_accounting"])
-        validated = validate_planner_model_output(
-            normalized,
-            planner_tier="fast",
-            expected_goal_ids_for_turn=["goal-walk", "goal-blink"],
-        )
-        self.assertEqual(validated.disposition, "respond")
+        self.assertEqual(normalized, raw)
+        self.assertFalse(any(repairs.values()))
+        with self.assertRaises(ValueError):
+            validate_planner_model_output(
+                normalized,
+                planner_tier="fast",
+                expected_goal_ids_for_turn=["goal-walk", "goal-blink"],
+            )
 
-    def test_unanimous_nonexecuting_outcome_drops_stale_execution_mechanics(self):
+    def test_unanimous_nonexecuting_outcome_does_not_rewrite_stale_mechanics(self):
         raw = {
             "disposition": "unavailable",
             "coverage": "complete",
@@ -1429,12 +1477,8 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
             capability_payload=[],
         )
 
-        self.assertEqual(normalized["plan_relation"], "exact")
-        self.assertFalse(normalized["user_confirmation_required"])
-        self.assertEqual(normalized["steps"], [])
-        self.assertEqual(normalized["parameter_resolutions"], [])
-        self.assertEqual(normalized["time_conditions"], [])
-        self.assertTrue(repairs["nonexecuting_plan_mechanics"])
+        self.assertEqual(normalized, raw)
+        self.assertFalse(any(repairs.values()))
 
     def test_numeric_capability_argument_string_is_mechanically_typed(self):
         raw = {
@@ -1470,9 +1514,10 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
         self.assertEqual(normalized["steps"][0]["args"], {"vx_mps": 0.2, "duration_s": 10})
         self.assertEqual(len(repairs["capability_argument_types"]), 2)
 
-    def test_single_response_goal_outcome_populates_redundant_top_level_fields(self):
-        output = validate_planner_model_output(
-            {
+    def test_single_response_goal_requires_complete_model_authored_fields(self):
+        with self.assertRaises(ValueError):
+            validate_planner_model_output(
+                {
                 "disposition": "respond",
                 "coverage": "complete",
                 "confidence": 0.95,
@@ -1487,20 +1532,16 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                         "step_ids": [],
                     }
                 },
-            },
-            planner_tier="fast",
-            expected_goal_ids_for_turn=["goal-weather"],
-        )
-
-        self.assertEqual(output.response_text, "I can help with that.")
-        outcome = output.goal_outcomes["goal-weather"]
-        self.assertEqual(outcome.disposition, "respond")
-        self.assertEqual(outcome.coverage, "complete")
+                },
+                planner_tier="fast",
+                expected_goal_ids_for_turn=["goal-weather"],
+            )
 
 
-    def test_step_outcome_links_follow_model_authored_step_ownership(self):
-        output = validate_planner_model_output(
-            {
+    def test_step_outcome_links_are_not_rewritten_from_step_ownership(self):
+        with self.assertRaises(ValueError):
+            validate_planner_model_output(
+                {
                 "disposition": "execute",
                 "coverage": "complete",
                 "confidence": 1.0,
@@ -1552,26 +1593,17 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                 "parameter_resolutions": [],
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
-            },
-            planner_tier="fast",
-            expected_goal_ids_for_turn=[
-                "goal-walk",
-                "goal-sing",
-                "goal-blink",
-            ],
-        )
+                },
+                planner_tier="fast",
+                expected_goal_ids_for_turn=[
+                    "goal-walk",
+                    "goal-sing",
+                    "goal-blink",
+                ],
+            )
 
-        self.assertEqual(output.disposition, "mixed")
-        self.assertEqual(output.goal_outcomes["goal-walk"].step_ids, ["walk-step"])
-        self.assertEqual(output.goal_outcomes["goal-sing"].step_ids, [])
-        self.assertEqual(output.goal_outcomes["goal-blink"].step_ids, ["blink-step"])
-
-    def test_transport_normalization_does_not_assign_an_unowned_execute_goal(self):
-        with self.assertRaisesRegex(
-            ValueError,
-            "execute goal outcome requires complete coverage and step_ids",
-        ):
-            validate_planner_model_output(
+    def test_transport_validation_does_not_rewrite_unowned_execute_goal(self):
+        output = validate_planner_model_output(
                 {
                     "disposition": "execute",
                     "coverage": "complete",
@@ -1612,8 +1644,12 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                     "user_confirmation_required": False,
                 },
                 planner_tier="fast",
-                expected_goal_ids_for_turn=["goal-walk", "goal-unowned"],
-            )
+            expected_goal_ids_for_turn=["goal-walk", "goal-unowned"],
+        )
+        self.assertEqual(
+            output.goal_outcomes["goal-unowned"].step_ids,
+            ["invented"],
+        )
 
 
 class FastPlannerResolverTests(unittest.TestCase):
@@ -1727,6 +1763,10 @@ class FastPlannerResolverTests(unittest.TestCase):
             "describe that exact source-Plan effect as completed",
             planning_prompt,
         )
+        self.assertIn(
+            "never mark a failure explanation as a complete respond result",
+            planning_prompt,
+        )
         self.assertNotIn(
             "At least one canonical Goal requires provider/effect evidence.",
             planning_prompt,
@@ -1787,7 +1827,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(
                 FakeOllama(raw),
                 FakeCatalog(),
-                max_contract_repairs=0,
             ).resolve_advance(run_request)
         )
 
@@ -1843,7 +1882,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(
                 FakeOllama(raw),
                 FakeCatalog(),
-                max_contract_repairs=0,
             ).resolve_advance(run_request)
         )
 
@@ -2088,7 +2126,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         advance = asyncio.run(
             FastPlannerResolver(
-                FakeOllama(raw), FakeCatalog(), max_contract_repairs=0
+                FakeOllama(raw), FakeCatalog()
             ).resolve_advance(run_request)
         )
 
@@ -2120,7 +2158,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         advance = asyncio.run(
             FastPlannerResolver(
-                FakeOllama(raw), FakeCatalog(), max_contract_repairs=0
+                FakeOllama(raw), FakeCatalog()
             ).resolve_advance(run_request)
         )
 
@@ -2157,7 +2195,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         advance = asyncio.run(
             FastPlannerResolver(
-                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+                FakeOllama(raw), WeatherCatalog()
             ).resolve_advance(run_request)
         )
 
@@ -2209,7 +2247,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         advance = asyncio.run(
             FastPlannerResolver(
-                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+                FakeOllama(raw), WeatherCatalog()
             ).resolve_advance(run_request)
         )
 
@@ -2253,7 +2291,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         advance = asyncio.run(
             FastPlannerResolver(
-                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+                FakeOllama(raw), WeatherCatalog()
             ).resolve_advance(run_request)
         )
 
@@ -2323,7 +2361,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         advance = asyncio.run(
             FastPlannerResolver(
-                FakeOllama(raw), WeatherCatalog(), max_contract_repairs=0
+                FakeOllama(raw), WeatherCatalog()
             ).resolve_advance(run_request)
         )
 
@@ -2564,6 +2602,18 @@ class FastPlannerResolverTests(unittest.TestCase):
             str(prompt),
         )
         self.assertIn("do not invent a semantic clarification", str(prompt))
+        self.assertIn(
+            "clarification cannot create provider support",
+            str(prompt),
+        )
+        self.assertIn(
+            "If any ref needs Deep: stay silent",
+            str(prompt),
+        )
+        self.assertIn(
+            "escalate all refs to it",
+            str(prompt),
+        )
 
     def test_first_activity_plan_schema_requires_explicit_decision_fields(self):
         schema = planner_schema.fast_advance_response_schema(["weather"])
@@ -2605,6 +2655,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(gap["properties"]["blocking"]["const"], True)
         self.assertEqual(gap["properties"]["resolved"]["const"], False)
+        self.assertIn("required_for", gap["required"])
 
     def test_first_activity_plan_keeps_late_catalog_semantics_visible(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
@@ -2889,42 +2940,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("duration_s", branch["properties"]["args"]["properties"])
 
-    def test_execute_revision_cannot_invent_progress_not_selected_initially(self):
-        responsibility = CognitiveResponsibilityProposal.model_validate(
-            {
-                "local_ref": "walk",
-                "outcome": "Walk forward",
-                "bindings": {"direction": "forward"},
-                "output_mode": "body_action",
-                "confidence": 0.98,
-            }
-        )
-        base = planner_schema.fast_advance_response_schema(
-            ["walk"],
-            responsibilities=[responsibility],
-        )
-
-        revision = planner_schema.fast_advance_revision_response_schema(
-            base,
-            {
-                "disposition": "execute",
-                "activities": [
-                    {
-                        "activity_id": "wrong-terminal",
-                        "role": "complete_response",
-                        "text": "I will walk forward.",
-                        "source_responsibility_refs": ["walk"],
-                    }
-                ],
-            },
-            committed_communicative=False,
-            capabilities=[],
-            responsibilities=[responsibility],
-        )
-
-        self.assertEqual(
-            revision["properties"]["activities"]["items"]["oneOf"],
-            [{"$ref": "#/$defs/FastPlannerCapabilityActivity"}],
+    def test_fast_advance_exposes_no_same_tier_revision_schema(self):
+        self.assertFalse(
+            hasattr(planner_schema, "fast_advance_revision_response_schema")
         )
 
     def test_complete_response_cannot_terminally_cover_body_action(self):
@@ -3518,7 +3536,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["duplicate-progress"],
         )
 
-    def test_advance_restores_required_weather_location_from_gi_bindings(self):
+    def test_advance_requires_model_authored_weather_location(self):
         raw = {
             "disposition": "execute",
             "coverage": "complete",
@@ -3528,6 +3546,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "activity_id": "weather_lookup",
                     "role": "capability",
                     "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "重庆"},
                     "source_responsibility_refs": ["r1", "r2"],
                 }
             ],
@@ -3569,10 +3588,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(capability.args, {"location": "重庆"})
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(
-            advance.metadata["authoritative_arg_repairs"][0]["parameter"],
-            "location",
-        )
+        self.assertNotIn("authoritative_arg_repairs", advance.metadata)
 
     def test_first_activity_plan_can_check_weather_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -4108,7 +4124,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ollama.prompts[0][0],
         )
 
-    def test_schema_invalid_capability_args_get_bounded_model_repair(self):
+    def test_schema_invalid_capability_args_fail_closed_without_model_repair(self):
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -4143,10 +4159,10 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(plan.steps[0].args, {"vx_mps": 0.1, "duration_s": 1.0})
-        self.assertIn("invalid_args", ollama.prompts[1][0])
-        self.assertIn("vx_mps", ollama.prompts[1][0])
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         step_schema = ollama.prompts[0][1]["response_format"]["$defs"][
             "PlannerModelStep"
         ]
@@ -4184,7 +4200,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(
                 FakeOllama(invalid),
                 FakeCatalog(),
-                max_contract_repairs=0,
             ).resolve(request("Walk briefly.", goal_ids=["goal-walk"]))
         )
 
@@ -4278,12 +4293,12 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "goal-place": {
                     "disposition": "clarify",
                     "coverage": "partial",
-                    "response_text": "",
-                    "unresolved": [],
+                    "response_text": "Which place do you mean?",
+                    "unresolved": ["location"],
                     "step_ids": [],
                     "satisfaction": {
                         "score": 0.0,
-                        "status": "partial",
+                        "status": "unsatisfied",
                         "satisfied_goal_ids": [],
                         "unmet_goal_ids": ["goal-place"],
                         "unmet_requirements": ["location"],
@@ -4294,7 +4309,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             },
             "goal_satisfaction": {
                 "score": 0.0,
-                "status": "partial",
+                "status": "unsatisfied",
                 "satisfied_goal_ids": [],
                 "unmet_goal_ids": ["goal-place"],
                 "unmet_requirements": ["location"],
@@ -4479,7 +4494,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             1,
         )
 
-    def test_contract_repair_receives_all_compound_shape_defects(self):
+    def test_contract_defects_fail_closed_without_same_tier_repair(self):
         invalid = {
             "disposition": "respond",
             "coverage": "complete",
@@ -4542,15 +4557,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "escalate")
-        repair_prompt = ollama.prompts[1][0]
-        self.assertIn("goal satisfaction score is inconsistent with status", repair_prompt)
-        self.assertIn("respond planner output must not carry executable steps", repair_prompt)
-        self.assertIn("complete multi-goal planner output requires goal_outcomes", repair_prompt)
-        self.assertIn("regenerate one fresh complete model-authored plan object", repair_prompt)
-        self.assertIn(
-            "Previous Fast Planner output when doing a mechanical DTO regeneration:\nnull",
-            repair_prompt,
-        )
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
     def test_compound_walk_and_blink_escalates_without_partial_steps(self):
         raw = multi_goal_plan(
@@ -4986,6 +4994,16 @@ class FastPlannerResolverTests(unittest.TestCase):
         run_request.context["goal_association_resolution"]["new_goals"][0][
             "description"
         ] = "Walk forward for 2 seconds."
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "object"
+        ] = {
+            "bindings": {
+                "duration": {
+                    "entity_type": "duration_seconds",
+                    "value": "2",
+                }
+            }
+        }
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
@@ -4994,13 +5012,12 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertFalse(plan.metadata["contract_repair_attempted"])
         self.assertEqual(
             plan.metadata["validation_feedback"][0]["type"],
             "authoritative_grounding_mismatch",
         )
 
-    def test_weather_temporal_binding_omission_receives_one_dto_repair(self):
+    def test_weather_temporal_binding_omission_fails_closed_without_repair(self):
         goal_id = "goal-weather"
         initial = multi_goal_plan(
             disposition="execute",
@@ -5158,26 +5175,10 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
 
-        self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(plan.steps[0].args["date"], "today")
-        self.assertEqual(plan.steps[0].args["period"], "night")
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
-        self.assertIn(
-            "did not realize authoritative semantic scope",
-            str(ollama.prompts[1][0]),
-        )
-        repair_system = str(ollama.prompts[1][1])
-        self.assertIn(
-            "trusted code projects only uniquely derivable duplicate provenance",
-            repair_system,
-        )
-        self.assertIn("Do not relabel a transformed value", repair_system)
-        repair_prompt = str(ollama.prompts[1][0])
-        self.assertIn(
-            "trusted code projects semantic_realization provenance",
-            repair_prompt,
-        )
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
     def test_declared_semantic_realization_provenance_is_host_projected(self):
         goal_id = "goal-weather"
@@ -5346,6 +5347,16 @@ class FastPlannerResolverTests(unittest.TestCase):
         run_request.context["goal_association_resolution"]["new_goals"][0][
             "description"
         ] = "Walk forward for 2 seconds."
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "object"
+        ] = {
+            "bindings": {
+                "duration": {
+                    "entity_type": "duration_seconds",
+                    "value": "2",
+                }
+            }
+        }
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
@@ -5385,6 +5396,16 @@ class FastPlannerResolverTests(unittest.TestCase):
         run_request.context["goal_association_resolution"]["new_goals"][0][
             "description"
         ] = "Walk forward for 2 seconds."
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "object"
+        ] = {
+            "bindings": {
+                "duration": {
+                    "entity_type": "duration_seconds",
+                    "value": "2",
+                }
+            }
+        }
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
@@ -5457,6 +5478,20 @@ class FastPlannerResolverTests(unittest.TestCase):
         run_request.context["goal_association_resolution"]["new_goals"][0][
             "description"
         ] = "Walk forward at 0.2 meters per second for 20 seconds."
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "object"
+        ] = {
+            "bindings": {
+                "velocity": {
+                    "entity_type": "velocity_mps",
+                    "value": "0.2",
+                },
+                "duration": {
+                    "entity_type": "duration_seconds",
+                    "value": "20",
+                },
+            }
+        }
 
         plan = asyncio.run(
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
@@ -5518,7 +5553,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(
                 FakeOllama(raw),
                 FakeCatalog(),
-                max_contract_repairs=0,
             ).resolve(run_request)
         )
 
@@ -5528,7 +5562,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             plan.metadata["error"],
         )
 
-    def test_dotted_step_id_is_unambiguous_in_parameter_repair_feedback(self):
+    def test_dotted_step_id_mismatch_fails_closed_without_repair(self):
         invalid = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -5588,18 +5622,11 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
         )
 
-        repair_prompt = ollama.prompts[1][0]
-        self.assertEqual(plan.disposition, "execute")
-        self.assertIn(
-            "step_id='soridormi.walk_velocity', parameter='duration_s'",
-            repair_prompt,
-        )
-        self.assertNotIn(
-            "soridormi.walk_velocity.duration_s",
-            repair_prompt,
-        )
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
-    def test_verified_result_repair_keeps_bindings_nested_in_material_args(self):
+    def test_detached_verified_result_provenance_fails_closed_without_repair(self):
         catalog = FakeCatalog()
         catalog.items.append(
             CatalogCapability(
@@ -5691,13 +5718,10 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
 
-        self.assertEqual(plan.disposition, "execute")
-        self.assertEqual(plan.steps[0].args["material_args"]["location"], "河南省内乡县")
-        self.assertEqual(plan.parameter_resolutions, [])
-        self.assertIn(
-            "do not emit separate parameter_resolutions for them",
-            ollama.prompts[1][0],
-        )
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
     def test_single_parallel_labeled_step_requires_provider_parallel_metadata(self):
         raw = multi_goal_plan(
@@ -5743,6 +5767,16 @@ class FastPlannerResolverTests(unittest.TestCase):
         run_request.context["goal_association_resolution"]["new_goals"][0][
             "description"
         ] = "Walk forward for 2 seconds."
+        run_request.context["goal_association_resolution"]["new_goals"][0][
+            "object"
+        ] = {
+            "bindings": {
+                "duration": {
+                    "entity_type": "duration_seconds",
+                    "value": "2",
+                }
+            }
+        }
 
         plan = asyncio.run(
             FastPlannerResolver(
@@ -5874,7 +5908,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["path_classification"], "terminal")
         self.assertEqual(len(ollama.prompts), 1)
 
-    def test_mixed_aggregate_repair_is_constrained_by_model_authored_outcomes(self):
+    def test_mixed_aggregate_mismatch_fails_closed_without_repair(self):
         initial = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -5912,9 +5946,9 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "mixed")
+        self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertNotIn("contract_repair_succeeded", plan.metadata)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         first_schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("execute", first_schema["properties"]["disposition"]["enum"])
 
@@ -6200,7 +6234,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             step_schema["properties"]["capability_id"]["enum"],
         )
 
-    def test_response_transport_step_is_repaired_to_conversational_response(self):
+    def test_response_transport_step_fails_closed_without_repair(self):
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -6235,12 +6269,12 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "respond")
+        self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.steps, [])
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertIn("generic response transport", ollama.prompts[1][0])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
-    def test_live_branch_minimal_escalation_repairs_under_flat_contract(self):
+    def test_live_branch_minimal_escalation_fails_closed_under_flat_contract(self):
         branch_minimal = {
             "planner_tier": "fast",
             "disposition": "escalate",
@@ -6282,17 +6316,11 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.goal_ids, ["goal-walk", "goal-blink"])
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
-        self.assertEqual(len(ollama.prompts), 2)
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         schema = ollama.prompts[0][1]["response_format"]
         self.assertNotIn("oneOf", schema)
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
-        self.assertEqual(ollama.prompts[1][1]["response_format"], schema)
-        repair_prompt = ollama.prompts[1][0]
-        self.assertGreater(
-            repair_prompt.index("FINAL AUTHORITATIVE CONTRACT REPAIR ERRORS JSON"),
-            repair_prompt.index("FINAL CANONICAL GOALS JSON"),
-        )
 
     def test_same_user_text_follows_different_model_authored_plans(self):
         """The host must not map words in the utterance to fixed actions."""
@@ -6409,7 +6437,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(
                 ollama,
                 FakeCatalog(),
-                max_contract_repairs=0,
             ).resolve(request("Abstract request.", goal_ids=["goal-a", "goal-b"]))
         )
 
@@ -6417,7 +6444,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         self.assertEqual(plan.steps, [])
 
-    def test_legacy_step_shape_requires_one_model_revision_without_local_mapping(self):
+    def test_legacy_step_shape_fails_closed_without_local_or_model_repair(self):
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -6455,11 +6482,10 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(ollama.prompts), 2)
-        self.assertEqual(plan.steps[0].capability_id, "soridormi.blink_eyes")
-        self.assertTrue(plan.metadata["contract_repair_succeeded"])
-        self.assertIn("capability_id", ollama.prompts[1][0])
-        self.assertIn("extra_forbidden", ollama.prompts[1][0])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.steps, [])
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
     def test_model_failure_escalates_safely(self):
         plan = asyncio.run(FastPlannerResolver(FakeOllama(RuntimeError("offline")), FakeCatalog()).resolve(request("眨眼。")))
