@@ -15,6 +15,8 @@ qualification remain complete through Fast v33 and Deep v15. Codex
 was used to optimize or evaluate the Planner.
 
 Updated: 2026-09-04; delivery branch: `main`
+Expected resume branch: latest `origin/main` commit containing this checkpoint
+and `HANDOFF.md` after the authorized fast-forward push.
 
 Pre-delivery base: `255499292d0116b4c7277ce26143ecee5ac63440`
 (`origin/main`, clean and 0 ahead/0 behind before this repair).

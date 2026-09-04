@@ -15,8 +15,8 @@ and `DEVELOPMENT_CHECKPOINT.md` override chat history.
 - Expected resume revision: the latest normal `main` commit containing this file
   and `DEVELOPMENT_CHECKPOINT.md`.
 - Active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35).
-- This delivery is committed locally only unless a later handoff explicitly
-  records a push.
+- Delivery target: fast-forward `main` to `origin/main`; verify the final remote
+  ref after push rather than treating this pre-push statement as proof.
 
 ## Reproduced defect and root cause
 
