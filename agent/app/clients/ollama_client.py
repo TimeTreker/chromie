@@ -270,6 +270,25 @@ class OllamaClient:
             resolved["num_predict"] = self.default_num_predict
         return resolved
 
+    @staticmethod
+    def _chat_messages(prompt: str, *, system: str | None) -> list[dict[str, str]]:
+        messages: list[dict[str, str]] = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        return messages
+
+    @staticmethod
+    def _assistant_content(payload: dict[str, Any]) -> str:
+        message = payload.get("message")
+        if isinstance(message, dict):
+            content = message.get("content")
+        else:
+            # Retain compatibility with already-recorded generate-shaped test
+            # fixtures and provider evidence while production uses /api/chat.
+            content = payload.get("response")
+        return content if isinstance(content, str) else ""
+
     async def generate(
         self,
         prompt: str | LayeredPrompt,
@@ -444,13 +463,11 @@ class OllamaClient:
             raise ValueError(f"Unsupported response_format: {response_format!r}")
         payload: dict[str, Any] = {
             "model": self.model,
-            "prompt": rendered_prompt,
+            "messages": self._chat_messages(rendered_prompt, system=system),
             "stream": True,
             "think": False,
             "options": request_options,
         }
-        if system:
-            payload["system"] = system
         if response_format == "json":
             payload["format"] = "json"
         elif isinstance(response_format, dict):
@@ -528,7 +545,7 @@ class OllamaClient:
             async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
                 async with client.stream(
                     "POST",
-                    f"{self.base_url}/api/generate",
+                    f"{self.base_url}/api/chat",
                     json=payload,
                 ) as response:
                     if response.status_code >= 400:
@@ -586,7 +603,24 @@ class OllamaClient:
                                     architecture_attribution="ollama_or_model_template",
                                     retryable=True,
                                 )
-                        delta = chunk.get("response")
+                        message = chunk.get("message")
+                        if isinstance(message, dict):
+                            for field in (
+                                "thinking",
+                                "reasoning",
+                                "reasoning_content",
+                            ):
+                                if message.get(field) not in (None, "", [], {}):
+                                    raise OllamaGenerationError(
+                                        "Ollama streaming response exposed reasoning output",
+                                        failure_class="thinking_output_violation",
+                                        failure_domain="provider_contract",
+                                        architecture_attribution="ollama_or_model_template",
+                                        retryable=True,
+                                    )
+                            delta = message.get("content")
+                        else:
+                            delta = chunk.get("response")
                         if delta is not None and not isinstance(delta, str):
                             raise OllamaGenerationError(
                                 "Ollama streaming response delta is not text",
@@ -608,7 +642,9 @@ class OllamaClient:
                     architecture_attribution="not_evaluated",
                     retryable=True,
                 )
-            provider_payload = {**final_payload, "response": full_text}
+            provider_message = dict(final_payload.get("message") or {})
+            provider_message.update({"role": "assistant", "content": full_text})
+            provider_payload = {**final_payload, "message": provider_message}
             try:
                 boundary = enforce_non_thinking_ollama_response(
                     provider_payload,
@@ -671,7 +707,7 @@ class OllamaClient:
                 call_id=call_id,
                 purpose=self.purpose,
                 stage=family,
-                transport="ollama.generate_stream",
+                transport="ollama.chat_stream",
                 request=payload,
                 response=provider_payload,
                 status="accepted",
@@ -700,9 +736,11 @@ class OllamaClient:
                 call_id=call_id,
                 purpose=self.purpose,
                 stage=family,
-                transport="ollama.generate_stream",
+                transport="ollama.chat_stream",
                 request=payload,
-                response={"response": full_text},
+                response={
+                    "message": {"role": "assistant", "content": full_text}
+                },
                 status="rejected",
                 elapsed_ms=(time.perf_counter() - started) * 1000.0,
                 correlations={"turn_id": turn_id, "attempt": attempt},
@@ -750,13 +788,10 @@ class OllamaClient:
     ) -> str | dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
-            "prompt": prompt,
+            "messages": self._chat_messages(prompt, system=system),
             "stream": False,
             "think": False,
         }
-
-        if system:
-            payload["system"] = system
 
         if options:
             payload["options"] = options
@@ -770,7 +805,7 @@ class OllamaClient:
             raise ValueError(f"Unsupported response_format: {response_format!r}")
 
         response_format_label = "json_schema" if isinstance(response_format, dict) else response_format
-        url = f"{self.base_url}/api/generate"
+        url = f"{self.base_url}/api/chat"
         timeout = httpx.Timeout(self.timeout_ms / 1000.0)
         evidence_started = time.perf_counter()
         evidence_recorded = False
@@ -792,7 +827,7 @@ class OllamaClient:
                 stage=str(
                     (evidence_context or {}).get("prompt_family") or self.purpose
                 ),
-                transport="ollama.generate",
+                transport="ollama.chat",
                 request=payload,
                 response=response_payload,
                 status=status,
@@ -1020,7 +1055,7 @@ class OllamaClient:
             if prefix_probe_call_id:
                 _PREFIX_CACHE_TRACKER.record_response(prefix_probe_call_id, data)
 
-            text = str(data.get("response") or "").strip()
+            text = self._assistant_content(data).strip()
 
             logger.info(
                 "ollama_generate_done purpose=%s response_chars=%s done_reason=%s "

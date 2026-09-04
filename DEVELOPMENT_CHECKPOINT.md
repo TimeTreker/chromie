@@ -1,134 +1,160 @@
 # Chromie Development Checkpoint
 
-Status: the Goal-driven single-authority line remains current, and the
-2026-09-04 live `voice_mujoco` Goal Interpretation failure is
-source-fixed. Interactive modes now allow one complete GI transaction with a
-60 s Agent watchdog and a 65 s Host GI deadline; the previously declared Host
-deadline is now actually consumed by `AgentClient.interpret_turn()`. Startup
-instructions also stop promising a wake-up greeting when startup speech is
-disabled. Focused configuration/client tests and relevant Level-A scenarios
-pass. Post-fix live voice evidence is not yet retained.
+Status: the current Goal-driven single-authority focus and active Issue #35
+delivery line have RTX 4090 Level-C-preview evidence for exact `你好。`. The prior Goal
+Interpretation watchdog failure is closed in source, and this continuation
+repaired the next deployed transport boundary: generic Agent semantic roles and
+warm-up now use Ollama `/api/chat` rather than the non-responsive
+`/api/generate` plus `think:false` transaction observed on Ollama 0.33.2. A
+repaired warm-up also establishes the 32K context required by Goal Association
+and Fast Planner.
 
-Issue #35 Planner single-authority correction and fixed-Codex offline
-qualification remain complete through Fast v33 and Deep v15. Codex
-`gpt-5.6-sol` was the fixed candidate Planner; no local Qwen/Ollama/vLLM model
-was used to optimize or evaluate the Planner.
+The greeting still does not succeed. With transport and context residency
+working, deployed `qwen3.5:4b` now reaches Fast Planner but incorrectly maps the
+speech-only greeting Responsibility to `chromie.clock.local`. Host validation
+correctly rejects that Plan before execution. The same result misses the
+two-second immediate-commit target. An unchanged 51-case deployed must-pass
+aggregate then hard-passed only 5 cases and placed 35 primary failures at Fast
+Planner output or communicative coverage. The fixed-Codex Fast v33
+qualification did not evaluate or qualify this deployed Qwen profile.
 
-Updated: 2026-09-04; delivery branch: `main`
-Expected resume branch: latest `origin/main` commit containing this checkpoint
-and `HANDOFF.md` after the authorized fast-forward push.
+Updated: 2026-09-05; branch: `main`
 
-Pre-delivery base: `255499292d0116b4c7277ce26143ecee5ac63440`
-(`origin/main`, clean and 0 ahead/0 behind before this repair).
+Pre-delivery base: `46b6fe90a36179e63da36f086ac2b04ed8e7b3c1`; `main == origin/main` before this continuation. Expected resume revision: the latest normal `main` commit containing this checkpoint and `HANDOFF.md` after the authorized fast-forward push.
 
 Active Issue: [#35 — Fast/Deep Planner prompt qualification and optimization](https://github.com/TimeTreker/chromie/issues/35).
 
-## Reported failure and actual workflow
+## Current exact workflow
 
-Retained bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20260904_163700.tar.gz`
-(SHA-256 `22b13dabaa29f8094275d61639fa4e4094463d07dbfa33affbd2370ea065f85b`,
-revision `255499292d0116b4c7277ce26143ecee5ac63440`).
+Retained formal case: `.chromie/acceptance/general-ability/greeting-chat-transport-postwarm-rerun-20260904/`.
+It is private Level C-preview live text on dirty source with incomplete identity.
 
 ```text
-voice -> VAD/ASR -> Gateway Attention admits turn
-      -> Agent GI sends one gemma4:12b /api/chat request
-      -> 5400 ms Agent watchdog fires before the complete DTO exists
-      -> httpx.ReadTimeout -> Ollama request cancellation
-      -> typed GI unavailable / Host HTTP 503
-      -> fail-closed fallback speech -> ordered TTS playback
+explicit text `你好。` -> Gateway admits the turn
+  -> GI /api/chat -> correct greeting speech Responsibility (~5.50 s)
+  -> concurrent downstream work
+       -> GA /api/chat -> correct one-Goal association (~6.08 s)
+       -> Fast /api/chat stream
+            -> valid empty PresentationCommit (~8.246 s after GI handoff)
+            -> invalid terminal Plan: clock Capability + `现在的时间是。`
+  -> Host rejects speech-to-clock mapping before execution
+  -> typed safe failure; no normal greeting response
 ```
 
-The same boundary failed for both retained turns:
-
-- `30efe1a0`, `你好。`: GI failed after about 5.44 s.
-- `bbdc4c92`, `晚上重庆会不会下雨啊？`: GI failed after about 5.43 s.
-
-| Boundary | Actual evidence | Expected contract | Verdict |
+| Boundary | Authoritative input and actual output | Expected output | Verdict |
 |---|---|---|---|
-| VAD / ASR | Both turns accepted; final text retained | Admit usable source audio/text | Correct |
-| Gateway Attention | Greeting and question admitted | Protectively filter, then admit addressed turns | Correct |
-| GI request | About 3.5K–3.8K prompt tokens sent to `gemma4:12b` | One complete WHAT-only DTO or typed provider failure | In flight |
-| Agent GI watchdog | Cancelled each request at the configured 5400 ms | Watchdog must cover one complete transaction; latency is measured separately | **Earliest wrong boundary** |
-| Host GI deadline | Dedicated key existed but was not consumed; generic 9000 ms remained | Host deadline must exceed the Agent GI deadline | Latent second wrong boundary |
-| Ollama 500/cancel | Appeared after the client timeout | Provider may finish or be cancelled by its client | Downstream symptom |
-| GA / Planner / weather | Never invoked | Run only after a valid GI result | Correctly absent |
-| Host fallback / TTS | Typed 503 became safe fallback; 2/2 chunks played | Fail closed without fabricated success | Correct containment |
+| Explicit text / Gateway | Exact `你好。`; turn admitted | Admit the usable addressed turn | Correct |
+| Goal Interpretation | Source turn; one greeting speech Responsibility in ~5.50 s | WHAT-only greeting Responsibility | Correct, slow |
+| Goal Association | Immutable GI result; one speech Goal in ~6.08 s | Preserve exact Responsibility and Goal coverage | Correct, slow |
+| Fast presentation commit | Same GI/context; empty commit after ~8.246 s | One natural immediate greeting within 2 s | Semantically incomplete and late |
+| Fast terminal Plan | Speech ref `r1`; proposed `chromie.clock.local` plus `现在的时间是。` | `complete_response` satisfying the greeting, with no Capability | **Earliest remaining wrong semantic boundary** |
+| Host validation | Invalid terminal Plan | Reject unauthorized/incorrect mapping without rewriting it | Correct containment |
+| Capability/TTS/playback | Not reached for a successful Plan | Execute only after a valid bound Plan | Correctly absent |
 
-Hybrid/SWA full-prompt reprocessing contributed latency. The early Agent warm
-DNS failure was not causal because launcher warm-up later succeeded and both
-models were resident. The silent startup was separately configured by
-`ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=0`; the launcher text, not runtime,
-was wrong to promise a greeting.
+Before this run, microphone session `fe7a5819` had exact ASR and correct GI, but GA/Fast
+timed out. Ollama 0.33.2 `/api/generate` with `think:false` returned no bytes while
+`/api/chat` worked; repaired warm-up then established 32K. The later aggregate repeated
+the Fast failure; all 39 retained commits missed target, median 12.228 seconds.
 
-## Implemented repair
+A later supervised device-mode session retained two diagnostic turns. `你好。` reached
+a correct greeting Responsibility but Fast again invented `chromie.clock.local`; a
+Chongqing rain request failed when GI translated `重庆` to `Chongqing`. Both calls ended
+normally, Host validation contained both invalid results, and the same failure utterance
+made distinct faults sound identical. This indicts the deployed model transaction, not
+the fallback.
 
-- `services`, `speech`, and `voice_mujoco` own
-  `AGENT_GOAL_INTERPRETER_TIMEOUT_MS=60000` and
-  `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=65000`.
-- `CognitionSettings` parses the existing Host GI deadline and
-  `AgentClient.interpret_turn()` uses it. Attention and other generic Agent
-  requests retain `ORCH_AGENT_TIMEOUT_MS`.
-- Generated runtime manifests and startup budget summaries now expose both GI
-  deadlines.
-- The runtime-configuration inventory and documentation record the owners and
-  mode-specific values.
-- Launcher instructions condition the wake-up greeting claim on the existing
-  speech-enabled setting.
-- No model, prompt, context projection, Schema, DTO, retry policy, semantic
-  authority, or execution policy changed. No configuration key, document, or
-  architecture term was added.
+## Aggregate failure distribution
 
-This prevents a valid GI transaction from being relabelled as provider failure;
-it does not make a 60-second response acceptable. GI latency remains a separate
-acceptance axis and must be judged from retained deployed evidence.
+Valid aggregate: `.chromie/acceptance/general-ability/qwen-chat-transport-must-pass-aggregate-valid-20260904/`.
 
-## Planner qualification retained
+| Primary result bucket | Cases | Representative failure |
+|---|---:|---|
+| Passed | 5 | Simple blink/head-shake/walk and one social response |
+| Goal Interpretation | 5 | Rewritten numeric binding, invalid duration provenance, invalid relationship/unresolved output |
+| Goal Association | 2 | Structured-output validation failure |
+| Fast Planner | 35 | Invalid JSON/DTO, invented args/Capabilities, ordering/resource conflict, truncation, or omitted communicative activity |
+| Deep Planner | 1 | Invalid Goal-outcome coverage |
+| Preview evidence limitation | 3 | Deterministic reflex requires non-preview execution evidence |
 
-- Fast v33: 204/204 process, Schema, Host, and hidden-target-region passes;
-  same-model review 201 pass, one partial, two fail.
-- Deep v15: 40/40 mechanical passes and 40/40 non-independent semantic review.
-- Fast corpus: 204 cases, 17 capacities, 51 bilingual contrast sets; tree digest
-  `2650948b9027071c948bb75481d203104923b4aff2bfc33750288d350679c2d8`.
-- Deep corpus: 40 cases; tree digest
-  `a0c79e38cf4055b7021a4dcc1cbd0a2caec915872174d41e9c2bf153a4a7406a`.
-- Fast v33 artifact:
-  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v33-qualified-full/`.
-- Deep v15 artifact:
-  `.chromie/benchmarks/deep-planner/20260904T-deep-v15-qualified-full/`.
+This is a non-overlapping primary-failure classification for triage. Some
+concurrent cases also retained a second failing semantic role. Semantic review
+is pending, and hard failures are not averaged into a pass.
 
-All Planner candidate/review evidence is fixed-Codex, same-model and
-non-independent. It is not deployed-model, statistical, training, voice,
-simulator, or robot evidence. SFT/QLoRA remains unauthorized.
+## Implemented continuation
 
-## Evidence completed for this repair
+- `OllamaClient` uses `/api/chat` for complete/streaming calls, separate
+  system/user messages, `message.content`, and non-thinking enforcement.
+- `scripts/warm_ollama.sh` now warms the same `/api/chat` production transport,
+  so configured context residency is exercised instead of a different endpoint.
+- Configuration documentation records the transport/warm-up contract.
+- The exact standalone greeting is now a discovered must-pass
+  `speech_identity_latency` scenario with no Capability, required speech,
+  required Fast communicative act, no Fast contract failure, and the existing
+  two-/three-second warm latency budgets.
+- The reviewed streaming exception hash changed; classification remains `narrow_reraise`.
+- No prompt, Schema, DTO, semantic authority, model, model profile, Capability,
+  retry, configuration key, architecture term, or execution policy changed.
+  Surface growth is zero keys, zero documents, and zero architecture terms.
 
-- Focused configuration/client suite: 83 passed, 43 subtests passed.
-- General Ability Level A: 12/12 across `planner_goal_semantic_quality` and
-  `robust_intent_understanding`.
-- Actual RTX 5090 `voice_mujoco` generation resolved Agent GI 60000 ms and Host
-  GI 65000 ms in both `.env.runtime` and the runtime manifest.
-- Full repository gates and final commit identity are recorded in `HANDOFF.md`.
+## Why prior optimization did not make `你好。` work
 
-No post-fix deployed service, live text, physical microphone/speaker, simulator,
-or robot run has been claimed.
+Fast v33 and Deep v15 were offline fixed-Codex `gpt-5.6-sol` qualifications, not
+tests of local `qwen3.5:4b`. Fast retained 204/204 mechanical and 201 pass/1
+partial/2 fail same-model review; Deep retained 40/40 mechanical/review passes.
+
+Earlier Qwen evidence had 0/50 must-pass hard passes. Offline transaction
+progress was mistaken for product progress. Because the schema already forbids
+Capability mapping for speech-only input, treat this deployed transaction as
+unqualified rather than tuning the phrase.
+
+## Evidence completed
+
+- Focused transport/runtime/scenario suite: 65 passed.
+- Canonical local gate: repository policy 15 rule families with zero exceptions;
+  test ownership, configuration, documentation, and static stages passed; 140
+  pytest, 2058 unittest, and 20 legacy Agent tests passed.
+- Formal exact greeting: 0/1, score 40, hard failure, Level C-preview.
+- Exact workflow: `.chromie/acceptance/general-ability/greeting-chat-transport-postwarm-rerun-20260904/01-must_pass-speech_identity_latency-standalone_greeting_one_natural_reply/session-workflows/20260904T14094030079-65f84c93.json`.
+- Focused bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260904_221033.tar.gz`, SHA-256 `386c50d9bd1844dead9a2e12da71705535c8da74054ea12c5d37dc8841c2660b`.
+- Unchanged must-pass aggregate: 5/51 hard-passed, 46 hard-failed, semantic
+  review pending, Level C-preview. Evidence:
+  `.chromie/acceptance/general-ability/qwen-chat-transport-must-pass-aggregate-valid-20260904/`.
+- Aggregate bundle (one post-run collection): `/home/chromie/Downloads/chromie_debug_bundle_20260904_230315.tar.gz`, SHA-256 `e26db4bbaee0bfa9de7374d7ec81564e78a72e77993963e59b5150fde4907f4a`.
+- Latest supervised device-mode diagnostic bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260904_232045.tar.gz`, SHA-256 `4c8644003dad8f013999f98133bd2493aca52ae5af3a28e6d7cb0515cef3e959`. It retains greeting SID `97957fa9` and weather SID `17c7c47a` on dirty base `46b6fe90`.
+
+The latest trace is supervised diagnostic device microphone/speaker evidence, not a
+formal acceptance cohort. None is clean committed-revision, independent-review,
+simulator, robot, safety, or release evidence.
 
 ## Resume point
 
-1. Rebuild/recreate the Agent and restart the Host from the committed revision;
-   generated `.env.runtime` must show GI 60000/65000 ms.
-2. Run the originating greeting and weather probes through one unchanged live
-   cohort, then collect exactly one debug bundle and judge both semantics and
-   latency. Do not average any hard integrity failure into a pass.
-3. Treat a completed but slow GI result as a latency failure, not as evidence to
-   restore a 5.4-second cognition kill switch.
-4. Preserve fixed Codex for any continued Planner qualification. Independently
-   review Fast v33 and Deep v15 before any training decision.
+1. Do not tune `你好。` in isolation. Use the retained 5/51 aggregate to qualify
+   the smallest deployable model/resource-profile change. The RTX 4090 profile
+   currently assigns every semantic role to one `qwen3.5:4b` runner with one
+   Ollama sequence slot, so it cannot realize designed GA/Fast concurrency and
+   has not demonstrated any warm Fast-commit latency pass. The latest voice
+   trace also alternated 16K GI and 32K Fast requests and retained multi-second
+   provider load durations; preserve this as a latency contributor to verify.
+2. Preserve the frozen scenarios and one-authority contracts while comparing
+   candidates. Reproduce the dominant Fast DTO/semantic failures first, then
+   verify the five GI, two GA, and one Deep primary failure buckets rather than
+   hiding them behind Fast improvements.
+3. After an aggregate-justified minimal profile/model change, rerun the full cohort on the
+   changed revision before another broad change. Then rerun the originating
+   greeting/weather voice cohort and retain one bundle.
+4. Rerun formal supervised physical microphone/speaker evidence and the
+   `current_revision_qualification` profile only after service, semantic, and
+   provenance integrity close on a committed revision.
 
 ## Claim boundary
 
-The source/configuration repair closes the reproduced premature GI cancellation
-mechanism and the latent Host deadline mismatch. Automated tests prove wiring,
-generation, ownership, and fail-closed contracts only. Live post-fix behavior,
-semantic quality of the deployed GI model, end-to-end latency, simulator/robot
-execution, physical safety, and release readiness remain unproven.
+The source change repairs the reproduced Ollama endpoint mismatch and makes the
+warm-up establish the downstream 32K context. Automated tests prove that
+transport contract. Current Level-C-preview evidence proves that the greeting
+can now reach all three semantic roles and that Host validation contains the
+bad Fast Plan. The unchanged aggregate proves the failure is broad—5/51 hard
+passes—and that every retained Fast timing misses the target. The later voice
+trace proves two distinct invalid semantic outputs collapse to the same safe
+utterance, but does not qualify normal voice behavior or prove which broader
+model/profile change will close the aggregate, simulator/robot behavior,
+safety, or release readiness.

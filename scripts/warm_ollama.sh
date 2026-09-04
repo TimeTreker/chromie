@@ -160,7 +160,9 @@ import sys
 model, keep_alive, num_ctx, num_predict = sys.argv[1:5]
 print(json.dumps({
     "model": model,
-    "prompt": "Reply with exactly one word: ready",
+    "messages": [
+        {"role": "user", "content": "Reply with exactly one word: ready"},
+    ],
     "stream": False,
     "think": False,
     "keep_alive": keep_alive,
@@ -180,7 +182,7 @@ PY
         --max-time "$REQUEST_TIMEOUT_SECONDS" \
         -o "$body_file" \
         -w "%{http_code}" \
-        "${OLLAMA_URL}/api/generate" \
+        "${OLLAMA_URL}/api/chat" \
         -H "Content-Type: application/json" \
         -d "$payload" || true
     )"

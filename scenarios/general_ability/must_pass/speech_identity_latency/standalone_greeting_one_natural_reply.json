@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "standalone_greeting_one_natural_reply",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "user_reported_live_episode",
+    "batch_id": "greeting_live_defect_2026_09_04",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "An admitted standalone greeting must receive one prompt natural reply without selecting an unrelated Capability, duplicating speech, or exposing a runtime fallback.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "provenance_and_llm_integrity",
+      "declared_interaction_latency_budgets"
+    ],
+    "semantic_dimensions": [
+      "intent_understanding",
+      "naturalness",
+      "response_cardinality",
+      "latency"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "chromie_specific": true,
+    "dimensions": [
+      "intent_understanding",
+      "naturalness",
+      "response_cardinality",
+      "latency"
+    ],
+    "primary_outcomes": [
+      "Reply once to the user's greeting in concise, natural Chinese."
+    ],
+    "acceptable_auxiliary": [
+      "The exact greeting wording may vary.",
+      "Optional social decoration may be absent and must not delay or replace the reply."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Select any Capability as the owner of the speech-only greeting.",
+      "Emit a second greeting after the first complete response.",
+      "Expose internal workflow, model, timeout, or fallback language.",
+      "Invent a task, factual claim, or unsupported relationship."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "text": "你好。",
+  "language": "zh-CN",
+  "expect_no_capabilities": true,
+  "require_speech": true,
+  "require_fast_communicative_act": true,
+  "expect_no_fast_contract_failure": true,
+  "min_new_goal_count": 1,
+  "min_goal_outcome_count": 1,
+  "max_warm_gi_handoff_to_fast_commit_ms": 2000,
+  "max_warm_fast_commit_to_playback_start_ms": 3000,
+  "description": "The originating greeting defect probes Planner-owned conversational response semantics and warm interaction latency.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "speech_identity_latency",
+        "title": "Speech Identity and Warm Response Latency",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "rationale": "A standalone greeting is the smallest complete conversational turn and must exercise the same Planner speech owner and latency contract as richer dialogue.",
+        "root_cause_boundaries": [
+          "Mind profile",
+          "Planner communication",
+          "Playback delivery",
+          "Latency evidence"
+        ]
+      }
+    ]
+  }
+}

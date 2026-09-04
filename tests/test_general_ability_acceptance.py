@@ -136,17 +136,18 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("qualification_planner_weather_evidence", live_ids)
         self.assertIn("qualification_workdag_walk_blink_once", live_ids)
         self.assertIn("qualification_continuous_weather_reentry", live_ids)
+        self.assertIn("standalone_greeting_one_natural_reply", live_ids)
         self.assertFalse(
             (DEFAULT_LEVEL_A_SCENARIO_ROOT / "general_ability_acceptance.json").exists()
         )
         self.assertEqual(
             [(stage.stage_id, len(stage.scenario_paths)) for stage in manifest.stages],
-            [("must_pass", 50), ("core", 15), ("challenge", 8)],
+            [("must_pass", 51), ("core", 15), ("challenge", 8)],
         )
-        self.assertEqual(len(live_ids), 73)
+        self.assertEqual(len(live_ids), 74)
         self.assertEqual(
             len({ref.source_path for ability in manifest.ability_classes for ref in ability.live_text_cases}),
-            73,
+            74,
         )
         generated = [
             ref

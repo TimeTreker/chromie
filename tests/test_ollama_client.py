@@ -45,10 +45,18 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
                 del exc_type, exc, tb
 
             async def aiter_lines(self):
-                yield json.dumps({"response": '{"presentation_commit":', "done": False})
                 yield json.dumps(
                     {
-                        "response": "{}}",
+                        "message": {
+                            "role": "assistant",
+                            "content": '{"presentation_commit":',
+                        },
+                        "done": False,
+                    }
+                )
+                yield json.dumps(
+                    {
+                        "message": {"role": "assistant", "content": "{}}"},
                         "done": True,
                         "done_reason": "stop",
                         "prompt_eval_count": 4,
@@ -84,6 +92,56 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(payload["stream"])
         self.assertFalse(payload["think"])
         self.assertEqual(payload["format"], {"type": "object"})
+        self.assertEqual(
+            payload["messages"],
+            [{"role": "user", "content": "prompt"}],
+        )
+        self.assertEqual(
+            http_client.stream.call_args.args[:2],
+            ("POST", "http://chromie-llm:11434/api/chat"),
+        )
+
+    async def test_generate_uses_chat_transport_and_reads_assistant_content(self) -> None:
+        response = mock.Mock()
+        response.status_code = 200
+        response.text = json.dumps(
+            {
+                "message": {"role": "assistant", "content": '{"status":"ok"}'},
+                "done_reason": "stop",
+            }
+        )
+        response.json.return_value = json.loads(response.text)
+        response.raise_for_status.return_value = None
+        http_client = mock.AsyncMock()
+        http_client.post.return_value = response
+        context = mock.AsyncMock()
+        context.__aenter__.return_value = http_client
+
+        with mock.patch(
+            "agent.app.clients.ollama_client.httpx.AsyncClient",
+            return_value=context,
+        ):
+            result = await OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="test-model",
+            ).generate(
+                "prompt",
+                system="system",
+                response_format={"type": "object"},
+            )
+
+        self.assertEqual(result, {"status": "ok"})
+        self.assertEqual(
+            http_client.post.call_args.args[0],
+            "http://chromie-llm:11434/api/chat",
+        )
+        self.assertEqual(
+            http_client.post.call_args.kwargs["json"]["messages"],
+            [
+                {"role": "system", "content": "system"},
+                {"role": "user", "content": "prompt"},
+            ],
+        )
 
     async def test_generate_stream_raises_typed_midstream_provider_error(self) -> None:
         class StreamResponse:
@@ -152,9 +210,12 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, "ready")
         payload = http_client.post.call_args.kwargs["json"]
-        self.assertEqual(payload["system"], "constitution")
         self.assertEqual(
-            payload["prompt"],
+            payload["messages"][0],
+            {"role": "system", "content": "constitution"},
+        )
+        self.assertEqual(
+            payload["messages"][1]["content"],
             "identity\n\nrole\n\ncatalog\n\nturn",
         )
 
@@ -266,8 +327,13 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         record = json.loads(evidence_line.split("llm_call_evidence ", 1)[1])
         self.assertEqual(record["purpose"], "goal_association")
         self.assertEqual(record["stage"], "goal_association.primary")
-        self.assertEqual(record["request"]["system"], "complete system prompt")
-        self.assertEqual(record["request"]["prompt"], "complete user prompt")
+        self.assertEqual(
+            record["request"]["messages"],
+            [
+                {"role": "system", "content": "complete system prompt"},
+                {"role": "user", "content": "complete user prompt"},
+            ],
+        )
         self.assertEqual(record["request"]["format"], schema)
         self.assertEqual(
             record["response"]["raw_model_output"],

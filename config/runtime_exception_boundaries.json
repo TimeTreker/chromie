@@ -83,7 +83,7 @@
       "owner": "agent.llm_transport",
       "contract": "Retain rejected streaming-call evidence, normalize transport timeout, and re-raise without retry or semantic repair.",
       "review_status": "reviewed",
-      "body_sha256": "bca987ff70073789c5dfb100ab2ff7290d780bf7ec9f254addd468b03a984128",
+      "body_sha256": "e28c51c2b4111b24292031f06532fa8aaa243db3f6a2dcfe57eabb4c18088d72",
       "failure_signals": [
         "bare_reraise",
         "raise",

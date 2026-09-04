@@ -772,12 +772,20 @@ parallel requests and creates `n_seq_max=1`, so this profile retains one honest
 provider slot. The laptop-specific topology remains subject to retained GPU and
 latency qualification while CosyVoice shares the 16 GB GPU.
 
-`scripts/warm_ollama.sh` performs a real `/api/generate` request for every model
+`scripts/warm_ollama.sh` performs a real non-thinking `/api/chat` request for every model
 that must be ready before the microphone opens. If Ollama is reachable but the
 native `llama-server` runner crashes, warmup restarts `chromie-llm` once when
 `OLLAMA_AUTO_RESTART_ON_CRASH=1`, waits for `/api/tags`, and retries the same
 model. A second native crash fails fast with commands to restart the LLM service
 and check GPU visibility.
+
+Agent semantic roles use Ollama's non-thinking `/api/chat` transport for both
+complete and streamed responses. System and user prompt layers remain separate
+chat messages, structured roles still pass their exact JSON Schema through
+Ollama's `format` field, and the shared client rejects any reasoning field or
+thinking marker before model output reaches a semantic validator. Warmup uses
+the same endpoint so a reachable health surface cannot hide an unusable
+production generation transport.
 
 Spoken generation paths set `think: false` and separate model reasoning from the
 user-visible speech contract. Normal cognition already uses typed response plans.

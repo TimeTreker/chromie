@@ -5,11 +5,13 @@ from pathlib import Path
 
 
 class RuntimeReliabilityStage4Tests(unittest.TestCase):
-    def test_warmup_uses_a_one_token_non_thinking_generation(self) -> None:
+    def test_warmup_uses_a_one_token_non_thinking_chat_request(self) -> None:
         source = Path("scripts/warm_ollama.sh").read_text(encoding="utf-8")
 
         self.assertIn('NUM_PREDICT="${OLLAMA_WARM_NUM_PREDICT:-1}"', source)
         self.assertIn('"think": False', source)
+        self.assertIn('"messages": [', source)
+        self.assertIn('${OLLAMA_URL}/api/chat', source)
         self.assertIn('OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT', source)
         self.assertIn('${OLLAMA_URL}/api/ps', source)
         self.assertIn('Concurrent residency verified for all selected models.', source)
