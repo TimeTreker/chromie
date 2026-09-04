@@ -305,6 +305,12 @@ def fast_plan_prompt(
         "after that answer, and omit previously delivered sentences, measurements, "
         "or conditions that do not change the decision. "
     )
+    supportive_speech_grounding_contract = (
+        "Supportive, encouraging, empathic, or relational response_text may be warm, "
+        "but it must not state or imply an unprovided user history, duration of effort, "
+        "emotional state, circumstance, preference, relationship history, or likely "
+        "future success as fact; express support without inventing familiarity or evidence. "
+    )
     concise_output_contract = (
         "Keep goal summaries, step reasons, satisfaction rationales, and "
         "outcome rationales concise: one short sentence each. Do not "
@@ -365,6 +371,7 @@ def fast_plan_prompt(
             f"{argument_grounding_contract}"
             f"{semantic_scope_contract}"
             f"{current_turn_communication_contract}"
+            f"{supportive_speech_grounding_contract}"
             f"{IDENTITY_SEMANTIC_CONTRACT}"
             f"{PERSONALITY_SEMANTIC_CONTRACT}"
             f"{STABLE_MIND_SEMANTIC_CONTRACT}"
@@ -415,6 +422,7 @@ def fast_plan_prompt(
         f"{argument_grounding_contract}"
         f"{semantic_scope_contract}"
         f"{current_turn_communication_contract}"
+        f"{supportive_speech_grounding_contract}"
         f"{IDENTITY_SEMANTIC_CONTRACT}"
         f"{PERSONALITY_SEMANTIC_CONTRACT}"
         f"{STABLE_MIND_SEMANTIC_CONTRACT}"

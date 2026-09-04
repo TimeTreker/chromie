@@ -1,6 +1,6 @@
 ---
-name: optimize-chromie-llm-prompt
-description: Qualify complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff; optimize a prompt only when evidence identifies it as the earliest defective owner. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize Goal Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie LLM role, model, prompt, Schema, or model-facing transaction.
+name: qualify-chromie-semantic-transaction
+description: Qualify and improve complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize Goal Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie semantic role, prompt, context projection, Schema, DTO, Host validator, model profile, or model-facing transaction. Do not imply that the candidate model itself is an optimization target.
 ---
 
 # Qualify a Chromie Semantic Model Role
@@ -164,6 +164,12 @@ references, or adjudication. Execute the role's exact declared primary transacti
 including only its owner-approved source-based depth delegation or mechanical
 regeneration. Use the model authority selected by the user; never silently substitute a
 smaller or local model. Mark interrupted batches incomplete.
+
+Treat the user's declared candidate model as fixed unless the user explicitly authorizes
+a model comparison or model change. When the user asks Codex to act as the candidate
+role, execute candidate inference with the declared Codex model and do not invoke,
+evaluate, tune, or use a configured local/deployed model as a proxy. Diagnose and repair
+only the authorized transaction surfaces around that fixed model.
 
 Retain per case:
 

@@ -65,7 +65,7 @@
                       "confidence": 1.0,
                       "entity_type": "location",
                       "name": "location",
-                      "value": "Hangzhou"
+                      "value": "杭州"
                     },
                     "period": {
                       "confidence": 1.0,
@@ -151,7 +151,7 @@
         {
           "bindings": {
             "date": "2099-09-04",
-            "location": "Hangzhou",
+            "location": "杭州",
             "period": "night",
             "ready_at": "2099-09-04T19:00:00+08:00"
           },

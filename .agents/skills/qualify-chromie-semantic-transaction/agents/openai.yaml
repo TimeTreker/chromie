@@ -1,0 +1,4 @@
+interface:
+  display_name: "Qualify Chromie Semantic Transaction"
+  short_description: "Qualify the transaction; repair its evidenced owner"
+  default_prompt: "Use $qualify-chromie-semantic-transaction to qualify the complete Fast Planner transaction with a fixed candidate model and frozen target-blind cohort, repairing only the earliest evidenced owner."

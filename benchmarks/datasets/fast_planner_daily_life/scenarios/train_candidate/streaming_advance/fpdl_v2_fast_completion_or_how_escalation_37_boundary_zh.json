@@ -38,7 +38,7 @@
           "bindings": {
             "date": "tomorrow",
             "due_at": "tomorrow at 07:30",
-            "location": "Hangzhou",
+            "location": "杭州",
             "period": "morning",
             "reminder_text": "bring an umbrella"
           },

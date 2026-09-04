@@ -37,7 +37,7 @@
         {
           "bindings": {
             "date": "tomorrow",
-            "location": "Hangzhou",
+            "location": "杭州",
             "period": "morning"
           },
           "confidence": 0.99,

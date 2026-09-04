@@ -754,7 +754,7 @@
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 204,
     "contrast_set_size": 4,
-    "scenario_tree_sha256": "b5da6e022886effd3b9618384e48914775e7a742b19cbe584f9c1826227eb669"
+    "scenario_tree_sha256": "2650948b9027071c948bb75481d203104923b4aff2bfc33750288d350679c2d8"
   },
   "split_policy": {
     "unit": "contrast_set",

@@ -114,7 +114,7 @@ and real Schema/DTO/Host adjudication. A non-zero process, timeout, missing
 output, or source/harness change makes the batch incomplete; successful cases
 from different batches are never spliced together.
 
-All inference and optimization follows `optimize-chromie-llm-prompt`: freeze
+All inference and optimization follows `qualify-chromie-semantic-transaction`: freeze
 the coverage-designed corpus and transaction, infer without targets, adjudicate
 the earliest boundary, make only an authorized minimal repair, rerun focused
 proof, then rerun the complete frozen cohort. A prompt changes only when the

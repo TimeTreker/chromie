@@ -183,7 +183,7 @@ It composes this root-cause classification with authority audit, frozen contrast
 corpora, target-blind inference, adjudication, bounded iteration, full reruns, stop
 conditions, and cross-session handoff. This section remains authoritative for the
 failure categories used by that method.
-The repository [Semantic Model-Role Qualification Skill](.agents/skills/optimize-chromie-llm-prompt/SKILL.md)
+The repository [Semantic Transaction Qualification Skill](.agents/skills/qualify-chromie-semantic-transaction/SKILL.md)
 is its executable coding-agent entrypoint; the method document remains authoritative.
 
 1. Retain the original single- or multi-turn scenario, the expected contract,

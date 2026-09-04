@@ -1,8 +1,8 @@
 # Chromie Latest Handoff
 
-Audience: the project owner or coding agent resuming Issue #35 final Fast and
-deployed-model qualification after the Planner authority and workflow-watchdog
-delivery.
+Audience: the project owner or coding agent resuming Issue #35 independent
+semantic review or surrounding-transaction optimization after fixed-Codex Fast
+Planner qualification.
 
 Owner: project owner. Current source, tests, retained artifacts, this handoff,
 and `DEVELOPMENT_CHECKPOINT.md` override chat history.
@@ -11,8 +11,12 @@ and `DEVELOPMENT_CHECKPOINT.md` override chat history.
 
 - Repository: `https://github.com/TimeTreker/chromie.git`
 - Branch: `main`
+- Current evaluated revision: `04dd76fcb2c59f452bcd09cd2d6b5336e8e5b740`
+  (`origin/main`, 0 ahead/0 behind before the current uncommitted qualification
+  patch)
 - Pre-delivery base: `bc278c9f71239a173f098fa9d6599f03f2b4fdd5`
-- `origin/main` was fetched on 2026-09-04 and matched that base (0 ahead/0 behind).
+- `origin/main` was fetched on 2026-09-04 and matched the current evaluated
+  revision (0 ahead/0 behind before the current uncommitted qualification patch).
 - Active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35)
 - Expected resume revision: latest normal `origin/main` commit containing this
   file and `DEVELOPMENT_CHECKPOINT.md`.
@@ -88,21 +92,72 @@ Artifacts under `.chromie/` are ignored and machine-local.
   `.chromie/benchmarks/fast-planner/20260904T-fast-v22-focused-unspecified-plan/`
   passed 1/1 process, Schema, Host, and hidden target-region checks after the
   prompt prohibited evaluating details that the source never supplied.
-- Current production-files digest:
+- Pre-supportive-repair production-files digest:
   `0c07329afc04855a609dceac6452e95191759d26e5113c06c0244d8362c36398`
-- Current production tracked-diff digest:
-  `4daf8377d1c1ccf631d0278ca8b844a7fa43edfeadd81119807cbbaf096b4c26`
 - Current corpus tree digest:
-  `b5da6e022886effd3b9618384e48914775e7a742b19cbe584f9c1826227eb669`
-- Current full-rerun blocker:
+  `2650948b9027071c948bb75481d203104923b4aff2bfc33750288d350679c2d8`
+- Historical full-rerun blocker:
   `.chromie/benchmarks/fast-planner/20260904T-fast-v24-qualified-full/`
   attempted 115/204 cases before stop: 23 completed and 92 timed out at 180 s
   with no output. Logs contain request timeouts, WebSocket/TLS disconnects, and
   MCP initialization failures. This is an incomplete provider-integrity batch,
   not a semantic result.
+- Incomplete v25 diagnostic:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v25-qualified-full/`
+  attempted 97/204: 67 outputs and 30 provider timeouts.
+- Complete v26 diagnostic on the pre-repair corpus:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v26-qualified-full/`
+  completed 204/204 processes and Schemas but passed Host/target checks 203/204.
+  The sole rejection paired directly supplied Chinese `杭州` with an invalid
+  synthetic GI binding `Hangzhou`; the Planner emitted the source-faithful value,
+  so the earliest wrong boundary was corpus input rather than Planner.
+- Focused current-corpus proof:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v27-focused-zh-location-binding/`
+  passed 1/1 process, Schema, Host, and hidden target-region checks after the
+  binding was corrected to `杭州`.
+- Incomplete v28 rerun:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v28-qualified-full/`
+  attempted 67/204: 59 outputs and 8 provider timeouts.
+- Pre-change current-corpus mechanical proof:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v29-qualified-full/`
+  passed 204/204 process, Schema, Host, and hidden target-region checks with
+  source/harness stable and zero timeout. Breakdown: English 102/102, Chinese
+  102/102; canonical primary 72/72, canonical re-entry 80/80, streaming advance
+  52/52. Corrected post-hoc review v3 completed 51/51 contrast sets and reported
+  199 pass, 2 partial, and 3 fail. Manual review identified one stable prompt
+  gap: supportive speech could invent unprovided effort/history.
+- Focused current prompt proof:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v32-focused-supportive-grounding/`
+  passed 1/1 process, Schema, Host, hidden target-region, and manual semantic
+  checks. The target-blind response was supportive without inventing prior
+  effort, familiarity, circumstance, or likely success.
+- Final current prompt proof:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v33-qualified-full/`
+  passed 204/204 process, Schema, Host, and hidden target-region checks with zero
+  timeout and no disallowed semantic repair. Breakdown: English 102/102, Chinese
+  102/102; canonical primary 72/72, canonical re-entry 80/80, streaming advance
+  52/52.
+- V33 post-hoc semantic review:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v33-qualified-full/semantic-review-codex-v1/`
+  completed 51/51 contrast sets with 201 pass, 1 partial, and 2 fail. Root
+  adjudication retained all three findings as model inference: repeated internal
+  escalation rationale (non-hard), a user-facing exact date reduced to
+  unanchored `that morning` (hard), and Planner wording that claimed it would
+  `authorize` a blink despite Runtime owning authorization (hard). Each governing
+  rule is already explicit, so no additional Prompt/Schema/DTO/Host repair is
+  recommended.
+- Current production-files digest:
+  `c751adc530dd06241d7b86ec857e465f0aada1911875b01982c21bcc5057279f`;
+  `agent/app/planner_prompt.py` digest:
+  `14aa76efe559674234d91512b61e604f49e2e64aa5b985e328fe46a6b1b13d1f`.
+- Candidate generation and review used fixed Codex `gpt-5.6-sol`. No local or
+  deployed Qwen/Ollama/vLLM model was invoked, evaluated, tuned, or used as a
+  proxy.
 
-Do not promote v12/v14/v16/v23/v24. V17 and v19 exposed date-rotted corpus
-inputs. V21 is a complete predecessor; it is not a full final-prompt result.
+Do not promote v12/v14/v16/v23/v24/v25/v28/v31. V17, v19, and v26 exposed
+corpus defects. V21 and v29 are complete diagnostic predecessors. V31 was not
+run: prompt rendering exposed that the first edit reached only one Fast branch,
+and the projection was corrected before candidate inference.
 
 ### Deep Planner
 
@@ -118,8 +173,8 @@ inputs. V21 is a complete predecessor; it is not a full final-prompt result.
 - Corpus tree digest:
   `a0c79e38cf4055b7021a4dcc1cbd0a2caec915872174d41e9c2bf153a4a7406a`
 
-Both semantic reviews use `gpt-5.6-sol`, the same model family as candidate
-generation. They are non-independent. Every scenario remains
+Fast and Deep candidate/review calls use fixed `gpt-5.6-sol`. Their separate
+post-hoc reviews are same-model and non-independent. Every scenario remains
 `training_eligible=false` and `independent_semantic_review=false`.
 
 ## Coverage contract
@@ -151,23 +206,22 @@ all policy, ownership, Ruff, Mypy, configuration, and documentation stages passe
 Do not translate Level A or same-model offline evidence into deployed service,
 voice, simulator, GPU, target-hardware, or physical-robot claims.
 
-## Serving and QLoRA decision
+## Candidate-model boundary
 
-The vLLM isolation probe passed strict JSON, SSE, short-request concurrency,
-cancellation isolation, and health recovery. Semantic screens did not: Qwen3.5-
-4B scored 1/5 and Qwen3.5-9B 2/5; two long streams also slowed TTS first audio
-2.37×. Current Ollama Qwen exposes one sequence slot and cannot realize GA/Fast
-inference overlap.
+This work fixes Codex `gpt-5.6-sol` as the candidate Planner and optimizes only
+the surrounding semantic transaction. Model comparison, weight tuning, local
+Qwen/Ollama/vLLM inference, and local-model proxy evaluation are outside the
+authorized scope. Historical serving/model notes remain context only.
 
-Do not begin SFT yet. The next legitimate sequence is:
+Do not begin SFT. The legitimate next sequence is:
 
-1. independently review the 204 Fast and 40 Deep cases and correct any labels;
-2. run them target-blind through the exact deployed Qwen3.5-4B + decoder +
-   transport profile;
-3. cluster failures by earliest boundary;
-4. only then form an approved train/validation/frozen split for QLoRA and compare
-   the tuned checkpoint against the untouched frozen holdout;
-5. qualify vLLM separately as transport and under GA/Fast plus TTS contention.
+1. independently review Fast v33 and Deep v15 and correct any scenario/oracle
+   defects;
+2. preserve Codex as the candidate for any continued Planner qualification;
+3. cluster retained failures by earliest boundary and change only an evidenced
+   Prompt/context/Schema/DTO/Host/corpus owner;
+4. retain already-contracted model-inference failures without keyword repair,
+   semantic Host rewriting, same-stage retry, or a second model authority.
 
 ## Resume commands
 
@@ -183,15 +237,17 @@ python scripts/check_test_ownership.py
 python scripts/check_docs.py
 ```
 
-Then start a new immutable output directory for the exact deployed target-model
-cohort. Never resume or patch an old batch, change source between cases, average
-a hard failure into a pass, or approve training data from same-model review.
+Then obtain independent semantic review of Fast v33 and Deep v15. If another
+fixed-Codex Planner cohort is justified, use a new immutable output directory.
+Never resume or patch an old batch, change source between cases, average a hard
+failure into a pass, invoke a local model as proxy, or approve training data from
+same-model review.
 
 ## Claim boundary
 
 This handoff records source correction, Deep same-model offline qualification,
-and focused Fast repair evidence. Full current-source Fast qualification remains
-open behind the recorded provider failure. It does not qualify deployed Qwen/
-Ollama/vLLM, independent semantics, QLoRA data, live voice, simulator, GPU
-coexistence, target hardware, physical safety, release readiness, or customer-
-visible behavior.
+the corpus-binding correction, the supportive-speech Fast prompt repair, and
+204/204 current-corpus Fast mechanical qualification with fixed Codex. It does
+not establish independent semantics, statistical reliability, SFT/QLoRA data,
+deployed/local-model behavior, live voice, simulator, GPU coexistence, target
+hardware, physical safety, release readiness, or customer-visible behavior.

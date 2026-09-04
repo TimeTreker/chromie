@@ -173,7 +173,7 @@ mechanical-contract owner.
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Semantic Model-Role Qualification and Prompt Optimization Method](LLM_PROMPT_QUALIFICATION_METHOD.md)
-- [Chromie LLM Prompt Qualification Skill](../.agents/skills/optimize-chromie-llm-prompt/SKILL.md): coding-agent entrypoint for applying the owned method
+- [Chromie Semantic Transaction Qualification Skill](../.agents/skills/qualify-chromie-semantic-transaction/SKILL.md): coding-agent entrypoint for applying the owned method
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
 - [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
 - [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
@@ -232,7 +232,7 @@ mechanical-contract owner.
 - [Support](../SUPPORT.md)
 - [Changelog](../CHANGELOG.md)
 - [Coding Agent Guidance](../AGENTS.md)
-- [Semantic Model-Role Qualification Skill](../.agents/skills/optimize-chromie-llm-prompt/SKILL.md): executable entrypoint for frozen-transaction qualification and evidenced owner repair
+- [Semantic Transaction Qualification Skill](../.agents/skills/qualify-chromie-semantic-transaction/SKILL.md): executable entrypoint for frozen-transaction qualification and evidenced owner repair
 - [Chromie Delivery Handoff Skill](../.agents/skills/chromie-delivery-handoff/SKILL.md): Git delivery workflow for keeping the checkpoint and handoff truthful
 - [Architecture Audit](../ARCHITECTURE_AUDIT.md): external point-in-time review, 2026-08-28; not a maintained authority
 

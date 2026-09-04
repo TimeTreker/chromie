@@ -23,7 +23,7 @@ or [Acceptance and Evidence](ACCEPTANCE.md); it composes them into one qualifica
 operating protocol.
 
 Coding agents apply this method through the
-[Chromie LLM Prompt Qualification Skill](../.agents/skills/optimize-chromie-llm-prompt/SKILL.md).
+[Chromie Semantic Transaction Qualification Skill](../.agents/skills/qualify-chromie-semantic-transaction/SKILL.md).
 The Skill is an execution entrypoint; this document remains the binding method.
 
 ## 1. Objective

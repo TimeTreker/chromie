@@ -65,7 +65,7 @@
                       "confidence": 1.0,
                       "entity_type": "location",
                       "name": "location",
-                      "value": "Hangzhou"
+                      "value": "杭州"
                     },
                     "period": {
                       "confidence": 1.0,
@@ -145,7 +145,7 @@
         {
           "bindings": {
             "date": "tomorrow",
-            "location": "Hangzhou",
+            "location": "杭州",
             "period": "morning"
           },
           "confidence": 0.99,
