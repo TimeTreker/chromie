@@ -117,6 +117,7 @@ def build_agent_client(settings: HostSettingsSnapshot) -> AgentClient:
     return AgentClient(
         cognition.agent_url,
         cognition.agent_timeout_ms,
+        goal_interpreter_timeout_ms=cognition.goal_interpreter_timeout_ms,
         dag_engine_execution_token=cognition.dag_engine_execution_token,
     )
 

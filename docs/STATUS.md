@@ -1,7 +1,7 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-04
-**Current focus:** The Goal-driven single-authority path now covers Goal Interpretation, Goal Association, and Fast/Deep Planner. Planner same-tier repair/revision and Host semantic rewriting are removed; Deep 40 passes same-model offline qualification, while Fast's final focused repair passes and its full current-source rerun is blocked by remote provider integrity. Exact deployed `qwen3.5:4b` qualification, independent semantic review, and only then a QLoRA decision are next. Live voice, simulator, and physical behavior remain separate evidence claims.
+**Current focus:** The Goal-driven single-authority path now covers Goal Interpretation, Goal Association, and Fast/Deep Planner. Fast v33 and Deep v15 complete fixed-Codex offline qualification, while independent semantic review remains open. A retained RTX 5090 live voice failure exposed premature 5.4-second Goal Interpretation cancellation and an inert Host GI deadline; source now gives interactive GI 60/65-second Agent/Host watchdogs and wires the Host deadline into the Agent client. Post-fix live voice, simulator, and physical behavior remain separate evidence claims.
 
 This file contains current facts only. Historical implementation narratives,
 superseded architecture, old test totals, and revision-specific diagnostics belong in
@@ -183,7 +183,9 @@ A full offline Codex GI diagnostic exercised all 1,496 bilingual daily-life scen
 
 The contract defects found by the call-path audit are now fixed. Primary and Deep GI no longer have a same-stage repair call; the repository policy checker rejects restoration of those call markers. Measured values retain an exact number-and-unit source/context surface, standalone social acts remain speech Responsibilities, and unfamiliar names become unresolved only when the category/referent choice materially changes WHAT. Charter principle 31 now agrees with runtime: GI authors `output_mode`, GA preserves it under decoder `const` plus conservation checks, and the Host derives execution projections after validation. The 1,496-case candidate corpus passes generated schema and Host validation with 68 genuine unresolved cases and a pinned 406 digit-measurement-surface count. The final changed-worktree primary and Deep diagnostics are retained under ignored `.chromie/acceptance/model-qualification/` paths; no model/profile was promoted.
 
-The Planner audit is source-closed: Fast and Deep each produce one complete primary result; Deep receives authoritative Goals/context, and Host validation cannot rewrite semantics. The design-derived Fast corpus covers 17 capacities in 51 bilingual supported/boundary contrasts across primary, re-entry, and streaming forms. The immediately prior Fast prompt passed 204/204 mechanical/target checks; its 201/204 same-model semantic review exposed two corpus defects and one prompt defect. The final focused repair passes 1/1, while the full current-source rerun is incomplete after 92/115 attempted calls timed out at the remote provider. Deep passed 40/40 plus 40/40 non-independent semantic review. Both corpora remain training-ineligible and do not qualify deployed Qwen, Ollama, vLLM, voice, or robot behavior.
+The Planner audit is source-closed: Fast and Deep each produce one complete primary result; Deep receives authoritative Goals/context, and Host validation cannot rewrite semantics. The design-derived Fast corpus covers 17 capacities in 51 bilingual supported/boundary contrasts across primary, re-entry, and streaming forms. Fast v33 passed 204/204 process, Schema, Host, and hidden-target checks; its same-model review reports 201 pass, one partial, and two fail, all retained as model-inference findings against already-explicit contracts. Deep v15 passed 40/40 plus 40/40 non-independent semantic review. Codex `gpt-5.6-sol` was fixed as the candidate Planner; no local Qwen/Ollama/vLLM model was used as a Planner proxy. Both corpora remain training-ineligible and do not qualify deployed models, voice, or robot behavior.
+
+The 2026-09-04 RTX 5090 `voice_mujoco` bundle retained two admitted turns that both failed at Goal Interpretation after about 5.4 seconds. ASR and Gateway Attention were correct; GA, Planner, and weather handling were never invoked. The earliest wrong boundary was the interactive Agent GI watchdog, which cancelled a still-running `gemma4:12b` primary transaction. A second latent boundary was the declared but previously unconsumed Host GI deadline. Interactive modes now use 60000 ms Agent and 65000 ms Host GI watchdogs, and `AgentClient.interpret_turn()` consumes the dedicated Host value. These values protect transaction completion and do not qualify human-facing latency. The startup launcher also no longer promises a wake-up greeting when startup speech is disabled. Automated wiring evidence passes; post-fix deployed/live proof remains open.
 
 | Area | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|---|
@@ -201,18 +203,13 @@ The Planner audit is source-closed: Fast and Deep each produce one complete prim
 
 ## Current open work
 
-1. **Close the reproduced all-Qwen resource and semantic blockers.** The complete
-   current-source must-pass cohort is retained and mechanically judged. Qwen3.5 still
-   fails GI availability/provenance/authority contracts, while Ollama exposes one sequence
-   slot for concurrent GA/Fast work. Do not use Host resegmentation, another semantic call,
-   or validator weakening to relabel either failure class. Development workflow watchdogs
-   now cover the legal concurrent workflow and are explicitly separate from latency
-   acceptance; do not treat that separation as a latency pass. A different vLLM transport
-   is qualified in isolation, but all screened laptop-fit candidates failed primary GI
-   semantics or the current non-thinking authority contract. Independently review the
-   frozen Planner corpora, run the exact deployed target transaction, and cluster failures
-   before approving any QLoRA dataset or provider. Do not substitute phrase rules or a
-   second semantic call for coverage.
+1. **Retain post-fix live Goal Interpretation evidence.** Rebuild/recreate the Agent
+   and restart the Host from the committed revision, run the retained greeting and
+   weather probes as one unchanged live cohort, and collect exactly one debug bundle.
+   Confirm that the single GI transaction completes or returns a genuine typed provider
+   failure before the 60/65-second watchdogs, then judge semantic quality and latency as
+   separate axes. Do not restore a latency target as a cognition kill switch, add a
+   same-authority retry, or weaken validation.
 2. **Close Issue #32 source gates and target evidence before final Fast-Planner
    Prompt/model promotion.** The one typed production path is implemented and the
    superseded endpoint/DTO/model/config surface is removed. Retain ordered-frame,

@@ -13,6 +13,7 @@ from fastapi import HTTPException
 
 from agent.app import main as agent_main
 from agent.app.cognitive_core.goal_interpreter.engine import Settings as GoalInterpreterSettings
+from orchestrator.runtime.host_components import build_agent_client
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 
 
@@ -41,6 +42,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         settings = HostSettingsSnapshot.from_env(project_root=ROOT, environ={})
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
+        self.assertEqual(settings.cognition.goal_interpreter_timeout_ms, 9000)
         self.assertEqual(settings.cognition.goal_association_timeout_ms, 65000)
         self.assertEqual(settings.cognition.fast_planner_timeout_ms, 65000)
         self.assertEqual(settings.cognition.deep_planner_timeout_ms, 125000)
@@ -60,6 +62,18 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertGreater(
             int(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
             int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
+        )
+
+    def test_goal_interpreter_host_budget_has_a_dedicated_typed_setting(self) -> None:
+        settings = HostSettingsSnapshot.from_env(
+            project_root=ROOT,
+            environ={"ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS": "65000"},
+        )
+
+        self.assertEqual(settings.cognition.goal_interpreter_timeout_ms, 65000)
+        self.assertEqual(
+            build_agent_client(settings).goal_interpreter_timeout_ms,
+            65000,
         )
 
     def test_goal_interpreter_uses_fast_llm_by_default(self) -> None:
@@ -403,6 +417,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", launcher)
         self.assertIn("Chromie services are ready", launcher)
         self.assertNotIn("Chromie voice interaction is ready", launcher)
+        self.assertIn(
+            '${ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED:-0}',
+            launcher,
+        )
+        self.assertIn("Startup speech is disabled.", launcher)
         self.assertIn("python_ws_health_check()", launcher)
         self.assertIn(
             'wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"',

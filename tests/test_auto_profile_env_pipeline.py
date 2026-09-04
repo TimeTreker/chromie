@@ -138,6 +138,16 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             set(modes),
             {"qualification", "services", "speech", "voice_mujoco"},
         )
+        for mode_name in ("services", "speech", "voice_mujoco"):
+            with self.subTest(mode=mode_name, budget="goal_interpreter"):
+                self.assertEqual(
+                    modes[mode_name]["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+                    "60000",
+                )
+                self.assertEqual(
+                    modes[mode_name]["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+                    "65000",
+                )
 
 
     def test_process_selected_operator_mode_is_applied_and_protected(self) -> None:
@@ -177,7 +187,15 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "voice_mujoco")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_CAPABILITIES"], "1")
         self.assertEqual(values["ORCH_ACTION_DRY_RUN"], "false")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "65000")
         self.assertEqual(manifest["active_operator_mode"], "voice_mujoco")
+        self.assertEqual(
+            manifest["cognitive_budgets"]["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+            "65000",
+        )
+        self.assertIn("goal_interpreter=60000ms", completed.stdout)
+        self.assertIn("host_goal_interpreter=65000ms", completed.stdout)
 
     def test_every_profile_owns_the_complete_model_plan(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):
@@ -246,6 +264,16 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(
             manifest["cognitive_budgets"]["CHROMIE_COGNITIVE_BUDGET_PROFILE"],
             "interactive",
+        )
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "65000")
+        self.assertEqual(
+            manifest["cognitive_budgets"]["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+            "60000",
+        )
+        self.assertEqual(
+            manifest["cognitive_budgets"]["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+            "65000",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"],
@@ -326,10 +354,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
+        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "125000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "300000")
@@ -342,6 +372,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "ORCH_AGENT_TIMEOUT_MS",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS",
             "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+            "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
             "AGENT_FAST_PLANNER_TIMEOUT_MS",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS",

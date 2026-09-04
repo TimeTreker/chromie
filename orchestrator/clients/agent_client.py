@@ -51,10 +51,20 @@ class AgentClient:
         base_url: str,
         timeout_ms: int = 3000,
         *,
+        goal_interpreter_timeout_ms: int | None = None,
         dag_engine_execution_token: str | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout_ms = max(100, int(timeout_ms))
+        effective_goal_interpreter_timeout_ms = (
+            self.timeout_ms
+            if goal_interpreter_timeout_ms is None
+            else goal_interpreter_timeout_ms
+        )
+        self.goal_interpreter_timeout_ms = max(
+            100,
+            int(effective_goal_interpreter_timeout_ms),
+        )
         self.dag_engine_execution_token = (
             str(dag_engine_execution_token).strip()
             if dag_engine_execution_token is not None
@@ -93,7 +103,9 @@ class AgentClient:
             turn_envelope=turn_envelope,
             context_snapshot=context_snapshot,
         )
-        timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)
+        timeout = aiohttp.ClientTimeout(
+            total=self.goal_interpreter_timeout_ms / 1000.0
+        )
         async with session.post(
             f"{self.base_url}/cognitive-core/interpret",
             json=request.model_dump(mode="json"),

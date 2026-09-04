@@ -71,6 +71,43 @@ class _FakeSession:
 @unittest.skipIf(AgentClient is None, "aiohttp is unavailable")
 class AgentClientTests(unittest.IsolatedAsyncioTestCase):
 
+    async def test_goal_interpretation_uses_its_dedicated_host_timeout(self) -> None:
+        result = {
+            "schema_version": 2,
+            "turn_id": "turn-timeout",
+            "session_id": "session-timeout",
+            "authority": "goal_interpretation",
+            "confidence": 0.95,
+            "language": "zh-CN",
+            "responsibilities": [
+                {
+                    "local_ref": "weather",
+                    "outcome": "查询天气",
+                    "bindings": {},
+                    "confidence": 0.95,
+                }
+            ],
+            "unresolved": [],
+        }
+        session = _FakeSession(_FakeResponse(text=json.dumps(result)))
+        client = AgentClient(
+            "http://agent.local",
+            timeout_ms=9000,
+            goal_interpreter_timeout_ms=65000,
+        )
+
+        with mock.patch(
+            "orchestrator.clients.agent_client.CoreTurnRequest"
+        ) as request_type:
+            request_type.return_value.model_dump.return_value = {}
+            await client.interpret_turn(
+                session,  # type: ignore[arg-type]
+                turn_envelope=mock.Mock(),
+                context_snapshot=mock.Mock(),
+            )
+
+        self.assertAlmostEqual(session.posts[0]["timeout"].total, 65.0)
+
     async def test_fast_stream_yields_typed_commit_from_single_endpoint(self) -> None:
         commit = PresentationCommit(
             commit_id="commit-fast",

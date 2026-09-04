@@ -714,7 +714,11 @@ check_soridormi_from_agent_container
 run_soridormi_capability_probe
 
 if [ "$START_ORCHESTRATOR" = "1" ]; then
-  READY_NEXT_STEP="The host Orchestrator starts next; wait for Chromie's wake-up greeting and 'Microphone started' before speaking."
+  if [ "${ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED:-0}" = "1" ]; then
+    READY_NEXT_STEP="The host Orchestrator starts next; wait for Chromie's wake-up greeting and 'Microphone started' before speaking."
+  else
+    READY_NEXT_STEP="The host Orchestrator starts next; wait for 'Microphone started' before speaking. Startup speech is disabled."
+  fi
 else
   READY_NEXT_STEP='Host Orchestrator: not started (--no-orchestrator).'
 fi

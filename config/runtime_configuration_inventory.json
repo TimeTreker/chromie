@@ -2090,7 +2090,11 @@
       "key": "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "env/modes/qualification.env"
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {

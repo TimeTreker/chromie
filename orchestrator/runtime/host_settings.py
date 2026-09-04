@@ -263,6 +263,7 @@ class CognitionSettings:
     agent_url: str
     action_executor_url: str
     agent_timeout_ms: int
+    goal_interpreter_timeout_ms: int
     action_timeout_ms: int
     action_dry_run: bool
     enable_agent: bool
@@ -546,6 +547,12 @@ class HostSettingsSnapshot:
                 ),
                 agent_timeout_ms=_int(
                     values, "ORCH_AGENT_TIMEOUT_MS", 9000, minimum=100
+                ),
+                goal_interpreter_timeout_ms=_int(
+                    values,
+                    "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+                    9000,
+                    minimum=100,
                 ),
                 action_timeout_ms=_int(
                     values, "ORCH_ACTION_TIMEOUT_MS", 5000, minimum=100

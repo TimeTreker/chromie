@@ -258,7 +258,7 @@ Capabilities, or delegate HOW.
 | `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `gemma4:12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
-| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `5400`; per-invocation timeout for one WHAT-only Fast interpretation or one allowed source-based Deep GI interpretation. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
+| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | Common fallback `5400`; interactive `services`/`speech`/`voice_mujoco` modes use `60000`, while explicit qualification mode uses `120000`. This is the per-invocation watchdog for one complete WHAT-only Fast interpretation or one allowed source-based Deep GI interpretation; human-facing latency remains separately measured and is not used as a cognition kill switch. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
 | `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained GI request still excludes Capability catalog entries and canonical lifecycle IDs. |
 | `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
 | `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
@@ -452,7 +452,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | `9000` in common low-latency configuration and `150000` in explicit qualification mode. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
+| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | Common fallback `9000`; interactive `services`/`speech`/`voice_mujoco` modes use `65000`, while explicit qualification mode uses `150000`. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
 | `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout. Hardware profiles do not own it; explicit operator/validation modes may override it when collecting qualification evidence. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |

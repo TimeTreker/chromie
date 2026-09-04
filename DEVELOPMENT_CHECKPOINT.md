@@ -1,159 +1,132 @@
 # Chromie Development Checkpoint
 
-Status: Issue #35 Goal-driven Fast/Deep Planner single-authority correction,
-coverage design, and fixed-Codex offline qualification are complete through the current Fast corpus. Codex
-`gpt-5.6-sol` was the candidate Planner; no local/deployed model was invoked.
-After one prompt repair, 204/204 mechanical checks pass; same-model semantic
-review reports 201 pass, one partial, and two fail, all remaining findings at
-model inference. Independent review and training approval remain open.
+Status: the Goal-driven single-authority line remains current, and the
+2026-09-04 live `voice_mujoco` Goal Interpretation failure is
+source-fixed. Interactive modes now allow one complete GI transaction with a
+60 s Agent watchdog and a 65 s Host GI deadline; the previously declared Host
+deadline is now actually consumed by `AgentClient.interpret_turn()`. Startup
+instructions also stop promising a wake-up greeting when startup speech is
+disabled. Focused configuration/client tests and relevant Level-A scenarios
+pass. Post-fix live voice evidence is not yet retained.
+
+Issue #35 Planner single-authority correction and fixed-Codex offline
+qualification remain complete through Fast v33 and Deep v15. Codex
+`gpt-5.6-sol` was the fixed candidate Planner; no local Qwen/Ollama/vLLM model
+was used to optimize or evaluate the Planner.
 
 Updated: 2026-09-04; delivery branch: `main`
 
-Current evaluated revision: `04dd76fcb2c59f452bcd09cd2d6b5336e8e5b740`
-(`origin/main`, 0 ahead/0 behind before the current uncommitted qualification
-patch).
+Pre-delivery base: `255499292d0116b4c7277ce26143ecee5ac63440`
+(`origin/main`, clean and 0 ahead/0 behind before this repair).
 
 Active Issue: [#35 — Fast/Deep Planner prompt qualification and optimization](https://github.com/TimeTreker/chromie/issues/35).
 
-## User-visible defect and actual workflow
+## Reported failure and actual workflow
 
-The retained bundle is
-`.chromie/debug/debug_bundle_20260902_221509/`. For the admitted voice turn
-`你好。`, the model-authored semantic work was not the first wrong boundary.
+Retained bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260904_163700.tar.gz`
+(SHA-256 `22b13dabaa29f8094275d61639fa4e4094463d07dbfa33affbd2370ea065f85b`,
+revision `255499292d0116b4c7277ce26143ecee5ac63440`).
 
 ```text
-admitted voice turn
-  -> Goal Interpretation: one greeting Responsibility (correct)
-  -> Goal Association and Fast Planner start concurrently (correct invariant)
-       GA completes at 5903.1 ms
-       Fast emits a valid presentation commit at 7958.7 ms
-  -> outer cognitive-runtime watchdog fires at 9055.1 ms
-  -> in-flight workflow is cancelled before terminal Plan/response projection
-  -> generic failure speech: 咦，刚才没接上。你再跟我说一遍嘛。
-  -> later turns contend for the single qwen35 Ollama slot and GI returns ReadTimeout
+voice -> VAD/ASR -> Gateway Attention admits turn
+      -> Agent GI sends one gemma4:12b /api/chat request
+      -> 5400 ms Agent watchdog fires before the complete DTO exists
+      -> httpx.ReadTimeout -> Ollama request cancellation
+      -> typed GI unavailable / Host HTTP 503
+      -> fail-closed fallback speech -> ordered TTS playback
 ```
 
-| Boundary | Owner and material input | Actual output | Expected output | Verdict |
-|---|---|---|---|---|
-| Voice admission / GI | Gateway + GI; `你好。` | Addressed greeting; one speech Responsibility | Same | Correct |
-| GA | Goal Association; same immutable GI result | Valid greeting Goal at 5903.1 ms | Canonical Goal without delaying Fast launch | Correct |
-| Fast presentation | Planner; GI result and common catalog, launched with GA | Valid presentation commit at 7958.7 ms | Continue the same invocation to terminal Plan | Correct but interrupted downstream |
-| Runtime watchdog | Host cognitive runtime; concurrent GA/Fast workflow | Cancelled the legal workflow at 9055.1 ms | Development watchdog must cover the legal workflow; latency is measured separately | **Earliest wrong boundary** |
-| Failure projection | Host failure path | Generic reconnect wording | Preserve a truthful typed failure only after the workflow actually fails | Downstream symptom |
-| Subsequent GI calls | One-slot Ollama `qwen3.5:4b` | `ReadTimeout` under retained contention | Bounded provider completion or typed availability failure | Contributing condition |
+The same boundary failed for both retained turns:
 
-The fix preserves concurrent GA/Fast launch. It separates development workflow
-watchdogs from latency targets: Agent GA/Fast are 60 s, Deep 120 s; Host GA/Fast
-are 65 s, Deep 125 s; the outer cognitive runtime is 300 s. These values prevent
-the watchdog from relabelling a legal workflow as model failure. They do not turn
-slow interaction into a pass; latency remains a separate measured acceptance axis
-and can be tightened only from retained deployed evidence.
+- `30efe1a0`, `你好。`: GI failed after about 5.44 s.
+- `bbdc4c92`, `晚上重庆会不会下雨啊？`: GI failed after about 5.43 s.
 
-## Planner authority correction
+| Boundary | Actual evidence | Expected contract | Verdict |
+|---|---|---|---|
+| VAD / ASR | Both turns accepted; final text retained | Admit usable source audio/text | Correct |
+| Gateway Attention | Greeting and question admitted | Protectively filter, then admit addressed turns | Correct |
+| GI request | About 3.5K–3.8K prompt tokens sent to `gemma4:12b` | One complete WHAT-only DTO or typed provider failure | In flight |
+| Agent GI watchdog | Cancelled each request at the configured 5400 ms | Watchdog must cover one complete transaction; latency is measured separately | **Earliest wrong boundary** |
+| Host GI deadline | Dedicated key existed but was not consumed; generic 9000 ms remained | Host deadline must exceed the Agent GI deadline | Latent second wrong boundary |
+| Ollama 500/cancel | Appeared after the client timeout | Provider may finish or be cancelled by its client | Downstream symptom |
+| GA / Planner / weather | Never invoked | Run only after a valid GI result | Correctly absent |
+| Host fallback / TTS | Typed 503 became safe fallback; 2/2 chunks played | Fail closed without fabricated success | Correct containment |
 
-- Fast and Deep are passes of one Planner HOW authority. Each produces its full
-  semantic result in one primary invocation.
-- Forbidden Fast/Deep same-tier semantic repair, revision, critic, and
-  qualification calls are removed. Deep receives authoritative Goals/context,
-  not a Fast candidate or validator feedback.
-- Host validation is fail-closed and mechanical. It no longer restores or
-  rewrites wording, steps, arguments, timing, Goal coverage, satisfaction, IDs,
-  or candidate semantics.
-- Deep sees the complete bounded Capability catalog. It does not confuse a
-  missing composite provider with missing available component capabilities.
-- Fast schema/prompt contracts now require complete information-gap ownership,
-  exact catalog/default/confirmation semantics, and one two-frame streaming
-  transaction. Deep prompt contracts cover minimum satisfaction, conditional
-  read-before-effect composition, retryability evidence strength, and
-  cancellation semantics.
-- Numeric grounding uses authoritative typed Goal bindings rather than mining
-  arbitrary prose or ISO date fragments.
+Hybrid/SWA full-prompt reprocessing contributed latency. The early Agent warm
+DNS failure was not causal because launcher warm-up later succeeded and both
+models were resident. The silent startup was separately configured by
+`ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=0`; the launcher text, not runtime,
+was wrong to promise a greeting.
 
-## Coverage-designed corpora
+## Implemented repair
 
-The stale 1,500-case Fast cross-product was replaced because its count did not
-establish Planner ability coverage and much of its input no longer matched the
-current GA DTO. The maintained corpus is design-traced:
+- `services`, `speech`, and `voice_mujoco` own
+  `AGENT_GOAL_INTERPRETER_TIMEOUT_MS=60000` and
+  `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=65000`.
+- `CognitionSettings` parses the existing Host GI deadline and
+  `AgentClient.interpret_turn()` uses it. Attention and other generic Agent
+  requests retain `ORCH_AGENT_TIMEOUT_MS`.
+- Generated runtime manifests and startup budget summaries now expose both GI
+  deadlines.
+- The runtime-configuration inventory and documentation record the owners and
+  mode-specific values.
+- Launcher instructions condition the wake-up greeting claim on the existing
+  speech-enabled setting.
+- No model, prompt, context projection, Schema, DTO, retry policy, semantic
+  authority, or execution policy changed. No configuration key, document, or
+  architecture term was added.
 
-- Fast/shared: 204 cases = 17 Planner capacities × 3 controlled daily-life
-  situation families × supported/boundary contrast × English/Chinese.
-- Runtime entries: 72 canonical primary, 80 canonical re-entry, 52 streaming
-  advance; 102 cases per language; 51 contrast sets.
-- Splits: 120 train-candidate, 44 validation, 40 frozen-test. Every case remains
-  `training_eligible=false` and `independent_semantic_review=false`.
-- Fast scenario-tree SHA-256:
+This prevents a valid GI transaction from being relabelled as provider failure;
+it does not make a 60-second response acceptable. GI latency remains a separate
+acceptance axis and must be judged from retained deployed evidence.
+
+## Planner qualification retained
+
+- Fast v33: 204/204 process, Schema, Host, and hidden-target-region passes;
+  same-model review 201 pass, one partial, two fail.
+- Deep v15: 40/40 mechanical passes and 40/40 non-independent semantic review.
+- Fast corpus: 204 cases, 17 capacities, 51 bilingual contrast sets; tree digest
   `2650948b9027071c948bb75481d203104923b4aff2bfc33750288d350679c2d8`.
-- Deep: 40 independent extension cases spanning primary and re-entry semantics;
-  scenario-tree SHA-256:
+- Deep corpus: 40 cases; tree digest
   `a0c79e38cf4055b7021a4dcc1cbd0a2caec915872174d41e9c2bf153a4a7406a`.
+- Fast v33 artifact:
+  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v33-qualified-full/`.
+- Deep v15 artifact:
+  `.chromie/benchmarks/deep-planner/20260904T-deep-v15-qualified-full/`.
 
-This matrix demonstrates the named Planner capacities and controlled contrasts;
-it is not a claim of exhaustive daily life, statistical model reliability, live
-service behavior, or training-data approval.
+All Planner candidate/review evidence is fixed-Codex, same-model and
+non-independent. It is not deployed-model, statistical, training, voice,
+simulator, or robot evidence. SFT/QLoRA remains unauthorized.
 
-## Retained qualification evidence
+## Evidence completed for this repair
 
-| Evidence | Observed result | Qualification limit |
-|---|---|---|
-| Fast v21 predecessor | 204/204 process, Schema, Host, and hidden target-region passes; its post-hoc review passed 201/204 and exposed two date-rotted corpus inputs plus one unspecified-plan characterization defect | Same-model offline Codex surrogate on the immediately prior prompt/corpus |
-| Fast v22 focused repair | 1/1 process, Schema, Host, and hidden target-region pass for the unspecified-plan defect | Current prompt; focused same-model evidence only |
-| Fast v26 diagnostic | 204/204 processes and Schemas; 203 Host/target passes. The sole rejection showed a Chinese source `杭州` paired with invalid synthetic GI binding `Hangzhou` | Complete diagnostic on the pre-repair corpus; earliest wrong boundary was corpus input, not Planner |
-| Fast v27 focused corpus repair | 1/1 process, Schema, Host, and hidden target-region pass with source-faithful `杭州` | Focused same-model evidence; Planner source unchanged |
-| Fast v29 pre-change full rerun | 204/204 process, Schema, Host, and hidden target-region passes; post-hoc review 199 pass, 2 partial, 3 fail | Corrected corpus and pre-change prompt; diagnostic same-model evidence |
-| Fast v32 focused prompt repair | 1/1 process, Schema, Host, target-region, and manual semantic pass; supportive wording no longer invents user history, prior effort, or future success | Fixed `gpt-5.6-sol` candidate; focused same-model evidence |
-| Fast v33 current full rerun | 204/204 process, Schema, Host, and hidden target-region passes; 102/102 English, 102/102 Chinese; 72/72 primary, 80/80 re-entry, 52/52 streaming | Current corpus and prompt; fixed Codex candidate; zero timeout and no disallowed semantic repair |
-| Fast v33 post-hoc review | 201 pass, 1 partial, 2 fail across 51 contrast sets; all three findings are model inference against existing concise-rationale, exact-date, or Runtime-authorization contracts | Same-model and non-independent; not a full semantic qualification |
-| Deep v15 | 40/40 process, Schema, Host, and hidden target-region passes; 20 English/20 Chinese, 24 primary/16 re-entry | Same-model offline Codex surrogate only |
-| Deep v15 post-hoc review | 40/40 semantic passes | Same-model and non-independent |
-| Relevant General Ability Level A | 46/46 across eight Planner-related ability classes | Source-level Level A only |
-| Repository policy / ownership / docs | 15 rule families, 0 exceptions; ownership pass; 102 Markdown files pass | Static/source consistency only |
-| Canonical local gate | Final result recorded in `HANDOFF.md` | Local automated evidence only |
+- Focused configuration/client suite: 83 passed, 43 subtests passed.
+- General Ability Level A: 12/12 across `planner_goal_semantic_quality` and
+  `robust_intent_understanding`.
+- Actual RTX 5090 `voice_mujoco` generation resolved Agent GI 60000 ms and Host
+  GI 65000 ms in both `.env.runtime` and the runtime manifest.
+- Full repository gates and final commit identity are recorded in `HANDOFF.md`.
 
-- Current Fast production-files SHA-256: `c751adc530dd06241d7b86ec857e465f0aada1911875b01982c21bcc5057279f`;
-  prompt SHA-256: `14aa76efe559674234d91512b61e604f49e2e64aa5b985e328fe46a6b1b13d1f`.
-- Fast v33 current full proof:
-  `.chromie/benchmarks/fast-planner/20260904T-resume-fast-v33-qualified-full/`;
-  root adjudication: `semantic-review-codex-v1/root-adjudication.json`.
-- Deep v15: `.chromie/benchmarks/deep-planner/20260904T-deep-v15-qualified-full/`;
-  production-files SHA-256: `482b22aea8cb3eadf4bb2fbb25e6dda2f219d061e57513850286c18d6a34d495`.
-
-Never promote v12/v14/v16/v23/v24/v25/v28/v31. V17/v19/v26 exposed corpus
-defects; v21 and v29 are complete diagnostic predecessors, not proof for the
-current prompt. V31 was intentionally not run because prompt rendering exposed
-the rule in only one Fast branch before candidate inference.
-
-## Candidate-model and training boundary
-
-The candidate Planner is fixed as Codex `gpt-5.6-sol`; only its surrounding
-semantic transaction is in scope. Calls were target-blind, one per case, high
-reasoning, without retry. Separate same-model review is non-independent.
-
-Historical Qwen/Ollama/vLLM evidence remains context only and was not invoked,
-extended, or used as a proxy in this work. QLoRA/SFT remains unauthorized: all
-retained cases are training-ineligible and lack independent semantic review.
+No post-fix deployed service, live text, physical microphone/speaker, simulator,
+or robot run has been claimed.
 
 ## Resume point
 
-1. Obtain independent human or separately authorized model review of Fast v33
-   and Deep v15. Do not treat same-model review as semantic truth or training
-   approval.
-2. Preserve the fixed Codex candidate if Planner qualification continues. For
-   each retained failure, change Prompt/context/Schema/DTO/Host/corpus only when
-   evidence identifies that surface as the earliest wrong boundary; do not tune,
-   compare, or proxy the candidate with a local model.
-3. Do not add redundant prompt clauses or semantic Host keyword repair for the
-   three v33 findings: their governing contracts are already explicit. Retain
-   them as fixed-model inference variance and as independent-review probes.
-4. Rebuild the current revision and retain the complete live voice cohort plus
-   exactly one debug bundle. Physical microphone/speaker and robot proof remain
-   supervised evidence gaps.
+1. Rebuild/recreate the Agent and restart the Host from the committed revision;
+   generated `.env.runtime` must show GI 60000/65000 ms.
+2. Run the originating greeting and weather probes through one unchanged live
+   cohort, then collect exactly one debug bundle and judge both semantics and
+   latency. Do not average any hard integrity failure into a pass.
+3. Treat a completed but slow GI result as a latency failure, not as evidence to
+   restore a 5.4-second cognition kill switch.
+4. Preserve fixed Codex for any continued Planner qualification. Independently
+   review Fast v33 and Deep v15 before any training decision.
 
 ## Claim boundary
 
-This working tree closes the reproduced watchdog defect, Planner
-single-authority source defects, coverage-designed offline corpora, Deep
-same-model offline qualification, the supportive-speech Fast prompt gap, and
-current-corpus Fast mechanical qualification with a fixed Codex candidate. It
-does not establish independent semantic truth, statistical model reliability,
-SFT data, deployed/local-model behavior, live voice, simulator, target hardware,
-physical safety, release readiness, or customer-visible behavior.
+The source/configuration repair closes the reproduced premature GI cancellation
+mechanism and the latent Host deadline mismatch. Automated tests prove wiring,
+generation, ownership, and fail-closed contracts only. Live post-fix behavior,
+semantic quality of the deployed GI model, end-to-end latency, simulator/robot
+execution, physical safety, and release readiness remain unproven.
