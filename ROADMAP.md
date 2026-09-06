@@ -18,25 +18,25 @@ organized by capability, risk, and retained evidence.
 
 ## Current execution order
 
-The current-revision implementation/qualification axes remain separate. Phases 1 through 5
-are source-closed in the maintained tree; they are not requests to re-implement those
-migrations. Continue in this order:
+The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit reopens a bounded source-correctness slice at the GA/Fast/Runtime transaction boundary; it does **not** reopen the overall authority architecture. The findings and evidence boundary are recorded in [Current Status](docs/STATUS.md#2026-09-06-source-audit-correction). Continue in this order:
 
-1. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
+1. **Close the audited source transaction defects before target promotion.** Make the full maintained test tree collectible, preserve the complete GI Responsibility set into GA, reject GA semantic repair, validate every early `PresentationCommit` against current-request constraints before observable delivery, require a material state change for Fast re-decision, and preserve completed GA commit truth on failure paths.
+2. **Run a clean current-revision source gate with explicit collection evidence.** Record the revision, complete test collection counts, policy/static gates, and focused regressions for the audited failure interleavings.
+3. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
    and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
    Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
    behavior, duplicate-effect prevention, Planner-owned auxiliary social decoration,
    and latency.
-2. **Qualify the implemented Fast-Planner presentation boundary before final Prompt/model
+4. **Qualify the repaired Fast-Planner presentation boundary before final Prompt/model
    promotion.** Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the one
    streaming Fast Planner invocation and early typed immutable presentation commit. The
    separate endpoint/DTO/model path is removed; run source gates and measure the single
    production path's provider/model integrity, latency, and resource behavior before
    optimizing its Prompt or selecting the final Fast-Planner model.
-3. **Keep implementation, automated verification, target validation, and release readiness
+5. **Keep implementation, automated verification, target validation, and release readiness
    separate.** A source-closed architecture slice does not qualify microphone, provider,
    simulator, model quality, or latency behavior.
-4. **Reopen structural work only for a concrete ownership seam or defect.** File or method
+6. **Reopen structural work only for a concrete ownership seam or defect.** File or method
    count remains evidence of reconstructability cost, not permission to create another
    semantic manager or perform decomposition for its own sake.
 

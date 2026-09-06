@@ -1,13 +1,6 @@
 # Chromie Development Checkpoint
 
-Status: the current Goal-driven single-authority focus and active Issue #35
-delivery line have RTX 4090 Level-C-preview evidence for exact `你好。`. The prior Goal
-Interpretation watchdog failure is closed in source, and this continuation
-repaired the next deployed transport boundary: generic Agent semantic roles and
-warm-up now use Ollama `/api/chat` rather than the non-responsive
-`/api/generate` plus `think:false` transaction observed on Ollama 0.33.2. A
-repaired warm-up also establishes the 32K context required by Goal Association
-and Fast Planner.
+Status: the current Goal-driven single-authority focus remains authoritative. RTX 4090 Level-C-preview evidence reaches GI/GA/Fast after the Ollama `/api/chat` and 32K warm-up repair, but the deployed Qwen profile remains unqualified and the 2026-09-06 source audit reopens a bounded GA/Fast/Runtime correctness slice before further promotion.
 
 The greeting still does not succeed. With transport and context residency
 working, deployed `qwen3.5:4b` now reaches Fast Planner but incorrectly maps the
@@ -18,11 +11,15 @@ aggregate then hard-passed only 5 cases and placed 35 primary failures at Fast
 Planner output or communicative coverage. The fixed-Codex Fast v33
 qualification did not evaluate or qualify this deployed Qwen profile.
 
-Updated: 2026-09-05; branch: `main`
+Updated: 2026-09-06; branch: `main`
 
 Pre-delivery base: `46b6fe90a36179e63da36f086ac2b04ed8e7b3c1`; `main == origin/main` before this continuation. Expected resume revision: the latest normal `main` commit containing this checkpoint and `HANDOFF.md` after the authorized fast-forward push.
 
 Active Issue: [#35 — Fast/Deep Planner prompt qualification and optimization](https://github.com/TimeTreker/chromie/issues/35).
+
+## 2026-09-06 source-audit correction
+
+Before further Qwen/profile qualification, close the bounded source transaction defects recorded in `docs/STATUS.md`: incomplete main-test collection, lossful GA Responsibility projection, GA semantic normalization, incomplete request-specific validation before early speech, no-state-change Fast re-decision, and failure responses that can omit already-committed GA state. The previous source-closure wording is superseded. Resume order is: collect/regress all maintained tests; close GA input/semantic and Fast pre-effect boundaries; close re-decision/commit reconciliation; run a clean source gate with explicit collection counts; then resume model/provider and live qualification.
 
 ## Current exact workflow
 

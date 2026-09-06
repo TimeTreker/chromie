@@ -1,14 +1,18 @@
 # Chromie Current Status
 
-**Updated:** 2026-09-05
-**Current focus:** The Goal-driven single-authority path now covers Goal Interpretation, Goal Association, and Fast/Deep Planner. Fast v33 and Deep v15 complete fixed-Codex offline qualification, while independent semantic review remains open. Current RTX 4090 Level-C-preview evidence closes an Ollama Agent endpoint/context-residency blocker but hard-passes only 5/51 must-pass cases on the all-`qwen3.5:4b` profile. The exact `你好。` case repeats an invalid clock-Capability selection and a 10.685-second Fast commit; later supervised device-mode diagnostics reproduce that Fast failure and a separate GI provenance failure. Clean committed-revision qualification, semantic review, normal live voice, simulator, and robot behavior remain separate evidence claims.
+**Updated:** 2026-09-06
+**Current focus:** The Goal-driven single-authority architecture remains the target, but the current source is not yet closed at the GA/Fast/Runtime transaction boundary. The 2026-09-06 archive audit identifies six open defects: GA semantic normalization that can repair model meaning, no-state-change Fast re-decision after `unavailable`/`refused`, incomplete request-specific validation before streamed speech is released, incomplete main-test collection, silent truncation of authoritative GI Responsibilities in the GA prompt, and failure results that can omit already-committed GA state. These source defects must close before further model/profile promotion. Existing RTX 4090 all-`qwen3.5:4b` evidence remains diagnostic (5/51 must-pass hard-passes) and does not qualify release behavior. The detailed corrective boundary is recorded below.
 
-This file contains current facts only. Historical implementation narratives,
-superseded architecture, old test totals, and revision-specific diagnostics belong in
-Git history, `CHANGELOG.md`, retained evidence bundles, and archived reports. Historical
-evidence remains useful for the exact revision it records, but it does not define the
-current architecture or qualify later source automatically.
-
+## 2026-09-06 source-audit correction
+Review of the current repository archive reopens a bounded source-correctness slice without changing the target authority architecture. Six findings remain open:
+- **A01 / blocker — GA semantic repair:** pre-validation normalization can delete an ungrounded resource-query location or reclassify a model-authored binding from one semantic category to another. Schema-only normalization remains valid, but semantic/grounding conflicts must stay visible and fail closed.
+- **A02 / blocker — Fast re-decision without new state:** streamed `unavailable`/`refused` can enter a second full Fast `resolve_fast_plan()` even when there is no Goal/Work/Evidence revision reason. Re-entry must require a distinct material trigger.
+- **A03 / blocker — early observable speech validation:** the first streamed `PresentationCommit` is released after generic DTO/ref/mode checks, while complete request-specific validation occurs only after the terminal frame. Any ordering, unresolved-meaning, or phase constraint knowable at commit time must be validated before Host vocal realization starts.
+- **A04 / high — incomplete main-test collection:** `scripts/run_tests.sh` runs `unittest discover` for `tests/`; this archive contains 150 top-level pytest-style `test_*` functions across 25 files in addition to 2058 class test methods. The green gate therefore does not prove those 150 functions executed.
+- **A05 / high — lossful authoritative GA input:** `build_association_prompt()` renders the complete GI Responsibility array through `bounded_json(..., 2600)`, whose list policy silently keeps only a fitting prefix. Required current-turn Responsibility evidence must be lossless; optional context should be bounded first, otherwise the transaction must fail explicitly for capacity.
+- **A06 / high — committed GA truth can disappear from an error result:** GA may commit canonical Goal state concurrently, then Fast may fail before the main coroutine consumes the completed GA task result. Cleanup retrieves the task but can still finish with local `association=None` and empty `goal_state_results`. Failure projection must reconcile already-committed Goal truth without pretending the Goal was cancelled or completed.
+These findings also correct two over-strong documentation claims: GA source closure and streamed Planner source/contract closure are not complete until A01/A03 close. Existing RTX 4090 model evidence remains useful only after these harness defects are removed, because changing the model or serving backend cannot repair them.
+Corrective order: (1) make the complete maintained test tree collectible and add focused regressions for A01–A06; (2) make GA authoritative input lossless, reject semantic correction, and close the pre-effect commit validator; (3) require material state for Fast re-decision and reconcile completed GA state on every failure/cancellation path; (4) run a clean full source gate with explicit collection counts; (5) only then resume model/provider/voice/simulator qualification.
 ## Current architecture
 
 The maintained authority line is:
@@ -83,10 +87,7 @@ reviewer/semantic-repair chains. GI source now follows that contract: its primar
 result carries per-Responsibility source-token evidence, resolved valid meaning uses
 one model call, genuine unresolved meaning may delegate once to source-based Deep GI,
 and every invalid primary or Deep DTO fails closed without a same-authority repair.
-Goal Association now follows the same single-authority
-rule: its primary result owns the complete continuity transaction, a Pydantic-invalid
-DTO may receive one mechanical JSON repair, and trusted conservation/grounding checks
-cannot trigger another model. When retained candidates exist, associations and independent
+Goal Association is intended to follow the same single-authority rule: its primary result owns the complete continuity transaction and trusted conservation/grounding checks cannot trigger another semantic model call. The 2026-09-06 source audit found that pre-validation normalizers can still delete or reclassify model-authored semantic fields, so GA source closure is **not yet complete**; semantic/grounding conflicts must remain visible and fail closed rather than be normalized into acceptance. When retained candidates exist, associations and independent
 new Goals are non-exclusive collections in that one result, with every accepted GI
 Responsibility conserved exactly once across their union; the obsolete exclusive branch
 discriminant is removed. Fast and Deep Planner now also close truth, Goal coverage,
@@ -110,8 +111,7 @@ CanonicalPlan carry the same commit identity and cannot duplicate or re-author s
 The separate post-resolution Social Attention bridge has now been removed:
 `PresentationCommit`, terminal Fast output, and canonical Fast/Deep primary outputs own
 optional `auxiliary_activities[]` directly under exact primary anchors.
-This amendment is source/contract closure, not target behavior, audible voice, executed
-simulation, or hardware evidence.
+The streaming architecture and terminal validation are implemented, but the 2026-09-06 audit found that the first released `PresentationCommit` is not yet checked against every request-specific pre-terminal constraint before Host vocal realization can start. This is therefore **not yet complete source/contract closure**; target behavior, audible voice, simulation, and hardware qualification remain separately open.
 Core/challenge did not start; release readiness remains development only.
 
 The RTX 4090 Laptop profile now assigns every LLM role to one `qwen3.5:4b` runner.
