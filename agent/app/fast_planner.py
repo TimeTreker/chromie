@@ -110,6 +110,68 @@ PRESENTATION_COMMIT_CLOSE = "</presentation_commit>"
 TERMINAL_PLAN_OPEN = "<terminal_plan>"
 TERMINAL_PLAN_CLOSE = "</terminal_plan>"
 
+
+
+def validate_presentation_commit_request_scope(
+    activity: Any,
+    *,
+    responsibilities: list[CognitiveResponsibilityProposal],
+    interpretation_unresolved: list[str],
+) -> None:
+    """Reject an early observable Activity that is invalid for this exact turn.
+
+    The streaming transport is free-form text, so the dynamic presentation Schema
+    is prompt guidance rather than a decoder-enforced boundary.  Re-run the small
+    request-specific subset that can make an already validated DTO unsafe to yield
+    before terminal-plan validation.
+    """
+
+    if activity is None:
+        return
+    if any(str(item or "").strip() for item in interpretation_unresolved):
+        raise PlannerDTOContractError(
+            "PresentationCommit must remain silent while GI meaning is unresolved"
+        )
+    if getattr(activity, "role", None) != "complete_response":
+        return
+
+    by_ref = {item.local_ref: item for item in responsibilities}
+
+    def sibling_refs(value: Any) -> set[str]:
+        values = value if isinstance(value, list) else [value]
+        return {
+            str(item).strip()
+            for item in values
+            if str(item).strip() in by_ref
+        }
+
+    blocked_speech_refs: set[str] = set()
+    for item in responsibilities:
+        if item.output_mode != "speech":
+            continue
+        if (
+            sibling_refs(item.bindings.get("after"))
+            or sibling_refs(item.bindings.get("follows"))
+            or sibling_refs(item.bindings.get("parallel_with"))
+        ):
+            blocked_speech_refs.add(item.local_ref)
+    for item in responsibilities:
+        for target_ref in (
+            sibling_refs(item.bindings.get("before"))
+            | sibling_refs(item.bindings.get("precedes"))
+            | sibling_refs(item.bindings.get("parallel_with"))
+        ):
+            target = by_ref.get(target_ref)
+            if target is not None and target.output_mode == "speech":
+                blocked_speech_refs.add(target_ref)
+
+    invalid_refs = set(activity.source_responsibility_refs) & blocked_speech_refs
+    if invalid_refs:
+        raise PlannerDTOContractError(
+            "PresentationCommit cannot complete ordered or synchronized speech "
+            "before terminal planning: " + ",".join(sorted(invalid_refs))
+        )
+
 def presentation_commit_id(request: CognitiveWorkRequest) -> str:
     responsibility_refs = "|".join(
         str(item.local_ref) for item in request.responsibilities
@@ -380,6 +442,11 @@ class FastPlannerResolver:
                     )
                 )
                 activity = presentation.activity
+                validate_presentation_commit_request_scope(
+                    activity,
+                    responsibilities=responsibilities,
+                    interpretation_unresolved=list(request.interpretation_unresolved),
+                )
                 if activity is not None:
                     refs = set(activity.source_responsibility_refs)
                     if not refs or not refs.issubset(set(responsibility_refs)):

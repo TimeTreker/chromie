@@ -779,8 +779,10 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "goal_association.fresh_interpretation",
                 "goal_association.responsibility_coverage_final",
                 "_validate_coverage_certificate",
+                "drop_ungrounded_resource_query_locations(",
+                "normalize_grounded_binding_types(",
             ),
-            "Goal Association may not restore a same-authority coverage, reviewer, resegmentation, or final-audit model call",
+            "Goal Association may not restore same-authority review or trusted semantic repair of the primary result",
         ),
         "agent/app/goal_association_contract.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,

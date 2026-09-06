@@ -83,9 +83,7 @@ from .goal_association_schema import goal_association_response_schema
 from .goal_association_validation import (
     action_collection_bindings,
     binding_semantic_contract_conflicts,
-    drop_ungrounded_resource_query_locations,
     non_verbatim_explicit_location_bindings,
-    normalize_grounded_binding_types,
     normalize_optional_referent_updates,
     normalize_optional_resource_quantity,
     normalize_resource_binding_branches,
@@ -211,8 +209,6 @@ class GoalAssociationResolver:
         optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
         invalid_optional_quantity_recovery: list[dict[str, Any]] = []
-        ungrounded_resource_location_recovery: list[dict[str, Any]] = []
-        generic_location_type_recovery: list[dict[str, Any]] = []
         missing_description_recovery: list[dict[str, Any]] = []
 
         async def invoke(
@@ -260,16 +256,6 @@ class GoalAssociationResolver:
                 normalized
             )
             invalid_optional_quantity_recovery.extend(recovered)
-            normalized, recovered = drop_ungrounded_resource_query_locations(
-                normalized,
-                request=request,
-            )
-            ungrounded_resource_location_recovery.extend(recovered)
-            normalized, recovered = normalize_grounded_binding_types(
-                normalized,
-                request=request,
-            )
-            generic_location_type_recovery.extend(recovered)
             normalized, recovered = restore_missing_goal_descriptions(
                 normalized,
                 request=request,
@@ -375,20 +361,6 @@ class GoalAssociationResolver:
                     "dropped_count": len(invalid_optional_quantity_recovery),
                     "entries": invalid_optional_quantity_recovery,
                 }
-            if ungrounded_resource_location_recovery:
-                metadata["source_grounding_recovery"] = {
-                    "field": "new_goals[].resource_responsibility.query_scope",
-                    "strategy": "drop_unentailed_location_query_fact",
-                    "dropped_count": len(ungrounded_resource_location_recovery),
-                    "entries": ungrounded_resource_location_recovery,
-                }
-            if generic_location_type_recovery:
-                metadata["generic_location_type_recovery"] = {
-                    "field": "new_goals[].semantic_bindings[].entity_type",
-                    "strategy": "normalize_grounded_generic_location_type",
-                    "changed_count": len(generic_location_type_recovery),
-                    "entries": generic_location_type_recovery,
-                }
             if missing_description_recovery:
                 metadata["missing_description_recovery"] = {
                     "field": "new_goals[].description",
@@ -456,20 +428,6 @@ class GoalAssociationResolver:
                     "strategy": "normalize_inactive_resource_binding_branch",
                     "dropped_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
-                }
-            if ungrounded_resource_location_recovery:
-                metadata["source_grounding_recovery"] = {
-                    "field": "new_goals[].resource_responsibility.query_scope",
-                    "strategy": "drop_unentailed_location_query_fact",
-                    "dropped_count": len(ungrounded_resource_location_recovery),
-                    "entries": ungrounded_resource_location_recovery,
-                }
-            if generic_location_type_recovery:
-                metadata["generic_location_type_recovery"] = {
-                    "field": "new_goals[].semantic_bindings[].entity_type",
-                    "strategy": "normalize_grounded_generic_location_type",
-                    "changed_count": len(generic_location_type_recovery),
-                    "entries": generic_location_type_recovery,
                 }
             if missing_description_recovery:
                 metadata["missing_description_recovery"] = {

@@ -11,6 +11,8 @@ from unittest import mock
 from pathlib import Path
 
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+from agent.app.fast_planner import validate_presentation_commit_request_scope
+from agent.app.planner_model_contract import PlannerDTOContractError
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveEvidenceRecorder,
@@ -30,7 +32,10 @@ from shared.chromie_contracts.execution_outcome import (
     claim_qualification_policy_sha256,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CoreInterpretationResult,
+)
 from shared.chromie_contracts.user_turn import AttentionReviewResult
 from shared.chromie_contracts.interaction import output_schema_sha256
 from shared.chromie_contracts.mind import default_mind_profile
@@ -484,6 +489,63 @@ def walk_definition() -> CapabilityDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
+    def test_presentation_commit_rejects_ordered_complete_response_before_yield(self):
+        body = CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="nod once",
+            output_mode="body_action",
+            confidence=1.0,
+        )
+        speech = CognitiveResponsibilityProposal(
+            local_ref="r2",
+            outcome="say hello",
+            output_mode="speech",
+            bindings={"after": ["r1"]},
+            confidence=1.0,
+        )
+        activity = FastPlannerCompleteResponseAct(
+            activity_id="speak-too-early",
+            role="complete_response",
+            text="你好！",
+            speech_act="greeting",
+            source_responsibility_refs=["r2"],
+        )
+
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "ordered or synchronized speech",
+        ):
+            validate_presentation_commit_request_scope(
+                activity,
+                responsibilities=[body, speech],
+                interpretation_unresolved=[],
+            )
+
+    def test_presentation_commit_rejects_any_activity_while_gi_meaning_unresolved(self):
+        responsibility = CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="answer after resolving the referent",
+            output_mode="speech",
+            confidence=0.7,
+        )
+        activity = FastPlannerCompleteResponseAct(
+            activity_id="answer-too-early",
+            role="complete_response",
+            text="好的。",
+            speech_act="respond",
+            source_responsibility_refs=["r1"],
+        )
+
+        with self.assertRaisesRegex(
+            PlannerDTOContractError,
+            "GI meaning is unresolved",
+        ):
+            validate_presentation_commit_request_scope(
+                activity,
+                responsibilities=[responsibility],
+                interpretation_unresolved=["which person the user means"],
+            )
+
     def test_new_resource_goal_preserves_one_fast_decision_and_binds_goal_id(self):
         advance = FastPlannerAdvance(
             turn_id="turn-perception",
