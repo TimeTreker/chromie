@@ -91,7 +91,6 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
     deep_prompt = planner_prompt.deep_plan_prompt(
         request,
         [],
-        feedback=[],
         response_schema={},
         expected_goal_ids=["goal-weather"],
     )

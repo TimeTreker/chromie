@@ -1,6 +1,6 @@
 # Chromie Development Checkpoint
 
-Status: the current Goal-driven single-authority focus remains authoritative. RTX 4090 Level-C-preview evidence reaches GI/GA/Fast after the Ollama `/api/chat` and 32K warm-up repair, but the deployed Qwen profile remains unqualified and the 2026-09-06 source audit reopens a bounded GA/Fast/Runtime correctness slice before further promotion.
+Status: the current Goal-driven single-authority focus remains authoritative. The 2026-09-06 bounded transaction-fidelity implementation has source-closed audit findings A01–A06 without adding a new semantic owner. RTX 4090 Level-C-preview evidence still reaches GI/GA/Fast after the Ollama `/api/chat` and 32K warm-up repair, but that deployed Qwen profile remains unqualified. The next gate is a clean revision-bound full source qualification with pinned tooling and complete pytest collection, followed by frozen model/provider qualification.
 
 The greeting still does not succeed. With transport and context residency
 working, deployed `qwen3.5:4b` now reaches Fast Planner but incorrectly maps the
@@ -17,9 +17,9 @@ Pre-delivery base: `46b6fe90a36179e63da36f086ac2b04ed8e7b3c1`; `main == origin/m
 
 Active Issue: [#35 — Fast/Deep Planner prompt qualification and optimization](https://github.com/TimeTreker/chromie/issues/35).
 
-## 2026-09-06 source-audit correction
+## 2026-09-06 transaction-fidelity source closure
 
-Before further Qwen/profile qualification, close the bounded source transaction defects recorded in `docs/STATUS.md`: incomplete main-test collection, lossful GA Responsibility projection, GA semantic normalization, incomplete request-specific validation before early speech, no-state-change Fast re-decision, and failure responses that can omit already-committed GA state. The previous source-closure wording is superseded. Resume order is: collect/regress all maintained tests; close GA input/semantic and Fast pre-effect boundaries; close re-decision/commit reconciliation; run a clean source gate with explicit collection counts; then resume model/provider and live qualification.
+A01–A06 are source-closed in the current worktree: live GA no longer semantically repairs rejected model meaning; `unavailable/refused` are terminal Fast decisions unless canonical state materially changes; early `PresentationCommit` is request-scope validated before vocal release; the main test tree uses pytest collection; both live GA prompt paths preserve the complete authoritative GI Responsibility projection or fail explicitly for capacity; and downstream failure cleanup preserves any GA state already committed. Focused evidence includes PR7 71 passed plus 2 subtests, the A05/A06 focused set 153 passed plus 2 subtests, the migrated hidden-test set 94 passed plus 2 subtests, Level-A `multi_goal_daily_life` 10/10, and one broad partition 475 passed plus 50 subtests. A separate large partition exceeded the audit environment command timeout, so the full canonical source gate remains explicitly open. Resume order: clean checkout + pinned `./scripts/run_tests.sh` with exact collection counts; then frozen transaction model/provider qualification; then live voice/simulator/provider latency qualification.
 
 ## Current exact workflow
 

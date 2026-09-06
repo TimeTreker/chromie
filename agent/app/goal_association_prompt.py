@@ -21,7 +21,7 @@ from .goal_association_contract import (
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
 )
-from .prompt_projection import bounded_json
+from .prompt_projection import bounded_json, required_json
 
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -115,12 +115,13 @@ def build_segmentation_prompt(
         if identity_json != "null"
         else ""
     )
-    responsibilities_json = bounded_json(
+    responsibilities_json = required_json(
         [
             item.model_dump(mode="json", exclude_none=True)
             for item in request.responsibilities
         ],
-        4200,
+        16000,
+        label="GI Responsibility evidence",
     )
     return (
         "There are no active or retained recent Goals. Association is impossible; "
@@ -437,7 +438,7 @@ def build_association_prompt(
         "Candidate Goal semantic evidence JSON:\n"
         f"{bounded_json(association_goal_projection(candidate_goals), 2600)}\n\n"
         "GI Responsibility evidence JSON:\n"
-        f"{bounded_json(responsibilities, 2600)}\n\n"
+        f"{required_json(responsibilities, 16000, label='GI Responsibility evidence')}\n\n"
         "GI unresolved-meaning evidence JSON:\n"
         f"{bounded_json(request.interpretation_unresolved, 800)}\n\n"
         "Goal interaction evidence JSON:\n"

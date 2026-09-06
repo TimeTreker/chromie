@@ -6,6 +6,7 @@ from agent.app import goal_association_prompt as ga_prompt
 
 import asyncio
 import copy
+import json
 import unittest
 
 from jsonschema import Draft202012Validator
@@ -1916,6 +1917,33 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertEqual(query_scope[0]["entity_type"], "temporal_scope")
         self.assertEqual(query_scope[0]["value"], "现在")
         self.assertTrue(repaired[0]["source_pair_grounded"])
+
+    def test_goal_segmentation_prompt_preserves_all_authoritative_responsibilities(self):
+        outcomes = [
+            f"responsibility {index}: " + ("material semantic detail " * 10)
+            for index in range(1, 9)
+        ]
+        req = request(
+            "Handle all eight independent responsibilities.",
+            language="en-US",
+            responsibility_outcomes=outcomes,
+        )
+
+        prompt = ga_prompt.build_prompt(
+            req,
+            [],
+            output_type=GoalSegmentationModelOutput,
+        )
+
+        label = "Responsibility evidence JSON:\n"
+        payload_text = prompt.split(label, 1)[1].split("\n\n", 1)[0]
+        payload = json.loads(payload_text)
+        self.assertGreater(len(payload_text), 2600)
+        self.assertEqual(
+            [item["local_ref"] for item in payload],
+            [f"r{index}" for index in range(1, 9)],
+        )
+        self.assertIn(outcomes[-1].strip(), prompt)
 
     def test_goal_association_prompt_uses_gateway_original_user_wording(self):
         req = request("今晚，重庆热不热？")

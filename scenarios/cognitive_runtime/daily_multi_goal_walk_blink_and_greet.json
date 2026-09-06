@@ -269,7 +269,6 @@
     "calls": [
       "goal_association",
       "fast_stream",
-      "fast_plan",
       "deep_plan"
     ]
   },

@@ -17,6 +17,7 @@ and `DEVELOPMENT_CHECKPOINT.md` override chat history.
   handoff and `DEVELOPMENT_CHECKPOINT.md` after the authorized fast-forward push.
 - Delivery target: fast-forward `main` to `origin/main`, then verify the remote ref.
 - Active Issue: [#35](https://github.com/TimeTreker/chromie/issues/35).
+- 2026-09-06 transaction-fidelity continuation: A01–A06 are source-closed in the current worktree. The next evidence gate is a clean checkout with pinned dependencies running `./scripts/run_tests.sh` and recording the full pytest collection/pass counts before any model/profile promotion.
 - Scope: deliver the transport, warm-up, scenario, test, status, checkpoint,
   and handoff changes listed below in one revision.
 
@@ -34,6 +35,21 @@ tests/test_ollama_client.py
 tests/test_runtime_reliability_stage4.py
 DEVELOPMENT_CHECKPOINT.md
 HANDOFF.md
+```
+
+## 2026-09-06 transaction-fidelity continuation
+
+The archive audit found six implementation mismatches without changing the target authority architecture. The current worktree removes live GA semantic repair, makes terminal Fast limitations/refusals final unless canonical state materially changes, validates request-specific early speech before release, switches the main test tree to pytest collection and migrates stale hidden tests/scenarios, makes authoritative GI Responsibility projection lossless in both GA prompt paths, and reconciles completed GA commit truth into downstream error results.
+
+Focused evidence retained in this work session: PR7 71 passed plus 2 subtests; A05/A06 focused 153 passed plus 2 subtests; migrated hidden-test focused set 94 passed plus 2 subtests; Level-A `multi_goal_daily_life` 10/10; one broad pytest partition 475 passed plus 50 subtests. Another broad partition exceeded this execution environment's command timeout, so this handoff does **not** claim a complete canonical gate. Run the pinned full gate on the destination checkout before delivery/promotion.
+
+Next commands after applying the patch:
+
+```bash
+python -m pip install -r requirements-test.txt
+./scripts/run_tests.sh
+python scripts/general_ability_acceptance.py --mode level-a --ability-class multi_goal_daily_life --no-write
+git diff --check
 ```
 
 ## What was reproduced

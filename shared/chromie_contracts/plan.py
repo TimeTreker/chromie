@@ -1232,8 +1232,16 @@ class CanonicalPlan(BaseModel):
             if self.steps:
                 raise ValueError("non-complete plans must not carry executable steps")
             if self.planner_tier == "fast":
-                if self.disposition not in {"escalate", "clarify"}:
-                    raise ValueError("partial or uncertain fast plans must clarify or escalate")
+                if self.disposition not in {
+                    "escalate",
+                    "clarify",
+                    "unavailable",
+                    "refused",
+                }:
+                    raise ValueError(
+                        "partial or uncertain fast plans must clarify, escalate, "
+                        "report unavailable, or refuse"
+                    )
                 if self.disposition == "escalate" and not self.escalation_reason:
                     raise ValueError("escalating plans require escalation_reason")
             elif self.disposition not in {"clarify", "unavailable", "refused"}:

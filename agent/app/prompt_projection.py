@@ -29,6 +29,24 @@ def _bounded_scalar(value: Any, max_chars: int) -> str:
     return best or "null"
 
 
+
+def required_json(value: Any, max_chars: int, *, label: str) -> str:
+    """Return one required prompt projection losslessly or fail explicitly.
+
+    Use this for authoritative transaction inputs whose omission would change the
+    model's decision surface. Optional/background prompt context may still use
+    ``bounded_json``.
+    """
+
+    max_chars = max(4, int(max_chars))
+    text = _encode(value)
+    if len(text) > max_chars:
+        raise ValueError(
+            f"{label} exceeds required prompt projection budget: "
+            f"chars={len(text)} max_chars={max_chars}"
+        )
+    return text
+
 def bounded_json(value: Any, max_chars: int) -> str:
     """Return valid bounded JSON without slicing a serialized structure.
 

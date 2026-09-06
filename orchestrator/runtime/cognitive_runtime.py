@@ -57,6 +57,8 @@ from shared.chromie_contracts.plan import (
     PlannerInformationGap,
     PlannedCommunicativeAct,
     RespondGoalPlanOutcome,
+    RefusedGoalPlanOutcome,
+    UnavailableGoalPlanOutcome,
     fast_planner_activity_request_id,
     canonical_plan_fingerprint,
 )
@@ -3047,9 +3049,9 @@ class GoalDrivenRuntimeCoordinator:
             raise ValueError(
                 "Fast Planner terminal result must reference its PresentationCommit"
             )
-        if advance.disposition in {"escalate", "unavailable", "refused"}:
+        if advance.disposition == "escalate":
             raise ValueError(
-                "non-terminal Fast Planner advance cannot become a canonical Activity Plan"
+                "escalating Fast Planner advance cannot become a terminal canonical Plan"
             )
         refs_to_goals = cls._goal_ids_by_responsibility(association)
         missing_refs = sorted(
@@ -3221,6 +3223,32 @@ class GoalDrivenRuntimeCoordinator:
                         rationale="No Capability Evidence is required for this Goal.",
                     )
                 )
+            elif advance.disposition == "unavailable":
+                outcomes.append(
+                    UnavailableGoalPlanOutcome(
+                        goal_id=goal_id,
+                        disposition="unavailable",
+                        coverage=advance.coverage,
+                        unresolved=unresolved,
+                        rationale=(
+                            advance.reason_summary
+                            or "Fast Planner found no currently available way to satisfy this Goal."
+                        ),
+                    )
+                )
+            elif advance.disposition == "refused":
+                outcomes.append(
+                    RefusedGoalPlanOutcome(
+                        goal_id=goal_id,
+                        disposition="refused",
+                        coverage=advance.coverage,
+                        unresolved=unresolved,
+                        rationale=(
+                            advance.reason_summary
+                            or "Fast Planner refused this Goal without executable Work."
+                        ),
+                    )
+                )
             else:
                 raise ValueError(
                     f"Fast Planner supplied no terminal Activity for Goal {goal_id!r}"
@@ -3231,7 +3259,9 @@ class GoalDrivenRuntimeCoordinator:
             next(iter(dispositions)) if len(dispositions) == 1 else "mixed"
         )
         top_coverage = (
-            "uncertain" if disposition == "clarify" else "complete"
+            advance.coverage
+            if disposition in {"clarify", "unavailable", "refused"}
+            else "complete"
         )
         plan_seed = json.dumps(
             advance.model_dump(mode="json", exclude_none=True),
@@ -3240,7 +3270,7 @@ class GoalDrivenRuntimeCoordinator:
             separators=(",", ":"),
         )
         global_satisfaction = None
-        if "clarify" not in dispositions:
+        if dispositions.issubset({"execute", "respond"}):
             global_satisfaction = GoalSatisfactionAssessment(
                 score=max(0.95, advance.confidence),
                 status="exact",
@@ -3268,7 +3298,11 @@ class GoalDrivenRuntimeCoordinator:
             communicative_acts=communicative_acts,
             steps=steps,
             auxiliary_activities=auxiliary_activities,
-            unresolved=(unresolved if disposition in {"clarify", "mixed"} else []),
+            unresolved=(
+                unresolved
+                if disposition in {"clarify", "mixed", "unavailable", "refused"}
+                else []
+            ),
             goal_outcomes=outcomes,
             goal_satisfaction=global_satisfaction,
             metadata={
@@ -4134,16 +4168,36 @@ class GoalDrivenRuntimeCoordinator:
             }
 
         async def cancel_uncommitted_fast_work(reason: str) -> None:
-            """Stop unfinished turn fan-out and unbound provisional Fast work."""
+            """Stop unfinished fan-out while retaining any completed GA truth."""
 
             nonlocal ready_fast_capability_status
+            nonlocal association, context, history, planning_context, situation
+            nonlocal goal_state_results, goal_state_commit_stage
+            nonlocal has_named_goal_cancellation, has_goal_replacement
             if association_task is not None:
                 if not association_task.done():
                     association_task.cancel()
-                # A concurrent GA failure can finish just before Fast Planner
-                # fails. Always retrieve that terminal result so asyncio does
-                # not report an unowned "Task exception was never retrieved".
-                await asyncio.gather(association_task, return_exceptions=True)
+                # A concurrent GA transaction may have committed canonical Goal
+                # truth before Fast fails. Retrieve its completed stage result and
+                # project those already-established facts into the public failure
+                # resolution rather than reporting an empty Goal state.
+                association_results = await asyncio.gather(
+                    association_task,
+                    return_exceptions=True,
+                )
+                association_result = association_results[0]
+                if isinstance(association_result, _GoalAssociationStageResult):
+                    association = association_result.association
+                    context = association_result.context
+                    history = association_result.history
+                    planning_context = association_result.planning_context
+                    situation = association_result.situation
+                    goal_state_results = association_result.goal_state_results
+                    goal_state_commit_stage = association_result.goal_state_commit_stage
+                    has_named_goal_cancellation = (
+                        association_result.has_named_goal_cancellation
+                    )
+                    has_goal_replacement = association_result.has_goal_replacement
             execution = ready_fast_capability_execution
             execution_status = ready_fast_capability_status
             if (
@@ -4622,15 +4676,13 @@ class GoalDrivenRuntimeCoordinator:
                 )
                 if deep_failure is not None:
                     raise CognitiveStageFailure("deep_planner", deep_failure)
-            elif (
-                fast_advance.disposition in {"unavailable", "refused"}
-                or canonical_fast_revision_reason
-            ):
-                # A malformed/unavailable first Activity Plan, or a committed Goal
-                # intersecting retained/provisional Work, receives one canonical Fast
-                # Planner revision. GA supplies Goal continuity only; it never decides
-                # Work compatibility. Provisional safe Work remains available until
-                # Planner explicitly selects reuse or authors replacement Work.
+            elif canonical_fast_revision_reason:
+                # A material canonical-state change after the streamed Fast result
+                # receives one same-Planner revision. GA supplies Goal continuity only;
+                # it never decides Work compatibility. Provisional safe Work remains
+                # available until Planner explicitly selects reuse or authors replacement
+                # Work. A terminal unavailable/refused decision is not itself a revision
+                # trigger.
                 stage = time.perf_counter()
                 fast_plan = await self._observe_workflow_stage(
                     sid=sid,
@@ -4638,11 +4690,7 @@ class GoalDrivenRuntimeCoordinator:
                     input_payload={
                         "user_text": text,
                         "goal_association": association,
-                        "revision_reason": (
-                            canonical_fast_revision_reason
-                            if canonical_fast_revision_reason
-                            else "fast_planner_advance_unavailable"
-                        ),
+                        "revision_reason": canonical_fast_revision_reason,
                         "interaction_context": planning_context.get(
                             "interaction_context", {}
                         ),

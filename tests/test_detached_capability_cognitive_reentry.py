@@ -344,7 +344,7 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
 
 
 @pytest.mark.asyncio
-async def test_multi_capability_result_reentry_projects_only_terminal_sibling_scope():
+async def test_multi_capability_success_results_wait_for_batch_closure():
     spoken: list[str] = []
 
     async def schedule_speech(args: dict[str, Any]) -> dict[str, Any]:
@@ -390,33 +390,20 @@ async def test_multi_capability_result_reentry_projects_only_terminal_sibling_sc
     provider.release_first.set()
     await asyncio.sleep(0.05)
 
-    assert spoken == ["first result"]
-    assert "Both reads succeeded." not in spoken
+    # A successful sibling from a multi-Capability dispatch is not yet the whole
+    # immutable fact set.  It therefore waits for dispatch closure instead of
+    # re-entering Planner while another successful sibling is still in flight.
+    assert spoken == []
     assert not provider.release_second.is_set()
-    assert len(assistant.agent_client.requests) == 1
-    first_request = assistant.agent_client.requests[0]
-    assert first_request.text == "Obtain the first requested result."
-    assert first_request.original_user_text == first_request.text
-    assert "user_turn_envelope" not in first_request.context
-    assert first_request.context["result_evidence_reentry"]["source_goal_ids"] == [
-        "goal-first"
-    ]
-    first_truth = first_request.context["trusted_execution_outcome"]
-    assert first_truth["aggregate_status"] == "completed"
-    assert first_truth["goal_outcomes"][0]["goal_id"] == "goal-first"
-    assert first_truth["goal_outcomes"][0]["status"] == "completed"
-    assert first_truth["goal_outcomes"][0]["evidence_ids"]
-    assert [item.outcome for item in first_request.responsibilities] == [
-        "Obtain the first requested result."
-    ]
+    assert assistant.agent_client.requests == []
 
-    # Each exact sibling result remains an immediate cognitive opportunity, while
-    # its Planner transaction cannot see the other sibling's source semantics.
     provider.release_second.set()
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
     assert result_task.done()
-    assert "Both reads succeeded." not in spoken
-    assert len(assistant.agent_client.requests) == 2
+    # This fixture replaces the normal closure owner with a no-op stub, so the
+    # only assertion here is that neither individual success bypassed batching.
+    assert spoken == []
+    assert assistant.agent_client.requests == []
 
 
 @pytest.mark.asyncio
@@ -625,7 +612,7 @@ class _FollowUpAgentClient(_AgentClient):
 
 
 @pytest.mark.asyncio
-async def test_terminal_evidence_can_start_follow_up_work_while_sibling_is_running():
+async def test_successful_terminal_evidence_waits_before_follow_up_work():
     coordinator = InteractionRuntimeCoordinator(
         lambda _args: {"scheduled": True, "playback_started": True}
     )
@@ -662,24 +649,19 @@ async def test_terminal_evidence_can_start_follow_up_work_while_sibling_is_runni
     await asyncio.wait_for(provider.second_started.wait(), timeout=1.0)
     await asyncio.wait_for(asyncio.shield(foreground), timeout=1.0)
 
-    # One terminal sibling is enough to create a cognitive opportunity. Planner may
-    # schedule genuinely new Work without waiting for the unrelated sibling to finish.
+    # A successful sibling is deferred until the multi-Capability dispatch closes,
+    # so Planner cannot author follow-up Work from an incomplete success fact set.
     provider.release_first.set()
-    await asyncio.wait_for(follow_up.started.wait(), timeout=1.0)
+    await asyncio.sleep(0.05)
 
+    assert not follow_up.started.is_set()
     assert not provider.release_second.is_set()
-    assert len(assistant.agent_client.requests) == 1
-    request = assistant.agent_client.requests[0]
-    assert request.context["terminal_request_id"] == "request-first"
-    assert request.context["result_evidence_reentry"]["source_goal_ids"] == [
-        "goal-first"
-    ]
-    assert "goal-first" in request.context["situation"].get("focus_goal_ids", [])
+    assert assistant.agent_client.requests == []
 
-    # Clean up provider work. The important assertion is that follow-up Work became
-    # ready before the original second sibling reached terminal state.
-    assistant.conversation_state.goal_status["goal-first"] = "cancelled"
+    # Clean up the original batch.  This fixture stubs the normal closure owner,
+    # therefore no follow-up is expected here after closure either.
     provider.release_second.set()
-    follow_up.release.set()
     for task in list(assistant.active_cognitive_runtime_tasks):
         await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
+    assert not follow_up.started.is_set()
+    assert assistant.agent_client.requests == []

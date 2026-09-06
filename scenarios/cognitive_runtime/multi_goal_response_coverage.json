@@ -95,8 +95,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "fast_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

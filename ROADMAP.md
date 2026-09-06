@@ -18,10 +18,10 @@ organized by capability, risk, and retained evidence.
 
 ## Current execution order
 
-The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit reopens a bounded source-correctness slice at the GA/Fast/Runtime transaction boundary; it does **not** reopen the overall authority architecture. The findings and evidence boundary are recorded in [Current Status](docs/STATUS.md#2026-09-06-source-audit-correction). Continue in this order:
+The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:
 
-1. **Close the audited source transaction defects before target promotion.** Make the full maintained test tree collectible, preserve the complete GI Responsibility set into GA, reject GA semantic repair, validate every early `PresentationCommit` against current-request constraints before observable delivery, require a material state change for Fast re-decision, and preserve completed GA commit truth on failure paths.
-2. **Run a clean current-revision source gate with explicit collection evidence.** Record the revision, complete test collection counts, policy/static gates, and focused regressions for the audited failure interleavings.
+1. **Retain a clean revision-bound full source qualification.** On a clean checkout with pinned test dependencies, run the documented repository policy, Ruff, Mypy, benchmark, documentation, and complete pytest main-tree gate. Record exact revision and collection/pass counts; do not treat the current audit worktree's focused/partition evidence as the final canonical gate.
+2. **Freeze and qualify the complete model transaction on that exact source.** Re-run target-blind GI/GA/Fast/Deep cohorts with the production prompt projections, schemas/decoder transport, one-call topology, early commit guard, and failure-state reconciliation. A model or serving backend may be promoted only from revision-bound evidence.
 3. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
    and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
    Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence

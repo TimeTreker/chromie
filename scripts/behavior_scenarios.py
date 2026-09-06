@@ -66,6 +66,10 @@ from shared.chromie_contracts.core_interpretation import (
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
+    FastPlannerCapabilityActivity,
+    FastPlannerClarificationAct,
+    FastPlannerCompleteResponseAct,
+    FastPlannerProgressAct,
     FastPlannerStreamTerminal,
     PresentationCommit,
 )
@@ -529,6 +533,184 @@ class _CognitiveScenarioClient:
                 association["source_responsibility_refs"] = [refs[0]]
         return GoalAssociationResolution.model_validate(raw)
 
+    def _streamed_fast_fixture(
+        self,
+        request: Any,
+        *,
+        presentation_commit_id: str,
+    ) -> FastPlannerAdvance:
+        """Project the retained canonical fixture onto the one-call Fast stream."""
+
+        plan = CanonicalPlan.model_validate(self.stub["fast_plan"])
+        all_refs = [item.local_ref for item in request.responsibilities]
+        raw_association = json.loads(json.dumps(self.stub["goal_association"]))
+        raw_association["turn_id"] = str(
+            request.context.get("turn_id") or request.sid
+        )
+        raw_association.setdefault("resolution_status", "resolved")
+        for index, goal in enumerate(raw_association.get("new_goals") or []):
+            if not goal.get("source_responsibility_refs") and all_refs:
+                goal["source_responsibility_refs"] = [
+                    all_refs[min(index, len(all_refs) - 1)]
+                ]
+        for item in raw_association.get("associations") or []:
+            if not item.get("source_responsibility_refs") and all_refs:
+                item["source_responsibility_refs"] = [all_refs[0]]
+        association = GoalAssociationResolution.model_validate(raw_association)
+        refs_by_goal: dict[str, list[str]] = {}
+        for goal in association.new_goals:
+            refs_by_goal[goal.goal_id] = list(goal.source_responsibility_refs)
+        for item in association.associations:
+            for goal_id in item.target_goal_ids:
+                refs_by_goal.setdefault(goal_id, [])
+                for ref in item.source_responsibility_refs:
+                    if ref not in refs_by_goal[goal_id]:
+                        refs_by_goal[goal_id].append(ref)
+
+        def refs_for_goal_ids(goal_ids: list[str]) -> list[str]:
+            refs: list[str] = []
+            for goal_id in goal_ids:
+                for ref in refs_by_goal.get(goal_id, []):
+                    if ref not in refs:
+                        refs.append(ref)
+            return refs or list(all_refs)
+
+        activities: list[Any] = []
+        for step in plan.steps:
+            activities.append(
+                FastPlannerCapabilityActivity(
+                    role="capability",
+                    activity_id=step.step_id,
+                    capability_id=step.capability_id,
+                    args=dict(step.args),
+                    timing=step.timing,
+                    source_responsibility_refs=refs_for_goal_ids(
+                        list(step.source_goal_ids)
+                    ),
+                    reason_summary=step.reason_summary,
+                )
+            )
+        for act in plan.communicative_acts:
+            source_refs = list(act.source_responsibility_refs) or refs_for_goal_ids(
+                list(act.source_goal_ids)
+            )
+            if act.role == "complete_response":
+                source_goal_ids = list(act.source_goal_ids)
+                executes_goal = any(
+                    outcome.goal_id in source_goal_ids
+                    and outcome.disposition == "execute"
+                    for outcome in plan.goal_outcomes
+                )
+                if executes_goal:
+                    # Legacy canonical fixtures used complete_response wording for
+                    # pre-action acknowledgement.  In the streamed contract that
+                    # speech is prospective progress because the effect is not yet
+                    # complete.
+                    activities.append(
+                        FastPlannerProgressAct(
+                            activity_id=act.activity_id,
+                            role="progress",
+                            text=act.text,
+                            timing=act.timing,
+                            progress_kind="perform_action",
+                            source_responsibility_refs=source_refs,
+                        )
+                    )
+                else:
+                    activities.append(
+                        FastPlannerCompleteResponseAct(
+                            activity_id=act.activity_id,
+                            role="complete_response",
+                            text=act.text,
+                            timing=act.timing,
+                            speech_act=act.speech_act,
+                            source_responsibility_refs=source_refs,
+                            truth_stage=act.truth_stage,
+                            evidence_refs=list(act.evidence_refs),
+                        )
+                    )
+            elif act.role == "clarification":
+                activities.append(
+                    FastPlannerClarificationAct(
+                        activity_id=act.activity_id,
+                        role="clarification",
+                        text=act.text,
+                        timing=act.timing,
+                        speech_act="ask_clarification",
+                        source_responsibility_refs=source_refs,
+                        truth_stage="context_grounded",
+                        information_gaps=list(act.information_gaps),
+                    )
+                )
+            elif act.role == "progress":
+                activities.append(
+                    FastPlannerProgressAct(
+                        activity_id=act.activity_id,
+                        role="progress",
+                        text=act.text,
+                        timing=act.timing,
+                        progress_kind=act.progress_kind or "think",
+                        source_responsibility_refs=source_refs,
+                    )
+                )
+
+        for outcome in plan.goal_outcomes:
+            if outcome.disposition != "respond" or not outcome.response_text:
+                continue
+            source_refs = refs_for_goal_ids([outcome.goal_id])
+            if any(
+                activity.role == "complete_response"
+                and set(activity.source_responsibility_refs).intersection(source_refs)
+                for activity in activities
+            ):
+                continue
+            activities.append(
+                FastPlannerCompleteResponseAct(
+                    activity_id=f"fixture-response-{outcome.goal_id}",
+                    role="complete_response",
+                    text=outcome.response_text,
+                    speech_act="respond",
+                    source_responsibility_refs=source_refs,
+                    truth_stage="context_grounded",
+                )
+            )
+
+        if (
+            plan.response_text
+            and plan.disposition in {"respond", "mixed"}
+            and not any(item.role == "complete_response" for item in activities)
+        ):
+            activities.append(
+                FastPlannerCompleteResponseAct(
+                    activity_id="fixture-complete-response",
+                    role="complete_response",
+                    text=plan.response_text,
+                    speech_act="respond",
+                    source_responsibility_refs=list(all_refs),
+                    truth_stage="context_grounded",
+                )
+            )
+
+        return FastPlannerAdvance(
+            turn_id=str(request.sid),
+            disposition=plan.disposition,
+            coverage=plan.coverage,
+            covered_responsibility_refs=list(all_refs),
+            activities=activities,
+            continuations=(
+                ["deep_planner"] if plan.disposition == "escalate" else []
+            ),
+            confidence=plan.confidence,
+            unresolved=list(plan.unresolved),
+            reason_summary=(
+                plan.escalation_reason
+                or str(plan.metadata.get("reason") or "")
+                or plan.goal_summary
+                or "Retained scenario Fast decision."
+            ),
+            metadata={"presentation_commit_id": presentation_commit_id},
+        )
+
     async def stream_fast_advance(self, *args: Any, **kwargs: Any):
         del args
         self.calls.append("fast_stream")
@@ -540,18 +722,9 @@ class _CognitiveScenarioClient:
             metadata={"semantic_authority": "level_a_fixture"},
         )
         yield commit
-        advance = FastPlannerAdvance(
-            turn_id=str(request.sid),
-            disposition="unavailable",
-            coverage="uncertain",
-            covered_responsibility_refs=[
-                item.local_ref for item in request.responsibilities
-            ],
-            confidence=0.99,
-            reason_summary=(
-                "The retained scenario supplies its canonical post-GA Fast Plan."
-            ),
-            metadata={"presentation_commit_id": commit.commit_id},
+        advance = self._streamed_fast_fixture(
+            request,
+            presentation_commit_id=commit.commit_id,
         )
         yield FastPlannerStreamTerminal(
             turn_id=str(request.sid),

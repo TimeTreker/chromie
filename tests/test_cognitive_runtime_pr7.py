@@ -136,12 +136,20 @@ class RecordingPlannerAdapter(CanonicalPlanRuntimeAdapter):
         super().__init__(runtime)
         self.planner_response_contexts: list[dict] = []
 
+    def build_fast_advance_response(self, **kwargs):
+        self.planner_response_contexts.append(dict(kwargs.get("context") or {}))
+        return super().build_fast_advance_response(**kwargs)
+
     async def build_planner_owned_response(self, **kwargs):
         self.planner_response_contexts.append(dict(kwargs.get("context") or {}))
         return await super().build_planner_owned_response(**kwargs)
 
 
 class FailingPlannerAdapter(CanonicalPlanRuntimeAdapter):
+    def build_fast_advance_response(self, **kwargs):
+        del kwargs
+        raise RuntimeError("planner activity validation unavailable")
+
     async def build_planner_owned_response(self, **kwargs):
         del kwargs
         raise RuntimeError("planner activity validation unavailable")
@@ -177,6 +185,171 @@ class FastPlannerProgressRenderingTests(unittest.TestCase):
         self.assertEqual(activity.evidence_refs, [])
 
 
+
+
+def _stream_advance_from_canonical_plan(
+    plan: CanonicalPlan,
+    association: GoalAssociationResolution,
+) -> FastPlannerAdvance:
+    """Project legacy test fixtures onto the one-call streamed Fast contract.
+
+    Runtime tests historically used ``unavailable`` as a sentinel that forced a
+    second ``/fast-plan`` call.  The maintained contract now treats the streamed
+    terminal result as authoritative unless canonical state actually changes.
+    This helper keeps those fixtures about their intended Planner result instead
+    of preserving the retired retry protocol.
+    """
+
+    refs_by_goal: dict[str, list[str]] = {}
+    all_refs: list[str] = []
+
+    def bind(ref: str, goal_id: str) -> None:
+        if ref not in all_refs:
+            all_refs.append(ref)
+        refs_by_goal.setdefault(goal_id, [])
+        if ref not in refs_by_goal[goal_id]:
+            refs_by_goal[goal_id].append(ref)
+
+    for item in association.associations:
+        for goal_id in item.target_goal_ids:
+            for ref in item.source_responsibility_refs:
+                bind(ref, goal_id)
+    for goal in association.new_goals:
+        for ref in goal.source_responsibility_refs:
+            bind(ref, goal.goal_id)
+
+    activities = []
+    for step in plan.steps:
+        source_refs = [
+            ref
+            for goal_id in step.source_goal_ids
+            for ref in refs_by_goal.get(goal_id, [])
+        ] or list(all_refs)
+        activities.append(
+            FastPlannerCapabilityActivity(
+                role="capability",
+                activity_id=step.step_id,
+                capability_id=step.capability_id,
+                args=dict(step.args),
+                timing=step.timing,
+                source_responsibility_refs=source_refs,
+                reason_summary=step.reason_summary,
+            )
+        )
+
+    for act in plan.communicative_acts:
+        source_refs = list(act.source_responsibility_refs) or [
+            ref
+            for goal_id in act.source_goal_ids
+            for ref in refs_by_goal.get(goal_id, [])
+        ] or list(all_refs)
+        if act.role == "complete_response":
+            activities.append(
+                FastPlannerCompleteResponseAct(
+                    activity_id=act.activity_id,
+                    role="complete_response",
+                    text=act.text,
+                    timing=act.timing,
+                    speech_act=act.speech_act,
+                    source_responsibility_refs=source_refs,
+                    truth_stage=act.truth_stage,
+                    evidence_refs=list(act.evidence_refs),
+                )
+            )
+        elif act.role == "clarification":
+            activities.append(
+                FastPlannerClarificationAct(
+                    activity_id=act.activity_id,
+                    role="clarification",
+                    text=act.text,
+                    timing=act.timing,
+                    speech_act="ask_clarification",
+                    source_responsibility_refs=source_refs,
+                    truth_stage="context_grounded",
+                    information_gaps=list(act.information_gaps),
+                )
+            )
+        elif act.role == "progress":
+            activities.append(
+                FastPlannerProgressAct(
+                    activity_id=act.activity_id,
+                    role="progress",
+                    text=act.text,
+                    timing=act.timing,
+                    progress_kind=act.progress_kind or "think",
+                    source_responsibility_refs=source_refs,
+                )
+            )
+
+    for outcome in plan.goal_outcomes:
+        if outcome.disposition != "respond" or not outcome.response_text:
+            continue
+        source_refs = list(refs_by_goal.get(outcome.goal_id, [])) or list(all_refs)
+        if any(
+            item.role == "complete_response"
+            and set(item.source_responsibility_refs).intersection(source_refs)
+            for item in activities
+        ):
+            continue
+        activities.append(
+            FastPlannerCompleteResponseAct(
+                activity_id=f"fixture-response-{outcome.goal_id}",
+                role="complete_response",
+                text=outcome.response_text,
+                speech_act="respond",
+                source_responsibility_refs=source_refs,
+                truth_stage="context_grounded",
+            )
+        )
+
+    if (
+        plan.response_text
+        and plan.disposition in {"respond", "mixed"}
+        and not any(item.role == "complete_response" for item in activities)
+    ):
+        activities.append(
+            FastPlannerCompleteResponseAct(
+                activity_id="fixture-complete-response",
+                role="complete_response",
+                text=plan.response_text,
+                speech_act="respond",
+                source_responsibility_refs=list(all_refs),
+                truth_stage="context_grounded",
+            )
+        )
+
+    return FastPlannerAdvance(
+        turn_id="test-fast-advance",
+        disposition=plan.disposition,
+        coverage=plan.coverage,
+        covered_responsibility_refs=list(all_refs),
+        activities=activities,
+        continuations=(
+            ["deep_planner"] if plan.disposition == "escalate" else []
+        ),
+        confidence=plan.confidence,
+        unresolved=list(plan.unresolved),
+        reason_summary=(
+            plan.escalation_reason
+            or str(plan.metadata.get("reason") or "")
+            or plan.goal_summary
+            or "Fixture preserves the canonical Planner decision."
+        ),
+        metadata={
+            "fixture_source_plan_id": plan.plan_id,
+            "path_classification": plan.metadata.get("path_classification", ""),
+            **(
+                {
+                    "failure_class": plan.metadata["failure_class"],
+                    "failure_domain": plan.metadata.get("failure_domain", "model_contract"),
+                }
+                if plan.metadata.get("failure_class")
+                else {}
+            ),
+        },
+    )
+
+
 class ScriptedClient:
     def __init__(
         self,
@@ -189,26 +362,32 @@ class ScriptedClient:
     ):
         self.association = association
         self.fast_plans = list(fast_plans)
+        self._explicit_fast_advances = fast_advances is not None
         self.deep_plans = list(deep_plans or [])
         self.fast_advances = list(
             fast_advances
             if fast_advances is not None
-            else [
-                FastPlannerAdvance(
-                    turn_id="test-fast-advance",
-                    disposition="unavailable",
-                    coverage="uncertain",
-                    covered_responsibility_refs=["r1"],
-                    activities=[],
-                    continuations=[],
-                    confidence=0.95,
-                    unresolved=["first Activity Plan unavailable in legacy-path test"],
-                    reason_summary="Request one canonical Fast Planner revision.",
-                    metadata={
-                        "advance_status": "canonical_fast_revision_required"
-                    },
-                )
-            ]
+            else (
+                [_stream_advance_from_canonical_plan(self.fast_plans[0], association)]
+                if self.fast_plans
+                else [
+                    FastPlannerAdvance(
+                        turn_id=association.turn_id,
+                        disposition="unavailable",
+                        coverage="uncertain",
+                        covered_responsibility_refs=[
+                            ref
+                            for item in [*association.associations, *association.new_goals]
+                            for ref in item.source_responsibility_refs
+                        ],
+                        activities=[],
+                        continuations=[],
+                        confidence=0.95,
+                        unresolved=["no scripted Fast decision supplied"],
+                        reason_summary="No scripted Fast decision supplied.",
+                    )
+                ]
+            )
         )
         self.deep_contexts: list[dict] = []
         self.calls: list[str] = []
@@ -232,7 +411,7 @@ class ScriptedClient:
             raise AssertionError("unexpected Fast Planner stream")
         commit = self.presentation_commits.pop(0)
         advance = self.fast_advances.pop(0)
-        if commit.activity is None:
+        if commit.activity is None and self._explicit_fast_advances:
             immediate = next(
                 (
                     item
@@ -287,14 +466,14 @@ class ScriptedClient:
         self.deep_contexts.append(dict(getattr(request, "context", {}) or {}))
         return self.deep_plans.pop(0)
 
-def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
+def new_goal_association(goal_id: str = "goal-1", *, source_ref: str = "r1") -> GoalAssociationResolution:
     return GoalAssociationResolution(
         resolution_status="resolved",
         turn_id="turn-1",
         new_goals=[
             SemanticGoal(
                 goal_id=goal_id,
-                source_responsibility_refs=["r1"],
+                source_responsibility_refs=[source_ref],
                 description="Respond to the user.",
                 source_text="hello",
                 metadata={
@@ -308,14 +487,14 @@ def new_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
     )
 
 
-def body_goal_association(goal_id: str = "goal-1") -> GoalAssociationResolution:
+def body_goal_association(goal_id: str = "goal-1", *, source_ref: str = "r1") -> GoalAssociationResolution:
     return GoalAssociationResolution(
         resolution_status="resolved",
         turn_id="turn-body",
         new_goals=[
             SemanticGoal(
                 goal_id=goal_id,
-                source_responsibility_refs=["r1"],
+                source_responsibility_refs=[source_ref],
                 description="Blink the eyes.",
                 source_text="blink",
                 metadata={
@@ -1118,10 +1297,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         *,
         text="hello",
         intent=None,
+        responsibilities=None,
     ):
         del intent
         core, envelope = admitted_core(
-            text, sid="sid-pr7", language="zh-CN"
+            text, sid="sid-pr7", language="zh-CN", responsibilities=responsibilities
         )
         return asyncio.run(
             coordinator.resolve(
@@ -1181,7 +1361,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             reason_summary="Fresh weather needs continuity while progress can speak now.",
         )
         client = Client(
-            association=new_goal_association(),
+            association=new_goal_association(source_ref="weather"),
             fast_plans=[respond_plan()],
             fast_advances=[advance],
             presentation_commits=[
@@ -1253,10 +1433,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertNotIn("social_attention_started", events)
         self.assertEqual(runtime.started_fast_activities[0][1], "我先看看能不能查到。")
-        self.assertEqual(
-            client.calls,
-            ["stream", "association", "fast"],
-        )
+        self.assertCountEqual(client.calls, ["stream", "association"])
 
     def test_gi_fans_out_to_fast_planner_and_ga_without_second_fast_plan(self):
         advance = FastPlannerAdvance(
@@ -2319,11 +2496,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             stage_names[3:],
-            [
-                "fast_planner",
-                "canonical_plan_validation",
-                "planner_communicative_activity_validation",
-            ],
+            ["canonical_plan_validation"],
         )
         for _, stage in observed:
             self.assertIn("input_payload", stage)
@@ -2362,10 +2535,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 )
                 return await super().resolve_goal_association(*args, **kwargs)
 
-            async def resolve_fast_plan(self, *args, **kwargs):
+            async def stream_fast_advance(self, *args, **kwargs):
                 request = kwargs.get("request")
                 self.fast_contexts.append(dict(getattr(request, "context", {}) or {}))
-                return await super().resolve_fast_plan(*args, **kwargs)
+                async for frame in super().stream_fast_advance(*args, **kwargs):
+                    yield frame
 
         client = ContextClient()
         adapter = RecordingPlannerAdapter(FakeRuntime([blink_definition()]))
@@ -2384,7 +2558,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ][0]["subject_id"],
             "speech-existing",
         )
-        self.assertIn(
+        self.assertNotIn(
             "goal_associated",
             {
                 item["event_type"]
@@ -2403,17 +2577,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         association_situation = client.association_contexts[0]["situation"]
-        fast_situation = client.fast_contexts[0]["situation"]
         adapter_situation = adapter.planner_response_contexts[0]["situation"]
         self.assertEqual(association_situation["revision"], 1)
         self.assertEqual(association_situation["focus_goal_ids"], [])
-        self.assertEqual(fast_situation["revision"], 2)
-        self.assertEqual(fast_situation["focus_goal_ids"], ["goal-1"])
-        self.assertEqual(adapter_situation, fast_situation)
-        self.assertNotEqual(
-            association_situation["digest"],
-            fast_situation["digest"],
-        )
+        # Fast starts concurrently from the immutable GI result, before GA has
+        # constructed its Situation projection.  The canonical response path
+        # receives the GA-bound Situation after the join.
+        self.assertNotIn("situation", client.fast_contexts[0])
+        self.assertEqual(adapter_situation["revision"], 2)
+        self.assertEqual(adapter_situation["focus_goal_ids"], ["goal-1"])
     def test_runtime_trace_can_emit_one_runtime_event_package(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2447,7 +2619,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
     def test_goal_interpretation_cannot_short_circuit_missing_ability_before_goal_state(self):
         client = ScriptedClient(
-            association=new_goal_association(),
+            association=new_goal_association(source_ref="restaurant"),
             fast_plans=[respond_plan()],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -2497,12 +2669,48 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result.status, "applied")
+        self.assertEqual(result.status, "error")
+        self.assertIsNotNone(result.goal_association)
+        self.assertEqual(result.metadata["authoritative_goal_count"], 1)
         self.assertCountEqual(client.calls[:2], ["stream", "association"])
+        self.assertEqual(client.calls[2:], [])
         self.assertNotEqual(
             result.metadata.get("fast_planner_path"),
             "terminal_missing_ability",
         )
+
+    def test_fast_unavailable_and_refused_are_terminal_without_second_fast_call(self):
+        for disposition in ("unavailable", "refused"):
+            with self.subTest(disposition=disposition):
+                association = new_goal_association()
+                advance = FastPlannerAdvance(
+                    turn_id=association.turn_id,
+                    disposition=disposition,
+                    coverage="uncertain",
+                    covered_responsibility_refs=["r1"],
+                    activities=[],
+                    continuations=[],
+                    confidence=0.95,
+                    unresolved=["terminal bounded limitation"],
+                    reason_summary=f"Fast Planner terminal {disposition} decision.",
+                )
+                client = ScriptedClient(
+                    association=association,
+                    fast_plans=[],
+                    fast_advances=[advance],
+                )
+                coordinator = GoalDrivenRuntimeCoordinator(
+                    agent_client=client,
+                    adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+                    policy=CognitiveRuntimePolicy(mode="report_only"),
+                )
+
+                result = self.run_resolution(coordinator, client)
+
+                self.assertEqual(result.status, "report_only")
+                self.assertEqual(result.terminal_plan.disposition, disposition)
+                self.assertEqual(result.terminal_plan.coverage, "uncertain")
+                self.assertCountEqual(client.calls, ["stream", "association"])
 
     def test_report_only_builds_terminal_plan_without_interaction(self):
         client = ScriptedClient(
@@ -2518,9 +2726,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "report_only")
         self.assertIsNone(result.interaction_response)
         self.assertCountEqual(client.calls[:2], ["stream", "association"])
-        self.assertEqual(client.calls[2:], ["fast"])
+        self.assertEqual(client.calls[2:], [])
 
-    def test_planner_response_adapter_receives_playback_started_current_turn_speech(self):
+    def test_fast_advance_response_does_not_reproject_delivered_turn_speech(self):
         client = ScriptedClient(
             association=new_goal_association(),
             fast_plans=[respond_plan()],
@@ -2547,9 +2755,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client)
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(
-            adapter.planner_response_contexts[0]["delivered_turn_speech"],
-            [{**event, "session_id": "sid-pr7"}],
+        self.assertNotIn(
+            "delivered_turn_speech",
+            adapter.planner_response_contexts[0],
         )
 
     def test_budget_failure_is_preserved_without_causal_attribution(self):
@@ -2842,7 +3050,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertCountEqual(client.calls[:2], ["stream", "association"])
-        self.assertEqual(client.calls[2:], ["fast"])
+        self.assertEqual(client.calls[2:], [])
         self.assertIsNotNone(result.interaction_response)
         self.assertEqual(
             [item.capability_id for item in result.interaction_response.capabilities],
@@ -3771,11 +3979,27 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator,
             client,
             text="Blink twice and tell me a short joke.",
+            responsibilities=[
+                {
+                    "local_ref": "r1",
+                    "outcome": "blink twice",
+                    "output_mode": "body_action",
+                    "bindings": {"count": 2},
+                    "confidence": 0.97,
+                },
+                {
+                    "local_ref": "r2",
+                    "outcome": "tell a short joke",
+                    "output_mode": "speech",
+                    "bindings": {},
+                    "confidence": 0.97,
+                },
+            ],
         )
 
         self.assertEqual(result.status, "applied")
         self.assertCountEqual(client.calls[:2], ["stream", "association"])
-        self.assertEqual(client.calls[2:], ["fast"])
+        self.assertEqual(client.calls[2:], [])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
         self.assertFalse(result.metadata["deep_planner_invoked"])
@@ -3814,13 +4038,77 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(
             result.metadata["deep_planner_invocation_reason"],
-            "semantic_escalation",
+            "fast_planner_advance_complexity",
         )
         self.assertEqual(result.metadata["stage_diagnostics"], [])
         self.assertEqual(
             client.deep_contexts[0]["deep_planner_invocation_reason"],
-            "semantic_escalation",
+            "fast_planner_advance_complexity",
         )
+
+    def test_fast_failure_preserves_completed_goal_association_commit_truth(self):
+        committed = asyncio.Event()
+        goal_state_marker = [{"goal_id": "goal-1", "status": "created"}]
+        association = new_goal_association()
+
+        class Client:
+            def __init__(self):
+                self.calls: list[str] = []
+
+            async def resolve_goal_association(self, *args, **kwargs):
+                del args, kwargs
+                self.calls.append("association")
+                return association
+
+            async def stream_fast_advance(self, *args, **kwargs):
+                del args, kwargs
+                self.calls.append("stream")
+                yield PresentationCommit(
+                    commit_id="commit-before-fast-failure",
+                    turn_id="sid-pr7",
+                    activity=None,
+                    metadata={"semantic_authority": "test"},
+                )
+                await committed.wait()
+                yield FastPlannerStreamFailure(
+                    turn_id="sid-pr7",
+                    presentation_commit_id="commit-before-fast-failure",
+                    failure_stage="after_commit",
+                    failure_class="structured_output_validation",
+                    failure_domain="model_contract",
+                    architecture_attribution="fast_planner",
+                    retryable=False,
+                    reason="terminal Fast output is invalid",
+                )
+
+        client = Client()
+
+        def apply_goal_state(_association, *, sid, user_text, source):
+            self.assertEqual(sid, "sid-pr7")
+            self.assertEqual(user_text, "hello")
+            self.assertEqual(
+                source,
+                "goal_driven_cognitive_runtime_goal_association",
+            )
+            committed.set()
+            return list(goal_state_marker)
+
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            goal_state_apply=apply_goal_state,
+        )
+
+        result = self.run_resolution(coordinator, client)
+
+        self.assertEqual(result.status, "error")
+        self.assertIsNotNone(result.goal_association)
+        self.assertEqual(result.goal_association.turn_id, association.turn_id)
+        self.assertEqual(result.goal_state_results, goal_state_marker)
+        self.assertEqual(result.metadata["goal_state_commit_stage"], "goal_association")
+        self.assertEqual(result.metadata["authoritative_goal_count"], 1)
+        self.assertCountEqual(client.calls, ["stream", "association"])
 
     def test_fast_contract_failure_does_not_invoke_deep_planner(self):
         validation_feedback = [
@@ -3845,10 +4133,32 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "failure_domain": "model_contract",
             },
         )
-        client = ScriptedClient(
+        class ContractFailureClient(ScriptedClient):
+            async def stream_fast_advance(self, *args, **kwargs):
+                del args, kwargs
+                self.calls.append("stream")
+                yield PresentationCommit(
+                    commit_id="contract-failure-presentation",
+                    turn_id="sid-pr7",
+                    activity=None,
+                    metadata={"semantic_authority": "test"},
+                )
+                yield FastPlannerStreamFailure(
+                    turn_id="sid-pr7",
+                    presentation_commit_id="contract-failure-presentation",
+                    failure_stage="after_commit",
+                    failure_class="structured_output_validation",
+                    failure_domain="model_contract",
+                    architecture_attribution="fast_planner",
+                    retryable=False,
+                    reason="invalid Fast Planner contract",
+                )
+
+        client = ContractFailureClient(
             association=body_goal_association(),
-            fast_plans=[fast],
+            fast_plans=[],
             deep_plans=[execute_plan()],
+            fast_advances=[],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
@@ -3863,10 +4173,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "error")
-        self.assertEqual(result.metadata["failure_stage"], "fast_planner")
-        self.assertEqual(result.metadata["fast_planner_path"], "contract_failure")
+        self.assertEqual(result.metadata["failure_stage"], "fast_planner_stream")
+        self.assertEqual(result.metadata["fast_planner_path"], "")
         self.assertFalse(result.metadata["deep_planner_invoked"])
-        self.assertTrue(result.metadata["deep_planner_avoided"])
+
         self.assertEqual(client.deep_contexts, [])
 
     def test_fast_contract_failure_stays_visible_without_deep_repair(self):
@@ -3888,10 +4198,32 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "repair_raw_output": '{"still_bad":true}',
             },
         )
-        client = ScriptedClient(
+        class ContractFailureClient(ScriptedClient):
+            async def stream_fast_advance(self, *args, **kwargs):
+                del args, kwargs
+                self.calls.append("stream")
+                yield PresentationCommit(
+                    commit_id="contract-failure-presentation",
+                    turn_id="sid-pr7",
+                    activity=None,
+                    metadata={"semantic_authority": "test"},
+                )
+                yield FastPlannerStreamFailure(
+                    turn_id="sid-pr7",
+                    presentation_commit_id="contract-failure-presentation",
+                    failure_stage="after_commit",
+                    failure_class="structured_output_validation",
+                    failure_domain="model_contract",
+                    architecture_attribution="fast_planner",
+                    retryable=False,
+                    reason="invalid Fast Planner contract",
+                )
+
+        client = ContractFailureClient(
             association=body_goal_association(),
-            fast_plans=[fast],
+            fast_plans=[],
             deep_plans=[execute_plan()],
+            fast_advances=[],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
@@ -3906,9 +4238,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "error")
-        self.assertEqual(result.metadata["failure_stage"], "fast_planner")
+        self.assertEqual(result.metadata["failure_stage"], "fast_planner_stream")
         self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
-        self.assertEqual(result.metadata["fast_planner_path"], "contract_failure")
+        self.assertEqual(result.metadata["fast_planner_path"], "")
         self.assertFalse(result.metadata["deep_planner_invoked"])
         self.assertNotIn("initial_raw_output", result.metadata)
         self.assertNotIn("repair_raw_output", result.metadata)
@@ -4299,12 +4631,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 self.planner_started = asyncio.Event()
                 self.release_planner = asyncio.Event()
 
-            async def resolve_fast_plan(self, *args, **kwargs):
-                del args, kwargs
-                self.calls.append("fast")
-                self.planner_started.set()
-                await self.release_planner.wait()
-                return self.fast_plans.pop(0)
+            async def stream_fast_advance(self, *args, **kwargs):
+                async for frame in super().stream_fast_advance(*args, **kwargs):
+                    if isinstance(frame, FastPlannerStreamTerminal):
+                        self.planner_started.set()
+                        await self.release_planner.wait()
+                    yield frame
 
         client = BlockingPlannerClient()
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -4344,7 +4676,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = asyncio.run(run())
         self.assertEqual(result.status, "applied")
         self.assertCountEqual(client.calls[:2], ["stream", "association"])
-        self.assertEqual(client.calls[2:], ["fast"])
+        self.assertEqual(client.calls[2:], [])
 
     def test_named_cancellation_is_not_committed_before_runtime_closure(self):
         association = GoalAssociationResolution(
@@ -4354,6 +4686,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "association_id": "association-cancel",
                     "relationship": "cancel",
+                    "source_responsibility_refs": ["r1"],
                     "target_goal_ids": ["goal-existing"],
                     "confidence": 0.96,
                     "reason_summary": "The user cancelled the existing goal.",
