@@ -369,18 +369,28 @@ Implementation order:
    top-level model context. Structured relational entries are also blocked from the existing
    durable owner-profile channel until principal/privacy/deletion policy is separately
    qualified. No SocialGraph/relationship-memory owner is introduced.
-5. **Derive relational/situational salience — source open.** Use cheap bounded policy over
-   Stable Mind, Memory, Situation, relationship context, and open Goals to decide whether a
-   state change is worth Core cognition. High salience is only readiness; silence and
-   continued observation remain valid. Do not add a priority engine/manager unless a later
-   independently necessary lifecycle is proven.
+5. **Derive relational/situational salience — first source slice implemented.** Goal-free
+   Situation cognition now applies one deterministic pre-model readiness policy over current
+   typed Situation, disclosure-safe activated relational Memory, and delivery-qualified
+   Interaction context. A semantic Situation signature excludes turn/revision/source-event
+   identity, so the same social meaning can be recognized across transport revisions; only
+   an actually delivered situational response records that signature in the Interaction
+   Ledger and suppresses only a short bounded repeat window rather than permanently
+   tombstoning a recurring life event. Direct social changes such as arrival/addressing may justify Fast cognition;
+   routine/ambient presence, already-pending speech, occupied/private-conversation context,
+   uncertain/conflicted Situation, or a recently acknowledged identical semantic Situation
+   stay local without a model call. Consequential Goal-free state fails quiet through the
+   existing slow boundary rather than borrowing Planner. Relationship Memory can raise
+   relevance but never privacy, trust, Goal, Work, or effect authority. This remains a cheap
+   derived policy, not a numeric priority engine, persistent salience state, or manager.
 6. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
    Goal-free situational cognition is a stateless same-Core invocation with no Goal/Work
    fields. It may return `silence` or author exactly one context-grounded communicative act
    (`greeting|acknowledge|inquire|inform|respond`); Runtime binds Situation/opportunity
    provenance and the resulting `InteractionResponse` structurally contains no Capability
-   Work or Goal-completion authority. `local` readiness does not call a model, while `slow`
-   Goal-free readiness currently fails quiet rather than borrowing Deep Planner. Concrete
+   Work or Goal-completion authority. PSM-3 now derives `local|fast|slow` after relationship
+   Memory activation and before the model call; only `fast` spends the situational model
+   invocation. `slow` Goal-free readiness currently fails quiet rather than borrowing Deep Planner. Concrete
    social adapters and model/target qualification are still open. Capability availability
    must not manufacture demand, and effectful autonomy remains separately governed.
 7. **Close the social feedback loop — source open.** Human reaction/turn-taking changes

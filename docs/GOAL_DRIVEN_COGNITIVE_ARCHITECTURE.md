@@ -1850,6 +1850,18 @@ Situation/opportunity provenance rather than a fake user Responsibility. If the 
 then creates a concrete owed outcome, the normal Goal/Planner/authorization boundaries take
 over.
 
+The first relational-salience implementation remains reconstructable rather than adding a
+new Mind object. Runtime derives one semantic signature from the current Situation
+interpretations while excluding transport revision identity, activates only disclosure-safe
+Memory for the exact Situation subjects, and compares only delivery-qualified Interaction
+history. A coarse deterministic policy then selects `local`, `fast`, or `slow` before any
+Goal-free model call. Relationship/shared experience can make a direct social change more
+relevant, but routine presence does not become interesting merely because the person is
+close. Occupied/private-conversation context and recently acknowledged identical situations
+prefer non-interruption; uncertain/conflicted state remains local; consequential Goal-free
+state fails quiet at the slow boundary. There is no numeric social priority score, persistent
+salience record, or `SalienceManager`.
+
 `Social Attention` remains intentionally narrower than social cognition: it may add
 optional gaze/posture/expression around a concrete primary Activity, but it does not own
 person recognition, relationship inference, emotion interpretation, initiative, or social

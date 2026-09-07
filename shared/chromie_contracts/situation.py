@@ -214,6 +214,42 @@ class SituationProjection(BaseModel):
 
         return self.model_dump(mode="json")
 
+    def interpretation_signature(self) -> str:
+        """Return semantic identity for the current interpretations only.
+
+        Turn IDs, revisions, source-event identities, and Goal relevance are deliberately
+        excluded.  Two trusted observations that restate the same current social/world
+        meaning therefore share one signature even when their transport revisions differ.
+        The signature is delivery/readiness accounting only; it is not Evidence and does
+        not make the interpretation true.
+        """
+
+        payload = sorted(
+            (
+                {
+                    "subject_ref": item.subject_ref,
+                    "relation": item.relation,
+                    "value": item.value,
+                    "epistemic_status": item.epistemic_status,
+                }
+                for item in self.interpretations
+            ),
+            key=lambda item: (
+                item["subject_ref"],
+                item["relation"],
+                item["value"],
+                item["epistemic_status"],
+            ),
+        )
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
 
 class SituationRevisionObservation(BaseModel):
     """Trusted external Situation delta admitted for continuous cognition.
@@ -354,10 +390,12 @@ class CognitiveOpportunity(BaseModel):
     reason_codes: list[str] = Field(default_factory=list, max_length=8)
     recommended_cognition: CognitiveOpportunityMode = "slow"
     situation_digest: str = Field(default="", max_length=64)
+    situation_signature: str = Field(default="", max_length=64)
 
     @field_validator(
         "opportunity_id",
         "situation_digest",
+        "situation_signature",
         mode="before",
     )
     @classmethod
@@ -396,6 +434,10 @@ class CognitiveOpportunity(BaseModel):
                 raise ValueError(
                     "goal-free Situation opportunity requires situation_digest"
                 )
+            if len(self.situation_signature) != 64:
+                raise ValueError(
+                    "goal-free Situation opportunity requires situation_signature"
+                )
             if not self.source_refs:
                 raise ValueError(
                     "goal-free Situation opportunity requires trusted source_refs"
@@ -418,6 +460,7 @@ class CognitiveOpportunity(BaseModel):
         reason_codes: list[str] | None = None,
         recommended_cognition: CognitiveOpportunityMode = "slow",
         situation_digest: str = "",
+        situation_signature: str = "",
     ) -> "CognitiveOpportunity":
         payload = {
             "trigger": trigger,
@@ -428,6 +471,7 @@ class CognitiveOpportunity(BaseModel):
             "reason_codes": list(reason_codes or []),
             "recommended_cognition": recommended_cognition,
             "situation_digest": situation_digest,
+            "situation_signature": situation_signature,
         }
         encoded = json.dumps(
             payload,
@@ -448,6 +492,7 @@ class CognitiveOpportunity(BaseModel):
             reason_codes=list(reason_codes or []),
             recommended_cognition=recommended_cognition,
             situation_digest=situation_digest,
+            situation_signature=situation_signature,
         )
 
     def prompt_projection(self) -> dict[str, Any]:
@@ -517,6 +562,13 @@ class SituationalCognitionRequest(BaseModel):
         if self.opportunity.situation_digest != self.situation.digest:
             raise ValueError(
                 "Situational cognition opportunity must bind the supplied Situation digest"
+            )
+        if (
+            self.opportunity.situation_signature
+            != self.situation.interpretation_signature()
+        ):
+            raise ValueError(
+                "Situational cognition opportunity must bind the supplied Situation signature"
             )
         situation_sources = {item.reference_id for item in self.situation.source_refs}
         if not self.opportunity.source_refs:

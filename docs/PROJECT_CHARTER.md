@@ -200,7 +200,10 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   justify cognition even when nobody addressed Chromie and no Goal is open. Derived
   salience is a cheap readiness judgment from Stable Mind, Memory, relationships,
   Situation, and open Responsibilities; it is not a new `SalienceManager`, Goal, or
-  authority. The valid result may be silence/continued observation. A self-initiated
+  authority. Salience may consume only Memory already admitted by the Memory owner's
+  disclosure policy and delivery-qualified Interaction state; hidden/private Memory or a
+  merely scheduled utterance cannot silently increase outward social initiative. The valid
+  result may be silence/continued observation. A self-initiated
   Communicative Activity must be low-consequence, proportionate, privacy-safe, and
   grounded in the admitted Situation. Effectful autonomous action remains behind normal
   authorization/autonomy/safety policy and is never implied merely by relationship or

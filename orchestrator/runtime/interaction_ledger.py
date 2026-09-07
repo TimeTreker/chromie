@@ -247,6 +247,13 @@ class InteractionLedger:
                 "delivery_role": _normalized_text(
                     event.get("delivery_role")
                 ),
+                "cognitive_opportunity_id": _normalized_text(
+                    event.get("cognitive_opportunity_id")
+                ),
+                "situation_signature": _normalized_text(
+                    event.get("situation_signature")
+                ),
+                "subject_refs": _normalized_ids(event.get("subject_refs")),
                 "claims": _normalized_ids(event.get("claims")),
                 "commitment": _normalized_text(event.get("commitment")),
                 "must_not_claim_completion": event.get(

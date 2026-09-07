@@ -457,6 +457,14 @@ use audience-gated Memory until a trusted presence/identity source supplies that
 Relationship context may change salience and natural wording; it never becomes disclosure,
 factual-trust, or effect authorization.
 
+Goal-free social readiness is now filtered before model cognition by a bounded mechanical
+salience policy. It may use only current trusted Situation, relational Memory already cleared
+for the current model audience, and actually delivered Interaction facts. Routine presence,
+social non-interruption context, uncertainty/conflict, pending speech, or an identical
+semantic Situation recently acknowledged by delivered speech can therefore remain local with
+no model call. A relationship can increase relevance for a genuine social change; it cannot
+manufacture a need to speak.
+
 ## Progressive cognition and conversational self-repair
 
 Chromie may sometimes speak a useful current judgment before all worthwhile cognition is

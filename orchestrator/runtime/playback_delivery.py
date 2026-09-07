@@ -116,6 +116,9 @@ class PlaybackDeliveryLifecycle:
         delivery_role: str = "response",
         claims: list[str] | None = None,
         must_not_claim_completion: bool | None = None,
+        cognitive_opportunity_id: str = "",
+        situation_signature: str = "",
+        subject_refs: list[str] | None = None,
     ) -> dict[str, Any] | None:
         sid = str(session_id or "").strip()
         text = str(normalized_text or "").strip()
@@ -136,6 +139,13 @@ class PlaybackDeliveryLifecycle:
             normalized_activity_ids.sort()
         normalized_goal_ids = self._normalized_text_values(source_goal_ids)
         normalized_claims = self._normalized_text_values(claims)
+        normalized_subject_refs = self._normalized_text_values(subject_refs)
+        normalized_opportunity_id = " ".join(
+            str(cognitive_opportunity_id or "").strip().split()
+        )
+        normalized_situation_signature = " ".join(
+            str(situation_signature or "").strip().split()
+        )
         normalized_plan_id = " ".join(str(canonical_plan_id or "").strip().split())
         normalized_plan_fingerprint = " ".join(
             str(canonical_plan_fingerprint or "").strip().split()
@@ -225,6 +235,9 @@ class PlaybackDeliveryLifecycle:
                 "communicative_activity_ids": normalized_activity_ids,
                 "claims": normalized_claims,
                 "must_not_claim_completion": must_not_claim_completion,
+                "cognitive_opportunity_id": normalized_opportunity_id,
+                "situation_signature": normalized_situation_signature,
+                "subject_refs": normalized_subject_refs,
                 "generation": int(generation),
                 "orders": normalized_orders,
             }

@@ -518,6 +518,17 @@ there is no periodic prompt asking "what should I do now?" and no ambient semant
 loop. Family is expected to dominate ordinary data because it is Chromie's primary living
 context, not because the runtime switches into a family mode.
 
+The first salience source slice is implemented for Goal-free Situation cognition. Runtime
+computes a semantic Situation signature from only subject/relation/value/epistemic status,
+excluding turn IDs, revisions, and source-event identities. After disclosure-safe Memory
+activation and Interaction projection, a deterministic policy decides `local|fast|slow`
+before any situational model call. Routine/ambient presence, uncertain/conflicted state,
+pending speech, non-interruption social context, or an identical semantic Situation that
+recently produced delivered situational speech stays local. Direct social change and relevant
+relationship context may justify Fast cognition; consequential Goal-free state remains slow
+and fail-quiet. The Interaction Ledger retains the signature only from actual playback, so a
+scheduled or unheard proposal never counts as social common ground.
+
 The first Goal-free source slice is now implemented. `SituationRevisionObservation` and
 `CognitiveOpportunity` may carry no Goal IDs only when an exact Situation digest and trusted
 source provenance remain bound; the opportunity also carries bounded subject/source refs.

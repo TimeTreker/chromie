@@ -17,6 +17,41 @@ from shared.chromie_contracts.interaction_ledger import InteractionLedgerEvent
 
 
 class InteractionLedgerTests(unittest.TestCase):
+    def test_goal_free_situation_delivery_retains_semantic_signature(self) -> None:
+        ledger = InteractionLedger()
+        lifecycle = PlaybackDeliveryLifecycle(
+            interaction_event_sink=ledger.record_playback_event
+        )
+        lifecycle.register_turn_speech_event(
+            session_id="sid",
+            turn_id="arrival-observation-1",
+            generation=1,
+            orders=[1],
+            normalized_text="爸爸回来啦。",
+            stage="situational_cognition",
+            purpose="greeting",
+            delivery_role="situational_response",
+            cognitive_opportunity_id="opportunity-arrival",
+            situation_signature="a" * 64,
+            subject_refs=["person:dad"],
+        )
+        lifecycle.update_turn_speech_event_for_playback(
+            generation=1,
+            order=1,
+            session_id="sid",
+            started=True,
+            reason="playback_start",
+        )
+
+        context = ledger.context("sid")
+
+        self.assertEqual(len(context.already_spoken), 1)
+        metadata = context.already_spoken[0]["metadata"]
+        self.assertEqual(metadata["delivery_role"], "situational_response")
+        self.assertEqual(metadata["cognitive_opportunity_id"], "opportunity-arrival")
+        self.assertEqual(metadata["situation_signature"], "a" * 64)
+        self.assertEqual(metadata["subject_refs"], ["person:dad"])
+
     def test_playback_transitions_append_without_rewriting_prior_fact(self) -> None:
         ledger = InteractionLedger()
         lifecycle = PlaybackDeliveryLifecycle(

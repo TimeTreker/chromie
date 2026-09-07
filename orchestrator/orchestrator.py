@@ -165,12 +165,7 @@ from shared.chromie_contracts.execution_outcome import (
     aggregate_execution_status,
     goal_completion_qualification_summary,
 )
-from shared.chromie_contracts.situation import (
-    CognitiveOpportunity,
-    SituationProjection,
-    SituationRevisionObservation,
-    SituationalCognitionRequest,
-)
+from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -629,6 +624,9 @@ class VoiceAssistant:
         delivery_role: str = "response",
         claims: list[str] | None = None,
         must_not_claim_completion: bool | None = None,
+        cognitive_opportunity_id: str = "",
+        situation_signature: str = "",
+        subject_refs: list[str] | None = None,
     ) -> dict[str, Any] | None:
         return self._playback_state().register_turn_speech_event(
             session_id=session_id,
@@ -648,6 +646,9 @@ class VoiceAssistant:
             delivery_role=delivery_role,
             claims=claims,
             must_not_claim_completion=must_not_claim_completion,
+            cognitive_opportunity_id=cognitive_opportunity_id,
+            situation_signature=situation_signature,
+            subject_refs=subject_refs,
         )
 
 
@@ -1529,6 +1530,22 @@ class VoiceAssistant:
                     if isinstance(metadata, dict)
                     and isinstance(metadata.get("must_not_claim_completion"), bool)
                     else None
+                ),
+                cognitive_opportunity_id=(
+                    str(metadata.get("cognitive_opportunity_id") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                situation_signature=(
+                    str(metadata.get("situation_signature") or "")
+                    if isinstance(metadata, dict)
+                    else ""
+                ),
+                subject_refs=(
+                    list(metadata.get("subject_refs") or [])
+                    if isinstance(metadata, dict)
+                    and isinstance(metadata.get("subject_refs"), list)
+                    else []
                 ),
             )
             if speech_event is not None:
@@ -4946,202 +4963,6 @@ class VoiceAssistant:
             repeat_check_context=extra_context,
         )
 
-
-    async def _situational_cognition_response(
-        self,
-        *,
-        observation: SituationRevisionObservation,
-        opportunity: CognitiveOpportunity,
-        session_id: str | None,
-        language: str,
-    ) -> InteractionResponse | None:
-        """Invoke the same Cognitive Core with Goal/Work authority removed.
-
-        Runtime supplies trusted current Situation and readiness provenance. The model
-        may choose silence or author one exact low-commitment utterance; it cannot create
-        Goal state, Capability Work, confirmation, or effect authority.
-        """
-
-        if observation.goal_ids or observation.projection.focus_goal_ids:
-            raise ValueError("situational cognition cannot carry Goal bindings")
-        if opportunity.goal_ids:
-            raise ValueError("situational cognition opportunity cannot carry Goals")
-        if opportunity.trigger != "situation_revision":
-            raise ValueError("situational cognition requires situation_revision trigger")
-        if opportunity.situation_digest != observation.projection.digest:
-            self.session_log(
-                session_id,
-                "situational_cognition_rejected: reason=situation_digest_mismatch",
-            )
-            return None
-        if set(opportunity.source_refs) != set(observation.source_refs):
-            self.session_log(
-                session_id,
-                "situational_cognition_rejected: reason=source_provenance_mismatch",
-            )
-            return None
-
-        context = self.build_context(session_id)
-        context["situation"] = observation.projection.prompt_projection()
-        context["cognitive_opportunity"] = opportunity.prompt_projection()
-        situation_activation_texts: list[str] = []
-        opportunity_subjects = set(opportunity.subject_refs)
-        for interpretation in observation.projection.interpretations:
-            if opportunity_subjects and interpretation.subject_ref not in opportunity_subjects:
-                continue
-            situation_activation_texts.extend(
-                [
-                    interpretation.subject_ref,
-                    interpretation.relation,
-                    interpretation.value,
-                ]
-            )
-        relational_memory = self.conversation_state.activated_memory_context(
-            activation_texts=situation_activation_texts,
-            activation_subject_refs=list(opportunity.subject_refs),
-            # PSM-2 does not infer who can hear a goal-free utterance. Until a
-            # trusted multi-person presence/identity adapter supplies the complete
-            # audience, Memory entries requiring audience resolution stay hidden.
-            audience_refs=[],
-            limit=12,
-        )
-        context["memory_summary"] = relational_memory["summary"]
-        context["extracted_memory"] = relational_memory["entries"]
-        context["relational_memory_selection"] = relational_memory["selection"]
-        interaction_ledger = getattr(
-            getattr(self, "cognitive_runtime", None),
-            "interaction_ledger",
-            None,
-        )
-        ledger_scope = str(
-            session_id
-            or getattr(self, "session_id", "")
-            or context.get("conversation_id")
-            or "goal-free-situation"
-        ).strip()
-        if interaction_ledger is not None:
-            context["interaction_context"] = interaction_ledger.context(
-                ledger_scope,
-                goal_ids=[],
-                turn_id=observation.observation_id,
-            ).model_dump(mode="json")
-
-        request = SituationalCognitionRequest(
-            opportunity=opportunity,
-            situation=observation.projection,
-            language=language or "auto",
-            context=context,
-        )
-        cognition_call = getattr(
-            self.agent_client,
-            "resolve_situational_cognition",
-            None,
-        )
-        if not callable(cognition_call):
-            self.session_log(
-                session_id,
-                "situational_cognition_unavailable: opportunity_id=%s",
-                opportunity.opportunity_id,
-            )
-            return None
-        session = await self.get_http_session()
-        started_ms = now_ms()
-        resolution = await cognition_call(
-            session,
-            request=request,
-            timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
-        )
-        record_session_workflow_stage(
-            self,
-            session_id,
-            stage="situational_cognition",
-            started_monotonic_ms=started_ms,
-            finished_monotonic_ms=now_ms(),
-            status="resolved",
-            input_payload={
-                "opportunity_id": opportunity.opportunity_id,
-                "situation_digest": observation.projection.digest,
-                "source_refs": list(observation.source_refs),
-            },
-            output_payload=resolution,
-            errors=[],
-            metadata={
-                "wording_owner": "cognitive_core",
-                "authority_scope": "goal_free_situation",
-            },
-        )
-        if (
-            resolution.opportunity_id != opportunity.opportunity_id
-            or resolution.situation_digest != observation.projection.digest
-            or set(resolution.source_refs) != set(observation.source_refs)
-        ):
-            raise ValueError(
-                "situational cognition result changed trusted readiness provenance"
-            )
-        if resolution.disposition == "silence":
-            self.session_log(
-                session_id,
-                "situational_cognition_silence: opportunity_id=%s",
-                opportunity.opportunity_id,
-            )
-            return None
-        activity = resolution.activity
-        if activity is None:  # guarded by contract; keep runtime fail-closed
-            raise ValueError("communicate situational cognition has no Activity")
-
-        response = InteractionResponse(
-            speech=[
-                InteractionSpeech(
-                    id=f"situational_speech_{activity.activity_id}"[:160],
-                    text=activity.text,
-                    timing="immediate",
-                    style="brief",
-                    priority="normal",
-                    interruptible=True,
-                    metadata={
-                        "source": "situational_cognition",
-                        "wording_owner": "cognitive_core",
-                        "authority_scope": "goal_free_situation",
-                        "truth_stage": "context_grounded",
-                        "speech_act": activity.speech_act,
-                        "delivery_role": "situational_response",
-                        "goal_completion_authority": False,
-                        "cognitive_opportunity_id": opportunity.opportunity_id,
-                        "situation_digest": observation.projection.digest,
-                        "source_situation_refs": list(observation.source_refs),
-                        "subject_refs": list(resolution.subject_refs),
-                        "language": language or "auto",
-                        "wait_for_playback_start": True,
-                        "playback_start_required_for_delivery": True,
-                    },
-                )
-            ],
-            capabilities=[],
-            metadata={
-                "source": "situational_cognition",
-                "authority_scope": "goal_free_situation",
-                "cognitive_opportunity": opportunity.prompt_projection(),
-                "situation": observation.projection.prompt_projection(),
-                "source_situation_refs": list(observation.source_refs),
-                "goal_ids": [],
-                "language": language or "auto",
-            },
-        )
-        if ledger_scope:
-            response, suppressed = suppress_already_delivered_speech(
-                response,
-                (
-                    item.get("text") or ""
-                    for item in self._delivered_turn_speech_events(ledger_scope)
-                ),
-            )
-            if suppressed:
-                self.session_log(
-                    session_id,
-                    "situational_cognition_duplicate_speech_suppressed: count=%s",
-                    suppressed,
-                )
-        return response if response.speech else None
 
     async def _reenter_cognition_for_provider_state(
         self,

@@ -157,6 +157,8 @@ class SituationalCognitionResolver:
             f"{bounded_json(request.situation.prompt_projection(), 7000)}\n\n"
             "Cognitive Opportunity JSON:\n"
             f"{bounded_json(request.opportunity.prompt_projection(), 3000)}\n\n"
+            "Deterministic Situational Salience JSON:\n"
+            f"{bounded_json(context.get('situational_salience') or {}, 1200)}\n\n"
             "Relevant Memory Summary:\n"
             f"{bounded_json(context.get('memory_summary') or '', 1800)}\n\n"
             "Activated extracted Memory JSON:\n"
