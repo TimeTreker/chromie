@@ -20,7 +20,7 @@ from shared.chromie_runtime.latency_evidence import distribution  # noqa: E402
 
 
 REPORT_TYPE = "chromie.inference_provider_contention_summary"
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -63,7 +63,7 @@ def _discover_sources(values: Iterable[str | Path]) -> list[Path]:
 
 def _is_provider_evidence(payload: dict[str, Any]) -> bool:
     return (
-        payload.get("schema_version") == 2
+        payload.get("schema_version") == 3
         and isinstance(payload.get("provider"), str)
         and isinstance(payload.get("phases"), dict)
         and "foreground_under_deliberative_load" in payload["phases"]
@@ -81,8 +81,11 @@ def _identity(payload: dict[str, Any]) -> dict[str, Any]:
         "accelerator_identity": payload.get("accelerator_identity"),
         "model": payload.get("model"),
         "model_revision": payload.get("model_revision"),
+        "model_artifact": payload.get("model_artifact"),
         "base_url": payload.get("base_url"),
         "git_revision": payload.get("git_revision"),
+        "git_dirty": payload.get("git_dirty"),
+        "git_worktree_state_sha256": payload.get("git_worktree_state_sha256"),
         "scheduler_operator_record": operator_record,
         "workload_config": payload.get("workload_config"),
     }

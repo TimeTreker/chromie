@@ -256,8 +256,9 @@ accepted optimum. Tune and qualify it on the actual target.
 
 `scripts/qualify_inference_provider.py` replaces the old vLLM-named transport probe because
 the maintained contract is an OpenAI-compatible candidate-provider contract, not a vLLM
-semantic contract. It supports `sglang` and `vllm`, records their provider-specific priority
-number conventions, and includes a mandatory `foreground_under_deliberative_load` phase:
+semantic contract. It supports `sglang` and `vllm` candidate qualification plus an `ollama`
+contention-only deployed control, records provider-specific priority semantics, and includes a
+mandatory `foreground_under_deliberative_load` phase:
 
 ```text
 optional TTS warm/baseline
@@ -276,6 +277,22 @@ mapping. SGLang's default convention is translated as larger numeric values firs
 priority convention is translated as smaller numeric values first. These raw numbers are
 evidence knobs only and never become semantic configuration.
 
+For Qwen3-family contention canaries, the workload also freezes non-thinking behavior at the
+provider wire boundary instead of assuming one provider's extension works everywhere. SGLang
+and vLLM receive `chat_template_kwargs.enable_thinking=false`; Ollama's OpenAI-compatible
+endpoint receives its supported `reasoning_effort=none`. The exact control is retained under
+`workload_config.reasoning_control`, so samples with different reasoning behavior cannot be
+combined into one latency distribution.
+
+Every retained provider sample also carries an explicit `model_artifact` operator record with
+`source_model_id`, `weight_format`, and `quantization`. This is required because a shared model
+name is not enough to prove a scheduler-isolated comparison: a GGUF Q4 checkpoint and an HF
+BF16 safetensors checkpoint have different memory footprints and compute cost even when both
+descend from the same base model. The evidence also hashes the current tracked diff plus all
+untracked non-ignored source files. Repeated samples therefore cannot be summarized across a
+clean/dirty transition or across two different dirty worktrees that happen to share the same
+Git commit.
+
 Example SGLang run with the default CosyVoice service:
 
 ```bash
@@ -285,6 +302,7 @@ python scripts/qualify_inference_provider.py \
   --runtime-image "$SGLANG_IMAGE" \
   --model "$SGLANG_SERVED_MODEL_NAME" \
   --model-revision "$SGLANG_MODEL_REVISION" \
+  --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"safetensors","quantization":"none","dtype":"bfloat16"}' \
   --cuda-runtime '<exact-cuda-runtime>' \
   --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
   --tts-url ws://127.0.0.1:5000 \
@@ -339,6 +357,7 @@ python scripts/qualify_inference_provider.py \
   --runtime-image "$OLLAMA_IMAGE" \
   --model '<exact-served-ollama-model-name>' \
   --model-revision '<exact-ollama-model-digest>' \
+  --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"gguf","quantization":"Q4_K_M"}' \
   --cuda-runtime '<exact-container-cuda-runtime>' \
   --scheduler-config-json '{"num_parallel":1,"context_length":32768,"flash_attention":true,"kv_cache_type":"q8_0"}' \
   --contention-only \
@@ -361,25 +380,52 @@ image/CUDA/accelerator/source revision/scheduler operator record/workload config
 It reports p50/p90/p95/p99 for Fast-GI TTFT, Fast-Planner TTFT, the complete foreground window,
 Deep timing, TTS timing, peak VRAM, and GPU utilization. It does not invent a promotion threshold.
 
-Example after choosing and freezing one exact command as `$RUN_CONTENTION`:
+Use `scripts/run_inference_contention_series.py` instead of manually copying a command N times.
+The wrapper forwards one frozen `--contention-only` transaction, owns only the per-trial output
+paths, verifies that Git revision plus worktree-state hash do not change between trials, and then
+invokes the maintained summarizer. It refuses to mix semantic GI probes into the latency series.
 
 ```bash
-mkdir -p .chromie/acceptance/inference-runtime/sglang-contention
-for i in $(seq -w 1 20); do
-  $RUN_CONTENTION \
-    --output ".chromie/acceptance/inference-runtime/sglang-contention/trial-${i}.json"
-done
-
-python scripts/summarize_inference_provider_evidence.py \
-  --source .chromie/acceptance/inference-runtime/sglang-contention \
-  --label sglang \
-  --output .chromie/acceptance/inference-runtime/sglang-contention-summary.json
+python scripts/run_inference_contention_series.py \
+  --trials 20 \
+  --output-dir .chromie/acceptance/inference-runtime/sglang-contention \
+  --summary-output .chromie/acceptance/inference-runtime/sglang-contention-summary.json \
+  --label sglang-rtx4090-laptop \
+  -- \
+  --provider sglang \
+  --provider-version '<exact-sglang-version>' \
+  --runtime-image "$SGLANG_IMAGE" \
+  --model "$SGLANG_SERVED_MODEL_NAME" \
+  --model-revision "$SGLANG_MODEL_REVISION" \
+  --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"safetensors","quantization":"none","dtype":"bfloat16"}' \
+  --cuda-runtime '<exact-cuda-runtime>' \
+  --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
+  --contention-only \
+  --tts-url ws://127.0.0.1:5000
 ```
 
 The sample count remains explicit in the report. Twenty samples are shown only as an operator
 example; this document does not redefine the project's latency acceptance policy or claim that a
 particular sample count is statistically sufficient for release. Use the same count and frozen
 workload for each provider comparison.
+
+### RTX 4090 Laptop comparison boundary
+
+The maintained `rtx4090_laptop` profile uses Ollama `qwen3.5:4b`, which is a Q4_K_M GGUF
+artifact, while the straightforward SGLang/vLLM candidate path uses the upstream
+`Qwen/Qwen3.5-4B` safetensors checkpoint. Therefore use the laptop in two distinct layers:
+
+1. **Scheduler/runtime candidate comparison:** SGLang versus vLLM on the exact same HF model
+   revision, weight format, dtype, context, workload, TTS state, and sample count. Differences
+   here can reasonably be attributed to the serving/runtime stack and its scheduling controls.
+2. **Deployed outcome comparison:** compare the winning candidate with production Ollama under
+   the same user-visible workload. Because the model artifact/quantization differs, this measures
+   the whole deployed topology outcome and MUST NOT be reported as scheduler-only causality.
+
+If an exact matched-weight artifact is later qualified across all runtimes, a stricter
+scheduler-isolated three-provider comparison may be added. Do not weaken model quality merely to
+force artifact symmetry; serving-runtime qualification and model-role qualification remain
+separate decisions.
 
 This phase is provider-level scheduling evidence. The Fast-GI/Fast-Planner strings are
 canaries, not production semantic transactions, and

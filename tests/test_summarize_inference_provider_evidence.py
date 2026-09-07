@@ -13,7 +13,7 @@ def _sample(*, index: int, provider: str = "sglang", planner_before_deep: bool =
     planner_finish = fast_start + 0.4 + index * 0.01
     deep_finish = planner_finish + 1.0 if planner_before_deep else planner_finish - 0.1
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "provider": provider,
         "provider_version": "0.5.19",
         "qualification_mode": "contention_control",
@@ -25,9 +25,15 @@ def _sample(*, index: int, provider: str = "sglang", planner_before_deep: bool =
         },
         "model": "Qwen/Qwen3.5-9B",
         "model_revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+        "model_artifact": {
+            "source_model_id": "Qwen/Qwen3.5-9B",
+            "weight_format": "safetensors",
+            "quantization": "none",
+        },
         "base_url": "http://127.0.0.1:30000/v1",
         "git_revision": "abc123",
         "git_dirty": False,
+        "git_worktree_state_sha256": "worktree-test",
         "status": "pass",
         "scheduler_config": {
             "operator_record": {"context_length": 32768},
@@ -121,4 +127,31 @@ def test_summary_rejects_mixed_qualification_identity(tmp_path: Path) -> None:
     _write(tmp_path / "trial-2.json", second)
 
     with pytest.raises(ValueError, match="model_revision"):
+        build_summary([tmp_path])
+
+
+def test_summary_rejects_clean_dirty_or_worktree_identity_drift(tmp_path: Path) -> None:
+    first = _sample(index=1)
+    second = _sample(index=2)
+    second["git_dirty"] = True
+    second["git_worktree_state_sha256"] = "different-worktree"
+    _write(tmp_path / "trial-1.json", first)
+    _write(tmp_path / "trial-2.json", second)
+
+    with pytest.raises(ValueError, match="git_dirty|git_worktree_state_sha256"):
+        build_summary([tmp_path])
+
+
+def test_summary_rejects_model_artifact_drift(tmp_path: Path) -> None:
+    first = _sample(index=1)
+    second = _sample(index=2)
+    second["model_artifact"] = {
+        "source_model_id": "Qwen/Qwen3.5-9B",
+        "weight_format": "gguf",
+        "quantization": "Q4_K_M",
+    }
+    _write(tmp_path / "trial-1.json", first)
+    _write(tmp_path / "trial-2.json", second)
+
+    with pytest.raises(ValueError, match="model_artifact"):
         build_summary([tmp_path])

@@ -14,6 +14,7 @@ from scripts.qualify_inference_provider import (
     _extract_stream_delta,
     _load_goal_interpreter_manifest,
     _candidate_compatible_schema,
+    _model_artifact_arg,
     _provider_priority,
     _provider_priority_semantics,
     _priority_mapping,
@@ -23,27 +24,48 @@ from agent.app.inference_compute import CognitionComputeClass
 
 
 class InferenceProviderQualificationTests(unittest.TestCase):
-    def test_chat_payload_explicitly_disables_qwen_thinking(self) -> None:
+    def test_chat_payload_uses_candidate_qwen_thinking_control(self) -> None:
+        for provider in ("sglang", "vllm"):
+            with self.subTest(provider=provider):
+                payload = _chat_payload(
+                    "Qwen/Qwen3.5-4B",
+                    "prompt",
+                    provider=provider,
+                    stream=True,
+                    max_tokens=32,
+                )
+
+                self.assertEqual(
+                    payload["chat_template_kwargs"],
+                    {"enable_thinking": False},
+                )
+                self.assertNotIn("reasoning_effort", payload)
+                self.assertEqual(payload["temperature"], 0)
+                self.assertTrue(payload["stream"])
+
+    def test_chat_payload_uses_ollama_openai_reasoning_control(self) -> None:
         payload = _chat_payload(
-            "Qwen/Qwen3.5-4B",
+            "qwen3.5:4b",
             "prompt",
+            provider="ollama",
             stream=True,
             max_tokens=32,
         )
 
-        self.assertEqual(
-            payload["chat_template_kwargs"],
-            {"enable_thinking": False},
-        )
-        self.assertEqual(payload["temperature"], 0)
-        self.assertTrue(payload["stream"])
+        self.assertEqual(payload["reasoning_effort"], "none")
+        self.assertNotIn("chat_template_kwargs", payload)
 
     def test_chat_payload_carries_provider_priority_only_when_requested(self) -> None:
         without_priority = _chat_payload(
-            "model", "prompt", stream=True, max_tokens=32
+            "model", "prompt", provider="sglang", stream=True, max_tokens=32
         )
         with_priority = _chat_payload(
-            "model", "prompt", stream=True, max_tokens=32, priority=300
+            "model",
+            "prompt",
+            provider="sglang",
+            stream=True,
+            max_tokens=32,
+            priority=300,
         )
 
         self.assertNotIn("priority", without_priority)
@@ -89,6 +111,17 @@ class InferenceProviderQualificationTests(unittest.TestCase):
             },
         )
 
+    def test_model_artifact_requires_comparison_identity_fields(self) -> None:
+        artifact = _model_artifact_arg(
+            '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"gguf",'
+            '"quantization":"Q4_K_M","dtype":"q4"}'
+        )
+        self.assertEqual(artifact["source_model_id"], "Qwen/Qwen3.5-4B")
+        self.assertEqual(artifact["quantization"], "Q4_K_M")
+
+        with self.assertRaisesRegex(Exception, "source_model_id"):
+            _model_artifact_arg('{"weight_format":"safetensors","quantization":"none"}')
+
     def test_ollama_control_never_fabricates_request_priority(self) -> None:
         self.assertIsNone(
             _provider_priority(
@@ -114,6 +147,7 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         payload = _chat_payload(
             "RedHatAI/gemma-3-12b-it-quantized.w4a16",
             "prompt",
+            provider="sglang",
             stream=False,
             max_tokens=32,
         )

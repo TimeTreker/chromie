@@ -133,10 +133,12 @@ class Evidence:
     started_at: str
     git_revision: str | None
     git_dirty: bool | None
+    git_worktree_state_sha256: str | None
     cuda_runtime: str
     qualification_mode: str = "provider_contract"
     accelerator_identity: dict[str, Any] = field(default_factory=dict)
     runtime_image: str | None = None
+    model_artifact: dict[str, Any] = field(default_factory=dict)
     scheduler_config: dict[str, Any] = field(default_factory=dict)
     workload_config: dict[str, Any] = field(default_factory=dict)
     phases: dict[str, Any] = field(default_factory=dict)
@@ -187,7 +189,7 @@ class Evidence:
         else:
             evidence_class = "foreground_contention_control"
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "evidence_class": evidence_class,
             "claim_boundary": claim_boundary,
             "qualification_dimensions": {
@@ -207,6 +209,7 @@ class Evidence:
             "accelerator_identity": self.accelerator_identity,
             "model": self.model,
             "model_revision": self.model_revision,
+            "model_artifact": self.model_artifact,
             "base_url": self.base_url,
             "scheduler_config": self.scheduler_config,
             "workload_config": self.workload_config,
@@ -214,6 +217,7 @@ class Evidence:
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "git_revision": self.git_revision,
             "git_dirty": self.git_dirty,
+            "git_worktree_state_sha256": self.git_worktree_state_sha256,
             "http_timeout": None,
             "status": self.status,
             "error": self.error,
@@ -249,6 +253,43 @@ def _git_dirty() -> bool | None:
                 stderr=subprocess.DEVNULL,
             ).strip()
         )
+    except Exception:
+        return None
+
+
+def _git_worktree_state_sha256() -> str | None:
+    """Hash tracked changes plus untracked non-ignored files for evidence identity."""
+
+    try:
+        digest = hashlib.sha256()
+        digest.update(b"git-diff-head\0")
+        digest.update(
+            subprocess.check_output(
+                ["git", "diff", "--binary", "HEAD", "--"],
+                cwd=ROOT,
+                stderr=subprocess.DEVNULL,
+            )
+        )
+        untracked = subprocess.check_output(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            cwd=ROOT,
+            stderr=subprocess.DEVNULL,
+        ).split(b"\0")
+        for encoded in sorted(item for item in untracked if item):
+            relative = encoded.decode("utf-8", errors="surrogateescape")
+            path = ROOT / relative
+            digest.update(b"untracked\0")
+            digest.update(encoded)
+            digest.update(b"\0")
+            if path.is_symlink():
+                digest.update(b"symlink\0")
+                digest.update(os.readlink(path).encode("utf-8", errors="surrogateescape"))
+            elif path.is_file():
+                digest.update(path.read_bytes())
+            else:
+                digest.update(b"non-regular")
+            digest.update(b"\0")
+        return digest.hexdigest()
     except Exception:
         return None
 
@@ -301,10 +342,50 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
+def _reasoning_control_identity(provider: str, model: str) -> dict[str, Any]:
+    """Describe the exact wire-level reasoning control used by this workload."""
+
+    if "qwen3" not in model.casefold():
+        return {"mode": "not_applied_non_qwen3"}
+    if provider == "ollama":
+        return {
+            "mode": "disabled",
+            "wire_field": "reasoning_effort",
+            "wire_value": "none",
+        }
+    if provider in {"sglang", "vllm"}:
+        return {
+            "mode": "disabled",
+            "wire_field": "chat_template_kwargs.enable_thinking",
+            "wire_value": False,
+        }
+    raise ValueError(f"unsupported provider: {provider!r}")
+
+
+def _apply_reasoning_control(
+    payload: dict[str, Any],
+    *,
+    provider: str,
+    model: str,
+) -> None:
+    """Keep the synthetic qualification workload non-thinking per provider wire API."""
+
+    control = _reasoning_control_identity(provider, model)
+    if control["mode"] != "disabled":
+        return
+    if provider == "ollama":
+        # Ollama's OpenAI-compatible endpoint owns reasoning control through the
+        # supported reasoning_effort field, not vLLM/SGLang chat-template kwargs.
+        payload["reasoning_effort"] = "none"
+        return
+    payload["chat_template_kwargs"] = {"enable_thinking": False}
+
+
 def _chat_payload(
     model: str,
     prompt: str,
     *,
+    provider: str,
     stream: bool,
     max_tokens: int,
     priority: int | None = None,
@@ -325,8 +406,7 @@ def _chat_payload(
         "max_tokens": max_tokens,
         "temperature": 0,
     }
-    if "qwen3" in model.casefold():
-        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    _apply_reasoning_control(payload, provider=provider, model=model)
     if priority is not None:
         payload["priority"] = int(priority)
     return payload
@@ -884,6 +964,7 @@ async def _qualify_goal_interpreter(
     client: httpx.AsyncClient,
     endpoint: str,
     *,
+    provider: str,
     model: str,
     priority: int | None = None,
     manifest_path: Path = DEFAULT_GOAL_INTERPRETER_MANIFEST,
@@ -932,8 +1013,7 @@ async def _qualify_goal_interpreter(
                 },
             },
         }
-        if "qwen3" in model.casefold():
-            request_payload["chat_template_kwargs"] = {"enable_thinking": False}
+        _apply_reasoning_control(request_payload, provider=provider, model=model)
         if priority is not None:
             request_payload["priority"] = int(priority)
         started = time.perf_counter()
@@ -1046,6 +1126,7 @@ async def _qualify_foreground_under_deep_load(
             _chat_payload(
                 model,
                 deep_prompt,
+                provider=provider,
                 stream=True,
                 max_tokens=deliberative_max_tokens,
                 priority=deep_priority,
@@ -1088,6 +1169,7 @@ async def _qualify_foreground_under_deep_load(
         _chat_payload(
             model,
             "Reply with exactly: chromie-fast-gi-ready",
+            provider=provider,
             stream=True,
             max_tokens=32,
             priority=foreground_priority,
@@ -1111,6 +1193,7 @@ async def _qualify_foreground_under_deep_load(
         _chat_payload(
             model,
             "Reply with exactly: chromie-presentation-commit-ready",
+            provider=provider,
             stream=True,
             max_tokens=32,
             priority=foreground_priority,
@@ -1225,6 +1308,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 _chat_payload(
                     args.model,
                     "Reply with exactly: chromie-stream-ready",
+                    provider=args.provider,
                     stream=True,
                     max_tokens=32,
                 ),
@@ -1258,6 +1342,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
         structured_payload = _chat_payload(
             args.model,
             "Return status=ready and count=2 using the required JSON schema.",
+            provider=args.provider,
             stream=False,
             max_tokens=128,
         )
@@ -1308,6 +1393,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             _chat_payload(
                 args.model,
                 "Reply with exactly: chromie-stream-ready",
+                provider=args.provider,
                 stream=True,
                 max_tokens=32,
             ),
@@ -1329,7 +1415,13 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             _observe_stream(
                 client,
                 endpoint,
-                _chat_payload(args.model, overlap_prompt, stream=True, max_tokens=384),
+                _chat_payload(
+                    args.model,
+                    overlap_prompt,
+                    provider=args.provider,
+                    stream=True,
+                    max_tokens=384,
+                ),
                 label="overlap_a",
             )
         )
@@ -1337,7 +1429,13 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             _observe_stream(
                 client,
                 endpoint,
-                _chat_payload(args.model, overlap_prompt, stream=True, max_tokens=384),
+                _chat_payload(
+                    args.model,
+                    overlap_prompt,
+                    provider=args.provider,
+                    stream=True,
+                    max_tokens=384,
+                ),
                 label="overlap_b",
             )
         )
@@ -1370,7 +1468,13 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 cancelled_observation = await _observe_stream(
                     client,
                     endpoint,
-                    _chat_payload(args.model, overlap_prompt, stream=True, max_tokens=384),
+                    _chat_payload(
+                        args.model,
+                        overlap_prompt,
+                        provider=args.provider,
+                        stream=True,
+                        max_tokens=384,
+                    ),
                     label="cancel_target",
                     first_delta_event=cancel_started,
                 )
@@ -1382,7 +1486,13 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             _observe_stream(
                 client,
                 endpoint,
-                _chat_payload(args.model, overlap_prompt, stream=True, max_tokens=384),
+                _chat_payload(
+                    args.model,
+                    overlap_prompt,
+                    provider=args.provider,
+                    stream=True,
+                    max_tokens=384,
+                ),
                 label="cancel_survivor",
             )
         )
@@ -1426,6 +1536,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             goal_interpreter = await _qualify_goal_interpreter(
                 client,
                 endpoint,
+                provider=args.provider,
                 model=args.model,
                 priority=_provider_priority(
                     args.provider,
@@ -1452,6 +1563,24 @@ def _json_object_arg(value: str) -> dict[str, Any]:
     return parsed
 
 
+_MODEL_ARTIFACT_REQUIRED_FIELDS = ("source_model_id", "weight_format", "quantization")
+
+
+def _model_artifact_arg(value: str) -> dict[str, Any]:
+    parsed = _json_object_arg(value)
+    missing = [
+        key
+        for key in _MODEL_ARTIFACT_REQUIRED_FIELDS
+        if not isinstance(parsed.get(key), str) or not str(parsed.get(key)).strip()
+    ]
+    if missing:
+        raise argparse.ArgumentTypeError(
+            "model artifact must contain non-empty string fields: "
+            + ", ".join(_MODEL_ARTIFACT_REQUIRED_FIELDS)
+        )
+    return parsed
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("ollama", "sglang", "vllm"), required=True)
@@ -1460,6 +1589,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url")
     parser.add_argument("--model", required=True)
     parser.add_argument("--model-revision", required=True)
+    parser.add_argument(
+        "--model-artifact-json",
+        type=_model_artifact_arg,
+        required=True,
+        help=(
+            "Exact model-artifact identity for comparison integrity. Required fields: "
+            "source_model_id, weight_format, quantization. Extra fields such as dtype or "
+            "gguf_variant are retained verbatim."
+        ),
+    )
     parser.add_argument(
         "--cuda-runtime",
         required=True,
@@ -1561,10 +1700,12 @@ def main(argv: list[str] | None = None) -> int:
         runtime_image=args.runtime_image,
         model=args.model,
         model_revision=args.model_revision,
+        model_artifact=args.model_artifact_json,
         base_url=args.base_url,
         started_at=datetime.now(timezone.utc).isoformat(),
         git_revision=_git_revision(),
         git_dirty=_git_dirty(),
+        git_worktree_state_sha256=_git_worktree_state_sha256(),
         cuda_runtime=args.cuda_runtime,
         qualification_mode=(
             "contention_control" if args.contention_only else "provider_contract"
@@ -1583,6 +1724,7 @@ def main(argv: list[str] | None = None) -> int:
             "deliberative_max_tokens": args.deliberative_max_tokens,
             "tts_enabled": bool(args.tts_url),
             "tts_speaker": args.tts_speaker if args.tts_url else None,
+            "reasoning_control": _reasoning_control_identity(args.provider, args.model),
         },
     )
     result = asyncio.run(_run(args, evidence))
