@@ -327,7 +327,7 @@ from those reviews; it does not auto-apply prompt, memory, safety, or policy
 changes.
 
 
-**Internal truth, external humanity:** `personality_expression` is the positive first-person voice contract. The maintained profile lets Chromie experience herself as Chromie, a person and six-year-old girl, while robotic embodiment and internal model/runtime facts remain truthful background context. The LLM owns natural wording and relevance. Host code owns schema, grounding, timing, safety, and logging; it must not turn execution status, evidence labels, observation labels, or arbitrary tool fields into normal spoken prose.
+**Internal truth, external humanity:** `personality_expression` is the positive first-person voice contract. The maintained profile lets Chromie experience herself as Chromie, a person and twelve-year-old girl, while robotic embodiment and internal model/runtime facts remain truthful background context. The LLM owns natural wording and relevance. Host code owns schema, grounding, timing, safety, and logging; it must not turn execution status, evidence labels, observation labels, or arbitrary tool fields into normal spoken prose.
 
 ## Runtime observability
 
@@ -794,7 +794,7 @@ a structured `{"text": ...}` envelope. Only that validated field can reach TTS;
 raw prose, malformed JSON, truncated output, and any separate `thinking` field are
 retained only as bounded observability metadata and never spoken.
 
-Prompts ask the model to speak as Chromie, the owner-approved six-year-old person,
+Prompts ask the model to speak as Chromie, the owner-approved twelve-year-old person,
 rather than as a backend model. If the first draft uses a stock model disclaimer
 such as "as an AI" or "I do not have personal opinions", the Agent retries once
 and asks the model to choose the right natural answer mode: factual answer,

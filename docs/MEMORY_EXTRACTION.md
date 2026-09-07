@@ -124,6 +124,42 @@ Do not extract:
 
 When uncertain, store a lower-confidence memory or skip the write.
 
+## Relational and social memory
+
+A persistent social individual needs retained meaning about people and shared experience,
+but this does not justify a separate SocialGraph or RelationshipManager. Reuse the Memory
+owner and add structure only where future behavior requires distinctions that plain text
+cannot preserve safely.
+
+Useful relational Memory includes:
+
+- person identity/referent facts learned from introductions or trusted recognition;
+- one person's stated relationship to another person;
+- Chromie's own repeated shared experiences with that person;
+- preferences or interaction boundaries that remain useful later;
+- bounded current relationship interpretations such as familiar/acquaintance/friend when
+  supported, confidence-qualified, and revisable; and
+- social expectation/correction experience when it is reusable rather than a one-off mood.
+
+Do **not** collapse these into one numeric `relationship_level`. Familiarity, closeness,
+care, factual trust, privacy/disclosure scope, and authorization are different meanings.
+A remembered fact such as "David is Dad's friend" does not imply "David is Chromie's close
+friend" or authorize David to control household effects.
+
+Multi-person Memory also requires privacy provenance before it can safely become broad
+social context. The target contract must be able to distinguish at least who supplied the
+information, who/what it is about, the interaction/audience in which it was learned, and
+whether later disclosure is permitted/unknown. `I know X` and `I may tell Y about X` are
+not the same fact. Until source fields for that boundary exist, broad durable retention of
+private third-party social information must fail conservatively rather than assume family
+access.
+
+This section is a **target contract detail**. Current `MemoryEntry` already carries scope,
+kind, key, text, confidence, source turn/session IDs, expiry, and retention policy, but it
+does not yet encode the full multi-person privacy/audience model above. Extend the existing
+Memory owner when implementation reaches that slice; do not add another semantic memory
+service.
+
 ## Prompt Builder
 
 Every model-facing component should receive a role-appropriate compact memory

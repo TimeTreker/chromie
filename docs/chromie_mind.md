@@ -3,9 +3,11 @@
 ## Status
 
 Maintained description of Chromie's owner-approved MindProfile and its place in the
-current Goal-driven architecture. The Mind is durable context for one person-like
-identity; it is **not** a planner, router, response composer, capability selector, or
-execution authority.
+Continuous-Mind architecture. The Mind is durable context for one persistent person-like
+social identity: the factory profile is a twelve-year-old girl whose everyday life happens
+primarily with her family, but who is not defined as a family service role. The MindProfile
+is **not** a planner, router, response composer, relationship database, capability selector,
+or execution authority.
 
 The maintained implementation provides:
 
@@ -27,18 +29,26 @@ The offline scoring/mining loop is documented in
 ## Stable Mind versus current cognition
 
 The MindProfile is stable background context. Current cognition remains owned by the
-normal Goal-driven loop:
+normal Core owners, with two distinct ingress shapes:
 
 ```text
-owner-approved MindProfile
+owner-approved MindProfile / persistent Self
         +
-Person / World -> Perception -> Cognitive Gateway
-                               -> Goal Interpretation -> Responsibility / WHAT
-                               -> Goal Association -> canonical Goal continuity
-                               -> Planner fast/deep -> HOW / Work / communication
-                               -> Trusted Capability Runtime -> Provider -> Evidence
-                               -> Situation / Goal / Work update -> Planner re-entry
+person-authored input -> Cognitive Gateway -> Goal Interpretation
+                       -> Responsibility / WHAT -> Goal/Planner cognition
+
+trusted world/social transition -> Situation revision
+                                -> derived readiness / CognitiveOpportunity
+                                -> same Core cognition
+
+Core -> communication and, when HOW exists, Planner Work
+     -> Trusted Capability Runtime -> Provider -> Evidence / reaction
+     -> Situation / Goal / Memory-relevant experience -> later cognition
 ```
+
+The non-turn path does not fabricate a UserTurn, Responsibility, or Goal. Current source
+still requires Goal binding for production Situation-driven re-entry; Goal-free social
+readiness is approved target work rather than an implemented MindProfile feature.
 
 The profile may shape interpretation, planning, language style, and optional Social
 Attention, but it never authorizes an effect or becomes a parallel semantic lifecycle.
@@ -61,7 +71,7 @@ MindProfile or a language model.
 
 | Layer | Persistence | Changed by experience? | Purpose |
 |---|---:|---:|---|
-| Identity | Long-lived | No | Stable name, six-year-old-girl social identity, pronouns, family role, and self-reference guidance |
+| Identity | Long-lived | No | Stable name, twelve-year-old-girl social identity, pronouns, person-first self-reference, and household relationship guidance |
 | Personality Expression | Long-lived | No | Owner-approved self-concept, traits, spoken style, brevity, and truthfulness guidance |
 | Social Interaction Style | Long-lived | No | Bounded courtesy, expressiveness, initiative, restraint, cooldown, and repetition guidance |
 | Worldview | Long-lived | Household perspectives through confirmed setup | Stable self-in-world, relationship, uncertainty, and dynamic-knowledge boundaries plus bounded household perspective |
@@ -76,6 +86,25 @@ MindProfile or a language model.
 The MindProfile does not absorb Goal, Work, Evidence, Situation, provider state, or
 conversation history merely because those facts are useful to cognition. Those remain
 owned by their existing lifecycle/state boundaries.
+
+## Person first; relationships are context, not identity modes
+
+The factory MindProfile models one persistent Chromie. She does not switch into separate
+family, friend, guest, or stranger personas. Family is her primary everyday habitat and
+therefore contributes dense common ground and shared experience, while relationships with
+individual people are learned and revised through normal Memory/Situation evidence.
+
+`MindProfile.identity.family_role` is household relationship wording, not a task/job
+assignment. The factory value is `a member of her family`; deployments may personalize
+household wording without converting it into authorization. Identity, relationship,
+privacy/disclosure permission, factual trust, and authorization remain distinct.
+
+Current interests or social concerns should normally remain bounded Situation/Memory
+meaning rather than new durable Mind fields. Promote them only when an existing owner
+needs continuity: an unfinished accepted outcome becomes Goal, reusable experience becomes
+Memory, and committed external speech/action remains Interaction/Runtime history. Do not
+add `ConcernManager`, `RelationshipManager`, or a persistent `SocialGraph` merely because
+these concepts are useful for reasoning.
 
 ## Owner-editable identity configuration
 
@@ -114,8 +143,12 @@ must not infer a user intent or write a first-person answer from profile fields 
 ## Social Interaction Style
 
 `MindProfile.social_interaction_style` is supplied to Planner communication and Social
-Attention where applicable. It describes tendencies, not gesture tables and not body
-truth. Ordinary deployments may select a reviewed preset:
+Attention where applicable. It describes tendencies, not gesture tables, relationship
+truth, or body truth. Its `initiative` field constrains optional auxiliary expression; it
+does not itself authorize goal-free Core speech/action. Self-initiated social behavior must
+instead be justified by current Situation, relationship/Memory context, privacy,
+consequence, and normal authorization policy. Ordinary deployments may select a reviewed
+preset:
 
 ```bash
 ORCH_SOCIAL_INTERACTION_STYLE_PRESET=courteous  # neutral / reserved also supported

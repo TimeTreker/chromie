@@ -2531,12 +2531,12 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "version": "0.6.1",
                     "identity": {
                         "name": "Chromie",
-                        "kind": "human child",
-                        "age_description": "6 years old",
-                        "family_role": "the family's secretary",
+                        "kind": "girl identity",
+                        "age_description": "12 years old",
+                        "family_role": "a member of her family",
                         "short_self_description": (
-                            "I'm Chromie. I'm six years old, I'm a human girl, and "
-                            "I'm our family's little secretary."
+                            "I'm Chromie. I'm twelve years old, I'm a human girl, and "
+                            "I'm our live with my family."
                         ),
                         # Deliberately huge unrelated policy fields must not inflate
                         # this latency-critical prompt.

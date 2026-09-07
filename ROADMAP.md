@@ -313,6 +313,83 @@ Architecture review may remove or replace pre-release compatibility/workflow
 structures when they obstruct this model. `Use less to solve more` means ending
 with fewer truth owners and processes, not preserving an obsolete pipeline or
 adding a manager because a useful explanatory term exists.
+## Approved architecture line — Persistent Social Mind and relational life
+
+The person-first social target is approved as an extension of the compressed Continuous
+Mind baseline. Chromie is one persistent twelve-year-old-girl social identity whose
+ordinary life happens primarily with her family; family is not a service role, Persona, or
+runtime mode. Social cognition generalizes the same Mind to family, friends, acquaintances,
+guests, strangers, and changing relationships without adding a `FamilyManager`,
+`SocialGraphManager`, `ConcernManager`, `InitiativeManager`, or second response owner.
+
+This line keeps the existing truth owners:
+
+- Stable Mind owns persistent Self/identity/personality/value boundaries;
+- Memory owns selectively retained person/relationship/shared-experience meaning;
+- Situation owns bounded current social/world interpretation;
+- Goal owns only unfinished Responsibility that genuinely needs continuity;
+- the same Core owns ordinary semantic/social communication decisions;
+- Planner owns HOW/Work when actual means selection is required;
+- Interaction/Evidence/Runtime retain delivered speech and real-world truth; and
+- Host/provider policy remains authoritative for privacy, authentication, consent,
+  authorization, safety, and effects.
+
+Implementation order:
+
+1. **Rebase the factory identity — source implemented by this slice.** Change the maintained
+   identity from six-year-old family secretary to a person-first twelve-year-old girl who
+   lives primarily with her family, has her own interests, and may form relationships
+   through real experience. Preserve truthful robotic embodiment. Update identity prompts,
+   startup wording, tests, and identity benchmarks together so old service-role behavior
+   cannot silently return.
+2. **Generalize Situation/CognitiveOpportunity beyond Goal-only readiness — source open.**
+   Current `SituationRevisionObservation.goal_ids` and `CognitiveOpportunity.goal_ids`
+   still require at least one Goal. Permit trustworthy Situation-only social/world
+   transitions to create an ephemeral Goal-free opportunity with exact source/subject
+   provenance while retaining Goal binding for actual Responsibility continuation. Never
+   fabricate a UserTurn, GI result, Responsibility, or Goal to wake cognition.
+3. **Add source-specific social/perception Situation ingress — source open.** Admit only
+   bounded trusted person/scene/interaction changes worth current cognition; do not create
+   a world-model database or poll a semantic LLM continuously. `SituationProjection`
+   remains the one soft current-interpretation surface.
+4. **Extend relational Memory and privacy provenance — source open.** Reuse `MemoryEntry`
+   and current-context activation for person identity, person-to-person relationships,
+   shared experiences, interaction boundaries, and revisable relationship interpretations.
+   Add audience/disclosure provenance before broad multi-person durable retention. Identity,
+   relationship, privacy, factual trust, and authorization stay distinct.
+5. **Derive relational/situational salience — source open.** Use cheap bounded policy over
+   Stable Mind, Memory, Situation, relationship context, and open Goals to decide whether a
+   state change is worth Core cognition. High salience is only readiness; silence and
+   continued observation remain valid. Do not add a priority engine/manager unless a later
+   independently necessary lifecycle is proven.
+6. **Qualify low-commitment self-initiative — source open.** Allow situation-grounded,
+   low-consequence, reversible, low-interruption Communicative Activities such as a natural
+   greeting or gentle question without fake Goal provenance. Capability availability must
+   not manufacture demand. Effectful autonomy remains separately governed and is not
+   implied by this social slice.
+7. **Close the social feedback loop — source open.** Human reaction/turn-taking changes
+   Situation and may create another bounded opportunity for continue/stop/repair. Selective
+   Reflection may retain supported scoped experience, never permanent personality judgments
+   about another person or global social policy.
+8. **Add General Ability scenarios before wider autonomy.** Cover ordinary family life,
+   meeting a new person, gradual familiarity, friend interaction, awkward/negative feedback,
+   privacy boundaries, person-to-person versus Chromie-to-person relationships, doing
+   nothing, continuing her own activity, and Capability temptation without need. Qualify
+   semantics and user experience before adding long-lived self-created intentions.
+
+Exit criteria:
+
+- one Self behaves coherently across family/friend/stranger situations without Persona
+  routing;
+- a trusted meaningful Situation can wake cognition without manufacturing a Goal;
+- goal-free wake frequently and correctly results in silence/observation;
+- relational Memory improves later interaction without becoming authorization or a privacy
+  leak;
+- Social Attention remains auxiliary body expression rather than social cognition owner;
+- no Capability is selected merely because it exists; and
+- source, automated verification, target-model quality, and live/social evidence remain
+  separately reported.
+
 ## Approved architecture line — asynchronous transport-independent Capability Runtime
 
 The Trusted Capability Runtime now has an approved target architecture. Current source

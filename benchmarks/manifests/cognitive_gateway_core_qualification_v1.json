@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "qualification_id": "cognitive_gateway_core_entry_v1",
-  "description": "Source-bound live-text, active-cancellation, and simulator qualification for pre-Core admission, single Core authority, conversational continuity, and Chromie's owner-approved person identity and natural six-year-old voice.",
+  "description": "Source-bound live-text, active-cancellation, and simulator qualification for pre-Core admission, single Core authority, conversational continuity, and Chromie's owner-approved person identity and natural twelve-year-old voice.",
   "runtime_policy_authority": false,
   "release_qualified": false,
   "human_review_required": true,

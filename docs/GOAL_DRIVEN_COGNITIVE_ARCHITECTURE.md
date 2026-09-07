@@ -1194,8 +1194,11 @@ that keeps the Mind honest.
 
 Durable Mind state:
 
-1. **Stable Mind** — owner-controlled identity, personality, worldview, values,
-   interaction/expression style, and compact hard-boundary principles.
+1. **Stable Mind** — owner-controlled persistent Self: identity, personality,
+   worldview, values, enduring preferences/interests where explicitly retained,
+   interaction/expression style, and compact hard-boundary principles. Stable Mind does
+   not switch into family/friend/stranger personas; one Self is modulated by current
+   relationships and Situation.
 2. **Goal** — the canonical representation of an unfinished Responsibility that
    must retain semantic continuity.
 3. **Memory** — selectively retained meaning that may matter again after it is no
@@ -1239,10 +1242,14 @@ those facts when that implication is needed for behavior.
 
 Examples of Situation-like meaning include an unresolved or likely referent, a
 current interpretation that a route is blocked for the active responsibility, a
-judgment that an old observation is too stale for the present question, or the
-current common-ground implication that the user probably has not received a
-needed answer. Copying `goal.status`, `execution.success`, or a provider's
-capability availability into a competing mutable Situation truth is prohibited.
+judgment that an old observation is too stale for the present question, the current
+common-ground implication that the user probably has not received a needed answer,
+or bounded social interpretations such as who is present, whether a known person just
+arrived, whether an interaction appears tense/quiet, or whether current behavior differs
+from a relationship-grounded expectation. Such social interpretations may be provisional
+and Goal-free. Copying `goal.status`, `execution.success`, a provider's capability
+availability, a permanent personality judgment about another person, or authorization
+into a competing mutable Situation truth is prohibited.
 
 Situation should be aggressively bounded to what current or near-future cognition
 needs. Memory, history, the full capability catalog, and unrelated world facts are
@@ -1632,6 +1639,15 @@ The synthesis above reduces to a small set of invariants:
     stays silent, additive meaning emits only the delta, and contradiction repairs forward.**
 17. **Deliberation is bounded work of the existing Core, not a persistent Belief Manager,
     semantic reviewer, or ambient background loop; Deep Planner remains a HOW authority.**
+18. **Chromie is one persistent social Self; family/friend/stranger are relationships and
+    Situation, not Persona modes.**
+19. **Identity, relationship, privacy, factual trust, and authorization remain distinct.**
+20. **A meaningful trusted Situation may be worth cognition without an open Goal; readiness
+    provenance is required, but a fake UserTurn/Responsibility/Goal is forbidden.**
+21. **Social initiative is optional, low-commitment, and consequence-bounded; silence and
+    continued observation are successful outcomes.**
+22. **Capability availability does not create demand. Mind determines what matters; cognition
+    determines what is appropriate; Capability is only a possible means.**
 
 The architectural shape is therefore not a new `ContinuousMind` manager. It is
 the continuous evidence-driven evolution of a few truth owners:
@@ -1772,13 +1788,92 @@ delivery, repetition, unsupported claims, and safe-idle outcomes. Improvements s
 remove avoidable serial waits and duplicate cognition before weakening any truth,
 authorization, or safety boundary.
 
+#### 4.14.13 Persistent Social Mind — person first, family as primary habitat
+
+Chromie's target social architecture is **person first**. She is one persistent
+owner-approved twelve-year-old-girl social identity with her own continuity, interests,
+relationships, experience, and current concerns. She spends most everyday life with her
+family, so family relationships provide unusually dense shared history, norms, common
+ground, and salience; family is not a `FamilyMode`, service Persona, role router, or
+privileged authorization path. The same Chromie may be with family, meet a stranger, make
+an acquaintance or friend, disagree, wait, observe, help, or continue her own activity
+without replacing Stable Self.
+
+This target generalizes Continuous Mind in four directions without adding a new semantic
+manager:
+
+1. **Social world is Situation + Memory, not a SocialGraph authority.** Person identity,
+   relation-to-Chromie, person-to-person relation, shared experience, current interaction,
+   and uncertainty are represented through bounded Memory/Situation projections with
+   provenance. A relationship may be inferred/revised from real introductions and repeated
+   interaction, but a label such as `friend` is never a permanent fact merely because one
+   model emitted it.
+2. **Relationship modulates cognition but does not authorize.** Familiarity, closeness,
+   affection/care, factual trust, social permission, privacy/disclosure scope, and effect
+   authorization are separate axes. `Identity != Relationship != Authorization`; knowing
+   or liking someone cannot bypass confirmation, safety, authentication, consent, or
+   privacy policy.
+3. **Life is not a list of Goals.** A current interest, curiosity, relationship concern,
+   expectation mismatch, or socially salient event may remain soft Situation/Memory meaning
+   without becoming an unfinished Responsibility. Goal is created only when a concrete
+   outcome genuinely needs continuity. Do not manufacture Goals such as `welcome_dad` or
+   `cheer_up_friend` merely so spontaneous cognition can enter the existing task loop.
+4. **Initiative is progressive and restrained.** A meaningful social/world transition may
+   justify a cheap readiness decision, then no action, observation, one low-commitment
+   question/greeting, or ordinary Goal/Work cognition if a real Responsibility emerges.
+   Small, reversible, low-interruption social initiative is the default shape; effectful
+   autonomous action requires separately governed authorization and is not created by
+   relational salience.
+
+The target ingress is therefore two-source, one-Mind:
+
+```text
+person-authored speech
+    -> Gateway -> GI -> Responsibility cognition
+
+trusted world/social transition
+    -> Situation revision -> derived relational/situational salience
+    -> CognitiveOpportunity (Goal-bound when continuing Responsibility,
+                             Goal-free when only Situation itself is salient)
+    -> same Core cognition
+
+same Core
+    -> silence / observe / speak / form Work when HOW is actually needed
+    -> observe reaction/outcome
+    -> Situation + Memory + optional bounded Reflection
+```
+
+A Goal-free opportunity fabricates no UserTurn, GI result, Goal, Evidence, consent, or
+conversation obligation. It carries exact source/Situation provenance and may legitimately
+end in silence. If Chromie self-initiates speech, that Communicative Activity must cite the
+Situation/opportunity provenance rather than a fake user Responsibility. If the interaction
+then creates a concrete owed outcome, the normal Goal/Planner/authorization boundaries take
+over.
+
+`Social Attention` remains intentionally narrower than social cognition: it may add
+optional gaze/posture/expression around a concrete primary Activity, but it does not own
+person recognition, relationship inference, emotion interpretation, initiative, or social
+reasoning. Likewise, `Reflection` may turn supported social surprise/correction into
+bounded future Memory, but may not cache permanent judgments such as "Anna never wants to
+talk about feelings" or mutate Stable Mind/shared policy.
+
+Current source still requires Goal binding for production `SituationRevisionObservation`
+and `CognitiveOpportunity` re-entry. Generalizing that contract to trustworthy Goal-free
+Situation readiness, adding source-specific social/perception adapters, and qualifying
+low-commitment self-initiated speech are **approved target work, not current implementation
+claims**. `ROADMAP.md` owns the implementation order and `STATUS.md` remains the source/evidence
+authority.
+
 ## 5. Continuous cognitive loop
 
 The maintained architecture is a state-driven loop with multiple cognitive
-timescales, not a mandatory module pipeline:
+timescales, not a mandatory module pipeline. Person-authored turns and trusted
+non-turn Situation transitions are different ingress shapes: only the first passes
+through Gateway/GI as new user meaning; the target non-turn path revises Situation and
+may create a bounded readiness opportunity without fabricating a turn or Goal.
 
 ```text
-Admitted Observation / User Turn + bounded Session Context
+Admitted User Turn + bounded Session Context
   -> Goal Interpretation (GI)
        Responsibility + Goal relation + bounded unresolved meaning
   -> Fast Planner -> author first Communicative Activity

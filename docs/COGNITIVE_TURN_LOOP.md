@@ -139,7 +139,7 @@ composer or execution specialist.
 | Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
-| Runtime event/state transition → Evidence or bounded Situation observation → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence/Situation source refs | ephemeral readiness signal for Planner; no fabricated user turn and no response decision. Terminal qualified observations enter through Evidence. Meaningful live provider state enters `SituationProjection` v3 as `runtime_state` source provenance and direct bounded interpretations; it does **not** become Evidence. Heartbeats/percent churn do not qualify; blocked/waiting/degraded/paused/recovering or material phase/member-state changes may qualify. After restart, an open Goal marked `runtime_revalidation_required` may also re-enter only after fresh provider/catalog truth exists and exact original Responsibility provenance was durably retained; the stale pre-restart Plan/request binding is invalidated rather than resumed. | Goal ownership, Evidence truth, or any Activity by itself |
+| Runtime event/state transition → Evidence or bounded Situation observation → `CognitiveOpportunity` | exact authority-owned source provenance plus affected Goal IDs when continuing an existing Responsibility; target situation-only social/world readiness may instead be Goal-free | ephemeral readiness signal for the same Core; no fabricated user turn/Responsibility/Goal and no response decision. Terminal qualified observations enter through Evidence. Meaningful live/provider/perception/interaction state enters Situation with exact provenance and does **not** become Evidence merely to wake cognition. Current production provider-state/restart paths remain Goal-bound; Goal-free Situation wake is approved target work. | Goal ownership, Evidence truth, relationship/authorization truth, or any Activity by itself |
 
 Progressive conversational deliberation intentionally does **not** add another row or
 module to this table. It is an invocation mode of the existing Core/Planner communication
@@ -148,7 +148,7 @@ result is either no new Activity or a Planner-owned communicative delta/repair. 
 continuation is communication-only it receives no Capability/Work mutation authority; a
 separate need for HOW uses the normal Planner contract.
 
-`situation_revision` and `time_condition` have bounded source contracts without gaining semantic authority, but their implementation state is deliberately distinguished. `SituationProjection` v3 carries bounded current interpretations plus exact authority-owned source references. Meaningful provider Runtime-state transitions are the first production `SituationRevisionObservation` ingress: blocked/waiting/degraded/paused/recovering or material phase/member-state changes may revise Situation and wake the **same Planner**, while heartbeat/percentage churn is filtered. Provider Runtime state is not fabricated Evidence, so this re-entry carries zero Evidence refs and cannot by itself mark speech `post_evidence`; a `situation_digest` opportunity is accepted only with the exact validated Situation/Goal binding. Broader scene/body/environment Situation ingress still needs source-specific trusted adapters. `GoalTimeCondition` is a structured Goal/current-Plan-bound condition persisted by ConversationState; stale Plan bindings are discarded, a due condition is consumed exactly once, and the production wall-clock wake loop may re-enter the same Planner from exact retained Responsibility provenance without inventing a UserTurn. Planner-authored creation/registration of useful time conditions remains an implementation gap; Host still must not parse free-form Goal/deadline text into timers or run an ambient semantic-thinking loop.
+`situation_revision` and `time_condition` have bounded source contracts without gaining semantic authority, but their implementation state is deliberately distinguished. `SituationProjection` v3 already carries bounded current interpretations plus exact authority-owned source references and can conceptually represent social meaning without creating a `SocialSituation`. Meaningful provider Runtime-state transitions are the first production `SituationRevisionObservation` ingress: blocked/waiting/degraded/paused/recovering or material phase/member-state changes may revise Situation and wake the **same Planner**, while heartbeat/percentage churn is filtered. Provider Runtime state is not fabricated Evidence, so this re-entry carries zero Evidence refs and cannot by itself mark speech `post_evidence`; the **current source** accepts a `situation_digest` opportunity only with exact validated Situation/Goal binding. The approved target generalizes Situation readiness so trusted scene/person/interaction changes may wake the same Core with no Goal when no Responsibility exists. That target must preserve exact source/subject provenance, never synthesize GI meaning, and may validly choose silence. Broader scene/body/environment/social ingress still needs source-specific trusted adapters. `GoalTimeCondition` remains Goal/current-Plan-bound because it continues a concrete Responsibility. Host still must not parse free-form Goal/deadline text into timers or run an ambient semantic-thinking loop.
 
 ## 3. Turn state machine
 
@@ -483,6 +483,45 @@ Progress, Interaction Ledger/Context, CanonicalPlan, ExecutionOutcome, Memory,
 Capability/provider state, and bounded live Situation projections. A new
 first-class concept still requires an independently necessary lifecycle or
 authority that those owners cannot express without information loss.
+
+### 3.3 Person-authored turn and Situation-driven wake are different ingress
+
+A persistent social Mind needs cognition that is not always caused by a person issuing a
+turn. The architecture therefore distinguishes two sources without creating two Minds:
+
+```text
+person speaks to Chromie
+  -> Gateway admission
+  -> GI Responsibility / WHAT
+  -> ordinary Core cognition
+
+trusted scene / person / interaction state materially changes
+  -> source-specific adapter
+  -> Situation revision
+  -> derived situational / relational salience
+  -> CognitiveOpportunity
+  -> same Core cognition
+```
+
+The second path is not a hidden synthetic user message. It does not pass through GI unless
+a real later person-authored turn arrives, and it must not manufacture a Goal merely to fit
+an existing Planner API. A Goal-free opportunity represents only "this may now be worth
+thinking about". It can yield no Activity, continued observation, or a low-consequence
+self-initiated Communicative Activity grounded in Situation provenance. If an actual
+unfinished Responsibility or effectful HOW emerges, normal Goal/Planner/authorization
+boundaries apply from that point.
+
+Relational salience is derived policy, not another model owner. Stable Mind, bounded
+relationship/shared-experience Memory, current Situation, and any open Goals may make one
+state change more relevant than another. The policy should remain cheap and selective;
+there is no periodic prompt asking "what should I do now?" and no ambient semantic polling
+loop. Family is expected to dominate ordinary data because it is Chromie's primary living
+context, not because the runtime switches into a family mode.
+
+Current production `SituationRevisionObservation`/`CognitiveOpportunity` schemas still
+require Goal binding. Removing that artificial requirement safely, adding subject/source
+provenance for Goal-free readiness, and wiring trusted scene/social adapters are source-open
+work tracked in `ROADMAP.md` and must not be inferred from this design section.
 
 ## 4. Gateway-to-Core contract
 

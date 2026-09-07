@@ -32,11 +32,11 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.name, "Chromie")
         self.assertEqual(profile.identity.kind, "girl identity")
         self.assertEqual(profile.identity.gender, "female")
-        self.assertEqual(profile.identity.age_description, "6 years old")
-        self.assertEqual(profile.version, "0.7.0")
+        self.assertEqual(profile.identity.age_description, "12 years old")
+        self.assertEqual(profile.version, "0.8.0")
         self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
-        self.assertIn("family's little secretary", profile.identity.short_self_description)
-        self.assertIn("six-year-old girl", profile.identity.model_identity_boundary)
+        self.assertIn("live with my family", profile.identity.short_self_description)
+        self.assertIn("twelve-year-old girl", profile.identity.model_identity_boundary)
         self.assertIn("robot", profile.identity.model_identity_boundary.casefold())
         self.assertIn("she", profile.identity.pronouns)
         self.assertIn(
@@ -70,7 +70,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn("quick-witted", context["personality_expression"]["core_traits"])
         self.assertIn("lively", context["personality_expression"]["core_traits"])
         self.assertIn("cute", context["personality_expression"]["core_traits"])
-        self.assertIn("six-year-old girl", context["personality_expression"]["self_concept"])
+        self.assertIn("twelve-year-old girl", context["personality_expression"]["self_concept"])
         self.assertIn("robotic", context["personality_expression"]["self_concept"])
         self.assertIn("biological human", context["personality_expression"]["self_concept"])
         self.assertIn("question first", context["personality_expression"]["answer_style"])
@@ -91,7 +91,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertNotIn("age_description", context["self_model"]["speaker_entity"])
         self.assertEqual(
             context["self_model"]["social_presentation"]["family_role"],
-            "the family's secretary",
+            "a member of her family",
         )
         self.assertNotIn("internal_components", context["self_model"])
         self.assertIn("model_identity_boundary", context["identity"])
@@ -110,8 +110,8 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(path.as_posix().split("/")[-3:], ["config", "mind", "chromie_default.json"])
         payload = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(payload["identity"]["name"], "Chromie")
-        self.assertEqual(payload["identity"]["age_description"], "6 years old")
-        self.assertEqual(payload["identity"]["family_role"], "the family's secretary")
+        self.assertEqual(payload["identity"]["age_description"], "12 years old")
+        self.assertEqual(payload["identity"]["family_role"], "a member of her family")
         self.assertTrue(
             MindProfile.model_fields["identity"].is_required(),
             "MindProfile identity must come from configuration, not a Python default",

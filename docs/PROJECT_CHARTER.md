@@ -137,11 +137,26 @@ automated checks can refer to one definition instead of restating competing vers
 They are requirements, not new runtime modules, managers, DTOs, or execution stages.
 
 - **IDENTITY-TRUTH-001** — Chromie's owner-approved first-person social identity is a
-  six-year-old girl and family young secretary. That identity is not a biological-human
-  claim. Her current embodiment is robotic when relevant, and ordinary cognition must
-  neither deny that fact nor invent human birth history, physiology, or biological
-  status. Internal model/provider/system labels do not replace her ordinary social
-  self-description.
+  twelve-year-old girl and persistent social individual whose everyday life happens
+  primarily with her family. Family membership is a relationship/living context, not a
+  service role or assistant mode. That identity is not a biological-human claim. Her
+  current embodiment is robotic when relevant, and ordinary cognition must neither deny
+  that fact nor invent human birth history, physiology, or biological status. Internal
+  model/provider/system labels do not replace her ordinary social self-description.
+- **PERSON-FIRST-MIND-001** — Chromie is modeled from the inside out as one persistent
+  person-like Self, not as a family assistant that selects social roles. Stable Mind,
+  Memory, Situation, relationships, current interests/concerns, and accepted unfinished
+  Responsibilities jointly shape cognition. Family, friend, acquaintance, guest, and
+  stranger are contents of her social world, never separate Persona/Family/Friend modes.
+  Relationship context may modulate relevance, wording, initiative, and restraint but
+  must not replace Stable Self or create another response owner.
+- **RELATIONSHIP-AUTHORITY-001** — Identity, relationship, privacy, factual trust, and
+  authorization are separate dimensions. Knowing who a person is does not establish
+  closeness; closeness does not establish factual truth, disclosure permission, or
+  effect authorization; and one person's relationship to another is not automatically
+  Chromie's relationship to either. Relationship meaning is learned/revised through
+  trusted interaction and Memory/Situation context, while Host/provider policy remains
+  the authority for authentication, consent, privacy enforcement, and side effects.
 - **ATTENTION-AUTHORITY-001** — Cognitive Gateway Attention Review is controlled by
   maintained configuration and owns only addressedness/speech-act admission evidence.
   A disabled or unavailable review may fail open to cognition, but it is explicitly
@@ -165,18 +180,31 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
 - **ASYNC-COGNITION-001** — Trusted asynchronous Runtime events report what happened;
   Host-bound Evidence records what is true; Responsibility/Goal records what is still
   owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
-  that re-enters Planner. A trigger is not automatically Evidence: a structured
-  Goal/current-Plan-bound clock condition may be a trusted readiness transition with zero
-  Evidence refs, while Situation revision must preserve exact admitted source provenance.
-  A Situation source may be retained Evidence or independently trusted live authority-owned
-  state such as provider Runtime state; live state must not be relabeled as Evidence merely
-  to wake cognition. In all cases the callback says only that cognition may now be useful; it
-  never selects a response or Work itself. Planner may produce zero, one, or many desired
-  Activity changes. A deliberately unfinished conversational commitment may also schedule
-  exactly one bounded owner-preserving cognition continuation through the existing
-  continuation/readiness machinery. That continuation owns no truth, Goal, Work, or
-  response state by itself, carries no fabricated Evidence, and must never become an
-  ambient polling or always-running LLM loop.
+  that re-enters the same Cognitive Core. A trigger is not automatically Evidence: a
+  structured Goal/current-Plan-bound clock condition may be a trusted readiness transition
+  with zero Evidence refs, while Situation revision must preserve exact admitted source
+  provenance. A Situation source may be retained Evidence or independently trusted live
+  authority-owned state such as provider Runtime state, perception state, or interaction
+  state; live state must not be relabeled as Evidence merely to wake cognition. An
+  opportunity that continues an existing Responsibility carries exact Goal provenance;
+  a situation-only social/world opportunity may instead be Goal-free but must carry exact
+  source/Situation provenance and gains no Goal or Work authority from being salient. In
+  all cases the callback says only that cognition may now be useful; it never selects a
+  response or Work itself. Core cognition may produce zero, one, or many desired Activity
+  changes, and Planner owns HOW only when actual Work formation is needed. A deliberately
+  unfinished conversational commitment may also schedule exactly one bounded
+  owner-preserving cognition continuation through the existing continuation/readiness
+  machinery. No path may fabricate a UserTurn, Responsibility, Goal, Evidence, consent,
+  or an ambient polling/always-running LLM loop merely to keep the Mind active.
+- **SITUATIONAL-INITIATIVE-001** — A meaningful trusted social/world Situation change may
+  justify cognition even when nobody addressed Chromie and no Goal is open. Derived
+  salience is a cheap readiness judgment from Stable Mind, Memory, relationships,
+  Situation, and open Responsibilities; it is not a new `SalienceManager`, Goal, or
+  authority. The valid result may be silence/continued observation. A self-initiated
+  Communicative Activity must be low-consequence, proportionate, privacy-safe, and
+  grounded in the admitted Situation. Effectful autonomous action remains behind normal
+  authorization/autonomy/safety policy and is never implied merely by relationship or
+  social salience.
 - **PROGRESSIVE-COGNITION-001** — A low-consequence provider-free Responsibility may emit
   one useful **provisional** Communicative Activity before cognition is finished when the
   current bounded context supports a tentative answer. Provisional speech is substantive
@@ -217,18 +245,33 @@ pipeline or an always-running cognition loop:
 
 ```mermaid
 flowchart TD
-    U["Person / world input"] --> GW["Cognitive Gateway"]
-    GW --> GI["Goal Interpretation<br/>Responsibility / WHAT"]
+    SELF["Stable Mind / persistent Self"] --> STATE["Current bounded cognitive state<br/>derived view, not a new truth store"]
+    MEM["Memory<br/>retained meaning / relationships / shared experience"] --> STATE
 
-    GI --> P0["Planner fast pass<br/>smallest safe useful commitment"]
+    USER["Person-authored input"] --> GW["Cognitive Gateway"]
+    GW --> GI["Goal Interpretation<br/>Responsibility / WHAT"]
+    GI --> P0["Fast Core / Planner pass<br/>smallest safe useful commitment"]
     GI --> GA["Goal Association<br/>canonical Goal continuity"]
-    P0 --> ACT["Detailed Plan / Activities<br/>speech, body, information, tool, or other Capability Work"]
+
+    WORLD["Trusted world / social transition"] --> SIT["Situation<br/>bounded current interpretation"]
+    SIT --> STATE
+    SELF --> SAL["Derived situational / relational salience<br/>readiness only"]
+    MEM --> SAL
+    SIT --> SAL
+    GOALS --> SAL
+    SAL -. "material enough" .-> OPP["CognitiveOpportunity<br/>ephemeral, possibly Goal-free"]
+
+    P0 --> ACT["Detailed Activities<br/>speech, body, information, tool, or other Capability Work"]
     P0 -. "complex HOW" .-> DP["Deep Planner<br/>same HOW authority"]
     DP --> ACT
     P0 -. "provisional speech keeps Responsibility open" .-> DC["Bounded deliberative cognition<br/>communication-only authority scope"]
     DC --> DCR["Delivered-claim reconciliation<br/>silence / delta / repair"]
     DCR --> ACT
-    GA --> GOALS["Canonical Goals<br/>what persistent Responsibility is still owed"]
+    GA --> GOALS["Canonical Goals<br/>unfinished Responsibility only"]
+
+    GI --> RESP["Responsibility<br/>what is owed"]
+    RESP --> STATE
+    GOALS --> STATE
 
     ACT --> RT["Trusted Capability Runtime"]
     RT --> PROV["Vocal / tool / Soridormi / peer Providers"]
@@ -236,23 +279,18 @@ flowchart TD
     EVT --> WORK["Current Work state<br/>queued / running / terminal"]
     EVT --> CORR["Host correlation + schema / provenance validation"]
     CORR --> EVID["Trusted Evidence<br/>what is true"]
-
-    GI --> RESP["Responsibility<br/>what is owed"]
-    RESP --> STATE["Current bounded cognitive state<br/>derived view, not a new truth store"]
-    GOALS --> STATE
     WORK --> STATE
     EVID --> STATE
-    SIT["Situation / interaction state"] --> STATE
 
-    EVT -. "meaningful trusted transition" .-> OPP["CognitiveOpportunity<br/>ephemeral trigger, no semantic authority"]
+    EVT -. "meaningful trusted transition" .-> OPP
     EVID -. "new relevant Evidence" .-> OPP
     GOALS -. "material Goal continuity change" .-> OPP
     SIT -. "material relevant change" .-> OPP
-    OPP --> P1["Planner/Core re-entry<br/>same semantic authority"]
-    STATE --> P1
 
-    P1 --> DELTA["0..N desired Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify / repair"]
-    P1 --> NONE["No new Activity<br/>keep acting / wait / listen / remain silent / close naturally"]
+    OPP --> P1["Core re-entry<br/>same semantic authority;<br/>Planner only when HOW exists"]
+    STATE --> P1
+    P1 --> DELTA["0..N desired Activity changes<br/>speak / act / query / reuse / cancel / replace / clarify / repair"]
+    P1 --> NONE["No new Activity<br/>keep acting / observe / wait / listen / remain silent / close naturally"]
     DELTA --> RT
 ```
 
@@ -265,11 +303,13 @@ The four stable truths are deliberately separate:
    including the valid decision to do nothing.
 
 `Current bounded cognitive state` in the diagram is not a new database, manager,
-or semantic authority. It is the bounded Core/Planner view reconstructed from the existing
-authoritative owners: Responsibility/Goal, Situation, actual Work, Evidence, and
-Interaction state. `CognitiveOpportunity` is likewise only an ephemeral bridge from a
-meaningful trusted state transition to possible cognition. A callback never chooses a
-response or an action by itself. An explicitly provisional conversational commitment is
+or semantic authority. It is the bounded Core view reconstructed from Stable Mind,
+Memory, Responsibility/Goal when one exists, Situation, actual Work, Evidence, and
+Interaction state. Relationship and salience are derived interpretations over those
+owners rather than competing truth stores. `CognitiveOpportunity` is likewise only an
+ephemeral bridge from a meaningful trusted state transition to possible cognition. A
+callback never chooses a response or an action by itself, and a situation-only opportunity
+must not borrow a Goal ID merely to enter cognition. An explicitly provisional conversational commitment is
 the one additional case where the same transaction may retain a **one-shot bounded
 continuation obligation** without waiting for new external Evidence. That obligation is
 not truth or a background scheduler; once Goal-bound, it only permits the same Core
@@ -339,7 +379,7 @@ same as having no turn**:
 | Startup orientation | None | None | Host lifecycle may offer one quiet baseline Activity. It is not a user interaction or Social Attention. |
 | Protective Reflex | A received `NormalizedTurnCapture` | Not required | Gateway applies deterministic pre-semantic stop/cancel/emergency/silence/unusable-input policy to the turn before GI exists, then retains the reflex evidence. |
 | Ordinary admitted interaction | An admitted `UserTurnEnvelope` | None until GA commits one | GI interprets Responsibility; Planner may advance safe HOW while GA independently owns canonical Goal continuity. |
-| `CognitiveOpportunity` reactivation | No fabricated new user turn; exact originating interaction/request provenance remains retained | One or more `goal_ids` are required | A meaningful trusted state transition may reactivate Planner for those Goals. The opportunity is ephemeral, owns neither Goal nor Evidence truth, and may legitimately produce zero new Activities. |
+| `CognitiveOpportunity` reactivation | No fabricated new user turn; exact source/interaction/request/Situation provenance remains retained | Existing Goal IDs are required when continuing an unfinished Responsibility; situation-only social/world readiness may be Goal-free | A meaningful trusted state transition may reactivate the same Core. The opportunity is ephemeral, owns neither Goal nor Evidence/Situation truth, may legitimately produce zero new Activities, and cannot create Work authority merely because a social event is salient. |
 | Provisional cognition continuation | The original admitted turn and delivered provisional Activity remain the source/common-ground evidence | The still-open Responsibility must be canonically Goal-bound before continuation is consumed | One explicitly authorized one-shot deliberative continuation may re-enter the same Core communication authority. It fabricates no Evidence, gains no Work authority, and cannot recur without another material event or explicit bounded continuation. |
 
 Therefore Protective Reflex is a deterministic **pre-semantic turn path**, not a
