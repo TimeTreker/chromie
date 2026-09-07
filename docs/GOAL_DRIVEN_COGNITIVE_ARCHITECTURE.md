@@ -1864,9 +1864,18 @@ subject refs, and replaying the same Situation digest creates no cognition. A st
 same-Core situational-cognition invocation can only remain silent or author one exact
 context-grounded low-commitment utterance; its schema contains no Capability Work, Goal
 mutation, confirmation, or effect authority, and `slow` Goal-free readiness currently fails
-quiet rather than entering Deep Planner. Concrete social/perception source adapters,
-relational Memory/privacy, salience, feedback, and target qualification remain open.
-`ROADMAP.md` owns their implementation order and `STATUS.md` remains the evidence authority.
+quiet rather than entering Deep Planner. The first relational-Memory/privacy source slice is also implemented without a new social
+owner. `MemoryEntry` carries bounded relation/subject/source-person/audience/disclosure
+provenance; exact Situation subject refs participate in deterministic activation; and
+privacy-aware entries are filtered before model projection. Unknown/private social Memory
+remains retained but hidden, audience-gated Memory requires an explicitly resolved current
+audience, and Goal-free cognition deliberately infers none. Ordinary model/interaction
+Memory cannot grant itself `public` disclosure; permissive scopes enter only through the
+dedicated already-trusted relational Memory ingress. Structured relational Memory
+is not admitted to the existing durable owner-profile store. Concrete social/perception
+source adapters, trusted principal/audience resolution, salience, feedback, and target
+qualification remain open. `ROADMAP.md` owns their implementation order and `STATUS.md`
+remains the evidence authority.
 
 ## 5. Continuous cognitive loop
 

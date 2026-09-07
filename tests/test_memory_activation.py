@@ -96,3 +96,126 @@ def test_memory_without_current_activation_keeps_recent_fallback() -> None:
     selected = store.prompt_entries(limit=2)
 
     assert [item["key"] for item in selected] == ["note_3", "note_4"]
+
+
+def test_structured_subject_ref_activates_old_public_relationship_memory() -> None:
+    store = MemoryStore(max_entries=16)
+    store.add(
+        MemoryEntry(
+            scope="session",
+            kind="person_relationship",
+            key="dad_relationship",
+            text="Dad is a close family relationship for Chromie.",
+            relation="family",
+            subject_refs=["person:dad"],
+            source_person_refs=["person:dad"],
+            disclosure_scope="public",
+            confidence=0.95,
+        )
+    )
+    for index in range(8):
+        store.add(
+            MemoryEntry(
+                scope="session",
+                kind="note",
+                key=f"noise_{index}",
+                text=f"Unrelated recent note {index} about drawing.",
+            )
+        )
+
+    activated = store.prompt_entries(
+        limit=3,
+        activation_subject_refs=["person:dad"],
+    )
+
+    assert activated[0]["key"] == "dad_relationship"
+    assert activated[0]["subject_refs"] == ["person:dad"]
+    assert activated[0]["relation"] == "family"
+
+
+def test_privacy_aware_relational_memory_fails_closed_without_resolved_audience() -> None:
+    store = MemoryStore(max_entries=8)
+    store.add(
+        MemoryEntry(
+            scope="session",
+            kind="shared_experience",
+            key="anna_private_topic",
+            text="Anna privately shared a sensitive school concern with Chromie.",
+            relation="shared_private_context",
+            subject_refs=["person:anna"],
+            source_person_refs=["person:anna"],
+            audience_refs=["person:anna", "self:chromie"],
+            disclosure_scope="shared_with_audience",
+            confidence=0.9,
+        )
+    )
+
+    hidden = store.prompt_entries(
+        activation_subject_refs=["person:anna"],
+        audience_refs=[],
+    )
+    visible_to_original_audience = store.prompt_entries(
+        activation_subject_refs=["person:anna"],
+        audience_refs=["person:anna"],
+    )
+    hidden_from_other_person = store.prompt_entries(
+        activation_subject_refs=["person:anna"],
+        audience_refs=["person:dad"],
+    )
+
+    assert hidden == []
+    assert [item["key"] for item in visible_to_original_audience] == [
+        "anna_private_topic"
+    ]
+    assert hidden_from_other_person == []
+
+
+def test_relational_memory_without_disclosure_scope_defaults_to_unknown() -> None:
+    entry = MemoryEntry(
+        scope="session",
+        kind="person_relationship",
+        text="David is Dad's friend.",
+        relation="friend_of",
+        subject_refs=["person:david", "person:dad"],
+    )
+    store = MemoryStore(max_entries=4)
+    store.add(entry)
+
+    assert entry.disclosure_scope == "unknown"
+    assert store.prompt_entries(activation_subject_refs=["person:david"]) == []
+
+
+def test_build_context_uses_disclosure_safe_memory_projection_not_raw_snapshot() -> None:
+    from types import SimpleNamespace
+
+    from orchestrator.orchestrator import VoiceAssistant
+
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.is_playing_audio = False
+    assistant.playback_generation = 0
+    assistant.action_dry_run = False
+    assistant.mind = SimpleNamespace(context=lambda: {})
+    assistant._interaction_engagement_context = lambda *_args, **_kwargs: {}
+    assistant.conversation_state = SimpleNamespace(
+        snapshot=lambda: {
+            "conversation_id": "conversation-private",
+            "session_memory": {
+                "memory_summary": "None",
+                "extracted_memory": [],
+            },
+            "extracted_memory": [
+                {
+                    "kind": "shared_experience",
+                    "text": "Private raw retained memory must not enter model context.",
+                    "subject_refs": ["person:anna"],
+                    "disclosure_scope": "private",
+                }
+            ],
+        },
+        active_goal_snapshots=lambda: [],
+    )
+
+    context = assistant.build_context(None)
+
+    assert context["extracted_memory"] == []
+    assert context["conversation"]["extracted_memory"][0]["disclosure_scope"] == "private"

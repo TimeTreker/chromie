@@ -445,6 +445,18 @@ quality/frequency of initiative remain unqualified target behavior; `slow` Goal-
 readiness deliberately fails quiet until bounded deliberative cognition is separately
 qualified.
 
+The first relational-Memory slice is likewise implemented inside the existing Memory owner.
+Person/relationship/shared-experience entries may carry exact subject/source-person/audience
+refs plus an explicit disclosure scope. Situation subject refs can activate those entries,
+but prompt projection is privacy-gated before any model sees them: public entries may pass,
+shared-audience entries require a fully resolved allowed audience, and private/unknown
+entries stay hidden. Ordinary model/interaction Memory cannot self-declare public social
+context; permissive disclosure is accepted only from an already-trusted relational ingress.
+A Goal-free social wake does not guess who can hear it, so it cannot
+use audience-gated Memory until a trusted presence/identity source supplies that fact.
+Relationship context may change salience and natural wording; it never becomes disclosure,
+factual-trust, or effect authorization.
+
 ## Progressive cognition and conversational self-repair
 
 Chromie may sometimes speak a useful current judgment before all worthwhile cognition is

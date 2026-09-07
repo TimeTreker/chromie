@@ -6,12 +6,16 @@ Implemented. The host Orchestrator has bounded `MemoryEntry`, `MemoryStore`,
 `MemoryExtractor`, and `MemoryPromptBuilder` support. `ConversationStateManager`
 exposes `memory_summary` and `extracted_memory`, records typed task/context and
 trusted Runtime outcome memory, and keeps explicitly consent-bound profile Memory
-in protected owner-local storage. Prompt selection is current-context-conditioned:
-the latest user turn, open Goal/task context, and discourse focus can activate an
-older relevant entry ahead of unrelated recent entries; recency remains fallback.
-No `memory` route, separate memory agent, vector database, or retrieval LLM owns Memory
-semantics. Raw transcript remains bounded interaction evidence rather than the
-default retained-meaning projection.
+in protected owner-local storage. PSM-2 extends the same entry with bounded relational
+provenance (`relation`, `subject_refs`, `source_person_refs`, `audience_refs`, and
+`disclosure_scope`) without adding a SocialGraph or relationship-memory service. Prompt
+selection is current-context-conditioned: the latest user turn, open Goal/task context,
+discourse focus, or exact trusted Situation subject refs can activate an older relevant
+entry ahead of unrelated recent entries; recency remains fallback. Privacy-aware entries
+are mechanically filtered before model projection, and unresolved/private social Memory
+fails closed. No `memory` route, separate memory agent, vector database, or retrieval LLM
+owns Memory semantics. Raw transcript and non-projectable retained Memory remain bounded
+internal state rather than default model context.
 
 ## Principle
 
@@ -79,6 +83,11 @@ Memory entries should be structured and small:
   "key": "optional stable key for replacing a prior entry",
   "text": "Compact natural-language memory statement.",
   "confidence": 0.0,
+  "relation": "optional bounded relation token",
+  "subject_refs": ["person:..."],
+  "source_person_refs": ["person:..."],
+  "audience_refs": ["person:..."],
+  "disclosure_scope": "legacy_context|public|shared_with_audience|private|unknown",
   "source_turn_ids": ["turn_..."],
   "source_sids": ["sid_..."],
   "created_ms": 0,
@@ -154,11 +163,36 @@ not the same fact. Until source fields for that boundary exist, broad durable re
 private third-party social information must fail conservatively rather than assume family
 access.
 
-This section is a **target contract detail**. Current `MemoryEntry` already carries scope,
-kind, key, text, confidence, source turn/session IDs, expiry, and retention policy, but it
-does not yet encode the full multi-person privacy/audience model above. Extend the existing
-Memory owner when implementation reaches that slice; do not add another semantic memory
-service.
+The **first PSM-2 source slice is implemented**. `MemoryEntry` now carries bounded
+`relation`, `subject_refs`, `source_person_refs`, `audience_refs`, and
+`disclosure_scope`. Structured relational entries with no disclosure decision default to
+`unknown` and are retained but excluded from ordinary model prompts. `public` entries may
+be projected normally; `shared_with_audience` entries are visible only when the caller
+supplies a complete current audience contained by the stored allowed audience. `private`
+and `unknown` remain non-projectable. Legacy non-social entries retain their pre-PSM-2
+prompt behavior.
+
+Exact Situation `subject_refs` now participate in deterministic Memory activation, so a
+Goal-free observation about `person:dad` can surface older public relationship/shared
+experience Memory even when the observation text does not repeat a name. The generic
+Goal-free path deliberately supplies no inferred audience, so audience-gated Memory stays
+hidden until a trusted multi-person presence/identity adapter provides that evidence. Raw
+retained `extracted_memory` is no longer copied into top-level model context; model-facing
+context uses the Memory owner's disclosure-safe projection.
+
+Permissive disclosure is not model authority. Ordinary interaction/model `memory_updates`
+may retain structured social Memory, but any attempted `public` or
+`shared_with_audience` promotion is mechanically downgraded to `unknown`. Only the
+dedicated `ConversationStateManager.record_trusted_relational_memory(...)` ingress accepts
+a permissive disclosure scope, and that method explicitly assumes a source-specific adapter
+has already established principal/source/audience policy; it does not perform recognition or
+authentication itself. Restrictive `private|unknown` labels may always fail closed.
+
+PSM-2 intentionally **does not enable durable relational/profile retention**. Structured
+relational entries are rejected from the existing owner-profile durable store even when its
+ordinary explicit-consent fields are present, because third-party principal identity,
+privacy, deletion, and consent policy need separate qualification. This is conservative
+retention policy, not a claim that public relationships can never be durable.
 
 ## Prompt Builder
 
@@ -187,7 +221,9 @@ Extracted Conversation Context:
 For conversation and capability planning, use compact extracted context by
 default. A tiny recent-turn window may be used only for immediate reference
 resolution, such as "that one", "continue", or "why?", and should remain
-bounded.
+bounded. Relational fields are context, not authority: a `relation=family` or
+`relation=friend` entry may change salience/wording but never grants factual trust,
+privacy permission, or action authorization.
 
 ## Raw History Policy
 

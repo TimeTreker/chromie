@@ -86,6 +86,46 @@ class DurableProfileMemoryTests(unittest.TestCase):
                 "explicit_current_turn",
             )
 
+    def test_relational_memory_does_not_piggyback_on_profile_durability(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            manager = ConversationStateManager(
+                durable_memory_enabled=True,
+                durable_memory_path=path,
+            )
+            manager.record_interaction_response(
+                "sid-social",
+                {
+                    "metadata": {
+                        "memory_updates": [
+                            {
+                                "type": "extracted_memory",
+                                "value": {
+                                    "scope": "profile",
+                                    "kind": "person_relationship",
+                                    "key": "anna_relationship",
+                                    "text": "Anna is Chromie's friend.",
+                                    "relation": "friend",
+                                    "subject_refs": ["person:anna"],
+                                    "disclosure_scope": "public",
+                                    "persistence_policy": "durable_with_explicit_consent",
+                                    "consent_basis": "explicit_current_turn",
+                                    "retention_days": 365,
+                                },
+                            }
+                        ]
+                    }
+                },
+            )
+
+            # PSM-2 deliberately keeps relational Memory out of the owner-profile
+            # durable channel until principal/privacy/deletion policy is qualified.
+            self.assertEqual(
+                manager.session_memory()["durable_profile_memory"]["entries"],
+                [],
+            )
+            self.assertFalse(path.exists())
+
     def test_explicit_forget_and_clear_are_durable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "profile.json"

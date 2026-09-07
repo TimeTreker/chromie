@@ -2216,3 +2216,94 @@ class TimeConditionContinuousCognitionTests(unittest.TestCase):
         base["source_plan_id"] = "plan-reminder"
         base["source_responsibility_refs"] = ["resp-other"]
         self.assertFalse(manager.register_goal_time_condition(GoalTimeCondition(**base)))
+
+
+def test_relational_memory_update_preserves_provenance_and_prompt_privacy() -> None:
+    manager = ConversationStateManager(base_conversation_id="relational-memory")
+
+    manager.record_trusted_relational_memory(
+        {
+            "scope": "session",
+            "kind": "person_relationship",
+            "key": "anna_friend_of_dad",
+            "text": "Anna is Dad's friend.",
+            "relation": "friend_of",
+            "subject_refs": ["person:anna", "person:dad"],
+            "source_person_refs": ["person:dad"],
+            "audience_refs": ["person:dad", "self:chromie"],
+            "disclosure_scope": "shared_with_audience",
+            "confidence": 0.9,
+        },
+        sid="sid-anna",
+    )
+
+    raw = manager.snapshot()["extracted_memory"]
+    assert raw[0]["relation"] == "friend_of"
+    assert raw[0]["subject_refs"] == ["person:anna", "person:dad"]
+    assert raw[0]["source_person_refs"] == ["person:dad"]
+    assert raw[0]["disclosure_scope"] == "shared_with_audience"
+
+    # Ordinary model context has no resolved multi-person audience yet, so the
+    # privacy-aware entry remains retained but is not projected.
+    assert manager.session_memory()["extracted_memory"] == []
+
+    allowed = manager.activated_memory_context(
+        activation_subject_refs=["person:anna"],
+        audience_refs=["person:dad"],
+    )
+    assert allowed["entries"][0]["key"] == "anna_friend_of_dad"
+
+
+def test_public_relational_memory_activates_from_situation_subject_ref() -> None:
+    manager = ConversationStateManager(base_conversation_id="relational-public")
+    manager.record_trusted_relational_memory(
+        {
+            "scope": "session",
+            "kind": "person_relationship",
+            "key": "dad_family",
+            "text": "Dad is a close family relationship for Chromie.",
+            "relation": "family",
+            "subject_refs": ["person:dad"],
+            "source_person_refs": ["person:dad"],
+            "disclosure_scope": "public",
+            "confidence": 0.95,
+        },
+        sid="sid-dad",
+    )
+
+    selected = manager.activated_memory_context(
+        activation_texts=["social.arrival", "arrived_home"],
+        activation_subject_refs=["person:dad"],
+    )
+
+    assert selected["entries"][0]["key"] == "dad_family"
+    assert selected["selection"]["activation_subject_ref_count"] == 1
+
+
+def test_untrusted_memory_update_cannot_self_promote_relational_disclosure() -> None:
+    manager = ConversationStateManager(base_conversation_id="relational-untrusted")
+    manager.record_interaction_response(
+        "sid-model",
+        {
+            "metadata": {
+                "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "person_relationship",
+                            "key": "anna_claimed_public",
+                            "text": "Anna is Chromie's friend.",
+                            "relation": "friend",
+                            "subject_refs": ["person:anna"],
+                            "disclosure_scope": "public",
+                        },
+                    }
+                ]
+            }
+        },
+    )
+
+    raw = manager.snapshot()["extracted_memory"]
+    assert raw[0]["disclosure_scope"] == "unknown"
+    assert manager.session_memory()["extracted_memory"] == []

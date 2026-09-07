@@ -357,11 +357,18 @@ Implementation order:
    their own trust/privacy boundary and admit only bounded meaningful changes; no semantic
    polling loop or world-model database is introduced. `SituationProjection` remains the
    one soft current-interpretation surface.
-4. **Extend relational Memory and privacy provenance — source open.** Reuse `MemoryEntry`
-   and current-context activation for person identity, person-to-person relationships,
-   shared experiences, interaction boundaries, and revisable relationship interpretations.
-   Add audience/disclosure provenance before broad multi-person durable retention. Identity,
-   relationship, privacy, factual trust, and authorization stay distinct.
+4. **Extend relational Memory and privacy provenance — first source slice implemented.**
+   `MemoryEntry` now retains bounded relation/subject/source-person/audience/disclosure
+   provenance, exact Situation subject refs participate in deterministic activation, and
+   privacy-aware entries are filtered mechanically before model projection. Ordinary
+   model/interaction Memory cannot self-promote permissive disclosure; only the dedicated
+   already-trusted relational ingress may retain `public|shared_with_audience`. `public` may
+   project; `shared_with_audience` requires an explicitly resolved current audience;
+   `private`/`unknown` stay hidden. Goal-free Situation cognition deliberately infers no
+   audience, so gated Memory fails closed. Raw retained Memory is no longer copied into the
+   top-level model context. Structured relational entries are also blocked from the existing
+   durable owner-profile channel until principal/privacy/deletion policy is separately
+   qualified. No SocialGraph/relationship-memory owner is introduced.
 5. **Derive relational/situational salience — source open.** Use cheap bounded policy over
    Stable Mind, Memory, Situation, relationship context, and open Goals to decide whether a
    state change is worth Core cognition. High salience is only readiness; silence and

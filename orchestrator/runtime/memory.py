@@ -10,10 +10,69 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Deque, Iterable
+from typing import Any, Deque, Iterable, Literal, cast
 
 
 logger = logging.getLogger("chromie.orchestrator.memory")
+
+
+MemoryDisclosureScope = Literal[
+    "legacy_context",
+    "public",
+    "shared_with_audience",
+    "private",
+    "unknown",
+]
+_RELATIONAL_MEMORY_KINDS = {
+    "person_identity",
+    "person_relationship",
+    "shared_experience",
+    "relationship_interpretation",
+    "interaction_boundary",
+}
+_DISCLOSURE_SCOPES = {
+    "legacy_context",
+    "public",
+    "shared_with_audience",
+    "private",
+    "unknown",
+}
+
+
+def _normalized_refs(value: Iterable[str] | None, *, limit: int = 16) -> list[str]:
+    out: list[str] = []
+    for item in list(value or [])[:limit]:
+        text = compact_text(str(item or ""), limit=160)
+        if text and text not in out:
+            out.append(text)
+    return out
+
+
+def _memory_prompt_visible(
+    entry: dict[str, Any],
+    *,
+    audience_refs: set[str],
+) -> bool:
+    """Apply conservative disclosure policy before Memory reaches a model prompt.
+
+    Legacy entries preserve the pre-PSM-2 behavior. Privacy-aware relational entries
+    default to ``unknown`` and therefore stay out of ordinary model context until an
+    owner supplies an explicit disclosure scope. ``shared_with_audience`` requires the
+    caller to resolve the complete current audience; an empty/partial audience never
+    widens disclosure.
+    """
+
+    scope = str(entry.get("disclosure_scope") or "legacy_context").strip()
+    if scope in {"legacy_context", "public"}:
+        return True
+    if scope == "shared_with_audience":
+        allowed = {
+            compact_text(str(item), limit=160)
+            for item in entry.get("audience_refs") or []
+            if compact_text(str(item), limit=160)
+        }
+        return bool(audience_refs) and audience_refs.issubset(allowed)
+    return False
 
 
 def now_ms() -> float:
@@ -68,46 +127,72 @@ def _memory_prompt_activation_score(
     entry: dict[str, Any],
     *,
     activation_tokens: set[str],
+    activation_subject_refs: set[str],
 ) -> float:
-    if not activation_tokens:
-        return 0.0
     text_tokens = _activation_tokens(
         [
             str(entry.get("kind") or ""),
             str(entry.get("key") or ""),
+            str(entry.get("relation") or ""),
             str(entry.get("text") or ""),
         ]
     )
     overlap = activation_tokens & text_tokens
-    if not overlap:
-        return 0.0
     key_tokens = _activation_tokens([str(entry.get("key") or "")])
     key_overlap = activation_tokens & key_tokens
+    subject_refs = {
+        compact_text(str(item), limit=160)
+        for item in entry.get("subject_refs") or []
+        if compact_text(str(item), limit=160)
+    }
+    subject_overlap = activation_subject_refs & subject_refs
+    if not overlap and not subject_overlap:
+        return 0.0
     confidence = max(0.0, min(1.0, float(entry.get("confidence") or 0.0)))
-    return float(len(overlap)) + (2.0 * len(key_overlap)) + (0.1 * confidence)
+    return (
+        float(len(overlap))
+        + (2.0 * len(key_overlap))
+        + (16.0 * len(subject_overlap))
+        + (0.1 * confidence)
+    )
 
 
 def rank_memory_prompt_entries(
     entries: Iterable[dict[str, Any]],
     *,
     activation_texts: Iterable[str] | None = None,
+    activation_subject_refs: Iterable[str] | None = None,
+    audience_refs: Iterable[str] | None = None,
     limit: int = 8,
 ) -> list[dict[str, Any]]:
-    """Select bounded Memory by current-context activation, then recency.
+    """Select bounded, disclosure-safe Memory by current context, then recency.
 
-    Relevant older entries outrank unrelated recent entries. Recency remains the
-    fallback when no cue matches, and fills unused capacity after relevant hits.
-    Input order is treated as oldest-to-newest.
+    Exact structured subject references outrank lexical coincidence so a trusted
+    Situation about ``person:dad`` can activate older public/shared relationship Memory
+    even when the current observation text does not repeat the person's name. Privacy
+    filtering happens before ranking and is mechanical; it never infers an audience.
     """
 
     bounded_limit = max(0, int(limit))
     if bounded_limit == 0:
         return []
-    items = [dict(item) for item in entries if isinstance(item, dict)]
+    resolved_audience_refs = set(_normalized_refs(audience_refs, limit=16))
+    items = [
+        dict(item)
+        for item in entries
+        if isinstance(item, dict)
+        and _memory_prompt_visible(
+            item,
+            audience_refs=resolved_audience_refs,
+        )
+    ]
     if not items:
         return []
     activation_tokens = _activation_tokens(list(activation_texts or []))
-    if not activation_tokens:
+    resolved_subject_refs = set(
+        _normalized_refs(activation_subject_refs, limit=16)
+    )
+    if not activation_tokens and not resolved_subject_refs:
         return items[-bounded_limit:]
 
     ranked: list[tuple[float, int, dict[str, Any]]] = []
@@ -116,6 +201,7 @@ def rank_memory_prompt_entries(
         score = _memory_prompt_activation_score(
             item,
             activation_tokens=activation_tokens,
+            activation_subject_refs=resolved_subject_refs,
         )
         if score > 0:
             ranked.append((score, index, item))
@@ -139,6 +225,11 @@ class MemoryEntry:
     text: str
     key: str | None = None
     confidence: float = 0.8
+    relation: str | None = None
+    subject_refs: list[str] = field(default_factory=list)
+    source_person_refs: list[str] = field(default_factory=list)
+    audience_refs: list[str] = field(default_factory=list)
+    disclosure_scope: MemoryDisclosureScope | None = None
     source_turn_ids: list[str] = field(default_factory=list)
     source_sids: list[str] = field(default_factory=list)
     created_ms: float = field(default_factory=now_ms)
@@ -155,8 +246,55 @@ class MemoryEntry:
         self.key = compact_text(self.key, limit=120) if self.key else None
         self.text = compact_text(self.text, limit=260)
         self.confidence = max(0.0, min(1.0, float(self.confidence)))
+        self.relation = compact_text(self.relation, limit=120) if self.relation else None
+        self.subject_refs = _normalized_refs(self.subject_refs)
+        self.source_person_refs = _normalized_refs(self.source_person_refs)
+        self.audience_refs = _normalized_refs(self.audience_refs)
+        structured_social = bool(
+            self.kind in _RELATIONAL_MEMORY_KINDS
+            or self.relation
+            or self.subject_refs
+            or self.source_person_refs
+            or self.audience_refs
+        )
+        disclosure_scope = str(self.disclosure_scope or "").strip()
+        if not disclosure_scope:
+            disclosure_scope = "unknown" if structured_social else "legacy_context"
+        if disclosure_scope not in _DISCLOSURE_SCOPES:
+            raise ValueError(f"unsupported memory disclosure scope: {disclosure_scope}")
+        if disclosure_scope == "shared_with_audience" and not self.audience_refs:
+            raise ValueError(
+                "shared_with_audience Memory requires explicit audience_refs"
+            )
+        if structured_social and not self.subject_refs:
+            raise ValueError(
+                "structured relational Memory requires at least one subject_ref"
+            )
+        self.disclosure_scope = cast(MemoryDisclosureScope, disclosure_scope)
         if not self.id:
-            self.id = _memory_id(self.scope, self.kind, self.text, self.key)
+            semantic_identity = "|".join(
+                [
+                    *self.subject_refs,
+                    self.relation or "",
+                    disclosure_scope,
+                ]
+            )
+            identity_text = (
+                f"{self.text}|{semantic_identity}"
+                if semantic_identity.strip("|")
+                else self.text
+            )
+            self.id = _memory_id(self.scope, self.kind, identity_text, self.key)
+
+    @property
+    def is_relational(self) -> bool:
+        return bool(
+            self.kind in _RELATIONAL_MEMORY_KINDS
+            or self.relation
+            or self.subject_refs
+            or self.source_person_refs
+            or self.audience_refs
+        )
 
     def merge_source(self, *, sid: str | None = None, turn_id: str | None = None) -> None:
         if sid and sid not in self.source_sids:
@@ -175,6 +313,11 @@ class MemoryEntry:
             "key": self.key,
             "text": self.text,
             "confidence": self.confidence,
+            "relation": self.relation,
+            "subject_refs": list(self.subject_refs),
+            "source_person_refs": list(self.source_person_refs),
+            "audience_refs": list(self.audience_refs),
+            "disclosure_scope": self.disclosure_scope,
             "source_turn_ids": list(self.source_turn_ids),
             "source_sids": list(self.source_sids),
             "created_ms": self.created_ms,
@@ -186,13 +329,24 @@ class MemoryEntry:
         }
 
     def to_prompt_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "scope": self.scope,
             "kind": self.kind,
             "key": self.key,
             "text": self.text,
             "confidence": self.confidence,
         }
+        if self.relation:
+            payload["relation"] = self.relation
+        if self.subject_refs:
+            payload["subject_refs"] = list(self.subject_refs)
+        if self.source_person_refs:
+            payload["source_person_refs"] = list(self.source_person_refs)
+        if self.audience_refs:
+            payload["audience_refs"] = list(self.audience_refs)
+        if self.disclosure_scope != "legacy_context":
+            payload["disclosure_scope"] = self.disclosure_scope
+        return payload
 
 
 class MemoryStore:
@@ -264,11 +418,15 @@ class MemoryStore:
         *,
         limit: int = 8,
         activation_texts: Iterable[str] | None = None,
+        activation_subject_refs: Iterable[str] | None = None,
+        audience_refs: Iterable[str] | None = None,
     ) -> list[dict[str, Any]]:
         self.prune_expired()
         return rank_memory_prompt_entries(
             [entry.to_prompt_dict() for entry in self._entries],
             activation_texts=activation_texts,
+            activation_subject_refs=activation_subject_refs,
+            audience_refs=audience_refs,
             limit=limit,
         )
 
@@ -326,29 +484,38 @@ class ProtectedDurableMemoryStore:
                     continue
                 if item.get("consent_basis") != "explicit_current_turn":
                     continue
-                entries.append(
-                    MemoryEntry(
-                        scope="profile",
-                        kind=str(item.get("kind") or "note"),
-                        key=str(item.get("key") or "") or None,
-                        text=str(item.get("text") or ""),
-                        confidence=float(item.get("confidence") or 0.8),
-                        source_turn_ids=[str(v) for v in item.get("source_turn_ids") or []],
-                        source_sids=[str(v) for v in item.get("source_sids") or []],
-                        created_ms=float(item.get("created_ms") or now_ms()),
-                        updated_ms=float(item.get("updated_ms") or now_ms()),
-                        expires_ms=(
-                            float(item["expires_ms"])
-                            if item.get("expires_ms") is not None
-                            else None
-                        ),
-                        persistence_policy="durable_with_explicit_consent",
-                        consent_basis=(
-                            str(item.get("consent_basis") or "") or None
-                        ),
-                        id=str(item.get("id") or "") or None,
-                    )
+                entry = MemoryEntry(
+                    scope="profile",
+                    kind=str(item.get("kind") or "note"),
+                    key=str(item.get("key") or "") or None,
+                    text=str(item.get("text") or ""),
+                    confidence=float(item.get("confidence") or 0.8),
+                    relation=str(item.get("relation") or "") or None,
+                    subject_refs=[str(v) for v in item.get("subject_refs") or []],
+                    source_person_refs=[
+                        str(v) for v in item.get("source_person_refs") or []
+                    ],
+                    audience_refs=[str(v) for v in item.get("audience_refs") or []],
+                    disclosure_scope=(
+                        str(item.get("disclosure_scope") or "") or None
+                    ),
+                    source_turn_ids=[str(v) for v in item.get("source_turn_ids") or []],
+                    source_sids=[str(v) for v in item.get("source_sids") or []],
+                    created_ms=float(item.get("created_ms") or now_ms()),
+                    updated_ms=float(item.get("updated_ms") or now_ms()),
+                    expires_ms=(
+                        float(item["expires_ms"])
+                        if item.get("expires_ms") is not None
+                        else None
+                    ),
+                    persistence_policy="durable_with_explicit_consent",
+                    consent_basis=(
+                        str(item.get("consent_basis") or "") or None
+                    ),
+                    id=str(item.get("id") or "") or None,
                 )
+                if not entry.is_relational:
+                    entries.append(entry)
             self.store.replace(entries)
             self.store.prune_expired()
             self.persist()
@@ -366,6 +533,11 @@ class ProtectedDurableMemoryStore:
                 or entry.persistence_policy != "durable_with_explicit_consent"
                 or entry.consent_basis != "explicit_current_turn"
                 or not entry.key
+                # PSM-2 keeps third-party/social relationship Memory session-scoped.
+                # Durable relational retention needs a separately qualified principal,
+                # deletion, consent, and privacy policy rather than piggybacking on the
+                # owner's ordinary profile-memory consent surface.
+                or entry.is_relational
             ):
                 continue
             self.store.add(entry)
@@ -392,11 +564,15 @@ class ProtectedDurableMemoryStore:
         *,
         limit: int = 8,
         activation_texts: Iterable[str] | None = None,
+        activation_subject_refs: Iterable[str] | None = None,
+        audience_refs: Iterable[str] | None = None,
     ) -> list[dict[str, Any]]:
         return (
             self.store.prompt_entries(
                 limit=limit,
                 activation_texts=activation_texts,
+                activation_subject_refs=activation_subject_refs,
+                audience_refs=audience_refs,
             )
             if self.enabled
             else []
@@ -442,10 +618,14 @@ class MemoryPromptBuilder:
         *,
         limit: int = 8,
         activation_texts: Iterable[str] | None = None,
+        activation_subject_refs: Iterable[str] | None = None,
+        audience_refs: Iterable[str] | None = None,
     ) -> dict[str, Any]:
         entries = store.prompt_entries(
             limit=limit,
             activation_texts=activation_texts,
+            activation_subject_refs=activation_subject_refs,
+            audience_refs=audience_refs,
         )
         return {
             "summary": (
@@ -467,7 +647,7 @@ class MemoryExtractor:
     ) -> list[MemoryEntry]:
         metadata = metadata or {}
         entries: list[MemoryEntry] = []
-        for item in self._entries_from_metadata(metadata, sid=sid):
+        for item in self._entries_from_metadata(metadata, sid=sid, trusted_disclosure=False):
             entries.append(item)
 
         patch = self._task_patch(metadata)
@@ -564,12 +744,44 @@ class MemoryExtractor:
 
     def extract_explicit_entries(self, value: Any, *, sid: str | None) -> list[MemoryEntry]:
         raw_entries = value if isinstance(value, list) else [value]
-        return self._entries_from_metadata({"extracted_memory": raw_entries}, sid=sid)
+        return self._entries_from_metadata(
+            {"extracted_memory": raw_entries},
+            sid=sid,
+            trusted_disclosure=False,
+        )
 
-    def _entries_from_metadata(self, metadata: dict[str, Any], *, sid: str | None) -> list[MemoryEntry]:
-        raw_entries = metadata.get("extracted_memory") or metadata.get("memory_entries") or []
-        if not isinstance(raw_entries, list):
-            return []
+    def extract_trusted_relational_entries(
+        self,
+        value: Any,
+        *,
+        sid: str | None,
+    ) -> list[MemoryEntry]:
+        """Parse relational Memory after an external source trust/privacy boundary.
+
+        This method does not establish trust itself. Callers must already have resolved
+        source provenance and any disclosure/audience policy. It merely prevents ordinary
+        model-authored Memory updates from self-promoting private social context to public.
+        """
+
+        raw_entries = value if isinstance(value, list) else [value]
+        return self._entries_from_metadata(
+            {"relational_memory": raw_entries},
+            sid=sid,
+            trusted_disclosure=True,
+        )
+
+    def _entries_from_metadata(
+        self,
+        metadata: dict[str, Any],
+        *,
+        sid: str | None,
+        trusted_disclosure: bool,
+    ) -> list[MemoryEntry]:
+        raw_entries: list[Any] = []
+        for key in ("extracted_memory", "memory_entries", "relational_memory"):
+            value = metadata.get(key)
+            if isinstance(value, list):
+                raw_entries.extend(value)
         entries: list[MemoryEntry] = []
         for item in raw_entries:
             if not isinstance(item, dict):
@@ -577,13 +789,43 @@ class MemoryExtractor:
             text = compact_text(str(item.get("text") or ""), limit=260)
             if not text:
                 continue
+            kind = str(item.get("kind") or "note")
+            relation = str(item.get("relation") or "").strip() or None
+            subject_refs = self._ref_list(item.get("subject_refs"))
+            source_person_refs = self._ref_list(item.get("source_person_refs"))
+            audience_refs = self._ref_list(item.get("audience_refs"))
+            structured_social = bool(
+                kind in _RELATIONAL_MEMORY_KINDS
+                or relation
+                or subject_refs
+                or source_person_refs
+                or audience_refs
+            )
+            disclosure_scope = str(item.get("disclosure_scope") or "").strip()
+            if structured_social and not trusted_disclosure:
+                # Ordinary model/interaction Memory cannot grant itself broader
+                # disclosure. Restrictive private/unknown labels are safe to retain;
+                # any permissive claim is downgraded until a trusted relational source
+                # supplies the policy through the dedicated ingress.
+                disclosure_scope = (
+                    disclosure_scope
+                    if disclosure_scope in {"private", "unknown"}
+                    else "unknown"
+                )
+            elif not disclosure_scope:
+                disclosure_scope = "unknown" if structured_social else "legacy_context"
             entries.append(
                 MemoryEntry(
                     scope=str(item.get("scope") or "session"),
-                    kind=str(item.get("kind") or "note"),
+                    kind=kind,
                     key=str(item.get("key") or "") or None,
                     text=text,
                     confidence=float(item.get("confidence") or 0.75),
+                    relation=relation,
+                    subject_refs=subject_refs,
+                    source_person_refs=source_person_refs,
+                    audience_refs=audience_refs,
+                    disclosure_scope=disclosure_scope,
                     source_sids=[sid] if sid else [],
                     expires_ms=(
                         now_ms() + float(item.get("retention_days")) * 86400000.0
@@ -597,6 +839,16 @@ class MemoryExtractor:
                 )
             )
         return entries
+
+    @staticmethod
+    def _ref_list(value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        return _normalized_refs(str(item) for item in value)
 
     @staticmethod
     def _task_patch(metadata: dict[str, Any]) -> dict[str, Any]:

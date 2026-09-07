@@ -1699,7 +1699,12 @@ class VoiceAssistant:
             "conversation": conversation,
             "session_memory": conversation.get("session_memory", {}),
             "memory_summary": (conversation.get("session_memory") or {}).get("memory_summary"),
-            "extracted_memory": conversation.get("extracted_memory", []),
+            # Model-facing Memory must come from the Memory owner's disclosure-safe
+            # prompt projection, never the raw retained snapshot. The raw aggregate
+            # remains internal conversation state for retention/debug ownership only.
+            "extracted_memory": (conversation.get("session_memory") or {}).get(
+                "extracted_memory", []
+            ),
             "mind": mind_context,
             "core_principles": mind_context.get("core_principles", []),
             "long_term_goals": mind_context.get("long_term_goals", []),
@@ -4979,6 +4984,30 @@ class VoiceAssistant:
         context = self.build_context(session_id)
         context["situation"] = observation.projection.prompt_projection()
         context["cognitive_opportunity"] = opportunity.prompt_projection()
+        situation_activation_texts: list[str] = []
+        opportunity_subjects = set(opportunity.subject_refs)
+        for interpretation in observation.projection.interpretations:
+            if opportunity_subjects and interpretation.subject_ref not in opportunity_subjects:
+                continue
+            situation_activation_texts.extend(
+                [
+                    interpretation.subject_ref,
+                    interpretation.relation,
+                    interpretation.value,
+                ]
+            )
+        relational_memory = self.conversation_state.activated_memory_context(
+            activation_texts=situation_activation_texts,
+            activation_subject_refs=list(opportunity.subject_refs),
+            # PSM-2 does not infer who can hear a goal-free utterance. Until a
+            # trusted multi-person presence/identity adapter supplies the complete
+            # audience, Memory entries requiring audience resolution stay hidden.
+            audience_refs=[],
+            limit=12,
+        )
+        context["memory_summary"] = relational_memory["summary"]
+        context["extracted_memory"] = relational_memory["entries"]
+        context["relational_memory_selection"] = relational_memory["selection"]
         interaction_ledger = getattr(
             getattr(self, "cognitive_runtime", None),
             "interaction_ledger",

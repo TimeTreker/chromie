@@ -182,6 +182,13 @@ def test_voice_assistant_goal_free_cognition_never_calls_planner_or_emits_work()
             self.situation_calls += 1
             assert request.opportunity.goal_ids == []
             assert timeout_ms == 3000
+            assert request.context["extracted_memory"][0]["key"] == "dad_relationship"
+            assert request.context["relational_memory_selection"][
+                "activation_subject_ref_count"
+            ] == 1
+            assert request.context["relational_memory_selection"][
+                "audience_resolved"
+            ] is False
             return SituationalCognitionResolution(
                 opportunity_id=request.opportunity.opportunity_id,
                 situation_digest=request.situation.digest,
@@ -212,6 +219,28 @@ def test_voice_assistant_goal_free_cognition_never_calls_planner_or_emits_work()
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
     assistant.session_log = lambda *_args, **_kwargs: None
+    assistant.conversation_state = SimpleNamespace(
+        activated_memory_context=lambda **kwargs: {
+            "entries": [
+                {
+                    "kind": "person_relationship",
+                    "key": "dad_relationship",
+                    "text": "Dad is a close family relationship for Chromie.",
+                    "relation": "family",
+                    "subject_refs": ["person:dad"],
+                    "disclosure_scope": "public",
+                }
+            ],
+            "summary": "- Dad is a close family relationship for Chromie.",
+            "selection": {
+                "policy": "context_subject_relevance_then_recency",
+                "activation_subject_ref_count": len(
+                    kwargs.get("activation_subject_refs") or []
+                ),
+                "audience_resolved": bool(kwargs.get("audience_refs")),
+            },
+        }
+    )
     assistant.build_context = lambda _sid: {
         "conversation_id": "conversation-1",
         "memory_summary": "",

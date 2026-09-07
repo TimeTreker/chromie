@@ -257,6 +257,26 @@ class ConversationStateManager:
         if durable_entries:
             self._durable_memory.add_many(durable_entries)
 
+    def record_trusted_relational_memory(
+        self,
+        value: Any,
+        *,
+        sid: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retain bounded relational Memory from an already-trusted source boundary.
+
+        This method does not recognize people or decide privacy. A source-specific adapter
+        must first establish its own provenance/principal/audience policy. The Memory owner
+        then validates and stores the supplied relationship/shared-experience projection.
+        """
+
+        entries = self._memory_extractor.extract_trusted_relational_entries(
+            value,
+            sid=sid,
+        )
+        self._store_explicit_memory_entries(entries)
+        return [entry.to_dict() for entry in entries]
+
     def forget_durable_memory(self, *, key: str) -> int:
         return self._durable_memory.remove(key=key)
 
@@ -3446,6 +3466,77 @@ class ConversationStateManager:
             for value in values
             if str(value or "").strip()
         ][:16]
+
+    def activated_memory_context(
+        self,
+        *,
+        activation_texts: list[str] | None = None,
+        activation_subject_refs: list[str] | None = None,
+        audience_refs: list[str] | None = None,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        """Project bounded Memory for an exact current cognitive context.
+
+        The normal session projection activates by current user/task/discourse cues.
+        Goal-free Situation cognition can additionally bind exact ``subject_refs`` so
+        relational Memory about the observed person outranks unrelated recency. Privacy
+        filtering remains inside the Memory owner; callers may pass only a fully resolved
+        current audience and an empty audience never widens disclosure.
+        """
+
+        base_activation_texts = self._memory_activation_texts()
+        extra_activation_texts = [
+            self._compact_text(value, limit=260)
+            for value in list(activation_texts or [])[:16]
+            if str(value or "").strip()
+        ]
+        combined_activation_texts = [
+            *base_activation_texts,
+            *extra_activation_texts,
+        ][:32]
+        extracted = self._memory_prompt_builder.build(
+            self._memory_store,
+            limit=limit,
+            activation_texts=combined_activation_texts,
+            activation_subject_refs=activation_subject_refs,
+            audience_refs=audience_refs,
+        )
+        durable_entries = self._durable_memory.prompt_entries(
+            limit=limit,
+            activation_texts=combined_activation_texts,
+            activation_subject_refs=activation_subject_refs,
+            audience_refs=audience_refs,
+        )
+        combined_entries = rank_memory_prompt_entries(
+            [*durable_entries, *extracted["entries"]],
+            activation_texts=combined_activation_texts,
+            activation_subject_refs=activation_subject_refs,
+            audience_refs=audience_refs,
+            limit=limit,
+        )
+        summary_lines = [
+            f"- {entry['text']}"
+            for entry in combined_entries
+            if entry.get("text")
+        ]
+        return {
+            "entries": combined_entries,
+            "summary": "\n".join(summary_lines) if summary_lines else "None",
+            "selection": {
+                "policy": "context_subject_relevance_then_recency",
+                "activation_source_count": len(combined_activation_texts),
+                "activation_subject_ref_count": len(
+                    [
+                        item
+                        for item in list(activation_subject_refs or [])
+                        if str(item or "").strip()
+                    ]
+                ),
+                "audience_resolved": bool(
+                    [item for item in list(audience_refs or []) if str(item or "").strip()]
+                ),
+            },
+        }
 
     def session_memory(self) -> dict[str, Any]:
         active_tasks = self._active_pending_tasks()
