@@ -8,6 +8,10 @@ from typing import Any, Iterable
 
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
+from shared.chromie_contracts.social_world import (
+    TrustedSocialFeedbackObservation,
+    TrustedSocialPerceptionObservation,
+)
 from shared.chromie_contracts.situation import (
     CognitiveOpportunity,
     GoalTimeCondition,
@@ -279,6 +283,111 @@ def build_situation_projection(
         unresolved_conditions=conditions,
         source_refs=bounded_sources,
         interpretations=bounded_interpretations,
+    )
+
+
+def build_social_feedback_situation_observation(
+    observation: TrustedSocialFeedbackObservation,
+    *,
+    context: dict[str, Any] | None = None,
+) -> SituationRevisionObservation:
+    """Project trusted social feedback into Goal-free Situation without interpreting it."""
+
+    interpretations: list[SituationInterpretation] = []
+    for index, signal in enumerate(observation.signals):
+        interpretations.append(
+            SituationInterpretation(
+                interpretation_id=f"{observation.observation_id}:feedback:{index}"[:200],
+                subject_ref=signal.subject_ref,
+                relation=signal.relation,
+                value=signal.value,
+                epistemic_status=signal.epistemic_status,
+                relevance_goal_ids=[],
+                source_refs=list(signal.source_refs),
+            )
+        )
+    for index, activity_id in enumerate(observation.reacts_to_activity_ids):
+        interpretations.append(
+            SituationInterpretation(
+                interpretation_id=f"{observation.observation_id}:activity:{index}"[:200],
+                subject_ref="self:chromie",
+                relation="social.feedback_target",
+                value=activity_id,
+                epistemic_status="established",
+                relevance_goal_ids=[],
+                source_refs=[observation.source_refs[0].reference_id],
+            )
+        )
+    projection = build_situation_projection(
+        context=context or {},
+        turn_id=observation.observation_id,
+        focus_goal_ids=[],
+        audience_refs=list(observation.audience_refs),
+        revision=observation.source_revision,
+        source_refs=list(observation.source_refs),
+        interpretations=interpretations,
+    )
+    return SituationRevisionObservation(
+        observation_id=observation.observation_id,
+        source_id=observation.source_id,
+        source_revision=observation.source_revision,
+        goal_ids=[],
+        source_refs=[item.reference_id for item in observation.source_refs],
+        projection=projection,
+    )
+
+
+def build_social_perception_situation_observation(
+    observation: TrustedSocialPerceptionObservation,
+    *,
+    context: dict[str, Any] | None = None,
+) -> SituationRevisionObservation:
+    """Project one already-trusted social perception into Goal-free Situation.
+
+    Presence/identity/audience semantics are source-owned facts. This helper performs
+    no person recognition, relationship inference, salience judgment, or response choice.
+    """
+
+    interpretations: list[SituationInterpretation] = []
+    for index, person in enumerate(observation.people):
+        interpretations.append(
+            SituationInterpretation(
+                interpretation_id=f"{observation.observation_id}:presence:{index}"[:200],
+                subject_ref=person.subject_ref,
+                relation="social.presence",
+                value=person.presence,
+                epistemic_status=person.epistemic_status,
+                relevance_goal_ids=[],
+                source_refs=list(person.source_refs),
+            )
+        )
+        interpretations.append(
+            SituationInterpretation(
+                interpretation_id=f"{observation.observation_id}:identity:{index}"[:200],
+                subject_ref=person.subject_ref,
+                relation="social.identity_resolution",
+                value=f"{person.identity_status}:{person.identity_confidence:.3f}",
+                epistemic_status=person.epistemic_status,
+                relevance_goal_ids=[],
+                source_refs=list(person.source_refs),
+            )
+        )
+    projection = build_situation_projection(
+        context=context or {},
+        turn_id=observation.observation_id,
+        focus_goal_ids=[],
+        audience_refs=list(observation.audience_refs),
+        revision=observation.source_revision,
+        source_refs=list(observation.source_refs),
+        interpretations=interpretations,
+    )
+    return SituationRevisionObservation(
+        observation_id=observation.observation_id,
+        source_id=observation.source_id,
+        source_revision=observation.source_revision,
+        goal_ids=[],
+        source_refs=[item.reference_id for item in observation.source_refs],
+        projection=projection,
     )
 
 
@@ -643,7 +752,10 @@ async def resolve_goal_free_situation_response(
     resolution = await cognition_call(
         session,
         request=request,
-        timeout_ms=host.cognitive_runtime_policy.fast_planner_timeout_ms,
+        timeout_ms=max(
+            host.cognitive_runtime_policy.fast_planner_timeout_ms,
+            host.cognitive_runtime_policy.deep_planner_timeout_ms,
+        ),
     )
     record_session_workflow_stage(
         host,
@@ -672,6 +784,30 @@ async def resolve_goal_free_situation_response(
         raise ValueError(
             "situational cognition result changed trusted readiness provenance"
         )
+    situation_subjects = {item.subject_ref for item in observation.projection.interpretations}
+    source_refs = set(observation.source_refs)
+    for candidate in resolution.memory_candidates:
+        if not set(candidate.subject_refs).issubset(situation_subjects):
+            raise ValueError("situational memory candidate widened Situation subjects")
+        if not set(candidate.source_refs).issubset(source_refs):
+            raise ValueError("situational memory candidate widened trusted source provenance")
+    if resolution.memory_candidates:
+        host.conversation_state.record_cognitive_relational_experience(
+            list(resolution.memory_candidates),
+            sid=session_id,
+        )
+    for candidate in resolution.self_memory_candidates:
+        if not set(candidate.source_refs).issubset(source_refs):
+            raise ValueError("self-context candidate widened trusted source provenance")
+        # External subjects may be retained only as cues around Chromie's own concern;
+        # the candidate must always include self:chromie by contract.
+        if not set(candidate.subject_refs).issubset(situation_subjects | {"self:chromie"}):
+            raise ValueError("self-context candidate widened Situation subjects")
+    if resolution.self_memory_candidates:
+        host.conversation_state.record_cognitive_self_context(
+            list(resolution.self_memory_candidates),
+            sid=session_id,
+        )
     if resolution.disposition == "silence":
         host.session_log(
             session_id,
@@ -682,6 +818,22 @@ async def resolve_goal_free_situation_response(
     activity = resolution.activity
     if activity is None:
         raise ValueError("communicate situational cognition has no Activity")
+    if activity.repair_of_activity_ids:
+        interaction_context = context.get("interaction_context")
+        already_spoken = (
+            interaction_context.get("already_spoken")
+            if isinstance(interaction_context, dict)
+            else []
+        )
+        delivered_activity_ids = {
+            str(activity_id).strip()
+            for event in already_spoken or []
+            if isinstance(event, dict)
+            for activity_id in (event.get("metadata") or {}).get("communicative_activity_ids", [])
+            if str(activity_id).strip()
+        }
+        if not set(activity.repair_of_activity_ids).issubset(delivered_activity_ids):
+            raise ValueError("situational repair must reference actually delivered activities")
 
     response = InteractionResponse(
         speech=[
@@ -706,6 +858,7 @@ async def resolve_goal_free_situation_response(
                     "source_situation_refs": list(observation.source_refs),
                     "subject_refs": list(resolution.subject_refs),
                     "communicative_activity_ids": [activity.activity_id],
+                    "repair_of_activity_ids": list(activity.repair_of_activity_ids),
                     "turn_id": observation.observation_id,
                     "language": language or "auto",
                     "wait_for_playback_start": True,
@@ -908,6 +1061,8 @@ __all__ = [
     "apply_due_time_condition_opportunity",
     "build_provider_state_situation_observation",
     "build_situation_projection",
+    "build_social_feedback_situation_observation",
+    "build_social_perception_situation_observation",
     "build_trusted_goal_free_situation_observation",
     "derive_situation_revision_opportunity",
     "drain_due_time_conditions_once",

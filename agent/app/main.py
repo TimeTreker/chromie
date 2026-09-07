@@ -346,11 +346,23 @@ situational_cognition_client = (
     if settings.use_llm and settings.fast_planner_enabled
     else None
 )
+situational_deliberative_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.deep_planner_model,
+        timeout_ms=settings.deep_planner_timeout_ms,
+        purpose="situational_deliberative_cognition",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.deep_planner_enabled
+    else None
+)
 situational_cognition_resolver = (
     SituationalCognitionResolver(
         situational_cognition_client,
-        num_ctx=settings.fast_planner_num_ctx,
-        num_predict=min(settings.fast_planner_num_predict, 768),
+        deliberative_ollama=situational_deliberative_client,
+        num_ctx=max(settings.fast_planner_num_ctx, settings.deep_planner_num_ctx),
+        num_predict=min(settings.deep_planner_num_predict, 1024),
     )
     if situational_cognition_client is not None
     else None

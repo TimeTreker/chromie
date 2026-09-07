@@ -350,14 +350,13 @@ Implementation order:
    and fail validation when neither Goal/Evidence nor Situation provenance exists. The
    maintained Goal-bound provider/time/Evidence paths are unchanged. No UserTurn, GI result,
    Responsibility, or Goal is fabricated to wake cognition.
-3. **Add source-specific social/perception Situation ingress — source-neutral trusted ingress + audience binding implemented, concrete adapters open.**
+3. **Add source-specific social/perception Situation ingress — PSM-5 trusted person/presence/audience contract implemented.**
    `build_trusted_goal_free_situation_observation(...)` binds one already-trusted source,
    its typed current interpretations, and optional exact `audience_refs` into the existing
    Goal-free Situation surface; `apply_goal_free_situation_opportunity(...)` invokes the same
    Cognitive Core without synthetic UserTurn/Goal provenance. The generic ingress performs no
    person recognition, relationship inference, audience guessing, or scene/social semantic
-   classification. Concrete camera/person/scene/social adapters must establish those meanings
-   and their own trust/privacy boundary before admission. Replaying the same Situation digest
+   classification. The source-neutral `TrustedSocialPerceptionObservation` now carries source-owned person/presence, identity-resolution status/confidence, and exact audience; Runtime projects those facts into Situation without recommending behavior. Concrete camera/person/scene providers remain source-specific and must establish sensing/trust/privacy before constructing this contract. Replaying the same Situation digest
    remains a mechanical no-op; no ambient polling loop or world-model database is introduced.
 4. **Extend relational Memory and privacy provenance — first source slice implemented.**
    `MemoryEntry` now retains bounded relation/subject/source-person/audience/disclosure
@@ -381,7 +380,11 @@ Implementation order:
    context and now includes exact trusted audience; Host keeps no persistent salience state or
    priority manager. Relationship Memory can inform semantic relevance but never privacy,
    trust, Goal, Work, or effect authority.
-6. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
+6. **Close the social feedback loop — PSM-6 source contract implemented.** Trusted social feedback may reference the exact delivered Communicative Activity IDs it reacts to and enter the same Goal-free Situation/Core path. Source adapters report observable signals only; they do not label anger/approval/rejection or prescribe behavior. Situational cognition may remain silent, follow up, or author a `repair` act that must reference an actually delivered Activity. Runtime validates that reference mechanically and never decides whether repair is socially warranted.
+7. **Form relationship experience without relationship rules — PSM-7 first source slice implemented.** Goal-free cognition may propose a bounded session-scoped `shared_experience` Memory candidate tied to exact current Situation subjects/source refs. Runtime rejects widened provenance and stores the candidate as private ephemeral Memory only. No interaction-count→friendship rule, relationship score, or model-granted public disclosure is created; future cognition interprets relationships from retained experiences.
+8. **Separate Goal-free deliberation from Planner — PSM-8 source implemented.** Fast situational cognition may request one bounded deliberative continuation. That continuation uses the configured quality/deep model but the same Goal-free output authority: silence, one low-commitment Communicative Activity, and private bounded experience proposals only. It cannot create Goal/Capability Work, reinterpret a user Responsibility, or recurse into another deliberative pass. Deep model selection therefore changes cognition depth, not authority.
+9. **Retain short-lived self-directed concerns/interests — PSM-9 first source slice implemented.** The same Goal-free Core may propose bounded `self_concern|interest` session Memory with exact Situation source provenance and TTL. Runtime stores it as Chromie-owned `self_context`; it can re-enter later cognition but creates no Goal, timer, Work, Capability, authorization, or autonomous polling loop. Long-lived self-created intentions remain a separate future irreducibility question.
+10. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
    Goal-free situational cognition is a stateless same-Core invocation with no Goal/Work
    fields. It may return `silence` or author exactly one context-grounded communicative act
    (`greeting|acknowledge|inquire|inform|respond`); Runtime binds Situation/opportunity

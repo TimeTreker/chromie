@@ -440,10 +440,9 @@ The first Goal-free non-turn source path is implemented: an already-trusted type
 revision may raise a provenance-bound Goal-free `CognitiveOpportunity` and enter a stateless
 same-Core situational-cognition scope without a synthetic user turn, Responsibility, Goal,
 or Planner call. The result is either silence or one context-grounded low-commitment speech
-Activity and can never contain Capability Work. Concrete social perception adapters and the
-quality/frequency of initiative remain unqualified target behavior; `slow` Goal-free
-readiness deliberately fails quiet until bounded deliberative cognition is separately
-qualified.
+Activity and can never contain Capability Work. PSM-5 now provides a source-neutral trusted person/presence/audience observation contract; concrete perception providers and the quality/frequency of initiative remain separately qualified target behavior; `slow` Goal-free readiness and Fast semantic escalation now enter one bounded PSM-8 deliberative pass using the quality/deep model under the same Goal-free authority. The pass may not create Work or recurse; deep cognition is therefore not Deep Planner.
+
+PSM-6 also admits trusted social feedback as ordinary Goal-free Situation. A source may bind an observed signal to exact delivered Chromie Activity IDs; the same Core decides silence, follow-up, or repair. `repair` is a Communicative Activity function and must cite an actually delivered Activity. Runtime validates the citation only; it never classifies the human reaction or chooses an apology.
 
 The first relational-Memory slice is likewise implemented inside the existing Memory owner.
 Person/relationship/shared-experience entries may carry exact subject/source-person/audience
@@ -474,6 +473,8 @@ audience is never guessed and therefore keeps audience-gated Memory hidden. The 
 accepts already-trusted typed interpretations only; source adapters remain responsible for
 sensing, person/principal resolution, audience resolution, privacy admission, and semantic
 interpretation.
+
+PSM-9 also allows short-lived Chromie-owned concerns/interests to survive as bounded session Memory. They are not user Responsibilities and do not become Goals merely because Chromie cares about them. They may influence later cognition when relevant, expire naturally, and cannot schedule themselves or authorize effects.
 
 ## Progressive cognition and conversational self-repair
 

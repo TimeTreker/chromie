@@ -277,6 +277,65 @@ class ConversationStateManager:
         self._store_explicit_memory_entries(entries)
         return [entry.to_dict() for entry in entries]
 
+    def record_cognitive_relational_experience(
+        self,
+        candidates: list[Any],
+        *,
+        sid: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retain private bounded experience proposed by cognition, never disclosure authority."""
+
+        entries: list[MemoryEntry] = []
+        for candidate in candidates[:4]:
+            payload = candidate.model_dump(mode="json") if hasattr(candidate, "model_dump") else dict(candidate)
+            entries.append(
+                MemoryEntry(
+                    scope="session",
+                    kind="shared_experience",
+                    text=str(payload.get("text") or ""),
+                    confidence=float(payload.get("confidence") or 0.7),
+                    relation="shared_experience",
+                    subject_refs=[str(v) for v in payload.get("subject_refs") or []],
+                    source_ref_ids=[str(v) for v in payload.get("source_refs") or []],
+                    disclosure_scope="private",
+                    source_sids=[sid] if sid else [],
+                    expires_ms=_now_ms() + 1000.0 * float(payload.get("retention_seconds") or 21600),
+                    persistence_policy="ephemeral",
+                )
+            )
+        self._memory_store.add_many(entries)
+        return [entry.to_dict() for entry in entries]
+
+    def record_cognitive_self_context(
+        self,
+        candidates: list[Any],
+        *,
+        sid: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retain short-lived Chromie-owned concern/interest context without action authority."""
+
+        entries: list[MemoryEntry] = []
+        for candidate in candidates[:4]:
+            payload = candidate.model_dump(mode="json") if hasattr(candidate, "model_dump") else dict(candidate)
+            entries.append(
+                MemoryEntry(
+                    scope="session",
+                    kind=str(payload.get("kind") or "self_concern"),
+                    text=str(payload.get("text") or ""),
+                    confidence=float(payload.get("confidence") or 0.7),
+                    relation="self_context",
+                    subject_refs=[str(v) for v in payload.get("subject_refs") or ["self:chromie"]],
+                    source_ref_ids=[str(v) for v in payload.get("source_refs") or []],
+                    disclosure_scope="self_context",
+                    source_sids=[sid] if sid else [],
+                    expires_ms=_now_ms() + 1000.0 * float(payload.get("retention_seconds") or 14400),
+                    persistence_policy="ephemeral",
+                    safety_note="Self-context guides cognition only; it creates no Goal, timer, action, or authorization.",
+                )
+            )
+        self._memory_store.add_many(entries)
+        return [entry.to_dict() for entry in entries]
+
     def forget_durable_memory(self, *, key: str) -> int:
         return self._durable_memory.remove(key=key)
 

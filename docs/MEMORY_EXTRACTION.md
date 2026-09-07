@@ -194,6 +194,14 @@ ordinary explicit-consent fields are present, because third-party principal iden
 privacy, deletion, and consent policy need separate qualification. This is conservative
 retention policy, not a claim that public relationships can never be durable.
 
+## Cognitive relationship experience
+
+PSM-7 permits the same Goal-free Cognitive Core to propose a small `shared_experience` entry grounded in the current trusted Situation. Runtime binds subject/source provenance and stores it only as private, ephemeral session Memory. The proposal records an episode; it does not promote a person to friend/family/trusted, grant disclosure, or authorize effects. Repeated interactions therefore accumulate evidence for later cognition rather than crossing hard-coded relationship thresholds.
+
+## Short-lived self context
+
+PSM-9 reuses Memory rather than adding a Concern/Intention manager. Goal-free cognition may retain a bounded `self_concern` or `interest` about Chromie's own current life, with exact Situation source refs and expiry. The Memory is visible as `self_context` to later cognition but has no Goal, timer, Work, effect, or authorization semantics. This supports continuity such as wanting to return to a drawing without creating an autonomous background loop.
+
 ## Prompt Builder
 
 Every model-facing component should receive a role-appropriate compact memory

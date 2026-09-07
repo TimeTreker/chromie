@@ -22,6 +22,7 @@ MemoryDisclosureScope = Literal[
     "shared_with_audience",
     "private",
     "unknown",
+    "self_context",
 ]
 _RELATIONAL_MEMORY_KINDS = {
     "person_identity",
@@ -36,6 +37,7 @@ _DISCLOSURE_SCOPES = {
     "shared_with_audience",
     "private",
     "unknown",
+    "self_context",
 }
 
 
@@ -63,7 +65,7 @@ def _memory_prompt_visible(
     """
 
     scope = str(entry.get("disclosure_scope") or "legacy_context").strip()
-    if scope in {"legacy_context", "public"}:
+    if scope in {"legacy_context", "public", "self_context"}:
         return True
     if scope == "shared_with_audience":
         allowed = {
@@ -228,6 +230,7 @@ class MemoryEntry:
     relation: str | None = None
     subject_refs: list[str] = field(default_factory=list)
     source_person_refs: list[str] = field(default_factory=list)
+    source_ref_ids: list[str] = field(default_factory=list)
     audience_refs: list[str] = field(default_factory=list)
     disclosure_scope: MemoryDisclosureScope | None = None
     source_turn_ids: list[str] = field(default_factory=list)
@@ -249,6 +252,7 @@ class MemoryEntry:
         self.relation = compact_text(self.relation, limit=120) if self.relation else None
         self.subject_refs = _normalized_refs(self.subject_refs)
         self.source_person_refs = _normalized_refs(self.source_person_refs)
+        self.source_ref_ids = _normalized_refs(self.source_ref_ids)
         self.audience_refs = _normalized_refs(self.audience_refs)
         structured_social = bool(
             self.kind in _RELATIONAL_MEMORY_KINDS
@@ -316,6 +320,7 @@ class MemoryEntry:
             "relation": self.relation,
             "subject_refs": list(self.subject_refs),
             "source_person_refs": list(self.source_person_refs),
+            "source_ref_ids": list(self.source_ref_ids),
             "audience_refs": list(self.audience_refs),
             "disclosure_scope": self.disclosure_scope,
             "source_turn_ids": list(self.source_turn_ids),
@@ -342,6 +347,8 @@ class MemoryEntry:
             payload["subject_refs"] = list(self.subject_refs)
         if self.source_person_refs:
             payload["source_person_refs"] = list(self.source_person_refs)
+        if self.source_ref_ids:
+            payload["source_ref_ids"] = list(self.source_ref_ids)
         if self.audience_refs:
             payload["audience_refs"] = list(self.audience_refs)
         if self.disclosure_scope != "legacy_context":
@@ -495,6 +502,7 @@ class ProtectedDurableMemoryStore:
                     source_person_refs=[
                         str(v) for v in item.get("source_person_refs") or []
                     ],
+                    source_ref_ids=[str(v) for v in item.get("source_ref_ids") or []],
                     audience_refs=[str(v) for v in item.get("audience_refs") or []],
                     disclosure_scope=(
                         str(item.get("disclosure_scope") or "") or None
@@ -793,6 +801,7 @@ class MemoryExtractor:
             relation = str(item.get("relation") or "").strip() or None
             subject_refs = self._ref_list(item.get("subject_refs"))
             source_person_refs = self._ref_list(item.get("source_person_refs"))
+            source_ref_ids = self._ref_list(item.get("source_ref_ids"))
             audience_refs = self._ref_list(item.get("audience_refs"))
             structured_social = bool(
                 kind in _RELATIONAL_MEMORY_KINDS
@@ -824,6 +833,7 @@ class MemoryExtractor:
                     relation=relation,
                     subject_refs=subject_refs,
                     source_person_refs=source_person_refs,
+                    source_ref_ids=source_ref_ids,
                     audience_refs=audience_refs,
                     disclosure_scope=disclosure_scope,
                     source_sids=[sid] if sid else [],

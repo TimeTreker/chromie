@@ -516,6 +516,7 @@ SituationalSpeechAct = Literal[
     "inquire",
     "inform",
     "respond",
+    "repair",
 ]
 
 
@@ -532,11 +533,25 @@ class SituationalCommunicativeAct(BaseModel):
     activity_id: str = Field(min_length=1, max_length=160)
     text: str = Field(min_length=1, max_length=600)
     speech_act: SituationalSpeechAct
+    repair_of_activity_ids: list[str] = Field(default_factory=list, max_length=8)
 
     @field_validator("activity_id", "text", mode="before")
     @classmethod
     def normalize_activity_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
+
+    @field_validator("repair_of_activity_ids", mode="before")
+    @classmethod
+    def normalize_repair_refs(cls, value: Any) -> list[str]:
+        return CognitiveOpportunity.normalize_opportunity_lists(value)
+
+    @model_validator(mode="after")
+    def validate_repair_shape(self) -> "SituationalCommunicativeAct":
+        if self.speech_act == "repair" and not self.repair_of_activity_ids:
+            raise ValueError("repair situational act requires repair_of_activity_ids")
+        if self.speech_act != "repair" and self.repair_of_activity_ids:
+            raise ValueError("only repair situational acts may reference repaired activities")
+        return self
 
 
 class SituationalCognitionRequest(BaseModel):
@@ -601,6 +616,64 @@ class SituationalCognitionRequest(BaseModel):
         return self
 
 
+
+
+class SituationalRelationshipMemoryCandidate(BaseModel):
+    """Private bounded shared-experience proposal from Goal-free cognition."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str = Field(min_length=1, max_length=260)
+    subject_refs: list[str] = Field(min_length=1, max_length=8)
+    source_refs: list[str] = Field(min_length=1, max_length=8)
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+    retention_seconds: int = Field(default=21600, ge=60, le=604800)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def normalize_candidate_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("subject_refs", "source_refs", mode="before")
+    @classmethod
+    def normalize_candidate_refs(cls, value: Any) -> list[str]:
+        return CognitiveOpportunity.normalize_opportunity_lists(value)
+
+
+
+
+SituationalSelfMemoryKind = Literal["self_concern", "interest"]
+
+
+class SituationalSelfMemoryCandidate(BaseModel):
+    """Short-lived self-context proposal; never an action, Goal, or wake condition."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: SituationalSelfMemoryKind
+    text: str = Field(min_length=1, max_length=260)
+    subject_refs: list[str] = Field(default_factory=lambda: ["self:chromie"], min_length=1, max_length=8)
+    source_refs: list[str] = Field(min_length=1, max_length=8)
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0)
+    retention_seconds: int = Field(default=14400, ge=60, le=86400)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def normalize_self_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("subject_refs", "source_refs", mode="before")
+    @classmethod
+    def normalize_self_refs(cls, value: Any) -> list[str]:
+        return CognitiveOpportunity.normalize_opportunity_lists(value)
+
+    @model_validator(mode="after")
+    def validate_self_subject(self) -> "SituationalSelfMemoryCandidate":
+        if "self:chromie" not in self.subject_refs:
+            raise ValueError("self-context candidate must include self:chromie")
+        return self
+
+
 class SituationalCognitionResolution(BaseModel):
     """Canonical result of one Goal-free situational cognition invocation."""
 
@@ -613,6 +686,8 @@ class SituationalCognitionResolution(BaseModel):
     subject_refs: list[str] = Field(default_factory=list, max_length=16)
     disposition: SituationalCognitionDisposition
     activity: SituationalCommunicativeAct | None = None
+    memory_candidates: list[SituationalRelationshipMemoryCandidate] = Field(default_factory=list, max_length=4)
+    self_memory_candidates: list[SituationalSelfMemoryCandidate] = Field(default_factory=list, max_length=4)
     reason_summary: str = Field(default="", max_length=600)
 
     @field_validator(

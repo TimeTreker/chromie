@@ -273,7 +273,7 @@ def test_voice_assistant_goal_free_cognition_never_calls_planner_or_emits_work()
         async def resolve_situational_cognition(self, _session, *, request, timeout_ms):
             self.situation_calls += 1
             assert request.opportunity.goal_ids == []
-            assert timeout_ms == 3000
+            assert timeout_ms == 10000
             assert request.context["extracted_memory"][0]["key"] == "dad_relationship"
             assert request.context["relational_memory_selection"][
                 "activation_subject_ref_count"
@@ -598,3 +598,28 @@ def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
     assert silence == "silence"
     assert no_change == "no_change"
     assert host.delivered == 0
+
+@pytest.mark.asyncio
+async def test_fast_situational_cognition_can_escalate_to_same_scope_deliberation() -> None:
+    observation = goal_free_observation()
+    fast = FakeOllama({"disposition": "deliberate", "activity": None, "memory_candidates": [], "reason_summary": "Need broader context."})
+    deep = FakeOllama({"disposition": "communicate", "activity": {"activity_id": "deep-social-1", "text": "你还好吗？", "speech_act": "inquire", "repair_of_activity_ids": []}, "memory_candidates": [], "reason_summary": "A small inquiry is appropriate."})
+    resolver = SituationalCognitionResolver(fast, deliberative_ollama=deep)
+
+    result = await resolver.resolve(request_for(observation))
+
+    assert result.disposition == "communicate"
+    assert result.activity is not None and result.activity.activity_id == "deep-social-1"
+    assert fast.calls == 1
+    assert deep.calls == 1
+    assert "DELiberative".lower() in deep.prompt.lower()
+
+
+@pytest.mark.asyncio
+async def test_deliberative_situational_cognition_cannot_recurse() -> None:
+    observation = goal_free_observation()
+    fast = FakeOllama({"disposition": "deliberate", "activity": None, "memory_candidates": [], "reason_summary": "Need deeper reasoning."})
+    deep = FakeOllama({"disposition": "deliberate", "activity": None, "memory_candidates": [], "reason_summary": "Again."})
+    resolver = SituationalCognitionResolver(fast, deliberative_ollama=deep)
+    with pytest.raises(ValueError, match="cannot recurse"):
+        await resolver.resolve(request_for(observation))
