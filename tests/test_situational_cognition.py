@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -12,8 +11,8 @@ from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy
 from orchestrator.runtime.situation import (
     apply_goal_free_situation_opportunity,
     build_situation_projection,
+    build_trusted_goal_free_situation_observation,
     derive_situation_revision_opportunity,
-    goal_free_situation_salience,
     resolve_goal_free_situation_response,
 )
 from shared.chromie_contracts.interaction import (
@@ -31,7 +30,9 @@ from shared.chromie_contracts.situation import (
 )
 
 
-def goal_free_observation(*, revision: int = 1) -> SituationRevisionObservation:
+def goal_free_observation(
+    *, revision: int = 1, audience_refs: list[str] | None = None
+) -> SituationRevisionObservation:
     source = SituationSourceRef(
         kind="interaction_state",
         reference_id=f"trusted-arrival-{revision}",
@@ -50,6 +51,7 @@ def goal_free_observation(*, revision: int = 1) -> SituationRevisionObservation:
         context={},
         turn_id=f"situation-{revision}",
         focus_goal_ids=[],
+        audience_refs=audience_refs or [],
         revision=revision,
         source_refs=[source],
         interpretations=[interpretation],
@@ -110,225 +112,78 @@ def test_semantic_situation_signature_ignores_transport_revision() -> None:
     )
 
 
-def test_goal_free_salience_prefers_direct_known_social_change() -> None:
-    observation = goal_free_observation()
-    opportunity = derive_situation_revision_opportunity(observation)
-    assert opportunity is not None
-
-    salience = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[
-            {
-                "kind": "person_relationship",
-                "subject_refs": ["person:dad"],
-                "relation": "family",
-                "text": "Dad is close family.",
-                "disclosure_scope": "public",
-            }
-        ],
-        situation_signature=opportunity.situation_signature,
+def test_semantic_situation_signature_changes_with_trusted_audience() -> None:
+    without_audience = goal_free_observation(revision=1)
+    with_audience = goal_free_observation(
+        revision=1,
+        audience_refs=["person:dad", "self:chromie"],
     )
 
-    assert salience.mode == "fast"
-    assert "direct_social_change" in salience.reason_codes
-    assert "known_relationship_relevant" in salience.reason_codes
+    assert without_audience.projection.digest != with_audience.projection.digest
+    assert (
+        without_audience.projection.interpretation_signature()
+        != with_audience.projection.interpretation_signature()
+    )
 
 
-def test_goal_free_salience_keeps_routine_presence_local() -> None:
+def test_trusted_goal_free_ingress_preserves_source_and_audience_without_inference() -> None:
     source = SituationSourceRef(
-        kind="interaction_state",
-        reference_id="trusted-presence",
+        kind="perception",
+        reference_id="scene-observation-7",
         owner="trusted_scene_adapter",
     )
-    projection = build_situation_projection(
-        context={},
-        turn_id="routine-presence",
-        focus_goal_ids=[],
-        revision=1,
-        source_refs=[source],
-        interpretations=[
-            SituationInterpretation(
-                interpretation_id="dad-visible",
-                subject_ref="person:dad",
-                relation="social.presence",
-                value="present",
-                epistemic_status="established",
-                source_refs=[source.reference_id],
-            )
-        ],
-    )
-    observation = SituationRevisionObservation(
-        observation_id="routine-presence-observation",
-        source_id="trusted_scene_adapter",
-        source_revision=1,
+    interpretation = SituationInterpretation(
+        interpretation_id="person-track-7-arrival",
+        subject_ref="person:dad",
+        relation="social.arrival",
+        value="arrived_home",
+        epistemic_status="established",
+        relevance_goal_ids=[],
         source_refs=[source.reference_id],
-        projection=projection,
     )
 
-    salience = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[
-            {
-                "kind": "person_relationship",
-                "subject_refs": ["person:dad"],
-                "relation": "family",
-                "text": "Dad is close family.",
-                "disclosure_scope": "public",
-            }
-        ],
-        situation_signature=projection.interpretation_signature(),
+    observation = build_trusted_goal_free_situation_observation(
+        context={},
+        turn_id="scene-turn-7",
+        source_id="trusted_scene_adapter",
+        source_revision=7,
+        source=source,
+        interpretations=[interpretation],
+        audience_refs=["person:dad", "self:chromie"],
     )
 
-    assert salience.mode == "local"
-    assert "routine_or_ambient_change" in salience.reason_codes
+    assert observation.goal_ids == []
+    assert observation.source_refs == ["scene-observation-7"]
+    assert observation.projection.focus_goal_ids == []
+    assert observation.projection.audience_refs == ["person:dad", "self:chromie"]
+    assert observation.projection.interpretations == [interpretation]
 
 
-def test_goal_free_salience_relationship_context_can_make_nonroutine_change_fast() -> None:
+def test_trusted_goal_free_ingress_rejects_goal_semantics() -> None:
     source = SituationSourceRef(
-        kind="interaction_state",
-        reference_id="trusted-quiet-change",
+        kind="perception",
+        reference_id="scene-goal-leak",
         owner="trusted_scene_adapter",
     )
-    projection = build_situation_projection(
-        context={},
-        turn_id="known-person-quiet",
-        focus_goal_ids=[],
-        revision=1,
-        source_refs=[source],
-        interpretations=[
-            SituationInterpretation(
-                interpretation_id="dad-unusually-quiet",
-                subject_ref="person:dad",
-                relation="social.state",
-                value="quiet",
-                epistemic_status="established",
-                source_refs=[source.reference_id],
-            )
-        ],
-    )
-    observation = SituationRevisionObservation(
-        observation_id="known-person-quiet-observation",
-        source_id="trusted_scene_adapter",
-        source_revision=1,
+    interpretation = SituationInterpretation(
+        interpretation_id="goal-leak",
+        subject_ref="person:dad",
+        relation="social.presence",
+        value="present",
+        epistemic_status="established",
+        relevance_goal_ids=["goal-should-not-exist"],
         source_refs=[source.reference_id],
-        projection=projection,
     )
 
-    unknown_person = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[],
-        situation_signature=projection.interpretation_signature(),
-    )
-    known_person = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[
-            {
-                "kind": "person_relationship",
-                "subject_refs": ["person:dad"],
-                "relation": "family",
-                "text": "Dad is close family.",
-                "disclosure_scope": "public",
-            }
-        ],
-        situation_signature=projection.interpretation_signature(),
-    )
-
-    assert unknown_person.mode == "local"
-    assert known_person.mode == "fast"
-    assert "relationship_context_makes_change_relevant" in known_person.reason_codes
-
-
-def test_goal_free_salience_does_not_interrupt_busy_social_context() -> None:
-    source = SituationSourceRef(
-        kind="interaction_state",
-        reference_id="trusted-busy",
-        owner="trusted_scene_adapter",
-    )
-    projection = build_situation_projection(
-        context={},
-        turn_id="busy-social",
-        focus_goal_ids=[],
-        revision=1,
-        source_refs=[source],
-        interpretations=[
-            SituationInterpretation(
-                interpretation_id="dad-busy",
-                subject_ref="person:dad",
-                relation="social.engagement",
-                value="private_conversation",
-                epistemic_status="established",
-                source_refs=[source.reference_id],
-            )
-        ],
-    )
-    observation = SituationRevisionObservation(
-        observation_id="busy-observation",
-        source_id="trusted_scene_adapter",
-        source_revision=1,
-        source_refs=[source.reference_id],
-        projection=projection,
-    )
-
-    salience = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[],
-        situation_signature=projection.interpretation_signature(),
-    )
-
-    assert salience.mode == "local"
-    assert salience.reason_codes == ("social_context_prefers_non_interruption",)
-
-
-def test_goal_free_salience_suppresses_semantically_repeated_spoken_situation() -> None:
-    observation = goal_free_observation(revision=2)
-    signature = observation.projection.interpretation_signature()
-    now = datetime(2026, 9, 7, 13, 0, tzinfo=timezone.utc)
-    salience = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[],
-        interaction_context={
-            "already_spoken": [
-                {
-                    "occurred_at": (now - timedelta(seconds=30)).isoformat(),
-                    "metadata": {
-                        "delivery_role": "situational_response",
-                        "situation_signature": signature,
-                    }
-                }
-            ]
-        },
-        situation_signature=signature,
-        now=now,
-    )
-
-    assert salience.mode == "local"
-    assert salience.reason_codes == ("same_situation_already_acknowledged",)
-
-
-def test_goal_free_salience_allows_same_life_event_after_cooldown() -> None:
-    observation = goal_free_observation(revision=3)
-    signature = observation.projection.interpretation_signature()
-    now = datetime(2026, 9, 7, 13, 0, tzinfo=timezone.utc)
-    salience = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=[],
-        interaction_context={
-            "already_spoken": [
-                {
-                    "occurred_at": (now - timedelta(minutes=10)).isoformat(),
-                    "metadata": {
-                        "delivery_role": "situational_response",
-                        "situation_signature": signature,
-                    },
-                }
-            ]
-        },
-        situation_signature=signature,
-        now=now,
-    )
-
-    assert salience.mode == "fast"
-    assert "same_situation_already_acknowledged" not in salience.reason_codes
+    with pytest.raises(ValueError, match="cannot reference Goals"):
+        build_trusted_goal_free_situation_observation(
+            context={},
+            turn_id="scene-goal-leak",
+            source_id="trusted_scene_adapter",
+            source_revision=1,
+            source=source,
+            interpretations=[interpretation],
+        )
 
 
 class FakeOllama:
@@ -506,9 +361,9 @@ def test_voice_assistant_goal_free_cognition_never_calls_planner_or_emits_work()
     assert assistant.agent_client.planner_calls == 0
 
 
-def test_voice_assistant_skips_model_for_low_salience_routine_presence() -> None:
+def test_routine_presence_still_uses_core_semantic_judgment_not_host_rules() -> None:
     source = SituationSourceRef(
-        kind="interaction_state",
+        kind="perception",
         reference_id="routine-presence-source",
         owner="trusted_scene_adapter",
     )
@@ -538,13 +393,23 @@ def test_voice_assistant_skips_model_for_low_salience_routine_presence() -> None
     )
     opportunity = derive_situation_revision_opportunity(observation)
     assert opportunity is not None
+    assert opportunity.recommended_cognition == "fast"
 
     class Agent:
         situation_calls = 0
 
-        async def resolve_situational_cognition(self, *_args, **_kwargs):
+        async def resolve_situational_cognition(self, _session, *, request, timeout_ms):
             self.situation_calls += 1
-            raise AssertionError("low salience must not spend a model call")
+            assert request.situation.interpretations[0].value == "present"
+            return SituationalCognitionResolution(
+                opportunity_id=request.opportunity.opportunity_id,
+                situation_digest=request.situation.digest,
+                source_refs=request.opportunity.source_refs,
+                subject_refs=request.opportunity.subject_refs,
+                disposition="silence",
+                activity=None,
+                reason_summary="No useful outward social delta now.",
+            )
 
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Agent()
@@ -556,16 +421,8 @@ def test_voice_assistant_skips_model_for_low_salience_routine_presence() -> None
     assistant.session_log = lambda *_args, **_kwargs: None
     assistant.conversation_state = SimpleNamespace(
         activated_memory_context=lambda **_kwargs: {
-            "entries": [
-                {
-                    "kind": "person_relationship",
-                    "subject_refs": ["person:dad"],
-                    "relation": "family",
-                    "text": "Dad is close family.",
-                    "disclosure_scope": "public",
-                }
-            ],
-            "summary": "- Dad is close family.",
+            "entries": [],
+            "summary": "",
             "selection": {},
         }
     )
@@ -573,6 +430,8 @@ def test_voice_assistant_skips_model_for_low_salience_routine_presence() -> None
         "conversation_id": "conversation-1",
         "mind": {"identity": {"name": "Chromie"}},
     }
+    assistant.get_http_session = lambda: asyncio.sleep(0, result=object())
+    assistant._delivered_turn_speech_events = lambda _sid: []
 
     response = asyncio.run(
         resolve_goal_free_situation_response(
@@ -585,7 +444,64 @@ def test_voice_assistant_skips_model_for_low_salience_routine_presence() -> None
     )
 
     assert response is None
-    assert assistant.agent_client.situation_calls == 0
+    assert assistant.agent_client.situation_calls == 1
+
+
+def test_trusted_audience_is_used_by_memory_privacy_gate() -> None:
+    observation = goal_free_observation(
+        audience_refs=["person:dad", "self:chromie"]
+    )
+    opportunity = derive_situation_revision_opportunity(observation)
+    assert opportunity is not None
+    captured: dict[str, object] = {}
+
+    class Agent:
+        async def resolve_situational_cognition(self, _session, *, request, timeout_ms):
+            return SituationalCognitionResolution(
+                opportunity_id=request.opportunity.opportunity_id,
+                situation_digest=request.situation.digest,
+                source_refs=request.opportunity.source_refs,
+                subject_refs=request.opportunity.subject_refs,
+                disposition="silence",
+                activity=None,
+                reason_summary="No speech needed.",
+            )
+
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.agent_client = Agent()
+    assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
+        fast_planner_timeout_ms=3000
+    )
+    assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
+    assistant.sessions = SimpleNamespace(current_sid=None)
+    assistant.session_log = lambda *_args, **_kwargs: None
+
+    def activated_memory_context(**kwargs):
+        captured.update(kwargs)
+        return {"entries": [], "summary": "", "selection": {}}
+
+    assistant.conversation_state = SimpleNamespace(
+        activated_memory_context=activated_memory_context
+    )
+    assistant.build_context = lambda _sid: {
+        "conversation_id": "conversation-audience",
+        "mind": {"identity": {"name": "Chromie"}},
+    }
+    assistant.get_http_session = lambda: asyncio.sleep(0, result=object())
+    assistant._delivered_turn_speech_events = lambda _sid: []
+
+    response = asyncio.run(
+        resolve_goal_free_situation_response(
+            assistant,
+            observation=observation,
+            opportunity=opportunity,
+            session_id=None,
+            language="zh-CN",
+        )
+    )
+
+    assert response is None
+    assert captured["audience_refs"] == ["person:dad", "self:chromie"]
 
 
 def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
@@ -619,10 +535,27 @@ def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
         projection=projection,
     )
 
+    class Agent:
+        async def resolve_situational_cognition(self, _session, *, request, timeout_ms):
+            return SituationalCognitionResolution(
+                opportunity_id=request.opportunity.opportunity_id,
+                situation_digest=request.situation.digest,
+                source_refs=request.opportunity.source_refs,
+                subject_refs=request.opportunity.subject_refs,
+                disposition="silence",
+                activity=None,
+                reason_summary="No meaningful outward response.",
+            )
+
     class Host:
         def __init__(self) -> None:
             self.delivered = 0
+            self.agent_client = Agent()
+            self.cognitive_runtime_policy = CognitiveRuntimePolicy(
+                fast_planner_timeout_ms=3000
+            )
             self.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
+            self.sessions = SimpleNamespace(current_sid=None)
             self.conversation_state = SimpleNamespace(
                 activated_memory_context=lambda **_kwargs: {
                     "entries": [],
@@ -635,7 +568,16 @@ def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
             return None
 
         def build_context(self, _sid):
-            return {"conversation_id": "conversation-ambient"}
+            return {
+                "conversation_id": "conversation-ambient",
+                "mind": {"identity": {"name": "Chromie"}},
+            }
+
+        async def get_http_session(self):
+            return object()
+
+        def _delivered_turn_speech_events(self, _sid):
+            return []
 
         async def _execute_cognitive_outcome_response(self, *_args, **_kwargs):
             self.delivered += 1

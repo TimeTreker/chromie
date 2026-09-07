@@ -217,10 +217,10 @@ def test_live_provider_state_enters_situation_without_becoming_evidence() -> Non
     assert opportunity.trigger == "situation_revision"
     assert opportunity.situation_digest == projection.digest
     assert opportunity.evidence_refs == []
-    assert opportunity.recommended_cognition == "slow"
+    assert opportunity.recommended_cognition == "fast"
 
 
-def test_waiting_provider_state_is_local_cognition_only() -> None:
+def test_waiting_provider_state_enters_fast_semantic_reentry() -> None:
     from orchestrator.runtime.situation import (
         build_provider_state_situation_observation,
         derive_situation_revision_opportunity,
@@ -240,7 +240,7 @@ def test_waiting_provider_state_is_local_cognition_only() -> None:
 
     opportunity = derive_situation_revision_opportunity(observation)
     assert opportunity is not None
-    assert opportunity.recommended_cognition == "local"
+    assert opportunity.recommended_cognition == "fast"
 
 
 def test_situation_digest_opportunity_cannot_reenter_with_different_projection() -> None:

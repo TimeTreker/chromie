@@ -197,17 +197,27 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   machinery. No path may fabricate a UserTurn, Responsibility, Goal, Evidence, consent,
   or an ambient polling/always-running LLM loop merely to keep the Mind active.
 - **SITUATIONAL-INITIATIVE-001** — A meaningful trusted social/world Situation change may
-  justify cognition even when nobody addressed Chromie and no Goal is open. Derived
-  salience is a cheap readiness judgment from Stable Mind, Memory, relationships,
-  Situation, and open Responsibilities; it is not a new `SalienceManager`, Goal, or
-  authority. Salience may consume only Memory already admitted by the Memory owner's
-  disclosure policy and delivery-qualified Interaction state; hidden/private Memory or a
-  merely scheduled utterance cannot silently increase outward social initiative. The valid
-  result may be silence/continued observation. A self-initiated
-  Communicative Activity must be low-consequence, proportionate, privacy-safe, and
-  grounded in the admitted Situation. Effectful autonomous action remains behind normal
-  authorization/autonomy/safety policy and is never implied merely by relationship or
-  social salience.
+  justify cognition even when nobody addressed Chromie and no Goal is open. Whether that
+  change matters socially, whether another person should be interrupted, and whether any
+  outward response is worthwhile are ordinary semantic judgments owned by the same
+  Cognitive Core over Stable Mind, disclosure-safe Memory, relationships, Situation, and
+  actual Interaction state. Host/Runtime must not implement those judgments with person,
+  relationship, event-name, keyword, or priority rules. Runtime may only admit trusted
+  source state, reject unchanged/stale provenance, enforce privacy/safety/authorization,
+  and account for what was actually delivered. The valid semantic result may be silence or
+  continued observation. A self-initiated Communicative Activity must be low-consequence,
+  proportionate, privacy-safe, and grounded in the admitted Situation. Effectful autonomous
+  action remains behind normal authorization/autonomy/safety policy and is never implied
+  merely by relationship or social relevance.
+- **SEMANTIC-BEHAVIOR-001** — Ordinary human-like behavior is not implemented by Host
+  decision tables. Conversation, salience, social relevance, relationship-sensitive
+  behavior, interruption judgment, initiative, uncertainty handling, and ordinary
+  prioritization belong to bounded model reasoning inside the Cognitive Core. Deterministic
+  code may validate schemas, provenance, privacy, safety, authorization, resource/state
+  invariants, exact delivery/effect truth, and mechanical no-change/duplicate transport
+  conditions; it must not map domain words or scenario classes directly to what Chromie
+  should think, say, or do. Benchmarks and fixtures judge this intelligence; they never
+  become its implementation.
 - **PROGRESSIVE-COGNITION-001** — A low-consequence provider-free Responsibility may emit
   one useful **provisional** Communicative Activity before cognition is finished when the
   current bounded context supports a tentative answer. Provisional speech is substantive
@@ -640,9 +650,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    only that provider/deployment.
 2. **Robot thinking belongs to the Cognitive Core, models, and contracts.**
    Outside deterministic operational controls, normal conversation, memory,
-   tool, robot-action,
-   capability-selection, body-goal interpretation, planning, Fast/Deep cognitive
-   depth, and deep-thought behavior must be decided by LLM reasoning over
+   tool, robot-action, social relevance, salience, relationship-sensitive behavior,
+   interruption/initiative judgment, capability-selection, body-goal interpretation,
+   planning, Fast/Deep cognitive depth, and deep-thought behavior must be decided by LLM reasoning over
    language meaning, bounded context, capability descriptions, schemas, and
    task memory. Catalog search, score thresholds, regression fixtures, regexes,
    and phrase tables may retrieve candidates or validate and reject model
@@ -683,9 +693,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or unconfirmed work does not execute.
 6. **Operational controls stay deterministic.** Stop, cancel, emergency,
    silence, and unusable-audio paths do not depend on model judgment.
-7. **Rule-based routing stays narrow.** Phrase and pattern rules belong only to
-   the deterministic operational filter. Normal conversation, tool, memory,
-   robot-action, and deep-thought intent must come from bounded model
+7. **Rule-based behavior stays narrow.** Phrase, pattern, person/event-category,
+   social-salience, and scenario rules belong only where they express a deterministic
+   operational invariant. Normal conversation, social relevance, relationship-sensitive
+   behavior, tool, memory, robot-action, and deep-thought intent must come from bounded model
    understanding and contract validation. When valid meaning cannot be
    established, the Core returns a typed unavailable, clarification, or refusal
    outcome; it never invents an ordinary lane.
@@ -743,8 +754,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    destination clear. Current runtime code should implement only complexity
    required by current validated needs. Design the future; do not prematurely
    build hypothetical future machinery.
-17. **Solve behavior at the highest suitable semantic layer.** For semantic and
-   conversational behavior, consider general prompts, bounded context, memory,
+17. **Solve behavior at the highest suitable semantic layer.** For semantic, social,
+   salience, relationship-sensitive, and conversational behavior, consider general prompts, bounded context, memory,
    and cognitive contracts before procedural exceptions. Prefer teaching the
    Cognitive Core one reusable rule over teaching Host code another case.
    Deterministic code remains responsible for mechanical correctness, safety,
@@ -753,7 +764,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 18. **Mechanisms report reality; cognition decides behavior.** Runtime mechanisms
    provide trustworthy facts about what was requested, scheduled, delivered,
    committed, completed, failed, cancelled, or observed. Cognitive layers decide
-   meaning, communication, prioritization, and ordinary behavior from those
+   meaning, salience, relationship relevance, interruption, communication, prioritization, and ordinary behavior from those
    facts. Low-level mechanisms must not quietly become owners of social or
    semantic judgment, and cognition must not invent runtime facts. A response,
    interpretation, or presentation failure must not rewrite trusted outcome truth:

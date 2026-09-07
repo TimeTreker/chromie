@@ -457,13 +457,23 @@ use audience-gated Memory until a trusted presence/identity source supplies that
 Relationship context may change salience and natural wording; it never becomes disclosure,
 factual-trust, or effect authorization.
 
-Goal-free social readiness is now filtered before model cognition by a bounded mechanical
-salience policy. It may use only current trusted Situation, relational Memory already cleared
-for the current model audience, and actually delivered Interaction facts. Routine presence,
-social non-interruption context, uncertainty/conflict, pending speech, or an identical
-semantic Situation recently acknowledged by delivered speech can therefore remain local with
-no model call. A relationship can increase relevance for a genuine social change; it cannot
-manufacture a need to speak.
+Goal-free social relevance is model-owned cognition, not a Host salience table. Runtime
+passes current trusted Situation, relational Memory already cleared for the exact trusted
+audience, and delivery-qualified Interaction facts to the same bounded situational-cognition
+invocation. The model decides holistically whether the event matters, whether another person
+should be interrupted, and whether silence or one low-commitment utterance is appropriate.
+Runtime may suppress only mechanically unchanged/stale input or invalid/duplicate delivery; it
+does not classify routine/arrival/busy/private/friend/stranger cases with domain rules. A
+relationship may inform the model's judgment, but cannot manufacture disclosure, factual trust,
+Goal, Work, or effect authority.
+
+The first source-neutral social-world ingress now also carries an exact current audience when
+a trusted source-specific adapter has resolved one. `SituationProjection.audience_refs` is
+part of Situation identity and feeds the existing Memory disclosure gate. Missing or partial
+audience is never guessed and therefore keeps audience-gated Memory hidden. The generic ingress
+accepts already-trusted typed interpretations only; source adapters remain responsible for
+sensing, person/principal resolution, audience resolution, privacy admission, and semantic
+interpretation.
 
 ## Progressive cognition and conversational self-repair
 

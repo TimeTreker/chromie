@@ -167,12 +167,13 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    same Planner can author bounded `time_conditions` for executable Goals; Host materializes
    stable condition identity and ConversationState binds current Plan plus original
    Responsibility provenance. Host never parses deadline prose into timers.
-4. **Make readiness genuinely selective.** **Implemented for bounded Situation re-entry:**
-   unchanged state produces no opportunity; benign waiting/recovering/running or phase-only
-   changes remain local; ordinary material revisions use Fast Planner; blocked/degraded/failed/
-   unsafe state enters Deep Planner directly. This is a small derived readiness policy, not a
-   numeric priority engine or competing semantic planner. Broader risk/novelty/resource signals
-   should be added only when their authority is concrete.
+4. **Make readiness genuinely selective without semantic Host routing.** **Implemented for bounded Situation re-entry:**
+   unchanged state produces no opportunity and source-specific mechanical churn filtering remains
+   below cognition. Any admitted meaningful Situation revision begins with one bounded Fast semantic
+   pass; Host does not map waiting/blocked/degraded/unsafe or other domain values directly to
+   local/Fast/Deep cognition. The owning model may remain silent/no-change or escalate within its
+   existing authority when deeper reasoning is actually warranted. No numeric priority engine or
+   competing semantic planner is introduced.
 5. **Activate Memory by current context rather than recency alone.** **Implemented:** the
    existing Memory owner deterministically projects bounded cues from the current user turn,
    open task/Goal context, and discourse focus. Older relevant entries outrank unrelated recent
@@ -349,14 +350,15 @@ Implementation order:
    and fail validation when neither Goal/Evidence nor Situation provenance exists. The
    maintained Goal-bound provider/time/Evidence paths are unchanged. No UserTurn, GI result,
    Responsibility, or Goal is fabricated to wake cognition.
-3. **Add source-specific social/perception Situation ingress — generic Core ingress implemented, concrete adapters open.**
-   `orchestrator.runtime.situation.apply_goal_free_situation_opportunity(...)` now accepts one already-trusted
-   typed Goal-free Situation revision, derives delta-driven readiness, and invokes the same
-   Cognitive Core without synthetic UserTurn/Goal provenance. Replaying the same Situation
-   digest is a no-op. Concrete camera/person/scene/social adapters still must establish
-   their own trust/privacy boundary and admit only bounded meaningful changes; no semantic
-   polling loop or world-model database is introduced. `SituationProjection` remains the
-   one soft current-interpretation surface.
+3. **Add source-specific social/perception Situation ingress — source-neutral trusted ingress + audience binding implemented, concrete adapters open.**
+   `build_trusted_goal_free_situation_observation(...)` binds one already-trusted source,
+   its typed current interpretations, and optional exact `audience_refs` into the existing
+   Goal-free Situation surface; `apply_goal_free_situation_opportunity(...)` invokes the same
+   Cognitive Core without synthetic UserTurn/Goal provenance. The generic ingress performs no
+   person recognition, relationship inference, audience guessing, or scene/social semantic
+   classification. Concrete camera/person/scene/social adapters must establish those meanings
+   and their own trust/privacy boundary before admission. Replaying the same Situation digest
+   remains a mechanical no-op; no ambient polling loop or world-model database is introduced.
 4. **Extend relational Memory and privacy provenance — first source slice implemented.**
    `MemoryEntry` now retains bounded relation/subject/source-person/audience/disclosure
    provenance, exact Situation subject refs participate in deterministic activation, and
@@ -369,28 +371,24 @@ Implementation order:
    top-level model context. Structured relational entries are also blocked from the existing
    durable owner-profile channel until principal/privacy/deletion policy is separately
    qualified. No SocialGraph/relationship-memory owner is introduced.
-5. **Derive relational/situational salience — first source slice implemented.** Goal-free
-   Situation cognition now applies one deterministic pre-model readiness policy over current
-   typed Situation, disclosure-safe activated relational Memory, and delivery-qualified
-   Interaction context. A semantic Situation signature excludes turn/revision/source-event
-   identity, so the same social meaning can be recognized across transport revisions; only
-   an actually delivered situational response records that signature in the Interaction
-   Ledger and suppresses only a short bounded repeat window rather than permanently
-   tombstoning a recurring life event. Direct social changes such as arrival/addressing may justify Fast cognition;
-   routine/ambient presence, already-pending speech, occupied/private-conversation context,
-   uncertain/conflicted Situation, or a recently acknowledged identical semantic Situation
-   stay local without a model call. Consequential Goal-free state fails quiet through the
-   existing slow boundary rather than borrowing Planner. Relationship Memory can raise
-   relevance but never privacy, trust, Goal, Work, or effect authority. This remains a cheap
-   derived policy, not a numeric priority engine, persistent salience state, or manager.
+5. **Derive relational/situational salience — semantic owner corrected and source-implemented.** Goal-free
+   Situation cognition no longer uses a deterministic Host decision table over event words,
+   relationship labels, routine/busy/private categories, or consequence terms. Every changed
+   trusted Goal-free Situation enters one bounded Fast situational-cognition judgment after
+   disclosure-safe relational Memory and delivery-qualified Interaction projection; the same
+   Cognitive Core decides relevance, non-interruption, silence, and low-commitment speech. A
+   semantic Situation signature remains only transport-independent correlation/common-ground
+   context and now includes exact trusted audience; Host keeps no persistent salience state or
+   priority manager. Relationship Memory can inform semantic relevance but never privacy,
+   trust, Goal, Work, or effect authority.
 6. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
    Goal-free situational cognition is a stateless same-Core invocation with no Goal/Work
    fields. It may return `silence` or author exactly one context-grounded communicative act
    (`greeting|acknowledge|inquire|inform|respond`); Runtime binds Situation/opportunity
    provenance and the resulting `InteractionResponse` structurally contains no Capability
-   Work or Goal-completion authority. PSM-3 now derives `local|fast|slow` after relationship
-   Memory activation and before the model call; only `fast` spends the situational model
-   invocation. `slow` Goal-free readiness currently fails quiet rather than borrowing Deep Planner. Concrete
+   Work or Goal-completion authority. Semantic relevance is decided in that same invocation,
+   not by a Host salience gate. `slow` Goal-free readiness remains an explicit future
+   deliberative contract rather than borrowing Deep Planner. Concrete
    social adapters and model/target qualification are still open. Capability availability
    must not manufacture demand, and effectful autonomy remains separately governed.
 7. **Close the social feedback loop — source open.** Human reaction/turn-taking changes

@@ -497,10 +497,9 @@ person speaks to Chromie
 
 trusted scene / person / interaction state materially changes
   -> source-specific adapter
-  -> Situation revision
-  -> derived situational / relational salience
+  -> trusted Situation revision (+ exact audience when resolved)
   -> CognitiveOpportunity
-  -> same Core cognition
+  -> same Core situational cognition decides relevance / silence / speech
 ```
 
 The second path is not a hidden synthetic user message. It does not pass through GI unless
@@ -511,23 +510,27 @@ self-initiated Communicative Activity grounded in Situation provenance. If an ac
 unfinished Responsibility or effectful HOW emerges, normal Goal/Planner/authorization
 boundaries apply from that point.
 
-Relational salience is derived policy, not another model owner. Stable Mind, bounded
-relationship/shared-experience Memory, current Situation, and any open Goals may make one
-state change more relevant than another. The policy should remain cheap and selective;
-there is no periodic prompt asking "what should I do now?" and no ambient semantic polling
-loop. Family is expected to dominate ordinary data because it is Chromie's primary living
-context, not because the runtime switches into a family mode.
+Relational/situational salience is part of the same bounded semantic cognition, not a
+Runtime policy table and not another model owner. Stable Mind, disclosure-safe
+relationship/shared-experience Memory, current Situation, current audience, and actual
+Interaction history may make one state change more relevant than another; the model reasons
+about those facts together. Host code does not map `arrival`, `routine`, `busy`, relationship
+labels, or other domain terms to `local|fast|slow`. There is still no periodic prompt asking
+"what should I do now?" and no ambient semantic polling loop: cognition starts only from an
+admitted trusted Situation revision. Family dominates ordinary data because it is Chromie's
+primary living context, not because the runtime switches into a family mode.
 
-The first salience source slice is implemented for Goal-free Situation cognition. Runtime
-computes a semantic Situation signature from only subject/relation/value/epistemic status,
-excluding turn IDs, revisions, and source-event identities. After disclosure-safe Memory
-activation and Interaction projection, a deterministic policy decides `local|fast|slow`
-before any situational model call. Routine/ambient presence, uncertain/conflicted state,
-pending speech, non-interruption social context, or an identical semantic Situation that
-recently produced delivered situational speech stays local. Direct social change and relevant
-relationship context may justify Fast cognition; consequential Goal-free state remains slow
-and fail-quiet. The Interaction Ledger retains the signature only from actual playback, so a
-scheduled or unheard proposal never counts as social common ground.
+Runtime still computes a transport-independent Situation signature for correlation and
+delivery context. It excludes turn/revision/source-event identities but includes the exact
+trusted audience because audience changes can legitimately change privacy and wording. The
+signature is not a semantic decision or Evidence. Delivery-qualified Interaction history is
+passed to the model so it can decide whether a prior response makes new speech unnecessary;
+Host retains only exact mechanical duplicate-delivery protection.
+
+The source-neutral Goal-free ingress now accepts one already-trusted source plus typed current
+interpretations and optional exact `audience_refs`. It performs no person recognition,
+relationship inference, audience guessing, scene semantics, or social classification. Those
+remain source-specific adapter responsibilities below the Situation boundary.
 
 The first Goal-free source slice is now implemented. `SituationRevisionObservation` and
 `CognitiveOpportunity` may carry no Goal IDs only when an exact Situation digest and trusted

@@ -1505,16 +1505,14 @@ not currently justify independent persistent Mind state:
 - compute preemption/scheduling belongs to runtime, while valuable resumable
   cognition belongs in existing Work/continuation artifacts.
 
-A relevant state change may produce no cognition, a deterministic/local reaction,
-fast cognition, slow cognition, or overlapping fast progress plus slower
-reasoning. Fast and Slow cognition are different cognitive timescales/resources,
-not mandatory sequential stages. The first production policy is deliberately small:
-no semantic Situation delta emits no opportunity; benign waiting/recovering/running
-or phase-only Runtime revisions are `local`; ordinary material revisions are `fast`;
-blocked/degraded/failed/unsafe revisions are `slow`. `local` preserves the changed
-Situation without a model call, while `slow` may enter Deep Planner directly instead
-of paying for a mandatory Fast pass. This is a bounded readiness judgment, not a new
-semantic authority or universal numeric priority score.
+A relevant state change may produce no cognition, fast cognition, a model-owned decision
+to remain silent/no-change, or a justified escalation to slower cognition inside the existing
+authority. Fast and Slow cognition are different cognitive timescales/resources, not mandatory
+sequential stages. Runtime decides only whether authoritative source state actually changed and
+whether source-specific mechanical churn should be admitted at all. Once a meaningful Situation
+revision is admitted, Host does not map provider/social/domain values to `local|fast|slow`; one
+bounded Fast semantic pass owns relevance and may escalate when deeper reasoning is actually
+warranted. This keeps prioritization in cognition rather than a hidden Runtime decision table.
 
 Open responsibilities wait passively until reality makes new progress possible.
 Provider results, user clarification, timer events, scene/body changes, memory
@@ -1851,16 +1849,22 @@ then creates a concrete owed outcome, the normal Goal/Planner/authorization boun
 over.
 
 The first relational-salience implementation remains reconstructable rather than adding a
-new Mind object. Runtime derives one semantic signature from the current Situation
-interpretations while excluding transport revision identity, activates only disclosure-safe
-Memory for the exact Situation subjects, and compares only delivery-qualified Interaction
-history. A coarse deterministic policy then selects `local`, `fast`, or `slow` before any
-Goal-free model call. Relationship/shared experience can make a direct social change more
-relevant, but routine presence does not become interesting merely because the person is
-close. Occupied/private-conversation context and recently acknowledged identical situations
-prefer non-interruption; uncertain/conflicted state remains local; consequential Goal-free
-state fails quiet at the slow boundary. There is no numeric social priority score, persistent
-salience record, or `SalienceManager`.
+new Mind object, but semantic salience is not implemented by Host rules. Runtime derives one
+semantic Situation signature for correlation, activates only disclosure-safe Memory for the
+exact Situation subjects and trusted audience, and projects delivery-qualified Interaction
+history. The same bounded situational-cognition model then decides whether the current change
+matters, whether interruption is appropriate, and whether to remain silent or speak once.
+Relationship/shared experience, uncertainty, consequence, privacy, and prior delivery are
+semantic inputs to that judgment rather than string/event decision tables. There is no
+numeric social priority score, persistent salience record, `SalienceManager`, or person/event
+keyword routing.
+
+The first source-neutral social-world ingress also preserves exact trusted audience context.
+`SituationProjection.audience_refs` changes the Situation signature and feeds Memory's
+disclosure gate. A source-specific adapter may provide stable person/principal refs and the
+complete audience only after its own sensing, identity, privacy, and trust boundary; Host
+never infers them from relationship Memory or scene labels. Unknown/partial audience remains
+empty and keeps audience-gated Memory hidden.
 
 `Social Attention` remains intentionally narrower than social cognition: it may add
 optional gaze/posture/expression around a concrete primary Activity, but it does not own

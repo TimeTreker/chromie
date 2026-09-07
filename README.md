@@ -322,9 +322,10 @@ documented in
 - model output is a request, never authorization;
 - low-level robot controls are forbidden in shared contracts;
 - stop, cancel, emergency, silence, and unusable-audio paths are deterministic;
-- normal robot thinking, including body-goal interpretation, capability choice,
-  and planning, belongs to LLM reasoning over bounded contracts, not hardcoded
-  phrase, regex, or regression-case matches;
+- normal robot thinking, including social relevance/salience, relationship-sensitive
+  behavior, interruption/initiative judgment, body-goal interpretation, capability choice,
+  and planning, belongs to LLM reasoning over bounded contracts, not hardcoded phrase,
+  person/event category, regex, or regression-case matches;
 - normal natural-language cognition goes through model-authored typed meaning;
   Goal Interpretation owns WHAT, Goal Association owns canonical Goal continuity,
   and Fast/Deep Planner owns HOW plus every user-facing Communicative Activity;

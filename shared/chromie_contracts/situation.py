@@ -11,6 +11,7 @@ SituationSourceKind = Literal[
     "evidence",
     "runtime_state",
     "interaction_state",
+    "perception",
     "memory",
     "other",
 ]
@@ -131,6 +132,7 @@ class SituationProjection(BaseModel):
     revision: int = Field(default=1, ge=1)
     focus_goal_ids: list[str] = Field(default_factory=list, max_length=8)
     discourse_focus_ids: list[str] = Field(default_factory=list, max_length=8)
+    audience_refs: list[str] = Field(default_factory=list, max_length=16)
     unresolved_conditions: list[SituationConditionRef] = Field(
         default_factory=list,
         max_length=12,
@@ -150,6 +152,7 @@ class SituationProjection(BaseModel):
     @field_validator(
         "focus_goal_ids",
         "discourse_focus_ids",
+        "audience_refs",
         mode="before",
     )
     @classmethod
@@ -224,7 +227,7 @@ class SituationProjection(BaseModel):
         not make the interpretation true.
         """
 
-        payload = sorted(
+        interpretations = sorted(
             (
                 {
                     "subject_ref": item.subject_ref,
@@ -241,6 +244,13 @@ class SituationProjection(BaseModel):
                 item["epistemic_status"],
             ),
         )
+        payload = {
+            "interpretations": interpretations,
+            # Audience is current social/privacy context. The same observed event with a
+            # different trusted audience may justify different wording or disclosure, so
+            # it is semantic Situation identity rather than transport metadata.
+            "audience_refs": sorted(self.audience_refs),
+        }
         encoded = json.dumps(
             payload,
             ensure_ascii=False,

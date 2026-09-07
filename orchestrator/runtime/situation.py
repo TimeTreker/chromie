@@ -4,9 +4,7 @@ import asyncio
 import hashlib
 import json
 import time
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Iterable, Literal
+from typing import Any, Iterable
 
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
@@ -197,6 +195,7 @@ def build_situation_projection(
     context: dict[str, Any] | None,
     turn_id: str,
     focus_goal_ids: Iterable[str] | None = None,
+    audience_refs: Iterable[str] | None = None,
     revision: int = 1,
     source_refs: Iterable[SituationSourceRef] | None = None,
     interpretations: Iterable[SituationInterpretation] | None = None,
@@ -276,9 +275,71 @@ def build_situation_projection(
         revision=max(1, int(revision)),
         focus_goal_ids=selected_goals,
         discourse_focus_ids=_unique(discourse_focus[-8:], limit=8),
+        audience_refs=_unique(audience_refs or [], limit=16),
         unresolved_conditions=conditions,
         source_refs=bounded_sources,
         interpretations=bounded_interpretations,
+    )
+
+
+def build_trusted_goal_free_situation_observation(
+    *,
+    context: dict[str, Any] | None,
+    turn_id: str,
+    source_id: str,
+    source_revision: int,
+    source: SituationSourceRef,
+    interpretations: Iterable[SituationInterpretation],
+    audience_refs: Iterable[str] | None = None,
+) -> SituationRevisionObservation:
+    """Bind one already-trusted source projection into Goal-free Situation.
+
+    This is a source-neutral ingress mechanism, not a perception or social-semantic
+    classifier.  The caller owns source-specific sensing, identity/principal resolution,
+    audience resolution, privacy admission, and the meaning of the supplied
+    interpretations.  Runtime only validates provenance and reconstructs the bounded
+    Situation; it never infers who a person is, how they relate to Chromie, whether an
+    event matters, or how Chromie should respond.
+    """
+
+    normalized_source_id = _bounded(source_id, limit=160)
+    if not normalized_source_id:
+        raise ValueError("trusted Goal-free Situation ingress requires source_id")
+    supplied = list(interpretations)
+    if not supplied:
+        raise ValueError("trusted Goal-free Situation ingress requires interpretations")
+    for item in supplied:
+        if item.relevance_goal_ids:
+            raise ValueError("Goal-free Situation interpretations cannot reference Goals")
+        if source.reference_id not in item.source_refs:
+            raise ValueError(
+                "Goal-free Situation interpretation must reference the admitted source"
+            )
+    projection = build_situation_projection(
+        context=context,
+        turn_id=turn_id,
+        focus_goal_ids=[],
+        audience_refs=audience_refs,
+        revision=max(1, int(source_revision)),
+        source_refs=[source],
+        interpretations=supplied,
+    )
+    observation_id = (
+        f"situation_observation:{normalized_source_id}:"
+        f"{max(1, int(source_revision))}"
+    )
+    if len(observation_id) > 200:
+        observation_id = (
+            "situation_observation:"
+            f"{hashlib.sha256(observation_id.encode('utf-8')).hexdigest()[:32]}"
+        )
+    return SituationRevisionObservation(
+        observation_id=observation_id,
+        source_id=normalized_source_id,
+        source_revision=max(1, int(source_revision)),
+        goal_ids=[],
+        source_refs=[source.reference_id],
+        projection=projection,
     )
 
 
@@ -365,243 +426,6 @@ def build_provider_state_situation_observation(
     )
 
 
-def situation_revision_cognition_mode(
-    observation: SituationRevisionObservation,
-) -> str:
-    """Select cognition depth from the admitted Situation delta, not its trigger name.
-
-    This is a bounded mechanical readiness judgment.  It does not choose Work or
-    interpret user meaning.  No-op is represented by no CognitiveOpportunity;
-    ``local`` means the trusted owner state is worth retaining/logging but does
-    not justify an LLM pass.
-    """
-
-    values = {
-        _normalized(item.value).casefold()
-        for item in observation.projection.interpretations
-        if item.source_refs
-    }
-    relations = {
-        _normalized(item.relation).casefold()
-        for item in observation.projection.interpretations
-    }
-    severe = {"blocked", "degraded", "failed", "error", "unsafe"}
-    if values.intersection(severe):
-        return "slow"
-    if values.intersection({"paused", "needs_attention"}):
-        return "fast"
-    if values.intersection({"waiting", "recovering", "running"}):
-        return "local"
-    if relations and relations.issubset({"runtime.phase", "runtime.member_status"}):
-        return "local"
-    return "fast"
-
-
-GoalFreeSalienceMode = Literal["local", "fast", "slow"]
-
-
-@dataclass(frozen=True)
-class GoalFreeSituationSalience:
-    """Cheap derived readiness for one Goal-free Situation change.
-
-    This is not durable Mind state, a priority engine, or a semantic owner.  It only
-    decides whether the already-admitted Situation warrants no model pass, one bounded
-    fast cognition pass, or fail-quiet slow/deeper handling.  Relationship Memory is
-    consumed only after the Memory owner's disclosure gate.
-    """
-
-    mode: GoalFreeSalienceMode
-    reason_codes: tuple[str, ...]
-
-
-_SOCIAL_HIGH_SALIENCE_TERMS = {
-    "addressed",
-    "arrival",
-    "arrived",
-    "calling",
-    "departure",
-    "distress",
-    "greeting",
-    "help",
-    "invitation",
-    "needs_attention",
-    "unexpected",
-}
-_SOCIAL_LOW_SALIENCE_TERMS = {
-    "ambient",
-    "background",
-    "nearby",
-    "pass_by",
-    "presence",
-    "present",
-    "routine",
-    "unchanged",
-    "visible",
-}
-_SOCIAL_DEFER_TERMS = {
-    "busy",
-    "occupied",
-    "private_conversation",
-    "sleeping",
-    "do_not_interrupt",
-}
-_SOCIAL_CONSEQUENTIAL_TERMS = {
-    "danger",
-    "emergency",
-    "injured",
-    "unsafe",
-}
-_RELATIONAL_KINDS = {
-    "person_identity",
-    "person_relationship",
-    "relationship_interpretation",
-    "shared_experience",
-}
-_SITUATIONAL_RESPONSE_COOLDOWN_S = 300.0
-
-
-def _social_terms(observation: SituationRevisionObservation) -> set[str]:
-    terms: set[str] = set()
-    for item in observation.projection.interpretations:
-        for raw in (item.relation, item.value):
-            normalized = _normalized(raw).casefold()
-            if not normalized:
-                continue
-            terms.add(normalized)
-            terms.update(
-                part
-                for part in normalized.replace("/", ".").replace(":", ".").split(".")
-                if part
-            )
-    return terms
-
-
-def goal_free_situation_salience(
-    observation: SituationRevisionObservation,
-    *,
-    activated_memory_entries: Iterable[dict[str, Any]] = (),
-    interaction_context: dict[str, Any] | None = None,
-    situation_signature: str = "",
-    now: datetime | None = None,
-) -> GoalFreeSituationSalience:
-    """Select Goal-free cognition readiness without an LLM or a new state owner.
-
-    The policy intentionally uses coarse, inspectable signals.  Unknown/private Memory
-    has already been excluded by the Memory owner.  A relationship can raise relevance,
-    but can never grant disclosure, factual-trust, Goal, Capability, or effect authority.
-    """
-
-    if observation.goal_ids or observation.projection.focus_goal_ids:
-        raise ValueError("goal-free salience cannot evaluate Goal-bound Situation")
-
-    interpretations = list(observation.projection.interpretations)
-    if not interpretations:
-        return GoalFreeSituationSalience("local", ("no_current_interpretation",))
-
-    statuses = {item.epistemic_status for item in interpretations}
-    if statuses.intersection({"conflicted", "stale", "unknown"}):
-        return GoalFreeSituationSalience(
-            "local",
-            ("uncertain_or_conflicted_situation",),
-        )
-
-    context = interaction_context if isinstance(interaction_context, dict) else {}
-    if context.get("pending_speech"):
-        return GoalFreeSituationSalience("local", ("speech_already_pending",))
-
-    normalized_signature = _normalized(situation_signature)
-    if normalized_signature:
-        reference_time = now or datetime.now(timezone.utc)
-        if reference_time.tzinfo is None:
-            reference_time = reference_time.replace(tzinfo=timezone.utc)
-        for item in context.get("already_spoken") or []:
-            if not isinstance(item, dict):
-                continue
-            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
-            if str(metadata.get("delivery_role") or "") != "situational_response":
-                continue
-            if _normalized(metadata.get("situation_signature")) != normalized_signature:
-                continue
-            occurred_at = _normalized(item.get("occurred_at"))
-            try:
-                occurred = datetime.fromisoformat(occurred_at.replace("Z", "+00:00"))
-            except ValueError:
-                continue
-            if occurred.tzinfo is None:
-                occurred = occurred.replace(tzinfo=timezone.utc)
-            age_s = (reference_time - occurred).total_seconds()
-            if 0.0 <= age_s <= _SITUATIONAL_RESPONSE_COOLDOWN_S:
-                return GoalFreeSituationSalience(
-                    "local",
-                    ("same_situation_already_acknowledged",),
-                )
-
-    terms = _social_terms(observation)
-    if terms.intersection(_SOCIAL_CONSEQUENTIAL_TERMS):
-        return GoalFreeSituationSalience(
-            "slow",
-            ("consequential_goal_free_situation",),
-        )
-    if terms.intersection(_SOCIAL_DEFER_TERMS):
-        return GoalFreeSituationSalience(
-            "local",
-            ("social_context_prefers_non_interruption",),
-        )
-
-    direct_social_change = bool(terms.intersection(_SOCIAL_HIGH_SALIENCE_TERMS))
-    routine_or_ambient = bool(terms.intersection(_SOCIAL_LOW_SALIENCE_TERMS))
-    reasons: list[str] = []
-    if direct_social_change:
-        reasons.append("direct_social_change")
-    if routine_or_ambient:
-        reasons.append("routine_or_ambient_change")
-
-    subjects = {
-        item.subject_ref for item in interpretations if _normalized(item.subject_ref)
-    }
-    known_relationship_relevant = False
-    shared_experience_relevant = False
-    for entry in activated_memory_entries:
-        if not isinstance(entry, dict):
-            continue
-        kind = _normalized(entry.get("kind")).casefold()
-        if kind not in _RELATIONAL_KINDS:
-            continue
-        entry_subjects = {
-            _normalized(value)
-            for value in entry.get("subject_refs") or []
-            if _normalized(value)
-        }
-        if not subjects.intersection(entry_subjects):
-            continue
-        if kind == "shared_experience":
-            shared_experience_relevant = True
-        else:
-            known_relationship_relevant = True
-    if known_relationship_relevant:
-        reasons.append("known_relationship_relevant")
-    if shared_experience_relevant:
-        reasons.append("shared_experience_relevant")
-
-    # A routine/ambient observation does not become worth a model call merely
-    # because the subject is close to Chromie.  A direct social change is
-    # independently salient; otherwise established relationship/shared-experience
-    # context may make a non-routine current change worth one bounded Fast pass.
-    if routine_or_ambient and not direct_social_change:
-        return GoalFreeSituationSalience("local", tuple(reasons))
-    if direct_social_change:
-        return GoalFreeSituationSalience("fast", tuple(reasons))
-    if (
-        "established" in statuses
-        and (known_relationship_relevant or shared_experience_relevant)
-    ):
-        return GoalFreeSituationSalience(
-            "fast",
-            tuple([*reasons, "relationship_context_makes_change_relevant"]),
-        )
-    return GoalFreeSituationSalience("local", tuple(reasons or ["low_salience_change"]))
-
-
 def derive_situation_revision_opportunity(
     observation: SituationRevisionObservation,
     *,
@@ -641,7 +465,12 @@ def derive_situation_revision_opportunity(
         source_refs=list(observation.source_refs),
         subject_refs=subject_refs,
         reason_codes=["trusted_situation_revision"],
-        recommended_cognition=situation_revision_cognition_mode(observation),
+        # Situation-level semantic relevance and cognition depth are not selected from
+        # source-state words in Host code. Every admitted meaningful Situation revision
+        # begins with one bounded Fast semantic pass; the owning cognition may remain
+        # silent/no-change or escalate within its own authority when deeper reasoning is
+        # actually warranted.
+        recommended_cognition="fast",
         situation_digest=observation.projection.digest,
         situation_signature=observation.projection.interpretation_signature(),
     )
@@ -760,10 +589,10 @@ async def resolve_goal_free_situation_response(
     relational_memory = host.conversation_state.activated_memory_context(
         activation_texts=situation_activation_texts,
         activation_subject_refs=list(opportunity.subject_refs),
-        # PSM-2 does not infer who can hear a Goal-free utterance. Until a trusted
-        # multi-person presence/identity adapter supplies the complete audience,
-        # Memory entries requiring audience resolution stay hidden.
-        audience_refs=[],
+        # PSM-4 never infers an audience in Host code.  A source-specific trusted
+        # principal/presence adapter may supply the complete current audience through
+        # Situation; absent or partial audience keeps gated Memory hidden.
+        audience_refs=list(observation.projection.audience_refs),
         limit=12,
     )
     context["memory_summary"] = relational_memory["summary"]
@@ -787,40 +616,10 @@ async def resolve_goal_free_situation_response(
             turn_id=observation.observation_id,
         ).model_dump(mode="json")
 
-    salience = goal_free_situation_salience(
-        observation,
-        activated_memory_entries=relational_memory["entries"],
-        interaction_context=(
-            context.get("interaction_context")
-            if isinstance(context.get("interaction_context"), dict)
-            else {}
-        ),
-        situation_signature=opportunity.situation_signature,
-    )
-    opportunity = opportunity.model_copy(
-        update={
-            "recommended_cognition": salience.mode,
-            "reason_codes": list(
-                dict.fromkeys([*opportunity.reason_codes, *salience.reason_codes])
-            )[:8],
-        }
-    )
-    context["cognitive_opportunity"] = opportunity.prompt_projection()
-    context["situational_salience"] = {
-        "mode": salience.mode,
-        "reason_codes": list(salience.reason_codes),
-    }
-    if salience.mode != "fast":
-        host.session_log(
-            session_id,
-            "situational_cognition_salience_suppressed: opportunity_id=%s "
-            "mode=%s reasons=%s",
-            opportunity.opportunity_id,
-            salience.mode,
-            ",".join(salience.reason_codes),
-        )
-        return None
-
+    # Semantic relevance, non-interruption, relationship meaning, and whether any
+    # outward response is worthwhile are model-owned cognition.  Runtime supplies the
+    # trusted Situation, disclosure-safe Memory, and actual Interaction context without
+    # reducing them to social keyword/priority rules.
     request = SituationalCognitionRequest(
         opportunity=opportunity,
         situation=observation.projection,
@@ -920,7 +719,6 @@ async def resolve_goal_free_situation_response(
             "authority_scope": "goal_free_situation",
             "cognitive_opportunity": opportunity.prompt_projection(),
             "situation": observation.projection.prompt_projection(),
-            "situational_salience": context["situational_salience"],
             "source_situation_refs": list(observation.source_refs),
             "goal_ids": [],
             "language": language or "auto",
@@ -1110,10 +908,9 @@ __all__ = [
     "apply_due_time_condition_opportunity",
     "build_provider_state_situation_observation",
     "build_situation_projection",
+    "build_trusted_goal_free_situation_observation",
     "derive_situation_revision_opportunity",
     "drain_due_time_conditions_once",
-    "GoalFreeSituationSalience",
-    "goal_free_situation_salience",
     "resolve_goal_free_situation_response",
     "run_time_condition_wake_loop",
     "situation_revision_cognition_mode",
