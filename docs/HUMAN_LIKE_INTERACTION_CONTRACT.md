@@ -397,6 +397,56 @@ an interruption, partial or failed execution, and a later continuation are stron
 probes than isolated phrase expectations. Every probe still uses the relevant General
 Ability class and the evidence level actually reached.
 
+## Progressive cognition and conversational self-repair
+
+Chromie may sometimes speak a useful current judgment before all worthwhile cognition is
+finished. This is not permission for two answerers to race. One admitted Responsibility
+retains one semantic/conversational authority; the first utterance can be an explicitly
+`provisional_response`, after which one bounded deliberative continuation may reconsider
+that same Responsibility from current Situation, Memory, Evidence, and Interaction Ledger
+state.
+
+The provisional utterance is substantive. For example, a harmless social judgment may be
+phrased with natural uncertainty instead of being reduced to "好的，我想想". But the role is
+not a loophole for unverified external results. If Chromie has started or must start Work
+whose result materially determines the answer, she may say that she will check or remain
+silent; she may not preview the pending result merely by calling it tentative. The same
+rule is stricter for safety, authorization, irreversible action, and other consequential
+claims: required qualified Evidence remains required regardless of confidence or tone.
+
+A provisional response does **not** satisfy/close the conversational Responsibility merely
+because playback succeeded. Its delivered Activity becomes immutable common-ground evidence,
+and the continuation is allowed exactly because unfinished reasoning was declared before
+closure. The continuation is one bounded cognition transaction, not an always-running mind,
+critic, or `BeliefManager`. It must have no private durable `pending_review`/belief truth and
+no independent Goal/Work/speech authority. If implementation needs a second model call, it
+should share the existing model-transaction, grounding, and validation infrastructure rather
+than duplicate a parallel stack.
+
+When later cognition completes, Chromie should behave like a person reconciling what she now
+thinks with what the other person actually heard:
+
+```text
+no material semantic change -> say nothing
+new useful detail            -> say only the detail
+material contradiction       -> repair the earlier claim
+earlier claim should not stand -> retract it and repair
+```
+
+`repair` is a typed Communicative Activity function. It points forward from immutable
+history; it does not edit the earlier Activity, mutate its `truth_stage`, or become a new
+Plan disposition. Pending but unheard speech can be cancelled/superseded without a spoken
+repair because it never became common ground. Host exact-text duplicate suppression remains
+a delivery safety net only; semantic equivalence and contradiction belong to the same Core
+communication authority that owns normal wording.
+
+Epistemic stance is separate from truth provenance and execution state. `tentative` describes
+how strongly Chromie currently commits to an otherwise supportable conversational judgment;
+`context_grounded/pre_evidence/post_evidence` still describe provenance, and claim
+qualification such as `established/insufficient/stale/contradicted/unknown` still describes
+Evidence sufficiency. Do not collapse these into one confidence enum or invent a permanent
+belief database.
+
 ## Responsive speech and planning depth
 
 The routing and independently scheduled Fast-response boundaries in this section
@@ -424,11 +474,14 @@ finishes, but GA still commits its canonical conversational Goal and later binds
 delivered Activity to that Goal. This binding is continuity and completion Evidence;
 it never authorizes a second response. If persistent work also exists, Fast Planner may
 author only prospective progress while Goal Association establishes continuity. The compact
-`PresentationCommit` decoder therefore exposes `complete_response` or silence when every supplied
-Responsibility is conversational speech WHAT; it does not mislabel an already-authored
-conversational answer as progress and then authorize the same answer again. Information
-and observable/stateful WHAT can choose only prospective progress or silence until fresh
-Evidence/work exists. These are
+`PresentationCommit` target therefore distinguishes `complete_response`,
+`provisional_response`, prospective progress, and silence. `complete_response` is used when
+current support is sufficient to close an ordinary provider-free conversational
+Responsibility after delivery. `provisional_response` is used only when a substantive current
+judgment is useful, consequence policy permits tentative commitment, and one bounded
+continuation remains warranted; it leaves the Responsibility open. Information and
+observable/stateful WHAT whose answer materially depends on fresh Work can choose only
+prospective progress or silence until the relevant Evidence exists. These are
 model-authored planning decisions, never a Host greeting phrase table, and Goal
 Interpretation does not write the reply. Planner owns
 the Communicative Act and its exact wording; the Host validates and delivers without
@@ -465,10 +518,11 @@ has no Deep continuation and must contain a live Capability Activity. Therefore 
 model cannot hide an unverified result inside a field merely labelled progress or
 claim execution while emitting only conversational status.
 Later `ResponseStage` speech is scheduled only after the applicable Goal/Plan,
-evidence, claim, cancellation, and delivery contracts authorize it. The Host
-validates typed fields and lifecycle authority without phrase blacklists or a
-second semantic repair owner. A transport-safe fallback never claims evidence or
-an effect.
+evidence, claim, cancellation, and delivery contracts authorize it. When the earlier
+Activity was provisional, the bounded continuation may produce silence, an additive delta,
+or a typed `repair`; this is forward continuation of one open Responsibility, not a second
+semantic repair owner. The Host validates typed fields and lifecycle authority without
+phrase blacklists. A transport-safe fallback never claims evidence or an effect.
 
 Current-turn de-duplication uses the typed speech-event identity and its turn,
 structured purpose, stage, route, commitment, source Goal IDs, Plan provenance,

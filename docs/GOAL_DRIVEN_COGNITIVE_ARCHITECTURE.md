@@ -100,8 +100,11 @@ Responsibility / WHAT
       │
       ├──────────────────────┐
       ▼                      ▼
-Planner                 Goal Association
-fast pass / deep pass     Goal continuity
+Planner fast pass        Goal Association
+speech + ordinary HOW     Goal continuity
+      │                      │
+      ├─ complex HOW ──> Deep Planner
+      ├─ provisional ──> bounded deliberative cognition
       │                      │
       ▼                      ▼
 Plan / Activities       Canonical Goals
@@ -156,10 +159,14 @@ directly. Likewise, comparing a changed Goal with already queued/running/complet
 is simply one Planner operation. **`Work Reconciliation` is not a mandatory cognitive
 stage or separate semantic authority.**
 
-Planner's fast and deep paths are two cognition depths of the same planning authority.
-The fast pass should produce a complete detailed Plan whenever HOW is sufficiently clear;
-the deep pass is reserved for genuinely complex dependencies, alternatives, resource or
-safety reasoning. The depth label never changes Planner's authority.
+Planner's fast and deep **planning** paths are two cognition depths of the same HOW
+authority. The fast pass should produce a complete detailed Plan whenever HOW is
+sufficiently clear; the deep Planner pass is reserved for genuinely complex dependencies,
+alternatives, resource, or safety reasoning. Separately, a valid provisional conversational
+Activity may keep its Responsibility open and authorize one bounded communication-only
+deliberative continuation. That continuation does not become Deep Planner and does not gain
+Work authority; it returns through the same Core/Planner communication surface. The depth
+label never changes authority.
 
 A safe, side-effect-free read may begin before Goal Association finishes when the
 Capability contract explicitly permits it. Later Goal continuity, Runtime state, terminal
@@ -215,6 +222,32 @@ previous model output repeatedly is not cognition.
 A purely mechanical DTO/schema failure is different. The same stage may
 regenerate the same representation once under the same meaning and schema. That
 is retransmission, not semantic repair. No repair-of-repair follows.
+
+### Progressive cognition may speak before it is finished
+
+Human-like responsiveness is not equivalent to choosing one model depth up front and
+waiting for a final immutable answer. For a provider-free, low-consequence conversational
+Responsibility, current context may already justify one useful answer while uncertainty
+still justifies further reasoning. Chromie may therefore commit a substantive
+`provisional_response`, keep the Responsibility open, and continue one bounded
+owner-preserving deliberative pass. This is **Progressive Cognition**: speech is an
+externalized current judgment, not proof that cognition has terminated.
+
+The continuation is not another semantic manager. It owns no durable belief state, Goal,
+Work mutation, Evidence, or independent wording channel. It consumes the same
+Responsibility, Situation, Memory, Evidence, and Interaction Ledger projections as the
+Cognitive Core and returns through the same Planner-owned Communicative-Activity authority.
+Implementation should reuse common model-transaction, grounding, and validation mechanics
+rather than clone a parallel agent stack. A communication-only deliberative pass has no
+Capability/Work authority; if genuine HOW becomes necessary, normal Planner authority owns
+that HOW. In particular, **deeper cognition is not automatically Deep Planner**.
+
+A provisional claim is never permission to guess ahead of pending Work. If the truth of
+what Chromie would say materially depends on a Capability result or fresh Evidence that is
+still in flight, she may acknowledge/check/wait or remain silent, but she must not preview
+that result under a `tentative` label. Likewise, consequence policy can require established
+Evidence regardless of model confidence. Thinking may be bold; external factual and action
+commitments remain consequence-bounded.
 
 ### Responsibility is what Chromie owes; Work is how it advances
 
@@ -1593,6 +1626,12 @@ The synthesis above reduces to a small set of invariants:
     only by claim-specific qualified evidence.**
 14. **Online learning may refine bounded future context, but it cannot replace future
     reasoning or mutate shared cognitive policy.**
+15. **A useful provisional conversational act may precede completed cognition, but it
+    never closes the Responsibility merely because speech was delivered.**
+16. **Later cognition reconciles against what was actually delivered: unchanged meaning
+    stays silent, additive meaning emits only the delta, and contradiction repairs forward.**
+17. **Deliberation is bounded work of the existing Core, not a persistent Belief Manager,
+    semantic reviewer, or ambient background loop; Deep Planner remains a HOW authority.**
 
 The architectural shape is therefore not a new `ContinuousMind` manager. It is
 the continuous evidence-driven evolution of a few truth owners:
@@ -1656,11 +1695,16 @@ flowchart TD
     CONTROL -->|"stop, cancel, emergency"| REFLEX["Deterministic reflex<br/>revoke, cancel, or E-stop"]
     CONTROL -->|"ordinary admitted turn"| GI["Goal Interpretation<br/>Responsibility / WHAT"]
 
-    GI --> PLAN["Planner fast pass<br/>detailed useful progress"]
+    GI --> PLAN["Fast Core / Planner pass<br/>smallest useful commitment"]
     GI --> GA["Goal Association<br/>canonical continuity when needed"]
     PLAN --> WORK["Communicative / Capability Activities"]
-    PLAN --> DEEP["Planner deep pass<br/>only for complex HOW"]
+    PLAN --> PROV{"Provisional conversation?"}
+    PROV -->|"yes"| DELIB["Bounded deliberative cognition<br/>communication-only unless HOW emerges"]
+    PROV -->|"no"| WORK
+    PLAN --> DEEP["Deep Planner pass<br/>only for complex HOW"]
+    DELIB --> RECON["Delivered-claim reconciliation<br/>silence / delta / repair"]
     DEEP --> WORK
+    RECON --> WORK
     GA --> GOALS["Canonical Goals<br/>unfinished Responsibility"]
 
     WORK --> HOST["Host validation<br/>authorization, confirmation,<br/>resources, versions, safety"]
@@ -1687,7 +1731,7 @@ flowchart TD
     OPP --> REENTRY["Planner re-entry"]
     STATE --> REENTRY
 
-    REENTRY --> DELTA["0..N Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify"]
+    REENTRY --> DELTA["0..N Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify / repair"]
     REENTRY --> QUIET["No new Activity<br/>continue / wait / listen / remain quiet / close"]
     DELTA --> HOST
 
@@ -1701,6 +1745,9 @@ pipeline:
 
 - a simple complete answer should not create durable Goal state or wait for unrelated
   cognition;
+- a useful but explicitly provisional answer may be delivered quickly, keep its
+  Responsibility open, and authorize one bounded deliberative continuation without creating
+  a persistent belief object or background-thought loop;
 - an acknowledgement should add useful common ground, not fill silence while nothing
   has been committed;
 - ready safe Work may advance while speech, Goal Association, or unrelated slower
@@ -1710,7 +1757,9 @@ pipeline:
 - a follow-up should use retained Goal and Interaction Ledger state and communicate
   only the still-needed delta instead of replaying the whole prior turn;
 - a correction should revise current meaning, preserve compatible Work, and repair
-  already-spoken or already-executed commitments forward;
+  already-spoken or already-executed commitments forward; semantic equality/conflict is
+  decided by the same Core speech authority, while Host exact-text suppression remains only
+  a mechanical duplicate-delivery guard;
 - Stable Mind should keep identity, values, and expression coherent while Situation,
   Goals, Plans, and Memory remain appropriately revisable; and
 - harmless awkwardness or missed optional expression may remain imperfect, while
@@ -3117,6 +3166,59 @@ live voice path. Model promotion still requires retained evidence for structured
 emission, mid-stream error containment, commit/terminal consistency, accepted-commit and
 playback latency, and actual single-slot resource contention. A non-streaming call duration
 is not evidence of streaming time to first commit.
+
+### 15.1.4 Progressive conversational commitment and delivered-claim reconciliation
+
+The maintained response contract already separates communicative role, truth provenance,
+execution status, and Evidence binding. Progressive cognition must keep those axes separate
+rather than collapsing them into one "confidence" or "commitment" enum. The target adds one
+small conversational epistemic axis, minimally `tentative` versus ordinary commitment;
+claim qualification such as `established|insufficient|stale|contradicted|unknown` remains
+Evidence-owned and is not duplicated as `verified_belief` state.
+
+Two Main-Activity functions complete the missing lifecycle:
+
+- `provisional_response` is a substantive answer that is useful now but intentionally does
+  **not** close the Responsibility. It must name a tentative epistemic stance and may be
+  `context_grounded` or supported by already-available Evidence. It can request one bounded
+  deliberative continuation. It may not be used to preview a result that depends materially
+  on still-pending Work or to weaken a consequence-specific grounding requirement.
+- `repair` is a later Communicative Activity that points to the delivered Activity/claim it
+  corrects and contains the new still-needed wording. It is an Activity role/function, not a
+  new `PlanDisposition`; mixed turns may therefore repair speech while independently acting,
+  clarifying, or waiting without combinatorial disposition variants.
+
+The lifecycle is:
+
+```text
+Fast current judgment
+    -> complete_response                 # Responsibility can close once delivery rules allow
+    -> provisional_response              # Responsibility remains open
+           -> one bounded deliberative continuation
+           -> current semantic result
+           -> reconcile with actually delivered speech
+                same meaning       -> silence
+                useful refinement  -> delta only
+                contradiction      -> repair
+                prior claim invalid-> retract + repair
+```
+
+Reconciliation is **not** a new stage owner. The Interaction Ledger supplies immutable
+actually-delivered speech and pending-delivery state; the same Core/Planner communication
+authority that owns ordinary wording reasons from that evidence on re-entry. Delivered
+speech is never edited or "upgraded" after the fact. Unheard pending speech may be cancelled
+or superseded without a spoken repair because it never became common ground. Host and Runtime
+may validate identity, provenance, truth stage, Evidence refs, cancellation generation, and
+literal duplicate delivery. They must not decide semantic equivalence, contradiction, or
+repair wording. Existing exact-text suppression remains a mechanical safety net after the
+semantic decision, not the reconciliation algorithm.
+
+The deliberative continuation is likewise not a reviewer of Fast text. It exists only
+because the Responsibility was explicitly left unfinished by a provisional commitment. It
+has no durable `pending_review`/belief database, no Goal/Work mutation authority outside the
+normal owners, and no ambient timer. Its implementation should share model-call, grounding,
+and validation infrastructure with existing Core cognition while using a communication-only
+authority scope unless genuine HOW separately invokes Planner planning.
 
 ### 15.2 Post-execution response
 

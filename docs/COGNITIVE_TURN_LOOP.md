@@ -40,16 +40,21 @@ receive person input
   -> admit or protect
   -> Goal Interpretation preserves Responsibility / WHAT
   -> concurrently when useful:
-       Planner fast pass authors detailed Activities
+       Fast Core / Planner pass authors the smallest safe useful commitment
        Goal Association commits canonical Goal continuity
+       -> an ordinary complete response may end there
+       -> an explicit provisional response may remain open and schedule one bounded
+          deliberative continuation with communication-only authority
+       -> complex HOW may escalate to Deep Planner
   -> Trusted Capability Runtime validates and submits ready Work asynchronously
   -> Provider / Runtime lifecycle events report what happened
   -> Host correlation turns qualified terminal observations into Evidence
   -> meaningful Goal / Work / Evidence / Situation transition creates CognitiveOpportunity
-  -> Planner re-enters with Responsibility + Goal + Situation + actual Work + Evidence
+  -> Core/Planner re-enters with Responsibility + Goal + Situation + actual Work + Evidence
        -> 0..N new Activity changes, or no new Activity
+       -> reconcile against actually delivered speech when prior communication exists
        -> deep Planner pass only when HOW genuinely warrants it
-  -> remain active, wait, listen, speak, act, or close naturally
+  -> remain active, wait, listen, speak, act, repair, or close naturally
 ```
 
 This is the robot equivalent of a general tool-using agent loop, but it is not
@@ -136,6 +141,13 @@ composer or execution specialist.
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten Planner wording |
 | Runtime event/state transition → Evidence or bounded Situation observation → `CognitiveOpportunity` | exact Runtime event/request provenance plus affected Goal IDs and admitted Evidence/Situation source refs | ephemeral readiness signal for Planner; no fabricated user turn and no response decision. Terminal qualified observations enter through Evidence. Meaningful live provider state enters `SituationProjection` v3 as `runtime_state` source provenance and direct bounded interpretations; it does **not** become Evidence. Heartbeats/percent churn do not qualify; blocked/waiting/degraded/paused/recovering or material phase/member-state changes may qualify. After restart, an open Goal marked `runtime_revalidation_required` may also re-enter only after fresh provider/catalog truth exists and exact original Responsibility provenance was durably retained; the stale pre-restart Plan/request binding is invalidated rather than resumed. | Goal ownership, Evidence truth, or any Activity by itself |
 
+Progressive conversational deliberation intentionally does **not** add another row or
+module to this table. It is an invocation mode of the existing Core/Planner communication
+authority: the same bounded state is read, no private durable truth is written, and the
+result is either no new Activity or a Planner-owned communicative delta/repair. When the
+continuation is communication-only it receives no Capability/Work mutation authority; a
+separate need for HOW uses the normal Planner contract.
+
 `situation_revision` and `time_condition` have bounded source contracts without gaining semantic authority, but their implementation state is deliberately distinguished. `SituationProjection` v3 carries bounded current interpretations plus exact authority-owned source references. Meaningful provider Runtime-state transitions are the first production `SituationRevisionObservation` ingress: blocked/waiting/degraded/paused/recovering or material phase/member-state changes may revise Situation and wake the **same Planner**, while heartbeat/percentage churn is filtered. Provider Runtime state is not fabricated Evidence, so this re-entry carries zero Evidence refs and cannot by itself mark speech `post_evidence`; a `situation_digest` opportunity is accepted only with the exact validated Situation/Goal binding. Broader scene/body/environment Situation ingress still needs source-specific trusted adapters. `GoalTimeCondition` is a structured Goal/current-Plan-bound condition persisted by ConversationState; stale Plan bindings are discarded, a due condition is consumed exactly once, and the production wall-clock wake loop may re-enter the same Planner from exact retained Responsibility provenance without inventing a UserTurn. Planner-authored creation/registration of useful time conditions remains an implementation gap; Host still must not parse free-form Goal/deadline text into timers or run an ambient semantic-thinking loop.
 
 ## 3. Turn state machine
@@ -154,6 +166,11 @@ RECEIVED
         -> EVIDENCE_RESPONSE_READY
   -> CLOSED | WAITING_FOR_USER | REPLAN_REQUIRED
 ```
+
+A delivered `provisional_response` does not require a new persistent turn state. The
+canonical Goal remains open and the one-shot continuation remains an ephemeral readiness
+obligation; after delivery the turn is therefore not `CLOSED` merely because a
+Communicative Activity completed. Closure still follows Responsibility reconciliation.
 
 Alternative terminal ingress states are:
 
@@ -179,6 +196,15 @@ remaining uncertainty or consequence justifies broader reasoning. A numeric conf
 score is evidence, not the sole escalation switch. Harmless ordinary conversation
 should not pay a Deep-thinking tax merely because confidence is imperfectly calibrated.
 
+The word **deep** is owner-scoped. `Deep Planner` remains a deeper pass of the HOW
+planning authority and is justified by complex dependencies, alternatives, resources,
+or safety. A provider-free conversational Responsibility may instead request one bounded
+**deliberative cognition** continuation after a useful provisional response. That
+continuation is communication-only unless genuine HOW separately requires Planner Work;
+it is not a renamed Deep Planner, a reviewer of the Fast response, or a persistent
+belief owner. Shared model invocation, grounding, decoder, and validation mechanics are
+preferred over a parallel implementation stack.
+
 The stage boundary remains exact. Fast Goal Interpretation may escalate once to Deep
 Goal Interpretation for genuine consequential ambiguity in the person's intended
 outcome, scope, or referent. Fast Planner may escalate once to Deep Planner for complex
@@ -189,6 +215,12 @@ the same meaning and schema. A semantic/grounding/coverage failure is not repair
 rewriting previous model output; terminal Deep rejection fails closed or leads Planner
 to a genuine user-resolvable clarification. The Host validates and contains; it does
 not become a third semantic planner.
+
+A provisional conversational commitment is intentionally different from a rejected
+Fast result. It is a valid external Activity whose Responsibility remains open. Its one
+bounded continuation reasons forward from authoritative source state rather than editing
+or qualifying prior model text. Later speech, if any, is a new Activity that reconciles
+with immutable delivered history.
 
 ### 3.1 Continuous progress and the critical path
 
@@ -370,6 +402,36 @@ trusted observation + canonical Goal relationships
 The acknowledgement can overlap Goal Association because speech is already an
 observable Activity. The weather lookup itself cannot: provider work begins only
 after canonical Goal binding and Planner selection.
+
+### 3.1.1 Progressive conversational continuation
+
+A simple turn has three legal fast conversational outcomes:
+
+```text
+complete enough now  -> complete_response -> normal closure after delivery
+useful but tentative -> provisional_response -> Responsibility stays open
+not useful/safe yet  -> silence/progress -> wait for deliberation or Evidence
+```
+
+`provisional_response` is not progress wording. It contains a real answer with an explicit
+lower epistemic stance. It is allowed only when current bounded context independently
+supports that answer and consequence policy permits tentative externalization. If a pending
+Capability result is materially needed to know whether the answer is true, only prospective
+progress or silence is legal until that Evidence returns.
+
+The provisional decision may authorize one bounded continuation tied to the exact
+Responsibility and presentation Activity. Runtime/Host may schedule that continuation
+through the existing continuation/readiness mechanism but cannot choose its semantic
+content. No recurring timer or open-ended thought loop is created. The continuation ends
+when it produces a current semantic result; further cognition requires a new material
+state/user event or another explicitly authorized bounded continuation.
+
+The current result is reconciled against `InteractionContext.already_spoken` and exact
+Interaction-Ledger delivery state by the same ordinary communication authority. Semantic
+results are `silence`, a still-needed additive delta, `repair`, or `retract + repair`.
+Pending unheard speech may be superseded rather than verbally repaired. Delivered speech
+remains append-only history. Host literal-text duplicate suppression is a final mechanical
+guard only and must not substitute for this semantic decision.
 
 ### 3.2 General Progress inside the Continuous Mind baseline
 
@@ -882,7 +944,12 @@ The final response must:
 Only speech with a completed delivery result is added to model-visible
 conversation history. The same rule applies to host confirmation and recovery
 prompts: a scheduler, provider, or playback-start failure cannot create an
-assistant turn that the user never heard.
+assistant turn that the user never heard. When re-entry follows earlier delivered speech,
+the model-facing bounded context must preserve exact delivered Activity identity and
+wording so the same communication authority can decide whether new meaning is unchanged,
+additive, or contradictory. Host may suppress an exact textual duplicate after that
+decision, but it cannot infer that paraphrases are equivalent or that a contradiction is
+a repair.
 
 Delivered post-execution tool speech is retained with a Host-authored
 evidence-bound marker plus its source Goal and Canonical Plan IDs. A later turn

@@ -196,6 +196,22 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    concrete reconstructability/ownership defect, not file size alone.
 8. **Re-run current-revision qualification on the resulting exact tree.** Target evidence
    remains separate from source/test closure and must not be inferred from these patches.
+9. **Progressive Cognition & Conversational Repair — architecture approved, source open.**
+   Extend the existing one-authority Continuous Mind rather than adding a Belief/Reconcile
+   manager. The target Fast presentation contract distinguishes an ordinary
+   `complete_response` from a substantive `provisional_response`; provisional delivery keeps
+   the Responsibility open and may schedule exactly one bounded communication-only
+   deliberative continuation. Deliberative cognition has no persistent truth, Goal/Work
+   mutation, or second wording authority and is not automatically Deep Planner. The same
+   Core/Planner communication authority then reconciles current meaning against actually
+   delivered Interaction-Ledger speech and chooses silence, still-needed delta, `repair`, or
+   retract+repair. `repair` is a Communicative Activity role/function, not `PlanDisposition`.
+   Pending Work whose unreturned result materially determines a factual answer forbids
+   provisional result speech. Consequence/claim-qualification requirements cannot be
+   weakened by a tentative stance. Implementation should share existing model transaction,
+   grounding, validation, and re-entry infrastructure; exact-text Host suppression remains
+   only a mechanical safety net. No source-complete or target-qualified claim is made by this
+   documentation patch.
 
 The already-settled implementation facts below remain constraints during that closure:
 
@@ -256,9 +272,10 @@ available.
 1. **Make simple interaction promptly useful.** Meet the approved Fast-Planner and
    audible-start budgets by removing avoidable model reloads, duplicate generations,
    and serial waits inside existing owners. A provider-free answer may close its canonical
-   conversational Goal immediately without making that closed Goal durable; a pending-work
-   acknowledgement must add truthful common ground
-   and must not claim execution. Preserve claim-specific evidence qualification,
+   conversational Goal immediately when it is complete; a useful low-consequence answer may
+   instead be explicitly provisional, remain open, and continue one bounded deliberative
+   cognition pass. A pending-work acknowledgement must add truthful common ground and must
+   not preview an unreturned result. Preserve claim-specific evidence qualification,
    primary-result truth contracts, and every deterministic truth/safety validator.
 2. **Keep conversation available while Work continues.** Exercise a follow-up or
    correction while safe read-only or embodied Work is queued/running. Gateway keeps
@@ -266,10 +283,12 @@ available.
    affected Work, and independent Work survives. Barge-in stops stale output without
    silently cancelling unrelated Goals.
 3. **Speak from state changes, not pipeline milestones.** On progress, terminal
-   Evidence, timeout, refusal, or cancellation, reactivate the existing Fast Planner
-   with the bounded current snapshot. Deliver only the still-needed response delta at
-   an appropriate conversational opening; suppress duplicate acknowledgement and
-   completion speech. Safety/control obligations retain deterministic pre-emption.
+   Evidence, timeout, refusal, cancellation, or an explicitly authorized provisional
+   continuation, reactivate the same Core/Planner communication authority with the bounded
+   current snapshot. Reconcile against actually delivered speech and emit only silence,
+   the still-needed delta, or a forward repair. Exact-text Host suppression remains a
+   mechanical final guard, not the semantic reconciliation policy. Safety/control
+   obligations retain deterministic pre-emption.
 4. **Make correction and waiting feel continuous.** Retain open Responsibility while
    waiting for user input, time, provider readiness, or trustworthy Evidence. A later
    event should resume from current Goal/Work/Evidence state rather than restart the

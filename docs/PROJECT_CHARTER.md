@@ -155,10 +155,13 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   communicate, the Communicative Activity, its exact wording, truth stage, and Goal /
   Responsibility provenance. Host, Runtime, TTS, and Provider may validate, schedule,
   realize, retry delivery, or reject it but never independently rewrite its meaning.
-- **PLANNER-AUTHORITY-001** — There is one Planner authority. Fast and deep are cognition
-  passes/depths of that same HOW authority. Comparing, reusing, cancelling, replacing,
-  or supplementing existing Work are Planner operations, not a mandatory reconciliation
-  stage or another semantic owner.
+- **PLANNER-AUTHORITY-001** — There is one Planner authority. Fast and deep Planner are
+  cognition passes/depths of that same HOW authority. Comparing, reusing, cancelling,
+  replacing, or supplementing existing Work are Planner operations, not a mandatory
+  reconciliation stage or another semantic owner. This does **not** mean every deeper
+  non-HOW thought must be mislabeled Deep Planner: bounded conversational deliberation may
+  continue under the same Cognitive-Core semantic authority with no Capability/Work
+  mutation authority and no independent wording owner.
 - **ASYNC-COGNITION-001** — Trusted asynchronous Runtime events report what happened;
   Host-bound Evidence records what is true; Responsibility/Goal records what is still
   owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
@@ -169,7 +172,31 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   state such as provider Runtime state; live state must not be relabeled as Evidence merely
   to wake cognition. In all cases the callback says only that cognition may now be useful; it
   never selects a response or Work itself. Planner may produce zero, one, or many desired
-  Activity changes.
+  Activity changes. A deliberately unfinished conversational commitment may also schedule
+  exactly one bounded owner-preserving cognition continuation through the existing
+  continuation/readiness machinery. That continuation owns no truth, Goal, Work, or
+  response state by itself, carries no fabricated Evidence, and must never become an
+  ambient polling or always-running LLM loop.
+- **PROGRESSIVE-COGNITION-001** — A low-consequence provider-free Responsibility may emit
+  one useful **provisional** Communicative Activity before cognition is finished when the
+  current bounded context supports a tentative answer. Provisional speech is substantive
+  speech, not a disguised acknowledgement, but it does not close the Responsibility. It
+  must carry an explicit lower epistemic stance than an ordinary completed answer and may
+  request one bounded deliberative continuation. It is forbidden when the factual claim
+  materially depends on pending Work or fresh Evidence that has not returned, and it can
+  never lower a consequence-, authorization-, or claim-qualification requirement. Deep
+  Planner remains reserved for HOW; deeper conversation-only reasoning gains no Work
+  authority merely because it is deliberative.
+- **DELIVERED-CLAIM-001** — Actually delivered speech is immutable conversation evidence.
+  On later cognition, the same ordinary speech semantic authority reconciles current
+  meaning against delivered Communicative Activities: unchanged meaning produces silence;
+  useful additive meaning produces only the delta; a material contradiction produces a
+  forward repair; and a claim that should no longer stand is explicitly retracted and
+  repaired. Pending but unheard speech may instead be cancelled or superseded and is not
+  treated as common ground. Repair is a Communicative-Activity function, not a top-level
+  Plan disposition or a new `Reconciler`/`BeliefManager`. Host/Runtime may enforce exact
+  identity, provenance, delivery state, and literal duplicate suppression as mechanical
+  safety checks, but semantic equivalence, contradiction, and wording remain Core-owned.
 - **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at
   most 2.0 seconds from validated GI handoff to the first valid Planner Communicative
   Activity commitment and at most 3.0 seconds from that commitment to playback start.
@@ -193,9 +220,14 @@ flowchart TD
     U["Person / world input"] --> GW["Cognitive Gateway"]
     GW --> GI["Goal Interpretation<br/>Responsibility / WHAT"]
 
-    GI --> P0["Planner<br/>fast pass; deep pass only when HOW warrants it"]
+    GI --> P0["Planner fast pass<br/>smallest safe useful commitment"]
     GI --> GA["Goal Association<br/>canonical Goal continuity"]
     P0 --> ACT["Detailed Plan / Activities<br/>speech, body, information, tool, or other Capability Work"]
+    P0 -. "complex HOW" .-> DP["Deep Planner<br/>same HOW authority"]
+    DP --> ACT
+    P0 -. "provisional speech keeps Responsibility open" .-> DC["Bounded deliberative cognition<br/>communication-only authority scope"]
+    DC --> DCR["Delivered-claim reconciliation<br/>silence / delta / repair"]
+    DCR --> ACT
     GA --> GOALS["Canonical Goals<br/>what persistent Responsibility is still owed"]
 
     ACT --> RT["Trusted Capability Runtime"]
@@ -216,10 +248,10 @@ flowchart TD
     EVID -. "new relevant Evidence" .-> OPP
     GOALS -. "material Goal continuity change" .-> OPP
     SIT -. "material relevant change" .-> OPP
-    OPP --> P1["Planner re-entry<br/>fast pass; deep pass only if needed"]
+    OPP --> P1["Planner/Core re-entry<br/>same semantic authority"]
     STATE --> P1
 
-    P1 --> DELTA["0..N desired Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify"]
+    P1 --> DELTA["0..N desired Activity changes<br/>answer / act / query / reuse / cancel / replace / clarify / repair"]
     P1 --> NONE["No new Activity<br/>keep acting / wait / listen / remain silent / close naturally"]
     DELTA --> RT
 ```
@@ -229,14 +261,19 @@ The four stable truths are deliberately separate:
 1. asynchronous Runtime/Provider events report **what happened**;
 2. validated Evidence records **what is true**;
 3. Responsibility and canonical Goal state record **what Chromie still owes**; and
-4. Planner decides **what to do now**, including the valid decision to do nothing.
+4. the Cognitive Core's Planner-owned Activity authority decides **what to do now**,
+   including the valid decision to do nothing.
 
 `Current bounded cognitive state` in the diagram is not a new database, manager,
-or semantic authority. It is the bounded Planner view reconstructed from the existing
+or semantic authority. It is the bounded Core/Planner view reconstructed from the existing
 authoritative owners: Responsibility/Goal, Situation, actual Work, Evidence, and
 Interaction state. `CognitiveOpportunity` is likewise only an ephemeral bridge from a
 meaningful trusted state transition to possible cognition. A callback never chooses a
-response or an action by itself.
+response or an action by itself. An explicitly provisional conversational commitment is
+the one additional case where the same transaction may retain a **one-shot bounded
+continuation obligation** without waiting for new external Evidence. That obligation is
+not truth or a background scheduler; once Goal-bound, it only permits the same Core
+semantic authority to deliberate again from current state.
 
 Goal Association has a narrower role than Planner re-entry. A **new person-authored
 semantic change** enters Gateway → Goal Interpretation and may require Goal Association
@@ -303,6 +340,7 @@ same as having no turn**:
 | Protective Reflex | A received `NormalizedTurnCapture` | Not required | Gateway applies deterministic pre-semantic stop/cancel/emergency/silence/unusable-input policy to the turn before GI exists, then retains the reflex evidence. |
 | Ordinary admitted interaction | An admitted `UserTurnEnvelope` | None until GA commits one | GI interprets Responsibility; Planner may advance safe HOW while GA independently owns canonical Goal continuity. |
 | `CognitiveOpportunity` reactivation | No fabricated new user turn; exact originating interaction/request provenance remains retained | One or more `goal_ids` are required | A meaningful trusted state transition may reactivate Planner for those Goals. The opportunity is ephemeral, owns neither Goal nor Evidence truth, and may legitimately produce zero new Activities. |
+| Provisional cognition continuation | The original admitted turn and delivered provisional Activity remain the source/common-ground evidence | The still-open Responsibility must be canonically Goal-bound before continuation is consumed | One explicitly authorized one-shot deliberative continuation may re-enter the same Core communication authority. It fabricates no Evidence, gains no Work authority, and cannot recur without another material event or explicit bounded continuation. |
 
 Therefore Protective Reflex is a deterministic **pre-semantic turn path**, not a
 turn-free path. Result reactivation is an internal continuation of grounded prior
@@ -332,11 +370,16 @@ Read the diagram with these boundaries:
   invocation concurrently. The first closed tagged frame of that single Planner result is
   a typed `PresentationCommit`: intentional silence or one immediately truthful
   Communicative Activity, plus optional auxiliary social Activities anchored to that
-  exact communication. Trusted code exposes it only after the complete frame payload is
+  exact communication. The target communication role may be complete, prospective
+  progress, clarification, or explicitly provisional; a provisional Activity is useful
+  now but leaves the Responsibility open. Trusted code exposes the commit only after the
+  complete frame payload is
   parsed and validated; raw tokens, tags, and partial payloads never reach TTS or a
   Capability. A second closed `terminal_plan` frame completes the same HOW decision,
   references the accepted commit,
-  and cannot regenerate, contradict, duplicate, or silently omit it. Both branches retain
+  and cannot regenerate, contradict, duplicate, or silently omit it. A provisional commit
+  may additionally retain one bounded deliberative continuation identity, but that
+  continuation cannot replace or rewrite the accepted speech. Both branches retain
   the immutable admitted UserTurn as source evidence in addition to the structured GI
   Responsibility; source wording can expose lost qualifiers but does not grant Planner a
   second WHAT authority. Failure before commit is silent. Failure after commit preserves
@@ -379,8 +422,10 @@ Read the diagram with these boundaries:
   is not such a material Work change: the accepted terminal result from the original
   Fast stream is bound mechanically to that Goal and is not sent through a second Fast
   semantic invocation. Re-entry is reserved for an actual retained/provisional Work
-  intersection, a GA-authored update to retained Goal meaning, or later trusted
-  Runtime/Evidence/Situation change.
+  intersection, a GA-authored update to retained Goal meaning, later trusted
+  Runtime/Evidence/Situation change, or the one explicitly authorized deliberative
+  continuation of a delivered provisional Activity after its still-open Responsibility
+  has canonical Goal binding.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
 - Planner owns **what Work can advance those Goals now**, constrained by the currently
   available Capability/provider contracts. Fast/deep are cognition passes of that same
@@ -692,6 +737,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    correction, changed state, new evidence, clarification, or another genuinely
    new conversational responsibility. This is one shared continuity rule, not a
    growing set of pairwise module-suppression rules.
+
+   The same rule applies when Chromie intentionally speaks before cognition is
+   finished. A provisional answer leaves its Responsibility open and retains the
+   exact delivered Activity as common-ground evidence. A bounded continuation then
+   reasons from current Responsibility, Situation, Memory, Evidence, and Interaction
+   Ledger state. If the meaning did not materially change, remain silent; if useful
+   information was added, communicate only that delta; if the earlier claim no longer
+   stands, repair it forward. Do not create a second response owner, persistent belief
+   record, or background-thought loop to implement this behavior.
 22. **Prompts teach principles; models supply ordinary semantic knowledge.**
    Production prompts state general reasoning and evidence contracts, while
    authoritative Capability descriptions, schemas, runtime state, and provider
@@ -1017,12 +1071,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
 35. **Response is a Planner-owned Main Activity, not a second semantic mind.**
    Once authoritative Responsibility and bounded Goal/evidence state are available,
-   Fast or Deep Planner chooses the still-needed user-facing delta and authors one
-   typed Communicative Activity containing both its semantic function and exact
-   natural wording. Goal Interpretation owns neither. The Activity also carries
-   timing, Goal/Responsibility provenance, a truth stage, and exact Evidence
-   references for facts that depend on observed reality. There is no independent
-   response-authoring or result-wording semantic owner between Planner and Runtime.
+   the Planner-owned communication surface chooses the still-needed user-facing delta
+   and authors one typed Communicative Activity containing both its semantic function
+   and exact natural wording. Ordinary Fast/Deep Planner does this while planning HOW;
+   a bounded conversation-only deliberative continuation may reuse the same speech
+   authority without acquiring Capability/Work authority or becoming another semantic
+   owner. Goal Interpretation owns neither. The Activity also carries timing,
+   Goal/Responsibility provenance, a truth stage, and exact Evidence references for facts
+   that depend on observed reality. There is no independent response-authoring or
+   result-wording semantic owner between the Cognitive Core and Runtime.
    The Host validates these fields mechanically and rejects unsupported reality,
    stale Goal binding, duplicate delivery, or unsafe commitment; it cannot author
    replacement wording or reopen ordinary meaning. TTS realizes accepted text as
@@ -1035,15 +1092,23 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Planner result. Trusted code may validate only closed schema/provenance mechanics;
    it cannot call another model to certify, review, or repair that response.
    Wording or presentation failure is local; it is not a reason to restart primary
-   cognition. **Optional presentation must never reopen primary cognition.**
+   cognition. An explicitly provisional Activity is different: its Responsibility was
+   never closed, so one pre-authorized deliberative continuation may reason forward from
+   source state. That continuation is not a reviewer or repair call over prior model text.
+   When it changes delivered meaning, the same speech authority emits a typed repair
+   Activity; history remains immutable. **Optional presentation must never reopen primary
+   cognition.**
 
 36. **Harmless imperfection may pass; consequential uncertainty may not.** Human-like
    interaction does not require every low-risk turn or optional expression to be
    perfected through repeated review. A missed blink, slightly imperfect wording,
    or harmless conversational variation may simply end locally. False claims about
    reality, unsafe or irreversible effects, unauthorized writes, material Goal loss,
-   or other consequential uncertainty must stop before commitment. Spend cognitive
-   cost where being wrong matters; do not turn perfectionism into architecture.
+   or other consequential uncertainty must stop before commitment. A `tentative`
+   conversational stance never weakens an Evidence, authorization, confirmation, or
+   provider-postcondition requirement: when the consequence class requires established
+   truth, provisional factual speech is not a loophole. Spend cognitive cost where being
+   wrong matters; do not turn perfectionism into architecture.
 
 37. **Optional social decoration is authored once by the primary Planner.** The
    same Fast or Deep Planner invocation that authors a Main Activity may also
