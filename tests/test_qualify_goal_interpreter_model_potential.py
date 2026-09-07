@@ -11,7 +11,7 @@ from scripts.qualify_goal_interpreter_model_potential import (
     _project_candidate_payload,
     _response_schema,
 )
-from scripts.qualify_vllm_provider import QualificationFailure
+from scripts.qualify_inference_provider import QualificationFailure
 
 
 class GoalInterpreterModelPotentialTests(unittest.TestCase):

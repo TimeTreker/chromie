@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify a vLLM OpenAI-compatible endpoint for Chromie's LLM transport needs.
+"""Qualify an OpenAI-compatible inference provider for Chromie's LLM runtime needs.
 
 This is a provider-contract probe, not a robot-behavior qualification.  It uses
 no HTTP request deadline so a slow model is measured rather than misclassified
@@ -36,6 +36,9 @@ DEFAULT_GOAL_INTERPRETER_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "goal_interpreter_primary_v1.json"
 )
 
+from agent.app.inference_compute import CognitionComputeClass, compute_rank  # noqa: E402
+
+
 
 class QualificationFailure(RuntimeError):
     """A required provider contract was not observed."""
@@ -46,7 +49,9 @@ class StreamObservation:
     label: str
     started_s: float
     first_delta_s: float | None = None
+    last_delta_s: float | None = None
     finished_s: float | None = None
+    max_inter_delta_gap_ms: float = 0.0
     delta_count: int = 0
     text: str = ""
     finish_reason: str | None = None
@@ -120,11 +125,18 @@ class TtsObservation:
 
 @dataclass
 class Evidence:
+    provider: str
+    provider_version: str
     model: str
+    model_revision: str
     base_url: str
     started_at: str
     git_revision: str | None
     git_dirty: bool | None
+    cuda_runtime: str
+    accelerator_identity: dict[str, Any] = field(default_factory=dict)
+    runtime_image: str | None = None
+    scheduler_config: dict[str, Any] = field(default_factory=dict)
     phases: dict[str, Any] = field(default_factory=dict)
     gpu_samples: list[GpuSample] = field(default_factory=list)
     status: str = "running"
@@ -137,23 +149,52 @@ class Evidence:
             (item.utilization_percent for item in self.gpu_samples), default=None
         )
         includes_goal_interpreter = "goal_interpreter_semantics" in self.phases
+        contention_phase = self.phases.get("foreground_under_deliberative_load") or {}
+        includes_tts = isinstance(contention_phase, dict) and contention_phase.get("tts") is not None
+        if includes_goal_interpreter:
+            claim_boundary = (
+                "Direct candidate-provider transport, provider-level contention, optional TTS "
+                "synthesis timing, and isolated current-checkout Goal Interpreter probe evidence "
+                "only; not an Agent workflow, audible playback, simulator, target, or physical "
+                "robot claim."
+            )
+        elif includes_tts:
+            claim_boundary = (
+                "Direct candidate-provider transport and provider-level contention with TTS "
+                "synthesis timing only; not Agent semantic quality, audible playback, simulator, "
+                "target, or physical robot evidence."
+            )
+        else:
+            claim_boundary = (
+                "Direct candidate-provider transport and provider-level contention evidence only; "
+                "not Agent semantic quality, voice/audio delivery, simulator, target, or physical "
+                "robot evidence."
+            )
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "evidence_class": (
                 "provider_contract_and_goal_interpreter_probe"
                 if includes_goal_interpreter
                 else "provider_contract_only"
             ),
-            "claim_boundary": (
-                "Direct vLLM transport and isolated current-checkout Goal Interpreter "
-                "probe evidence only; not an Agent workflow, voice, audio playback, "
-                "simulator, target, or physical robot claim."
-                if includes_goal_interpreter
-                else "Direct vLLM transport evidence only; not Agent semantic quality, "
-                "voice, audio, simulator, target, or physical robot evidence."
-            ),
+            "claim_boundary": claim_boundary,
+            "qualification_dimensions": {
+                "provider_transport": True,
+                "foreground_under_deliberative_load": True,
+                "tts_contention": includes_tts,
+                "goal_interpreter_semantics": includes_goal_interpreter,
+                "audible_playback": False,
+                "agent_workflow": False,
+            },
+            "provider": self.provider,
+            "provider_version": self.provider_version,
+            "runtime_image": self.runtime_image,
+            "cuda_runtime": self.cuda_runtime,
+            "accelerator_identity": self.accelerator_identity,
             "model": self.model,
+            "model_revision": self.model_revision,
             "base_url": self.base_url,
+            "scheduler_config": self.scheduler_config,
             "started_at": self.started_at,
             "finished_at": datetime.now(timezone.utc).isoformat(),
             "git_revision": self.git_revision,
@@ -197,6 +238,37 @@ def _git_dirty() -> bool | None:
         return None
 
 
+def _accelerator_identity() -> dict[str, Any]:
+    """Capture stable host GPU/driver identity without making it semantic truth."""
+
+    try:
+        output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,uuid,driver_version",
+                "--format=csv,noheader",
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as exc:
+        return {"status": "unavailable", "error": type(exc).__name__}
+    devices: list[dict[str, str]] = []
+    for line in output.splitlines():
+        parts = [part.strip() for part in line.split(",", maxsplit=2)]
+        if len(parts) != 3:
+            continue
+        name, uuid, driver_version = parts
+        devices.append(
+            {
+                "name": name,
+                "uuid": uuid,
+                "driver_version": driver_version,
+            }
+        )
+    return {"status": "observed", "devices": devices}
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(
@@ -220,6 +292,7 @@ def _chat_payload(
     *,
     stream: bool,
     max_tokens: int,
+    priority: int | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": model,
@@ -239,7 +312,39 @@ def _chat_payload(
     }
     if "qwen3" in model.casefold():
         payload["chat_template_kwargs"] = {"enable_thinking": False}
+    if priority is not None:
+        payload["priority"] = int(priority)
     return payload
+
+
+def _provider_priority(
+    provider: str,
+    compute_class: CognitionComputeClass,
+    *,
+    step: int,
+) -> int:
+    """Translate relative Chromie compute class for qualification only.
+
+    SGLang schedules larger values first by default; vLLM priority scheduling
+    handles smaller values first.  These raw values are evidence knobs, not
+    production semantics or settled acceptance thresholds.
+    """
+
+    if step <= 0:
+        raise ValueError("priority step must be positive")
+    rank = compute_rank(compute_class)
+    if provider == "sglang":
+        return rank * step
+    if provider == "vllm":
+        return (4 - rank) * step
+    raise ValueError(f"unsupported provider: {provider!r}")
+
+
+def _priority_mapping(provider: str, *, step: int) -> dict[str, int]:
+    return {
+        compute_class.value: _provider_priority(provider, compute_class, step=step)
+        for compute_class in CognitionComputeClass
+    }
 
 
 def _extract_stream_delta(chunk: dict[str, Any]) -> tuple[str, str | None, bool]:
@@ -299,10 +404,17 @@ async def _observe_stream(
                 if finish_reason is not None:
                     observation.finish_reason = finish_reason
                 if content:
+                    observed_s = time.perf_counter()
                     if observation.first_delta_s is None:
-                        observation.first_delta_s = time.perf_counter()
+                        observation.first_delta_s = observed_s
                         if first_delta_event is not None:
                             first_delta_event.set()
+                    elif observation.last_delta_s is not None:
+                        observation.max_inter_delta_gap_ms = max(
+                            observation.max_inter_delta_gap_ms,
+                            (observed_s - observation.last_delta_s) * 1000.0,
+                        )
+                    observation.last_delta_s = observed_s
                     observation.delta_count += 1
                     observation.text += content
         observation.finished_s = time.perf_counter()
@@ -385,7 +497,7 @@ async def _observe_tts(
                         "cognition streams can share the GPU safely."
                     ),
                     "speaker_id": speaker,
-                    "request_id": f"vllm-qualification-{label}",
+                    "request_id": f"inference-qualification-{label}",
                 }
             )
         )
@@ -705,7 +817,7 @@ def _evaluate_goal_interpreter_case_dimensions(
     return dimensions
 
 
-def _vllm_compatible_schema(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def _candidate_compatible_schema(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Remove only decoder hints that canonical Host validation re-enforces."""
 
     translated = copy.deepcopy(schema)
@@ -745,6 +857,7 @@ async def _qualify_goal_interpreter(
     endpoint: str,
     *,
     model: str,
+    priority: int | None = None,
     manifest_path: Path = DEFAULT_GOAL_INTERPRETER_MANIFEST,
 ) -> dict[str, Any]:
     from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
@@ -773,7 +886,7 @@ async def _qualify_goal_interpreter(
             language=str(case["language"]),
         )
         ollama_payload = interpreter.build_interpretation_payload(request)
-        provider_schema, removed_schema_keywords = _vllm_compatible_schema(ollama_payload["format"])
+        provider_schema, removed_schema_keywords = _candidate_compatible_schema(ollama_payload["format"])
         options = dict(ollama_payload.get("options") or {})
         request_payload = {
             "model": model,
@@ -793,6 +906,8 @@ async def _qualify_goal_interpreter(
         }
         if "qwen3" in model.casefold():
             request_payload["chat_template_kwargs"] = {"enable_thinking": False}
+        if priority is not None:
+            request_payload["priority"] = int(priority)
         started = time.perf_counter()
         response = await client.post(endpoint, json=request_payload)
         elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -814,7 +929,7 @@ async def _qualify_goal_interpreter(
             "usage": provider_data.get("usage"),
             "schema_translation": {
                 "removed": removed_schema_keywords,
-                "reason": "vLLM structured-output backends reject uniqueItems",
+                "reason": "qualification wire schema omits uniqueItems; canonical Host revalidation remains authoritative",
                 "canonical_host_revalidation_retained": True,
             },
             "status": "fail",
@@ -856,13 +971,198 @@ async def _qualify_goal_interpreter(
     }
 
 
+async def _qualify_foreground_under_deep_load(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    *,
+    provider: str,
+    model: str,
+    priority_step: int,
+    deliberative_context_repeat: int,
+    deliberative_max_tokens: int,
+    tts_url: str | None,
+    tts_speaker: str,
+) -> dict[str, Any]:
+    """Prove foreground work can progress while deliberation remains active.
+
+    This intentionally asserts only scheduling/transport facts.  End-to-end
+    human-interaction acceptance still belongs to Chromie's existing latency
+    contract and live Agent/TTS qualification, not this provider canary.
+    """
+
+    priorities = _priority_mapping(provider, step=priority_step)
+    deep_priority = priorities[CognitionComputeClass.DELIBERATIVE.value]
+    foreground_priority = priorities[CognitionComputeClass.INTERACTIVE.value]
+
+    warmup_tts: TtsObservation | None = None
+    baseline_tts: TtsObservation | None = None
+    if tts_url:
+        warmup_tts = await _observe_tts(tts_url, speaker=tts_speaker, label="warmup")
+        baseline_tts = await _observe_tts(tts_url, speaker=tts_speaker, label="baseline")
+
+    filler = (
+        "Deliberative context item: retain this text while continuing the requested "
+        "sequence; do not summarize it. "
+    ) * max(1, deliberative_context_repeat)
+    deep_prompt = (
+        filler
+        + "\nNow output the integers from 1 through 2000, in order, separated only "
+        "by single spaces. Do not omit integers and do not add prose."
+    )
+    deep_started = asyncio.Event()
+    deep_task = asyncio.create_task(
+        _observe_stream(
+            client,
+            endpoint,
+            _chat_payload(
+                model,
+                deep_prompt,
+                stream=True,
+                max_tokens=deliberative_max_tokens,
+                priority=deep_priority,
+            ),
+            label="deliberative_load",
+            first_delta_event=deep_started,
+        )
+    )
+    deep_started_waiter = asyncio.create_task(deep_started.wait())
+    completed, _ = await asyncio.wait(
+        {deep_task, deep_started_waiter},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+    if deep_task in completed and not deep_started.is_set():
+        deep_started_waiter.cancel()
+        await asyncio.gather(deep_started_waiter, return_exceptions=True)
+        deep_early = await deep_task
+        _assert_complete_stream(deep_early)
+        raise QualificationFailure(
+            "deliberative request ended before producing a contention window"
+        )
+    await deep_started_waiter
+    deep_active_at_fast_gi_start = not deep_task.done()
+    if not deep_active_at_fast_gi_start:
+        raise QualificationFailure(
+            "deliberative request completed before foreground contention began"
+        )
+
+    contention_tts_task = (
+        asyncio.create_task(
+            _observe_tts(tts_url, speaker=tts_speaker, label="foreground_contention")
+        )
+        if tts_url
+        else None
+    )
+
+    fast_gi = await _observe_stream(
+        client,
+        endpoint,
+        _chat_payload(
+            model,
+            "Reply with exactly: chromie-fast-gi-ready",
+            stream=True,
+            max_tokens=32,
+            priority=foreground_priority,
+        ),
+        label="foreground_fast_gi",
+    )
+    _assert_complete_stream(fast_gi)
+    if fast_gi.text.strip() != "chromie-fast-gi-ready":
+        raise QualificationFailure(
+            f"foreground_fast_gi: unexpected output {fast_gi.text.strip()!r}"
+        )
+
+    deep_active_at_fast_planner_start = not deep_task.done()
+    if not deep_active_at_fast_planner_start:
+        raise QualificationFailure(
+            "deliberative request ended before Fast Planner contention could be observed"
+        )
+    fast_planner = await _observe_stream(
+        client,
+        endpoint,
+        _chat_payload(
+            model,
+            "Reply with exactly: chromie-presentation-commit-ready",
+            stream=True,
+            max_tokens=32,
+            priority=foreground_priority,
+        ),
+        label="foreground_fast_planner",
+    )
+    _assert_complete_stream(fast_planner)
+    if fast_planner.text.strip() != "chromie-presentation-commit-ready":
+        raise QualificationFailure(
+            "foreground_fast_planner: unexpected output "
+            f"{fast_planner.text.strip()!r}"
+        )
+
+    contention_tts = await contention_tts_task if contention_tts_task is not None else None
+    deep = await deep_task
+    _assert_complete_stream(deep)
+    if deep.finished_s is None or fast_planner.finished_s is None:
+        raise QualificationFailure("foreground/deep completion timing evidence is incomplete")
+    foreground_completed_before_deep = fast_planner.finished_s < deep.finished_s
+    if not foreground_completed_before_deep:
+        raise QualificationFailure(
+            "foreground Fast GI + Fast Planner did not complete while deliberation remained active"
+        )
+
+    tts_evidence: dict[str, Any] | None = None
+    if contention_tts is not None and baseline_tts is not None and warmup_tts is not None:
+        if contention_tts.finished_s is None or fast_planner.finished_s is None:
+            raise QualificationFailure("TTS/foreground contention timing missing")
+        foreground_window_start = fast_gi.started_s
+        foreground_window_finish = fast_planner.finished_s
+        overlap_proven = (
+            contention_tts.started_s < foreground_window_finish
+            and foreground_window_start < contention_tts.finished_s
+        )
+        if not overlap_proven:
+            raise QualificationFailure(
+                "TTS synthesis did not overlap the Fast-GI/Fast-Planner foreground window "
+                "while deliberation remained active"
+            )
+        first_audio_ratio = None
+        if baseline_tts.first_audio_ms and contention_tts.first_audio_ms:
+            first_audio_ratio = contention_tts.first_audio_ms / baseline_tts.first_audio_ms
+        elapsed_ratio = None
+        if baseline_tts.elapsed_ms and contention_tts.elapsed_ms:
+            elapsed_ratio = contention_tts.elapsed_ms / baseline_tts.elapsed_ms
+        tts_evidence = {
+            "overlap_proven": True,
+            "discarded_warmup": warmup_tts.evidence(),
+            "baseline": baseline_tts.evidence(),
+            "under_foreground_and_deliberative_load": contention_tts.evidence(),
+            "first_audio_slowdown_ratio": first_audio_ratio,
+            "total_slowdown_ratio": elapsed_ratio,
+            "audio_was_generated_but_not_played": True,
+        }
+
+    return {
+        "status": "pass",
+        "claim_boundary": (
+            "Provider-level priority/contention evidence only; no end-to-end "
+            "PresentationCommit or human-interaction latency threshold is claimed."
+        ),
+        "provider_priority_semantics": (
+            "larger_value_first" if provider == "sglang" else "smaller_value_first"
+        ),
+        "qualification_only_priority_mapping": priorities,
+        "priority_step": priority_step,
+        "deep_active_at_fast_gi_start": deep_active_at_fast_gi_start,
+        "deep_active_at_fast_planner_start": deep_active_at_fast_planner_start,
+        "foreground_completed_before_deep": foreground_completed_before_deep,
+        "requests": {
+            "deliberative": deep.evidence(),
+            "fast_gi_canary": fast_gi.evidence(),
+            "fast_planner_canary": fast_planner.evidence(),
+        },
+        "tts": tts_evidence,
+    }
+
+
 async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
     endpoint = f"{args.base_url.rstrip('/')}/chat/completions"
     async with httpx.AsyncClient(timeout=None, trust_env=False) as client:
-        version_response = await client.get(
-            f"{args.base_url.rstrip('/').removesuffix('/v1')}/version"
-        )
-        version_response.raise_for_status()
         models_response = await client.get(f"{args.base_url.rstrip('/')}/models")
         models_response.raise_for_status()
         models_payload = models_response.json()
@@ -877,8 +1177,12 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             )
         evidence.phases["model_identity"] = {
             "status": "pass",
+            "provider": args.provider,
+            "provider_version": args.provider_version,
+            "runtime_image": args.runtime_image,
+            "model": args.model,
+            "model_revision": args.model_revision,
             "served_models": served_models,
-            "provider_version": version_response.json(),
         }
 
         structured_payload = _chat_payload(
@@ -890,7 +1194,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
         structured_payload["response_format"] = {
             "type": "json_schema",
             "json_schema": {
-                "name": "chromie_vllm_contract",
+                "name": "chromie_inference_contract",
                 "strict": True,
                 "schema": {
                     "type": "object",
@@ -1033,95 +1337,30 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             "provider_healthy_after": True,
         }
 
-        if args.tts_url:
-            warmup_tts = await _observe_tts(
-                args.tts_url,
-                speaker=args.tts_speaker,
-                label="warmup",
+        evidence.phases["foreground_under_deliberative_load"] = (
+            await _qualify_foreground_under_deep_load(
+                client,
+                endpoint,
+                provider=args.provider,
+                model=args.model,
+                priority_step=args.priority_step,
+                deliberative_context_repeat=args.deliberative_context_repeat,
+                deliberative_max_tokens=args.deliberative_max_tokens,
+                tts_url=args.tts_url,
+                tts_speaker=args.tts_speaker,
             )
-            baseline_tts = await _observe_tts(
-                args.tts_url,
-                speaker=args.tts_speaker,
-                label="baseline",
-            )
-            contention_tts_task = asyncio.create_task(
-                _observe_tts(
-                    args.tts_url,
-                    speaker=args.tts_speaker,
-                    label="contention",
-                )
-            )
-            contention_a_task = asyncio.create_task(
-                _observe_stream(
-                    client,
-                    endpoint,
-                    _chat_payload(args.model, overlap_prompt, stream=True, max_tokens=384),
-                    label="tts_contention_a",
-                )
-            )
-            contention_b_task = asyncio.create_task(
-                _observe_stream(
-                    client,
-                    endpoint,
-                    _chat_payload(args.model, overlap_prompt, stream=True, max_tokens=384),
-                    label="tts_contention_b",
-                )
-            )
-            contention_tts, contention_a, contention_b = await asyncio.gather(
-                contention_tts_task,
-                contention_a_task,
-                contention_b_task,
-            )
-            _assert_complete_stream(contention_a)
-            _assert_complete_stream(contention_b)
-            if contention_tts.finished_s is None:
-                raise QualificationFailure("TTS contention: completion timing missing")
-            llm_finish_times = [
-                value.finished_s
-                for value in (contention_a, contention_b)
-                if value.finished_s is not None
-            ]
-            llm_first_times = [
-                value.first_delta_s
-                for value in (contention_a, contention_b)
-                if value.first_delta_s is not None
-            ]
-            overlap_proven = bool(
-                llm_finish_times
-                and llm_first_times
-                and contention_tts.started_s < max(llm_finish_times)
-                and min(llm_first_times) < contention_tts.finished_s
-            )
-            if not overlap_proven:
-                raise QualificationFailure(
-                    "TTS and vLLM requests did not have observed lifetime overlap"
-                )
-            first_audio_ratio = None
-            if baseline_tts.first_audio_ms and contention_tts.first_audio_ms:
-                first_audio_ratio = contention_tts.first_audio_ms / baseline_tts.first_audio_ms
-            elapsed_ratio = None
-            if baseline_tts.elapsed_ms and contention_tts.elapsed_ms:
-                elapsed_ratio = contention_tts.elapsed_ms / baseline_tts.elapsed_ms
-            evidence.phases["tts_gpu_coexistence"] = {
-                "status": "pass",
-                "overlap_proven": True,
-                "discarded_warmup": warmup_tts.evidence(),
-                "baseline": baseline_tts.evidence(),
-                "under_two_vllm_streams": contention_tts.evidence(),
-                "first_audio_slowdown_ratio": first_audio_ratio,
-                "total_slowdown_ratio": elapsed_ratio,
-                "vllm_requests": [
-                    contention_a.evidence(),
-                    contention_b.evidence(),
-                ],
-                "audio_was_generated_but_not_played": True,
-            }
+        )
 
         if args.goal_interpreter_probe:
             goal_interpreter = await _qualify_goal_interpreter(
                 client,
                 endpoint,
                 model=args.model,
+                priority=_provider_priority(
+                    args.provider,
+                    CognitionComputeClass.INTERACTIVE,
+                    step=args.priority_step,
+                ),
                 manifest_path=args.goal_interpreter_manifest,
             )
             evidence.phases["goal_interpreter_semantics"] = goal_interpreter
@@ -1132,11 +1371,54 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 )
 
 
+def _json_object_arg(value: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise argparse.ArgumentTypeError(f"invalid JSON object: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise argparse.ArgumentTypeError("scheduler config must be a JSON object")
+    return parsed
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000/v1")
+    parser.add_argument("--provider", choices=("sglang", "vllm"), required=True)
+    parser.add_argument("--provider-version", required=True)
+    parser.add_argument("--runtime-image")
+    parser.add_argument("--base-url")
     parser.add_argument("--model", required=True)
+    parser.add_argument("--model-revision", required=True)
+    parser.add_argument(
+        "--cuda-runtime",
+        required=True,
+        help="Exact CUDA runtime/toolkit identity used by the candidate server image.",
+    )
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--scheduler-config-json",
+        type=_json_object_arg,
+        default={},
+        help="Operator-recorded scheduler settings used by the candidate server.",
+    )
+    parser.add_argument(
+        "--priority-step",
+        type=int,
+        default=100,
+        help="Qualification-only spacing between relative compute classes.",
+    )
+    parser.add_argument(
+        "--deliberative-context-repeat",
+        type=int,
+        default=800,
+        help="Synthetic context pressure for the long deliberative request.",
+    )
+    parser.add_argument(
+        "--deliberative-max-tokens",
+        type=int,
+        default=2048,
+        help="Decode budget used to keep deliberation active during foreground probes.",
+    )
     parser.add_argument("--tts-url")
     parser.add_argument("--tts-speaker", default="chromie_mixed")
     parser.add_argument("--goal-interpreter-probe", action="store_true")
@@ -1167,16 +1449,46 @@ async def _run(args: argparse.Namespace, evidence: Evidence) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.priority_step <= 0:
+        raise SystemExit("--priority-step must be positive")
+    if args.deliberative_context_repeat <= 0:
+        raise SystemExit("--deliberative-context-repeat must be positive")
+    if args.deliberative_max_tokens < 256:
+        raise SystemExit("--deliberative-max-tokens must be at least 256")
+    if not args.base_url:
+        args.base_url = (
+            "http://127.0.0.1:30000/v1"
+            if args.provider == "sglang"
+            else "http://127.0.0.1:8000/v1"
+        )
+    args.base_url = args.base_url.rstrip("/")
     args.output = args.output.expanduser()
+    priority_mapping = _priority_mapping(args.provider, step=args.priority_step)
     evidence = Evidence(
+        provider=args.provider,
+        provider_version=args.provider_version,
+        runtime_image=args.runtime_image,
         model=args.model,
-        base_url=args.base_url.rstrip("/"),
+        model_revision=args.model_revision,
+        base_url=args.base_url,
         started_at=datetime.now(timezone.utc).isoformat(),
         git_revision=_git_revision(),
         git_dirty=_git_dirty(),
+        cuda_runtime=args.cuda_runtime,
+        accelerator_identity=_accelerator_identity(),
+        scheduler_config={
+            "operator_record": args.scheduler_config_json,
+            "provider_priority_semantics": (
+                "larger_value_first"
+                if args.provider == "sglang"
+                else "smaller_value_first"
+            ),
+            "qualification_only_priority_mapping": priority_mapping,
+            "priority_step": args.priority_step,
+        },
     )
     result = asyncio.run(_run(args, evidence))
-    print(f"vLLM provider qualification: status={evidence.status} output={args.output}")
+    print(f"Inference provider qualification: status={evidence.status} output={args.output}")
     if evidence.error:
         print(
             f"error={evidence.error['type']}: {evidence.error['message']}",

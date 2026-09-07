@@ -238,6 +238,18 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   Plan disposition or a new `Reconciler`/`BeliefManager`. Host/Runtime may enforce exact
   identity, provenance, delivery state, and literal duplicate suppression as mechanical
   safety checks, but semantic equivalence, contradiction, and wording remain Core-owned.
+- **INFERENCE-ATTENTION-001** — Chromie has one semantic mind and may run many
+  peripheral/runtime processes concurrently, but central LLM inference is a limited compute
+  resource. Foreground cognition must never be trapped behind deliberative or background
+  cognition merely because requests share one provider/GPU. A provider-neutral compute
+  class may express only operational scheduling intent; it owns no Responsibility, Goal,
+  Capability, Plan, wording, or truth. Logical GA/Fast concurrency remains valid while the
+  inference scheduler may intentionally give foreground Fast cognition disproportionate
+  compute until a useful typed commitment exists. Exact provider priority numbers,
+  preemption thresholds, cache policy, and engine topology are deployment/qualification
+  evidence, not Charter semantics. One engine may time-share/batch/preempt work more
+  effectively, but it does not create independent compute capacity or another cognitive
+  authority.
 - **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at
   most 2.0 seconds from validated GI handoff to the first valid Planner Communicative
   Activity commitment and at most 3.0 seconds from that commitment to playback start.

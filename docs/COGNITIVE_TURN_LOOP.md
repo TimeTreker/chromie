@@ -403,6 +403,31 @@ The acknowledgement can overlap Goal Association because speech is already an
 observable Activity. The weather lookup itself cannot: provider work begins only
 after canonical Goal binding and Planner selection.
 
+### 3.1a Logical concurrency is not fair compute scheduling
+
+The concurrent GI-result branches above are semantic/readiness concurrency, not a promise
+that one GPU gives GA, Fast, and Deep equal physical compute at every instant. Equal/fair
+service is specifically the wrong target when it lets continuity or deliberation block the
+first meaningful foreground reaction. Human attention is selective: foreground cognition
+may temporarily dominate central inference while unrelated lower-priority cognition yields
+and later resumes.
+
+Chromie carries this only as provider-neutral operational compute class metadata. Fast GI
+and Fast Planner are interactive foreground work; Goal Association is continuity work;
+deep cognition is deliberative; Reflection/background consolidation is background work.
+The mapping expresses relative scheduling intent, not semantic authority and not fixed raw
+provider integers. A runtime/provider adapter may translate it into SGLang, vLLM, or another
+engine's priority/preemption controls. Ollama may record the class without being able to
+honor it. No scheduler may inspect user content and no compute class may alter the typed
+GI/GA/Planner transaction.
+
+Accordingly, Goal Association remains logically concurrent but is not on the critical path
+to a first valid `PresentationCommit`. If a single engine can protect foreground tail
+latency under deep load, keep the simpler single-engine topology. Only measured failure
+justifies separate foreground/deliberative engines, and only further failure justifies
+physical compute isolation. See
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md#foreground-priority-inference-runtime-candidate-qualification).
+
 ### 3.1.1 Progressive conversational continuation
 
 A simple turn has three legal fast conversational outcomes:

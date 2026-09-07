@@ -1,7 +1,7 @@
 # Chromie Current Status
 
-**Updated:** 2026-09-06
-**Current focus:** The Goal-driven single-authority architecture remains the target. The bounded 2026-09-06 transaction-fidelity audit findings A01–A06 are now source-closed in the current worktree: GA semantic errors remain visible instead of being trusted-code repaired; terminal `unavailable`/`refused` no longer trigger a same-authority Fast re-decision without material new state; request-specific early-speech constraints are checked before `PresentationCommit` leaves the Agent; the maintained main test tree is pytest-collected; both live GA prompt paths carry authoritative GI Responsibilities losslessly or fail explicitly for capacity; and Fast failure cleanup reconciles any completed GA commit truth before producing the public error result. This is source closure only. A clean revision-bound canonical source gate with pinned Ruff/Mypy and explicit collection evidence is still required before model/provider promotion. Existing RTX 4090 all-`qwen3.5:4b` evidence remains diagnostic (5/51 must-pass hard-passes) and does not qualify release behavior.
+**Updated:** 2026-09-07
+**Current focus:** The Goal-driven single-authority architecture remains the target. The bounded 2026-09-06 transaction-fidelity audit findings A01–A06 are now source-closed in the current worktree: GA semantic errors remain visible instead of being trusted-code repaired; terminal `unavailable`/`refused` no longer trigger a same-authority Fast re-decision without material new state; request-specific early-speech constraints are checked before `PresentationCommit` leaves the Agent; the maintained main test tree is pytest-collected; both live GA prompt paths carry authoritative GI Responsibilities losslessly or fail explicitly for capacity; and Fast failure cleanup reconciles any completed GA commit truth before producing the public error result. This is source closure only. A clean revision-bound canonical source gate with pinned Ruff/Mypy and explicit collection evidence is still required before model/provider promotion. Existing RTX 4090 all-`qwen3.5:4b` evidence remains diagnostic (5/51 must-pass hard-passes) and does not qualify release behavior. The current source also introduces provider-neutral compute-class observability plus isolated SGLang/vLLM foreground-under-deliberation qualification; production remains Ollama until same-revision end-to-end evidence passes.
 ## 2026-09-06 transaction-fidelity source closure
 The archive audit did not reopen the authority architecture; it found six implementation mismatches at the existing GA/Fast/Runtime boundaries. The current worktree closes them as follows:
 - **A01 / source-closed — GA semantic repair:** the live GA normalization chain no longer deletes ungrounded resource-query locations or reclassifies model-authored semantic binding types before acceptance. Semantic/grounding conflicts remain visible to fail-closed validation; repository policy guards reject reconnecting those repair calls to the live transaction.
@@ -207,19 +207,20 @@ A later supervised device-mode session retained two admitted turns on the same d
 | Static quality gates | Repository policy, documentation, configuration ownership/inventory, structure ratchets, and selected static-analysis scopes are maintained. Documentation authority now explicitly includes the canonical cognitive architecture, human-interaction contract, and acceptance contract; the docs gate rejects retired positive deepthinking/memory-route claims. Phase 2 guards documentation authority; Phase 4 additionally rejects verified obsolete prompt/client artifacts and direct re-copying of shared whitespace/JSON-Schema mechanisms. The pinned test environment now includes `pytest-asyncio`. | Dependency-free gates can run without GPU. The incremental Ruff/Mypy ratchet now also owns `scripts/run_mypy.py`; further widening remains one verified slice at a time rather than a blanket repo-wide switch. | Not a runtime target. | Development only. |
 ## Current open work
 
-1. **Replace or revise the unqualified deployed semantic transaction based on the retained aggregate, not the pasted greeting.** The unchanged 51-case must-pass
+1. **Complete foreground-priority inference-runtime qualification before provider promotion.** Run the isolated SGLang candidate and vLLM control with the same target model/source/TTS environment, retain the new deep-load contention evidence, and add the same comparable saturated-deliberation baseline for deployed Ollama. Then carry the winning provider-neutral compute class through a production-capable client and re-run the real Agent GI -> Fast Planner -> `PresentationCommit` -> TTS/playback latency contract. Do not switch production merely because the provider canary passes.
+2. **Replace or revise the unqualified deployed semantic transaction based on the retained aggregate, not the pasted greeting.** The unchanged 51-case must-pass
    aggregate hard-passed 5 cases and placed 35 primary failures at Fast Planner
    output/coverage, with additional GI, GA, and Deep failures. Qualify a deployable
    model/resource profile against the frozen corpus while preserving one semantic
    authority and the validated contracts. The single-slot all-`qwen3.5:4b` profile cannot meet the designed GA/Fast concurrency or observed latency target. Do not add
    phrase rules, semantic repair calls, or present fixed-Codex results as target proof.
-2. **Close Issue #32 source gates and target evidence before final Fast-Planner
+3. **Close Issue #32 source gates and target evidence before final Fast-Planner
    Prompt/model promotion.** The one typed production path is implemented and the
    superseded endpoint/DTO/model/config surface is removed. Retain ordered-frame,
    commit/terminal identity, pre/post-commit failure, and no-early-Work regressions; then
    measure the exact target provider/model under the real single-slot resource profile.
    Do not stream raw tokens to TTS or add another semantic writer/repair call.
-3. **Run the `current_revision_qualification` evidence profile on the committed target.**
+4. **Run the `current_revision_qualification` evidence profile on the committed target.**
    The profile requires the canonical source report, the directory-discovered retained live
    interaction cases, the live provider fault matrix, Gateway/Core, Agent Skill/weather,
    Social Attention, and LAN evidence on the same clean revision. WorkDAG revision/no-redispatch
@@ -227,7 +228,7 @@ A later supervised device-mode session retained two admitted turns on the same d
    cancellation, provider-backed Evidence re-entry, multi-goal behavior, follow-up continuity,
    duplicate-effect cardinality, and declared warm Planner/playback budgets. Physical voice
    and physical robot remain separate optional evidence tracks.
-4. **Retain the structural rule during qualification and later maintenance.** Reopen
+5. **Retain the structural rule during qualification and later maintenance.** Reopen
    decomposition only for a concrete ownership seam or defect; file size alone is not
    permission to add a Speech Manager, Reconciliation Manager, Meta Planner, or one manager
    per cognitive term. Source

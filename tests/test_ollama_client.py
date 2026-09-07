@@ -11,6 +11,7 @@ from agent.app.clients.ollama_client import (
     OllamaClient,
     OllamaGenerationError,
 )
+from agent.app.inference_compute import CognitionComputeClass
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
@@ -69,17 +70,18 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         client_context = mock.AsyncMock()
         client_context.__aenter__.return_value = http_client
 
+        client = OllamaClient(
+            base_url="http://chromie-llm:11434",
+            model="test-model",
+            purpose="fast_planner",
+        )
         with mock.patch(
             "agent.app.clients.ollama_client.httpx.AsyncClient",
             return_value=client_context,
         ):
             deltas = [
                 delta
-                async for delta in OllamaClient(
-                    base_url="http://chromie-llm:11434",
-                    model="test-model",
-                    purpose="fast_planner",
-                ).generate_stream(
+                async for delta in client.generate_stream(
                     "prompt",
                     response_format={"type": "object"},
                     prompt_family="fast_planner.streaming_advance",
@@ -91,6 +93,8 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         payload = http_client.stream.call_args.kwargs["json"]
         self.assertTrue(payload["stream"])
         self.assertFalse(payload["think"])
+        self.assertNotIn("priority", payload)
+        self.assertEqual(client.compute_class, CognitionComputeClass.INTERACTIVE)
         self.assertEqual(payload["format"], {"type": "object"})
         self.assertEqual(
             payload["messages"],

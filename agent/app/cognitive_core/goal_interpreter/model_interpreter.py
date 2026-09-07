@@ -13,6 +13,7 @@ import httpx
 from pydantic import ValidationError
 
 from ...clients.ollama_client import OllamaGenerationError
+from ...inference_compute import goal_interpreter_compute_class
 from ...settings import agent_service_settings
 
 try:
@@ -3072,6 +3073,7 @@ class OllamaGoalInterpreter:
         system_text, user_text, all_text = _payload_message_texts(payload)
         profile = {
             "stage": stage,
+            "compute_class": goal_interpreter_compute_class(stage).value,
             "sid": request.sid if request is not None else None,
             "model": payload.get("model"),
             "prompt_chars": self._payload_prompt_chars(payload),
@@ -3329,7 +3331,10 @@ class OllamaGoalInterpreter:
                 response=None,
                 status="failed",
                 elapsed_ms=(time.perf_counter() - started) * 1000.0,
-                correlations={"sid": request.sid if request is not None else None},
+                correlations={
+                    "sid": request.sid if request is not None else None,
+                    "compute_class": goal_interpreter_compute_class(stage).value,
+                },
                 error={"error_type": type(exc).__name__, "message": str(exc)},
             )
             raise
@@ -3349,7 +3354,10 @@ class OllamaGoalInterpreter:
             response=data,
             status="accepted",
             elapsed_ms=(time.perf_counter() - started) * 1000.0,
-            correlations={"sid": request.sid if request is not None else None},
+            correlations={
+                "sid": request.sid if request is not None else None,
+                "compute_class": goal_interpreter_compute_class(stage).value,
+            },
             parsed_output=parsed_output,
         )
         return data

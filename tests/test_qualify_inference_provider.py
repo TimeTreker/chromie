@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.qualify_vllm_provider import (
+from scripts.qualify_inference_provider import (
     DEFAULT_GOAL_INTERPRETER_MANIFEST,
     QualificationFailure,
     StreamObservation,
@@ -13,12 +13,15 @@ from scripts.qualify_vllm_provider import (
     _evaluate_goal_interpreter_case_dimensions,
     _extract_stream_delta,
     _load_goal_interpreter_manifest,
-    _vllm_compatible_schema,
+    _candidate_compatible_schema,
+    _provider_priority,
+    _priority_mapping,
     _wire_coordination_satisfies,
 )
+from agent.app.inference_compute import CognitionComputeClass
 
 
-class VllmProviderQualificationTests(unittest.TestCase):
+class InferenceProviderQualificationTests(unittest.TestCase):
     def test_chat_payload_explicitly_disables_qwen_thinking(self) -> None:
         payload = _chat_payload(
             "Qwen/Qwen3.5-4B",
@@ -33,6 +36,57 @@ class VllmProviderQualificationTests(unittest.TestCase):
         )
         self.assertEqual(payload["temperature"], 0)
         self.assertTrue(payload["stream"])
+
+    def test_chat_payload_carries_provider_priority_only_when_requested(self) -> None:
+        without_priority = _chat_payload(
+            "model", "prompt", stream=True, max_tokens=32
+        )
+        with_priority = _chat_payload(
+            "model", "prompt", stream=True, max_tokens=32, priority=300
+        )
+
+        self.assertNotIn("priority", without_priority)
+        self.assertEqual(with_priority["priority"], 300)
+
+    def test_provider_priority_translation_preserves_relative_compute_order(self) -> None:
+        self.assertGreater(
+            _provider_priority(
+                "sglang", CognitionComputeClass.INTERACTIVE, step=100
+            ),
+            _provider_priority(
+                "sglang", CognitionComputeClass.DELIBERATIVE, step=100
+            ),
+        )
+        self.assertLess(
+            _provider_priority(
+                "vllm", CognitionComputeClass.INTERACTIVE, step=100
+            ),
+            _provider_priority(
+                "vllm", CognitionComputeClass.DELIBERATIVE, step=100
+            ),
+        )
+
+    def test_qualification_priority_mapping_is_provider_specific_not_semantic(self) -> None:
+        self.assertEqual(
+            _priority_mapping("sglang", step=100),
+            {
+                "realtime": 400,
+                "interactive": 300,
+                "continuity": 200,
+                "deliberative": 100,
+                "background": 0,
+            },
+        )
+        self.assertEqual(
+            _priority_mapping("vllm", step=100),
+            {
+                "realtime": 0,
+                "interactive": 100,
+                "continuity": 200,
+                "deliberative": 300,
+                "background": 400,
+            },
+        )
 
     def test_chat_payload_does_not_send_qwen_template_kwargs_to_other_models(self) -> None:
         payload = _chat_payload(
@@ -94,7 +148,7 @@ class VllmProviderQualificationTests(unittest.TestCase):
         with self.assertRaisesRegex(QualificationFailure, "reasoning channel"):
             _assert_complete_stream(observation)
 
-    def test_vllm_schema_translation_removes_only_unique_items(self) -> None:
+    def test_candidate_schema_translation_removes_only_unique_items(self) -> None:
         original = {
             "type": "object",
             "properties": {
@@ -107,7 +161,7 @@ class VllmProviderQualificationTests(unittest.TestCase):
             "additionalProperties": False,
         }
 
-        translated, removed = _vllm_compatible_schema(original)
+        translated, removed = _candidate_compatible_schema(original)
 
         self.assertEqual(removed, ["$.properties.refs.uniqueItems"])
         self.assertNotIn("uniqueItems", translated["properties"]["refs"])

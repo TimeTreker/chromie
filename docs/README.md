@@ -55,6 +55,7 @@ When documents disagree, correct the lower-authority document.
 | What common contract must runtime trace items obey? | `docs/RUNTIME_OBSERVABILITY.md` |
 | How should a module add trace instrumentation? | `docs/RUNTIME_OBSERVABILITY_OPERATIONS.md` |
 | How are accelerator observations, retained latency reports, and regression gates produced? | `docs/ACCELERATOR_LATENCY_EVIDENCE.md` |
+| How is foreground-priority LLM runtime contention qualified without changing semantic authority? | `docs/ACCELERATOR_LATENCY_EVIDENCE.md` |
 | What contract and evidence govern TTS backend selection? | `docs/TTS_PROVIDER_EVALUATION.md` |
 | What validation supports a claim? | `docs/ACCEPTANCE.md` and `docs/USER_OUTCOME_ACCEPTANCE.md` |
 | What cognitive principles govern goals, continuity, planning, and execution? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |

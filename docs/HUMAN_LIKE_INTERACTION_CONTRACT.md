@@ -526,6 +526,34 @@ qualification such as `established/insufficient/stale/contradicted/unknown` stil
 Evidence sufficiency. Do not collapse these into one confidence enum or invent a permanent
 belief database.
 
+## Foreground attention under inference contention
+
+Human-like responsiveness requires more than logically asynchronous Python tasks. When
+Fast cognition, Goal Association, deliberation, Reflection, or other model work share one
+effective inference resource, fair/FCFS service can make the architecture physically
+serial and leave a person waiting behind background thought. Chromie therefore treats
+central model compute as a limited attentional resource: foreground interactive cognition
+must strongly outrank deliberative/background cognition without becoming a second semantic
+brain.
+
+The inference scheduler may use provider-neutral compute classes, provider priority,
+chunked prefill, batching, preemption, cache reuse, resource reservation, or separate
+instances. Those are operational controls only. They may not inspect the utterance to
+create a greeting shortcut, reinterpret Goal meaning, select Capabilities, author wording,
+or decide truth. Fast and Deep remain cognition depths of their existing semantic owner;
+Goal Association remains canonical Goal continuity; Planner remains ordinary HOW/wording
+authority.
+
+Latency qualification must include contention, not only an idle-server TTFT. A target run
+must keep deliberative cognition active, inject a real foreground interaction, carry it
+through validated GI and Fast Planner `PresentationCommit`, and include TTS on the shared
+GPU. Retain P50/P95/P99 first meaningful reaction, foreground queue/TTFT/completion, TTS
+first PCM/playback, deep interruption/resume behavior, GPU/VRAM, cache/preemption, provider
+errors, structured-output validity, and semantic correctness. A longer watchdog or higher
+average tokens/sec cannot convert foreground tail-latency failure into a pass. The
+provider-level procedure is maintained in
+[Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md#foreground-priority-inference-runtime-candidate-qualification).
+
 ## Responsive speech and planning depth
 
 The routing and independently scheduled Fast-response boundaries in this section

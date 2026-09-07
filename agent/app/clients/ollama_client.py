@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator, Literal
 
 
+from ..inference_compute import CognitionComputeClass, compute_class_for_purpose
 from ..settings import AgentServiceSettings
 
 import httpx
@@ -234,6 +235,7 @@ class OllamaClient:
         *,
         timeout_ms: int | None = None,
         purpose: str | None = None,
+        compute_class: CognitionComputeClass | None = None,
         service_settings: AgentServiceSettings | None = None,
     ):
         configured = service_settings or AgentServiceSettings()
@@ -241,6 +243,7 @@ class OllamaClient:
         self.model = model or configured.model
         self.timeout_ms = int(timeout_ms or configured.timeout_ms)
         self.purpose = str(purpose or "unspecified").strip() or "unspecified"
+        self.compute_class = compute_class or compute_class_for_purpose(self.purpose)
         self.default_num_ctx = configured.ollama_num_ctx
         self.default_num_predict = configured.ollama_num_predict
         self.prompt_chars_per_token_estimate = (
@@ -251,9 +254,10 @@ class OllamaClient:
         )
 
         logger.info(
-            "ollama_client_init purpose=%s base_url=%s model=%s timeout_ms=%s "
+            "ollama_client_init purpose=%s compute_class=%s base_url=%s model=%s timeout_ms=%s "
             "default_num_ctx=%s default_num_predict=%s context_safety_margin_tokens=%s",
             self.purpose,
+            self.compute_class.value,
             self.base_url,
             self.model,
             self.timeout_ms,
@@ -355,6 +359,7 @@ class OllamaClient:
             kind="model_call",
             attributes={
                 "purpose": self.purpose,
+                "compute_class": self.compute_class.value,
                 "prompt_family": family,
                 "model": self.model,
                 "response_format": response_format_label,
@@ -389,6 +394,7 @@ class OllamaClient:
                         **trace_correlations,
                         "trace_id": trace_id or None,
                         "turn_id": turn_id,
+                        "compute_class": self.compute_class.value,
                         "prompt_family": family,
                         "attempt": attempt,
                     },
@@ -535,6 +541,16 @@ class OllamaClient:
         )
         call_id = str(start_probe.fields["call_id"])
         logger.info("%s", start_probe.render())
+        logger.info(
+            "ollama_generate_stream_start purpose=%s compute_class=%s "
+            "prompt_family=%s model=%s turn_id=%s call_id=%s",
+            self.purpose,
+            self.compute_class.value,
+            family,
+            self.model,
+            turn_id,
+            call_id,
+        )
         started = time.perf_counter()
         full_text = ""
         final_payload: dict[str, Any] | None = None
@@ -845,10 +861,11 @@ class OllamaClient:
 
         system_chars = len(system or "")
         logger.info(
-            "ollama_generate_start purpose=%s url=%s model=%s response_format=%s "
+            "ollama_generate_start purpose=%s compute_class=%s url=%s model=%s response_format=%s "
             "timeout_ms=%s num_ctx=%s num_predict=%s prompt_chars=%s system_chars=%s "
             "input_chars=%s prompt_preview=%r",
             self.purpose,
+            self.compute_class.value,
             url,
             self.model,
             response_format_label,

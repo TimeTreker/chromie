@@ -189,6 +189,119 @@ Thresholds must come from a retained representative baseline and an explicitly
 reviewed policy. This document does not invent a universal first-response
 budget, and automated or simulator traces cannot support a target-audio claim.
 
+## Foreground-priority inference runtime candidate qualification
+
+Chromie's semantic architecture remains one mind even when several model transactions are
+logically concurrent. Central LLM inference is a limited compute resource, so the runtime
+must protect foreground interaction from deliberative/background contention rather than
+serve every role fairly. Scheduling is operational only: it may carry compute class,
+provider/instance binding, queue priority, context/output budget, preemptibility, cache
+policy, or resource reservation, but it may not own Responsibility, Goal, Capability,
+Plan semantics, response wording, or truth.
+
+`agent/app/inference_compute.py` defines only relative provider-neutral classes:
+`REALTIME`, `INTERACTIVE`, `CONTINUITY`, `DELIBERATIVE`, and `BACKGROUND`. Their ordinal
+rank is not a raw provider priority. Exact provider values and preemption thresholds are
+qualification knobs retained with evidence rather than prompt or semantic-DTO constants.
+Existing Ollama transactions record the class for observability without sending unsupported
+priority fields.
+
+The topology decision is evidence-driven:
+
+```text
+Level 1: one candidate engine with foreground priority/preemption
+  pass -> keep one engine
+  fail -> Level 2: separate foreground and deliberative engines
+  fail -> Level 3: physical compute isolation
+```
+
+A single engine can improve time-sharing, batching, cache reuse, chunked prefill, and
+preemption, but it does not create a second GPU or another semantic brain.
+
+### Isolated SGLang candidate
+
+`docker-compose.sglang-qualification.yml` is separate from production `docker-compose.yml`.
+It does not replace `chromie-llm` or change Agent dependencies. It enables SGLang priority
+scheduling, fails a priority-bearing request closed if priority scheduling is not enabled,
+uses priority scheduling policy, and exposes configurable preemption/chunked-prefill/memory
+knobs.
+
+Use a pinned image and retain the exact identity in evidence:
+
+```bash
+export SGLANG_IMAGE='<pinned-sglang-image-or-image@sha256:digest>'
+export SGLANG_MODEL='<exact-huggingface-model-id>'
+export SGLANG_MODEL_REVISION='<exact-model-commit>'
+export SGLANG_SERVED_MODEL_NAME='chromie-sglang-candidate'
+export SGLANG_HF_CACHE_DIR="$HOME/.cache/huggingface"
+
+# Qualification starting values, not architecture constants:
+export SGLANG_PRIORITY_PREEMPTION_THRESHOLD=10
+export SGLANG_CHUNKED_PREFILL_SIZE=2048
+export SGLANG_SCHEDULE_CONSERVATIVENESS=1.0
+export SGLANG_MEM_FRACTION_STATIC=0.70
+
+docker compose -f docker-compose.sglang-qualification.yml up -d \
+  chromie-llm-sglang-qualification
+```
+
+The starting memory fraction intentionally leaves shared-GPU headroom for TTS; it is not an
+accepted optimum. Tune and qualify it on the actual target.
+
+### Candidate-provider contention harness
+
+`scripts/qualify_inference_provider.py` replaces the old vLLM-named transport probe because
+the maintained contract is an OpenAI-compatible candidate-provider contract, not a vLLM
+semantic contract. It supports `sglang` and `vllm`, records their provider-specific priority
+number conventions, and includes a mandatory `foreground_under_deliberative_load` phase:
+
+```text
+optional TTS warm/baseline
+  -> start long DELIBERATIVE stream with context pressure
+  -> wait until it is actively decoding
+  -> inject INTERACTIVE Fast-GI canary
+  -> while Deep remains active, inject INTERACTIVE Fast-Planner canary
+  -> optionally synthesize TTS in the same contention window
+  -> require foreground completion before Deep finishes
+  -> require Deep to complete cleanly afterwards
+```
+
+The harness retains TTFT, elapsed time, maximum inter-delta pause, GPU samples, TTS timing,
+provider/model/runtime identity, scheduler settings, and the qualification-only priority
+mapping. SGLang's default convention is translated as larger numeric values first; vLLM's
+priority convention is translated as smaller numeric values first. These raw numbers are
+evidence knobs only and never become semantic configuration.
+
+Example SGLang run with the default CosyVoice service:
+
+```bash
+python scripts/qualify_inference_provider.py \
+  --provider sglang \
+  --provider-version '<exact-sglang-version>' \
+  --runtime-image "$SGLANG_IMAGE" \
+  --model "$SGLANG_SERVED_MODEL_NAME" \
+  --model-revision "$SGLANG_MODEL_REVISION" \
+  --cuda-runtime '<exact-cuda-runtime>' \
+  --scheduler-config-json '{"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
+  --tts-url ws://127.0.0.1:5000 \
+  --goal-interpreter-probe \
+  --output .chromie/acceptance/inference-runtime/sglang-provider.json
+```
+
+For vLLM, use `--provider vllm`, the exact version/image/model identity, and a server started
+with priority scheduling. The old `scripts/qualify_vllm_provider.py` filename is intentionally
+removed instead of retained as a compatibility wrapper because it encoded a provider-specific
+owner for what is now a provider-neutral qualification contract.
+
+This phase is provider-level scheduling evidence. The Fast-GI/Fast-Planner strings are
+canaries, not production semantic transactions, and
+`chromie-presentation-commit-ready` is not a real `PresentationCommit`. A provider pass does
+not prove Chromie interaction latency, semantic correctness, audible playback, simulator
+behavior, or physical robot behavior. Production Ollama remains unchanged until same-revision
+comparison and the actual Agent GI -> Fast Planner -> typed `PresentationCommit` -> TTS ->
+playback path satisfy `INTERACTION-LATENCY-001`. The same saturated-deliberation control must
+also be retained for Ollama before a cross-provider promotion claim is made.
+
 ## Evidence-based latency gate
 
 The gate compares two retained reports:

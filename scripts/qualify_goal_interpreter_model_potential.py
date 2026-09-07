@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.qualify_vllm_provider import (  # noqa: E402
+from scripts.qualify_inference_provider import (  # noqa: E402
     DEFAULT_GOAL_INTERPRETER_MANIFEST,
     QualificationFailure,
     _evaluate_goal_interpreter_case_dimensions,
