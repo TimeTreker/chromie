@@ -221,10 +221,12 @@ preemption, but it does not create a second GPU or another semantic brain.
 ### Isolated SGLang candidate
 
 `docker-compose.sglang-qualification.yml` is separate from production `docker-compose.yml`.
-It does not replace `chromie-llm` or change Agent dependencies. It enables SGLang priority
-scheduling, fails a priority-bearing request closed if priority scheduling is not enabled,
-uses priority scheduling policy, and exposes configurable preemption/chunked-prefill/memory
-knobs.
+It does not replace `chromie-llm` or change Agent dependencies. It enables SGLang request
+priority scheduling, fails a priority-bearing request closed if priority scheduling is not
+enabled, keeps the base queue policy explicitly `fcfs`, and exposes configurable
+preemption/chunked-prefill/memory knobs. With priority scheduling enabled, SGLang orders the
+`fcfs` waiting queue by request priority first and arrival time second; the queue policy and
+request-priority mechanism are therefore intentionally separate controls.
 
 Use a pinned image and retain the exact identity in evidence:
 
@@ -234,8 +236,10 @@ export SGLANG_MODEL='<exact-huggingface-model-id>'
 export SGLANG_MODEL_REVISION='<exact-model-commit>'
 export SGLANG_SERVED_MODEL_NAME='chromie-sglang-candidate'
 export SGLANG_HF_CACHE_DIR="$HOME/.cache/huggingface"
+export SGLANG_CONTEXT_LENGTH=32768
 
 # Qualification starting values, not architecture constants:
+export SGLANG_DEFAULT_PRIORITY_VALUE=0
 export SGLANG_PRIORITY_PREEMPTION_THRESHOLD=10
 export SGLANG_CHUNKED_PREFILL_SIZE=2048
 export SGLANG_SCHEDULE_CONSERVATIVENESS=1.0
@@ -282,7 +286,7 @@ python scripts/qualify_inference_provider.py \
   --model "$SGLANG_SERVED_MODEL_NAME" \
   --model-revision "$SGLANG_MODEL_REVISION" \
   --cuda-runtime '<exact-cuda-runtime>' \
-  --scheduler-config-json '{"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
+  --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
   --tts-url ws://127.0.0.1:5000 \
   --goal-interpreter-probe \
   --output .chromie/acceptance/inference-runtime/sglang-provider.json

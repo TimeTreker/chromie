@@ -1,0 +1,68 @@
+services:
+  chromie-llm-sglang-qualification:
+    container_name: chromie-llm-sglang-qualification
+    image: ${SGLANG_IMAGE:?SGLANG_IMAGE must be set to a pinned SGLang image or digest}
+    init: true
+    gpus: all
+    ipc: host
+    ports:
+      - "127.0.0.1:30000:30000"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HOME: /root/.cache/huggingface
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${SGLANG_HF_CACHE_DIR:?SGLANG_HF_CACHE_DIR must be set}:/root/.cache/huggingface
+    entrypoint:
+      - python3
+      - -m
+      - sglang.launch_server
+    command:
+      - --model-path
+      - ${SGLANG_MODEL:?SGLANG_MODEL must be set to the exact Hugging Face model id}
+      - --revision
+      - ${SGLANG_MODEL_REVISION:?SGLANG_MODEL_REVISION must be set to the exact model revision}
+      - --served-model-name
+      - ${SGLANG_SERVED_MODEL_NAME:?SGLANG_SERVED_MODEL_NAME must be set}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "30000"
+      - --context-length
+      - ${SGLANG_CONTEXT_LENGTH:-32768}
+      - --schedule-policy
+      - fcfs
+      - --enable-priority-scheduling
+      - --default-priority-value
+      - ${SGLANG_DEFAULT_PRIORITY_VALUE:-0}
+      - --abort-on-priority-when-disabled
+      - --priority-scheduling-preemption-threshold
+      - ${SGLANG_PRIORITY_PREEMPTION_THRESHOLD:-10}
+      - --chunked-prefill-size
+      - ${SGLANG_CHUNKED_PREFILL_SIZE:-2048}
+      - --schedule-conservativeness
+      - ${SGLANG_SCHEDULE_CONSERVATIVENESS:-1.0}
+      - --mem-fraction-static
+      - ${SGLANG_MEM_FRACTION_STATIC:-0.70}
+      - --enable-metrics
+      - --enable-request-time-stats-logging
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:30000/health >/dev/null
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
