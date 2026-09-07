@@ -436,9 +436,14 @@ is a primary social act at all; Situation/Memory provide context; Runtime only v
 realizes. No `FamilyMode`, `FriendMode`, `SocialGraphManager`, `ConcernManager`, or
 `InitiativeManager` is introduced by this contract.
 
-The current runtime is still primarily Goal-bound for non-turn re-entry. Goal-free trusted
-social/Situation wake and low-commitment initiative are approved target behavior and must be
-qualified separately after source implementation.
+The first Goal-free non-turn source path is implemented: an already-trusted typed Situation
+revision may raise a provenance-bound Goal-free `CognitiveOpportunity` and enter a stateless
+same-Core situational-cognition scope without a synthetic user turn, Responsibility, Goal,
+or Planner call. The result is either silence or one context-grounded low-commitment speech
+Activity and can never contain Capability Work. Concrete social perception adapters and the
+quality/frequency of initiative remain unqualified target behavior; `slow` Goal-free
+readiness deliberately fails quiet until bounded deliberative cognition is separately
+qualified.
 
 ## Progressive cognition and conversational self-repair
 

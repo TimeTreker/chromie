@@ -518,10 +518,15 @@ there is no periodic prompt asking "what should I do now?" and no ambient semant
 loop. Family is expected to dominate ordinary data because it is Chromie's primary living
 context, not because the runtime switches into a family mode.
 
-Current production `SituationRevisionObservation`/`CognitiveOpportunity` schemas still
-require Goal binding. Removing that artificial requirement safely, adding subject/source
-provenance for Goal-free readiness, and wiring trusted scene/social adapters are source-open
-work tracked in `ROADMAP.md` and must not be inferred from this design section.
+The first Goal-free source slice is now implemented. `SituationRevisionObservation` and
+`CognitiveOpportunity` may carry no Goal IDs only when an exact Situation digest and trusted
+source provenance remain bound; the opportunity also carries bounded subject/source refs.
+`orchestrator.runtime.situation.apply_goal_free_situation_opportunity(...)` admits that typed transition into
+the same Core without fabricating a UserTurn or GI/Goal state. A stateless
+`/situational-cognition` invocation has no Capability/Work contract and may return only
+`silence` or one low-commitment context-grounded Communicative Activity. `local` readiness
+stays local and `slow` Goal-free readiness currently fails quiet instead of borrowing Deep
+Planner. Source-specific scene/person/social adapters and target qualification remain open.
 
 ## 4. Gateway-to-Core contract
 

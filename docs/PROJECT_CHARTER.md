@@ -1175,9 +1175,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
    Auxiliary-only target change, invalidation, failure, or completion must not create
    a `CognitiveOpportunity` and must never borrow or fabricate a Goal ID to re-enter
-   Planner; the existing non-empty `goal_ids` contract is a hard boundary. If a real
-   Goal-relevant state change independently creates a valid opportunity, the same
-   Planner may reconsider the whole affected Goal scope and author a new Plan revision.
+   Planner. A Goal-free opportunity is legal only for an independently trusted primary
+   Situation transition with exact Situation/source provenance; optional presentation
+   decoration can never manufacture that provenance. If a real Goal-relevant state
+   change independently creates a valid Goal-bound opportunity, the same Planner may
+   reconsider the whole affected Goal scope and author a new Plan revision.
    Model-facing auxiliary candidates exclude provider/backend/calibration identity so
    the social decision remains embodiment-independent. Machine guards must prevent the
    deleted independent Social Attention writer and configuration surface from returning.

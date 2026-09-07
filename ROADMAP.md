@@ -342,16 +342,21 @@ Implementation order:
    through real experience. Preserve truthful robotic embodiment. Update identity prompts,
    startup wording, tests, and identity benchmarks together so old service-role behavior
    cannot silently return.
-2. **Generalize Situation/CognitiveOpportunity beyond Goal-only readiness — source open.**
-   Current `SituationRevisionObservation.goal_ids` and `CognitiveOpportunity.goal_ids`
-   still require at least one Goal. Permit trustworthy Situation-only social/world
-   transitions to create an ephemeral Goal-free opportunity with exact source/subject
-   provenance while retaining Goal binding for actual Responsibility continuation. Never
-   fabricate a UserTurn, GI result, Responsibility, or Goal to wake cognition.
-3. **Add source-specific social/perception Situation ingress — source open.** Admit only
-   bounded trusted person/scene/interaction changes worth current cognition; do not create
-   a world-model database or poll a semantic LLM continuously. `SituationProjection`
-   remains the one soft current-interpretation surface.
+2. **Generalize Situation/CognitiveOpportunity beyond Goal-only readiness — first source slice implemented.**
+   `SituationRevisionObservation.goal_ids` and `CognitiveOpportunity.goal_ids` may now be
+   empty for an exact trusted Situation-only transition. Goal-free opportunities require
+   a Situation digest plus trusted source provenance, retain bounded subject/source refs,
+   and fail validation when neither Goal/Evidence nor Situation provenance exists. The
+   maintained Goal-bound provider/time/Evidence paths are unchanged. No UserTurn, GI result,
+   Responsibility, or Goal is fabricated to wake cognition.
+3. **Add source-specific social/perception Situation ingress — generic Core ingress implemented, concrete adapters open.**
+   `orchestrator.runtime.situation.apply_goal_free_situation_opportunity(...)` now accepts one already-trusted
+   typed Goal-free Situation revision, derives delta-driven readiness, and invokes the same
+   Cognitive Core without synthetic UserTurn/Goal provenance. Replaying the same Situation
+   digest is a no-op. Concrete camera/person/scene/social adapters still must establish
+   their own trust/privacy boundary and admit only bounded meaningful changes; no semantic
+   polling loop or world-model database is introduced. `SituationProjection` remains the
+   one soft current-interpretation surface.
 4. **Extend relational Memory and privacy provenance — source open.** Reuse `MemoryEntry`
    and current-context activation for person identity, person-to-person relationships,
    shared experiences, interaction boundaries, and revisable relationship interpretations.
@@ -362,11 +367,15 @@ Implementation order:
    state change is worth Core cognition. High salience is only readiness; silence and
    continued observation remain valid. Do not add a priority engine/manager unless a later
    independently necessary lifecycle is proven.
-6. **Qualify low-commitment self-initiative — source open.** Allow situation-grounded,
-   low-consequence, reversible, low-interruption Communicative Activities such as a natural
-   greeting or gentle question without fake Goal provenance. Capability availability must
-   not manufacture demand. Effectful autonomy remains separately governed and is not
-   implied by this social slice.
+6. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
+   Goal-free situational cognition is a stateless same-Core invocation with no Goal/Work
+   fields. It may return `silence` or author exactly one context-grounded communicative act
+   (`greeting|acknowledge|inquire|inform|respond`); Runtime binds Situation/opportunity
+   provenance and the resulting `InteractionResponse` structurally contains no Capability
+   Work or Goal-completion authority. `local` readiness does not call a model, while `slow`
+   Goal-free readiness currently fails quiet rather than borrowing Deep Planner. Concrete
+   social adapters and model/target qualification are still open. Capability availability
+   must not manufacture demand, and effectful autonomy remains separately governed.
 7. **Close the social feedback loop — source open.** Human reaction/turn-taking changes
    Situation and may create another bounded opportunity for continue/stop/repair. Selective
    Reflection may retain supported scoped experience, never permanent personality judgments

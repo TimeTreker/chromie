@@ -39,6 +39,7 @@ from shared.chromie_contracts.interaction import (
     validate_output_schema_declaration,
 )
 from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.situation import SituationalCognitionResolution
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
     AuxiliaryPlanActivity,
@@ -190,6 +191,10 @@ class CognitiveAgentClient(Protocol):
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
+
+    async def resolve_situational_cognition(
+        self, session: Any, **kwargs: Any
+    ) -> SituationalCognitionResolution: ...
 
     async def resolve_reflection(
         self, session: Any, **kwargs: Any

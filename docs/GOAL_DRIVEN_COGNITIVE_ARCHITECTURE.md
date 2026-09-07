@@ -1857,12 +1857,16 @@ reasoning. Likewise, `Reflection` may turn supported social surprise/correction 
 bounded future Memory, but may not cache permanent judgments such as "Anna never wants to
 talk about feelings" or mutate Stable Mind/shared policy.
 
-Current source still requires Goal binding for production `SituationRevisionObservation`
-and `CognitiveOpportunity` re-entry. Generalizing that contract to trustworthy Goal-free
-Situation readiness, adding source-specific social/perception adapters, and qualifying
-low-commitment self-initiated speech are **approved target work, not current implementation
-claims**. `ROADMAP.md` owns the implementation order and `STATUS.md` remains the source/evidence
-authority.
+The first production-neutral Goal-free source slice is implemented. Typed
+`SituationRevisionObservation`/`CognitiveOpportunity` may omit Goal IDs only with an exact
+Situation digest and trusted source provenance. The opportunity carries bounded source and
+subject refs, and replaying the same Situation digest creates no cognition. A stateless
+same-Core situational-cognition invocation can only remain silent or author one exact
+context-grounded low-commitment utterance; its schema contains no Capability Work, Goal
+mutation, confirmation, or effect authority, and `slow` Goal-free readiness currently fails
+quiet rather than entering Deep Planner. Concrete social/perception source adapters,
+relational Memory/privacy, salience, feedback, and target qualification remain open.
+`ROADMAP.md` owns their implementation order and `STATUS.md` remains the evidence authority.
 
 ## 5. Continuous cognitive loop
 

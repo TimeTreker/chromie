@@ -73,12 +73,15 @@ except ImportError:  # pragma: no cover
     )
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
+from .situational_cognition import SituationalCognitionResolver
 from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
 try:
     from chromie_contracts.reflection import ReflectionRequest
+    from chromie_contracts.situation import SituationalCognitionRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.reflection import ReflectionRequest
+    from shared.chromie_contracts.situation import SituationalCognitionRequest
 from .schema import HealthResponse
 from .cognitive_core.goal_interpreter import (
     GoalInterpretationRequest,
@@ -332,6 +335,26 @@ fast_planner_resolver = (
     if fast_planner_client is not None
     else None
 )
+situational_cognition_client = (
+    OllamaClient(
+        settings.ollama_url,
+        settings.fast_planner_model,
+        timeout_ms=settings.fast_planner_timeout_ms,
+        purpose="situational_cognition",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.fast_planner_enabled
+    else None
+)
+situational_cognition_resolver = (
+    SituationalCognitionResolver(
+        situational_cognition_client,
+        num_ctx=settings.fast_planner_num_ctx,
+        num_predict=min(settings.fast_planner_num_predict, 768),
+    )
+    if situational_cognition_client is not None
+    else None
+)
 deep_planner_client = (
     OllamaClient(
         settings.ollama_url,
@@ -574,6 +597,16 @@ async def resolve_deep_plan(request: CognitiveWorkRequest):
         result,
         disclosure,
     )
+
+
+@app.post("/situational-cognition")
+async def resolve_situational_cognition(request: SituationalCognitionRequest):
+    if situational_cognition_resolver is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Situational cognition is disabled with Fast cognition",
+        )
+    return await situational_cognition_resolver.resolve(request)
 
 
 @app.post("/reflection")

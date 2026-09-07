@@ -46,9 +46,11 @@ Core -> communication and, when HOW exists, Planner Work
      -> Situation / Goal / Memory-relevant experience -> later cognition
 ```
 
-The non-turn path does not fabricate a UserTurn, Responsibility, or Goal. Current source
-still requires Goal binding for production Situation-driven re-entry; Goal-free social
-readiness is approved target work rather than an implemented MindProfile feature.
+The non-turn path does not fabricate a UserTurn, Responsibility, or Goal. The first
+Goal-free source slice is implemented: an exact trusted Situation revision may create a
+provenance-bound Goal-free `CognitiveOpportunity` and enter stateless same-Core situational
+cognition, which can only remain silent or author one low-commitment speech Activity.
+Concrete social/perception adapters and model/live qualification remain target work.
 
 The profile may shape interpretation, planning, language style, and optional Social
 Attention, but it never authorizes an effect or becomes a parallel semantic lifecycle.

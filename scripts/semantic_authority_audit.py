@@ -25,11 +25,15 @@ def audit() -> dict[str, Any]:
     expected = {
         "orchestrator.handle_routed_text/apply",
         "orchestrator.handle_routed_text/report_only",
+        "orchestrator.runtime.situation.apply_goal_free_situation_opportunity",
     }
     if {str(row.get("entrypoint") or "") for row in matrix} != expected:
-        errors.append("semantic authority matrix must contain only maintained Goal-driven entrypoints")
+        errors.append(
+            "semantic authority matrix must contain maintained routed-turn and "
+            "Goal-free Situation entrypoints"
+        )
     for row in matrix:
-        if row.get("owner") != "goal_driven_runtime":
+        if row.get("owner") != "cognitive_core_runtime":
             errors.append(f"non-canonical semantic owner: {row.get('owner')!r}")
         if row.get("role") not in {"authoritative", "observer"}:
             errors.append(f"invalid maintained semantic role: {row.get('role')!r}")
@@ -76,8 +80,8 @@ def audit() -> dict[str, Any]:
             errors.append(f"legacy Agent production endpoint still exists: {forbidden}")
 
     orchestrator = _read("orchestrator/orchestrator.py")
-    if "_goal_driven_authority_context" not in orchestrator:
-        errors.append("Orchestrator is missing Goal-driven authority context")
+    if "_cognitive_core_authority_context" not in orchestrator:
+        errors.append("Orchestrator is missing Cognitive Core authority context")
     for forbidden in (
         "_legacy_agent_authority_context",
         "process_llm_tts",

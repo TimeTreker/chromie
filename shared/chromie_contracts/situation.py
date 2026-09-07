@@ -231,7 +231,7 @@ class SituationRevisionObservation(BaseModel):
     observation_id: str = Field(min_length=1, max_length=200)
     source_id: str = Field(min_length=1, max_length=160)
     source_revision: int = Field(ge=1)
-    goal_ids: list[str] = Field(min_length=1, max_length=8)
+    goal_ids: list[str] = Field(default_factory=list, max_length=8)
     source_refs: list[str] = Field(min_length=1, max_length=16)
     projection: SituationProjection
 
@@ -334,11 +334,12 @@ class CognitiveOpportunity(BaseModel):
     """Ephemeral readiness signal derived from a meaningful trusted state transition.
 
     This is not durable Mind state and is never an authority over the referenced
-    Goal, Evidence, or next Activity. It carries exact Goal binding plus optional
-    Evidence/Situation provenance only long enough to decide whether no cognition,
-    local handling, Planner fast-pass cognition, or slower/deeper cognition is useful.
-    A Runtime callback never becomes a response/action decision merely by creating
-    this object.
+    Goal, Evidence, Situation, or next Activity. Goal-bound opportunities retain exact
+    Goal provenance. Goal-free Situation opportunities instead retain exact trusted
+    Situation/source provenance; they must never fabricate a Goal or UserTurn merely
+    to wake cognition. The object lives only long enough to decide whether no cognition,
+    local handling, fast cognition, or slower/deeper cognition is useful. A Runtime
+    callback never becomes a response/action decision merely by creating this object.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -346,8 +347,10 @@ class CognitiveOpportunity(BaseModel):
     schema_version: Literal[1] = 1
     opportunity_id: str = Field(min_length=1, max_length=200)
     trigger: CognitiveOpportunityTrigger
-    goal_ids: list[str] = Field(default_factory=list, min_length=1, max_length=8)
+    goal_ids: list[str] = Field(default_factory=list, max_length=8)
     evidence_refs: list[str] = Field(default_factory=list, max_length=16)
+    source_refs: list[str] = Field(default_factory=list, max_length=16)
+    subject_refs: list[str] = Field(default_factory=list, max_length=16)
     reason_codes: list[str] = Field(default_factory=list, max_length=8)
     recommended_cognition: CognitiveOpportunityMode = "slow"
     situation_digest: str = Field(default="", max_length=64)
@@ -361,7 +364,14 @@ class CognitiveOpportunity(BaseModel):
     def normalize_opportunity_text(cls, value: Any) -> str:
         return " ".join(str(value or "").strip().split())
 
-    @field_validator("goal_ids", "evidence_refs", "reason_codes", mode="before")
+    @field_validator(
+        "goal_ids",
+        "evidence_refs",
+        "source_refs",
+        "subject_refs",
+        "reason_codes",
+        mode="before",
+    )
     @classmethod
     def normalize_opportunity_lists(cls, value: Any) -> list[str]:
         if value is None:
@@ -379,6 +389,23 @@ class CognitiveOpportunity(BaseModel):
                 out.append(text)
         return out
 
+    @model_validator(mode="after")
+    def validate_readiness_provenance(self) -> "CognitiveOpportunity":
+        if self.trigger == "situation_revision" and not self.goal_ids:
+            if not self.situation_digest:
+                raise ValueError(
+                    "goal-free Situation opportunity requires situation_digest"
+                )
+            if not self.source_refs:
+                raise ValueError(
+                    "goal-free Situation opportunity requires trusted source_refs"
+                )
+        if not self.goal_ids and not self.evidence_refs and not self.source_refs:
+            raise ValueError(
+                "CognitiveOpportunity requires Goal, Evidence, or Situation provenance"
+            )
+        return self
+
     @classmethod
     def create(
         cls,
@@ -386,6 +413,8 @@ class CognitiveOpportunity(BaseModel):
         trigger: CognitiveOpportunityTrigger,
         goal_ids: list[str],
         evidence_refs: list[str] | None = None,
+        source_refs: list[str] | None = None,
+        subject_refs: list[str] | None = None,
         reason_codes: list[str] | None = None,
         recommended_cognition: CognitiveOpportunityMode = "slow",
         situation_digest: str = "",
@@ -394,6 +423,8 @@ class CognitiveOpportunity(BaseModel):
             "trigger": trigger,
             "goal_ids": goal_ids,
             "evidence_refs": list(evidence_refs or []),
+            "source_refs": list(source_refs or []),
+            "subject_refs": list(subject_refs or []),
             "reason_codes": list(reason_codes or []),
             "recommended_cognition": recommended_cognition,
             "situation_digest": situation_digest,
@@ -412,6 +443,8 @@ class CognitiveOpportunity(BaseModel):
             trigger=trigger,
             goal_ids=goal_ids,
             evidence_refs=list(evidence_refs or []),
+            source_refs=list(source_refs or []),
+            subject_refs=list(subject_refs or []),
             reason_codes=list(reason_codes or []),
             recommended_cognition=recommended_cognition,
             situation_digest=situation_digest,
@@ -419,3 +452,137 @@ class CognitiveOpportunity(BaseModel):
 
     def prompt_projection(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
+
+
+SituationalCognitionDisposition = Literal["silence", "communicate"]
+SituationalSpeechAct = Literal[
+    "greeting",
+    "acknowledge",
+    "inquire",
+    "inform",
+    "respond",
+]
+
+
+class SituationalCommunicativeAct(BaseModel):
+    """One bounded goal-free communicative act authored by the same Cognitive Core.
+
+    The act is deliberately incapable of carrying Capability Work, Goal mutation, or
+    effect authorization. Trusted Runtime binds Situation provenance around this exact
+    model-authored wording; the Host may validate or suppress it but never rewrite it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    activity_id: str = Field(min_length=1, max_length=160)
+    text: str = Field(min_length=1, max_length=600)
+    speech_act: SituationalSpeechAct
+
+    @field_validator("activity_id", "text", mode="before")
+    @classmethod
+    def normalize_activity_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+
+class SituationalCognitionRequest(BaseModel):
+    """One bounded Goal-free cognition invocation from trusted current Situation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    opportunity: CognitiveOpportunity
+    situation: SituationProjection
+    language: str = Field(default="auto", min_length=1, max_length=32)
+    context: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def normalize_language(cls, value: Any) -> str:
+        return " ".join(str(value or "auto").strip().split()) or "auto"
+
+    @model_validator(mode="after")
+    def validate_goal_free_binding(self) -> "SituationalCognitionRequest":
+        if self.opportunity.trigger != "situation_revision":
+            raise ValueError(
+                "Situational cognition requires a situation_revision opportunity"
+            )
+        if self.opportunity.goal_ids:
+            raise ValueError(
+                "Situational cognition is only for Goal-free readiness"
+            )
+        if self.situation.focus_goal_ids:
+            raise ValueError(
+                "Situational cognition Situation must not carry focused Goals"
+            )
+        if self.opportunity.situation_digest != self.situation.digest:
+            raise ValueError(
+                "Situational cognition opportunity must bind the supplied Situation digest"
+            )
+        situation_sources = {item.reference_id for item in self.situation.source_refs}
+        if not self.opportunity.source_refs:
+            raise ValueError(
+                "Situational cognition requires trusted Situation source provenance"
+            )
+        if not set(self.opportunity.source_refs).issubset(situation_sources):
+            raise ValueError(
+                "Situational cognition source_refs must exist in supplied Situation"
+            )
+        situation_subjects = {
+            item.subject_ref for item in self.situation.interpretations
+        }
+        if self.opportunity.subject_refs and not set(
+            self.opportunity.subject_refs
+        ).issubset(situation_subjects):
+            raise ValueError(
+                "Situational cognition subject_refs must exist in supplied Situation"
+            )
+        return self
+
+
+class SituationalCognitionResolution(BaseModel):
+    """Canonical result of one Goal-free situational cognition invocation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    opportunity_id: str = Field(min_length=1, max_length=200)
+    situation_digest: str = Field(min_length=64, max_length=64)
+    source_refs: list[str] = Field(min_length=1, max_length=16)
+    subject_refs: list[str] = Field(default_factory=list, max_length=16)
+    disposition: SituationalCognitionDisposition
+    activity: SituationalCommunicativeAct | None = None
+    reason_summary: str = Field(default="", max_length=600)
+
+    @field_validator(
+        "opportunity_id",
+        "situation_digest",
+        "reason_summary",
+        mode="before",
+    )
+    @classmethod
+    def normalize_resolution_text(cls, value: Any) -> str:
+        return " ".join(str(value or "").strip().split())
+
+    @field_validator("source_refs", "subject_refs", mode="before")
+    @classmethod
+    def normalize_resolution_refs(cls, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("situational cognition refs must be arrays")
+        out: list[str] = []
+        for item in value:
+            text = " ".join(str(item or "").strip().split())
+            if text and text not in out:
+                out.append(text)
+        return out
+
+    @model_validator(mode="after")
+    def validate_disposition_activity(self) -> "SituationalCognitionResolution":
+        if self.disposition == "silence" and self.activity is not None:
+            raise ValueError("silence situational cognition must not carry an activity")
+        if self.disposition == "communicate" and self.activity is None:
+            raise ValueError("communicate situational cognition requires an activity")
+        return self

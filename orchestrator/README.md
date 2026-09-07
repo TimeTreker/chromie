@@ -84,8 +84,10 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
   -> exact plan/request/result/trace join -> per-Goal outcome/Evidence update
-  -> CognitiveOpportunity -> same Planner -> speech / follow-up Work / wait / silence
-  -> validated Planner-authored speech -> TTS -> playback
+  -> Goal-bound CognitiveOpportunity -> same Planner -> speech / follow-up Work / wait / silence
+  -> Goal-free trusted Situation -> CognitiveOpportunity -> same Core situational cognition
+       -> silence or one low-commitment speech Activity; never Capability Work
+  -> validated Core-authored speech -> TTS -> playback
 ```
 
 For an effectful cognitive response, the Orchestrator commits requests only

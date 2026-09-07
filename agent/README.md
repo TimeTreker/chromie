@@ -42,7 +42,11 @@ Evidence                what is true
           ↓
 CognitiveOpportunity    ephemeral readiness trigger when useful
           ↓
-Planner                  0..N Activity changes or none
+Planner                  0..N Activity changes or none (Goal-bound)
+
+Goal-free trusted Situation
+          ↓
+/situational-cognition   same Core; silence or one speech Activity; no Work
 ```
 
 Optional Social Attention decoration is emitted as `auxiliary_activities[]` in the

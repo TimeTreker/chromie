@@ -169,7 +169,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
     assistant.cognitive_runtime = SimpleNamespace(adapter=Adapter(), interaction_ledger=None)
     assistant.session_log = lambda *_args, **_kwargs: None
     assistant.build_context = lambda _sid: {"history": []}
-    assistant._goal_driven_authority_context = lambda context, **_kwargs: context
+    assistant._cognitive_core_authority_context = lambda context, **_kwargs: context
 
     async def get_session():
         return object()

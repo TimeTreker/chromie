@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 
-SemanticAuthorityOwner = Literal["goal_driven_runtime"]
+SemanticAuthorityOwner = Literal["cognitive_core_runtime"]
 SemanticAuthorityRole = Literal["authoritative", "observer"]
 
 
@@ -35,11 +35,11 @@ class SemanticAuthorityClaim(BaseModel):
 
     @model_validator(mode="after")
     def validate_role(self) -> "SemanticAuthorityClaim":
-        if self.owner == "goal_driven_runtime" and self.role not in {
+        if self.owner == "cognitive_core_runtime" and self.role not in {
             "authoritative",
             "observer",
         }:
-            raise ValueError("goal_driven_runtime must be authoritative or observer")
+            raise ValueError("cognitive_core_runtime must be authoritative or observer")
         return self
 
 
@@ -69,7 +69,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
     return [
         {
             "entrypoint": "orchestrator.handle_routed_text/apply",
-            "owner": "goal_driven_runtime",
+            "owner": "cognitive_core_runtime",
             "role": "authoritative",
             "planner_path": (
                 "Goal Interpretation owns WHAT; Goal Association owns persistent Goal "
@@ -82,9 +82,20 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
         },
         {
             "entrypoint": "orchestrator.handle_routed_text/report_only",
-            "owner": "goal_driven_runtime",
+            "owner": "cognitive_core_runtime",
             "role": "observer",
             "planner_path": "same cognitive authority without effect authorization",
             "fallback": "none",
+        },
+        {
+            "entrypoint": "orchestrator.runtime.situation.apply_goal_free_situation_opportunity",
+            "owner": "cognitive_core_runtime",
+            "role": "authoritative",
+            "planner_path": (
+                "Trusted Goal-free Situation may create bounded situational cognition; "
+                "the same Core may choose silence or one Communicative Act while Goal, "
+                "Capability Work, and effect authorization remain unavailable"
+            ),
+            "fallback": "fail_closed_to_silence",
         },
     ]

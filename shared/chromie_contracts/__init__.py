@@ -98,6 +98,11 @@ from .situation import (
     SituationProjection,
     SituationSourceKind,
     SituationSourceRef,
+    SituationalCognitionDisposition,
+    SituationalCognitionRequest,
+    SituationalCognitionResolution,
+    SituationalCommunicativeAct,
+    SituationalSpeechAct,
 )
 from .reflection import (
     ReflectionRequest,
@@ -301,6 +306,11 @@ __all__ = [
     "CognitiveOpportunity",
     "CognitiveOpportunityMode",
     "CognitiveOpportunityTrigger",
+    "SituationalCognitionDisposition",
+    "SituationalCognitionRequest",
+    "SituationalCognitionResolution",
+    "SituationalCommunicativeAct",
+    "SituationalSpeechAct",
     "ReflectionRequest",
     "ReflectionAction",
     "ReflectionMemoryCandidate",

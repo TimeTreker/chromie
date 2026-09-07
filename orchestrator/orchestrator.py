@@ -165,7 +165,12 @@ from shared.chromie_contracts.execution_outcome import (
     aggregate_execution_status,
     goal_completion_qualification_summary,
 )
-from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
+from shared.chromie_contracts.situation import (
+    CognitiveOpportunity,
+    SituationProjection,
+    SituationRevisionObservation,
+    SituationalCognitionRequest,
+)
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -1971,7 +1976,7 @@ class VoiceAssistant:
             "metadata": resolution.metadata,
         }
 
-    def _goal_driven_authority_context(
+    def _cognitive_core_authority_context(
         self,
         context: dict[str, Any],
         *,
@@ -1981,7 +1986,7 @@ class VoiceAssistant:
         return context_with_semantic_authority(
             context,
             SemanticAuthorityClaim(
-                owner="goal_driven_runtime",
+                owner="cognitive_core_runtime",
                 role="observer" if observer else "authoritative",
                 turn_id=session_id,
                 reason=(
@@ -2032,7 +2037,7 @@ class VoiceAssistant:
                 "cognitive_runtime_rejected: reason=missing_admitted_user_turn_envelope",
             )
             return resolution
-        authority_context = self._goal_driven_authority_context(
+        authority_context = self._cognitive_core_authority_context(
             context,
             session_id=session_id,
             observer=self.cognitive_runtime_mode != "apply",
@@ -4116,10 +4121,9 @@ class VoiceAssistant:
             },
         )
         try:
-            # This helper is used only for Planner re-entry after Runtime
-            # Evidence exists. Retain the delivered assistant turn, but do not
-            # reinterpret that communicative delta as replacement executable
-            # Work: the source interaction's outcome still owns reconciliation.
+            # This delivery helper is also used by bounded non-turn cognition.
+            # Retain only speech the Runtime proves was delivered; never reinterpret
+            # that communicative delta as replacement executable Work.
             self.conversation_state.record_interaction_response(
                 session_id,
                 delivered_response,
@@ -4938,6 +4942,178 @@ class VoiceAssistant:
         )
 
 
+    async def _situational_cognition_response(
+        self,
+        *,
+        observation: SituationRevisionObservation,
+        opportunity: CognitiveOpportunity,
+        session_id: str | None,
+        language: str,
+    ) -> InteractionResponse | None:
+        """Invoke the same Cognitive Core with Goal/Work authority removed.
+
+        Runtime supplies trusted current Situation and readiness provenance. The model
+        may choose silence or author one exact low-commitment utterance; it cannot create
+        Goal state, Capability Work, confirmation, or effect authority.
+        """
+
+        if observation.goal_ids or observation.projection.focus_goal_ids:
+            raise ValueError("situational cognition cannot carry Goal bindings")
+        if opportunity.goal_ids:
+            raise ValueError("situational cognition opportunity cannot carry Goals")
+        if opportunity.trigger != "situation_revision":
+            raise ValueError("situational cognition requires situation_revision trigger")
+        if opportunity.situation_digest != observation.projection.digest:
+            self.session_log(
+                session_id,
+                "situational_cognition_rejected: reason=situation_digest_mismatch",
+            )
+            return None
+        if set(opportunity.source_refs) != set(observation.source_refs):
+            self.session_log(
+                session_id,
+                "situational_cognition_rejected: reason=source_provenance_mismatch",
+            )
+            return None
+
+        context = self.build_context(session_id)
+        context["situation"] = observation.projection.prompt_projection()
+        context["cognitive_opportunity"] = opportunity.prompt_projection()
+        interaction_ledger = getattr(
+            getattr(self, "cognitive_runtime", None),
+            "interaction_ledger",
+            None,
+        )
+        ledger_scope = str(
+            session_id
+            or getattr(self, "session_id", "")
+            or context.get("conversation_id")
+            or "goal-free-situation"
+        ).strip()
+        if interaction_ledger is not None:
+            context["interaction_context"] = interaction_ledger.context(
+                ledger_scope,
+                goal_ids=[],
+                turn_id=observation.observation_id,
+            ).model_dump(mode="json")
+
+        request = SituationalCognitionRequest(
+            opportunity=opportunity,
+            situation=observation.projection,
+            language=language or "auto",
+            context=context,
+        )
+        cognition_call = getattr(
+            self.agent_client,
+            "resolve_situational_cognition",
+            None,
+        )
+        if not callable(cognition_call):
+            self.session_log(
+                session_id,
+                "situational_cognition_unavailable: opportunity_id=%s",
+                opportunity.opportunity_id,
+            )
+            return None
+        session = await self.get_http_session()
+        started_ms = now_ms()
+        resolution = await cognition_call(
+            session,
+            request=request,
+            timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+        )
+        record_session_workflow_stage(
+            self,
+            session_id,
+            stage="situational_cognition",
+            started_monotonic_ms=started_ms,
+            finished_monotonic_ms=now_ms(),
+            status="resolved",
+            input_payload={
+                "opportunity_id": opportunity.opportunity_id,
+                "situation_digest": observation.projection.digest,
+                "source_refs": list(observation.source_refs),
+            },
+            output_payload=resolution,
+            errors=[],
+            metadata={
+                "wording_owner": "cognitive_core",
+                "authority_scope": "goal_free_situation",
+            },
+        )
+        if (
+            resolution.opportunity_id != opportunity.opportunity_id
+            or resolution.situation_digest != observation.projection.digest
+            or set(resolution.source_refs) != set(observation.source_refs)
+        ):
+            raise ValueError(
+                "situational cognition result changed trusted readiness provenance"
+            )
+        if resolution.disposition == "silence":
+            self.session_log(
+                session_id,
+                "situational_cognition_silence: opportunity_id=%s",
+                opportunity.opportunity_id,
+            )
+            return None
+        activity = resolution.activity
+        if activity is None:  # guarded by contract; keep runtime fail-closed
+            raise ValueError("communicate situational cognition has no Activity")
+
+        response = InteractionResponse(
+            speech=[
+                InteractionSpeech(
+                    id=f"situational_speech_{activity.activity_id}"[:160],
+                    text=activity.text,
+                    timing="immediate",
+                    style="brief",
+                    priority="normal",
+                    interruptible=True,
+                    metadata={
+                        "source": "situational_cognition",
+                        "wording_owner": "cognitive_core",
+                        "authority_scope": "goal_free_situation",
+                        "truth_stage": "context_grounded",
+                        "speech_act": activity.speech_act,
+                        "delivery_role": "situational_response",
+                        "goal_completion_authority": False,
+                        "cognitive_opportunity_id": opportunity.opportunity_id,
+                        "situation_digest": observation.projection.digest,
+                        "source_situation_refs": list(observation.source_refs),
+                        "subject_refs": list(resolution.subject_refs),
+                        "language": language or "auto",
+                        "wait_for_playback_start": True,
+                        "playback_start_required_for_delivery": True,
+                    },
+                )
+            ],
+            capabilities=[],
+            metadata={
+                "source": "situational_cognition",
+                "authority_scope": "goal_free_situation",
+                "cognitive_opportunity": opportunity.prompt_projection(),
+                "situation": observation.projection.prompt_projection(),
+                "source_situation_refs": list(observation.source_refs),
+                "goal_ids": [],
+                "language": language or "auto",
+            },
+        )
+        if ledger_scope:
+            response, suppressed = suppress_already_delivered_speech(
+                response,
+                (
+                    item.get("text") or ""
+                    for item in self._delivered_turn_speech_events(ledger_scope)
+                ),
+            )
+            if suppressed:
+                self.session_log(
+                    session_id,
+                    "situational_cognition_duplicate_speech_suppressed: count=%s",
+                    suppressed,
+                )
+        return response if response.speech else None
+
     async def _reenter_cognition_for_provider_state(
         self,
         *,
@@ -5432,7 +5608,7 @@ class VoiceAssistant:
             or (canonical_plan.plan_id if canonical_plan is not None else "")
             or f"restored:{normalized_goal_ids[0]}"
         )
-        context = self._goal_driven_authority_context(
+        context = self._cognitive_core_authority_context(
             self.build_context(sid),
             session_id=sid,
             observer=False,

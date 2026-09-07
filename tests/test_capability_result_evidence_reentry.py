@@ -415,7 +415,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
         assistant.session_log = lambda *_args, **_kwargs: None
         assistant.build_context = lambda _sid: {"history": []}
-        assistant._goal_driven_authority_context = (
+        assistant._cognitive_core_authority_context = (
             lambda context, **_kwargs: context
         )
 
@@ -532,7 +532,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
         assistant.session_log = lambda *_args, **_kwargs: None
         assistant.build_context = lambda _sid: {"history": []}
-        assistant._goal_driven_authority_context = (
+        assistant._cognitive_core_authority_context = (
             lambda context, **_kwargs: context
         )
 

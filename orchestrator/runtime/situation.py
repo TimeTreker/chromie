@@ -413,13 +413,87 @@ def derive_situation_revision_opportunity(
         for source_ref in observation.source_refs
         if source_by_ref[source_ref].kind == "evidence"
     ]
+    observation_source_set = set(observation.source_refs)
+    subject_refs = _unique(
+        (
+            item.subject_ref
+            for item in observation.projection.interpretations
+            if observation_source_set.intersection(item.source_refs)
+        ),
+        limit=16,
+    )
     return CognitiveOpportunity.create(
         trigger="situation_revision",
         goal_ids=list(observation.goal_ids),
         evidence_refs=evidence_refs,
+        source_refs=list(observation.source_refs),
+        subject_refs=subject_refs,
         reason_codes=["trusted_situation_revision"],
         recommended_cognition=situation_revision_cognition_mode(observation),
         situation_digest=observation.projection.digest,
+    )
+
+
+async def apply_goal_free_situation_opportunity(
+    host: Any,
+    observation: SituationRevisionObservation,
+    *,
+    previous_situation_digest: str = "",
+    session_id: str | None = None,
+    language: str = "auto",
+) -> str:
+    """Run one bounded Goal-free current-Situation cognition opportunity.
+
+    The typed observation is the trusted ingress boundary. This function never
+    fabricates a UserTurn, Responsibility, or Goal. It derives readiness from an
+    actual Situation delta, invokes the same Cognitive Core through its bounded
+    Goal-free situational-cognition contract, and may deliver only speech.
+    Capability Work and effect authorization are structurally unavailable here.
+    """
+
+    if observation.goal_ids or observation.projection.focus_goal_ids:
+        raise ValueError(
+            "goal-free Situation cognition cannot carry Goal bindings"
+        )
+    opportunity = derive_situation_revision_opportunity(
+        observation,
+        previous_situation_digest=previous_situation_digest,
+    )
+    if opportunity is None:
+        return "no_change"
+    if opportunity.goal_ids:
+        raise ValueError("goal-free Situation opportunity unexpectedly carries Goals")
+    if opportunity.recommended_cognition == "local":
+        if hasattr(host, "session_log"):
+            host.session_log(
+                session_id,
+                "goal_free_situation_cognition_local: opportunity_id=%s",
+                opportunity.opportunity_id,
+            )
+        return "local_only"
+
+    resolver = getattr(host, "_situational_cognition_response", None)
+    if not callable(resolver):
+        return "situational_cognition_unavailable"
+    response = await resolver(
+        observation=observation,
+        opportunity=opportunity,
+        session_id=session_id,
+        language=_normalized(language) or "auto",
+    )
+    if response is None:
+        return "silence"
+    if getattr(response, "capabilities", None):
+        raise ValueError(
+            "goal-free situational cognition must never emit Capability Work"
+        )
+    deliver = getattr(host, "_execute_cognitive_outcome_response", None)
+    if not callable(deliver):
+        return "delivery_unavailable"
+    return await deliver(
+        response,
+        session_id=session_id,
+        detached_delivery=True,
     )
 
 
