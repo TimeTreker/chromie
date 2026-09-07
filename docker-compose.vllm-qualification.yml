@@ -1,0 +1,55 @@
+services:
+  chromie-llm-vllm-qualification:
+    container_name: chromie-llm-vllm-qualification
+    image: ${VLLM_IMAGE:?VLLM_IMAGE must be set to a pinned vLLM image or digest}
+    init: true
+    gpus: all
+    ipc: host
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HOME: /root/.cache/huggingface
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${VLLM_HF_CACHE_DIR:?VLLM_HF_CACHE_DIR must be set}:/root/.cache/huggingface
+    command:
+      - --model
+      - ${VLLM_MODEL:?VLLM_MODEL must be set to the exact Hugging Face model id}
+      - --revision
+      - ${VLLM_MODEL_REVISION:?VLLM_MODEL_REVISION must be set to the exact model revision}
+      - --served-model-name
+      - ${VLLM_SERVED_MODEL_NAME:?VLLM_SERVED_MODEL_NAME must be set}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --max-model-len
+      - ${VLLM_CONTEXT_LENGTH:-32768}
+      - --scheduling-policy
+      - priority
+      - --enable-chunked-prefill
+      - --max-num-batched-tokens
+      - ${VLLM_MAX_NUM_BATCHED_TOKENS:-2048}
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.70}
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:8000/health >/dev/null
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 180s

@@ -15,6 +15,7 @@ from scripts.qualify_inference_provider import (
     _load_goal_interpreter_manifest,
     _candidate_compatible_schema,
     _provider_priority,
+    _provider_priority_semantics,
     _priority_mapping,
     _wire_coordination_satisfies,
 )
@@ -86,6 +87,27 @@ class InferenceProviderQualificationTests(unittest.TestCase):
                 "deliberative": 300,
                 "background": 400,
             },
+        )
+
+    def test_ollama_control_never_fabricates_request_priority(self) -> None:
+        self.assertIsNone(
+            _provider_priority(
+                "ollama", CognitionComputeClass.INTERACTIVE, step=100
+            )
+        )
+        self.assertEqual(
+            _priority_mapping("ollama", step=100),
+            {
+                "realtime": None,
+                "interactive": None,
+                "continuity": None,
+                "deliberative": None,
+                "background": None,
+            },
+        )
+        self.assertEqual(
+            _provider_priority_semantics("ollama"),
+            "unsupported_control_no_priority_sent",
         )
 
     def test_chat_payload_does_not_send_qwen_template_kwargs_to_other_models(self) -> None:

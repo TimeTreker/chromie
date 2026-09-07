@@ -292,10 +292,94 @@ python scripts/qualify_inference_provider.py \
   --output .chromie/acceptance/inference-runtime/sglang-provider.json
 ```
 
-For vLLM, use `--provider vllm`, the exact version/image/model identity, and a server started
-with priority scheduling. The old `scripts/qualify_vllm_provider.py` filename is intentionally
-removed instead of retained as a compatibility wrapper because it encoded a provider-specific
-owner for what is now a provider-neutral qualification contract.
+### Isolated vLLM control candidate
+
+`docker-compose.vllm-qualification.yml` provides the same isolated deployment shape for the vLLM
+control candidate. It remains separate from production Ollama and from the SGLang service, pins
+image/model/revision inputs, uses vLLM `priority` scheduling (lower numeric values first), enables
+chunked prefill, and exposes the batched-token and GPU-memory reservation knobs used by the
+qualification.
+
+```bash
+export VLLM_IMAGE='<pinned-vllm-image-or-image@sha256:digest>'
+export VLLM_MODEL='<exact-huggingface-model-id>'
+export VLLM_MODEL_REVISION='<exact-model-commit>'
+export VLLM_SERVED_MODEL_NAME='chromie-vllm-candidate'
+export VLLM_HF_CACHE_DIR="$HOME/.cache/huggingface"
+export VLLM_CONTEXT_LENGTH=32768
+export VLLM_MAX_NUM_BATCHED_TOKENS=2048
+export VLLM_GPU_MEMORY_UTILIZATION=0.70
+
+docker compose -f docker-compose.vllm-qualification.yml up -d \
+  chromie-llm-vllm-qualification
+```
+
+Then run `scripts/qualify_inference_provider.py --provider vllm` with the exact version/image/model
+identity and the matching scheduler operator record. The old `scripts/qualify_vllm_provider.py`
+filename is intentionally removed instead of retained as a compatibility wrapper because it
+encoded a provider-specific owner for what is now a provider-neutral qualification contract.
+
+### Deployed Ollama saturated-deliberation control
+
+Provider promotion requires a same-workload control from the deployed Ollama runtime. Ollama is
+**not** treated as if it exposed Chromie's request-priority control: the harness sends no
+`priority` field for `--provider ollama`, records every compute-class mapping value as `null`, and
+labels the provider priority semantics `unsupported_control_no_priority_sent`. The control uses
+`--contention-only` so unsupported candidate-only structured-output/overlap gates cannot prevent
+the foreground-under-deep-load timing slice from being retained. A control can therefore retain
+`status=control_observed` when foreground work waits for Deep; that observation is the baseline,
+not a candidate-provider pass.
+
+Run the control against the already deployed model, with TTS alive:
+
+```bash
+python scripts/qualify_inference_provider.py \
+  --provider ollama \
+  --provider-version '<exact-ollama-version>' \
+  --runtime-image "$OLLAMA_IMAGE" \
+  --model '<exact-served-ollama-model-name>' \
+  --model-revision '<exact-ollama-model-digest>' \
+  --cuda-runtime '<exact-container-cuda-runtime>' \
+  --scheduler-config-json '{"num_parallel":1,"context_length":32768,"flash_attention":true,"kv_cache_type":"q8_0"}' \
+  --contention-only \
+  --tts-url ws://127.0.0.1:5000 \
+  --output .chromie/acceptance/inference-runtime/ollama-provider-control.json
+```
+
+The same target model/request budgets should then be run with `--contention-only` on SGLang and
+vLLM when comparing the contention slice. Their full provider-contract runs remain separate
+evidence. Do not compare a warm Ollama control against a cold candidate or change model/context/TTS
+conditions between providers and call the result a scheduler comparison.
+
+### Repeated contention distributions
+
+One contention run is a retained sample, not P95/P99 evidence. Repeat the exact same contention
+configuration into a provider-specific directory, then summarize those immutable samples with
+`scripts/summarize_inference_provider_evidence.py`. The summary reuses Chromie's maintained latency
+distribution implementation and refuses to combine samples whose provider/model revision/runtime
+image/CUDA/accelerator/source revision/scheduler operator record/workload configuration differ.
+It reports p50/p90/p95/p99 for Fast-GI TTFT, Fast-Planner TTFT, the complete foreground window,
+Deep timing, TTS timing, peak VRAM, and GPU utilization. It does not invent a promotion threshold.
+
+Example after choosing and freezing one exact command as `$RUN_CONTENTION`:
+
+```bash
+mkdir -p .chromie/acceptance/inference-runtime/sglang-contention
+for i in $(seq -w 1 20); do
+  $RUN_CONTENTION \
+    --output ".chromie/acceptance/inference-runtime/sglang-contention/trial-${i}.json"
+done
+
+python scripts/summarize_inference_provider_evidence.py \
+  --source .chromie/acceptance/inference-runtime/sglang-contention \
+  --label sglang \
+  --output .chromie/acceptance/inference-runtime/sglang-contention-summary.json
+```
+
+The sample count remains explicit in the report. Twenty samples are shown only as an operator
+example; this document does not redefine the project's latency acceptance policy or claim that a
+particular sample count is statistically sufficient for release. Use the same count and frozen
+workload for each provider comparison.
 
 This phase is provider-level scheduling evidence. The Fast-GI/Fast-Planner strings are
 canaries, not production semantic transactions, and
