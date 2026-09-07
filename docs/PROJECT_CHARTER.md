@@ -629,12 +629,20 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    or execution authority. All effects still use exact registered capabilities,
    Trusted Capability Runtime validation, and provider evidence. Skill retrieval may narrow
    candidates; it must not become phrase-based semantic selection.
-14. **Use less to solve more.** Complexity is a cost, not evidence of progress.
-   Prefer the smallest general solution that correctly solves the real problem.
-   New modules, managers, abstractions, state machines, policy layers, and
-   frameworks must justify their permanent maintenance cost. Prefer fewer
-   concepts, clearer ownership, stronger invariants, and reuse or consolidation
-   of existing logic when those choices remain correct.
+14. **Use less to solve more, but serve the project goal and architectural
+   quality first.** Complexity is a cost, not evidence of progress, and simplicity
+   is a means rather than an end. Prefer the smallest general solution that
+   correctly solves the real problem. New modules, managers, abstractions, state
+   machines, policy layers, and frameworks must justify their permanent
+   maintenance cost. Prefer fewer concepts, clearer ownership, stronger
+   invariants, and reuse or consolidation of existing logic when those choices
+   remain correct. This principle must not be used to preserve an inadequate
+   architecture, collapse genuinely distinct responsibilities, or reject necessary
+   structure merely because it adds concepts or components. When simplicity
+   conflicts with Chromie's main project goal, correctness, or the quality and
+   coherence of the architecture needed to achieve that goal, those higher
+   priorities win; implement the necessary design with the least incidental
+   complexity that preserves its correctness.
 15. **Restore invariants within the intended architecture.** A defect repair
    should identify the violated invariant and restore it with the smallest
    general change that fits the intended architecture. Minimal repair is the
