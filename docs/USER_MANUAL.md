@@ -283,6 +283,42 @@ endpoint.
 The old standalone text scenario suite and text skill sweep commands have been
 removed and should not be used as behavior-quality evidence.
 
+## Interactive PSM Text Console Without Microphone Or ASR
+
+Use `scripts/chromie_psm_live_text_console.py` for interactive development rehearsal of
+ordinary text conversation together with the Persistent Social Mind Situation ingress.
+The console bypasses microphone, VAD, and ASR only; plain terminal text still enters the
+maintained Host boundary through `VoiceAssistant.handle_routed_text(..., channel="text")`.
+It is a development runner, not release or microphone evidence, and it does not inject
+expected Goals, routes, social decisions, or response wording.
+
+Start the normal Agent/LLM/TTS services, then run from the Chromie checkout:
+
+```bash
+conda run -n Chromie python scripts/chromie_psm_live_text_console.py \
+  --no-speaker --no-capabilities
+```
+
+Type normal dialogue directly at the `you>` prompt. To exercise the trusted social-world
+PSM ingress without a camera source, use explicit source-fact commands such as:
+
+```text
+/presence person:dad entered identity=resolved confidence=0.95 audience=person:dad,self:chromie
+/feedback person:anna social.observed_signal turned_away audience=person:anna,self:chromie
+```
+
+These commands stand in only for an already-trusted perception/audience adapter. They do
+not mean "greet Dad", "Anna is angry", "apologize", or any other social behavior rule.
+The Cognitive Core still owns relevance, silence, wording, repair, deliberation,
+relationship experience, and short-lived self-context. Use `/context`, `/memory`, and
+`/ledger` to inspect the retained development state, and `/help` for the complete command
+surface.
+
+Enable `--speaker` when audible TTS is useful. Enable `--capabilities` only when an
+operator intentionally wants ordinary text turns to reach the supervised Soridormi
+Capability Runtime; avoid running another Host that can control the same provider at the
+same time.
+
 ## Automatic bilingual end-to-end audio check
 
 Use Chromie's generated voice for repeatable Chinese and English qualification:
