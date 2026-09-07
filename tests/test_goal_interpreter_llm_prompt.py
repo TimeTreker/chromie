@@ -540,9 +540,23 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         plain_system, _, _ = _payload_message_texts(plain)
         contextual_system, _, _ = _payload_message_texts(contextual)
-        self.assertNotIn("schema exposes prior_assistant_utterance", plain_system)
-        self.assertIn("schema exposes prior_assistant_utterance", contextual_system)
-        self.assertIn("exact accepted assistant utterance", contextual_system)
+        self.assertNotIn("prior assistant utterance is available", plain_system)
+        self.assertIn("prior assistant utterance is available", contextual_system)
+        self.assertIn(
+            "mere availability does not create any Responsibility",
+            contextual_system,
+        )
+        self.assertIn(
+            "whose cited source predicate itself asks to repeat or report",
+            contextual_system,
+        )
+        prior_binding = contextual["format"]["$defs"][
+            "CognitiveResponsibilityProposal"
+        ]["properties"]["binding_items"]["properties"]["prior_assistant_utterance"]
+        self.assertIn(
+            "presence in this schema never creates or implies a Responsibility",
+            prior_binding["description"],
+        )
 
     def test_primary_prompt_does_not_expose_runtime_sid(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
@@ -647,6 +661,25 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("standalone greeting, thanks", system_text)
         self.assertIn("one speech Responsibility", system_text)
         self.assertIn("politeness framing attached to a substantive request", system_text)
+
+    def test_primary_prompt_requires_minimal_nonoverlapping_responsibility_decomposition(
+        self,
+    ) -> None:
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="hello?")
+        )
+        system_text, _, _ = _payload_message_texts(payload)
+        responsibilities = payload["format"]["properties"]["responsibilities"]
+
+        self.assertIn("decomposition is minimal and source-partitioned", system_text)
+        self.assertIn("same source predicate", system_text)
+        self.assertIn("single conversational/social act", system_text)
+        self.assertIn(
+            "distinct non-overlapping positive predicate span",
+            responsibilities["description"],
+        )
+        self.assertIn("Context may resolve", responsibilities["description"])
+        self.assertIn("never creates a new one", responsibilities["description"])
 
     def test_primary_prompt_limits_unfamiliar_name_uncertainty_to_materiality(
         self,

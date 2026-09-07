@@ -2067,12 +2067,16 @@ class OllamaGoalInterpreter:
         prior = _most_recent_assistant_utterance(request.context)
         if prior is not None:
             sections.append(
-                "The schema exposes prior_assistant_utterance for this request. When the "
-                "person asks what Chromie most recently said, create a new speech "
-                "Responsibility to repeat or report the exact accepted assistant "
-                "utterance supplied in Context and bind it as prior_assistant_utterance. "
-                "Never substitute the current user turn, an unavailable marker, a "
-                "paraphrase, or an old Goal relationship."
+                "A prior assistant utterance is available only as bounded Context evidence "
+                "for this request. Its mere availability does not create any Responsibility, "
+                "positive effect, or request to repeat it. Use prior_assistant_utterance only "
+                "inside the single current-turn speech Responsibility whose cited source "
+                "predicate itself asks to repeat or report what Chromie most recently said. "
+                "For every other current turn, omit prior_assistant_utterance entirely and "
+                "do not create a sibling Responsibility about prior dialogue. When the "
+                "current turn really does request a repeat/report, bind the exact accepted "
+                "assistant utterance supplied in Context; never substitute the current user "
+                "turn, an unavailable marker, a paraphrase, or an old Goal relationship."
             )
         return "\n\n".join(sections)
 
@@ -2086,7 +2090,8 @@ class OllamaGoalInterpreter:
         recent_dialogue = _compact_recent_dialogue(request.context)
         prior_assistant_utterance = _most_recent_assistant_utterance(request.context)
         prior_assistant_context = (
-            "Most recent accepted Chromie/assistant utterance JSON:"
+            "Context-only most recent accepted Chromie/assistant utterance JSON "
+            "(evidence, not a current-turn obligation):"
             f"{_bounded_json(prior_assistant_utterance, max_chars=420)}\n"
             if prior_assistant_utterance is not None
             else ""
@@ -2129,6 +2134,17 @@ class OllamaGoalInterpreter:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
         schema["required"] = ["confidence", "responsibilities", "unresolved"]
+        responsibilities_schema = schema.get("properties", {}).get("responsibilities")
+        if isinstance(responsibilities_schema, dict):
+            responsibilities_schema["description"] = (
+                "Return the minimal complete set of independently satisfiable current-turn "
+                "outcomes. Every sibling must own a distinct non-overlapping positive "
+                "predicate span from the authoritative source turn. Context may resolve "
+                "bindings for a current-turn Responsibility but never creates a new one. "
+                "If two candidate outcomes require the same source predicate/span, emit one "
+                "complete Responsibility rather than sibling response/acknowledgement/"
+                "engagement facets."
+            )
         unresolved = schema.get("properties", {}).get("unresolved")
         if isinstance(unresolved, dict):
             unresolved["description"] = (
@@ -2535,8 +2551,13 @@ class OllamaGoalInterpreter:
                     binding_properties["prior_assistant_utterance"] = {
                         "const": prior_assistant_utterance,
                         "description": (
-                            "The exact most recent accepted assistant utterance supplied "
-                            "by bounded dialogue context; never paraphrase or truncate it."
+                            "Optional bounded Context evidence only. Its presence in this "
+                            "schema never creates or implies a Responsibility. Emit this "
+                            "binding only when the current Responsibility's own cited "
+                            "current-turn source predicate asks to repeat or report what "
+                            "Chromie most recently said. Otherwise omit it. When used, copy "
+                            "the exact most recent accepted assistant utterance; never "
+                            "paraphrase or truncate it."
                         ),
                     }
                 else:

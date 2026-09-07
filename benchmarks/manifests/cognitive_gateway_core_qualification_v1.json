@@ -71,6 +71,56 @@
       ]
     },
     {
+      "scenario_id": "basic_social_turn_atomicity",
+      "conversation_scope": "shared",
+      "turns": [
+        {
+          "turn_key": "social_greeting",
+          "text": "hello?",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "require_delivered_speech": true
+          }
+        },
+        {
+          "turn_key": "social_checkin",
+          "text": "how are you doing?",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "require_delivered_speech": true
+          }
+        },
+        {
+          "turn_key": "social_negative_reaction",
+          "text": "no, you are so stupid!",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "require_delivered_speech": true
+          }
+        },
+        {
+          "turn_key": "social_repeat_control",
+          "text": "what did you just say?",
+          "expect": {
+            "gateway_admission": "admit",
+            "core_entered": true,
+            "core_authority": "goal_driven_cognitive_core",
+            "runtime_status": "applied",
+            "require_delivered_speech": true
+          }
+        }
+      ]
+    },
+    {
       "scenario_id": "beijing_weather_tool_continuity",
       "conversation_scope": "shared",
       "turns": [

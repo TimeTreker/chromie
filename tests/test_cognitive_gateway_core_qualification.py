@@ -204,6 +204,22 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
             runtime_event(
                 "sid-self", "conv-self", digest, goal_ids=["goal-self"]
             ),
+            gateway_event("sid-social-1", "conv-social", "admit", digest),
+            runtime_event(
+                "sid-social-1", "conv-social", digest, goal_ids=["goal-social-1"]
+            ),
+            gateway_event("sid-social-2", "conv-social", "admit", digest),
+            runtime_event(
+                "sid-social-2", "conv-social", digest, goal_ids=["goal-social-2"]
+            ),
+            gateway_event("sid-social-3", "conv-social", "admit", digest),
+            runtime_event(
+                "sid-social-3", "conv-social", digest, goal_ids=["goal-social-3"]
+            ),
+            gateway_event("sid-social-4", "conv-social", "admit", digest),
+            runtime_event(
+                "sid-social-4", "conv-social", digest, goal_ids=["goal-social-4"]
+            ),
             gateway_event("sid-weather-1", "conv-weather", "admit", digest),
             runtime_event(
                 "sid-weather-1",
@@ -302,6 +318,27 @@ class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
                             "sid-self",
                             "你好，你是谁呀？",
                         )
+                    ],
+                },
+                {
+                    "scenario_id": "basic_social_turn_atomicity",
+                    "turns": [
+                        retained("social_greeting", "sid-social-1", "hello?"),
+                        retained(
+                            "social_checkin",
+                            "sid-social-2",
+                            "how are you doing?",
+                        ),
+                        retained(
+                            "social_negative_reaction",
+                            "sid-social-3",
+                            "no, you are so stupid!",
+                        ),
+                        retained(
+                            "social_repeat_control",
+                            "sid-social-4",
+                            "what did you just say?",
+                        ),
                     ],
                 },
                 {
