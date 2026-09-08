@@ -48,17 +48,19 @@ class InferenceProviderQualificationTests(unittest.TestCase):
                 self.assertEqual(payload["temperature"], 0)
                 self.assertTrue(payload["stream"])
 
-    def test_chat_payload_uses_ollama_openai_reasoning_control(self) -> None:
-        payload = _chat_payload(
-            "qwen3.5:4b",
-            "prompt",
-            provider="ollama",
-            stream=True,
-            max_tokens=32,
-        )
+    def test_chat_payload_uses_ollama_openai_reasoning_control_for_all_models(self) -> None:
+        for model in ("qwen3.5:4b", "gemma4:12b"):
+            with self.subTest(model=model):
+                payload = _chat_payload(
+                    model,
+                    "prompt",
+                    provider="ollama",
+                    stream=True,
+                    max_tokens=32,
+                )
 
-        self.assertEqual(payload["reasoning_effort"], "none")
-        self.assertNotIn("chat_template_kwargs", payload)
+                self.assertEqual(payload["reasoning_effort"], "none")
+                self.assertNotIn("chat_template_kwargs", payload)
 
     def test_chat_payload_carries_provider_priority_only_when_requested(self) -> None:
         without_priority = _chat_payload(

@@ -285,12 +285,15 @@ not create separate semantic authorities or personalities. The resolved topology
 `workload_config.model_topology`, so a repeated series cannot silently mix one-model and
 multi-model samples.
 
-For Qwen3-family contention canaries, the workload also freezes non-thinking behavior at the
-provider wire boundary instead of assuming one provider's extension works everywhere. SGLang
-and vLLM receive `chat_template_kwargs.enable_thinking=false`; Ollama's OpenAI-compatible
-endpoint receives its supported `reasoning_effort=none`. Reasoning control is retained per
-transaction route under `workload_config.reasoning_control`, so samples with different models or
-reasoning behavior cannot be combined into one latency distribution.
+The synthetic contention workload freezes non-thinking behavior at the provider wire boundary
+instead of letting model-family defaults change the canary. Ollama receives its supported
+`reasoning_effort=none` for every routed model, matching production `think:false`; this matters
+for Gemma as well as Qwen because a short canary must not spend its output budget only on hidden
+reasoning and then appear to have produced no content. SGLang and vLLM Qwen3-family routes receive
+`chat_template_kwargs.enable_thinking=false`; non-Qwen candidate controls remain provider/model
+specific until separately qualified. Reasoning control is retained per transaction route under
+`workload_config.reasoning_control`, so samples with different models or reasoning behavior cannot
+be combined into one latency distribution.
 
 Every retained provider sample carries an explicit base `model_artifact` operator record plus
 the artifact identity of every overridden contention route. Each artifact declares at least

@@ -345,14 +345,18 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 def _reasoning_control_identity(provider: str, model: str) -> dict[str, Any]:
     """Describe the exact wire-level reasoning control used by this workload."""
 
-    if "qwen3" not in model.casefold():
-        return {"mode": "not_applied_non_qwen3"}
+    # Production Ollama model calls are explicitly non-thinking regardless of
+    # model family.  Its OpenAI-compatible endpoint maps reasoning_effort=none
+    # to think=false, so the qualification transport must preserve that same
+    # behavior for Gemma as well as Qwen instead of leaving model defaults on.
     if provider == "ollama":
         return {
             "mode": "disabled",
             "wire_field": "reasoning_effort",
             "wire_value": "none",
         }
+    if "qwen3" not in model.casefold():
+        return {"mode": "not_applied_non_qwen3"}
     if provider in {"sglang", "vllm"}:
         return {
             "mode": "disabled",
