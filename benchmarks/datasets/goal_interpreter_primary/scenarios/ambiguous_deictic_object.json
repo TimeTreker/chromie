@@ -1,0 +1,68 @@
+{
+  "id": "ambiguous_deictic_object",
+  "group": "referent_uncertainty",
+  "source_scenario": "scenarios/general_ability/must_pass/natural_uncertainty_handling/ambiguous_object_bring_that.json",
+  "text": "把那个拿给我。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "bring",
+          "hand",
+          "拿",
+          "递",
+          "交给",
+          "give"
+        ],
+        "required_bindings": {
+          "entity": [
+            "那个"
+          ],
+          "recipient": [
+            "我"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location"
+        ],
+        "source_spans": [
+          "把那个拿给我"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": true
+  },
+  "contrast_set": "ambiguous_deictic_object",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "bring that to me",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t5"
+        },
+        "binding_items": {
+          "entity": "那个",
+          "recipient": "我"
+        }
+      }
+    ],
+    "unresolved": [
+      "which object is indicated"
+    ],
+    "coordination": []
+  }
+}

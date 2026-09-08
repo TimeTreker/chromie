@@ -27,7 +27,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.qualify_inference_provider import (  # noqa: E402
-    DEFAULT_GOAL_INTERPRETER_MANIFEST,
     QualificationFailure,
     _evaluate_goal_interpreter_case_dimensions,
     _git_dirty,
@@ -35,6 +34,8 @@ from scripts.qualify_inference_provider import (  # noqa: E402
     _load_goal_interpreter_manifest,
     _write_json,
 )
+
+DEFAULT_GOAL_INTERPRETER_MANIFEST = ROOT / "benchmarks/manifests/goal_interpreter_primary_v1.json"
 
 DEFAULT_OUTPUT_ROOT = (
     ROOT / ".chromie" / "acceptance" / "model-qualification" / "gi-model-potential"

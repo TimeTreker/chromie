@@ -1,0 +1,64 @@
+{
+  "id": "gaze_three_seconds_en",
+  "group": "binding_dimension_separation",
+  "text": "Look at me for three seconds.",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "gaze",
+          "look",
+          "看"
+        ],
+        "required_bindings": {
+          "entity": [
+            "me"
+          ],
+          "duration": [
+            "three seconds"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location",
+          "count",
+          "time_scope"
+        ],
+        "source_spans": [
+          "Look at me for three seconds"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "person_target_is_not_location",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of person_target_is_not_location",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "look at me",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t5"
+        },
+        "binding_items": {
+          "duration": "three seconds",
+          "entity": "me"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

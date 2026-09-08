@@ -1,0 +1,65 @@
+{
+  "id": "person_target_is_not_location",
+  "group": "binding_dimension_separation",
+  "source_scenario": "scenarios/general_ability/must_pass/stable_capability_grounding/look_at_me_three_seconds.json",
+  "text": "看着我三秒。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "gaze",
+          "look",
+          "看"
+        ],
+        "required_bindings": {
+          "entity": [
+            "我"
+          ],
+          "duration": [
+            "三秒"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location",
+          "count",
+          "time_scope"
+        ],
+        "source_spans": [
+          "看着我三秒"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "person_target_is_not_location",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "look at me",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t4"
+        },
+        "binding_items": {
+          "duration": "三秒",
+          "entity": "我"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

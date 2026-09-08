@@ -1,0 +1,94 @@
+{
+  "id": "speech_body_parallel",
+  "group": "atomic_decomposition_and_coordination",
+  "text": "Say hello while waving.",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "speech",
+        "outcome_contains_any": [
+          "hello",
+          "greet"
+        ],
+        "required_bindings": {},
+        "forbidden_binding_keys": [
+          "duration",
+          "count"
+        ],
+        "source_spans": [
+          "Say hello"
+        ]
+      },
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "wave",
+          "挥"
+        ],
+        "required_bindings": {},
+        "forbidden_binding_keys": [
+          "duration",
+          "count"
+        ],
+        "source_spans": [
+          "waving"
+        ]
+      }
+    ],
+    "coordination": [
+      {
+        "kind": "parallel",
+        "responsibility_indexes": [
+          0,
+          1
+        ]
+      }
+    ],
+    "unresolved": false
+  },
+  "contrast_set": "mixed_vocal_body_parallel",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of mixed_vocal_body_parallel",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "say hello",
+        "output_mode": "speech",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t1"
+        },
+        "binding_items": {}
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "wave",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t3",
+          "source_end_token_ref": "t3"
+        },
+        "binding_items": {}
+      }
+    ],
+    "unresolved": [],
+    "coordination": [
+      {
+        "kind": "parallel",
+        "refs": [
+          "r1",
+          "r2"
+        ]
+      }
+    ]
+  }
+}

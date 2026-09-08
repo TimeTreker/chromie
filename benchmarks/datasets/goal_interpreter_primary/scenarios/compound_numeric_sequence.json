@@ -1,0 +1,150 @@
+{
+  "id": "compound_numeric_sequence",
+  "group": "atomic_decomposition_and_coordination",
+  "source_scenario": "scenarios/general_ability/must_pass/composable_action_planning/compound_walk_nod_turn.json",
+  "text": "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "walk",
+          "locomot",
+          "move",
+          "前进",
+          "行走",
+          "走"
+        ],
+        "required_bindings": {
+          "speed": [
+            0.2
+          ],
+          "duration": [
+            "10 seconds"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "count"
+        ],
+        "source_spans": [
+          "walk ahead at 0.2 speed for 10 seconds"
+        ]
+      },
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "nod",
+          "点头"
+        ],
+        "required_bindings": {
+          "count": [
+            2
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration",
+          "speed",
+          "direction"
+        ],
+        "source_spans": [
+          "nod your head twice"
+        ]
+      },
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "turn",
+          "转"
+        ],
+        "required_bindings": {
+          "direction": [
+            "left"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration",
+          "speed",
+          "count"
+        ],
+        "source_spans": [
+          "turn left"
+        ]
+      }
+    ],
+    "coordination": [
+      {
+        "kind": "sequence",
+        "responsibility_indexes": [
+          0,
+          1,
+          2
+        ]
+      }
+    ],
+    "unresolved": false
+  },
+  "contrast_set": "compound_numeric_sequence",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "walk ahead",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t9"
+        },
+        "binding_items": {
+          "duration": "10 seconds",
+          "speed": 0.2
+        }
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "nod your head",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t12",
+          "source_end_token_ref": "t15"
+        },
+        "binding_items": {
+          "count": 2
+        }
+      },
+      {
+        "local_ref": "r3",
+        "outcome": "turn left",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t18",
+          "source_end_token_ref": "t19"
+        },
+        "binding_items": {
+          "direction": "left"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": [
+      {
+        "kind": "sequence",
+        "refs": [
+          "r1",
+          "r2",
+          "r3"
+        ]
+      }
+    ]
+  }
+}

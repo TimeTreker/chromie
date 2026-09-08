@@ -55,6 +55,8 @@ services:
       - ${SGLANG_CHUNKED_PREFILL_SIZE:-2048}
       - --schedule-conservativeness
       - ${SGLANG_SCHEDULE_CONSERVATIVENESS:-1.0}
+      - --max-total-tokens
+      - ${SGLANG_MAX_TOTAL_TOKENS:-32768}
       - --max-running-requests
       - ${SGLANG_MAX_RUNNING_REQUESTS:-2}
       - --max-mamba-cache-size

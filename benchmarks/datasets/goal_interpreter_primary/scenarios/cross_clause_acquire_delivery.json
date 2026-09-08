@@ -1,0 +1,75 @@
+{
+  "id": "cross_clause_acquire_delivery",
+  "group": "binding_dimension_separation",
+  "text": "Hello, I am thirsty and there is a bottle of water 50 meters ahead of you. Can you bring it to me? Thank you.",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "bring",
+          "deliver"
+        ],
+        "required_bindings": {
+          "direction": [
+            "ahead",
+            "ahead of you"
+          ],
+          "distance": [
+            "50 meters"
+          ],
+          "entity": [
+            "a bottle of water",
+            "bottle of water"
+          ],
+          "recipient": [
+            "me"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "count",
+          "duration",
+          "location",
+          "speed",
+          "time_scope"
+        ],
+        "source_spans": [
+          "Can you bring it to me"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "cross_clause_acquire_delivery",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "bring the bottle of water to me",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t18",
+          "source_end_token_ref": "t23"
+        },
+        "binding_items": {
+          "direction": "ahead",
+          "distance": "50 meters",
+          "entity": "a bottle of water",
+          "recipient": "me"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

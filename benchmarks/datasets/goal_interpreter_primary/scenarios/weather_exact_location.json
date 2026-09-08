@@ -1,0 +1,64 @@
+{
+  "id": "weather_exact_location",
+  "group": "temporal_and_location_binding",
+  "text": "今晚重庆会不会下雨哦？",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "information",
+        "outcome_contains_any": [
+          "rain",
+          "下雨",
+          "降雨"
+        ],
+        "required_bindings": {
+          "location": [
+            "重庆"
+          ],
+          "time_scope": [
+            "今晚"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "time",
+          "duration",
+          "threshold"
+        ],
+        "source_spans": [
+          "今晚重庆会不会下雨"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "weather_exact_location",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "determine whether it will rain in 重庆 tonight",
+        "output_mode": "information",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t8"
+        },
+        "binding_items": {
+          "location": "重庆",
+          "time_scope": "今晚"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

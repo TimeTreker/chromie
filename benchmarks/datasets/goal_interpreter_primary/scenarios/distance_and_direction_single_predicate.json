@@ -1,0 +1,67 @@
+{
+  "id": "distance_and_direction_single_predicate",
+  "group": "binding_dimension_separation",
+  "text": "Walk forward five meters.",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "walk",
+          "locomot",
+          "move",
+          "前进",
+          "行走",
+          "走"
+        ],
+        "required_bindings": {
+          "direction": [
+            "forward"
+          ],
+          "distance": [
+            "five meters"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration",
+          "count",
+          "location"
+        ],
+        "source_spans": [
+          "Walk forward five meters"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "distance_and_direction_single_predicate",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "walk forward",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t3"
+        },
+        "binding_items": {
+          "direction": "forward",
+          "distance": "five meters"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

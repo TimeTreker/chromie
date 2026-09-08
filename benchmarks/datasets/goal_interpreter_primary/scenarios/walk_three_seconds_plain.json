@@ -1,0 +1,68 @@
+{
+  "id": "walk_three_seconds_plain",
+  "group": "spoken_language_robustness",
+  "text": "往前走三秒。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "walk",
+          "locomot",
+          "move",
+          "前进",
+          "行走",
+          "走"
+        ],
+        "required_bindings": {
+          "direction": [
+            "往前",
+            "forward",
+            "ahead"
+          ],
+          "duration": [
+            "三秒"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "count",
+          "time_scope"
+        ],
+        "source_spans": [
+          "往前走三秒"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "polite_walk_three_seconds",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of polite_walk_three_seconds",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "walk forward",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t4"
+        },
+        "binding_items": {
+          "direction": "往前",
+          "duration": "三秒"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

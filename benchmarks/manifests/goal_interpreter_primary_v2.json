@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "qualification_id": "chromie.goal_interpreter.primary.v2",
+  "authority": "goal_interpretation",
+  "claim_boundary": "Primary GI regression screen plus explicit complete-transaction runner evidence when declared; not full role, Planner, Agent, voice or release qualification.",
+  "training_eligible": false,
+  "coverage": {
+    "design": "16 retained primary failures plus 8 minimal surface/language/modality contrasts, keeping whole contrast sets in frozen_test",
+    "cases": 24,
+    "languages": {
+      "zh-CN": 15,
+      "en-US": 9
+    },
+    "gaps": [
+      "Goal lifecycle/continuity",
+      "all ten modalities",
+      "all binding dimensions",
+      "complete deployment qualification"
+    ],
+    "oracle_changes": [
+      "retain measured units and source-language pronouns",
+      "unfamiliar name alone does not require unresolved",
+      "minimal source predicate spans checked for every responsibility"
+    ],
+    "review": "assistant authored and reviewed; not independent"
+  },
+  "case_files": [
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/ambiguous_bare_referent.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/ambiguous_deictic_object.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/approximate_walk_duration.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/blink_twice_plain.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/compound_numeric_sequence.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/cross_clause_acquire_delivery.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/deictic_bring_en.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/distance_and_direction_single_predicate.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/distance_five_meters_zh.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/filler_blink_twice.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/gaze_three_seconds_en.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/mixed_language_nod_twice.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/mixed_vocal_body_parallel.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/named_lookup_en.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/parallel_gaze_blink.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/person_target_is_not_location.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/polite_walk_three_seconds.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/speech_and_body_siblings.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/speech_body_parallel.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/walk_three_seconds_plain.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/weather_exact_location.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/weather_explicit_threshold.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/weather_threshold_en.json",
+    "benchmarks/datasets/goal_interpreter_primary/scenarios/weather_tomorrow_location.json"
+  ]
+}

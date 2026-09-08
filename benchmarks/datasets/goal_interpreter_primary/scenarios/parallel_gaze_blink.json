@@ -1,0 +1,114 @@
+{
+  "id": "parallel_gaze_blink",
+  "group": "atomic_decomposition_and_coordination",
+  "source_scenario": "scenarios/general_ability/must_pass/composable_action_planning/look_while_blinking_twice.json",
+  "text": "看着我三秒，同时眨两下眼睛。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "gaze",
+          "look",
+          "看"
+        ],
+        "required_bindings": {
+          "entity": [
+            "我"
+          ],
+          "duration": [
+            "三秒"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location",
+          "count",
+          "time_scope"
+        ],
+        "source_spans": [
+          "看着我三秒"
+        ]
+      },
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "blink",
+          "眨"
+        ],
+        "required_bindings": {
+          "count": [
+            2
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration",
+          "entity",
+          "location"
+        ],
+        "source_spans": [
+          "眨两下眼睛"
+        ]
+      }
+    ],
+    "coordination": [
+      {
+        "kind": "parallel",
+        "responsibility_indexes": [
+          0,
+          1
+        ]
+      }
+    ],
+    "unresolved": false
+  },
+  "contrast_set": "parallel_gaze_blink",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "look at me",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t4"
+        },
+        "binding_items": {
+          "duration": "三秒",
+          "entity": "我"
+        }
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "blink twice",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t8",
+          "source_end_token_ref": "t12"
+        },
+        "binding_items": {
+          "count": 2
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": [
+      {
+        "kind": "parallel",
+        "refs": [
+          "r1",
+          "r2"
+        ]
+      }
+    ]
+  }
+}

@@ -1,8 +1,119 @@
 # Chromie Latest Handoff
 
-## 2026-09-09 active handoff — RTX 4090 Laptop SGLang resource boundary
+## 2026-09-09 active handoff — engineering repairs and paired runtime evidence
 
-This section is the active continuation and supersedes the historical handoff below. Resume from
+Repository `TimeTreker/chromie`, `main`; pre-delivery baseline
+`759b5e062cd43ac2cb919e4ca587a682ca673eee`. Resume from the delivery commit containing
+this handoff and checkpoint. The owner authorized commit/push to remote main. No runtime
+promotion is included: the current candidate shows additional behavior differences, while
+existing common LLM deficiencies remain separate future model/LoRA work.
+
+### Delivered changes and causal boundary
+
+GI schema order contradicted its prompt: an ordered decoder could not emit duration after
+direction. Sorting the existing property set after context additions fixes that mechanical
+contract without changing authority, meaning or model. The v2 primary screen fixes oracle
+unit/ambiguity rules, source-span coverage, reference validation, raw retention and completion
+integrity. The 32K shared-cache limit is now a supported qualification Compose input instead
+of an ignored private override. Earlier checkpoint history was consolidated to restore its
+reviewed documentation limit. Detailed actual module I/O, root causes, containment and
+remaining inference differences are in
+[accelerator evidence](docs/ACCELERATOR_LATENCY_EVIDENCE.md#2026-09-09-contract-repair-and-responsiveness-comparison).
+
+Full gate passed **2302 tests, 268 subtests, 20 legacy Agent tests**, two warnings, plus
+140 benchmark tests. Focused set before the final completion-integrity test: 115 tests and
+18 subtests. General-ability Level A: robust intent 8/8, composable actions 5/5. All 1496
+existing daily-life references still validate. Final documentation/policy/diff checks follow
+these documentation updates; no live voice or release closure is implied by local tests.
+
+### Paired evidence
+
+Root: `/home/chromie/github/chromie/.chromie/acceptance/sglang-contract-comparison-20260909/`.
+Both complete 24-case GI runs and both three-trial contention series used one source digest:
+`fc0d5a0b425f759af72c34fa2bfda0eb1555dbc38e5e1992940331eb63227cb9`.
+Later changes add the already-tested cache cap to Compose, defensive grader checks/tests,
+and documented post-batch accepted-variation review; original inference reports are intact.
+The primary message, ordered schema, temperature and budget match per case. Production
+`interpret_goal` made 24 SGLang and 32 Ollama calls: eight Ollama cases invoked source-only
+Deep because unresolved was present. Confidence alone never triggers Deep.
+
+Key artifacts:
+
+- `decoder-order-proof.json`, `order-fixed/`: compiled grammar proof and full old-screen rerun.
+- `complete-sglang/`, `complete-ollama/`: frozen manifest, raw requests/responses, Schema/Host
+  outcomes, per-case decisions, latency, runtime identity and stable-source summaries.
+- `paired-packet-audit.json`, `post-batch-rubric-review.json`: matching inputs and explicit
+  post-batch review. Mechanical counts remain 2/24 SGLang and 4/24 Ollama; nominal passes
+  still require semantic review. No candidate response was repaired.
+- `fast-sglang/`, `fast-ollama/`, their `*-summary.json` and `*-command.json`: three trials
+  each. Fast GI median 91.294 ms vs 27473.888 ms; complete foreground window 279.363 ms vs
+  27686.594 ms. These are synthetic workload timings, not full voice-turn measurements.
+- `ollama-identity.json`, `ollama-loaded-cuda.txt`: exact Ollama identity; its command recorded
+  CUDA unknown, and supplemental process maps prove loaded runtime 13.0.96.
+- `maintained-compose-command.json`, `full-gate.log`, `focused.log`, `abilities.log`,
+  `daily-life-reference-validation.log`: rendered resource command and source validation.
+
+The current checked-in v2 scenario tree is
+`7b233a6647f20c7c453e6606f70cfeae47f6a592067e8c5c93735d17f2b156b5`;
+the inference snapshot tree was
+`b434ce62a0b7a55eb08c1a7b1af0d9da1090c6691cccc2d29af31bc264c80c67`.
+The difference accepts valid transfer wording/direction translation and is explicitly reviewed
+without rewriting or silently rescoring old reports. Historical v1 is unchanged.
+
+```text
+SGLang: 0.5.19 / CUDA 12.9.2
+image digest: sha256:59e11312666e1c5c155210ea335589b91daa0d70848521b390b93b1b1e8fb0ef
+model: cyankiwi/Qwen3.5-4B-AWQ-4bit
+revision: ef85d23bebaba87b3c4672ba11c449c79dbdb23e
+upstream Qwen revision: unpublished/unknown
+weights SHA256: 902477edf53bc6768bd1f212dd1866856fd5a0627def06887780c95900ffb013
+format: compressed-tensors AWQ W4A16 group32, BF16 activation/KV
+served name: chromie-qwen35-4b-awq-sglang
+context/shared cache: 32768/32768; requests: 2; Mamba: 10; fraction: .80
+prefill graphs: disabled; decode graphs retained
+Ollama: 0.33.2; qwen3.5:4b; GGUF Q4_K_M; one request; q8_0 KV
+image digest: sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
+model digest: 2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd
+TTS: ws://127.0.0.1:5000, chromie_mixed, generated audio not played
+```
+
+### Operational state and resume
+
+Ollama and TTS are healthy/running; SGLang is stopped to avoid concurrent model residency.
+Agent was not started/promoted. SGLang's stopped container/cache and all private raw evidence
+remain local. Different quantized artifacts mean this is a deployment comparison, not isolated
+scheduler-versus-model causality. Do not hide concrete modality/sequence regressions, and do
+not require all common model errors to disappear before further engineering work.
+
+For resource reproduction, use the existing `docker-compose.sglang-qualification.yml` with
+the pinned image/model/revision above, warmed resident TTS, prefill disabled, .80 fraction,
+32K context, two requests, ten Mamba slots and `SGLANG_MAX_TOTAL_TOKENS=32768`.
+Stop/unload Ollama first; do not run both full model pools on this laptop. The rendered
+`maintained-compose-command.json` records the exact argument set. No `.env.runtime` edit
+was made. `AGENT_LLM_PROVIDER` remains Ollama; the existing validation bridge is opt-in.
+
+The local `compare_gi.py` and `run_series.py` reproduce the retained comparison; they are
+private instrumentation, not new maintained APIs. Use fresh output directories and capture
+new runtime identities; do not overwrite this run. The maintained primary screen is
+`scripts/qualify_inference_provider.py --goal-interpreter-probe`, defaulting to the v2 manifest.
+It is primary-only; the full comparison used the production GI entrypoint separately.
+
+Bundles (local, not uploaded by Git):
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_060924.tar.gz`,
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_061242.tar.gz`,
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_061915.tar.gz`,
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_062218.tar.gz`.
+Earlier resource/OOM artifacts remain under
+`.chromie/acceptance/sglang-laptop-quantized-20260909/`; its bundle paths are retained in
+accelerator evidence. Copy private artifacts explicitly when changing machines.
+
+Next is owner-directed model/artifact work, followed by matched no-degradation checks and
+actual Agent/Host foreground, speech and interruption continuity before changing defaults.
+Keep all canonical validation and supervised physical-evidence boundaries intact.
+
+## Historical 2026-09-09 BF16 laptop resource boundary
+
+This historical section is superseded by the active quantized handoff above. Its original base was
 repository `TimeTreker/chromie`, branch `main`, base
 `7f9d1c019b5be97c664a3a26d88ae00f1376b459` plus the checkpoint patch that contains this text.
 

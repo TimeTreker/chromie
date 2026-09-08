@@ -1,0 +1,58 @@
+{
+  "id": "mixed_language_nod_twice",
+  "group": "spoken_language_robustness",
+  "source_scenario": "scenarios/general_ability/must_pass/robust_intent_understanding/mixed_language_nod_twice.json",
+  "text": "请 nod 两下。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "nod",
+          "点头"
+        ],
+        "required_bindings": {
+          "count": [
+            2
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration"
+        ],
+        "source_spans": [
+          "请 nod 两下"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "mixed_language_nod_twice",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "nod twice",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t3"
+        },
+        "binding_items": {
+          "count": 2
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

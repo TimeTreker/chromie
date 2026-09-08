@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
+import json
+
+import httpx
 import time
 import unittest
 from unittest.mock import patch
@@ -25,6 +29,7 @@ from scripts.qualify_inference_provider import (
     _provider_priority_semantics,
     _priority_mapping,
     _qualify_foreground_under_deep_load,
+    _qualify_goal_interpreter,
     _resolve_contention_model_topology,
     _sglang_native_control_url,
     _wire_coordination_satisfies,
@@ -308,8 +313,8 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         case_ids = {str(case["id"]) for case in manifest["cases"]}
         groups = {str(case["group"]) for case in manifest["cases"]}
 
-        self.assertEqual(manifest["qualification_id"], "chromie.goal_interpreter.primary.v1")
-        self.assertEqual(len(manifest["cases"]), 16)
+        self.assertEqual(manifest["qualification_id"], "chromie.goal_interpreter.primary.v2")
+        self.assertEqual(len(manifest["cases"]), 24)
         self.assertGreaterEqual(len(groups), 6)
         self.assertTrue(
             {
@@ -322,6 +327,22 @@ class InferenceProviderQualificationTests(unittest.TestCase):
             }.issubset(case_ids)
         )
         self.assertEqual(len(manifest["manifest_sha256"]), 64)
+
+    def test_current_oracle_preserves_units_and_rejects_trailing_source_particles(self) -> None:
+        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        cases = {case["id"]: case for case in manifest["cases"]}
+        threshold = cases["weather_explicit_threshold"]
+        self.assertEqual(threshold["expected"]["responsibilities"][0]["required_bindings"]["threshold"],
+                         ["30度"])
+        self.assertFalse(cases["ambiguous_bare_referent"]["expected"]["unresolved"])
+        case = cases["filler_blink_twice"]
+        wire = copy.deepcopy(case["reference_wire_output"])
+        decision = {"responsibilities": wire["responsibilities"], "unresolved": []}
+        self.assertEqual(_evaluate_goal_interpreter_case(case, decision, wire), [])
+        wire["responsibilities"][0]["source_evidence"]["source_end_token_ref"] = "t12"
+        verdict = _evaluate_goal_interpreter_case_dimensions(case, decision, wire)
+        self.assertTrue(verdict["source_evidence"])
+        self.assertEqual(verdict["bindings"], [])
 
     def test_binding_match_normalizes_text_and_integral_float(self) -> None:
         self.assertTrue(_binding_value_matches("  Tonight  ", ["tonight"]))
@@ -353,12 +374,14 @@ class InferenceProviderQualificationTests(unittest.TestCase):
                 {
                     "local_ref": "gaze",
                     "output_mode": "body_action",
-                    "binding_items": {"entity": "我", "duration": 3},
+                    "binding_items": {"entity": "我", "duration": "三秒"},
+                    "source_evidence": {"source_start_token_ref": "t0", "source_end_token_ref": "t4"},
                 },
                 {
                     "local_ref": "blink",
                     "output_mode": "body_action",
                     "binding_items": {"count": 2},
+                    "source_evidence": {"source_start_token_ref": "t8", "source_end_token_ref": "t12"},
                 },
             ],
             "coordination": [{"kind": "parallel", "refs": ["gaze", "blink"]}],
@@ -377,6 +400,30 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         self.assertTrue(any("contains forbidden binding count" in error for error in errors))
         self.assertTrue(dimensions["bindings"])
         self.assertEqual(dimensions["outcome"], [])
+
+
+class GoalInterpreterCompletionIntegrityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_retains_passing_content_and_rejects_truncated_valid_json(self) -> None:
+        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        case = next(c for c in manifest["cases"] if c["id"] == "distance_and_direction_single_predicate")
+        one_case = {**manifest, "cases": [case]}
+        content = json.dumps(case["reference_wire_output"])
+        for finish_reason in ("stop", "length"):
+            with self.subTest(finish_reason=finish_reason):
+                def respond(request: httpx.Request) -> httpx.Response:
+                    return httpx.Response(200, json={
+                        "choices": [{"finish_reason": finish_reason,
+                                     "message": {"content": content}}],
+                    })
+                async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+                    with patch("scripts.qualify_inference_provider._load_goal_interpreter_manifest",
+                               return_value=one_case):
+                        result = await _qualify_goal_interpreter(
+                            client, "http://qualification.invalid/chat/completions",
+                            provider="sglang", model="qwen3-test",
+                        )
+                self.assertEqual(result["passed"], int(finish_reason == "stop"))
+                self.assertEqual(result["cases"][0]["raw_content"], content)
 
 
 class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):

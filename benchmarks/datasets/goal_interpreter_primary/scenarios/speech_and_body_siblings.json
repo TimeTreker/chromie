@@ -1,0 +1,103 @@
+{
+  "id": "speech_and_body_siblings",
+  "group": "modality_separation",
+  "source_scenario": "scenarios/general_ability/must_pass/multi_goal_daily_life/nod_and_say_hello.json",
+  "text": "点两下头，再跟我说声你好。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "nod",
+          "点头"
+        ],
+        "required_bindings": {
+          "count": [
+            2
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration"
+        ],
+        "source_spans": [
+          "点两下头"
+        ]
+      },
+      {
+        "output_mode": "speech",
+        "outcome_contains_any": [
+          "greet",
+          "hello",
+          "say",
+          "你好",
+          "问候"
+        ],
+        "required_bindings": {},
+        "forbidden_binding_keys": [
+          "count",
+          "duration"
+        ],
+        "source_spans": [
+          "跟我说声你好"
+        ]
+      }
+    ],
+    "coordination": [
+      {
+        "kind": "sequence",
+        "responsibility_indexes": [
+          0,
+          1
+        ]
+      }
+    ],
+    "unresolved": false
+  },
+  "contrast_set": "speech_and_body_siblings",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "nod twice",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t3"
+        },
+        "binding_items": {
+          "count": 2
+        }
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "say hello to me",
+        "output_mode": "speech",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t6",
+          "source_end_token_ref": "t11"
+        },
+        "binding_items": {}
+      }
+    ],
+    "unresolved": [],
+    "coordination": [
+      {
+        "kind": "sequence",
+        "refs": [
+          "r1",
+          "r2"
+        ]
+      }
+    ]
+  }
+}

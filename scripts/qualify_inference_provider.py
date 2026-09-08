@@ -33,7 +33,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 DEFAULT_GOAL_INTERPRETER_MANIFEST = (
-    ROOT / "benchmarks" / "manifests" / "goal_interpreter_primary_v1.json"
+    ROOT / "benchmarks" / "manifests" / "goal_interpreter_primary_v2.json"
 )
 
 from agent.app.inference_compute import CognitionComputeClass, compute_rank  # noqa: E402
@@ -861,13 +861,33 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
         ) from exc
     if not isinstance(payload, dict):
         raise QualificationFailure("Goal Interpreter qualification manifest is not an object")
-    if payload.get("schema_version") != 1:
+    version = payload.get("schema_version")
+    if version not in (1, 2):
         raise QualificationFailure(
-            "Goal Interpreter qualification manifest schema_version must be 1"
+            "Goal Interpreter qualification manifest schema_version must be 1 or 2"
         )
     qualification_id = payload.get("qualification_id")
     if not isinstance(qualification_id, str) or not qualification_id.strip():
         raise QualificationFailure("Goal Interpreter qualification manifest lacks qualification_id")
+    if version == 2:
+        paths = payload.get("case_files")
+        if (
+            not isinstance(paths, list) or not paths
+            or any(not isinstance(path, str) or not path for path in paths)
+            or len(set(paths)) != len(paths)
+        ):
+            raise QualificationFailure("Goal Interpreter case_files must be unique paths")
+        cases_from_files = []
+        tree = hashlib.sha256()
+        for name in sorted(paths):
+            path = (ROOT / str(name)).resolve()
+            if ROOT not in path.parents or not path.is_file():
+                raise QualificationFailure(f"Goal Interpreter case file is missing: {name}")
+            raw = path.read_bytes()
+            tree.update(str(path.relative_to(ROOT)).encode() + b"\0" + raw + b"\0")
+            cases_from_files.append(json.loads(raw))
+        payload["cases"] = cases_from_files
+        payload["scenario_tree_sha256"] = tree.hexdigest()
     cases = payload.get("cases")
     if not isinstance(cases, list) or len(cases) < 10:
         raise QualificationFailure(
@@ -930,6 +950,13 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
                     f"Goal Interpreter case {case_id} responsibility "
                     f"{responsibility_index} has invalid required_bindings"
                 )
+            spans = responsibility.get("source_spans")
+            if version == 2 and (
+                not isinstance(spans, list) or not spans
+                or any(not isinstance(span, str) or not span or span not in case["text"]
+                       for span in spans)
+            ):
+                raise QualificationFailure(f"Goal Interpreter case {case_id} has invalid source spans")
             forbidden = responsibility.get("forbidden_binding_keys", [])
             if not isinstance(forbidden, list) or any(
                 not isinstance(value, str) or not value for value in forbidden
@@ -988,6 +1015,25 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
         raise QualificationFailure(
             "Goal Interpreter qualification manifest requires at least 5 semantic groups"
         )
+    if version == 2:
+        from jsonschema import Draft202012Validator
+        from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
+        from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://reference-validation.invalid", model="reference", timeout_ms=60000
+        )
+        for case in cases:
+            request = GoalInterpretationRequest(
+                text=case["text"], language=case["language"], context=case.get("context", {})
+            )
+            wire = case.get("reference_wire_output")
+            schema = interpreter.build_interpretation_payload(request)["format"]
+            Draft202012Validator(schema).validate(wire)
+            decision = interpreter._validate_interpretation_content(request, json.dumps(wire))
+            errors = _evaluate_goal_interpreter_case(case, decision.model_dump(mode="json"), wire)
+            if errors:
+                raise QualificationFailure(f"Reference {case['id']} fails its oracle: {errors}")
     payload["manifest_path"] = str(resolved.relative_to(ROOT))
     payload["manifest_sha256"] = hashlib.sha256(resolved.read_bytes()).hexdigest()
     return payload
@@ -1016,6 +1062,7 @@ def _evaluate_goal_interpreter_case_dimensions(
         "outcome": [],
         "output_mode": [],
         "bindings": [],
+        "source_evidence": [],
         "coordination": [],
         "unresolved": [],
     }
@@ -1036,6 +1083,7 @@ def _evaluate_goal_interpreter_case_dimensions(
         dimensions["outcome"] = None
         dimensions["output_mode"] = None
         dimensions["bindings"] = None
+        dimensions["source_evidence"] = None
     if len(wire_responsibilities) != len(expected_responsibilities):
         add_error(
             "decomposition",
@@ -1045,6 +1093,7 @@ def _evaluate_goal_interpreter_case_dimensions(
         dimensions["outcome"] = None
         dimensions["output_mode"] = None
         dimensions["bindings"] = None
+        dimensions["source_evidence"] = None
         dimensions["coordination"] = None
     if not dimensions["decomposition"]:
         for index, (actual, wire, wanted) in enumerate(
@@ -1060,6 +1109,7 @@ def _evaluate_goal_interpreter_case_dimensions(
                 dimensions["outcome"] = None
                 dimensions["output_mode"] = None
                 dimensions["bindings"] = None
+                dimensions["source_evidence"] = None
                 continue
             if actual.get("output_mode") != wanted["output_mode"]:
                 add_error(
@@ -1077,6 +1127,17 @@ def _evaluate_goal_interpreter_case_dimensions(
                     f"responsibility {index} outcome {actual.get('outcome')!r} lacks "
                     f"one of {wanted['outcome_contains_any']!r}",
                 )
+            if "source_spans" in wanted:
+                from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+
+                tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
+                evidence = wire.get("source_evidence") or {}
+                first = tokens.get(evidence.get("source_start_token_ref"))
+                last = tokens.get(evidence.get("source_end_token_ref"))
+                surface = case["text"][first["start"]:last["end"]] if first and last else None
+                if surface not in wanted["source_spans"]:
+                    add_error("source_evidence", f"responsibility {index} source span {surface!r} "
+                              f"not in {wanted['source_spans']!r}")
             bindings = wire.get("binding_items", actual.get("bindings", {}))
             if not isinstance(bindings, dict):
                 add_error("bindings", f"responsibility {index} bindings are not an object")
@@ -1191,6 +1252,7 @@ async def _qualify_goal_interpreter(
         request = GoalInterpretationRequest(
             text=str(case["text"]),
             language=str(case["language"]),
+            context=case.get("context", {}),
         )
         ollama_payload = interpreter.build_interpretation_payload(request)
         provider_schema, removed_schema_keywords = _candidate_compatible_schema(ollama_payload["format"])
@@ -1233,6 +1295,7 @@ async def _qualify_goal_interpreter(
             "finish_reason": choice.get("finish_reason"),
             "reasoning_seen": reasoning_seen,
             "usage": provider_data.get("usage"),
+            "raw_content": content,
             "schema_translation": {
                 "removed": removed_schema_keywords,
                 "reason": "qualification wire schema omits uniqueItems; canonical Host revalidation remains authoritative",
@@ -1241,6 +1304,8 @@ async def _qualify_goal_interpreter(
             "status": "fail",
         }
         try:
+            if choice.get("finish_reason") != "stop":
+                raise QualificationFailure("Goal Interpreter completion did not stop normally")
             wire_payload = json.loads(content)
             if not isinstance(wire_payload, dict):
                 raise QualificationFailure("Goal Interpreter wire output is not an object")
@@ -1271,6 +1336,7 @@ async def _qualify_goal_interpreter(
         "qualification_id": manifest["qualification_id"],
         "manifest_path": manifest["manifest_path"],
         "manifest_sha256": manifest["manifest_sha256"],
+        "scenario_tree_sha256": manifest.get("scenario_tree_sha256"),
         "groups": sorted({str(case["group"]) for case in cases}),
         "prompt_contract": "current_checkout_primary_goal_interpretation",
         "cases": results,

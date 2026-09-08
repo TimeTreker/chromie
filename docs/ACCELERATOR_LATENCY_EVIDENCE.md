@@ -270,6 +270,211 @@ measured candidate because, with TTS pre-warmed, it retains materially more runt
 exclusive-GPU setup while leaving enough static budget for weights plus the two-request state/KV
 pools. It is not accepted until the exact contention workload completes with TTS alive.
 
+### 2026-09-09 contract repair and responsiveness comparison
+
+The owner requested fixing non-model engineering defects first; model inference quality is
+separate future optimization/LoRA work. Migration is judged by foreground interaction latency
+and no additional degradation, not by requiring all model roles to become perfect.
+
+Baseline revision: `759b5e062cd43ac2cb919e4ca587a682ca673eee`. The paired 24-case GI runs and
+three-trial responsiveness series froze the same worktree digest:
+`fc0d5a0b425f759af72c34fa2bfda0eb1555dbc38e5e1992940331eb63227cb9`.
+Artifacts: `.chromie/acceptance/sglang-contract-comparison-20260909/`.
+
+**Confirmed non-model defects and repairs:**
+
+| Actual episode / boundary owner | Input → actual output → required output | Diagnosis and repair |
+| --- | --- | --- |
+| GI schema builder | Prompt requires lexicographic keys; schema placed duration before direction → SGLang grammar rejects direction then duration → decoder must admit the instructed order | `contract_or_schema`: sort binding properties after adding optional context fields, in Fast and Deep. Decoder proof rejects the old order and accepts the fixed order; no meaning, authority or allowed value changed. |
+| Primary-screen oracle | Canonical unit-bearing scalar `30度` → oracle demanded 30; unfamiliar name → unconditional ambiguity; minimal source span → not scored | `scenario_or_oracle`: v2 owns separate scenario files, validates references through Schema/Host, preserves units/pronouns, contrasts ambiguity, and checks spans. Historic v1 stays unchanged. |
+| Primary-screen result retention | Valid JSON with a length stop, or a mechanically passing result → incomplete termination could pass / passing raw text omitted | `context_or_harness`: require normal stop and retain raw text for both verdicts. Unalignable dimensions are unscored, not false passes. |
+| SGLang cache sizing | Default auto-sized shared cache with resident TTS → later CosyVoice allocation OOM → retain speech headroom | `runtime_or_provider`: maintained Compose now exposes positive `SGLANG_MAX_TOTAL_TOKENS`, default 32768, instead of relying on an ignored private override. Exact AWQ profile proved two simultaneous 16K inputs and speech coexistence. |
+
+The schema-order repair alone changed the historical 16-case mechanical result from 2 to
+3 passes; remaining raw semantic errors persisted. This is not evidence that the schema
+repair resolves all model errors. The source regression covers both depth variants and
+context-dependent bindings; compiled decoder evidence is in `decoder-order-proof.json`.
+
+The v2 coverage is 16 retained regressions plus eight minimal contrasts, 15 Chinese and nine
+English, six semantic groups, all in `frozen_test`, `training_eligible=false`. It deliberately
+omits broad Goal lifecycle/continuity and all-role deployment coverage. The inference corpus
+snapshot tree is `b434ce62a0b7a55eb08c1a7b1af0d9da1090c6691cccc2d29af31bc264c80c67`.
+Post-batch rubric review additionally accepts “give” as a transfer synonym and source-entailed
+“forward” as direction, while keeping measured distance verbatim. Final checked-in tree:
+`7b233a6647f20c7c453e6606f70cfeae47f6a592067e8c5c93735d17f2b156b5`.
+Original reports are unchanged; separate `post-batch-rubric-review.json` records the review,
+which changes neither aggregate pass count. No reference was supplied to model inference.
+
+Actual complete GI workflow for every case:
+
+```text
+immutable turn/context → production prompt + sorted dynamic Schema → provider call
+  → production parser / deterministic Host
+      ├─ rejected primary → explicit unavailable; no semantic retry
+      ├─ accepted and unresolved → one fresh source-only Deep call → Host
+      └─ accepted and resolved → final GI decision
+  → offline schema and semantic rubric review; no GA/Planner/robot execution
+```
+
+Both providers received identical primary messages, ordered compatible schema, temperature
+and output budget (`paired-packet-audit.json`). SGLang made 24 calls; Ollama made 32,
+including eight real unresolved-triggered Deep calls. Confidence alone does not trigger Deep.
+SGLang's two deictic cases incorrectly emitted no unresolved meaning, so Deep was not invoked.
+All 48 case results were retained and reviewed, including mechanical passes. Correct Host
+rejection of translated durations remains intact; other structurally valid wrong meanings
+remain model-output findings, not secretly repaired Host results.
+
+Mechanical scores are 2/24 SGLang and 4/24 Ollama. They are diagnostic, not complete semantic
+correctness scores. Some nominal passes contain extra/misbound fields (e.g. entity=nod or
+addressee=me), so manual findings remain visible. There are concrete cross-deployment changes:
+SGLang loses speech modality/sequence for nod-then-hello where Ollama retained them; SGLang
+better preserves decomposition in some compound requests where Ollama merges effects.
+Thus this is not a monotonic no-degradation replacement. Do not attribute these differences
+specifically to SGLang scheduling: quantized artifacts differ, and backend-versus-quantization
+numerical causality has not been isolated. No further prompt tuning was performed.
+
+Responsiveness series, three observations per deployment; report medians and ranges, not
+release percentiles. These are synthetic foreground requests under active Deep, not full
+production GI/Planner payloads or microphone-to-speaker latency:
+
+| Measurement | SGLang AWQ | Maintained Ollama Q4_K_M |
+| --- | --- | --- |
+| Fast GI first delta | 91.294 ms (49.384–99.433) | 27,473.888 ms (23,220.009–29,466.147) |
+| Fast Planner first delta | 85.856 ms (49.872–88.760) | 64.209 ms (63.804–77.632), after Deep finishes |
+| Complete foreground window | 279.363 ms (201.700–285.325) | 27,686.594 ms (23,414.119–29,654.988) |
+| TTS first audio under tested workload | 3,530.734 ms (2,865.601–4,266.149) | 6,493.102 ms (4,557.640–7,112.504) |
+
+SGLang retained Deep through both presentation leases and resumed it in 3/3 trials; Fast
+completed before Deep in 3/3 versus 0/3 for Ollama's one-slot maintained profile. SGLang
+replacement TTS first audio was 4,125.545 ms median (4,009.098–5,220.764). Ollama has no
+matching pause/revocation primitive in this control, so no paired interruption claim is made.
+Audio was generated but not played. The improvement is queue responsiveness, not every module
+running faster. Agent end-to-end, actual audible interruption and physical evidence remain open.
+
+SGLang retains the pinned AWQ/image identity from the resource continuation below. Ollama is
+0.33.2, image digest `sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2`,
+model `qwen3.5:4b` digest `2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd`,
+GGUF Q4_K_M, one request slot, q8_0 KV. Its series command recorded CUDA as unknown;
+subsequent process-map evidence binds the actually loaded `libcudart.so.13.0.96` in
+`ollama-loaded-cuda.txt`. This supplemental observation does not rewrite original metadata.
+
+Bundles: `/home/chromie/Downloads/chromie_debug_bundle_20260909_060924.tar.gz` (order-fix
+cohort), `..._061242.tar.gz` (SGLang v2), `..._061915.tar.gz` (Ollama v2), and
+`..._062218.tar.gz` (completed responsiveness series). Full paths are in each artifact log.
+
+Delivery changes no maintained provider/model default and adds no semantic repair. Ollama
+remains selected because the current whole-deployment candidate has additional behavior
+regressions, not because all existing model deficiencies must first be solved. SGLang stays
+available as a bounded candidate for the owner's later model work. Qualification-only
+`SGLANG_*` inputs grow 14→15; maintained runtime inventory stays 381 keys, four modes,
+one public boolean, zero aliases. No new current document or architectural term was added.
+
+### 2026-09-09 quantized laptop continuation
+
+Source baseline: `759b5e062cd43ac2cb919e4ca587a682ca673eee`; only the checkpoint
+consolidation was tracked during runtime trials. Private evidence directory:
+`.chromie/acceptance/sglang-laptop-quantized-20260909/`.
+
+The initial canonical gate failed because the checkpoint contained 246 lines against its
+reviewed 160-line limit. Consolidating superseded checkpoint history into the existing handoff
+restored the gate without changing behavior or weakening the check: 2,298 pytest tests,
+262 subtests, and 20 legacy Agent tests passed, with two warnings. All pinned test dependency
+versions matched; `source-validation.json` and `source-gate-after-checkpoint.log` retain the
+exact tested worktree scope. Focused provider/configuration tests passed 19 tests and four
+subtests. This is Level A source evidence, not a clean committed revision or target closure.
+
+Resource experiments preserved two requests, 32K per-request context, priority/preemption,
+and resident CosyVoice. FP8 used the existing pinned upstream Qwen3.5-4B checkpoint; AWQ used
+`cyankiwi/Qwen3.5-4B-AWQ-4bit` revision `ef85d23bebaba87b3c4672ba11c449c79dbdb23e`.
+The latter is compressed-tensors W4A16, symmetric group size 32, with BF16 activations/KV;
+its upstream source revision is unpublished/unknown. The 4,040,461,440-byte weights matched
+SHA-256 `902477edf53bc6768bd1f212dd1866856fd5a0627def06887780c95900ffb013`.
+SGLang image digest is
+`lmsysorg/sglang@sha256:59e11312666e1c5c155210ea335589b91daa0d70848521b390b93b1b1e8fb0ef`
+(version 0.5.19, CUDA 12.9.2). No remote model code was enabled.
+
+| Profile at static fraction .80 | Weights | Shared KV tokens | Observed result |
+| --- | --- | --- | --- |
+| Online FP8, prefill graphs | 5.93 GB | 58,917 | Provider pass; TTS warmup OOM |
+| Online FP8, prefill disabled | 5.93 GB | 32,768 | Provider pass; TTS warmup OOM |
+| AWQ, prefill disabled | 3.90 GB | 65,536 | Two simultaneous 32,000-token inputs plus 64 outputs each succeeded; provider pass; TTS warmup OOM |
+
+The actual failure workflow is the same in these three trials:
+
+| Boundary / owner | Authoritative input and actual output | Expected / downstream result |
+| --- | --- | --- |
+| SGLang resource sizing | Resident TTS, configured cache/request budget; engine starts and allocates cache | Correct startup, insufficient proof of transient voice headroom |
+| Provider harness | Structured output, streams, concurrent/cancel/foreground workload; pass | Inference contract satisfied for this synthetic workload |
+| Protocol-5 harness | Opens TTS warmup websocket before Deep or any lease | Correct ordering; first audio required before progressing |
+| CosyVoice GPU allocation | Warmup synthesis with SGLang resident; 20 MiB allocation fails, free memory only 6.31 / 22.31 / 10.31 MiB respectively | First failed execution boundary; worker fails instead of producing audio |
+| Harness containment | Receives worker error; records qualification failure | Correct fail-closed; Deep, lease/revocation and GI cohort not invoked |
+
+The root resource problem is insufficient shared-GPU transient headroom; an idle healthy
+container and an allocated KV pool do not prove speech coexistence. No evidence supports
+changing semantic prompts, validators, or lease ordering for these failures. Stop SGLang
+and successfully synthesize TTS before the next sizing trial. The next AWQ trial caps the
+shared cache at 32,768 tokens, freeing 1 GB without changing cognitive authority. This
+reduces simultaneous full-context capacity and must be qualified as such.
+
+Failure bundles (one per stopped failed trial), retained outside Git:
+
+- `/home/chromie/Downloads/chromie_debug_bundle_20260909_012302.tar.gz` (FP8 first).
+- `/home/chromie/Downloads/chromie_debug_bundle_20260909_012719.tar.gz` (FP8 32K).
+- `/home/chromie/Downloads/chromie_debug_bundle_20260909_014054.tar.gz` (AWQ 64K).
+
+These are automated real-GPU/service observations. No microphone, audible playback,
+physical robot, repeated latency distribution, or Agent end-to-end proof is claimed.
+
+The AWQ 32K shared-cache trial subsequently passed two simultaneous 16,000-token inputs
+with 64 generated tokens each, the full provider canary, and one protocol-5 round-trip.
+The same artifact/image used `max_running_requests=2`, Mamba slots 10, fraction .80,
+32K context, and disabled prefill graphs. It supports the demonstrated two 16K requests;
+two simultaneous full 32K contexts are not claimed. The memory-budget change alters only
+SGLang allocation, leaving more transient room for CosyVoice; it does not move semantic authority.
+
+`protocol5-awq32.json` retains first-audio baseline 2,722.82 ms, interruption speech
+2,864.89 ms, replacement speech 3,763.01 ms; synthetic Fast GI/Planner TTFTs were
+58.47/57.96 ms and interruption-to-GI-first-delta 59.24 ms. Deep stayed active before
+both pauses, emitted zero content deltas during each held lease, and resumed afterward.
+This is one sample, not P95/P99, production lease policy, real interruption, or audible playback.
+
+The frozen primary GI screen then completed all 16 cases on the unchanged runtime and
+worktree hash `b41f1d680d954871b8c3d0953817606cee215affa594f50a39913a8dfdee7263`.
+Manifest SHA-256:
+`f13c1c14e73bcb1c64092bbf1e959b21cac870b907a9c63ec13b00c8c290bbfe`.
+Mechanical result: **2/16 pass, 14/16 fail**. All requests returned HTTP 200 and stopped
+without output truncation. Actual prompts were roughly 3.4–3.9K tokens; the separate
+capacity probe supplies the larger-context evidence. All request/response pairs, including
+passes, are retained in `gi-transactions/`; `gi-adjudication.json` reviews every case.
+
+| GI workflow boundary / owner | Observed contract and output | Judgment |
+| --- | --- | --- |
+| Canonical payload builder | Exact immutable utterance, token refs, empty bounded context, WHAT prompt/schema; temperature 0, thinking off, 512 output tokens | No expected answers supplied to model; required binding rules present |
+| SGLang primary invocation | One complete JSON response per case; missing/mistyped dimensions, translated provenance, wrong modality and lost coordination | Earliest observed semantic failure is the primary transaction output; prompt/template/quantization/model causality not isolated |
+| Canonical Host validator | Rejects two translated duration cases; accepts other structurally valid DTOs | Correct duration containment; acceptance does not establish all semantic grounding |
+| Frozen oracle | Reports 12 additional failures and two passes | Incomplete oracle; manual review required |
+| Downstream authorities | Deep, GA, Planner, Agent/Host execution not invoked by this primary-only screen | No complete semantic-transaction or robot behavior claim |
+
+Failures cluster around typed binding coverage/grounding, modality/coordination, and
+referent interpretation. Reject this artifact for GI promotion under the unchanged transaction.
+Do not infer that quantization caused these errors without a controlled contrast. No prompt,
+Schema, DTO, Host semantic repair, or maintained model profile was changed.
+
+Manual review additionally found that mechanical pass `filler_blink_twice` cites trailing
+particle `吧` (t12), contrary to the minimal-source-span contract. The threshold oracle expects
+numeric 30 where the canonical unit-preserving contract requires `30度`; the unfamiliar-name
+oracle demands unresolved unconditionally although unfamiliarity alone is not ambiguity.
+Both failing cases have independent defects, so neither observation rescues this candidate.
+These oracle gaps must be reconciled and frozen as a new cohort before another optimization;
+do not silently edit or retrospectively rescore this run. Uniform confidence .5 is retained as diagnostic output. Production GI delegates only on
+unresolved meaning; confidence alone does not trigger Deep.
+
+One bundle was collected after the complete semantic cohort:
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_014915.tar.gz`.
+Next work is canonical oracle reconciliation and complete semantic transaction qualification,
+then repeated resource/lease proof and Agent end-to-end qualification on a qualified candidate.
+Ollama remains the maintained control. Current-target evidence closure remains open.
+
 ### RTX 4090 Laptop shared-GPU sizing checkpoint
 
 The 2026-09-09 RTX 4090 Laptop probe keeps scheduler/runtime qualification separate from semantic

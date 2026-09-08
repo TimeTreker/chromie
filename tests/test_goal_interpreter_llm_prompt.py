@@ -1006,6 +1006,23 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(sibling_schema).validate(sibling_decision)
 
+    def test_binding_decoder_order_matches_prompt_in_both_depths_and_contexts(self) -> None:
+        interpreter = self._interpreter()
+        for context in ({}, {"history": [{"role": "assistant", "text": "Hello there."}]}):
+            request = GoalInterpretationRequest(text="what did you say?", context=context)
+            for build in (interpreter.build_interpretation_payload,
+                          interpreter.build_deep_interpretation_payload):
+                with self.subTest(context=context, build=build.__name__):
+                    properties = build(request)["format"]["$defs"][
+                        "CognitiveResponsibilityProposal"
+                    ]["properties"]["binding_items"]["properties"]
+                    self.assertEqual(list(properties), sorted(properties))
+                    self.assertLess(list(properties).index("direction"),
+                                    list(properties).index("duration"))
+                    if context:
+                        self.assertEqual(properties["prior_assistant_utterance"]["const"],
+                                         "Hello there.")
+
     def test_primary_schema_exposes_sparse_typed_binding_items(self) -> None:
         text = "perform one action with two material modifiers"
         schema = self._interpreter().build_interpretation_payload(

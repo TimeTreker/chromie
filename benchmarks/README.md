@@ -667,3 +667,22 @@ python -m benchmarks.mining promote candidate.json \
 The mining workflow never commits changes, edits Prompts, changes personality or
 Runtime policy, selects an action from a phrase, or grants release qualification.
 See [Benchmark Scenario Migration and Continuous Review](../docs/BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md).
+
+## Primary Goal Interpretation screen
+
+`scripts/qualify_inference_provider.py --goal-interpreter-probe` defaults to
+`manifests/goal_interpreter_primary_v2.json`. Its 24 individual scenario files under
+`datasets/goal_interpreter_primary/scenarios/` retain the earlier 16 probes plus eight
+surface/language/modality contrasts. The loader validates each reference through the
+canonical dynamic Schema and Host and binds a deterministic scenario-tree digest.
+References stay out of inference packets. The grader checks exact minimal source spans,
+preserves measured units and supplied pronouns, and does not require uncertainty merely
+because a proper name is unfamiliar. Decomposition failures leave unalignable dimensions
+unscored. Raw content is retained for passes and failures; truncated completions fail.
+
+This bounded primary screen does not qualify all GI states or the complete Agent. The
+separate raw-model-potential probe retains the historical v1 oracle and its noncanonical
+contract; its results must not be substituted for production qualification. Historical v1
+artifacts and scores remain unchanged. Full GI comparisons must invoke `interpret_goal`,
+including only its source-based Deep delegation when unresolved meaning is present, and
+retain each actual request/response and canonical validation result.

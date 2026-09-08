@@ -1,0 +1,71 @@
+{
+  "id": "weather_threshold_en",
+  "group": "binding_dimension_separation",
+  "text": "Will Chongqing exceed 30 degrees today?",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "information",
+        "outcome_contains_any": [
+          "temperature",
+          "exceed",
+          "above",
+          "超过",
+          "气温",
+          "温度"
+        ],
+        "required_bindings": {
+          "location": [
+            "Chongqing"
+          ],
+          "time_scope": [
+            "today"
+          ],
+          "threshold": [
+            "30 degrees"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "time",
+          "duration",
+          "count"
+        ],
+        "source_spans": [
+          "Will Chongqing exceed 30 degrees today"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "weather_explicit_threshold",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of weather_explicit_threshold",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "determine whether the temperature in Chongqing exceeds 30 degrees today",
+        "output_mode": "information",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t5"
+        },
+        "binding_items": {
+          "location": "Chongqing",
+          "threshold": "30 degrees",
+          "time_scope": "today"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

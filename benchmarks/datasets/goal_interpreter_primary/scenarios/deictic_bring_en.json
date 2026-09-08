@@ -1,0 +1,67 @@
+{
+  "id": "deictic_bring_en",
+  "group": "referent_uncertainty",
+  "text": "Bring that to me.",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "bring",
+          "hand",
+          "拿",
+          "递",
+          "交给",
+          "give"
+        ],
+        "required_bindings": {
+          "entity": [
+            "that"
+          ],
+          "recipient": [
+            "me"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location"
+        ],
+        "source_spans": [
+          "Bring that to me"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": true
+  },
+  "contrast_set": "ambiguous_deictic_object",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of ambiguous_deictic_object",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "bring that to me",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t3"
+        },
+        "binding_items": {
+          "entity": "that",
+          "recipient": "me"
+        }
+      }
+    ],
+    "unresolved": [
+      "which object is indicated"
+    ],
+    "coordination": []
+  }
+}

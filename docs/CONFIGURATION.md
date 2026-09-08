@@ -109,6 +109,7 @@ All risky or incomplete execution paths are default-off.
 | `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. `sglang` is an explicit candidate runtime; it does not change GI/Planner semantic authority or promote a model. |
 | `AGENT_SGLANG_URL` | `http://chromie-llm-sglang-qualification:30000/v1` | OpenAI-compatible SGLang base URL used only when `AGENT_LLM_PROVIDER=sglang`. |
 | `AGENT_SGLANG_PRIORITY_STEP` | `100` | Operational translation step from provider-neutral compute ranks to SGLang request priority. |
+| `SGLANG_MAX_TOTAL_TOKENS` | `32768` | Qualification Compose shared KV-cache cap, independent of per-request context. Positive token count parsed by SGLang; the laptop AWQ profile retains two request slots and proves two 16K inputs. Larger caps require renewed speech-headroom qualification. |
 | `ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED` | `0` | Host-owned shared-GPU speech arbitration. When enabled, real Vocal delivery pauses the qualified SGLang engine and foreground input revokes that pause before GI. |
 | `ORCH_PRESENTATION_COMPUTE_CONTROL_URL` | `http://127.0.0.1:30000` | SGLang native control root for Host `pause_generation` / `continue_generation`; never a semantic endpoint. |
 | `ORCH_PRESENTATION_COMPUTE_LEASE_MODE` | `in_place` | Qualified engine pause mode retaining running request/KV state. |
@@ -1018,3 +1019,12 @@ The capability catalog is an ability source, not the semantic brain. Goal Interp
 must not emit executable IDs or route labels from it; Planner receives the applicable live
 catalog/schema projections for semantic Capability grounding. No maintained `rules_only`,
 `hybrid`, or `llm_only` route mode exists on the current Goal-driven path.
+
+The SGLang qualification cache cap is owned by `docker-compose.sglang-qualification.yml`.
+It addresses reproduced shared-GPU TTS allocation failures; startup health alone is not
+sufficient. The 32K default is the measured AWQ laptop budget, not a guarantee for every
+model/GPU. Keep the two-request priority/preemption contract and qualify the exact model,
+context, cache cap and resident speech service together. An explicit higher cap is supported
+only with retained headroom/contention evidence. This numeric setting adds no compatibility
+alias or boolean mode; it remains with the existing qualification service until that service
+is promoted or removed. Production Ollama configuration is unchanged.

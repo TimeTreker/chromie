@@ -1,0 +1,69 @@
+{
+  "id": "distance_five_meters_zh",
+  "group": "binding_dimension_separation",
+  "text": "往前走五米。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "walk",
+          "locomot",
+          "move",
+          "前进",
+          "行走",
+          "走"
+        ],
+        "required_bindings": {
+          "direction": [
+            "往前",
+            "forward",
+            "ahead"
+          ],
+          "distance": [
+            "五米"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration",
+          "count",
+          "location"
+        ],
+        "source_spans": [
+          "往前走五米"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "distance_and_direction_single_predicate",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of distance_and_direction_single_predicate",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "walk forward",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t4"
+        },
+        "binding_items": {
+          "direction": "往前",
+          "distance": "五米"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

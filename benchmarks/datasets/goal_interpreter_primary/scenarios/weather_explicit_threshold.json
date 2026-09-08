@@ -1,0 +1,71 @@
+{
+  "id": "weather_explicit_threshold",
+  "group": "binding_dimension_separation",
+  "text": "重庆今天会超过30度吗？",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "information",
+        "outcome_contains_any": [
+          "temperature",
+          "exceed",
+          "above",
+          "超过",
+          "气温",
+          "温度"
+        ],
+        "required_bindings": {
+          "location": [
+            "重庆"
+          ],
+          "time_scope": [
+            "今天"
+          ],
+          "threshold": [
+            "30度"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "time",
+          "duration",
+          "count"
+        ],
+        "source_spans": [
+          "重庆今天会超过30度"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "weather_explicit_threshold",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "determine whether 重庆 temperature exceeds 30度 today",
+        "output_mode": "information",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t8"
+        },
+        "binding_items": {
+          "location": "重庆",
+          "threshold": "30度",
+          "time_scope": "今天"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

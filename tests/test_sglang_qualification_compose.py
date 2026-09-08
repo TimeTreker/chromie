@@ -86,3 +86,15 @@ def test_sglang_priority_scheduling_uses_fcfs_base_queue_and_preemption() -> Non
     assert command[command.index("--cuda-graph-backend-prefill") + 1] == (
         "${SGLANG_CUDA_GRAPH_BACKEND_PREFILL:-breakable}"
     )
+
+
+def test_sglang_shared_cache_is_bounded_independently_of_request_context() -> None:
+    command = _service()["command"]
+    assert isinstance(command, list)
+    assert command[command.index("--max-total-tokens") + 1] == (
+        "${SGLANG_MAX_TOTAL_TOKENS:-32768}"
+    )
+    assert "--context-length" in command
+    assert command[command.index("--max-running-requests") + 1] == (
+        "${SGLANG_MAX_RUNNING_REQUESTS:-2}"
+    )

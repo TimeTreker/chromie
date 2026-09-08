@@ -1,0 +1,96 @@
+{
+  "id": "mixed_vocal_body_parallel",
+  "group": "atomic_decomposition_and_coordination",
+  "text": "Sing a short song while waving.",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "singing",
+        "outcome_contains_any": [
+          "sing",
+          "song",
+          "唱",
+          "歌"
+        ],
+        "required_bindings": {},
+        "forbidden_binding_keys": [
+          "duration",
+          "count"
+        ],
+        "source_spans": [
+          "Sing a short song"
+        ]
+      },
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "wave",
+          "挥"
+        ],
+        "required_bindings": {},
+        "forbidden_binding_keys": [
+          "duration",
+          "count"
+        ],
+        "source_spans": [
+          "waving"
+        ]
+      }
+    ],
+    "coordination": [
+      {
+        "kind": "parallel",
+        "responsibility_indexes": [
+          0,
+          1
+        ]
+      }
+    ],
+    "unresolved": false
+  },
+  "contrast_set": "mixed_vocal_body_parallel",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "sing a short song",
+        "output_mode": "singing",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t3"
+        },
+        "binding_items": {}
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "wave",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t5",
+          "source_end_token_ref": "t5"
+        },
+        "binding_items": {}
+      }
+    ],
+    "unresolved": [],
+    "coordination": [
+      {
+        "kind": "parallel",
+        "refs": [
+          "r1",
+          "r2"
+        ]
+      }
+    ]
+  }
+}

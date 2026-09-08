@@ -2529,36 +2529,6 @@ class OllamaGoalInterpreter:
                             "explanation."
                         ),
                     }
-                binding_properties = {
-                    name: binding_properties[name]
-                    for name in (
-                        "actor",
-                        "addressee",
-                        "experiencer",
-                        "entity",
-                        "item",
-                        "proposition",
-                        "preference",
-                        "attribute",
-                        "time",
-                        "time_scope",
-                        "duration",
-                        "speed",
-                        "quantity",
-                        "count",
-                        "distance",
-                        "direction",
-                        "location",
-                        "severity",
-                        "intensity",
-                        "magnitude",
-                        "threshold",
-                        "subtype",
-                        "polarity",
-                        "comparison",
-                        "recipient",
-                    )
-                }
                 bindings["properties"] = binding_properties
                 if prior_assistant_utterance is not None:
                     binding_properties["prior_assistant_utterance"] = {
@@ -2575,6 +2545,10 @@ class OllamaGoalInterpreter:
                     }
                 else:
                     binding_properties.pop("prior_assistant_utterance", None)
+                # Ordered decoders must agree with the prompt's serialization rule.
+                # Sort after optional context bindings have been added.
+                binding_properties = dict(sorted(binding_properties.items()))
+                bindings["properties"] = binding_properties
                 responsibility_properties = responsibility.get("properties", {})
                 responsibility_properties.pop("bindings", None)
                 responsibility_properties["binding_items"] = {

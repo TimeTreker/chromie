@@ -1,0 +1,67 @@
+{
+  "id": "weather_tomorrow_location",
+  "group": "temporal_and_location_binding",
+  "source_scenario": "scenarios/general_ability/must_pass/tool_and_conversation_lane_discipline/shanghai_tomorrow_temperature.json",
+  "text": "明天上海冷不冷？",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "information",
+        "outcome_contains_any": [
+          "cold",
+          "temperature",
+          "冷",
+          "气温",
+          "温度"
+        ],
+        "required_bindings": {
+          "location": [
+            "上海"
+          ],
+          "time_scope": [
+            "明天"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "time",
+          "duration",
+          "threshold"
+        ],
+        "source_spans": [
+          "明天上海冷不冷"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "weather_tomorrow_location",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "determine whether 上海 will be cold tomorrow",
+        "output_mode": "information",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t6"
+        },
+        "binding_items": {
+          "location": "上海",
+          "time_scope": "明天"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

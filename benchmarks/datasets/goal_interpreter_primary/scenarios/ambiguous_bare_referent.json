@@ -1,0 +1,61 @@
+{
+  "id": "ambiguous_bare_referent",
+  "group": "referent_uncertainty",
+  "source_scenario": "scenarios/general_ability/must_pass/natural_uncertainty_handling/tianxin_ambiguous_tool.json",
+  "text": "你能查天信吗？",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "information",
+        "outcome_contains_any": [
+          "查",
+          "look up",
+          "lookup",
+          "search",
+          "check"
+        ],
+        "required_bindings": {
+          "entity": [
+            "天信"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location"
+        ],
+        "source_spans": [
+          "你能查天信"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "ambiguous_bare_referent",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "look up 天信",
+        "output_mode": "information",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t4"
+        },
+        "binding_items": {
+          "entity": "天信"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

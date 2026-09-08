@@ -1,0 +1,60 @@
+{
+  "id": "named_lookup_en",
+  "group": "referent_uncertainty",
+  "text": "Can you look up Tianxin?",
+  "language": "en-US",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "information",
+        "outcome_contains_any": [
+          "查",
+          "look up",
+          "lookup",
+          "search",
+          "check"
+        ],
+        "required_bindings": {
+          "entity": [
+            "Tianxin"
+          ]
+        },
+        "forbidden_binding_keys": [
+          "location"
+        ],
+        "source_spans": [
+          "Can you look up Tianxin"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "ambiguous_bare_referent",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "minimal contrast of ambiguous_bare_referent",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "look up Tianxin",
+        "output_mode": "information",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t4"
+        },
+        "binding_items": {
+          "entity": "Tianxin"
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}

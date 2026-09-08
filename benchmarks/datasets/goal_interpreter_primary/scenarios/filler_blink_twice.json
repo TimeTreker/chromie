@@ -1,0 +1,58 @@
+{
+  "id": "filler_blink_twice",
+  "group": "spoken_language_robustness",
+  "source_scenario": "scenarios/general_ability/must_pass/robust_intent_understanding/filler_blink_twice.json",
+  "text": "嗯，那个……先眨两下眼睛吧。",
+  "language": "zh-CN",
+  "expected": {
+    "responsibilities": [
+      {
+        "output_mode": "body_action",
+        "outcome_contains_any": [
+          "blink",
+          "眨"
+        ],
+        "required_bindings": {
+          "count": [
+            2
+          ]
+        },
+        "forbidden_binding_keys": [
+          "duration"
+        ],
+        "source_spans": [
+          "眨两下眼睛"
+        ]
+      }
+    ],
+    "coordination": [],
+    "unresolved": false
+  },
+  "contrast_set": "filler_blink_twice",
+  "split": "frozen_test",
+  "training_eligible": false,
+  "provenance": {
+    "origin": "primary v1 retained regression",
+    "review": "assistant canonical-contract review; not independent"
+  },
+  "reference_wire_output": {
+    "confidence": 1.0,
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "blink twice",
+        "output_mode": "body_action",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t7",
+          "source_end_token_ref": "t11"
+        },
+        "binding_items": {
+          "count": 2
+        }
+      }
+    ],
+    "unresolved": [],
+    "coordination": []
+  }
+}
