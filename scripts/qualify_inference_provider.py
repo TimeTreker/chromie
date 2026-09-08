@@ -1084,7 +1084,9 @@ async def _qualify_foreground_under_deep_load(
     endpoint: str,
     *,
     provider: str,
-    model: str,
+    fast_gi_model: str,
+    fast_planner_model: str,
+    deliberative_model: str,
     priority_step: int,
     deliberative_context_repeat: int,
     deliberative_max_tokens: int,
@@ -1124,7 +1126,7 @@ async def _qualify_foreground_under_deep_load(
             client,
             endpoint,
             _chat_payload(
-                model,
+                deliberative_model,
                 deep_prompt,
                 provider=provider,
                 stream=True,
@@ -1167,7 +1169,7 @@ async def _qualify_foreground_under_deep_load(
         client,
         endpoint,
         _chat_payload(
-            model,
+            fast_gi_model,
             "Reply with exactly: chromie-fast-gi-ready",
             provider=provider,
             stream=True,
@@ -1191,7 +1193,7 @@ async def _qualify_foreground_under_deep_load(
         client,
         endpoint,
         _chat_payload(
-            model,
+            fast_planner_model,
             "Reply with exactly: chromie-presentation-commit-ready",
             provider=provider,
             stream=True,
@@ -1264,6 +1266,11 @@ async def _qualify_foreground_under_deep_load(
         "provider_priority_semantics": _provider_priority_semantics(provider),
         "qualification_only_priority_mapping": priorities,
         "priority_step": priority_step,
+        "model_routes": {
+            "fast_gi": fast_gi_model,
+            "fast_planner": fast_planner_model,
+            "deliberative": deliberative_model,
+        },
         "deep_active_at_fast_gi_start": deep_active_at_fast_gi_start,
         "deep_active_at_fast_planner_start": deep_active_at_fast_planner_start,
         "foreground_completed_before_deep": foreground_completed_before_deep,
@@ -1287,9 +1294,16 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             for item in models_payload.get("data", [])
             if isinstance(item, dict) and item.get("id")
         ]
-        if args.model not in served_models:
+        required_models = sorted(
+            {
+                args.model,
+                *(route["model"] for route in args.contention_model_topology.values()),
+            }
+        )
+        missing_models = [model for model in required_models if model not in served_models]
+        if missing_models:
             raise QualificationFailure(
-                f"requested model {args.model!r} absent from /models: {served_models}"
+                f"requested models absent from /models: {missing_models}; served={served_models}"
             )
         evidence.phases["model_identity"] = {
             "status": "pass",
@@ -1298,6 +1312,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             "runtime_image": args.runtime_image,
             "model": args.model,
             "model_revision": args.model_revision,
+            "contention_model_topology": args.contention_model_topology,
             "served_models": served_models,
         }
 
@@ -1306,7 +1321,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 client,
                 endpoint,
                 _chat_payload(
-                    args.model,
+                    args.contention_model_topology["fast_gi"]["model"],
                     "Reply with exactly: chromie-stream-ready",
                     provider=args.provider,
                     stream=True,
@@ -1328,7 +1343,9 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                     client,
                     endpoint,
                     provider=args.provider,
-                    model=args.model,
+                    fast_gi_model=args.contention_model_topology["fast_gi"]["model"],
+                    fast_planner_model=args.contention_model_topology["fast_planner"]["model"],
+                    deliberative_model=args.contention_model_topology["deliberative"]["model"],
                     priority_step=args.priority_step,
                     deliberative_context_repeat=args.deliberative_context_repeat,
                     deliberative_max_tokens=args.deliberative_max_tokens,
@@ -1522,7 +1539,9 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 client,
                 endpoint,
                 provider=args.provider,
-                model=args.model,
+                fast_gi_model=args.contention_model_topology["fast_gi"]["model"],
+                fast_planner_model=args.contention_model_topology["fast_planner"]["model"],
+                deliberative_model=args.contention_model_topology["deliberative"]["model"],
                 priority_step=args.priority_step,
                 deliberative_context_repeat=args.deliberative_context_repeat,
                 deliberative_max_tokens=args.deliberative_max_tokens,
@@ -1581,6 +1600,47 @@ def _model_artifact_arg(value: str) -> dict[str, Any]:
     return parsed
 
 
+def _resolve_contention_model_topology(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
+    """Resolve operational model routes for the frozen contention workload.
+
+    The base --model identity applies to every route unless a route is explicitly
+    overridden.  Any override must carry model, revision, and artifact together so
+    evidence never pairs one model name with another model's digest or weights.
+    """
+
+    default = {
+        "model": args.model,
+        "revision": args.model_revision,
+        "artifact": dict(args.model_artifact_json),
+    }
+    topology: dict[str, dict[str, Any]] = {}
+    for route in ("fast_gi", "fast_planner", "deliberative"):
+        model = getattr(args, f"{route}_model", None)
+        revision = getattr(args, f"{route}_model_revision", None)
+        artifact = getattr(args, f"{route}_model_artifact_json", None)
+        supplied = (model is not None, revision is not None, artifact is not None)
+        if any(supplied) and not all(supplied):
+            option = route.replace("_", "-")
+            raise ValueError(
+                f"{route} model override requires --{option}-model, "
+                f"--{option}-model-revision, and --{option}-model-artifact-json together"
+            )
+        topology[route] = (
+            {
+                "model": str(model),
+                "revision": str(revision),
+                "artifact": dict(artifact),
+            }
+            if all(supplied)
+            else {
+                "model": default["model"],
+                "revision": default["revision"],
+                "artifact": dict(default["artifact"]),
+            }
+        )
+    return topology
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("ollama", "sglang", "vllm"), required=True)
@@ -1599,6 +1659,28 @@ def _parser() -> argparse.ArgumentParser:
             "gguf_variant are retained verbatim."
         ),
     )
+    for route, label in (
+        ("fast-gi", "Fast Goal Interpretation canary"),
+        ("fast-planner", "Fast Planner canary"),
+        ("deliberative", "deliberative load"),
+    ):
+        dest = route.replace("-", "_")
+        parser.add_argument(
+            f"--{route}-model",
+            dest=f"{dest}_model",
+            help=f"Optional served model override for the {label}.",
+        )
+        parser.add_argument(
+            f"--{route}-model-revision",
+            dest=f"{dest}_model_revision",
+            help=f"Exact model revision paired with --{route}-model.",
+        )
+        parser.add_argument(
+            f"--{route}-model-artifact-json",
+            dest=f"{dest}_model_artifact_json",
+            type=_model_artifact_arg,
+            help=f"Exact artifact identity paired with --{route}-model.",
+        )
     parser.add_argument(
         "--cuda-runtime",
         required=True,
@@ -1684,6 +1766,10 @@ def main(argv: list[str] | None = None) -> int:
             "--goal-interpreter-probe is not part of the Ollama contention baseline; "
             "use existing deployed-model qualification for Ollama semantics"
         )
+    try:
+        args.contention_model_topology = _resolve_contention_model_topology(args)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     if not args.base_url:
         if args.provider == "sglang":
             args.base_url = "http://127.0.0.1:30000/v1"
@@ -1718,13 +1804,17 @@ def main(argv: list[str] | None = None) -> int:
             "priority_step": args.priority_step,
         },
         workload_config={
-            "contention_protocol_version": 1,
+            "contention_protocol_version": 2,
             "contention_only": bool(args.contention_only),
+            "model_topology": args.contention_model_topology,
             "deliberative_context_repeat": args.deliberative_context_repeat,
             "deliberative_max_tokens": args.deliberative_max_tokens,
             "tts_enabled": bool(args.tts_url),
             "tts_speaker": args.tts_speaker if args.tts_url else None,
-            "reasoning_control": _reasoning_control_identity(args.provider, args.model),
+            "reasoning_control": {
+                route: _reasoning_control_identity(args.provider, identity["model"])
+                for route, identity in args.contention_model_topology.items()
+            },
         },
     )
     result = asyncio.run(_run(args, evidence))

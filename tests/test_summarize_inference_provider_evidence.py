@@ -40,8 +40,37 @@ def _sample(*, index: int, provider: str = "sglang", planner_before_deep: bool =
             "provider_priority_semantics": "larger_value_first",
         },
         "workload_config": {
-            "contention_protocol_version": 1,
+            "contention_protocol_version": 2,
             "contention_only": True,
+            "model_topology": {
+                "fast_gi": {
+                    "model": "Qwen/Qwen3.5-9B",
+                    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+                    "artifact": {
+                        "source_model_id": "Qwen/Qwen3.5-9B",
+                        "weight_format": "safetensors",
+                        "quantization": "none",
+                    },
+                },
+                "fast_planner": {
+                    "model": "Qwen/Qwen3.5-9B",
+                    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+                    "artifact": {
+                        "source_model_id": "Qwen/Qwen3.5-9B",
+                        "weight_format": "safetensors",
+                        "quantization": "none",
+                    },
+                },
+                "deliberative": {
+                    "model": "Qwen/Qwen3.5-9B",
+                    "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+                    "artifact": {
+                        "source_model_id": "Qwen/Qwen3.5-9B",
+                        "weight_format": "safetensors",
+                        "quantization": "none",
+                    },
+                },
+            },
             "deliberative_context_repeat": 800,
             "deliberative_max_tokens": 2048,
             "tts_enabled": True,
@@ -154,4 +183,22 @@ def test_summary_rejects_model_artifact_drift(tmp_path: Path) -> None:
     _write(tmp_path / "trial-2.json", second)
 
     with pytest.raises(ValueError, match="model_artifact"):
+        build_summary([tmp_path])
+
+def test_summary_rejects_contention_model_topology_drift(tmp_path: Path) -> None:
+    first = _sample(index=1)
+    second = _sample(index=2)
+    second["workload_config"]["model_topology"]["fast_planner"] = {
+        "model": "Other/Fast-Model",
+        "revision": "different-fast-revision",
+        "artifact": {
+            "source_model_id": "Other/Fast-Model",
+            "weight_format": "safetensors",
+            "quantization": "none",
+        },
+    }
+    _write(tmp_path / "trial-1.json", first)
+    _write(tmp_path / "trial-2.json", second)
+
+    with pytest.raises(ValueError, match="workload_config"):
         build_summary([tmp_path])

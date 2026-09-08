@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import argparse
+import asyncio
 import unittest
+from unittest.mock import patch
 
 from scripts.qualify_inference_provider import (
     DEFAULT_GOAL_INTERPRETER_MANIFEST,
@@ -18,6 +21,8 @@ from scripts.qualify_inference_provider import (
     _provider_priority,
     _provider_priority_semantics,
     _priority_mapping,
+    _qualify_foreground_under_deep_load,
+    _resolve_contention_model_topology,
     _wire_coordination_satisfies,
 )
 from agent.app.inference_compute import CognitionComputeClass
@@ -121,6 +126,63 @@ class InferenceProviderQualificationTests(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "source_model_id"):
             _model_artifact_arg('{"weight_format":"safetensors","quantization":"none"}')
+
+    def test_contention_model_topology_defaults_and_overrides_per_transaction(self) -> None:
+        gemma_artifact = {
+            "source_model_id": "ollama/gemma4:12b",
+            "weight_format": "gguf",
+            "quantization": "Q4_K_M",
+        }
+        qwen_artifact = {
+            "source_model_id": "ollama/qwen3.5:9b",
+            "weight_format": "gguf",
+            "quantization": "Q4_K_M",
+        }
+        args = argparse.Namespace(
+            model="gemma4:12b",
+            model_revision="gemma-digest",
+            model_artifact_json=gemma_artifact,
+            fast_gi_model=None,
+            fast_gi_model_revision=None,
+            fast_gi_model_artifact_json=None,
+            fast_planner_model="qwen3.5:9b",
+            fast_planner_model_revision="qwen-digest",
+            fast_planner_model_artifact_json=qwen_artifact,
+            deliberative_model=None,
+            deliberative_model_revision=None,
+            deliberative_model_artifact_json=None,
+        )
+
+        topology = _resolve_contention_model_topology(args)
+
+        self.assertEqual(topology["fast_gi"]["model"], "gemma4:12b")
+        self.assertEqual(topology["fast_planner"]["model"], "qwen3.5:9b")
+        self.assertEqual(topology["deliberative"]["model"], "gemma4:12b")
+        self.assertEqual(topology["fast_planner"]["revision"], "qwen-digest")
+        self.assertEqual(topology["fast_planner"]["artifact"], qwen_artifact)
+
+    def test_contention_model_topology_rejects_partial_override_identity(self) -> None:
+        args = argparse.Namespace(
+            model="gemma4:12b",
+            model_revision="gemma-digest",
+            model_artifact_json={
+                "source_model_id": "ollama/gemma4:12b",
+                "weight_format": "gguf",
+                "quantization": "Q4_K_M",
+            },
+            fast_gi_model=None,
+            fast_gi_model_revision=None,
+            fast_gi_model_artifact_json=None,
+            fast_planner_model="qwen3.5:9b",
+            fast_planner_model_revision=None,
+            fast_planner_model_artifact_json=None,
+            deliberative_model=None,
+            deliberative_model_revision=None,
+            deliberative_model_artifact_json=None,
+        )
+
+        with self.assertRaisesRegex(ValueError, "fast_planner model override requires"):
+            _resolve_contention_model_topology(args)
 
     def test_ollama_control_never_fabricates_request_priority(self) -> None:
         self.assertIsNone(
@@ -309,6 +371,97 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         self.assertTrue(any("contains forbidden binding count" in error for error in errors))
         self.assertTrue(dimensions["bindings"])
         self.assertEqual(dimensions["outcome"], [])
+
+
+class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_contention_routes_each_stage_to_its_declared_model(self) -> None:
+        seen: dict[str, str] = {}
+        release_deep = asyncio.Event()
+
+        def observation(
+            *,
+            label: str,
+            text: str,
+            started_s: float,
+            finished_s: float,
+        ) -> StreamObservation:
+            return StreamObservation(
+                label=label,
+                started_s=started_s,
+                first_delta_s=started_s + 0.01,
+                last_delta_s=finished_s - 0.01,
+                finished_s=finished_s,
+                delta_count=1,
+                text=text,
+                finish_reason="stop",
+                terminal_seen=True,
+            )
+
+        async def fake_observe_stream(
+            client, endpoint, payload, *, label, first_delta_event=None
+        ):
+            del client, endpoint
+            seen[label] = payload["model"]
+            if label == "deliberative_load":
+                if first_delta_event is not None:
+                    first_delta_event.set()
+                await release_deep.wait()
+                return observation(
+                    label=label, text="1 2 3", started_s=1.0, finished_s=3.0
+                )
+            if label == "foreground_fast_gi":
+                return observation(
+                    label=label,
+                    text="chromie-fast-gi-ready",
+                    started_s=1.2,
+                    finished_s=1.4,
+                )
+            if label == "foreground_fast_planner":
+                release_deep.set()
+                return observation(
+                    label=label,
+                    text="chromie-presentation-commit-ready",
+                    started_s=1.5,
+                    finished_s=1.7,
+                )
+            raise AssertionError(label)
+
+        with patch(
+            "scripts.qualify_inference_provider._observe_stream",
+            side_effect=fake_observe_stream,
+        ):
+            result = await _qualify_foreground_under_deep_load(
+                object(),
+                "http://provider.invalid/v1/chat/completions",
+                provider="ollama",
+                fast_gi_model="gemma4:12b",
+                fast_planner_model="qwen3.5:9b",
+                deliberative_model="gemma4:12b",
+                priority_step=100,
+                deliberative_context_repeat=1,
+                deliberative_max_tokens=256,
+                tts_url=None,
+                tts_speaker="chromie_mixed",
+                require_foreground_before_deep=True,
+            )
+
+        self.assertEqual(
+            seen,
+            {
+                "deliberative_load": "gemma4:12b",
+                "foreground_fast_gi": "gemma4:12b",
+                "foreground_fast_planner": "qwen3.5:9b",
+            },
+        )
+        self.assertEqual(
+            result["model_routes"],
+            {
+                "fast_gi": "gemma4:12b",
+                "fast_planner": "qwen3.5:9b",
+                "deliberative": "gemma4:12b",
+            },
+        )
+        self.assertTrue(result["foreground_completed_before_deep"])
 
 
 if __name__ == "__main__":

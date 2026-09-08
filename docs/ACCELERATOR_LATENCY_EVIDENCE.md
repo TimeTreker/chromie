@@ -277,14 +277,23 @@ mapping. SGLang's default convention is translated as larger numeric values firs
 priority convention is translated as smaller numeric values first. These raw numbers are
 evidence knobs only and never become semantic configuration.
 
+The contention transaction has three explicit operational model routes: `fast_gi`,
+`fast_planner`, and `deliberative`. All three inherit the required base `--model` identity by
+default. A deployed topology may override any route only by supplying its model name, exact
+revision, and exact artifact record together. This is compute/deployment evidence only; it does
+not create separate semantic authorities or personalities. The resolved topology is retained in
+`workload_config.model_topology`, so a repeated series cannot silently mix one-model and
+multi-model samples.
+
 For Qwen3-family contention canaries, the workload also freezes non-thinking behavior at the
 provider wire boundary instead of assuming one provider's extension works everywhere. SGLang
 and vLLM receive `chat_template_kwargs.enable_thinking=false`; Ollama's OpenAI-compatible
-endpoint receives its supported `reasoning_effort=none`. The exact control is retained under
-`workload_config.reasoning_control`, so samples with different reasoning behavior cannot be
-combined into one latency distribution.
+endpoint receives its supported `reasoning_effort=none`. Reasoning control is retained per
+transaction route under `workload_config.reasoning_control`, so samples with different models or
+reasoning behavior cannot be combined into one latency distribution.
 
-Every retained provider sample also carries an explicit `model_artifact` operator record with
+Every retained provider sample carries an explicit base `model_artifact` operator record plus
+the artifact identity of every overridden contention route. Each artifact declares at least
 `source_model_id`, `weight_format`, and `quantization`. This is required because a shared model
 name is not enough to prove a scheduler-isolated comparison: a GGUF Q4 checkpoint and an HF
 BF16 safetensors checkpoint have different memory footprints and compute cost even when both
@@ -348,27 +357,39 @@ the foreground-under-deep-load timing slice from being retained. A control can t
 `status=control_observed` when foreground work waits for Deep; that observation is the baseline,
 not a candidate-provider pass.
 
-Run the control against the already deployed model, with TTS alive:
+Run the control against the already deployed model topology, with TTS alive. A single-model
+profile needs only the base model identity. A multi-model profile must override the exact routes
+that differ from the base. For example, the maintained RTX 5090 profile currently routes Fast GI
+and deliberative cognition through `gemma4:12b`, while Fast Planner uses `qwen3.5:9b`:
 
 ```bash
 python scripts/qualify_inference_provider.py \
   --provider ollama \
   --provider-version '<exact-ollama-version>' \
   --runtime-image "$OLLAMA_IMAGE" \
-  --model '<exact-served-ollama-model-name>' \
-  --model-revision '<exact-ollama-model-digest>' \
-  --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"gguf","quantization":"Q4_K_M"}' \
+  --model gemma4:12b \
+  --model-revision '<exact-gemma4:12b-ollama-digest>' \
+  --model-artifact-json '<exact-gemma4:12b-artifact-json>' \
+  --fast-planner-model qwen3.5:9b \
+  --fast-planner-model-revision '<exact-qwen3.5:9b-ollama-digest>' \
+  --fast-planner-model-artifact-json '<exact-qwen3.5:9b-artifact-json>' \
   --cuda-runtime '<exact-container-cuda-runtime>' \
-  --scheduler-config-json '{"num_parallel":1,"context_length":32768,"flash_attention":true,"kv_cache_type":"q8_0"}' \
+  --scheduler-config-json '<exact-observed-ollama-runtime-settings-json>' \
   --contention-only \
   --tts-url ws://127.0.0.1:5000 \
   --output .chromie/acceptance/inference-runtime/ollama-provider-control.json
 ```
 
-The same target model/request budgets should then be run with `--contention-only` on SGLang and
-vLLM when comparing the contention slice. Their full provider-contract runs remain separate
-evidence. Do not compare a warm Ollama control against a cold candidate or change model/context/TTS
-conditions between providers and call the result a scheduler comparison.
+The base identity therefore applies to both `fast_gi` and `deliberative`; only Fast Planner is
+overridden. This matters because the first foreground transaction can contend with Deep on the
+same Gemma runner before the later Planner transaction reaches the already-resident Qwen runner.
+Do not collapse those two stages into one generic "foreground model" in evidence.
+
+The same frozen transaction topology should be retained when comparing deployed outcomes. A
+single-model SGLang/vLLM Level-1 scheduler experiment answers a different question and may use one
+model for all three routes. Their full provider-contract runs remain separate evidence. Do not
+compare a warm Ollama control against a cold candidate or change model/context/TTS conditions and
+call the result a scheduler-only comparison.
 
 ### Repeated contention distributions
 
@@ -408,6 +429,27 @@ The sample count remains explicit in the report. Twenty samples are shown only a
 example; this document does not redefine the project's latency acceptance policy or claim that a
 particular sample count is statistically sufficient for release. Use the same count and frozen
 workload for each provider comparison.
+
+### RTX 5090 deployed-topology boundary
+
+The maintained `rtx5090` production profile is not a one-model scheduler experiment. It currently
+uses `gemma4:12b` for Goal Interpretation, Goal Association, and Deep Planner, while
+`qwen3.5:9b` owns Fast Planner and other latency-sensitive roles. Both models are intended to stay
+resident beside TTS. The deployed Ollama control must therefore preserve at least the transaction
+route relevant to the foreground-under-Deep experiment:
+
+```text
+Deep deliberative load    -> gemma4:12b
+Fast GI canary            -> gemma4:12b
+Fast Planner canary       -> qwen3.5:9b
+TTS                       -> live shared-GPU service
+```
+
+This deployed-topology control measures the actual current outcome. It is not scheduler-isolated
+because model artifacts, model sizes, and cross-runner GPU contention are part of the result.
+Separately run SGLang and vLLM on the exact same HF model revision/artifact when the goal is to
+isolate serving/runtime scheduling behavior. Only after those two evidence layers exist should a
+production topology change be proposed.
 
 ### RTX 4090 Laptop comparison boundary
 
