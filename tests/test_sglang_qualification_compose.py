@@ -30,6 +30,21 @@ def test_sglang_qualification_compose_is_real_isolated_service() -> None:
     assert "depends_on" not in service
 
 
+def test_sglang_qualification_compose_propagates_model_download_network_contract() -> None:
+    service = _service()
+    environment = service["environment"]
+    assert isinstance(environment, dict)
+
+    assert environment["HF_HUB_OFFLINE"] == "${HF_HUB_OFFLINE:-0}"
+    assert environment["TRANSFORMERS_OFFLINE"] == "${TRANSFORMERS_OFFLINE:-0}"
+    assert environment["HTTP_PROXY"] == "${HTTP_PROXY:-}"
+    assert environment["HTTPS_PROXY"] == "${HTTPS_PROXY:-}"
+    assert environment["NO_PROXY"] == (
+        "${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}"
+    )
+    assert service["extra_hosts"] == ["host.docker.internal:host-gateway"]
+
+
 def test_sglang_qualification_compose_pins_model_identity_inputs() -> None:
     command = _service()["command"]
     assert isinstance(command, list)
@@ -67,4 +82,7 @@ def test_sglang_priority_scheduling_uses_fcfs_base_queue_and_preemption() -> Non
     )
     assert command[command.index("--mem-fraction-static") + 1] == (
         "${SGLANG_MEM_FRACTION_STATIC:-0.80}"
+    )
+    assert command[command.index("--cuda-graph-backend-prefill") + 1] == (
+        "${SGLANG_CUDA_GRAPH_BACKEND_PREFILL:-breakable}"
     )

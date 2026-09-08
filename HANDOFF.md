@@ -1,5 +1,138 @@
 # Chromie Latest Handoff
 
+## 2026-09-09 active handoff — RTX 4090 Laptop SGLang resource boundary
+
+This section is the active continuation and supersedes the historical handoff below. Resume from
+repository `TimeTreker/chromie`, branch `main`, base
+`7f9d1c019b5be97c664a3a26d88ae00f1376b459` plus the checkpoint patch that contains this text.
+
+### What is already settled
+
+- Keep the Goal-driven single-authority architecture. GI owns WHAT; Planner owns HOW; GA owns Goal
+  continuity; runtime/provider owns effect truth; provider scheduling owns only operational compute.
+- Keep Ollama as the maintained production/control path. SGLang is still a candidate provider.
+- RTX 5090 provider evidence already proved priority/preemption, presentation lease, interruption
+  revocation, reacquisition for replacement TTS, and Deep continuity with protocol 5.
+- The RTX 5090 SGLang Qwen3.5-9B production-shaped GI semantic cohort passed only 1/16. Treat that
+  model-role promotion as rejected; the correct Host fail-closed validators must not be weakened.
+- Do not infer semantic quality from the RTX 4090 Laptop Qwen3.5-4B run described below. It is a
+  resource canary only.
+
+### RTX 4090 Laptop measured state
+
+The operator switched to the 16 GB RTX 4090 Laptop and kept CosyVoice on the same GPU. The first
+TTS restart loop was a container-network proxy error, not CUDA: the host shell exported
+`127.0.0.1:7897`, which addresses the container itself. Using
+`host.docker.internal:7897` made CosyVoice healthy with zero restarts. The qualification compose in
+this patch now exposes the same proxy/offline contract permanently.
+
+With TTS resident, exact SGLang canary identity:
+
+```text
+image: lmsysorg/sglang:v0.5.19-cu129
+model: Qwen/Qwen3.5-4B
+revision: 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+served name: chromie-qwen35-4b-sglang
+weights: HF safetensors, BF16, unquantized
+context_length: 32768
+max_running_requests: 2
+max_mamba_cache_size: 10
+```
+
+Measured sequence:
+
+```text
+mem_fraction_static=.70
+  weight load: 8.62 GB
+  result: fail before KV pool; SGLang minimum viable fraction > .826
+
+mem_fraction_static=.90, default prefill graph
+  Mamba ~= .53 GB
+  KV = 5,091 tokens
+  result: fail during prefill CUDA-graph capture OOM
+
+mem_fraction_static=.90, prefill graph disabled
+  decode graphs remain for bs=1,2
+  SGLang healthy + TTS healthy
+  KV = 5,091 tokens
+  total GPU ~= 15.9 / 16.4 GiB
+
+same run + --language-only
+  multimodal loading still initialized
+  0.10 GB multimodal sizing reservation remained
+  weights stayed 8.62 GB
+  KV stayed exactly 5,091 tokens
+  result: no useful memory gain; do not retain this flag
+```
+
+The Numba `inkling` warning (`Numba needs NumPy 2.4 or less; got 2.5`) is an ignored optional
+multimodal-processor import warning, not the current blocker. Do not downgrade NumPy merely to
+silence it.
+
+### Current decision / do-not-do list
+
+The laptop proves **physical co-residency, not a deployable cognitive topology**. 5,091 tokens is
+below the maintained GI 16K request and far below other 32K roles.
+
+Do not:
+
+- run protocol-5 and call it product evidence with this 5K pool;
+- reduce `max_running_requests` to 1 and thereby remove the foreground-vs-Deep objective;
+- shrink semantic contracts, source provenance, or Host validators to fit VRAM;
+- add model-specific semantic repair;
+- promote Qwen3.5-4B or Qwen3.5-9B in model lock / Agent profiles from these results;
+- keep `--language-only` as a supposed memory optimization;
+- copy `.90` or disabled prefill graphs blindly to a future quantized model—the new artifact must
+  be resized from its own measured pre-load/weight/pool facts.
+
+### Exact next work
+
+The next comparison target is a **quantized SGLang-served model/artifact** appropriate to the
+16 GB shared-GPU laptop. Hold these requirements fixed:
+
+```text
+CosyVoice resident and healthy
+two simultaneous model requests
+priority/preemption enabled
+32K target context topology (GI must at least clear 16K)
+typed non-thinking / structured-output transport
+exact source model + revision + quantization + runtime identity retained
+```
+
+First prove resource fit only. Do not run or optimize semantic prompts while the engine cannot
+retain the required context. Once a quantized candidate retains a production-sized pool:
+
+1. run one foreground-under-Deep provider canary;
+2. run one protocol-5 presentation lease/revocation round-trip with TTS;
+3. run the frozen production-shaped 16-case GI semantic cohort with the prompt/Schema/Host
+   transaction unchanged;
+4. only if semantic failures cluster narrowly at an evidenced prompt/profile boundary, optimize
+   that owner and rerun focused + full cohorts;
+5. only after GI qualification proceed to Fast/Deep Planner and real Agent/Host end-to-end work.
+
+### Patch/application gate
+
+This patch intentionally does **not** add a laptop SGLang Agent overlay. It only makes
+qualification infrastructure reproducible and records the checkpoint.
+
+After apply:
+
+```bash
+python3 scripts/runtime_configuration_inventory.py
+python3 scripts/runtime_configuration_inventory.py --check
+
+python3 -m pytest -q   tests/test_sglang_qualification_compose.py   tests/test_sglang_runtime_integration.py   tests/test_runtime_configuration_inventory.py
+
+python3 scripts/check_repository_policies.py
+python3 scripts/check_docs.py
+git diff --check
+```
+
+Commit the regenerated `config/runtime_configuration_inventory.json` together with the patch
+changes if the inventory generator modifies it.
+
+## Historical handoff retained for provenance
+
 Audience: the project owner or coding agent resuming the current Goal-driven
 single-authority focus, deployed Planner qualification, and current-revision
 evidence closure for Issue #35.

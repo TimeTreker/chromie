@@ -10,8 +10,19 @@ services:
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
       HF_HOME: /root/.cache/huggingface
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1,host.docker.internal}
       NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
       NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${SGLANG_HF_CACHE_DIR:?SGLANG_HF_CACHE_DIR must be set}:/root/.cache/huggingface
@@ -50,6 +61,8 @@ services:
       - ${SGLANG_MAX_MAMBA_CACHE_SIZE:-10}
       - --mem-fraction-static
       - ${SGLANG_MEM_FRACTION_STATIC:-0.80}
+      - --cuda-graph-backend-prefill
+      - ${SGLANG_CUDA_GRAPH_BACKEND_PREFILL:-breakable}
       - --enable-metrics
       - --enable-request-time-stats-logging
     ulimits:

@@ -1,5 +1,94 @@
 # Chromie Development Checkpoint
 
+## 2026-09-09 active checkpoint — RTX 4090 Laptop SGLang resource qualification
+
+This section supersedes the older resume point below; the older sections remain retained as
+historical evidence. The Goal-driven single-authority architecture is unchanged.
+
+- Source base before this checkpoint: `7f9d1c019b5be97c664a3a26d88ae00f1376b459`
+  (`main == origin/main`).
+- SGLang scheduler/priority, presentation lease, revocation, and lease reacquisition remain valid
+  provider/runtime work from the RTX 5090 qualification series. They are not semantic-model
+  promotion evidence.
+- The RTX 5090 `Qwen/Qwen3.5-9B` production-shaped GI cohort hard-passed only 1/16 cases. That
+  candidate is rejected for GI semantic promotion; do not patch Host validation to repair it.
+- The RTX 4090 Laptop maintains the Ollama `qwen3.5:4b` production profile. The HF BF16
+  `Qwen/Qwen3.5-4B` SGLang run described here is a resource canary only and is not promoted into
+  Agent role configuration.
+
+Measured laptop boundary with resident CosyVoice:
+
+```text
+GPU capacity                         16,376 MiB
+CosyVoice process                    ~4,662 MiB
+SGLang pre-weight available          10.45 GB
+Qwen3.5-4B BF16 weight memory         8.62 GB
+post-weight available                 1.83 GB
+Mamba cache                           ~0.53 GB
+BF16 KV pool                          5,091 tokens
+healthy co-resident GPU use          ~15.9 / 16.4 GiB
+```
+
+The sequence was attributable rather than trial-and-error: `.70` failed at KV sizing; `.90`
+cleared KV allocation but the default prefill CUDA graph OOMed; `.90` plus disabled prefill CUDA
+graphs produced healthy SGLang + TTS while preserving decode graphs for batch sizes 1 and 2.
+`--language-only` was measured separately and did not change the 8.62 GB weight footprint or
+5,091-token pool; multimodal loading/reservation remained active.
+
+**Current decision:** BF16 Qwen3.5-4B is physically co-resident but context-inadequate for Chromie.
+Do not run a short synthetic protocol-5 result as product evidence while the engine can retain only
+5,091 tokens. Do not reduce `max_running_requests` to 1, because foreground-vs-Deep concurrency is
+the qualification objective. Do not shrink canonical semantic meaning or add Host repair to fit
+the deployment.
+
+This checkpoint makes only operational qualification plumbing permanent:
+
+1. SGLang qualification Compose inherits optional HTTP/HTTPS proxy, offline HF mode, and
+   `host.docker.internal` host-gateway mapping.
+2. Prefill CUDA-graph backend is an evidence knob
+   (`SGLANG_CUDA_GRAPH_BACKEND_PREFILL`, default `breakable`) rather than a laptop hard-code.
+3. Accelerator evidence records the exact laptop failures, successful co-residency boundary, and
+   rejected `--language-only` optimization.
+4. No maintained Agent model profile, semantic prompt, Schema, DTO, Capability, model lock, or
+   release promotion changes.
+
+### Next gate
+
+Compare a **quantized SGLang-served model/artifact** while holding the cognitive contract and
+resource goal fixed. The next candidate must retain:
+
+```text
+resident CosyVoice
+max_running_requests = 2
+foreground priority/preemption
+target context = 32K (GI must at minimum clear the maintained 16K request)
+no same-authority reviewer or Host semantic repair
+exact model/revision/quantization identity in evidence
+```
+
+Order of proof:
+
+```text
+quantized model starts with TTS resident
+  -> production-sized context/KV pool is retained
+  -> two-request foreground-under-Deep canary
+  -> presentation lease + revocation round-trip
+  -> frozen production-shaped GI semantic cohort
+  -> only then Agent/Host end-to-end candidate qualification
+```
+
+After applying this checkpoint patch, regenerate the configuration inventory because the compose
+adds one qualification-only environment knob:
+
+```bash
+python3 scripts/runtime_configuration_inventory.py
+python3 scripts/runtime_configuration_inventory.py --check
+python3 -m pytest -q   tests/test_sglang_qualification_compose.py   tests/test_sglang_runtime_integration.py   tests/test_runtime_configuration_inventory.py
+python3 scripts/check_repository_policies.py
+python3 scripts/check_docs.py
+git diff --check
+```
+
 Status: the current Goal-driven single-authority focus remains authoritative. The 2026-09-06 bounded transaction-fidelity implementation has source-closed audit findings A01–A06 without adding a new semantic owner. RTX 4090 Level-C-preview evidence still reaches GI/GA/Fast after the Ollama `/api/chat` and 32K warm-up repair, but that deployed Qwen profile remains unqualified. The next gate is a clean revision-bound full source qualification with pinned tooling and complete pytest collection, followed by frozen model/provider qualification.
 
 The greeting still does not succeed. With transport and context residency

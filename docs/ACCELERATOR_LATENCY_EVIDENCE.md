@@ -270,6 +270,75 @@ measured candidate because, with TTS pre-warmed, it retains materially more runt
 exclusive-GPU setup while leaving enough static budget for weights plus the two-request state/KV
 pools. It is not accepted until the exact contention workload completes with TTS alive.
 
+### RTX 4090 Laptop shared-GPU sizing checkpoint
+
+The 2026-09-09 RTX 4090 Laptop probe keeps scheduler/runtime qualification separate from semantic
+model promotion. `Qwen/Qwen3.5-4B` revision
+`851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a` was used only as a SGLang resource canary. The
+maintained Agent profile remains Ollama `qwen3.5:4b`, and neither the HF BF16 4B canary nor the
+earlier HF BF16 9B canary is qualified as a Chromie semantic-role model.
+
+The first failure was not CUDA-related: CosyVoice inherited a host-shell proxy at
+`127.0.0.1:7897`, which resolves to the container itself. Once the TTS container used
+`host.docker.internal:7897`, the pinned CosyVoice snapshot downloaded and the worker became healthy
+with zero restarts. Qualification Compose therefore propagates the same optional proxy/offline
+contract as the maintained model services and maps `host.docker.internal` to the Docker host
+gateway. A fully cached operator may instead set `HF_HUB_OFFLINE=1` and
+`TRANSFORMERS_OFFLINE=1`.
+
+With CosyVoice warm and resident, the laptop exposed about 10.45 GB free to SGLang before Qwen
+weight load. The BF16 Qwen3.5-4B weights consumed 8.62 GB and left 1.83 GB. The measured sizing
+sequence was:
+
+```text
+mem_fraction_static=0.70
+  -> weight load succeeds
+  -> SGLang rejects KV allocation
+  -> provider-calculated minimum viable fraction > 0.826
+
+mem_fraction_static=0.90, default prefill CUDA graph
+  -> Mamba cache ~= 0.53 GB
+  -> BF16 KV cache = 5,091 tokens
+  -> prefill CUDA-graph capture exhausts the remaining GPU memory
+
+mem_fraction_static=0.90, prefill CUDA graph disabled
+  -> decode CUDA graphs remain enabled for batch sizes 1 and 2
+  -> SGLang and CosyVoice both become healthy
+  -> final max_total_num_tokens = 5,091
+  -> observed total GPU use ~= 15.9 / 16.4 GiB
+```
+
+`--language-only` was also measured as an isolated follow-up and did not reclaim a useful context
+budget in SGLang v0.5.19 for this Qwen3.5 path: multimodal loading still initialized, the 0.10 GB
+multimodal post-sizing reservation remained, weight memory stayed 8.62 GB, and the final KV pool
+remained exactly 5,091 tokens. Do not retain that flag as a Chromie optimization.
+
+This proves physical SGLang + CosyVoice co-residency on the 16 GB laptop, but **does not qualify
+the topology for Chromie cognition**. The maintained laptop GI request budget is 16K and other
+semantic roles retain 32K request budgets; 5,091 tokens cannot represent that deployment. Do not
+trade away the two-request concurrency requirement merely to make the canary fit, because
+foreground progress while Deep remains active is the reason for evaluating SGLang.
+
+The next laptop gate is therefore a quantized SGLang-served model/artifact comparison. Hold the
+semantic contracts, `max_running_requests=2`, resident TTS, priority semantics, and target context
+topology fixed while changing only the exact model artifact/runtime quantization. Resource fit must
+be proven before running semantic-role promotion. Only after a candidate has a production-sized
+context pool should the frozen GI semantic cohort and then protocol-5 contention/lease/revocation
+be used as promotion evidence.
+
+For resource reproduction on the measured BF16 canary, the relevant operator values are:
+
+```bash
+export SGLANG_MEM_FRACTION_STATIC=0.90
+export SGLANG_MAX_RUNNING_REQUESTS=2
+export SGLANG_MAX_MAMBA_CACHE_SIZE=10
+export SGLANG_CONTEXT_LENGTH=32768
+export SGLANG_CUDA_GRAPH_BACKEND_PREFILL=disabled
+```
+
+These values are retained evidence for that exact BF16 canary only. They are not defaults for a
+future quantized candidate.
+
 ### Candidate-provider contention harness
 
 `scripts/qualify_inference_provider.py` replaces the old vLLM-named transport probe because
