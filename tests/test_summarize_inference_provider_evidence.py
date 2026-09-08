@@ -241,3 +241,64 @@ def test_summary_reads_tts_and_control_latency_from_presentation_lease(tmp_path:
     assert report["metrics"]["presentation_lease_pause_ms"]["count"] == 3
     assert report["metrics"]["presentation_lease_continue_ms"]["count"] == 3
     assert report["metrics"]["presentation_lease_resume_to_next_delta_ms"]["count"] == 3
+
+
+def test_summary_reads_presentation_lease_revocation_metrics(tmp_path: Path) -> None:
+    for index in range(1, 4):
+        sample = _sample(index=index)
+        sample["workload_config"]["contention_protocol_version"] = 4
+        sample["workload_config"]["presentation_lease"] = {
+            "enabled": True,
+            "mode": "in_place",
+            "scope": "sglang_engine",
+            "pause_settle_ms": 100.0,
+            "continue_torch_empty_cache": False,
+            "revocation_probe": True,
+            "revocation_trigger": "tts_first_audio",
+        }
+        phase = sample["phases"]["foreground_under_deliberative_load"]
+        phase["requests"]["interruption_fast_gi_canary"] = {
+            "started_s": 20.0 + index,
+            "finished_s": 20.1 + index,
+            "ttft_ms": 25 + index,
+            "elapsed_ms": 100 + index,
+        }
+        phase["tts"] = {
+            "measurement_mode": "presentation_lease_revocation",
+            "interrupted_presentation_lease": {
+                "first_audio_ms": 70 + index,
+                "elapsed_ms": 75 + index,
+                "close_ms": 3 + index,
+            },
+            "post_interruption_recovery": {
+                "first_audio_ms": 80 + index,
+                "elapsed_ms": 140 + index,
+            },
+        }
+        phase["presentation_lease"] = {
+            "deep_active_before_continue": True,
+            "deep_deltas_during_tts": 0,
+            "deep_resumed_after_continue": True,
+            "pause": {"elapsed_ms": 5 + index},
+            "continue": {"elapsed_ms": 7 + index},
+            "resume_to_next_delta_ms": 11 + index,
+            "revocation": {
+                "deep_active_at_interrupt_gi_start": True,
+                "interrupt_gi_completed_before_deep": True,
+                "tts_recovery_completed": True,
+                "interrupt_gi_first_delta_from_interrupt_trigger_ms": 40 + index,
+                "tts": {"close_ms": 3 + index},
+            },
+        }
+        _write(tmp_path / f"trial-{index}.json", sample)
+
+    report = build_summary([tmp_path], label="sglang-presentation-lease-revocation")
+
+    assert report["outcomes"]["presentation_lease_revocation_sample_count"] == 3
+    assert report["outcomes"]["interruption_fast_gi_completed_before_deep_count"] == 3
+    assert report["outcomes"]["post_interruption_tts_recovery_count"] == 3
+    assert report["metrics"]["tts_first_audio_ms"]["count"] == 3
+    assert report["metrics"]["interruption_fast_gi_ttft_ms"]["count"] == 3
+    assert report["metrics"]["presentation_lease_revocation_to_gi_first_delta_ms"]["count"] == 3
+    assert report["metrics"]["presentation_lease_tts_cancel_close_ms"]["count"] == 3
+    assert report["metrics"]["post_interruption_tts_recovery_first_audio_ms"]["count"] == 3

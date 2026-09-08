@@ -385,6 +385,68 @@ The workload identity advances to contention protocol version 3 only when this l
 enabled. Repeated-series summarization therefore cannot silently combine ordinary contention
 samples with presentation-lease samples.
 
+### Presentation-lease revocation / synthetic user-interruption probe
+
+A stable presentation lease is still insufficient for production because `in_place` pauses the
+whole SGLang engine. A new user input that arrives while speech is being synthesized must be able
+to revoke that lease before it asks Fast GI for new foreground cognition. The provider must not
+turn "speech is active" into "the mind cannot hear anything new."
+
+`--presentation-lease-revocation-probe` extends the bounded provider canary only; it does not
+claim microphone detection, playback interruption, or Agent policy. The fixed sequence is:
+
+```text
+Deep actively decoding
+  -> Fast GI + Fast Planner complete
+  -> pause_generation(mode=in_place)
+  -> start TTS while Deep is quiescent
+  -> first TTS audio arrives (synthetic interruption trigger)
+  -> close the TTS websocket to cancel synthesis
+  -> continue_generation(torch_empty_cache=false)
+  -> immediately inject a new Fast-GI canary
+  -> require interrupted GI to finish while Deep is still active
+  -> require Deep to resume and finish normally
+  -> run one post-interruption TTS synthesis to prove provider recovery
+```
+
+The first-audio trigger is intentionally conservative: it proves revocation after speech has
+actually become presentable, not merely while TTS is queued. WebSocket close is already the
+qualified TTS request-cancellation boundary. Any TTS native drain that continues after close is
+left visible in the interrupted-GI timing instead of being hidden by an artificial sleep.
+
+The revocation probe records TTS close latency, interruption-trigger-to-GI-first-delta latency,
+interrupted Fast-GI TTFT, Deep continuity, and post-interruption TTS recovery. It advances the
+contention protocol to version 4 so ordinary contention, full presentation-lease, and revocation
+samples cannot be mixed into one repeated distribution.
+
+Run only after the full presentation-lease series is stable:
+
+```bash
+python scripts/qualify_inference_provider.py \
+  --provider sglang \
+  --provider-version "$SGLANG_VERSION" \
+  --runtime-image "$SGLANG_RUNTIME_IMAGE" \
+  --base-url http://127.0.0.1:30000/v1 \
+  --model "$SGLANG_SERVED_MODEL_NAME" \
+  --model-revision "$SGLANG_MODEL_REVISION" \
+  --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-9B","weight_format":"safetensors","quantization":"none","dtype":"bfloat16"}' \
+  --cuda-runtime "$SGLANG_CUDA_RUNTIME" \
+  --scheduler-config-json '{"schedule_policy":"fcfs","enable_priority_scheduling":true,"disable_priority_preemption":false,"default_priority_value":0,"priority_scheduling_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.80,"max_running_requests":2,"max_mamba_cache_size":10,"context_length":32768,"max_total_num_tokens_observed":38717}' \
+  --contention-only \
+  --presentation-lease-mode in_place \
+  --presentation-lease-revocation-probe \
+  --deliberative-context-repeat 800 \
+  --deliberative-max-tokens 2048 \
+  --tts-url ws://127.0.0.1:5000 \
+  --tts-speaker chromie_mixed \
+  --output .chromie/acceptance/inference-runtime/sglang-presentation-lease-revocation.json
+```
+
+This remains an engine-level primitive. A production design still needs an explicit Chromie-owned
+lease/revocation policy, actual speech/playback cancellation, and a real user-input path. Provider
+control APIs can execute the resource decision; they do not own the semantic decision to listen,
+speak, interrupt, or continue.
+
 Example SGLang run with the default CosyVoice service:
 
 ```bash

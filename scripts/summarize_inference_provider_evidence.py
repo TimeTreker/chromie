@@ -166,8 +166,14 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         isinstance(presentation_lease_config, dict)
         and presentation_lease_config.get("enabled") is True
     )
+    presentation_lease_revocation_enabled = (
+        presentation_lease_enabled
+        and presentation_lease_config.get("revocation_probe") is True
+    )
     tts_measurement_key = (
-        "presentation_lease"
+        "interrupted_presentation_lease"
+        if presentation_lease_revocation_enabled
+        else "presentation_lease"
         if presentation_lease_enabled
         else "under_foreground_and_deliberative_load"
     )
@@ -195,6 +201,16 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         ),
         "fast_planner_elapsed_ms": distribution(
             _metric_values(typed_phases, "requests", "fast_planner_canary", "elapsed_ms")
+        ),
+        "interruption_fast_gi_ttft_ms": distribution(
+            _metric_values(
+                typed_phases, "requests", "interruption_fast_gi_canary", "ttft_ms"
+            )
+        ),
+        "interruption_fast_gi_elapsed_ms": distribution(
+            _metric_values(
+                typed_phases, "requests", "interruption_fast_gi_canary", "elapsed_ms"
+            )
         ),
         "deliberative_ttft_ms": distribution(
             _metric_values(typed_phases, "requests", "deliberative", "ttft_ms")
@@ -231,6 +247,31 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
                 "resume_to_next_delta_ms",
             )
         ),
+        "presentation_lease_revocation_to_gi_first_delta_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "revocation",
+                "interrupt_gi_first_delta_from_interrupt_trigger_ms",
+            )
+        ),
+        "presentation_lease_tts_cancel_close_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "revocation",
+                "tts",
+                "close_ms",
+            )
+        ),
+        "post_interruption_tts_recovery_first_audio_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "tts",
+                "post_interruption_recovery",
+                "first_audio_ms",
+            )
+        ),
         "peak_gpu_memory_used_mib": distribution(
             _metric_values(payloads, "resources", "peak_gpu_memory_used_mib")
         ),
@@ -262,14 +303,39 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         and phase["presentation_lease"].get("deep_resumed_after_continue") is True
         for phase in typed_phases
     )
+    presentation_lease_revocation_sample_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and isinstance(phase["presentation_lease"].get("revocation"), dict)
+        for phase in typed_phases
+    )
+    interruption_fast_gi_before_deep_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and isinstance(phase["presentation_lease"].get("revocation"), dict)
+        and phase["presentation_lease"]["revocation"].get(
+            "interrupt_gi_completed_before_deep"
+        )
+        is True
+        for phase in typed_phases
+    )
+    post_interruption_tts_recovery_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and isinstance(phase["presentation_lease"].get("revocation"), dict)
+        and phase["presentation_lease"]["revocation"].get("tts_recovery_completed") is True
+        for phase in typed_phases
+    )
 
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "report_type": REPORT_TYPE,
         "claim_boundary": (
-            "Repeated provider-level foreground-under-deliberative-load timing distributions "
-            "only; not an Agent workflow, PresentationCommit, audible playback, simulator, "
-            "target, physical robot, or provider-promotion decision."
+            "Repeated provider-level foreground-under-deliberative-load timing distributions"
+            + (
+                " plus synthetic presentation-lease revocation distributions"
+                if presentation_lease_revocation_enabled
+                else ""
+            )
+            + "; not an Agent workflow, real user interruption, PresentationCommit, audible "
+            "playback, simulator, target, physical robot, or provider-promotion decision."
         ),
         "label": label,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -297,6 +363,13 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
             "presentation_lease_sample_count": presentation_lease_sample_count,
             "deep_paused_during_tts_count": deep_paused_during_tts_count,
             "deep_resumed_after_lease_count": deep_resumed_after_lease_count,
+            "presentation_lease_revocation_sample_count": (
+                presentation_lease_revocation_sample_count
+            ),
+            "interruption_fast_gi_completed_before_deep_count": (
+                interruption_fast_gi_before_deep_count
+            ),
+            "post_interruption_tts_recovery_count": post_interruption_tts_recovery_count,
         },
         "metrics": metrics,
     }

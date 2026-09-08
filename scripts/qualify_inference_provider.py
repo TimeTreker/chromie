@@ -124,6 +124,47 @@ class TtsObservation:
 
 
 @dataclass
+class TtsInterruptionObservation:
+    started_s: float
+    request_id: str
+    first_audio_s: float | None = None
+    cancelled_s: float | None = None
+    close_started_s: float | None = None
+    audio_bytes_before_cancel: int = 0
+    start_metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def first_audio_ms(self) -> float | None:
+        if self.first_audio_s is None:
+            return None
+        return (self.first_audio_s - self.started_s) * 1000.0
+
+    @property
+    def elapsed_ms(self) -> float | None:
+        if self.cancelled_s is None:
+            return None
+        return (self.cancelled_s - self.started_s) * 1000.0
+
+    @property
+    def close_ms(self) -> float | None:
+        if self.cancelled_s is None or self.close_started_s is None:
+            return None
+        return (self.cancelled_s - self.close_started_s) * 1000.0
+
+    def evidence(self) -> dict[str, Any]:
+        return {
+            "request_id": self.request_id,
+            "trigger": "tts_first_audio",
+            "first_audio_ms": self.first_audio_ms,
+            "elapsed_ms": self.elapsed_ms,
+            "close_ms": self.close_ms,
+            "audio_bytes_before_cancel": self.audio_bytes_before_cancel,
+            "start": self.start_metadata,
+            "cancelled_by_websocket_close": True,
+        }
+
+
+@dataclass
 class Evidence:
     provider: str
     provider_version: str
@@ -160,12 +201,27 @@ class Evidence:
             isinstance(contention_phase, dict)
             and contention_phase.get("presentation_lease") is not None
         )
+        includes_presentation_lease_revocation = (
+            includes_presentation_lease
+            and isinstance(contention_phase.get("presentation_lease"), dict)
+            and isinstance(
+                contention_phase["presentation_lease"].get("revocation"), dict
+            )
+        )
         if includes_goal_interpreter:
             claim_boundary = (
                 "Direct candidate-provider transport, provider-level contention, optional TTS "
                 "synthesis timing, and isolated current-checkout Goal Interpreter probe evidence "
                 "only; not an Agent workflow, audible playback, simulator, target, or physical "
                 "robot claim."
+            )
+        elif not includes_provider_contract and includes_presentation_lease_revocation:
+            claim_boundary = (
+                "Comparable foreground-under-deliberative-load control evidence plus an "
+                "SGLang engine-level in-place presentation lease and synthetic first-audio "
+                "revocation canary; this qualifies provider primitives only, not a production "
+                "per-request lease, real user interruption, Agent workflow, audible playback, "
+                "simulator, target, or physical robot claim."
             )
         elif not includes_provider_contract and includes_presentation_lease:
             claim_boundary = (
@@ -210,6 +266,7 @@ class Evidence:
                 "foreground_under_deliberative_load": True,
                 "tts_contention": includes_tts,
                 "presentation_compute_lease": includes_presentation_lease,
+                "presentation_lease_revocation": includes_presentation_lease_revocation,
                 "goal_interpreter_semantics": includes_goal_interpreter,
                 "audible_playback": False,
                 "agent_workflow": False,
@@ -656,6 +713,82 @@ async def _observe_tts(
     if observation.first_audio_s is None or not audio:
         raise QualificationFailure(f"TTS {label}: no audio received")
     return observation
+
+
+async def _interrupt_tts_at_first_audio(
+    url: str,
+    *,
+    speaker: str,
+    label: str,
+) -> TtsInterruptionObservation:
+    """Start TTS, observe first audio, then cancel by closing the websocket.
+
+    This models a user interruption after speech has actually become presentable.
+    The provider contract already treats websocket disconnect as request cancellation;
+    the observation retains close latency so lingering cancellation/drain work remains
+    visible in the subsequent foreground-GI timing.
+    """
+
+    request_id = f"inference-qualification-{label}"
+    observation = TtsInterruptionObservation(
+        started_s=time.perf_counter(),
+        request_id=request_id,
+    )
+    websocket = await websockets.connect(
+        url,
+        max_size=50_000_000,
+        open_timeout=None,
+        close_timeout=10,
+        ping_interval=None,
+    )
+    try:
+        await websocket.send(
+            json.dumps(
+                {
+                    "type": "synthesize_stream",
+                    "text": (
+                        "Chromie is checking that an active speech lease can be "
+                        "revoked immediately when a new user input arrives."
+                    ),
+                    "speaker_id": speaker,
+                    "request_id": request_id,
+                }
+            )
+        )
+        async for message in websocket:
+            if isinstance(message, bytes):
+                if observation.first_audio_s is None:
+                    observation.first_audio_s = time.perf_counter()
+                observation.audio_bytes_before_cancel += len(message)
+                break
+            data = json.loads(message)
+            if not isinstance(data, dict):
+                raise QualificationFailure(
+                    f"TTS {label}: control frame is not an object"
+                )
+            message_type = data.get("type")
+            if message_type == "start":
+                observation.start_metadata = data
+            elif message_type == "error":
+                raise QualificationFailure(
+                    f"TTS {label}: {data.get('message') or 'provider error'}"
+                )
+            elif message_type == "end":
+                raise QualificationFailure(
+                    f"TTS {label}: synthesis ended before first-audio interruption"
+                )
+        else:
+            raise QualificationFailure(
+                f"TTS {label}: websocket ended before first-audio interruption"
+            )
+        if observation.first_audio_s is None or observation.audio_bytes_before_cancel <= 0:
+            raise QualificationFailure(f"TTS {label}: no audio received before interruption")
+        observation.close_started_s = time.perf_counter()
+        await websocket.close(code=1000, reason="chromie qualification user interruption")
+        observation.cancelled_s = time.perf_counter()
+        return observation
+    finally:
+        await websocket.close()
 
 
 def _sglang_native_control_url(openai_base_url: str, action: str) -> str:
@@ -1159,6 +1292,7 @@ async def _qualify_foreground_under_deep_load(
     tts_speaker: str,
     require_foreground_before_deep: bool = True,
     presentation_lease_mode: str | None = None,
+    presentation_lease_revocation_probe: bool = False,
     provider_base_url: str | None = None,
 ) -> dict[str, Any]:
     """Prove foreground work can progress while deliberation remains active.
@@ -1184,6 +1318,10 @@ async def _qualify_foreground_under_deep_load(
             raise QualificationFailure("presentation lease probe requires TTS")
         if not provider_base_url:
             raise QualificationFailure("presentation lease probe requires provider base URL")
+    if presentation_lease_revocation_probe and presentation_lease_mode is None:
+        raise QualificationFailure(
+            "presentation lease revocation probe requires presentation lease mode"
+        )
 
     warmup_tts: TtsObservation | None = None
     baseline_tts: TtsObservation | None = None
@@ -1293,6 +1431,9 @@ async def _qualify_foreground_under_deep_load(
 
     presentation_lease: dict[str, Any] | None = None
     contention_tts: TtsObservation | None = None
+    interrupted_tts: TtsInterruptionObservation | None = None
+    interruption_fast_gi: StreamObservation | None = None
+    post_interruption_tts_recovery: TtsObservation | None = None
     if presentation_lease_mode is not None:
         assert provider_base_url is not None
         assert tts_url is not None
@@ -1313,20 +1454,27 @@ async def _qualify_foreground_under_deep_load(
                 "deliberative request completed before presentation pause took effect"
             )
 
-        # Give already-buffered SSE delivery a bounded moment to drain.  Any new
+        # Give already-buffered SSE delivery a bounded moment to drain. Any new
         # Deep content after this point means the engine did not stay quiescent
-        # for the TTS lease.
+        # for the presentation lease.
         pause_settle_ms = 100.0
         await asyncio.sleep(pause_settle_ms / 1000.0)
         deep_delta_count_after_pause_settle = len(deep_delta_times)
         continue_control: dict[str, Any] | None = None
         lease_error: BaseException | None = None
         try:
-            contention_tts = await _observe_tts(
-                tts_url,
-                speaker=tts_speaker,
-                label="presentation_lease",
-            )
+            if presentation_lease_revocation_probe:
+                interrupted_tts = await _interrupt_tts_at_first_audio(
+                    tts_url,
+                    speaker=tts_speaker,
+                    label="presentation_lease_interruption",
+                )
+            else:
+                contention_tts = await _observe_tts(
+                    tts_url,
+                    speaker=tts_speaker,
+                    label="presentation_lease",
+                )
             deep_delta_count_before_continue = len(deep_delta_times)
             deep_active_before_continue = not deep_task.done()
             if not deep_active_before_continue:
@@ -1355,7 +1503,6 @@ async def _qualify_foreground_under_deep_load(
             await asyncio.gather(deep_task, return_exceptions=True)
             raise lease_error
 
-        assert contention_tts is not None
         assert continue_control is not None
         presentation_lease = {
             "mode": presentation_lease_mode,
@@ -1371,6 +1518,54 @@ async def _qualify_foreground_under_deep_load(
             "pause": pause,
             "continue": continue_control,
         }
+
+        if presentation_lease_revocation_probe:
+            assert interrupted_tts is not None
+            assert interrupted_tts.first_audio_s is not None
+            deep_active_at_interrupt_gi_start = not deep_task.done()
+            if not deep_active_at_interrupt_gi_start:
+                raise QualificationFailure(
+                    "deliberative request ended before interrupted foreground GI could run"
+                )
+            interruption_fast_gi = await _observe_stream(
+                client,
+                endpoint,
+                _chat_payload(
+                    fast_gi_model,
+                    "Reply with exactly: chromie-interrupt-fast-gi-ready",
+                    provider=provider,
+                    stream=True,
+                    max_tokens=32,
+                    priority=foreground_priority,
+                ),
+                label="interruption_fast_gi",
+            )
+            _assert_complete_stream(interruption_fast_gi)
+            if interruption_fast_gi.text.strip() != "chromie-interrupt-fast-gi-ready":
+                raise QualificationFailure(
+                    "interruption_fast_gi: unexpected output "
+                    f"{interruption_fast_gi.text.strip()!r}"
+                )
+            presentation_lease["revocation"] = {
+                "enabled": True,
+                "trigger": "tts_first_audio",
+                "tts": interrupted_tts.evidence(),
+                "deep_active_at_interrupt_gi_start": deep_active_at_interrupt_gi_start,
+                "continue_ack_from_interrupt_trigger_ms": (
+                    continue_control["finished_s"] - interrupted_tts.first_audio_s
+                )
+                * 1000.0,
+                "interrupt_gi_start_from_interrupt_trigger_ms": (
+                    interruption_fast_gi.started_s - interrupted_tts.first_audio_s
+                )
+                * 1000.0,
+                "interrupt_gi_first_delta_from_interrupt_trigger_ms": (
+                    interruption_fast_gi.first_delta_s - interrupted_tts.first_audio_s
+                )
+                * 1000.0
+                if interruption_fast_gi.first_delta_s is not None
+                else None,
+            }
     else:
         contention_tts = (
             await contention_tts_task if contention_tts_task is not None else None
@@ -1405,49 +1600,88 @@ async def _qualify_foreground_under_deep_load(
         ) * 1000.0
         presentation_lease["deep_finished_after_continue"] = True
 
-    tts_evidence: dict[str, Any] | None = None
-    if contention_tts is not None and baseline_tts is not None and warmup_tts is not None:
-        first_audio_ratio = None
-        if baseline_tts.first_audio_ms and contention_tts.first_audio_ms:
-            first_audio_ratio = contention_tts.first_audio_ms / baseline_tts.first_audio_ms
-        elapsed_ratio = None
-        if baseline_tts.elapsed_ms and contention_tts.elapsed_ms:
-            elapsed_ratio = contention_tts.elapsed_ms / baseline_tts.elapsed_ms
-
-        if presentation_lease is not None:
-            tts_evidence = {
-                "measurement_mode": "presentation_lease",
-                "discarded_warmup": warmup_tts.evidence(),
-                "baseline": baseline_tts.evidence(),
-                "presentation_lease": contention_tts.evidence(),
-                "first_audio_slowdown_ratio": first_audio_ratio,
-                "total_slowdown_ratio": elapsed_ratio,
-                "audio_was_generated_but_not_played": True,
-            }
-        else:
-            if contention_tts.finished_s is None or fast_planner.finished_s is None:
-                raise QualificationFailure("TTS/foreground contention timing missing")
-            foreground_window_start = fast_gi.started_s
-            foreground_window_finish = fast_planner.finished_s
-            overlap_proven = (
-                contention_tts.started_s < foreground_window_finish
-                and foreground_window_start < contention_tts.finished_s
-            )
-            if not overlap_proven:
+        if presentation_lease_revocation_probe:
+            assert interruption_fast_gi is not None
+            assert interruption_fast_gi.finished_s is not None
+            interrupt_gi_completed_before_deep = interruption_fast_gi.finished_s < deep.finished_s
+            if not interrupt_gi_completed_before_deep:
                 raise QualificationFailure(
-                    "TTS synthesis did not overlap the Fast-GI/Fast-Planner foreground window "
-                    "while deliberation remained active"
+                    "interrupted foreground GI did not complete while deliberation remained active"
+                )
+            presentation_lease["revocation"]["interrupt_gi_completed_before_deep"] = True
+            presentation_lease["revocation"]["deep_resumed_after_revocation"] = True
+            post_interruption_tts_recovery = await _observe_tts(
+                tts_url,
+                speaker=tts_speaker,
+                label="post_interruption_recovery",
+            )
+            presentation_lease["revocation"]["tts_recovery_completed"] = True
+
+    tts_evidence: dict[str, Any] | None = None
+    if baseline_tts is not None and warmup_tts is not None:
+        if presentation_lease_revocation_probe:
+            assert interrupted_tts is not None
+            assert post_interruption_tts_recovery is not None
+            first_audio_ratio = None
+            if baseline_tts.first_audio_ms and interrupted_tts.first_audio_ms:
+                first_audio_ratio = interrupted_tts.first_audio_ms / baseline_tts.first_audio_ms
+            recovery_first_audio_ratio = None
+            if baseline_tts.first_audio_ms and post_interruption_tts_recovery.first_audio_ms:
+                recovery_first_audio_ratio = (
+                    post_interruption_tts_recovery.first_audio_ms / baseline_tts.first_audio_ms
                 )
             tts_evidence = {
-                "measurement_mode": "concurrent_foreground_and_deliberative",
-                "overlap_proven": True,
+                "measurement_mode": "presentation_lease_revocation",
                 "discarded_warmup": warmup_tts.evidence(),
                 "baseline": baseline_tts.evidence(),
-                "under_foreground_and_deliberative_load": contention_tts.evidence(),
+                "interrupted_presentation_lease": interrupted_tts.evidence(),
                 "first_audio_slowdown_ratio": first_audio_ratio,
-                "total_slowdown_ratio": elapsed_ratio,
+                "post_interruption_recovery": post_interruption_tts_recovery.evidence(),
+                "post_interruption_recovery_first_audio_ratio": recovery_first_audio_ratio,
                 "audio_was_generated_but_not_played": True,
             }
+        elif contention_tts is not None:
+            first_audio_ratio = None
+            if baseline_tts.first_audio_ms and contention_tts.first_audio_ms:
+                first_audio_ratio = contention_tts.first_audio_ms / baseline_tts.first_audio_ms
+            elapsed_ratio = None
+            if baseline_tts.elapsed_ms and contention_tts.elapsed_ms:
+                elapsed_ratio = contention_tts.elapsed_ms / baseline_tts.elapsed_ms
+
+            if presentation_lease is not None:
+                tts_evidence = {
+                    "measurement_mode": "presentation_lease",
+                    "discarded_warmup": warmup_tts.evidence(),
+                    "baseline": baseline_tts.evidence(),
+                    "presentation_lease": contention_tts.evidence(),
+                    "first_audio_slowdown_ratio": first_audio_ratio,
+                    "total_slowdown_ratio": elapsed_ratio,
+                    "audio_was_generated_but_not_played": True,
+                }
+            else:
+                if contention_tts.finished_s is None or fast_planner.finished_s is None:
+                    raise QualificationFailure("TTS/foreground contention timing missing")
+                foreground_window_start = fast_gi.started_s
+                foreground_window_finish = fast_planner.finished_s
+                overlap_proven = (
+                    contention_tts.started_s < foreground_window_finish
+                    and foreground_window_start < contention_tts.finished_s
+                )
+                if not overlap_proven:
+                    raise QualificationFailure(
+                        "TTS synthesis did not overlap the Fast-GI/Fast-Planner foreground window "
+                        "while deliberation remained active"
+                    )
+                tts_evidence = {
+                    "measurement_mode": "concurrent_foreground_and_deliberative",
+                    "overlap_proven": True,
+                    "discarded_warmup": warmup_tts.evidence(),
+                    "baseline": baseline_tts.evidence(),
+                    "under_foreground_and_deliberative_load": contention_tts.evidence(),
+                    "first_audio_slowdown_ratio": first_audio_ratio,
+                    "total_slowdown_ratio": elapsed_ratio,
+                    "audio_was_generated_but_not_played": True,
+                }
 
     scheduling_pass = (
         deep_active_at_fast_gi_start
@@ -1463,8 +1697,35 @@ async def _qualify_foreground_under_deep_load(
             and presentation_lease.get("deep_resumed_after_continue") is True
         )
     )
+    revocation_pass = (
+        not presentation_lease_revocation_probe
+        or (
+            presentation_lease is not None
+            and presentation_lease.get("revocation", {}).get(
+                "deep_active_at_interrupt_gi_start"
+            )
+            is True
+            and presentation_lease.get("revocation", {}).get(
+                "interrupt_gi_completed_before_deep"
+            )
+            is True
+            and presentation_lease.get("revocation", {}).get("tts_recovery_completed") is True
+        )
+    )
+    requests = {
+        "deliberative": deep.evidence(),
+        "fast_gi_canary": fast_gi.evidence(),
+        "fast_planner_canary": fast_planner.evidence(),
+    }
+    if interruption_fast_gi is not None:
+        requests["interruption_fast_gi_canary"] = interruption_fast_gi.evidence()
+
     return {
-        "status": "pass" if scheduling_pass and presentation_lease_pass else "control_observed",
+        "status": (
+            "pass"
+            if scheduling_pass and presentation_lease_pass and revocation_pass
+            else "control_observed"
+        ),
         "acceptance_required": require_foreground_before_deep,
         "claim_boundary": (
             "Provider-level priority/contention evidence"
@@ -1473,8 +1734,13 @@ async def _qualify_foreground_under_deep_load(
                 if presentation_lease is not None
                 else ""
             )
-            + "; no production per-request compute lease, end-to-end PresentationCommit, "
-            "or human-interaction latency threshold is claimed."
+            + (
+                " plus synthetic first-audio lease revocation and interrupted-GI evidence"
+                if presentation_lease_revocation_probe
+                else ""
+            )
+            + "; no production per-request compute lease, real user interruption, "
+            "end-to-end PresentationCommit, or human-interaction latency threshold is claimed."
         ),
         "provider_priority_semantics": _provider_priority_semantics(provider),
         "qualification_only_priority_mapping": priorities,
@@ -1487,14 +1753,11 @@ async def _qualify_foreground_under_deep_load(
         "deep_active_at_fast_gi_start": deep_active_at_fast_gi_start,
         "deep_active_at_fast_planner_start": deep_active_at_fast_planner_start,
         "foreground_completed_before_deep": foreground_completed_before_deep,
-        "requests": {
-            "deliberative": deep.evidence(),
-            "fast_gi_canary": fast_gi.evidence(),
-            "fast_planner_canary": fast_planner.evidence(),
-        },
+        "requests": requests,
         "presentation_lease": presentation_lease,
         "tts": tts_evidence,
     }
+
 
 
 async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
@@ -1567,6 +1830,9 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                     tts_speaker=args.tts_speaker,
                     require_foreground_before_deep=(args.provider != "ollama"),
                     presentation_lease_mode=args.presentation_lease_mode,
+                    presentation_lease_revocation_probe=(
+                        args.presentation_lease_revocation_probe
+                    ),
                     provider_base_url=args.base_url,
                 )
             )
@@ -1940,6 +2206,15 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--presentation-lease-revocation-probe",
+        action="store_true",
+        help=(
+            "Qualification-only synthetic user interruption: during an in-place "
+            "presentation lease, cancel TTS at first audio, resume SGLang, and require "
+            "a new foreground GI canary to complete while Deep remains active."
+        ),
+    )
+    parser.add_argument(
         "--contention-only",
         action="store_true",
         help=(
@@ -1999,6 +2274,10 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("--presentation-lease-mode requires --contention-only")
         if not args.tts_url:
             raise SystemExit("--presentation-lease-mode requires --tts-url")
+    if args.presentation_lease_revocation_probe and args.presentation_lease_mode is None:
+        raise SystemExit(
+            "--presentation-lease-revocation-probe requires --presentation-lease-mode"
+        )
     try:
         args.contention_model_topology = _resolve_contention_model_topology(args)
     except ValueError as exc:
@@ -2037,7 +2316,13 @@ def main(argv: list[str] | None = None) -> int:
             "priority_step": args.priority_step,
         },
         workload_config={
-            "contention_protocol_version": 3 if args.presentation_lease_mode else 2,
+            "contention_protocol_version": (
+                4
+                if args.presentation_lease_revocation_probe
+                else 3
+                if args.presentation_lease_mode
+                else 2
+            ),
             "contention_only": bool(args.contention_only),
             "model_topology": args.contention_model_topology,
             "deliberative_context_repeat": args.deliberative_context_repeat,
@@ -2051,6 +2336,10 @@ def main(argv: list[str] | None = None) -> int:
                 "pause_settle_ms": 100.0 if args.presentation_lease_mode else None,
                 "continue_torch_empty_cache": (
                     False if args.presentation_lease_mode else None
+                ),
+                "revocation_probe": bool(args.presentation_lease_revocation_probe),
+                "revocation_trigger": (
+                    "tts_first_audio" if args.presentation_lease_revocation_probe else None
                 ),
             },
             "reasoning_control": {

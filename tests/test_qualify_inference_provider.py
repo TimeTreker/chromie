@@ -10,6 +10,7 @@ from scripts.qualify_inference_provider import (
     DEFAULT_GOAL_INTERPRETER_MANIFEST,
     QualificationFailure,
     StreamObservation,
+    TtsInterruptionObservation,
     TtsObservation,
     _assert_complete_stream,
     _binding_value_matches,
@@ -600,6 +601,139 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                     {"torch_empty_cache": False},
                 ),
             ],
+        )
+
+    async def test_presentation_lease_revocation_unblocks_interrupted_gi(self) -> None:
+        release_deep = asyncio.Event()
+        controls: list[str] = []
+
+        def observation(label: str, text: str) -> StreamObservation:
+            started = time.perf_counter()
+            return StreamObservation(
+                label=label,
+                started_s=started,
+                first_delta_s=started + 0.001,
+                last_delta_s=started + 0.002,
+                finished_s=started + 0.003,
+                delta_count=1,
+                text=text,
+                finish_reason="stop",
+                terminal_seen=True,
+            )
+
+        async def fake_observe_stream(
+            client, endpoint, payload, *, label, first_delta_event=None, delta_times=None
+        ):
+            del client, endpoint, payload
+            if label == "deliberative_load":
+                started = time.perf_counter()
+                if delta_times is not None:
+                    delta_times.append(started)
+                if first_delta_event is not None:
+                    first_delta_event.set()
+                await release_deep.wait()
+                resumed = time.perf_counter()
+                if delta_times is not None:
+                    delta_times.append(resumed)
+                result = observation(label, "1 2 3")
+                result.started_s = started
+                result.first_delta_s = started + 0.001
+                result.finished_s = resumed + 0.02
+                result.last_delta_s = resumed + 0.01
+                return result
+            if label == "foreground_fast_gi":
+                return observation(label, "chromie-fast-gi-ready")
+            if label == "foreground_fast_planner":
+                return observation(label, "chromie-presentation-commit-ready")
+            if label == "interruption_fast_gi":
+                result = observation(label, "chromie-interrupt-fast-gi-ready")
+                release_deep.set()
+                return result
+            raise AssertionError(label)
+
+        async def fake_observe_tts(url, *, speaker, label):
+            del url, speaker
+            started = time.perf_counter()
+            return TtsObservation(
+                started_s=started,
+                first_audio_s=started + 0.001,
+                finished_s=started + 0.002,
+                audio_bytes=16,
+                audio_sha256=f"sha-{label}",
+            )
+
+        async def fake_interrupt_tts(url, *, speaker, label):
+            del url, speaker
+            now = time.perf_counter()
+            return TtsInterruptionObservation(
+                started_s=now - 0.02,
+                request_id=f"test-{label}",
+                first_audio_s=now - 0.01,
+                close_started_s=now - 0.002,
+                cancelled_s=now,
+                audio_bytes_before_cancel=8,
+            )
+
+        async def fake_control(client, *, url, label, payload):
+            del client, url, payload
+            controls.append(label)
+            started = time.perf_counter()
+            finished = time.perf_counter()
+            return {
+                "started_s": started,
+                "finished_s": finished,
+                "elapsed_ms": (finished - started) * 1000.0,
+                "request": {},
+                "response": {"status": "ok"},
+            }
+
+        with (
+            patch(
+                "scripts.qualify_inference_provider._observe_stream",
+                side_effect=fake_observe_stream,
+            ),
+            patch(
+                "scripts.qualify_inference_provider._observe_tts",
+                side_effect=fake_observe_tts,
+            ),
+            patch(
+                "scripts.qualify_inference_provider._interrupt_tts_at_first_audio",
+                side_effect=fake_interrupt_tts,
+            ),
+            patch(
+                "scripts.qualify_inference_provider._post_generation_control",
+                side_effect=fake_control,
+            ),
+        ):
+            result = await _qualify_foreground_under_deep_load(
+                object(),
+                "http://127.0.0.1:30000/v1/chat/completions",
+                provider="sglang",
+                fast_gi_model="chromie-qwen35-9b-sglang",
+                fast_planner_model="chromie-qwen35-9b-sglang",
+                deliberative_model="chromie-qwen35-9b-sglang",
+                priority_step=100,
+                deliberative_context_repeat=1,
+                deliberative_max_tokens=256,
+                tts_url="ws://127.0.0.1:5000",
+                tts_speaker="chromie_mixed",
+                require_foreground_before_deep=True,
+                presentation_lease_mode="in_place",
+                presentation_lease_revocation_probe=True,
+                provider_base_url="http://127.0.0.1:30000/v1",
+            )
+
+        revocation = result["presentation_lease"]["revocation"]
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["tts"]["measurement_mode"], "presentation_lease_revocation")
+        self.assertTrue(revocation["deep_active_at_interrupt_gi_start"])
+        self.assertTrue(revocation["interrupt_gi_completed_before_deep"])
+        self.assertTrue(revocation["tts_recovery_completed"])
+        self.assertTrue(revocation["tts"]["cancelled_by_websocket_close"])
+        self.assertIn("interruption_fast_gi_canary", result["requests"])
+        self.assertEqual(
+            controls,
+            ["presentation_lease_pause", "presentation_lease_continue"],
         )
 
 
