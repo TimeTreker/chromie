@@ -59,4 +59,12 @@ def test_sglang_priority_scheduling_uses_fcfs_base_queue_and_preemption() -> Non
     assert "--priority-scheduling-preemption-threshold" in command
     assert "--chunked-prefill-size" in command
     assert "--schedule-conservativeness" in command
-    assert "--mem-fraction-static" in command
+    assert command[command.index("--max-running-requests") + 1] == (
+        "${SGLANG_MAX_RUNNING_REQUESTS:-2}"
+    )
+    assert command[command.index("--max-mamba-cache-size") + 1] == (
+        "${SGLANG_MAX_MAMBA_CACHE_SIZE:-10}"
+    )
+    assert command[command.index("--mem-fraction-static") + 1] == (
+        "${SGLANG_MEM_FRACTION_STATIC:-0.80}"
+    )

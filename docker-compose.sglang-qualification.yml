@@ -44,8 +44,12 @@ services:
       - ${SGLANG_CHUNKED_PREFILL_SIZE:-2048}
       - --schedule-conservativeness
       - ${SGLANG_SCHEDULE_CONSERVATIVENESS:-1.0}
+      - --max-running-requests
+      - ${SGLANG_MAX_RUNNING_REQUESTS:-2}
+      - --max-mamba-cache-size
+      - ${SGLANG_MAX_MAMBA_CACHE_SIZE:-10}
       - --mem-fraction-static
-      - ${SGLANG_MEM_FRACTION_STATIC:-0.70}
+      - ${SGLANG_MEM_FRACTION_STATIC:-0.80}
       - --enable-metrics
       - --enable-request-time-stats-logging
     ulimits:

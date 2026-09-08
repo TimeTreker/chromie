@@ -243,14 +243,32 @@ export SGLANG_DEFAULT_PRIORITY_VALUE=0
 export SGLANG_PRIORITY_PREEMPTION_THRESHOLD=10
 export SGLANG_CHUNKED_PREFILL_SIZE=2048
 export SGLANG_SCHEDULE_CONSERVATIVENESS=1.0
-export SGLANG_MEM_FRACTION_STATIC=0.70
+# This single-user contention probe needs one Deep + one foreground request.
+export SGLANG_MAX_RUNNING_REQUESTS=2
+# Qwen3.5 uses the default extra-buffer hybrid-state strategy: 5 state slots/request.
+export SGLANG_MAX_MAMBA_CACHE_SIZE=10
+export SGLANG_MEM_FRACTION_STATIC=0.80
 
 docker compose -f docker-compose.sglang-qualification.yml up -d \
   chromie-llm-sglang-qualification
 ```
 
-The starting memory fraction intentionally leaves shared-GPU headroom for TTS; it is not an
-accepted optimum. Tune and qualify it on the actual target.
+These are qualification starting values, not architecture constants or production defaults.
+On the retained RTX 5090 + Qwen3.5-9B + CosyVoice3 path, two failed probes established a bounded
+shared-GPU window rather than an arbitrary tuning preference: starting SGLang first at
+`mem_fraction_static=0.70` let SGLang become ready but the later TTS warm synthesis failed during
+cuFFT initialization; warming TTS first and then starting SGLang at `0.60` failed even earlier
+because SGLang 0.5.19 computes its non-static slack from the GPU memory available before model
+load. With TTS already resident, that setting reserved more slack than remained after the 17.6 GB
+Qwen weights, and the hybrid Mamba/KV budget became negative.
+
+For the foreground-under-Deep experiment, Chromie needs only two simultaneous model requests.
+Pinning `max_running_requests=2` prevents irrelevant multi-user concurrency from consuming runtime
+state, while `max_mamba_cache_size=10` matches Qwen3.5's observed/default five hybrid-state slots
+per request and preserves the existing FP32 SSM state dtype. The `0.80` memory fraction is the next
+measured candidate because, with TTS pre-warmed, it retains materially more runtime slack than an
+exclusive-GPU setup while leaving enough static budget for weights plus the two-request state/KV
+pools. It is not accepted until the exact contention workload completes with TTS alive.
 
 ### Candidate-provider contention harness
 
@@ -316,7 +334,7 @@ python scripts/qualify_inference_provider.py \
   --model-revision "$SGLANG_MODEL_REVISION" \
   --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"safetensors","quantization":"none","dtype":"bfloat16"}' \
   --cuda-runtime '<exact-cuda-runtime>' \
-  --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
+  --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"max_running_requests":2,"max_mamba_cache_size":10,"mem_fraction_static":0.80}' \
   --tts-url ws://127.0.0.1:5000 \
   --goal-interpreter-probe \
   --output .chromie/acceptance/inference-runtime/sglang-provider.json
@@ -423,7 +441,7 @@ python scripts/run_inference_contention_series.py \
   --model-revision "$SGLANG_MODEL_REVISION" \
   --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-4B","weight_format":"safetensors","quantization":"none","dtype":"bfloat16"}' \
   --cuda-runtime '<exact-cuda-runtime>' \
-  --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.70}' \
+  --scheduler-config-json '{"schedule_policy":"fcfs","priority_scheduling":true,"default_priority_value":0,"priority_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"max_running_requests":2,"max_mamba_cache_size":10,"mem_fraction_static":0.80}' \
   --contention-only \
   --tts-url ws://127.0.0.1:5000
 ```
