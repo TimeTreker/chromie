@@ -646,9 +646,11 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
             if label == "foreground_fast_planner":
                 return observation(label, "chromie-presentation-commit-ready")
             if label == "interruption_fast_gi":
-                result = observation(label, "chromie-interrupt-fast-gi-ready")
-                release_deep.set()
-                return result
+                return observation(label, "chromie-interrupt-fast-gi-ready")
+            if label == "interruption_fast_planner":
+                return observation(
+                    label, "chromie-interrupt-presentation-commit-ready"
+                )
             raise AssertionError(label)
 
         async def fake_observe_tts(url, *, speaker, label):
@@ -677,6 +679,8 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
         async def fake_control(client, *, url, label, payload):
             del client, url, payload
             controls.append(label)
+            if label == "presentation_lease_revocation_reacquire_continue":
+                release_deep.set()
             started = time.perf_counter()
             finished = time.perf_counter()
             return {
@@ -728,12 +732,30 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["tts"]["measurement_mode"], "presentation_lease_revocation")
         self.assertTrue(revocation["deep_active_at_interrupt_gi_start"])
         self.assertTrue(revocation["interrupt_gi_completed_before_deep"])
+        self.assertTrue(revocation["interrupt_planner_completed_before_deep"])
         self.assertTrue(revocation["tts_recovery_completed"])
         self.assertTrue(revocation["tts"]["cancelled_by_websocket_close"])
+        self.assertEqual(
+            revocation["reacquired_presentation_lease"][
+                "deep_deltas_during_recovery_tts"
+            ],
+            0,
+        )
+        self.assertTrue(
+            revocation["reacquired_presentation_lease"][
+                "deep_resumed_after_continue"
+            ]
+        )
         self.assertIn("interruption_fast_gi_canary", result["requests"])
+        self.assertIn("interruption_fast_planner_canary", result["requests"])
         self.assertEqual(
             controls,
-            ["presentation_lease_pause", "presentation_lease_continue"],
+            [
+                "presentation_lease_pause",
+                "presentation_lease_continue",
+                "presentation_lease_revocation_reacquire_pause",
+                "presentation_lease_revocation_reacquire_continue",
+            ],
         )
 
 

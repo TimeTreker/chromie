@@ -1433,6 +1433,7 @@ async def _qualify_foreground_under_deep_load(
     contention_tts: TtsObservation | None = None
     interrupted_tts: TtsInterruptionObservation | None = None
     interruption_fast_gi: StreamObservation | None = None
+    interruption_fast_planner: StreamObservation | None = None
     post_interruption_tts_recovery: TtsObservation | None = None
     if presentation_lease_mode is not None:
         assert provider_base_url is not None
@@ -1546,8 +1547,99 @@ async def _qualify_foreground_under_deep_load(
                     "interruption_fast_gi: unexpected output "
                     f"{interruption_fast_gi.text.strip()!r}"
                 )
+
+            interruption_fast_planner = await _observe_stream(
+                client,
+                endpoint,
+                _chat_payload(
+                    fast_planner_model,
+                    "Reply with exactly: chromie-interrupt-presentation-commit-ready",
+                    provider=provider,
+                    stream=True,
+                    max_tokens=32,
+                    priority=foreground_priority,
+                ),
+                label="interruption_fast_planner",
+            )
+            _assert_complete_stream(interruption_fast_planner)
+            if (
+                interruption_fast_planner.text.strip()
+                != "chromie-interrupt-presentation-commit-ready"
+            ):
+                raise QualificationFailure(
+                    "interruption_fast_planner: unexpected output "
+                    f"{interruption_fast_planner.text.strip()!r}"
+                )
+
+            # The first-audio interruption revokes the old speech lease so the
+            # new GI/Planner can run.  Once that new foreground transaction reaches
+            # its synthetic PresentationCommit, acquire a *new* presentation lease
+            # before asking TTS to speak again.  Letting Deep run during the recovery
+            # synthesis would recreate the cross-process GPU contention this lease is
+            # meant to prevent and can also starve the old TTS cancellation drain.
+            deep_active_at_reacquire_request = not deep_task.done()
+            if not deep_active_at_reacquire_request:
+                raise QualificationFailure(
+                    "deliberative request ended before interrupted presentation lease "
+                    "could be reacquired"
+                )
+            reacquire_pause = await _post_generation_control(
+                client,
+                url=_sglang_native_control_url(provider_base_url, "pause_generation"),
+                label="presentation_lease_revocation_reacquire_pause",
+                payload={"mode": presentation_lease_mode},
+            )
+            deep_active_after_reacquire_pause_ack = not deep_task.done()
+            if not deep_active_after_reacquire_pause_ack:
+                raise QualificationFailure(
+                    "deliberative request completed before interrupted presentation "
+                    "reacquire pause took effect"
+                )
+            await asyncio.sleep(pause_settle_ms / 1000.0)
+            deep_delta_count_after_reacquire_settle = len(deep_delta_times)
+            reacquire_continue: dict[str, Any] | None = None
+            recovery_error: BaseException | None = None
+            try:
+                post_interruption_tts_recovery = await _observe_tts(
+                    tts_url,
+                    speaker=tts_speaker,
+                    label="post_interruption_recovery",
+                )
+                deep_delta_count_before_reacquire_continue = len(deep_delta_times)
+                deep_active_before_reacquire_continue = not deep_task.done()
+                if not deep_active_before_reacquire_continue:
+                    raise QualificationFailure(
+                        "deliberative request completed while interrupted presentation "
+                        "lease was held"
+                    )
+                deep_deltas_during_recovery_tts = (
+                    deep_delta_count_before_reacquire_continue
+                    - deep_delta_count_after_reacquire_settle
+                )
+                if deep_deltas_during_recovery_tts != 0:
+                    raise QualificationFailure(
+                        "deliberative stream advanced while interrupted presentation "
+                        "lease was held: "
+                        f"{deep_deltas_during_recovery_tts} content deltas"
+                    )
+            except BaseException as exc:
+                recovery_error = exc
+            finally:
+                reacquire_continue = await _post_generation_control(
+                    client,
+                    url=_sglang_native_control_url(provider_base_url, "continue_generation"),
+                    label="presentation_lease_revocation_reacquire_continue",
+                    payload={"torch_empty_cache": False},
+                )
+            if recovery_error is not None:
+                deep_task.cancel()
+                await asyncio.gather(deep_task, return_exceptions=True)
+                raise recovery_error
+
+            assert reacquire_continue is not None
             presentation_lease["revocation"] = {
                 "enabled": True,
+                "roundtrip_protocol": 1,
                 "trigger": "tts_first_audio",
                 "tts": interrupted_tts.evidence(),
                 "deep_active_at_interrupt_gi_start": deep_active_at_interrupt_gi_start,
@@ -1565,6 +1657,29 @@ async def _qualify_foreground_under_deep_load(
                 * 1000.0
                 if interruption_fast_gi.first_delta_s is not None
                 else None,
+                "interrupt_planner_finished_from_interrupt_trigger_ms": (
+                    interruption_fast_planner.finished_s - interrupted_tts.first_audio_s
+                )
+                * 1000.0
+                if interruption_fast_planner.finished_s is not None
+                else None,
+                "reacquired_presentation_lease": {
+                    "deep_active_at_pause_request": deep_active_at_reacquire_request,
+                    "deep_active_after_pause_ack": deep_active_after_reacquire_pause_ack,
+                    "deep_active_before_continue": deep_active_before_reacquire_continue,
+                    "deep_delta_count_after_pause_settle": (
+                        deep_delta_count_after_reacquire_settle
+                    ),
+                    "deep_delta_count_before_continue": (
+                        deep_delta_count_before_reacquire_continue
+                    ),
+                    "deep_deltas_during_recovery_tts": (
+                        deep_deltas_during_recovery_tts
+                    ),
+                    "pause": reacquire_pause,
+                    "continue": reacquire_continue,
+                },
+                "tts_recovery_completed": True,
             }
     else:
         contention_tts = (
@@ -1602,20 +1717,48 @@ async def _qualify_foreground_under_deep_load(
 
         if presentation_lease_revocation_probe:
             assert interruption_fast_gi is not None
+            assert interruption_fast_planner is not None
             assert interruption_fast_gi.finished_s is not None
+            assert interruption_fast_planner.finished_s is not None
             interrupt_gi_completed_before_deep = interruption_fast_gi.finished_s < deep.finished_s
+            interrupt_planner_completed_before_deep = (
+                interruption_fast_planner.finished_s < deep.finished_s
+            )
             if not interrupt_gi_completed_before_deep:
                 raise QualificationFailure(
                     "interrupted foreground GI did not complete while deliberation remained active"
                 )
+            if not interrupt_planner_completed_before_deep:
+                raise QualificationFailure(
+                    "interrupted foreground Planner did not complete while deliberation remained active"
+                )
             presentation_lease["revocation"]["interrupt_gi_completed_before_deep"] = True
-            presentation_lease["revocation"]["deep_resumed_after_revocation"] = True
-            post_interruption_tts_recovery = await _observe_tts(
-                tts_url,
-                speaker=tts_speaker,
-                label="post_interruption_recovery",
+            presentation_lease["revocation"][
+                "interrupt_planner_completed_before_deep"
+            ] = True
+            reacquired = presentation_lease["revocation"][
+                "reacquired_presentation_lease"
+            ]
+            reacquire_continue_finished_s = reacquired["continue"]["finished_s"]
+            reacquire_resumed_delta_s = next(
+                (
+                    value
+                    for value in deep_delta_times
+                    if value > reacquire_continue_finished_s
+                ),
+                None,
             )
-            presentation_lease["revocation"]["tts_recovery_completed"] = True
+            if reacquire_resumed_delta_s is None:
+                raise QualificationFailure(
+                    "deliberative request did not resume after interrupted presentation "
+                    "lease release"
+                )
+            reacquired["deep_resumed_after_continue"] = True
+            reacquired["resume_to_next_delta_ms"] = (
+                reacquire_resumed_delta_s - reacquire_continue_finished_s
+            ) * 1000.0
+            reacquired["deep_finished_after_continue"] = True
+            presentation_lease["revocation"]["deep_resumed_after_revocation"] = True
 
     tts_evidence: dict[str, Any] | None = None
     if baseline_tts is not None and warmup_tts is not None:
@@ -1709,7 +1852,19 @@ async def _qualify_foreground_under_deep_load(
                 "interrupt_gi_completed_before_deep"
             )
             is True
+            and presentation_lease.get("revocation", {}).get(
+                "interrupt_planner_completed_before_deep"
+            )
+            is True
             and presentation_lease.get("revocation", {}).get("tts_recovery_completed") is True
+            and presentation_lease.get("revocation", {})
+            .get("reacquired_presentation_lease", {})
+            .get("deep_deltas_during_recovery_tts")
+            == 0
+            and presentation_lease.get("revocation", {})
+            .get("reacquired_presentation_lease", {})
+            .get("deep_resumed_after_continue")
+            is True
         )
     )
     requests = {
@@ -1719,6 +1874,8 @@ async def _qualify_foreground_under_deep_load(
     }
     if interruption_fast_gi is not None:
         requests["interruption_fast_gi_canary"] = interruption_fast_gi.evidence()
+    if interruption_fast_planner is not None:
+        requests["interruption_fast_planner_canary"] = interruption_fast_planner.evidence()
 
     return {
         "status": (
@@ -2209,9 +2366,9 @@ def _parser() -> argparse.ArgumentParser:
         "--presentation-lease-revocation-probe",
         action="store_true",
         help=(
-            "Qualification-only synthetic user interruption: during an in-place "
-            "presentation lease, cancel TTS at first audio, resume SGLang, and require "
-            "a new foreground GI canary to complete while Deep remains active."
+            "Qualification-only synthetic user interruption round-trip: cancel TTS at "
+            "first audio, resume SGLang for new foreground GI + Planner, reacquire the "
+            "presentation lease for recovery TTS, then resume Deep."
         ),
     )
     parser.add_argument(
@@ -2317,7 +2474,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         workload_config={
             "contention_protocol_version": (
-                4
+                5
                 if args.presentation_lease_revocation_probe
                 else 3
                 if args.presentation_lease_mode
@@ -2340,6 +2497,11 @@ def main(argv: list[str] | None = None) -> int:
                 "revocation_probe": bool(args.presentation_lease_revocation_probe),
                 "revocation_trigger": (
                     "tts_first_audio" if args.presentation_lease_revocation_probe else None
+                ),
+                "revocation_roundtrip": (
+                    "resume_new_gi_planner_then_reacquire_for_tts"
+                    if args.presentation_lease_revocation_probe
+                    else None
                 ),
             },
             "reasoning_control": {

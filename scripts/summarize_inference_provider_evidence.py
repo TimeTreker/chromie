@@ -126,6 +126,15 @@ def _metric_values(samples: list[dict[str, Any]], *path: str) -> list[float]:
     return values
 
 
+
+
+def _scaled_metric_values(
+    samples: list[dict[str, Any]],
+    *path: str,
+    scale: float,
+) -> list[float]:
+    return [value * scale for value in _metric_values(samples, *path)]
+
 def _foreground_window_ms(phase: dict[str, Any]) -> float | None:
     requests = phase.get("requests")
     if not isinstance(requests, dict):
@@ -212,6 +221,22 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
                 typed_phases, "requests", "interruption_fast_gi_canary", "elapsed_ms"
             )
         ),
+        "interruption_fast_planner_ttft_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "requests",
+                "interruption_fast_planner_canary",
+                "ttft_ms",
+            )
+        ),
+        "interruption_fast_planner_elapsed_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "requests",
+                "interruption_fast_planner_canary",
+                "elapsed_ms",
+            )
+        ),
         "deliberative_ttft_ms": distribution(
             _metric_values(typed_phases, "requests", "deliberative", "ttft_ms")
         ),
@@ -264,12 +289,69 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
                 "close_ms",
             )
         ),
+        "presentation_lease_revocation_to_planner_finish_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "revocation",
+                "interrupt_planner_finished_from_interrupt_trigger_ms",
+            )
+        ),
+        "presentation_lease_reacquire_pause_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "revocation",
+                "reacquired_presentation_lease",
+                "pause",
+                "elapsed_ms",
+            )
+        ),
+        "presentation_lease_reacquire_continue_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "revocation",
+                "reacquired_presentation_lease",
+                "continue",
+                "elapsed_ms",
+            )
+        ),
+        "presentation_lease_reacquire_resume_to_next_delta_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "revocation",
+                "reacquired_presentation_lease",
+                "resume_to_next_delta_ms",
+            )
+        ),
         "post_interruption_tts_recovery_first_audio_ms": distribution(
             _metric_values(
                 typed_phases,
                 "tts",
                 "post_interruption_recovery",
                 "first_audio_ms",
+            )
+        ),
+        "post_interruption_tts_recovery_queue_wait_ms": distribution(
+            _scaled_metric_values(
+                typed_phases,
+                "tts",
+                "post_interruption_recovery",
+                "end",
+                "queue_wait_seconds",
+                scale=1000.0,
+            )
+        ),
+        "post_interruption_tts_recovery_native_first_audio_ms": distribution(
+            _scaled_metric_values(
+                typed_phases,
+                "tts",
+                "post_interruption_recovery",
+                "end",
+                "native_first_audio_seconds",
+                scale=1000.0,
             )
         ),
         "peak_gpu_memory_used_mib": distribution(
@@ -314,6 +396,45 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         and phase["presentation_lease"]["revocation"].get(
             "interrupt_gi_completed_before_deep"
         )
+        is True
+        for phase in typed_phases
+    )
+    interruption_fast_planner_before_deep_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and isinstance(phase["presentation_lease"].get("revocation"), dict)
+        and phase["presentation_lease"]["revocation"].get(
+            "interrupt_planner_completed_before_deep"
+        )
+        is True
+        for phase in typed_phases
+    )
+    reacquired_lease_paused_deep_during_recovery_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and isinstance(phase["presentation_lease"].get("revocation"), dict)
+        and isinstance(
+            phase["presentation_lease"]["revocation"].get(
+                "reacquired_presentation_lease"
+            ),
+            dict,
+        )
+        and phase["presentation_lease"]["revocation"][
+            "reacquired_presentation_lease"
+        ].get("deep_deltas_during_recovery_tts")
+        == 0
+        for phase in typed_phases
+    )
+    deep_resumed_after_reacquired_lease_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and isinstance(phase["presentation_lease"].get("revocation"), dict)
+        and isinstance(
+            phase["presentation_lease"]["revocation"].get(
+                "reacquired_presentation_lease"
+            ),
+            dict,
+        )
+        and phase["presentation_lease"]["revocation"][
+            "reacquired_presentation_lease"
+        ].get("deep_resumed_after_continue")
         is True
         for phase in typed_phases
     )
@@ -368,6 +489,15 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
             ),
             "interruption_fast_gi_completed_before_deep_count": (
                 interruption_fast_gi_before_deep_count
+            ),
+            "interruption_fast_planner_completed_before_deep_count": (
+                interruption_fast_planner_before_deep_count
+            ),
+            "reacquired_lease_paused_deep_during_recovery_count": (
+                reacquired_lease_paused_deep_during_recovery_count
+            ),
+            "deep_resumed_after_reacquired_lease_count": (
+                deep_resumed_after_reacquired_lease_count
             ),
             "post_interruption_tts_recovery_count": post_interruption_tts_recovery_count,
         },

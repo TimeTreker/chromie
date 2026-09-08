@@ -393,7 +393,7 @@ to revoke that lease before it asks Fast GI for new foreground cognition. The pr
 turn "speech is active" into "the mind cannot hear anything new."
 
 `--presentation-lease-revocation-probe` extends the bounded provider canary only; it does not
-claim microphone detection, playback interruption, or Agent policy. The fixed sequence is:
+claim microphone detection, playback interruption, or Agent policy. The correct round-trip is:
 
 ```text
 Deep actively decoding
@@ -401,23 +401,39 @@ Deep actively decoding
   -> pause_generation(mode=in_place)
   -> start TTS while Deep is quiescent
   -> first TTS audio arrives (synthetic interruption trigger)
-  -> close the TTS websocket to cancel synthesis
+  -> close the old TTS websocket to cancel synthesis
   -> continue_generation(torch_empty_cache=false)
   -> immediately inject a new Fast-GI canary
-  -> require interrupted GI to finish while Deep is still active
+  -> run a new Fast-Planner canary to the next synthetic PresentationCommit
+  -> pause_generation(mode=in_place) again
+  -> synthesize the replacement response while Deep is quiescent
+  -> require zero Deep deltas during that recovery TTS
+  -> continue_generation(torch_empty_cache=false) again
   -> require Deep to resume and finish normally
-  -> run one post-interruption TTS synthesis to prove provider recovery
 ```
 
 The first-audio trigger is intentionally conservative: it proves revocation after speech has
 actually become presentable, not merely while TTS is queued. WebSocket close is already the
-qualified TTS request-cancellation boundary. Any TTS native drain that continues after close is
-left visible in the interrupted-GI timing instead of being hidden by an artificial sleep.
+qualified TTS request-cancellation boundary. Any native drain that continues after close remains
+visible: the replacement synthesis begins immediately after the new PresentationCommit, so its
+queue wait includes any still-held TTS singleton/cancellation lock. The harness does not insert an
+artificial cancellation sleep.
 
-The revocation probe records TTS close latency, interruption-trigger-to-GI-first-delta latency,
-interrupted Fast-GI TTFT, Deep continuity, and post-interruption TTS recovery. It advances the
-contention protocol to version 4 so ordinary contention, full presentation-lease, and revocation
-samples cannot be mixed into one repeated distribution.
+The first retained protocol-4 RTX 5090 revocation series established 20/20 fast revocation and
+Deep continuity, but it also exposed an invalid recovery ordering in the canary itself: after the
+interrupted GI completed, the harness let Deep run to saturation and only then asked TTS to prove
+recovery. Fast interruption stayed excellent (about 56 ms worst-case trigger-to-GI-first-delta),
+but post-interruption TTS recovery became bimodal: about 2.09 s P50 versus about 13.9 s P95/P99.
+That path reintroduced the same cross-process contention that the presentation lease exists to
+prevent. CosyVoice's worker also uses a three-second bounded cancellation drain before falling back
+to terminate-and-reload, so starving that drain can turn a barge-in into a cold-worker tail.
+Protocol 4 is therefore diagnostic evidence, not the final revocation transaction.
+
+The corrected round-trip records interrupted GI and Planner latency, TTS close latency,
+interruption-trigger-to-GI-first-delta and Planner-finish latency, second-lease pause/continue and
+resume latency, Deep delta counts during recovery TTS, and recovery TTS queue/native-first-audio
+timing. Revocation samples now use contention protocol version 5 so protocol-4 diagnostics cannot
+be silently mixed with the corrected transaction.
 
 Run only after the full presentation-lease series is stable:
 
