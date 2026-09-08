@@ -323,6 +323,68 @@ untracked non-ignored source files. Repeated samples therefore cannot be summari
 clean/dirty transition or across two different dirty worktrees that happen to share the same
 Git commit.
 
+### Presentation compute-lease probe
+
+The foreground-priority canary answers only whether one LLM request can progress while another
+LLM request is deliberating. It does not make an independent CUDA process such as CosyVoice
+visible to the SGLang request scheduler. If the foreground LLM path passes but TTS first-audio
+latency degrades materially while Deep remains active, qualify the provider's generation-pause
+primitive before proposing Agent integration.
+
+For SGLang, `--presentation-lease-mode in_place` changes only the contention transaction after
+the Fast-Planner canary has produced its synthetic PresentationCommit boundary:
+
+```text
+Deep actively decoding
+  -> Fast GI completes under INTERACTIVE priority
+  -> Fast Planner completes under INTERACTIVE priority
+  -> POST /pause_generation {"mode":"in_place"}
+  -> allow already-buffered SSE delivery to settle
+  -> synthesize TTS while SGLang inference is quiescent
+  -> require zero new Deep content deltas during TTS
+  -> POST /continue_generation {"torch_empty_cache":false}
+  -> require a new Deep content delta and normal terminal completion
+```
+
+This is intentionally an **engine-level qualification primitive**, not the final Chromie
+resource-arbitration architecture. `in_place` preserves the running request and its KV state, but
+SGLang pauses inference for the engine rather than granting a per-request lease. Production must
+still define how a new user input can revoke or supersede a speech lease, and must not make the
+LLM provider the semantic owner of presentation policy.
+
+The harness records pause/continue latency, Deep delta counts across the held lease,
+resume-to-next-delta latency, TTS baseline and lease timing, and final Deep completion. It does
+**not** invent a new TTS slowdown threshold: the result is retained as evidence and must later be
+judged with Chromie's existing interaction-latency contract and real
+GI -> Planner -> typed `PresentationCommit` -> TTS -> playback evidence.
+
+Run the bounded probe only after the ordinary foreground-under-Deep SGLang canary has passed and
+TTS is warm/resident:
+
+```bash
+python scripts/qualify_inference_provider.py \
+  --provider sglang \
+  --provider-version "$SGLANG_VERSION" \
+  --runtime-image "$SGLANG_RUNTIME_IMAGE" \
+  --base-url http://127.0.0.1:30000/v1 \
+  --model "$SGLANG_SERVED_MODEL_NAME" \
+  --model-revision "$SGLANG_MODEL_REVISION" \
+  --model-artifact-json '{"source_model_id":"Qwen/Qwen3.5-9B","weight_format":"safetensors","quantization":"none","dtype":"bfloat16"}' \
+  --cuda-runtime "$SGLANG_CUDA_RUNTIME" \
+  --scheduler-config-json '{"schedule_policy":"fcfs","enable_priority_scheduling":true,"disable_priority_preemption":false,"default_priority_value":0,"priority_scheduling_preemption_threshold":10,"chunked_prefill_size":2048,"schedule_conservativeness":1.0,"mem_fraction_static":0.80,"max_running_requests":2,"max_mamba_cache_size":10,"context_length":32768,"max_total_num_tokens_observed":38717}' \
+  --contention-only \
+  --presentation-lease-mode in_place \
+  --deliberative-context-repeat 800 \
+  --deliberative-max-tokens 2048 \
+  --tts-url ws://127.0.0.1:5000 \
+  --tts-speaker chromie_mixed \
+  --output .chromie/acceptance/inference-runtime/sglang-presentation-lease.json
+```
+
+The workload identity advances to contention protocol version 3 only when this lease mode is
+enabled. Repeated-series summarization therefore cannot silently combine ordinary contention
+samples with presentation-lease samples.
+
 Example SGLang run with the default CosyVoice service:
 
 ```bash

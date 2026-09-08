@@ -156,12 +156,24 @@ class Evidence:
         includes_provider_contract = self.qualification_mode == "provider_contract"
         contention_phase = self.phases.get("foreground_under_deliberative_load") or {}
         includes_tts = isinstance(contention_phase, dict) and contention_phase.get("tts") is not None
+        includes_presentation_lease = (
+            isinstance(contention_phase, dict)
+            and contention_phase.get("presentation_lease") is not None
+        )
         if includes_goal_interpreter:
             claim_boundary = (
                 "Direct candidate-provider transport, provider-level contention, optional TTS "
                 "synthesis timing, and isolated current-checkout Goal Interpreter probe evidence "
                 "only; not an Agent workflow, audible playback, simulator, target, or physical "
                 "robot claim."
+            )
+        elif not includes_provider_contract and includes_presentation_lease:
+            claim_boundary = (
+                "Comparable foreground-under-deliberative-load control evidence plus an "
+                "SGLang engine-level in-place generation pause around TTS synthesis; this "
+                "qualifies a provider primitive only, not a production per-request compute "
+                "lease, Agent workflow, audible playback, simulator, target, or physical robot "
+                "claim."
             )
         elif not includes_provider_contract:
             claim_boundary = (
@@ -197,6 +209,7 @@ class Evidence:
                 "provider_contract": includes_provider_contract,
                 "foreground_under_deliberative_load": True,
                 "tts_contention": includes_tts,
+                "presentation_compute_lease": includes_presentation_lease,
                 "goal_interpreter_semantics": includes_goal_interpreter,
                 "audible_playback": False,
                 "agent_workflow": False,
@@ -491,6 +504,7 @@ async def _observe_stream(
     *,
     label: str,
     first_delta_event: asyncio.Event | None = None,
+    delta_times: list[float] | None = None,
 ) -> StreamObservation:
     observation = StreamObservation(label=label, started_s=time.perf_counter())
     try:
@@ -529,6 +543,8 @@ async def _observe_stream(
                     observation.last_delta_s = observed_s
                     observation.delta_count += 1
                     observation.text += content
+                    if delta_times is not None:
+                        delta_times.append(observed_s)
         observation.finished_s = time.perf_counter()
         return observation
     except asyncio.CancelledError:
@@ -640,6 +656,51 @@ async def _observe_tts(
     if observation.first_audio_s is None or not audio:
         raise QualificationFailure(f"TTS {label}: no audio received")
     return observation
+
+
+def _sglang_native_control_url(openai_base_url: str, action: str) -> str:
+    """Resolve an SGLang native control endpoint from its OpenAI /v1 base URL."""
+
+    normalized = openai_base_url.rstrip("/")
+    if not normalized.endswith("/v1"):
+        raise QualificationFailure(
+            "presentation lease requires an SGLang OpenAI base URL ending in /v1"
+        )
+    if action not in {"pause_generation", "continue_generation"}:
+        raise ValueError(f"unsupported SGLang generation-control action: {action!r}")
+    return f"{normalized[:-3]}/{action}"
+
+
+async def _post_generation_control(
+    client: httpx.AsyncClient,
+    *,
+    url: str,
+    label: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Observe one native generation-control transaction with no semantic claims."""
+
+    started_s = time.perf_counter()
+    response = await client.post(url, json=payload)
+    finished_s = time.perf_counter()
+    if response.status_code >= 400:
+        body = response.text
+        raise QualificationFailure(
+            f"{label}: HTTP {response.status_code}: {body[:600]}"
+        )
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise QualificationFailure(f"{label}: response is not JSON") from exc
+    if not isinstance(body, dict) or body.get("status") != "ok":
+        raise QualificationFailure(f"{label}: unexpected response {body!r}")
+    return {
+        "started_s": started_s,
+        "finished_s": finished_s,
+        "elapsed_ms": (finished_s - started_s) * 1000.0,
+        "request": dict(payload),
+        "response": body,
+    }
 
 
 def _normalized_binding_value(value: Any) -> Any:
@@ -1097,17 +1158,32 @@ async def _qualify_foreground_under_deep_load(
     tts_url: str | None,
     tts_speaker: str,
     require_foreground_before_deep: bool = True,
+    presentation_lease_mode: str | None = None,
+    provider_base_url: str | None = None,
 ) -> dict[str, Any]:
     """Prove foreground work can progress while deliberation remains active.
 
-    This intentionally asserts only scheduling/transport facts.  End-to-end
-    human-interaction acceptance still belongs to Chromie's existing latency
-    contract and live Agent/TTS qualification, not this provider canary.
+    With presentation_lease_mode="in_place", the synthetic PresentationCommit
+    boundary additionally pauses the SGLang engine before TTS synthesis and resumes
+    it afterward.  This qualifies only the provider primitive; it is not a
+    production per-request compute-arbitration design.
     """
 
     priorities = _priority_mapping(provider, step=priority_step)
     deep_priority = priorities[CognitionComputeClass.DELIBERATIVE.value]
     foreground_priority = priorities[CognitionComputeClass.INTERACTIVE.value]
+
+    if presentation_lease_mode is not None:
+        if presentation_lease_mode != "in_place":
+            raise QualificationFailure(
+                f"unsupported presentation lease mode: {presentation_lease_mode!r}"
+            )
+        if provider != "sglang":
+            raise QualificationFailure("presentation lease probe is SGLang-only")
+        if not tts_url:
+            raise QualificationFailure("presentation lease probe requires TTS")
+        if not provider_base_url:
+            raise QualificationFailure("presentation lease probe requires provider base URL")
 
     warmup_tts: TtsObservation | None = None
     baseline_tts: TtsObservation | None = None
@@ -1125,6 +1201,7 @@ async def _qualify_foreground_under_deep_load(
         "by single spaces. Do not omit integers and do not add prose."
     )
     deep_started = asyncio.Event()
+    deep_delta_times: list[float] = []
     deep_task = asyncio.create_task(
         _observe_stream(
             client,
@@ -1139,6 +1216,7 @@ async def _qualify_foreground_under_deep_load(
             ),
             label="deliberative_load",
             first_delta_event=deep_started,
+            delta_times=deep_delta_times,
         )
     )
     deep_started_waiter = asyncio.create_task(deep_started.wait())
@@ -1165,7 +1243,7 @@ async def _qualify_foreground_under_deep_load(
         asyncio.create_task(
             _observe_tts(tts_url, speaker=tts_speaker, label="foreground_contention")
         )
-        if tts_url
+        if tts_url and presentation_lease_mode is None
         else None
     )
 
@@ -1213,7 +1291,91 @@ async def _qualify_foreground_under_deep_load(
             f"{fast_planner.text.strip()!r}"
         )
 
-    contention_tts = await contention_tts_task if contention_tts_task is not None else None
+    presentation_lease: dict[str, Any] | None = None
+    contention_tts: TtsObservation | None = None
+    if presentation_lease_mode is not None:
+        assert provider_base_url is not None
+        assert tts_url is not None
+        deep_active_at_pause_request = not deep_task.done()
+        if not deep_active_at_pause_request:
+            raise QualificationFailure(
+                "deliberative request ended before presentation lease could be acquired"
+            )
+        pause = await _post_generation_control(
+            client,
+            url=_sglang_native_control_url(provider_base_url, "pause_generation"),
+            label="presentation_lease_pause",
+            payload={"mode": presentation_lease_mode},
+        )
+        deep_active_after_pause_ack = not deep_task.done()
+        if not deep_active_after_pause_ack:
+            raise QualificationFailure(
+                "deliberative request completed before presentation pause took effect"
+            )
+
+        # Give already-buffered SSE delivery a bounded moment to drain.  Any new
+        # Deep content after this point means the engine did not stay quiescent
+        # for the TTS lease.
+        pause_settle_ms = 100.0
+        await asyncio.sleep(pause_settle_ms / 1000.0)
+        deep_delta_count_after_pause_settle = len(deep_delta_times)
+        continue_control: dict[str, Any] | None = None
+        lease_error: BaseException | None = None
+        try:
+            contention_tts = await _observe_tts(
+                tts_url,
+                speaker=tts_speaker,
+                label="presentation_lease",
+            )
+            deep_delta_count_before_continue = len(deep_delta_times)
+            deep_active_before_continue = not deep_task.done()
+            if not deep_active_before_continue:
+                raise QualificationFailure(
+                    "deliberative request completed while presentation lease was held"
+                )
+            deep_deltas_during_tts = (
+                deep_delta_count_before_continue - deep_delta_count_after_pause_settle
+            )
+            if deep_deltas_during_tts != 0:
+                raise QualificationFailure(
+                    "deliberative stream advanced while SGLang presentation lease was held: "
+                    f"{deep_deltas_during_tts} content deltas"
+                )
+        except BaseException as exc:
+            lease_error = exc
+        finally:
+            continue_control = await _post_generation_control(
+                client,
+                url=_sglang_native_control_url(provider_base_url, "continue_generation"),
+                label="presentation_lease_continue",
+                payload={"torch_empty_cache": False},
+            )
+        if lease_error is not None:
+            deep_task.cancel()
+            await asyncio.gather(deep_task, return_exceptions=True)
+            raise lease_error
+
+        assert contention_tts is not None
+        assert continue_control is not None
+        presentation_lease = {
+            "mode": presentation_lease_mode,
+            "scope": "sglang_engine",
+            "pause_settle_ms": pause_settle_ms,
+            "continue_torch_empty_cache": False,
+            "deep_active_at_pause_request": deep_active_at_pause_request,
+            "deep_active_after_pause_ack": deep_active_after_pause_ack,
+            "deep_active_before_continue": deep_active_before_continue,
+            "deep_delta_count_after_pause_settle": deep_delta_count_after_pause_settle,
+            "deep_delta_count_before_continue": deep_delta_count_before_continue,
+            "deep_deltas_during_tts": deep_deltas_during_tts,
+            "pause": pause,
+            "continue": continue_control,
+        }
+    else:
+        contention_tts = (
+            await contention_tts_task if contention_tts_task is not None else None
+        )
+
     deep = await deep_task
     _assert_complete_stream(deep)
     if deep.finished_s is None or fast_planner.finished_s is None:
@@ -1224,48 +1386,95 @@ async def _qualify_foreground_under_deep_load(
             "foreground Fast GI + Fast Planner did not complete while deliberation remained active"
         )
 
+    if presentation_lease is not None:
+        continue_finished_s = presentation_lease["continue"]["finished_s"]
+        resumed_delta_s = next(
+            (value for value in deep_delta_times if value > continue_finished_s),
+            None,
+        )
+        deep_resumed_after_continue = (
+            resumed_delta_s is not None and deep.finished_s > continue_finished_s
+        )
+        if not deep_resumed_after_continue:
+            raise QualificationFailure(
+                "deliberative request did not resume after presentation lease release"
+            )
+        presentation_lease["deep_resumed_after_continue"] = True
+        presentation_lease["resume_to_next_delta_ms"] = (
+            resumed_delta_s - continue_finished_s
+        ) * 1000.0
+        presentation_lease["deep_finished_after_continue"] = True
+
     tts_evidence: dict[str, Any] | None = None
     if contention_tts is not None and baseline_tts is not None and warmup_tts is not None:
-        if contention_tts.finished_s is None or fast_planner.finished_s is None:
-            raise QualificationFailure("TTS/foreground contention timing missing")
-        foreground_window_start = fast_gi.started_s
-        foreground_window_finish = fast_planner.finished_s
-        overlap_proven = (
-            contention_tts.started_s < foreground_window_finish
-            and foreground_window_start < contention_tts.finished_s
-        )
-        if not overlap_proven:
-            raise QualificationFailure(
-                "TTS synthesis did not overlap the Fast-GI/Fast-Planner foreground window "
-                "while deliberation remained active"
-            )
         first_audio_ratio = None
         if baseline_tts.first_audio_ms and contention_tts.first_audio_ms:
             first_audio_ratio = contention_tts.first_audio_ms / baseline_tts.first_audio_ms
         elapsed_ratio = None
         if baseline_tts.elapsed_ms and contention_tts.elapsed_ms:
             elapsed_ratio = contention_tts.elapsed_ms / baseline_tts.elapsed_ms
-        tts_evidence = {
-            "overlap_proven": True,
-            "discarded_warmup": warmup_tts.evidence(),
-            "baseline": baseline_tts.evidence(),
-            "under_foreground_and_deliberative_load": contention_tts.evidence(),
-            "first_audio_slowdown_ratio": first_audio_ratio,
-            "total_slowdown_ratio": elapsed_ratio,
-            "audio_was_generated_but_not_played": True,
-        }
+
+        if presentation_lease is not None:
+            tts_evidence = {
+                "measurement_mode": "presentation_lease",
+                "discarded_warmup": warmup_tts.evidence(),
+                "baseline": baseline_tts.evidence(),
+                "presentation_lease": contention_tts.evidence(),
+                "first_audio_slowdown_ratio": first_audio_ratio,
+                "total_slowdown_ratio": elapsed_ratio,
+                "audio_was_generated_but_not_played": True,
+            }
+        else:
+            if contention_tts.finished_s is None or fast_planner.finished_s is None:
+                raise QualificationFailure("TTS/foreground contention timing missing")
+            foreground_window_start = fast_gi.started_s
+            foreground_window_finish = fast_planner.finished_s
+            overlap_proven = (
+                contention_tts.started_s < foreground_window_finish
+                and foreground_window_start < contention_tts.finished_s
+            )
+            if not overlap_proven:
+                raise QualificationFailure(
+                    "TTS synthesis did not overlap the Fast-GI/Fast-Planner foreground window "
+                    "while deliberation remained active"
+                )
+            tts_evidence = {
+                "measurement_mode": "concurrent_foreground_and_deliberative",
+                "overlap_proven": True,
+                "discarded_warmup": warmup_tts.evidence(),
+                "baseline": baseline_tts.evidence(),
+                "under_foreground_and_deliberative_load": contention_tts.evidence(),
+                "first_audio_slowdown_ratio": first_audio_ratio,
+                "total_slowdown_ratio": elapsed_ratio,
+                "audio_was_generated_but_not_played": True,
+            }
 
     scheduling_pass = (
         deep_active_at_fast_gi_start
         and deep_active_at_fast_planner_start
         and foreground_completed_before_deep
     )
+    presentation_lease_pass = (
+        presentation_lease is None
+        or (
+            presentation_lease["deep_active_after_pause_ack"]
+            and presentation_lease["deep_active_before_continue"]
+            and presentation_lease["deep_deltas_during_tts"] == 0
+            and presentation_lease.get("deep_resumed_after_continue") is True
+        )
+    )
     return {
-        "status": "pass" if scheduling_pass else "control_observed",
+        "status": "pass" if scheduling_pass and presentation_lease_pass else "control_observed",
         "acceptance_required": require_foreground_before_deep,
         "claim_boundary": (
-            "Provider-level priority/contention evidence only; no end-to-end "
-            "PresentationCommit or human-interaction latency threshold is claimed."
+            "Provider-level priority/contention evidence"
+            + (
+                " plus SGLang engine-level in-place pause/resume evidence"
+                if presentation_lease is not None
+                else ""
+            )
+            + "; no production per-request compute lease, end-to-end PresentationCommit, "
+            "or human-interaction latency threshold is claimed."
         ),
         "provider_priority_semantics": _provider_priority_semantics(provider),
         "qualification_only_priority_mapping": priorities,
@@ -1283,6 +1492,7 @@ async def _qualify_foreground_under_deep_load(
             "fast_gi_canary": fast_gi.evidence(),
             "fast_planner_canary": fast_planner.evidence(),
         },
+        "presentation_lease": presentation_lease,
         "tts": tts_evidence,
     }
 
@@ -1356,6 +1566,8 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                     tts_url=args.tts_url,
                     tts_speaker=args.tts_speaker,
                     require_foreground_before_deep=(args.provider != "ollama"),
+                    presentation_lease_mode=args.presentation_lease_mode,
+                    provider_base_url=args.base_url,
                 )
             )
             return
@@ -1552,6 +1764,8 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 tts_url=args.tts_url,
                 tts_speaker=args.tts_speaker,
                 require_foreground_before_deep=True,
+                presentation_lease_mode=args.presentation_lease_mode,
+                provider_base_url=args.base_url,
             )
         )
 
@@ -1718,6 +1932,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tts-url")
     parser.add_argument("--tts-speaker", default="chromie_mixed")
     parser.add_argument(
+        "--presentation-lease-mode",
+        choices=("in_place",),
+        help=(
+            "Qualification-only SGLang engine pause around post-Planner TTS synthesis. "
+            "Requires --provider sglang, --contention-only, and --tts-url."
+        ),
+    )
+    parser.add_argument(
         "--contention-only",
         action="store_true",
         help=(
@@ -1770,6 +1992,13 @@ def main(argv: list[str] | None = None) -> int:
             "--goal-interpreter-probe is not part of the Ollama contention baseline; "
             "use existing deployed-model qualification for Ollama semantics"
         )
+    if args.presentation_lease_mode is not None:
+        if args.provider != "sglang":
+            raise SystemExit("--presentation-lease-mode requires --provider sglang")
+        if not args.contention_only:
+            raise SystemExit("--presentation-lease-mode requires --contention-only")
+        if not args.tts_url:
+            raise SystemExit("--presentation-lease-mode requires --tts-url")
     try:
         args.contention_model_topology = _resolve_contention_model_topology(args)
     except ValueError as exc:
@@ -1808,13 +2037,22 @@ def main(argv: list[str] | None = None) -> int:
             "priority_step": args.priority_step,
         },
         workload_config={
-            "contention_protocol_version": 2,
+            "contention_protocol_version": 3 if args.presentation_lease_mode else 2,
             "contention_only": bool(args.contention_only),
             "model_topology": args.contention_model_topology,
             "deliberative_context_repeat": args.deliberative_context_repeat,
             "deliberative_max_tokens": args.deliberative_max_tokens,
             "tts_enabled": bool(args.tts_url),
             "tts_speaker": args.tts_speaker if args.tts_url else None,
+            "presentation_lease": {
+                "enabled": bool(args.presentation_lease_mode),
+                "mode": args.presentation_lease_mode,
+                "scope": "sglang_engine" if args.presentation_lease_mode else None,
+                "pause_settle_ms": 100.0 if args.presentation_lease_mode else None,
+                "continue_torch_empty_cache": (
+                    False if args.presentation_lease_mode else None
+                ),
+            },
             "reasoning_control": {
                 route: _reasoning_control_identity(args.provider, identity["model"])
                 for route, identity in args.contention_model_topology.items()

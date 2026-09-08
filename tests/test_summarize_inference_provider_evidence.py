@@ -202,3 +202,42 @@ def test_summary_rejects_contention_model_topology_drift(tmp_path: Path) -> None
 
     with pytest.raises(ValueError, match="workload_config"):
         build_summary([tmp_path])
+
+def test_summary_reads_tts_and_control_latency_from_presentation_lease(tmp_path: Path) -> None:
+    for index in range(1, 4):
+        sample = _sample(index=index)
+        sample["workload_config"]["contention_protocol_version"] = 3
+        sample["workload_config"]["presentation_lease"] = {
+            "enabled": True,
+            "mode": "in_place",
+            "scope": "sglang_engine",
+            "pause_settle_ms": 100.0,
+            "continue_torch_empty_cache": False,
+        }
+        phase = sample["phases"]["foreground_under_deliberative_load"]
+        phase["tts"] = {
+            "measurement_mode": "presentation_lease",
+            "presentation_lease": {
+                "first_audio_ms": 60 + index,
+                "elapsed_ms": 120 + index,
+            },
+        }
+        phase["presentation_lease"] = {
+            "deep_active_before_continue": True,
+            "deep_deltas_during_tts": 0,
+            "deep_resumed_after_continue": True,
+            "pause": {"elapsed_ms": 5 + index},
+            "continue": {"elapsed_ms": 7 + index},
+            "resume_to_next_delta_ms": 11 + index,
+        }
+        _write(tmp_path / f"trial-{index}.json", sample)
+
+    report = build_summary([tmp_path], label="sglang-presentation-lease")
+
+    assert report["outcomes"]["presentation_lease_sample_count"] == 3
+    assert report["outcomes"]["deep_paused_during_tts_count"] == 3
+    assert report["outcomes"]["deep_resumed_after_lease_count"] == 3
+    assert report["metrics"]["tts_first_audio_ms"]["count"] == 3
+    assert report["metrics"]["presentation_lease_pause_ms"]["count"] == 3
+    assert report["metrics"]["presentation_lease_continue_ms"]["count"] == 3
+    assert report["metrics"]["presentation_lease_resume_to_next_delta_ms"]["count"] == 3

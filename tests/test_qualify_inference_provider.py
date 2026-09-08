@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import time
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ from scripts.qualify_inference_provider import (
     DEFAULT_GOAL_INTERPRETER_MANIFEST,
     QualificationFailure,
     StreamObservation,
+    TtsObservation,
     _assert_complete_stream,
     _binding_value_matches,
     _chat_payload,
@@ -23,6 +25,7 @@ from scripts.qualify_inference_provider import (
     _priority_mapping,
     _qualify_foreground_under_deep_load,
     _resolve_contention_model_topology,
+    _sglang_native_control_url,
     _wire_coordination_satisfies,
 )
 from agent.app.inference_compute import CognitionComputeClass
@@ -400,7 +403,7 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
             )
 
         async def fake_observe_stream(
-            client, endpoint, payload, *, label, first_delta_event=None
+            client, endpoint, payload, *, label, first_delta_event=None, delta_times=None
         ):
             del client, endpoint
             seen[label] = payload["model"]
@@ -464,6 +467,140 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertTrue(result["foreground_completed_before_deep"])
+
+    def test_sglang_native_control_url_strips_openai_v1_suffix(self) -> None:
+        self.assertEqual(
+            _sglang_native_control_url(
+                "http://127.0.0.1:30000/v1", "pause_generation"
+            ),
+            "http://127.0.0.1:30000/pause_generation",
+        )
+        self.assertEqual(
+            _sglang_native_control_url(
+                "http://provider.invalid/prefix/v1/", "continue_generation"
+            ),
+            "http://provider.invalid/prefix/continue_generation",
+        )
+
+    async def test_presentation_lease_pauses_tts_window_and_resumes_deep(self) -> None:
+        release_deep = asyncio.Event()
+        controls: list[tuple[str, dict]] = []
+
+        def stream_observation(label: str, text: str, started: float, finished: float):
+            return StreamObservation(
+                label=label,
+                started_s=started,
+                first_delta_s=started + 0.001,
+                last_delta_s=finished - 0.001,
+                finished_s=finished,
+                delta_count=1,
+                text=text,
+                finish_reason="stop",
+                terminal_seen=True,
+            )
+
+        async def fake_observe_stream(
+            client, endpoint, payload, *, label, first_delta_event=None, delta_times=None
+        ):
+            del client, endpoint, payload
+            now = time.perf_counter()
+            if label == "deliberative_load":
+                if delta_times is not None:
+                    delta_times.append(now)
+                if first_delta_event is not None:
+                    first_delta_event.set()
+                await release_deep.wait()
+                resumed = time.perf_counter()
+                if delta_times is not None:
+                    delta_times.append(resumed)
+                return stream_observation(label, "1 2 3", now, resumed + 0.01)
+            if label == "foreground_fast_gi":
+                return stream_observation(
+                    label, "chromie-fast-gi-ready", now, now + 0.01
+                )
+            if label == "foreground_fast_planner":
+                return stream_observation(
+                    label, "chromie-presentation-commit-ready", now, now + 0.01
+                )
+            raise AssertionError(label)
+
+        async def fake_observe_tts(url, *, speaker, label):
+            del url, speaker
+            started = time.perf_counter()
+            return TtsObservation(
+                started_s=started,
+                first_audio_s=started + 0.01,
+                finished_s=started + 0.02,
+                audio_bytes=16,
+                audio_sha256=f"sha-{label}",
+            )
+
+        async def fake_control(client, *, url, label, payload):
+            del client
+            started = time.perf_counter()
+            finished = time.perf_counter()
+            controls.append((url, dict(payload)))
+            if label == "presentation_lease_continue":
+                asyncio.get_running_loop().call_soon(release_deep.set)
+            return {
+                "started_s": started,
+                "finished_s": finished,
+                "elapsed_ms": (finished - started) * 1000.0,
+                "request": dict(payload),
+                "response": {"status": "ok"},
+            }
+
+        with (
+            patch(
+                "scripts.qualify_inference_provider._observe_stream",
+                side_effect=fake_observe_stream,
+            ),
+            patch(
+                "scripts.qualify_inference_provider._observe_tts",
+                side_effect=fake_observe_tts,
+            ),
+            patch(
+                "scripts.qualify_inference_provider._post_generation_control",
+                side_effect=fake_control,
+            ),
+        ):
+            result = await _qualify_foreground_under_deep_load(
+                object(),
+                "http://127.0.0.1:30000/v1/chat/completions",
+                provider="sglang",
+                fast_gi_model="chromie-qwen35-9b-sglang",
+                fast_planner_model="chromie-qwen35-9b-sglang",
+                deliberative_model="chromie-qwen35-9b-sglang",
+                priority_step=100,
+                deliberative_context_repeat=1,
+                deliberative_max_tokens=256,
+                tts_url="ws://127.0.0.1:5000",
+                tts_speaker="chromie_mixed",
+                require_foreground_before_deep=True,
+                presentation_lease_mode="in_place",
+                provider_base_url="http://127.0.0.1:30000/v1",
+            )
+
+        lease = result["presentation_lease"]
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(lease["scope"], "sglang_engine")
+        self.assertEqual(lease["deep_deltas_during_tts"], 0)
+        self.assertTrue(lease["deep_resumed_after_continue"])
+        self.assertEqual(result["tts"]["measurement_mode"], "presentation_lease")
+        self.assertIn("presentation_lease", result["tts"])
+        self.assertEqual(
+            controls,
+            [
+                (
+                    "http://127.0.0.1:30000/pause_generation",
+                    {"mode": "in_place"},
+                ),
+                (
+                    "http://127.0.0.1:30000/continue_generation",
+                    {"torch_empty_cache": False},
+                ),
+            ],
+        )
 
 
 if __name__ == "__main__":

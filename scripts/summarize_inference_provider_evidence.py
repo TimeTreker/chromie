@@ -156,6 +156,21 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
 
     payloads = [payload for _, payload in provider_samples]
     identity = _require_stable_identity(payloads)
+    workload_config = identity.get("workload_config")
+    presentation_lease_config = (
+        workload_config.get("presentation_lease")
+        if isinstance(workload_config, dict)
+        else None
+    )
+    presentation_lease_enabled = (
+        isinstance(presentation_lease_config, dict)
+        and presentation_lease_config.get("enabled") is True
+    )
+    tts_measurement_key = (
+        "presentation_lease"
+        if presentation_lease_enabled
+        else "under_foreground_and_deliberative_load"
+    )
     phases = [payload["phases"]["foreground_under_deliberative_load"] for payload in payloads]
     if not all(isinstance(phase, dict) for phase in phases):
         raise ValueError("contention phase must be a JSON object in every source")
@@ -191,7 +206,7 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
             _metric_values(
                 typed_phases,
                 "tts",
-                "under_foreground_and_deliberative_load",
+                tts_measurement_key,
                 "first_audio_ms",
             )
         ),
@@ -199,8 +214,21 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
             _metric_values(
                 typed_phases,
                 "tts",
-                "under_foreground_and_deliberative_load",
+                tts_measurement_key,
                 "elapsed_ms",
+            )
+        ),
+        "presentation_lease_pause_ms": distribution(
+            _metric_values(typed_phases, "presentation_lease", "pause", "elapsed_ms")
+        ),
+        "presentation_lease_continue_ms": distribution(
+            _metric_values(typed_phases, "presentation_lease", "continue", "elapsed_ms")
+        ),
+        "presentation_lease_resume_to_next_delta_ms": distribution(
+            _metric_values(
+                typed_phases,
+                "presentation_lease",
+                "resume_to_next_delta_ms",
             )
         ),
         "peak_gpu_memory_used_mib": distribution(
@@ -220,6 +248,20 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         phase.get("deep_active_at_fast_planner_start") is True for phase in typed_phases
     )
     tts_sample_count = metrics["tts_first_audio_ms"].get("count", 0)
+    presentation_lease_sample_count = sum(
+        isinstance(phase.get("presentation_lease"), dict) for phase in typed_phases
+    )
+    deep_paused_during_tts_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and phase["presentation_lease"].get("deep_deltas_during_tts") == 0
+        and phase["presentation_lease"].get("deep_active_before_continue") is True
+        for phase in typed_phases
+    )
+    deep_resumed_after_lease_count = sum(
+        isinstance(phase.get("presentation_lease"), dict)
+        and phase["presentation_lease"].get("deep_resumed_after_continue") is True
+        for phase in typed_phases
+    )
 
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -252,6 +294,9 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
                 deep_active_planner_count / sample_count, 6
             ),
             "tts_sample_count": tts_sample_count,
+            "presentation_lease_sample_count": presentation_lease_sample_count,
+            "deep_paused_during_tts_count": deep_paused_during_tts_count,
+            "deep_resumed_after_lease_count": deep_resumed_after_lease_count,
         },
         "metrics": metrics,
     }
