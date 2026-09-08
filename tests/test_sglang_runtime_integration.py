@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
+from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.clients.model_client_factory import build_model_client
 from agent.app.clients.ollama_client import OllamaClient
 from agent.app.clients.sglang_client import SGLangClient
@@ -124,6 +125,34 @@ class SGLangProtocolTests(unittest.TestCase):
             self.assertIsInstance(client, SGLangClient)
             self.assertEqual(client.base_url, "http://example.invalid/v1")
             self.assertEqual(client.compute_class, CognitionComputeClass.INTERACTIVE)
+
+
+class SGLangGoalInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
+    async def test_warm_probe_reserves_terminal_completion_headroom(self) -> None:
+        interpreter = OllamaGoalInterpreter(
+            ollama_url="http://ollama.invalid",
+            model="chromie-qwen35-9b-sglang",
+            inference_provider="sglang",
+            sglang_url="http://sglang.invalid/v1",
+            timeout_ms=1000,
+        )
+        logged = AsyncMock(
+            return_value={
+                "message": {"role": "assistant", "content": "ready"},
+                "done": True,
+                "done_reason": "stop",
+            }
+        )
+
+        with patch.object(interpreter, "_chat_logged", logged):
+            await interpreter.warm_model()
+
+        logged.assert_awaited_once()
+        payload = logged.await_args.args[0]
+        self.assertEqual(logged.await_args.kwargs["stage"], "startup_warm")
+        self.assertEqual(payload["stream"], False)
+        self.assertGreater(payload["options"]["num_predict"], 1)
+        self.assertEqual(payload["options"]["num_predict"], 8)
 
 
 class _ObservedLease(PresentationComputeLease):

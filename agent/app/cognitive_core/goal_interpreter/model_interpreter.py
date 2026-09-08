@@ -3158,7 +3158,19 @@ class OllamaGoalInterpreter:
                         {"role": "user", "content": "Reply with exactly one word: ready"}
                     ],
                     "stream": False,
-                    "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": 1},
+                    # This readiness probe still traverses the ordinary completion
+                    # diagnostics used by semantic GI calls.  A one-token SGLang
+                    # cap necessarily reports finish_reason=length before the
+                    # provider can emit its normal terminal marker, which is
+                    # correctly indistinguishable from truncation at that shared
+                    # boundary.  Give the one-word probe enough headroom to reach
+                    # an ordinary terminal stop instead of weakening truncation
+                    # rejection for real cognition.
+                    "options": {
+                        "temperature": 0,
+                        "num_ctx": self.num_ctx,
+                        "num_predict": 8,
+                    },
                 },
                 stage="startup_warm",
             )
