@@ -17,6 +17,19 @@ class Settings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL") or os.getenv("OLLAMA_URL") or "http://chromie-llm:11434")
     model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL") or os.getenv("OLLAMA_MODEL") or "gemma4:e2b")
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS") or os.getenv("OLLAMA_TIMEOUT_MS") or "30000"))
+    llm_provider: Literal["ollama", "sglang"] = Field(
+        default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
+    )
+    sglang_url: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SGLANG_URL", "http://chromie-llm-sglang-qualification:30000/v1"
+        ).rstrip("/")
+    )
+    sglang_priority_step: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SGLANG_PRIORITY_STEP", "100")),
+        ge=1,
+        le=100000,
+    )
     use_llm: bool = Field(
         default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -321,6 +334,19 @@ class Settings(BaseModel):
 
 class GoalInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
+    inference_provider: Literal["ollama", "sglang"] = Field(
+        default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
+    )
+    sglang_url: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_SGLANG_URL", "http://chromie-llm-sglang-qualification:30000/v1"
+        ).rstrip("/")
+    )
+    sglang_priority_step: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_SGLANG_PRIORITY_STEP", "100")),
+        ge=1,
+        le=100000,
+    )
     model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3.5:4b"))
     deep_model: str = Field(
         # Deep Goal Interpretation retains the same WHAT-only model authority.

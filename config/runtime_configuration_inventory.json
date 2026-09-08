@@ -115,7 +115,7 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "acceptance_override",
       "key": "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
       "owners": [
         ".env.common",
@@ -129,7 +129,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -267,7 +268,7 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "acceptance_override",
       "key": "AGENT_DEEP_PLANNER_MODEL",
       "owners": [
         ".env.common",
@@ -281,7 +282,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -439,7 +441,7 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "acceptance_override",
       "key": "AGENT_FAST_PLANNER_MODEL",
       "owners": [
         ".env.common",
@@ -454,6 +456,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -532,7 +535,7 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "acceptance_override",
       "key": "AGENT_GOAL_ASSOCIATION_MODEL",
       "owners": [
         ".env.common",
@@ -546,7 +549,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -653,7 +657,7 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "acceptance_override",
       "key": "AGENT_GOAL_INTERPRETER_MODEL",
       "owners": [
         ".env.common",
@@ -668,6 +672,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -754,6 +759,17 @@
     },
     {
       "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_LLM_PROVIDER",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/validation/sglang_rtx5090_candidate.env"
+      ]
+    },
+    {
+      "boolean": false,
       "category": "service_internal",
       "key": "AGENT_LOG_LEVEL",
       "owners": [
@@ -762,7 +778,7 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "acceptance_override",
       "key": "AGENT_MODEL",
       "owners": [
         "agent/app/settings.py",
@@ -775,7 +791,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -792,6 +809,28 @@
       "key": "AGENT_PORT",
       "owners": [
         "agent/app/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_SGLANG_PRIORITY_STEP",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/validation/sglang_rtx5090_candidate.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_SGLANG_URL",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -886,14 +925,15 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "acceptance_override",
       "key": "AGENT_SKILL_SELECTION_MODEL",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -931,7 +971,7 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "acceptance_override",
       "key": "AGENT_TASK_CONTINUITY_MODEL",
       "owners": [
         "env/profiles/default.env",
@@ -942,7 +982,8 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -999,6 +1040,7 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/general_ability_acceptance.py",
@@ -2131,6 +2173,7 @@
       "key": "ORCH_AUDIO_INPUT_MODE",
       "owners": [
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2142,6 +2185,7 @@
       "key": "ORCH_AUDIO_OUTPUT_MODE",
       "owners": [
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2174,6 +2218,7 @@
         ".env.common",
         "env/modes/qualification.env",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -2185,6 +2230,7 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/cognitive_gateway_core_live_text.py"
       ]
     },
@@ -2195,6 +2241,7 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -2211,6 +2258,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2274,6 +2322,7 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2440,6 +2489,7 @@
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2493,6 +2543,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2510,6 +2561,7 @@
         "env/modes/voice_mujoco.env",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2553,6 +2605,7 @@
         ".env.common",
         "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/session.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -2803,6 +2856,46 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "ORCH_PRESENTATION_COMPUTE_CONTROL_URL",
+      "owners": [
+        ".env.common",
+        "env/validation/sglang_rtx5090_candidate.env",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": true,
+      "category": "acceptance_override",
+      "key": "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED",
+      "owners": [
+        ".env.common",
+        "env/validation/sglang_rtx5090_candidate.env",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "ORCH_PRESENTATION_COMPUTE_LEASE_MODE",
+      "owners": [
+        ".env.common",
+        "env/validation/sglang_rtx5090_candidate.env",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "env/validation/sglang_rtx5090_candidate.env",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
       "boolean": true,
       "category": "profile_constant",
       "key": "ORCH_RUNTIME_READY_GREETING_ENABLED",
@@ -2947,6 +3040,7 @@
         ".env.common",
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
     },
@@ -3182,6 +3276,7 @@
       "owners": [
         "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -3270,6 +3365,7 @@
       "owners": [
         ".env.common",
         "docker-compose.yml",
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/general_ability_acceptance.py",
         "scripts/interaction_text_mujoco_check.py",
         "scripts/preflight_cognitive_gateway_core_qualification.py",
@@ -3409,12 +3505,13 @@
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "acceptance_override",
       "key": "TTS_COSYVOICE_COMPACT_COGNITION",
       "owners": [
         ".env.common",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        "env/profiles/rtx5090.env",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     },
     {
@@ -3892,10 +3989,11 @@
     },
     {
       "boolean": true,
-      "category": "profile_constant",
+      "category": "acceptance_override",
       "key": "WARM_OLLAMA_BEFORE_ORCH",
       "owners": [
-        ".env.common"
+        ".env.common",
+        "env/validation/sglang_rtx5090_candidate.env"
       ]
     }
   ],
@@ -3908,14 +4006,14 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 33,
+      "acceptance_override": 50,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 129,
+      "profile_constant": 124,
       "public_choice": 9,
-      "service_internal": 203
+      "service_internal": 198
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 374
+    "total_keys": 381
   }
 }

@@ -106,6 +106,13 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway. High-confidence unaddressed ambient speech may be suppressed by Gateway Attention Review; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; Gateway-suppressed ambient turns do not refresh the exchange window. |
+| `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. `sglang` is an explicit candidate runtime; it does not change GI/Planner semantic authority or promote a model. |
+| `AGENT_SGLANG_URL` | `http://chromie-llm-sglang-qualification:30000/v1` | OpenAI-compatible SGLang base URL used only when `AGENT_LLM_PROVIDER=sglang`. |
+| `AGENT_SGLANG_PRIORITY_STEP` | `100` | Operational translation step from provider-neutral compute ranks to SGLang request priority. |
+| `ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED` | `0` | Host-owned shared-GPU speech arbitration. When enabled, real Vocal delivery pauses the qualified SGLang engine and foreground input revokes that pause before GI. |
+| `ORCH_PRESENTATION_COMPUTE_CONTROL_URL` | `http://127.0.0.1:30000` | SGLang native control root for Host `pause_generation` / `continue_generation`; never a semantic endpoint. |
+| `ORCH_PRESENTATION_COMPUTE_LEASE_MODE` | `in_place` | Qualified engine pause mode retaining running request/KV state. |
+| `ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS` | `2000` | Fail-closed timeout for one Host presentation-compute control operation. |
 
 A successfully queued fast response is projected into downstream Planner
 Interaction Context as a current-turn communicative commitment, never as

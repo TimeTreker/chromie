@@ -14,6 +14,7 @@ from scripts.release_provenance import (
     mutable_image_errors,
     model_lock_errors,
     ollama_models,
+    source_environment,
 )
 
 
@@ -23,6 +24,32 @@ class ReleaseProvenanceTests(unittest.TestCase):
 
     def test_repository_model_lock_matches_profiles(self) -> None:
         self.assertEqual(model_lock_errors(ROOT), [])
+
+    def test_sglang_candidate_served_model_is_source_revision_locked(self) -> None:
+        env = {
+            "AGENT_LLM_PROVIDER": "sglang",
+            "AGENT_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_GOAL_INTERPRETER_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_GOAL_ASSOCIATION_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_FAST_PLANNER_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_DEEP_PLANNER_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_TASK_CONTINUITY_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_SKILL_SELECTION_MODEL": "chromie-qwen35-9b-sglang",
+            **{
+                key: value
+                for key, value in source_environment(ROOT).items()
+                if key.startswith("TTS_")
+                or key.startswith("COSYVOICE3_")
+                or key.startswith("QWEN3_TTS_")
+            },
+        }
+        self.assertEqual(model_lock_errors(ROOT, env), [])
+        lock = json.loads((ROOT / "release" / "model-lock.json").read_text(encoding="utf-8"))
+        model = lock["sglang"]["candidate_served_models"]["chromie-qwen35-9b-sglang"]
+        self.assertEqual(model["source_model_id"], "Qwen/Qwen3.5-9B")
+        self.assertEqual(model["revision"], "c202236235762e1c871ad0ccb60c8ee5ba337b9a")
+        self.assertEqual(lock["sglang"]["promotion_status"], "candidate_only")
 
     def test_maintained_asr_profiles_are_multilingual(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):

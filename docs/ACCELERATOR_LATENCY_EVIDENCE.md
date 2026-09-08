@@ -435,6 +435,32 @@ resume latency, Deep delta counts during recovery TTS, and recovery TTS queue/na
 timing. Revocation samples now use contention protocol version 5 so protocol-4 diagnostics cannot
 be silently mixed with the corrected transaction.
 
+### Candidate runtime integration gate
+
+The retained RTX 5090 protocol-5 round-trip series closes the synthetic provider-compute phase:
+20/20 samples passed; original and interrupted foreground work completed before Deep in every
+trial; both presentation leases held Deep at zero new content deltas during TTS and Deep resumed
+afterward in every trial. Observed P99s were about 41.7 ms Fast-GI TTFT, 40.6 ms Fast-Planner
+TTFT, 54.6 ms interruption-trigger-to-new-GI-first-delta, 307.1 ms interruption-trigger-to-new
+Planner completion, 2.95 ms reacquire-pause, 4.71 ms reacquire-continue, and 3.79 ms
+resume-to-next-Deep-delta. Replacement TTS no longer showed the invalid protocol-4 ~14 s tail:
+its P99 first audio was about 2.86 s, split into about 825 ms worker queue wait and about 2.15 s
+native first audio.
+
+Source may therefore expose an **opt-in candidate runtime integration** without promoting it to
+the default deployment. `AGENT_LLM_PROVIDER=sglang` selects an SGLang transport at the Agent
+composition root and translates existing provider-neutral compute classes into the already
+qualified priority wire field. Ollama remains the default and is not deleted. The Host separately
+owns the presentation-compute lease around real Vocal delivery; Planner owns wording/HOW and the
+provider merely executes pause/resume resource commands. A newly admitted foreground input revokes
+an active engine pause before its routed GI transaction begins.
+
+This source integration is **not** model/role promotion evidence. The provider canaries used one
+Qwen3.5-9B served model to isolate scheduler behavior, while the maintained RTX 5090 Ollama profile
+still uses its declared Gemma/Qwen role topology. Candidate Agent runs must explicitly select the
+served model for each role and then pass the real GI/Planner semantic gates plus
+GI -> Planner -> typed PresentationCommit -> TTS -> playback/interruption end-to-end evidence.
+
 Run only after the full presentation-lease series is stable:
 
 ```bash

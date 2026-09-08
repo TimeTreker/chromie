@@ -13,6 +13,10 @@ import httpx
 from pydantic import ValidationError
 
 from ...clients.ollama_client import OllamaGenerationError
+from ...clients.sglang_protocol import (
+    build_sglang_chat_payload,
+    sglang_to_completion_evidence,
+)
 from ...inference_compute import goal_interpreter_compute_class
 from ...settings import agent_service_settings
 
@@ -2007,6 +2011,9 @@ class OllamaGoalInterpreter:
         ollama_url: str,
         model: str,
         deep_model: str | None = None,
+        inference_provider: str = "ollama",
+        sglang_url: str | None = None,
+        sglang_priority_step: int = 100,
         timeout_ms: int,
         num_ctx: int = 4096,
         num_predict: int = 512,
@@ -2014,6 +2021,11 @@ class OllamaGoalInterpreter:
         prompt_path: Path | None = None,
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
+        self.inference_provider = str(inference_provider or "ollama").strip().casefold()
+        if self.inference_provider not in {"ollama", "sglang"}:
+            raise ValueError(f"unsupported Goal Interpreter provider: {self.inference_provider!r}")
+        self.sglang_url = str(sglang_url or "").rstrip("/")
+        self.sglang_priority_step = max(1, int(sglang_priority_step))
         self.model = model
         self.deep_model = str(deep_model or model).strip() or model
         self.timeout_s = max(0.1, timeout_ms / 1000.0)
@@ -3138,6 +3150,18 @@ class OllamaGoalInterpreter:
             )
 
     async def warm_model(self, *, timeout_s: float | None = None) -> dict[str, Any]:
+        if self.inference_provider == "sglang":
+            return await self._chat_logged(
+                {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "user", "content": "Reply with exactly one word: ready"}
+                    ],
+                    "stream": False,
+                    "options": {"temperature": 0, "num_ctx": self.num_ctx, "num_predict": 1},
+                },
+                stage="startup_warm",
+            )
         payload: dict[str, Any] = {
             "model": self.model,
             "prompt": "Reply with exactly one word: ready",
@@ -3232,6 +3256,31 @@ class OllamaGoalInterpreter:
                     "_incident_evidence": {"request": payload},
                 },
             )
+        if self.inference_provider == "sglang":
+            if not self.sglang_url:
+                raise OllamaGenerationError(
+                    "Goal Interpreter SGLang URL is not configured",
+                    failure_class="provider_configuration",
+                    failure_domain="inference_transport",
+                    architecture_attribution="not_evaluated",
+                    retryable=False,
+                )
+            wire_payload = build_sglang_chat_payload(
+                model=str(payload.get("model") or self.model),
+                messages=[dict(item) for item in payload.get("messages") or [] if isinstance(item, dict)],
+                compute_class=goal_interpreter_compute_class(stage),
+                options=options,
+                response_format=payload.get("format", "text"),
+                stream=False,
+                priority_step=self.sglang_priority_step,
+            )
+            async with httpx.AsyncClient(timeout=self.timeout_s, trust_env=False) as client:
+                response = await client.post(f"{self.sglang_url}/chat/completions", json=wire_payload)
+                response.raise_for_status()
+                provider_data = response.json()
+            data = sglang_to_completion_evidence(provider_data)
+            self._validate_completion(payload, data, stage=stage)
+            return data
         async with httpx.AsyncClient(timeout=self.timeout_s, trust_env=False) as client:
             response = await client.post(f"{self.ollama_url}/api/chat", json=payload)
             response.raise_for_status()
@@ -3326,7 +3375,7 @@ class OllamaGoalInterpreter:
                 call_id=call_id,
                 purpose="goal_interpreter",
                 stage=stage,
-                transport="ollama.chat",
+                transport=f"{self.inference_provider}.chat",
                 request=payload,
                 response=None,
                 status="failed",
@@ -3349,7 +3398,7 @@ class OllamaGoalInterpreter:
             call_id=call_id,
             purpose="goal_interpreter",
             stage=stage,
-            transport="ollama.chat",
+            transport=f"{self.inference_provider}.chat",
             request=payload,
             response=data,
             status="accepted",

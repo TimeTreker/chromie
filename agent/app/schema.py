@@ -7,6 +7,8 @@ class HealthResponse(BaseModel):
     ok: bool = True
     service: str = "chromie-agent"
     model: str | None = None
+    inference_provider: str = "ollama"
+    inference_url: str | None = None
     ollama_url: str | None = None
     use_llm: bool = True
     capability_sources: list[str] = Field(default_factory=list)

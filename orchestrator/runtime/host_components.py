@@ -26,6 +26,7 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
     build_soridormi_invoker,
 )
+from orchestrator.runtime.presentation_compute_lease import PresentationComputeLease
 from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.session import SessionTracker
@@ -135,8 +136,18 @@ def build_interaction_runtime(
         invoker = build_soridormi_invoker(
             manifest_path=cognition.soridormi_manifest,
         )
+    presentation_compute_lease = PresentationComputeLease(
+        enabled=cognition.presentation_compute_lease_enabled,
+        control_url=cognition.presentation_compute_control_url,
+        mode=cognition.presentation_compute_lease_mode,
+        timeout_ms=cognition.presentation_compute_timeout_ms,
+    )
+    assistant.presentation_compute_lease = presentation_compute_lease
+    speech_scheduler = presentation_compute_lease.wrap_speech_scheduler(
+        assistant._schedule_interaction_speech
+    )
     return InteractionRuntimeCoordinator(
-        assistant._schedule_interaction_speech,
+        speech_scheduler,
         speech_cancel_scheduler=assistant._cancel_interaction_speech,
         soridormi_invoker=invoker,
         work_dag_handler=assistant._execute_planning_work_dag,

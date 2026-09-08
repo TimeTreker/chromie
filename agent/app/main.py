@@ -22,7 +22,7 @@ from .agent_skills import (
     build_configured_agent_skill_registry,
 )
 from .clients.external_information_client import HttpExternalInformationClient
-from .clients.ollama_client import OllamaClient
+from .clients.model_client_factory import build_model_client
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
@@ -120,12 +120,11 @@ logging.basicConfig(
 logger = logging.getLogger("chromie.agent")
 
 
-ollama_client = OllamaClient(
-    settings.ollama_url,
-    settings.model,
+ollama_client = build_model_client(
+    model=settings.model,
     timeout_ms=settings.timeout_ms,
     purpose="agent_default",
-        service_settings=settings,
+    service_settings=settings,
 )
 weather_client = OpenMeteoWeatherClient(service_settings=settings) if settings.weather_enabled else None
 external_information_client = (
@@ -139,9 +138,8 @@ external_information_client = (
 )
 
 cognitive_gateway_attention_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.cognitive_gateway_attention_model,
+    build_model_client(
+        model=settings.cognitive_gateway_attention_model,
         timeout_ms=settings.cognitive_gateway_attention_timeout_ms,
         purpose="cognitive_gateway_attention_review",
         service_settings=settings,
@@ -168,9 +166,8 @@ configured_agent_skill_registry = build_configured_agent_skill_registry(
 )
 agent_skill_registry = configured_agent_skill_registry.registry
 agent_skill_selection_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.agent_skill_selection_model,
+    build_model_client(
+        model=settings.agent_skill_selection_model,
         timeout_ms=settings.agent_skill_selection_timeout_ms,
         purpose="agent_skill_selection",
         service_settings=settings,
@@ -290,9 +287,8 @@ logger.info(
     settings.agent_skill_projection_count_limit,
 )
 goal_association_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.goal_association_model,
+    build_model_client(
+        model=settings.goal_association_model,
         timeout_ms=settings.goal_association_timeout_ms,
         purpose="goal_association",
         service_settings=settings,
@@ -313,9 +309,8 @@ goal_association_resolver = (
 )
 
 fast_planner_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.fast_planner_model,
+    build_model_client(
+        model=settings.fast_planner_model,
         timeout_ms=settings.fast_planner_timeout_ms,
         purpose="fast_planner",
         service_settings=settings,
@@ -336,9 +331,8 @@ fast_planner_resolver = (
     else None
 )
 situational_cognition_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.fast_planner_model,
+    build_model_client(
+        model=settings.fast_planner_model,
         timeout_ms=settings.fast_planner_timeout_ms,
         purpose="situational_cognition",
         service_settings=settings,
@@ -347,9 +341,8 @@ situational_cognition_client = (
     else None
 )
 situational_deliberative_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.deep_planner_model,
+    build_model_client(
+        model=settings.deep_planner_model,
         timeout_ms=settings.deep_planner_timeout_ms,
         purpose="situational_deliberative_cognition",
         service_settings=settings,
@@ -368,9 +361,8 @@ situational_cognition_resolver = (
     else None
 )
 deep_planner_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.deep_planner_model,
+    build_model_client(
+        model=settings.deep_planner_model,
         timeout_ms=settings.deep_planner_timeout_ms,
         purpose="deep_planner",
         service_settings=settings,
@@ -390,9 +382,8 @@ deep_planner_resolver = (
     else None
 )
 reflection_client = (
-    OllamaClient(
-        settings.ollama_url,
-        settings.deep_planner_model,
+    build_model_client(
+        model=settings.deep_planner_model,
         timeout_ms=settings.deep_planner_timeout_ms,
         purpose="reflection",
         service_settings=settings,
@@ -451,6 +442,12 @@ async def health() -> HealthResponse:
     return HealthResponse(
         ok=True,
         model=settings.model,
+        inference_provider=settings.llm_provider,
+        inference_url=(
+            settings.sglang_url
+            if settings.llm_provider == "sglang"
+            else settings.ollama_url
+        ),
         ollama_url=settings.ollama_url,
         use_llm=settings.use_llm,
         capability_sources=configured_registry.sources,

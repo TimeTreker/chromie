@@ -52,6 +52,14 @@ class InputSessionRuntime:
     def __init__(self, host: Any) -> None:
         self.host = host
 
+    async def _revoke_presentation_compute_lease(self, *, reason: str) -> None:
+        lease = getattr(self.host, "presentation_compute_lease", None)
+        if lease is None:
+            return
+        revoke = getattr(lease, "revoke", None)
+        if callable(revoke):
+            await revoke(reason=reason)
+
     async def _begin_playback_duck(
         self,
         *,
@@ -254,6 +262,9 @@ class InputSessionRuntime:
                     new_session_id=session_id,
                     log_event=True,
                 )
+                await self._revoke_presentation_compute_lease(
+                    reason="validated_new_input_turn"
+                )
 
             asr_workflow_started_ms = now_ms()
             try:
@@ -378,6 +389,9 @@ class InputSessionRuntime:
                                 await playback_transport_for(host).abort_output_stream()
                                 host._invalidate_output_state(
                                     cancel_cognitive_work=False,
+                                )
+                                await self._revoke_presentation_compute_lease(
+                                    reason="confirmed_external_barge_in"
                                 )
                                 confirmed_speech_to_silence_ms = (
                                     now_ms() - confirmation_started_ms

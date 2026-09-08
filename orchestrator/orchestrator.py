@@ -6651,6 +6651,13 @@ class VoiceAssistant:
         self._invalidate_output_state(
             cancel_cognitive_work=cancel_cognitive_work,
         )
+        presentation_compute_lease = getattr(
+            self, "presentation_compute_lease", None
+        )
+        if presentation_compute_lease is not None:
+            await presentation_compute_lease.revoke(
+                reason="explicit_output_interrupt"
+            )
         await playback_transport_for(self).abort_output_stream()
         if new_session_id and log_event:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)

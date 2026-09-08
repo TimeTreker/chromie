@@ -280,6 +280,10 @@ class CognitionSettings:
     capability_manifest_paths: str
     soridormi_manifest: Path
     dag_engine_execution_token: str
+    presentation_compute_lease_enabled: bool
+    presentation_compute_control_url: str
+    presentation_compute_lease_mode: str
+    presentation_compute_timeout_ms: int
 
 
 @dataclass(frozen=True)
@@ -380,6 +384,16 @@ class HostSettingsSnapshot:
             or ollama_model
         )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
+        presentation_compute_lease_enabled = _bool(
+            values, "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED", False
+        )
+        presentation_compute_control_url = _text(
+            values, "ORCH_PRESENTATION_COMPUTE_CONTROL_URL", "http://127.0.0.1:30000"
+        ).rstrip("/")
+        if presentation_compute_lease_enabled and not presentation_compute_control_url:
+            raise HostConfigurationError(
+                "ORCH_PRESENTATION_COMPUTE_CONTROL_URL is required when presentation compute lease is enabled"
+            )
         configured_mind_profile_path = _optional_path(
             values, "ORCH_MIND_PROFILE_PATH", project_root=project_root
         )
@@ -618,6 +632,21 @@ class HostSettingsSnapshot:
                 ),
                 dag_engine_execution_token=_text(
                     values, "AGENT_DAG_ENGINE_EXECUTION_TOKEN", ""
+                ),
+                presentation_compute_lease_enabled=presentation_compute_lease_enabled,
+                presentation_compute_control_url=presentation_compute_control_url,
+                presentation_compute_lease_mode=_choice(
+                    values,
+                    "ORCH_PRESENTATION_COMPUTE_LEASE_MODE",
+                    "in_place",
+                    {"in_place"},
+                ),
+                presentation_compute_timeout_ms=_int(
+                    values,
+                    "ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS",
+                    2000,
+                    minimum=100,
+                    maximum=30000,
                 ),
             ),
             conversation=ConversationSettings(

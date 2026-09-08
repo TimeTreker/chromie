@@ -32,6 +32,9 @@ RUNTIME_KEYS = (
     "CHROMIE_ACTIVE_PROFILE",
     "CHROMIE_ACTIVE_VALIDATION_PROFILE",
     "ORCH_COGNITIVE_RUNTIME_MODE",
+    "AGENT_LLM_PROVIDER",
+    "AGENT_SGLANG_URL",
+    "AGENT_SGLANG_PRIORITY_STEP",
 )
 
 MODEL_KEYS = (
@@ -354,6 +357,10 @@ def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
             ),
             "models": runtime_profile.get("models"),
             "cognitive_budgets": runtime_profile.get("cognitive_budgets"),
+            "inference_provider": runtime_profile.get("inference_provider"),
+            "active_inference_models": runtime_profile.get(
+                "active_inference_models"
+            ),
             "active_ollama_models": runtime_profile.get("active_ollama_models"),
         },
         "orchestrator_runtime": {
@@ -372,6 +379,20 @@ def capture_identity(args: argparse.Namespace) -> dict[str, Any]:
             "cognitive_runtime_mode": orchestrator_env.get(
                 "ORCH_COGNITIVE_RUNTIME_MODE"
             ),
+            "presentation_compute_lease": {
+                "enabled": orchestrator_env.get(
+                    "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED"
+                ),
+                "control_url": orchestrator_env.get(
+                    "ORCH_PRESENTATION_COMPUTE_CONTROL_URL"
+                ),
+                "mode": orchestrator_env.get(
+                    "ORCH_PRESENTATION_COMPUTE_LEASE_MODE"
+                ),
+                "timeout_ms": orchestrator_env.get(
+                    "ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS"
+                ),
+            },
         },
         "capability_manifests": manifests,
         "deployment": deployment,

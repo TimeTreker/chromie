@@ -1,0 +1,11 @@
+# Opt-in bridge from the already-qualified SGLang service into Chromie's base network.
+# Keep this separate so provider-only qualification remains standalone.
+services:
+  chromie-llm-sglang-qualification:
+    networks:
+      - chromie-net
+
+networks:
+  chromie-net:
+    name: ${COMPOSE_PROJECT_NAME:-chromie}_chromie-net
+    external: true

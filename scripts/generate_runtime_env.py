@@ -526,6 +526,9 @@ def generate(root: Path, *, supplied_system_info: Path | None = None) -> dict[st
     atomic_write(compose_env_path, content)
 
     models = active_models(resolved)
+    inference_provider = (
+        str(resolved.get("AGENT_LLM_PROVIDER") or "ollama").strip().casefold()
+    )
     manifest = {
         "schema_version": 3,
         "active_profile": profile_name,
@@ -540,7 +543,9 @@ def generate(root: Path, *, supplied_system_info: Path | None = None) -> dict[st
         "cognitive_budgets": {
             key: resolved.get(key, "") for key in COGNITIVE_BUDGET_KEYS
         },
-        "active_ollama_models": models,
+        "inference_provider": inference_provider,
+        "active_inference_models": models,
+        "active_ollama_models": models if inference_provider == "ollama" else [],
         "ignored_local_overrides": ignored_local_overrides,
         "strict_local_conflicts": strict_local_conflicts,
     }

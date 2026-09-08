@@ -288,9 +288,41 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
         errors.append(
             "release/model-lock.json agent_models do not match maintained hardware profiles"
         )
-    goal_interpreter_model = common.get("AGENT_GOAL_INTERPRETER_MODEL")
-    if goal_interpreter_model and goal_interpreter_model not in set(ollama.get("goal_interpreter_models", [])):
-        errors.append("AGENT_GOAL_INTERPRETER_MODEL is absent from release/model-lock.json")
+    inference_provider = str(common.get("AGENT_LLM_PROVIDER") or "ollama").strip().casefold()
+    if inference_provider == "ollama":
+        goal_interpreter_model = common.get("AGENT_GOAL_INTERPRETER_MODEL")
+        if goal_interpreter_model and goal_interpreter_model not in set(
+            ollama.get("goal_interpreter_models", [])
+        ):
+            errors.append("AGENT_GOAL_INTERPRETER_MODEL is absent from release/model-lock.json")
+    elif inference_provider == "sglang":
+        served = lock.get("sglang", {}).get("candidate_served_models", {})
+        if not isinstance(served, dict) or not served:
+            errors.append("release/model-lock.json has no SGLang candidate served models")
+        else:
+            sglang_model_keys = (
+                "AGENT_MODEL",
+                "AGENT_GOAL_INTERPRETER_MODEL",
+                "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+                "AGENT_GOAL_ASSOCIATION_MODEL",
+                "AGENT_FAST_PLANNER_MODEL",
+                "AGENT_DEEP_PLANNER_MODEL",
+                "AGENT_TASK_CONTINUITY_MODEL",
+                "AGENT_SKILL_SELECTION_MODEL",
+            )
+            configured_sglang_models = {
+                str(common.get(key) or "").strip()
+                for key in sglang_model_keys
+                if str(common.get(key) or "").strip()
+            }
+            missing = sorted(configured_sglang_models - set(served))
+            if missing:
+                errors.append(
+                    "configured SGLang model(s) are absent from release/model-lock.json: "
+                    + ", ".join(missing)
+                )
+    else:
+        errors.append(f"unsupported AGENT_LLM_PROVIDER in model lock check: {inference_provider}")
     return errors
 
 def collect_provenance(
