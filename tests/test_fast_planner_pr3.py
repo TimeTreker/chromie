@@ -1973,6 +1973,72 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("contract_revision_attempted", result.metadata)
 
 
+    def test_advance_numeric_binding_cannot_borrow_another_argument_value(self):
+        class NumericCatalog:
+            async def prompt_entries(self, **kwargs):
+                return [CatalogCapability(
+                    capability_id="soridormi.blink_eyes",
+                    agent_id="capability_agent",
+                    description="Blink eyes with bounded parameters.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {
+                            "count": {"type": "integer", "minimum": 1, "default": 2},
+                            "intensity": {"type": "number", "default": 1.0},
+                        },
+                        "additionalProperties": False,
+                    },
+                    effects=["physical_motion"],
+                    available=True,
+                    interaction_executable=True,
+                    prompt_tier="common",
+                )]
+
+        cases = [
+            ("wrong_count_decoy", {"count": 1}, {"count": 2, "intensity": 1.0}, False),
+            ("omitted_count_decoy", {"count": 1}, {"intensity": 1.0}, False),
+            ("correct_count", {"count": 1}, {"count": 1, "intensity": 2.0}, True),
+            ("reverse_count", {"count": 2}, {"count": 1, "intensity": 2.0}, False),
+            ("wrong_intensity", {"intensity": 1.0}, {"count": 1, "intensity": 0.5}, False),
+            ("correct_intensity", {"intensity": 0.5}, {"count": 1, "intensity": 0.5}, True),
+            ("unbound_default", {}, {}, True),
+        ]
+        for name, bindings, args, accepted in cases:
+            with self.subTest(name=name):
+                output = {
+                    "disposition": "execute", "coverage": "complete",
+                    "covered_responsibility_refs": ["r1"],
+                    "activities": [{
+                        "activity_id": "blink_eyes_001", "role": "capability",
+                        "capability_id": "soridormi.blink_eyes", "args": args,
+                        "source_responsibility_refs": ["r1"], "timing": "sequential",
+                    }],
+                    "continuations": [], "confidence": 1.0, "unresolved": [],
+                    "reason_summary": "Execute requested eye action.",
+                }
+                model = ScriptedOllama([output])
+                request = _work_request(
+                    sid="numeric-argument-" + name, text="眨一下眼睛。", language="zh-CN",
+                    responsibilities=[{
+                        "local_ref": "r1", "outcome": "blink eyes",
+                        "bindings": bindings, "output_mode": "body_action",
+                        "confidence": 1.0,
+                    }],
+                )
+                result = asyncio.run(
+                    FastPlannerResolver(model, NumericCatalog()).resolve_advance(request)
+                )
+                self.assertEqual(len(model.prompts), 1)
+                self.assertNotIn("contract_revision_attempted", result.metadata)
+                if accepted:
+                    self.assertEqual(result.disposition, "execute", result.metadata)
+                    self.assertEqual(result.activities[0].args, args)
+                else:
+                    self.assertEqual(result.disposition, "unavailable", result.metadata)
+                    self.assertEqual(result.activities, [])
+                    self.assertIn("numeric Capability input contradicts GI binding", result.metadata["error"])
+
+
     @staticmethod
     def _clarification_output(
         *,

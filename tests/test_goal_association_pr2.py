@@ -690,6 +690,68 @@ class GoalExecutionContractTests(unittest.TestCase):
             ],
         )
 
+    def test_decoder_object_alternative_requires_complete_association_result(self):
+        for refs in (["r1"], ["r1", "r2"]):
+            schema = ga_schema.goal_association_response_schema(
+                GoalAssociationModelOutput, [{"goal_id": "goal-a"}], [],
+                responsibility_refs=refs, responsibility_count=len(refs),
+            )
+            payload = {
+                "associations": [{
+                    "relationship": "continue", "source_responsibility_refs": refs,
+                    "target_goal_ids": ["goal-a"], "confidence": 1.0,
+                }],
+                "new_goals": [], "referent_updates": [], "resolved_references": [],
+                "confidence": 1.0, "reason_summary": "Continue retained work.",
+            }
+            complete = Draft202012Validator(schema)
+            # The pinned decoder chooses this alternative before sibling
+            # intersections. Exercise its accepted objects, not source text.
+            exposed = Draft202012Validator({
+                "$defs": schema["$defs"], **schema["anyOf"][0],
+            })
+            self.assertTrue(complete.is_valid(payload))
+            self.assertTrue(exposed.is_valid(payload))
+            for field in payload:
+                with self.subTest(refs=refs, missing=field):
+                    missing = copy.deepcopy(payload)
+                    del missing[field]
+                    self.assertFalse(exposed.is_valid(missing))
+            duplicate = copy.deepcopy(payload)
+            duplicate["associations"] *= 2
+            self.assertFalse(complete.is_valid(duplicate))
+            omitted = copy.deepcopy(payload)
+            omitted["associations"] = []
+            self.assertFalse(complete.is_valid(omitted))
+
+    def test_decoder_nested_association_preserves_types_and_conditional_contract(self):
+        schema = ga_schema.goal_association_response_schema(
+            GoalAssociationModelOutput, [{"goal_id": "goal-a"}], [],
+            responsibility_refs=["r1"],
+        )
+        association = schema["$defs"]["GoalAssociationModelAssociation"]
+        exposed = Draft202012Validator(association["anyOf"][0])
+        valid = {
+            "relationship": "continue", "source_responsibility_refs": ["r1"],
+            "target_goal_ids": ["goal-a"], "confidence": 1.0,
+        }
+        self.assertTrue(exposed.is_valid(valid))
+        for field in valid:
+            with self.subTest(missing=field):
+                missing = copy.deepcopy(valid)
+                del missing[field]
+                self.assertFalse(exposed.is_valid(missing))
+        for field, value in (
+            ("relationship", "invented"), ("source_responsibility_refs", [False]),
+            ("target_goal_ids", ["unknown-goal"]), ("confidence", "high"),
+        ):
+            with self.subTest(field=field, value=value):
+                self.assertFalse(exposed.is_valid({**valid, field: value}))
+        modify = {**valid, "relationship": "modify"}
+        self.assertFalse(Draft202012Validator(association).is_valid(modify))
+        modify["updated_description"] = "Walk for five seconds."
+        self.assertTrue(Draft202012Validator(association).is_valid(modify))
+
     def test_physical_resource_schema_preserves_entity_recipient_and_source(self):
         schema = ga_schema.goal_association_response_schema(
             GoalSegmentationModelOutput,
