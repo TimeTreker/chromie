@@ -48,6 +48,12 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         return {"type": "json_object"}
     if isinstance(response_format, dict):
         schema, _ = candidate_compatible_schema(response_format)
+        if schema.get("title") in {
+            "GoalAssociationModelOutput", "GoalSegmentationModelOutput"
+        }:
+            # Formatting belongs to this request, never to the shared model's
+            # global settings. Other roles retain their existing decoding.
+            schema["x-guidance"] = {"whitespace_flexible": False}
         return {
             "type": "json_schema",
             "json_schema": {

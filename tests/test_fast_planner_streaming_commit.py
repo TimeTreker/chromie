@@ -4,9 +4,14 @@ import json
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner_fast_validation import (
+    AuthoritativeGroundingValidationError,
+    validate_fast_advance_output,
+)
 from agent.app.planner_prompt import (
     fast_advance_capability_prompt_projection,
     fast_advance_layered_prompt,
@@ -28,6 +33,7 @@ from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
 )
 from shared.chromie_contracts.plan import (
+    FastPlannerAdvanceModelOutput,
     FastPlannerStreamFailure,
     FastPlannerStreamTerminal,
     PresentationCommit,
@@ -125,6 +131,132 @@ def _wire_output(output: dict[str, Any]) -> str:
         + json.dumps(output["terminal_result"], ensure_ascii=False)
         + "</terminal_plan>"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("gap", ["actor", "destination_location", "目标对象尚未确定"])
+@pytest.mark.parametrize("preserve_gap", [False, True])
+async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool) -> None:
+    """Replay the laptop's accepted shake plan with unresolved WHAT contrasts."""
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="shake head twice", output_mode="body_action",
+        bindings={"count": 2}, confidence=0.5,
+    )
+    request = CognitiveWorkRequest(
+        sid="unresolved-shake", text="摇两下头。", language="zh-CN",
+        responsibilities=[responsibility], interpretation_unresolved=[gap],
+        interpretation_confidence=0.5,
+    )
+    output = {
+        "presentation_commit": {"activity": None, "auxiliary_activities": []},
+        "terminal_result": {
+            "disposition": "execute", "coverage": "complete",
+            "covered_responsibility_refs": ["r1"],
+            "activities": [{
+                "role": "capability", "capability_id": "soridormi.shake_no",
+                "activity_id": "act_shake_head_twice", "args": {"count": 2},
+                "timing": "sequential", "source_responsibility_refs": ["r1"],
+            }],
+            "auxiliary_activities": [], "continuations": [], "confidence": 1.0,
+            "unresolved": [], "reason_summary": "Execute head shake twice as requested",
+        },
+    }
+    if preserve_gap:
+        output["terminal_result"]["disposition"] = "clarify"
+        output["terminal_result"]["coverage"] = "partial"
+        output["terminal_result"]["unresolved"] = [gap]
+        output["terminal_result"]["activities"] = [{
+            "activity_id": "ask-meaning", "role": "clarification",
+            "text": "你指的是哪个？", "speech_act": "ask_clarification",
+            "source_responsibility_refs": ["r1"],
+            "information_gaps": [{
+                "gap_id": "missing-meaning", "description": gap,
+                "required_for": [gap], "preferred_resolution": "ask_user",
+                "source_kind": "unresolved_meaning", "source_reference": gap,
+                "resolution_sources_considered": ["authoritative_context"],
+            }],
+        }]
+    model = _StreamingModel([_wire_output(output)])
+    catalog = _Catalog([_nod_catalog_capability().model_copy(update={
+        "capability_id": "soridormi.shake_no", "description": "Shake head twice.",
+    })])
+    frames = [frame async for frame in FastPlannerResolver(model, catalog).stream_advance(request)]
+    assert model.calls == 1
+    assert isinstance(frames[0], PresentationCommit)
+    assert frames[0].activity is None
+    if preserve_gap:
+        assert isinstance(frames[-1], FastPlannerStreamTerminal)
+        assert frames[-1].advance.disposition == "clarify"
+    else:
+        assert isinstance(frames[-1], FastPlannerStreamFailure)
+        assert "unresolved meaning" in frames[-1].reason
+        assert not frames[-1].retryable
+        assert not any(isinstance(frame, FastPlannerStreamTerminal) for frame in frames)
+
+
+@pytest.mark.parametrize("preserve_all", [False, True])
+@pytest.mark.parametrize("independent", [False, True])
+def test_meaning_gaps_preserve_independent_terminal_work(
+    preserve_all: bool, independent: bool,
+) -> None:
+    responsibilities = [
+        CognitiveResponsibilityProposal(
+            local_ref=ref, outcome=outcome, output_mode="body_action",
+            bindings={"count": 2}, confidence=0.9,
+        )
+        for ref, outcome in [("r1", "shake the indicated head twice"), ("r2", "nod twice")]
+    ]
+    request = CognitiveWorkRequest(
+        sid="mixed-meaning", text="让那个摇两下头，你点两下头。",
+        responsibilities=responsibilities,
+        interpretation_unresolved=["actor", "target_identity"],
+    )
+    gaps = [{
+        "gap_id": f"gap-{name}", "description": name,
+        "blocking": True, "resolved": False,
+        "required_for": [name], "preferred_resolution": "ask_user",
+        "source_kind": "unresolved_meaning", "source_reference": name,
+        "resolution_sources_considered": ["authoritative_context"],
+    } for name in (request.interpretation_unresolved if preserve_all else ["actor"])]
+    raw = {
+        "disposition": "mixed", "coverage": "complete",
+        "covered_responsibility_refs": ["r1", "r2"],
+        "activities": [{
+            "activity_id": "ask-meaning", "role": "clarification",
+            "text": "你说的是谁的头？", "speech_act": "ask_clarification",
+            "source_responsibility_refs": ["r1"], "information_gaps": gaps,
+        }, {
+            "activity_id": "nod", "role": "capability",
+            "capability_id": "soridormi.nod_yes", "args": {"count": 2},
+            "timing": "sequential",
+            "source_responsibility_refs": ["r2"] if independent else ["r1", "r2"],
+        }],
+        "auxiliary_activities": [], "continuations": [], "confidence": 0.9,
+        "unresolved": list(request.interpretation_unresolved),
+        "reason_summary": "Clarify the first request; perform the independent nod.",
+    }
+    capabilities = [_nod_catalog_capability().model_dump(mode="json")]
+    output = FastPlannerAdvanceModelOutput.model_validate(raw)
+    if preserve_all and independent:
+        validate_fast_advance_output(
+            output, request=request, responsibilities=responsibilities,
+            capabilities=capabilities,
+        )
+        schema = fast_streaming_advance_response_schema(
+            ["r1", "r2"], responsibilities=responsibilities,
+            capabilities=capabilities,
+            interpretation_unresolved=request.interpretation_unresolved,
+        )
+        Draft202012Validator(schema).validate({
+            "presentation_commit": {"activity": None, "auxiliary_activities": []},
+            "terminal_result": raw,
+        })
+    else:
+        with pytest.raises(AuthoritativeGroundingValidationError):
+            validate_fast_advance_output(
+                output, request=request, responsibilities=responsibilities,
+                capabilities=capabilities,
+            )
 
 
 def _body_request() -> tuple[CognitiveWorkRequest, CognitiveResponsibilityProposal]:

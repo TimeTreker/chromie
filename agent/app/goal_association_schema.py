@@ -6,6 +6,7 @@ This module has no model client, Goal state, or continuity decision lifecycle.
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any, Literal
 
 from .goal_association_contract import (
@@ -75,6 +76,40 @@ def _prune_unreferenced_definitions(schema: dict[str, Any]) -> dict[str, Any]:
         if name in reachable
     }
     return result
+
+
+def _expose_intersection_shapes(node: Any) -> None:
+    """Keep object and array shapes visible to intersection-first decoders.
+
+    The single alternative repeats existing constraints, so all original
+    conditions remain authoritative. Cross-field and cross-item conservation
+    still require full Schema and Host checks; this does not implement them
+    in a decoder that lacks support for those conditions.
+    """
+    if isinstance(node, list):
+        for value in node:
+            _expose_intersection_shapes(value)
+    elif isinstance(node, dict):
+        # Visit existing children first; the redundant branch must not recurse
+        # into another copy of itself.
+        for value in list(node.values()):
+            _expose_intersection_shapes(value)
+        shape_keys: tuple[str, ...] = ()
+        if node.get("type") == "object" and "properties" in node:
+            shape_keys = ("type", "properties", "required", "additionalProperties")
+        elif node.get("type") == "array" and "items" in node:
+            shape_keys = ("type", "items", "prefixItems", "minItems", "maxItems", "uniqueItems")
+        if (
+            node.get("allOf")
+            and shape_keys
+            and "oneOf" not in node
+            and "anyOf" not in node
+        ):
+            node["anyOf"] = [{
+                key: copy.deepcopy(node[key])
+                for key in shape_keys
+                if key in node
+            }]
 
 
 def goal_association_response_schema(
@@ -391,6 +426,15 @@ def goal_association_response_schema(
                     binding_properties["entity_type"] = {
                         "const": canonical_entity_type
                     }
+                    # The fixed name/type already satisfy the canonical binding
+                    # conditionals. A speed additionally needs its fixed value
+                    # to satisfy the existing speed vocabulary. Keep the clauses
+                    # for unresolved types or an invalid supplied speed.
+                    if canonical_entity_type != "speed" or (
+                        value in {"slow", "normal", "quick"}
+                        or re.search(r"[0-9]", value) is not None
+                    ):
+                        binding_branch.pop("allOf", None)
                 binding_branch["required"] = list(
                     dict.fromkeys(
                         [
@@ -419,20 +463,9 @@ def goal_association_response_schema(
                 else copy.deepcopy(binding_item_template)
             )
             constrained["uniqueItems"] = True
-            constrained["allOf"] = [
-                {
-                    "contains": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"const": name},
-                            "value": {"const": value},
-                        },
-                        "required": ["name", "value"],
-                    },
-                    "minContains": 1,
-                }
-                for name, value in expected_bindings
-            ]
+            # Exact length and required positional name/value constants already
+            # imply every contains clause. Repeating them as allOf makes some
+            # decoders discard the array's structural constraints altogether.
             return constrained
 
         def branch_properties(
@@ -792,11 +825,14 @@ def goal_association_response_schema(
         new_goal_conservation = {
             "minItems": len(responsibility_refs),
             "maxItems": len(responsibility_refs),
-            "allOf": [
+        }
+        if len(responsibility_refs) > 1:
+            new_goal_conservation["allOf"] = [
                 contains_source_ref(source_ref)
                 for source_ref in responsibility_refs
-            ],
-        }
+            ]
+        # For one ref, every item branch fixes that same singleton ref and the
+        # array has exactly one item. Multi-ref coverage is not redundant.
         if output_type is GoalSegmentationModelOutput:
             # With no retained Goal candidate, every GI Responsibility must
             # become exactly one new Goal. Encode the already-enforced Host
@@ -852,6 +888,7 @@ def goal_association_response_schema(
             if isinstance(branch, dict):
                 branch["type"] = "object"
                 branch["additionalProperties"] = False
+    _expose_intersection_shapes(schema)
     return _prune_unreferenced_definitions(schema)
 
 
@@ -915,6 +952,39 @@ def binding_semantic_contract_response_schema(
         }
     )
     return schema
+
+
+def _goal_resource_branches_are_closed(goal_schema: dict[str, Any]) -> bool:
+    """Whether every branch already implies the three resource conditionals."""
+    branches = goal_schema.get("oneOf")
+    if not isinstance(branches, list) or not branches:
+        return False
+    for branch in branches:
+        properties = branch.get("properties", {})
+        required = set(branch.get("required", []))
+        if not {"resource_responsibility", "bindings", "output_mode"} <= required:
+            return False
+        resource = properties.get("resource_responsibility", {})
+        if resource.get("type") == "null":
+            continue
+        resource_kind = resource.get("properties", {}).get("kind", {})
+        kind = resource_kind.get("const")
+        if kind is None and len(resource_kind.get("enum", [])) == 1:
+            kind = resource_kind["enum"][0]
+        expected_mode = {
+            "physical_object": "body_action", "information": "information"
+        }.get(kind)
+        if (
+            resource.get("type") != "object"
+            or "kind" not in resource.get("required", [])
+            or expected_mode is None
+            or properties.get("output_mode") != {"const": expected_mode}
+            or properties.get("bindings", {}).get("maxItems") != 0
+        ):
+            return False
+    return True
+
+
 def resource_semantic_contract_response_schema(
     response_schema: dict[str, Any],
 ) -> dict[str, Any]:
@@ -925,11 +995,12 @@ def resource_semantic_contract_response_schema(
     goal_schema = definitions.get("GoalAssociationModelGoal")
     if isinstance(goal_schema, dict):
         clauses = goal_schema.setdefault("allOf", [])
+        resource_clauses = []
         for resource_kind, output_mode in (
             ("physical_object", "body_action"),
             ("information", "information"),
         ):
-            clauses.append(
+            resource_clauses.append(
                 {
                     "if": {
                         "properties": {
@@ -947,6 +1018,27 @@ def resource_semantic_contract_response_schema(
                     },
                 }
             )
+        clauses.extend(resource_clauses)
+        if _goal_resource_branches_are_closed(goal_schema):
+            # Remove only the known implications. Candidate-ID exclusion and
+            # any other independent clauses must remain intact.
+            redundant = [
+                {
+                    "if": {
+                        "properties": {
+                            "resource_responsibility": {"not": {"type": "null"}}
+                        },
+                        "required": ["resource_responsibility"],
+                    },
+                    "then": {"properties": {"bindings": {"maxItems": 0}}},
+                },
+                *resource_clauses,
+            ]
+            remaining = [clause for clause in clauses if clause not in redundant]
+            if remaining:
+                goal_schema["allOf"] = remaining
+            else:
+                goal_schema.pop("allOf", None)
 
     physical_source = definitions.get("GoalAssociationModelPhysicalSource")
     if isinstance(physical_source, dict):

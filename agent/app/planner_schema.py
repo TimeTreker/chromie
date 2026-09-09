@@ -2283,6 +2283,11 @@ def fast_advance_response_schema(
 
     schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
+    unresolved_meaning = {
+        " ".join(str(item or "").strip().split())
+        for item in (interpretation_unresolved or [])
+        if " ".join(str(item or "").strip().split())
+    }
     top_properties = schema.get("properties", {})
     disposition = top_properties.get("disposition")
     if isinstance(disposition, dict):
@@ -2293,6 +2298,14 @@ def fast_advance_response_schema(
             "clarify",
             "escalate",
         ]
+        if unresolved_meaning:
+            disposition["enum"] = ["mixed", "clarify", "escalate"]
+            disposition["description"] = (
+                "Terminal work must preserve every GI unresolved meaning in an "
+                "exact unresolved_meaning InformationGap citation. Mixed work "
+                "may execute only independent Responsibilities not blocked by "
+                "a clarification. Escalation authorizes no Capability work."
+            )
     top_required = list(schema.get("required") or [])
     if "auxiliary_activities" not in top_required:
         top_required.append("auxiliary_activities")
@@ -2461,7 +2474,11 @@ def fast_advance_response_schema(
     if isinstance(clarification_contract, dict):
         gaps = clarification_contract.get("properties", {}).get("information_gaps")
         if isinstance(gaps, dict):
-            gaps["maxItems"] = 1
+            # One Responsibility may retain several independent GI gaps. Stay
+            # within the canonical DTO bound instead of forcing silent omission.
+            gaps["maxItems"] = min(
+                int(gaps.get("maxItems", 8)), max(1, len(unresolved_meaning))
+            )
     if committed_communicative or suppress_new_communicative:
         # PresentationCommit already made this invocation's communication decision.
         # Its terminal portion may still discover a real clarification need, but it

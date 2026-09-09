@@ -1054,6 +1054,18 @@ Build the pinned image with `docker build -t chromie-sglang:gemma4-fp8 llm/sglan
 Its Dockerfile fixes a reproduced missing `lm_head_is_tied` initialization in the
 unified Gemma constructor, preserving the existing GPU branch predicate. Remove the
 repair when a reviewed upstream image implements that constructor contract.
+The request-format candidate also makes the pinned XGrammar dispatcher honor
+`x-guidance.whitespace_flexible` per schema, retaining the complete schema as its
+cache key. The Agent adds `false` only to the two GA output-contract titles;
+GI, Planner and other requests retain their existing formatting. No global compact
+flag or environment variable is added. This candidate requires the full qualification
+record in the checkpoint before promotion; the earlier global compact experiment
+was rejected for GI regressions. Remove the image patch when upstream supports this
+request annotation. Independent canonical Schema and Host constraints remain required.
+The isolated GA schema candidate exposes existing object and array shape constraints
+through redundant alternatives for intersection-first decoders. Array item and length
+checks do not imply cross-item or cross-collection Responsibility conservation in the
+decoder; the original full Schema conditions and Host exact-once checks remain required.
 The checkpoint must be cached in `hf_cache` before offline startup. Normal launch is
 `./scripts/start_chromie.sh --build`; `--no-orchestrator --keep-services` provides
 service-only startup with unplayed speech readiness probes. The launcher uses SGLang
