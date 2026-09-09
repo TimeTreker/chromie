@@ -2327,6 +2327,58 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         self.assertIn("mechanical", repair_prompt)
         self.assertNotIn(req.original_user_text, repair_prompt)
 
+    def test_numeric_gi_binding_is_required_after_primary_or_mechanical_repair(self):
+        cases = [
+            ("请 nod 两下。", "nod twice", "count", 2),
+            ("眨一下眼睛。", "blink once", "count", 1),
+            ("Walk at a fifth of a metre per second.", "walk", "speed", 0.2),
+        ]
+        for text, outcome, name, value in cases:
+            for repaired in (False, True):
+                with self.subTest(text=text, repaired=repaired):
+                    req = request(text).model_copy(update={
+                        "responsibilities": typed_responsibilities({
+                            "local_ref": "r1", "outcome": outcome,
+                            "output_mode": "body_action", "bindings": {name: value},
+                            "confidence": 1.0,
+                        })
+                    })
+                    missing = create_goals(goal(outcome, "body_action"))
+                    malformed = copy.deepcopy(missing)
+                    malformed["new_goals"][0]["bindings"] = {name: value}
+                    ollama = ScriptedOllama([malformed, missing] if repaired else [missing])
+
+                    result = self._resolve(ollama, req)
+
+                    self.assertEqual(result.resolution_status, "fail_closed")
+                    self.assertEqual(result.new_goals, [])
+                    self.assertNotIn("responsibility_conservation", result.metadata)
+                    self.assertEqual(len(ollama.prompts), 2 if repaired else 1)
+                    self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
+
+    def test_numeric_gi_binding_keeps_value_and_responsibility_identity(self):
+        req = request("请 nod 两下。").model_copy(update={
+            "responsibilities": typed_responsibilities({
+                "local_ref": "r1", "outcome": "nod twice",
+                "output_mode": "body_action", "bindings": {"count": 2},
+                "confidence": 1.0,
+            })
+        })
+        for value, expected_status in [("1", "fail_closed"), ("2", "resolved")]:
+            with self.subTest(value=value):
+                payload = create_goals(goal(
+                    "nod twice", "body_action", bindings=[binding("count", "count", value)]
+                ))
+                ollama = ScriptedOllama([payload])
+                result = self._resolve(ollama, req)
+                self.assertEqual(result.resolution_status, expected_status)
+                self.assertEqual(len(ollama.prompts), 1)
+                if expected_status == "resolved":
+                    self.assertEqual(result.new_goals[0].object["bindings"]["count"]["value"], "2")
+                    self.assertEqual(result.new_goals[0].source_responsibility_refs, ["r1"])
+                else:
+                    self.assertEqual(result.new_goals, [])
+
     def test_primary_binding_conservation_failure_is_terminal_without_repair(self):
         missing = create_goals(
             goal("Move forward for 10 seconds.", "body_action")

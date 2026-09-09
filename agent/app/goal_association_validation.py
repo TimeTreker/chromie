@@ -900,7 +900,9 @@ def source_grounded_binding_conservation_conflicts(
     authoritative owner of the action/effect itself, while bindings own its
     material parameters; an exact source action retained in that description
     therefore does not need a redundant ``action`` binding.
-    Context-normalized values absent from the literal turn remain governed by
+    Numeric/boolean GI scalars are already typed authoritative values; conserve
+    them even when their original surface was a word (for example, "twice").
+    Context-normalized strings absent from the literal turn remain governed by
     their dedicated temporal/referent contracts.
     """
 
@@ -908,6 +910,8 @@ def source_grounded_binding_conservation_conflicts(
     expected_by_ref: dict[str, set[tuple[str, str]]] = {}
 
     def scalar_values(value: Any) -> set[str]:
+        if isinstance(value, (int, float, bool)):
+            return {_canonical_source_binding_value("", value)}
         if isinstance(value, str):
             normalized = " ".join(value.strip().casefold().split())
             return {normalized} if normalized else set()
@@ -933,7 +937,8 @@ def source_grounded_binding_conservation_conflicts(
             )
             for name, raw_value in responsibility.bindings.items()
             for value in scalar_values(raw_value)
-            if value in authoritative_turn
+            if isinstance(raw_value, (int, float, bool))
+            or value in authoritative_turn
         }
 
     conflicts: list[str] = []
