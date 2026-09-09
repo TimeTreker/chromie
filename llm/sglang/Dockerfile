@@ -18,3 +18,29 @@ if source.count(before) != 1:
     raise RuntimeError('Pinned Gemma constructor changed; review the upstream fix before building')
 path.write_text(source.replace(before, after))
 PY
+
+# XGrammar must honor the same per-schema whitespace annotation already used
+# by SGLang's llguidance backend. Remove when the pinned upstream supports it.
+# The complete schema string remains the cache key, including this annotation.
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path('/sgl-workspace/sglang/python/sglang/srt/constrained/xgrammar_backend.py')
+source = path.read_text()
+before = '''                ctx = self.grammar_compiler.compile_json_schema(
+                    schema=key_string, any_whitespace=self.any_whitespace
+                )'''
+after = '''                schema = json.loads(key_string)
+                guidance = schema.get("x-guidance", {}) if isinstance(schema, dict) else {}
+                if not isinstance(guidance, dict):
+                    raise RuntimeError("x-guidance must be an object")
+                any_whitespace = guidance.get("whitespace_flexible", self.any_whitespace)
+                if not isinstance(any_whitespace, bool):
+                    raise RuntimeError("whitespace_flexible must be a boolean")
+                ctx = self.grammar_compiler.compile_json_schema(
+                    schema=key_string, any_whitespace=any_whitespace
+                )'''
+if source.count(before) != 1:
+    raise RuntimeError('Pinned XGrammar dispatch changed; review request formatting before building')
+path.write_text(source.replace(before, after))
+PY

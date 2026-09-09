@@ -21,6 +21,26 @@ from orchestrator.runtime.presentation_compute_lease import PresentationComputeL
 
 
 class SGLangProtocolTests(unittest.TestCase):
+    def test_compact_formatting_is_scoped_to_ga_without_mutating_contract(self) -> None:
+        for title in (
+            "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
+            "GoalInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
+        ):
+            with self.subTest(title=title):
+                schema = {"title": title, "type": "object", "properties": {}}
+                payload = build_sglang_chat_payload(
+                    model="chromie-gemma4-12b", messages=[],
+                    compute_class=CognitionComputeClass.INTERACTIVE,
+                    options={}, response_format=schema, stream=False,
+                    priority_step=100,
+                )
+                wire = payload["response_format"]["json_schema"]["schema"]
+                expected = dict(schema)
+                if title in {"GoalSegmentationModelOutput", "GoalAssociationModelOutput"}:
+                    expected["x-guidance"] = {"whitespace_flexible": False}
+                self.assertEqual(wire, expected)
+                self.assertNotIn("x-guidance", schema)
+
     def test_priority_preserves_provider_neutral_compute_order(self) -> None:
         self.assertGreater(
             sglang_priority(CognitionComputeClass.REALTIME),
