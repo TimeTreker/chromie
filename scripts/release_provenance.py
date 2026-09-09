@@ -257,7 +257,21 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
                     f"{profile.relative_to(root)} ASR model/revision does not match release/model-lock.json"
                 )
         if values.get("AGENT_MODEL"):
-            agent_models.add(values["AGENT_MODEL"])
+            provider = values.get("AGENT_LLM_PROVIDER", "ollama").strip().casefold()
+            if provider == "ollama":
+                agent_models.add(values["AGENT_MODEL"])
+            elif provider == "sglang":
+                served = lock.get("sglang", {}).get("candidate_served_models", {})
+                configured = {
+                    value for key, value in values.items()
+                    if key.startswith("AGENT_") and key.endswith("_MODEL") and value
+                }
+                missing = sorted(configured - set(served))
+                if missing:
+                    errors.append(
+                        f"{profile.relative_to(root)} SGLang models absent from "
+                        f"release/model-lock.json: {missing}"
+                    )
 
     common = env or source_environment(root)
     tts = lock.get("tts", {})

@@ -1,6 +1,185 @@
 # Chromie Latest Handoff
 
-## 2026-09-09 active handoff — engineering repairs and paired runtime evidence
+## Current continuation — SGLang/Gemma deployed; behavior contracts remain open
+
+Active Issue #35; pre-delivery base `67d2b2f867064d59c21c075a8ad0108abc3250da` on `main`.
+Expected resume revision: the latest delivery commit containing this checkpoint and handoff.
+RTX 5090 auto-detection now selects shared Google Gemma4-12B online FP8 on SGLang,
+served as `chromie-gemma4-12b`: 65536 context/shared cache tokens, two request slots,
+priority preemption, 0.125 sliding/full cache ratio, and Host speech leases.
+ASR SenseVoice int8 and TTS CosyVoice3 0.5B remain specialized. Laptop unchanged.
+Normal launcher startup passed, including unplayed zh/en/mixed TTS warmups. All four
+services remain healthy; no host Orchestrator/microphone or physical effects were run.
+
+Build owner `llm/sglang/Dockerfile` pins the upstream image and repairs the reproduced
+missing `lm_head_is_tied` constructor field. `docker-compose.sglang.yml` overrides the
+existing `chromie-llm` owner; the obsolete Qwen validation overlay was removed. SGLang
+rejects colons in served aliases, so the profile uses the new alias for the same weights.
+Provider-aware startup, health, diagnostics and provenance validation are implemented.
+No prompt/Schema/semantic-authority changes. Inventory remains 381 environment keys.
+
+Evidence root `.chromie/acceptance/sglang-gemma12b-migration-20260909/`.
+Read `migration-report.md`, then `behavior-review.json` and `reviewed-cases/`.
+The real 23,919,549,408-byte checkpoint SHA256 was verified (`model-verified.json`).
+Real weights occupy 13.68 GiB; KV allocation is 3.50 GiB. No dummy-weight timing claim.
+Provider protocol passed. Saturated two-slot preemption passed 3/3 (foreground first
+output 74.69–77.90 ms). Speech pause/resume/revocation/recovery passed 3/3 with generated,
+unplayed audio. Actual GI median was 4.35 s; short canaries are not full-workflow latency.
+
+The immutable 51-case preview completed: four mechanical passes, zero fully qualified
+transactions. Terminal buckets: 37 GA Schema/DTO, seven Fast contract, one GI duration,
+two preview-reflex limitations, four mechanical passes rejected by review. Nod2/blink1
+planned correct actions but GA lost count bindings; B. merely echoed; capability inventory
+was not answered. No Fast input-budget failures. Earlier shared-Gemma 0/51 was Ollama Q4,
+not SGLang; FP8/64K versus Q4/32K is not a controlled backend-only comparison.
+All 49 raw GI results passed Schema; all 96 raw GA results violated submitted Schema.
+Offline proof: pinned XGrammar permits the exact invalid GA output through unsupported
+multi-option allOf; installed LLGuidance rejects contains constraints. These are retained
+integration gaps, not proof of intrinsic Gemma incapacity. Host binding conservation after
+GA repair also remains open. Preserve SGLang selection; do not silently weaken contracts.
+
+Canonical gate passed 2303 tests/268 subtests, 140 benchmark and 20 legacy tests; Level A
+45/45. Later final logs bind diagnostic/documentation consistency checks separately.
+Runtime identity: `runtime-identity.json`; complete raw calls: `raw-calls.jsonl` (194).
+Exactly one post-cohort bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_141505.tar.gz`.
+Owner authorized commit/push of this migration, followed by GA root-cause repair.
+Physical voice and default target closure remain open.
+
+### Exact runtime and resume
+
+Google revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`; source weight SHA256
+`5a84cb313260ac447237b890387116dfa8682e49a6b44bc585ae8353abbff18d`.
+Deployed image ID `sha256:2f425788c02f2502fd5541455f4917819759352b68e8b8b987bee750204c11ac`.
+Normal startup log `startup-alias-fixed.log`; rejected-name log `served-name-failure.log`.
+The complete model is cached in `hf_cache/hub/models--google--gemma-4-12B-it/`.
+Use the existing cache; no background downloader remains. Historical paused partial
+Ollama/BF16 download files are not active and are not the deployed artifact.
+
+```bash
+./scripts/start_chromie.sh --build --no-orchestrator --keep-services
+./scripts/verify_runtime_profile.sh
+```
+
+`cohort-command.json`, `protocol-command.json`, `contention-command.json`, and
+`preemption_probe.py` retain exact probes. Use new evidence directories for a rerun;
+never overwrite this frozen baseline. Capture a new runtime identity after implementation
+changes. The existing 51-case run was bound to `runtime-identity.json`; subsequent changes
+only correct launcher diagnostic text and documentation. No service rebuild was needed.
+
+Historical sections below describe earlier deployments, not the current selection.
+
+## Latest 2026-09-09 — shared Gemma RTX 5090 worktree
+
+No new commit. Source remains `67d2b2f867064d59c21c075a8ad0108abc3250da` with owner-requested
+profile/test/configuration/status edits. Every RTX 5090 reasoning role now uses `gemma4:12b`;
+one resident runner, 32768 context. ASR SenseVoice and TTS CosyVoice3 models are unchanged.
+This topology is implemented, not behavior-qualified: all 51 preview cases failed (see report).
+Canonical gate passed 2302 tests/268 subtests + 140 benchmark + 20 legacy; Level A 45/45.
+
+Evidence root `.chromie/acceptance/gemma12b-fair-rtx5090-20260909/`.
+Read `comparison-report.md` first, then `shared-gemma-review.json` and `reviewed-cases/`.
+One bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260909_121448.tar.gz`.
+`ollama-q4-runtime-identity.json` binds the frozen baseline worktree before later docs edits.
+`recovered-llm-calls.jsonl` has 62 calls; one interleaved Uvicorn fragment removed; original
+bundle unchanged. `tests-final.log` is the successful canonical gate (earlier attempts failed).
+
+Fair timing is blocked in the tested setup: native SGLang GGUF loader has no
+`gemma4_unified` mapping; BF16 placeholder-weight allocation with ASR/TTS resident failed
+at fraction 0.80 and yielded only 2017/32768 cache tokens at 0.99. These are allocation
+preflights, never model quality or throughput tests. No matched BF16 inference was run.
+Both probes stopped; Ollama shared Q4 model is warmed and all four normal services healthy.
+Downloads paused; partial cache files retained. Google artifact revision is
+`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`; expected safetensors SHA256
+`5a84cb313260ac447237b890387116dfa8682e49a6b44bc585ae8353abbff18d`.
+Ollama BF16 blob is `a01bdd1527e5daebb520cbb570d32e4074bb94df263743ae733a8ef75bc4778d`.
+Only one full norm tensor has been compared (3840 exact matches), not all weights.
+
+Resume downloads only after choosing a viable matched configuration:
+`docker exec chromie-llm ollama pull gemma4:12b-it-bf16`.
+HF: use cached image `59e11312666e` with `/home/chromie/github/chromie/hf_cache` mounted
+to `/root/.cache/huggingface`, and `huggingface_hub.snapshot_download` for the exact Google
+revision above (allow JSON/Jinja/model/safetensors/README files). The prior ephemeral
+`chromie-gemma-download` container was stopped and removed.
+`replay_gi.py` and `gi-freeze.json` retain 24 identical primary GI packets; invoke with
+`--provider ollama|sglang --model <verified-id> --url <loopback-base> --output <fresh-dir>`.
+Do not claim complete GI qualification from that primary-only probe; permitted depth
+delegation/repair and downstream all-role behavior require their own complete transactions.
+No performance claim while downloads or unrelated GPU workloads run. Rebind source/runtime
+identity after final docs edits and before any new aggregate. Keep one bundle per aggregate.
+
+## 2026-09-09 active handoff — RTX 5090 provider comparison
+
+Owner asked whether to switch to SGLang. Recommendation: pursue its demonstrated scheduling
+benefit, but do not promote the current all-role 9B profile. Maintained Ollama is restored;
+SGLang is stopped/cached. No source/prompt/model-file changes, commit or push. Source main
+`67d2b2f867064d59c21c075a8ad0108abc3250da` with existing documentation-only changes;
+comparison timing worktree hash `d95d8948f347f83f3b73fa9b46d62706311846669cd1133a403c0bf70dcb22be`.
+
+Evidence root: `/home/chromie/github/chromie/.chromie/acceptance/sglang-switch-rtx5090-20260909/`.
+Read `switch-decision.md` and `comparison-review.json` for all 51 case decisions, exact
+module I/O and the rejected mechanical pass. Three trials/provider: median GI first output
+19403 ms Ollama vs 37 ms SGLang; foreground window 19882 vs 209 ms; speech first audio
+3504 vs 2180 ms. SGLang finished foreground before Deep and resumed after both speech
+leases in 3/3 trials. Maximum observed VRAM 25314 vs 31403 MiB (32607 MiB device).
+These are synthetic canaries/unplayed TTS, not physical voice or release percentiles.
+
+Frozen 51-case planning preview: runner 1/51 SGLang vs 0/51 earlier Ollama. Review accepts
+zero complete transactions. Candidate terminal buckets: GI duration provenance ten,
+Fast input budget eight, output truncation eleven, contract six, GA contract thirteen,
+preview-only reflex restrictions two, mechanical pass one rejected on review. Correct
+validation rejection is not successful behavior. Original runner summaries remain unchanged.
+All scenario files match the Ollama baseline; `cohort-match.json` records each hash check.
+
+Critical case: `shake_head_twice_plain_request`, turn c70cf61a. GI primary and source-only
+Deep invent actor ambiguity; Deep also confuses robot self-identity with the human. GA
+primary emits malformed count/entity bindings; its repair drops them to bindings=[] and
+Host accepts the Goal. Concurrent Fast emits execute/complete shake_no with unresolved=[].
+Host constructs an executable interaction despite retained upstream unresolved meaning.
+Preview prevents dispatch; the mechanical oracle checks capability/count and misses this
+conservation/authority failure. This is a reproduced gap to fix before execution, not a pass.
+Look-then-blink also loses duration on SGLang where Ollama retained it (with other errors).
+Common model errors and new downstream reachability must remain separate from regressions.
+
+Exact candidate: SGLang 0.5.19/CUDA 12.9.2; Qwen/Qwen3.5-9B BF16 safetensors revision
+c202236235762e1c871ad0ccb60c8ee5ba337b9a, served chromie-qwen35-9b-sglang. 32768 context/
+shared cache, two requests, ten Mamba slots, .80 memory fraction, breakable prefill graphs.
+Candidate fingerprint 5298cb5d35f866eeb5f7ff1a3d52696ee16b3fe4f4d2d384ee232d6fbe28e545.
+Ollama 0.32.14 used maintained Gemma4-12B GI/GA/Deep and Qwen3.5-9B Fast, Q4_K_M weights,
+32768 context, q8_0 KV. Different artifacts/topologies prevent scheduler-only attribution.
+See `*-series-command.json`, `*-contention-summary.json`, `sglang.env`,
+`sglang-runtime-command.json`, `sglang-runtime-identity.json`, `ollama-models.json` and
+`ollama-cuda-maps.txt`. CUDA was initially unknown in Ollama commands; maps supplement it.
+
+Initial identity capture rejected dirty documentation; the shell nevertheless started a
+cohort. It was interrupted/excluded and bundled once:
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_114037.tar.gz`.
+Then capture used --allow-dirty and explicit candidate services/Compose files. The unchanged
+replacement completed and was bundled once:
+`/home/chromie/Downloads/chromie_debug_bundle_20260909_115034.tar.gz`.
+`sglang-must-pass-preview-bound/` is the complete run; `sglang-must-pass-preview/` is excluded.
+`recovered-sglang-calls.jsonl` reconstructs interleaved records from that retained Agent log.
+GA/Fast raw content lives in provider_response.choices[0].message.content, despite the generic
+raw_model_output field being null. Truncated Fast calls lack a complete retained raw result.
+
+The unchanged source passed the earlier full gate (2302 tests/268 subtests, 140 benchmark,
+20 legacy Agent) and 45 Level A cases. This comparison passed 14 focused SGLang tests.
+Soridormi remains running headless at port 8000/mcp on pre-existing dirty revision
+ d03c7e3b7da73b777b1e923044340fa9c8d66fa7; do not overwrite its skill/config/test edits.
+Earlier same-host Ollama baseline: `.chromie/acceptance/resume-67d2b2f8-rtx5090-20260909/`.
+Prior laptop comparison directories below are absent on this host.
+
+Next: reproduce c70cf61a conservation/unresolved admission, then shared full Fast payload
+preflight. Validate a role-compatible model/profile and actual Host voice continuity before
+promotion. No semantic host rewriting or global-authority change is proposed here.
+Reproduction commands are retained as structured arrays in `*-series-command.json`;
+use fresh output paths. Start candidate from the recorded SGLang Compose env only after
+unloading Ollama. Generate the opt-in validation profile, warm services, capture with the
+actual service list and --allow-dirty only when truthful, then run general abilities with
+--mode live-text --stage must_pass and that identity. Collect once after each full cohort.
+Do not reuse old identities or run physical effects from this preview evidence.
+
+## Earlier 2026-09-09 handoff — engineering repairs and paired runtime evidence
 
 Repository `TimeTreker/chromie`, `main`; pre-delivery baseline
 `759b5e062cd43ac2cb919e4ca587a682ca673eee`. Resume from the delivery commit containing

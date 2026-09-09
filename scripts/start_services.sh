@@ -169,6 +169,9 @@ BUILD_SERVICES=(
 
   chromie-agent
 )
+if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
+  BUILD_SERVICES+=(chromie-llm)
+fi
 
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 
@@ -239,7 +242,9 @@ echo " ./scripts/compose.sh logs -f"
 echo " ./scripts/compose.sh logs -f chromie-agent"
 echo " ./scripts/compose.sh ps"
 echo " ./scripts/show_profile.sh"
-echo " ./scripts/warm_ollama.sh"
+if [ "${AGENT_LLM_PROVIDER:-ollama}" = "ollama" ]; then
+  echo " ./scripts/warm_ollama.sh"
+fi
 echo " ./scripts/start_orchestrator.sh"
 echo
 echo "[start] Build commands:"

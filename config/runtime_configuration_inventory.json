@@ -115,7 +115,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
       "owners": [
         ".env.common",
@@ -129,8 +129,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -268,7 +267,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_DEEP_PLANNER_MODEL",
       "owners": [
         ".env.common",
@@ -282,8 +281,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -441,7 +439,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "AGENT_FAST_PLANNER_MODEL",
       "owners": [
         ".env.common",
@@ -456,7 +454,6 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -535,7 +532,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_GOAL_ASSOCIATION_MODEL",
       "owners": [
         ".env.common",
@@ -549,8 +546,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -657,7 +653,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "AGENT_GOAL_INTERPRETER_MODEL",
       "owners": [
         ".env.common",
@@ -672,7 +668,6 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -759,13 +754,13 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_LLM_PROVIDER",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -778,7 +773,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_MODEL",
       "owners": [
         "agent/app/settings.py",
@@ -791,8 +786,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -813,24 +807,23 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_SGLANG_PRIORITY_STEP",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "docker-compose.yml"
       ]
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_SGLANG_URL",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -925,15 +918,14 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "service_internal",
       "key": "AGENT_SKILL_SELECTION_MODEL",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -971,7 +963,7 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "AGENT_TASK_CONTINUITY_MODEL",
       "owners": [
         "env/profiles/default.env",
@@ -982,8 +974,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -1329,6 +1320,7 @@
       "category": "public_choice",
       "key": "CHROMIE_COMPOSE_OVERRIDE_FILES",
       "owners": [
+        "env/profiles/rtx5090.env",
         "scripts/capture_runtime_identity.py"
       ]
     },
@@ -2857,41 +2849,41 @@
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "ORCH_PRESENTATION_COMPUTE_CONTROL_URL",
       "owners": [
         ".env.common",
-        "env/validation/sglang_rtx5090_candidate.env",
+        "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
     {
       "boolean": true,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED",
       "owners": [
         ".env.common",
-        "env/validation/sglang_rtx5090_candidate.env",
+        "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "ORCH_PRESENTATION_COMPUTE_LEASE_MODE",
       "owners": [
         ".env.common",
-        "env/validation/sglang_rtx5090_candidate.env",
+        "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "env/validation/sglang_rtx5090_candidate.env",
+        "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -3505,13 +3497,12 @@
     },
     {
       "boolean": true,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "TTS_COSYVOICE_COMPACT_COGNITION",
       "owners": [
         ".env.common",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -3989,11 +3980,11 @@
     },
     {
       "boolean": true,
-      "category": "acceptance_override",
+      "category": "profile_constant",
       "key": "WARM_OLLAMA_BEFORE_ORCH",
       "owners": [
         ".env.common",
-        "env/validation/sglang_rtx5090_candidate.env"
+        "env/profiles/rtx5090.env"
       ]
     }
   ],
@@ -4006,11 +3997,11 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 50,
+      "acceptance_override": 33,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 124,
+      "profile_constant": 133,
       "public_choice": 9,
-      "service_internal": 198
+      "service_internal": 206
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,

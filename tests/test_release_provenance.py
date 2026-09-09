@@ -14,6 +14,7 @@ from scripts.release_provenance import (
     mutable_image_errors,
     model_lock_errors,
     ollama_models,
+    parse_env,
     source_environment,
 )
 
@@ -24,6 +25,17 @@ class ReleaseProvenanceTests(unittest.TestCase):
 
     def test_repository_model_lock_matches_profiles(self) -> None:
         self.assertEqual(model_lock_errors(ROOT), [])
+
+    def test_hardware_sglang_role_requires_its_own_model_lock(self) -> None:
+        def changed_profile(path):
+            values = parse_env(path)
+            if path.name == "rtx5090.env":
+                values["AGENT_FAST_PLANNER_MODEL"] = "unlocked-model"
+            return values
+
+        with mock.patch("scripts.release_provenance.parse_env", side_effect=changed_profile):
+            errors = model_lock_errors(ROOT)
+        self.assertTrue(any("unlocked-model" in error for error in errors), errors)
 
     def test_sglang_candidate_served_model_is_source_revision_locked(self) -> None:
         env = {
@@ -49,7 +61,11 @@ class ReleaseProvenanceTests(unittest.TestCase):
         model = lock["sglang"]["candidate_served_models"]["chromie-qwen35-9b-sglang"]
         self.assertEqual(model["source_model_id"], "Qwen/Qwen3.5-9B")
         self.assertEqual(model["revision"], "c202236235762e1c871ad0ccb60c8ee5ba337b9a")
-        self.assertEqual(lock["sglang"]["promotion_status"], "candidate_only")
+        self.assertEqual(lock["sglang"]["promotion_status"], "runtime_selected_release_unqualified")
+        gemma = lock["sglang"]["candidate_served_models"]["chromie-gemma4-12b"]
+        self.assertEqual(gemma["source_model_id"], "google/gemma-4-12B-it")
+        self.assertEqual(gemma["revision"], "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7")
+        self.assertEqual(gemma["quantization"], "fp8_online")
 
     def test_maintained_asr_profiles_are_multilingual(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):

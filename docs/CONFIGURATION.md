@@ -106,7 +106,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway. High-confidence unaddressed ambient speech may be suppressed by Gateway Attention Review; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; Gateway-suppressed ambient turns do not refresh the exchange window. |
-| `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. `sglang` is an explicit candidate runtime; it does not change GI/Planner semantic authority or promote a model. |
+| `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. RTX 5090 selects `sglang` in its hardware profile; other profiles retain their declared provider. This does not change GI/Planner semantic authority or establish behavior qualification. |
 | `AGENT_SGLANG_URL` | `http://chromie-llm-sglang-qualification:30000/v1` | OpenAI-compatible SGLang base URL used only when `AGENT_LLM_PROVIDER=sglang`. |
 | `AGENT_SGLANG_PRIORITY_STEP` | `100` | Operational translation step from provider-neutral compute ranks to SGLang request priority. |
 | `SGLANG_MAX_TOTAL_TOKENS` | `32768` | Qualification Compose shared KV-cache cap, independent of per-request context. Positive token count parsed by SGLang; the laptop AWQ profile retains two request slots and proves two 16K inputs. Larger caps require renewed speech-headroom qualification. |
@@ -158,7 +158,7 @@ cancellable deployment.
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` runner. Ollama 0.32.14 exposes only one sequence slot for the `qwen35` architecture even when configured for two, so the maintained profile truthfully retains one provider request slot. The maintained RTX 5090 profile also sets `0` and uses its declared Qwen/Gemma role split. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` runner. Ollama 0.32.14 exposes only one sequence slot for the `qwen35` architecture even when configured for two, so the maintained profile truthfully retains one provider request slot. The maintained RTX 5090 profile also sets `0` and assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 model; ASR and TTS retain their specialized models. This topology is pending all-role qualification. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -169,8 +169,9 @@ request for the singleton CosyVoice worker. Profiles with compact cognition enab
 The RTX 4090 Laptop profile uses one shared 32768-token `qwen3.5:4b` model with
 one provider request slot and quantized KV cache. Generated role contexts remain
 authoritative, including the qualification-only Deep Planner context. The RTX
-5090 profile opts out and keeps its declared Qwen/Gemma role split resident when
-memory permits.
+5090 profile opts out of compact cognition and assigns every reasoning role to
+one shared `chromie-gemma4-12b` SGLang FP8 model with a 65536-token context. This does not merge role
+authority or change ASR/TTS models; the all-role topology remains under qualification.
 Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
 only `chromie-llm` to clear stale runners left by an earlier launch. Select a
 fallback explicitly with
@@ -263,7 +264,7 @@ Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `gemma4:12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
+| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `chromie-gemma4-12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
 | `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | Common fallback `5400`; interactive `services`/`speech`/`voice_mujoco` modes use `60000`, while explicit qualification mode uses `120000`. This is the per-invocation watchdog for one complete WHAT-only Fast interpretation or one allowed source-based Deep GI interpretation; human-facing latency remains separately measured and is not used as a cognition kill switch. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
@@ -714,20 +715,19 @@ drain followed by worker restart when synchronous inference cannot stop.
 complete prompt, the complete generated output, and an explicit safety margin;
 raising only the context window does not prevent an output from stopping at
 `num_predict`. During development and source-bound qualification, the maintained
-RTX 5090 profile therefore prioritizes complete inference over latency:
+RTX 5090 profile reserves sufficient context for the full Planner prompt and response:
 
 ```text
-OLLAMA_CONTEXT_LENGTH=32768
-OLLAMA_NUM_CTX=32768
+OLLAMA_CONTEXT_LENGTH=65536
+OLLAMA_NUM_CTX=65536
 AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE=2.0
 AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048
 ```
 
-Every active Qwen and Gemma cognitive stage uses that same 32K runner topology.
-This avoids Ollama creating or evicting separate runners for the same model at
-2K, 4K, 8K, and 32K. Output ceilings remain role-specific: narrow Gateway work
-stays small, Fast Planning may use 4096 tokens, and Deep Planning may use 8192.
-These values are ceilings, not required response lengths.
+The legacy `OLLAMA_*` context names also supply Agent request budgets. All RTX 5090
+reasoning-role context settings are 65536; the provider is SGLang. Output ceilings
+remain role-specific and unchanged. Increasing the context addresses the reproduced
+full Fast request preflight failure without dropping authoritative prompt material.
 
 Before inference, Chromie estimates prompt tokens from the complete user and
 system text, reserves the entire declared output budget and the configured
@@ -863,7 +863,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `gemma4:12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after GI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -1027,4 +1027,40 @@ model/GPU. Keep the two-request priority/preemption contract and qualify the exa
 context, cache cap and resident speech service together. An explicit higher cap is supported
 only with retained headroom/contention evidence. This numeric setting adds no compatibility
 alias or boolean mode; it remains with the existing qualification service until that service
-is promoted or removed. Production Ollama configuration is unchanged.
+is promoted or removed. The RTX 5090 runtime configuration below supersedes the former Qwen candidate overlay.
+
+
+## RTX 5090 SGLang startup
+
+The detected `env/profiles/rtx5090.env` selects `docker-compose.sglang.yml` through
+the existing Compose override setting. The existing `chromie-llm` service becomes
+SGLang, so Agent health dependencies and shutdown still follow one service owner.
+The former `sglang_rtx5090_candidate` validation overlay was consolidated into this
+hardware profile; it is no longer a supported validation-profile name.
+
+The Compose owner pins Google Gemma4-12B-IT revision
+`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, served as `chromie-gemma4-12b`, with online FP8
+linear weights, BF16 compute/cache, 65536 context/cache tokens, two requests and a
+0.125 sliding/full cache ratio. Prefill chunks are 2048 tokens. Priority scheduling
+uses the existing compute-class adapter and a preemption threshold of 10; Host speech
+leases pause/resume generation and are revoked by foreground input. ASR and TTS
+retain their specialized models. Real-weight startup, provider protocol, three saturated
+preemption trials and three synthetic speech pause/resume/recovery trials passed. The
+51-case behavior preview remains unqualified: four mechanical passes, none fully qualified
+because of retained Schema/Host and semantic failures. See the current checkpoint for
+raw evidence; provider timing is not physical voice or complete interaction evidence.
+
+Build the pinned image with `docker build -t chromie-sglang:gemma4-fp8 llm/sglang`.
+Its Dockerfile fixes a reproduced missing `lm_head_is_tied` initialization in the
+unified Gemma constructor, preserving the existing GPU branch predicate. Remove the
+repair when a reviewed upstream image implements that constructor contract.
+The checkpoint must be cached in `hf_cache` before offline startup. Normal launch is
+`./scripts/start_chromie.sh --build`; `--no-orchestrator --keep-services` provides
+service-only startup with unplayed speech readiness probes. The launcher uses SGLang
+health on loopback port 30000 and skips Ollama reset/warmup. Hardware detection still
+selects the laptop's separate profile automatically.
+
+This change adds one runtime Compose file and one reproducible image Dockerfile,
+and removes the obsolete candidate overlay. No new environment variable or semantic
+authority is introduced. The existing standalone SGLang qualification Compose remains
+available for explicitly isolated provider experiments.

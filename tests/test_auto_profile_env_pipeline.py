@@ -209,7 +209,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 self.assertEqual(set(MODEL_KEYS) - values.keys(), set())
                 self.assertTrue(all(values[key] for key in MODEL_KEYS))
 
-    def test_rtx5090_is_detected_and_generates_12b_deliberate_stages(self) -> None:
+    def test_rtx5090_is_detected_and_generates_one_reasoning_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             system_info = root / "system.env"
@@ -227,13 +227,16 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("Auto-detected hardware profile: rtx5090", result.stdout)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_GOAL_ASSOCIATION_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_MODEL"], "gemma4:12b")
-        self.assertEqual(values["AGENT_FAST_PLANNER_MODEL"], "qwen3.5:9b")
+        for key in (*MODEL_KEYS, "AGENT_TASK_CONTINUITY_MODEL", "AGENT_SKILL_SELECTION_MODEL"):
+            self.assertEqual(values[key], "chromie-gemma4-12b", key)
+        self.assertEqual(
+            values["ASR_MODEL_REVISION"],
+            "asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+        )
+        self.assertEqual(values["TTS_MODEL_SIZE"], "0.6B")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
-        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
-        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
+        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "65536")
+        self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(values["OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT"], "1")
         self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
         self.assertEqual(values["OLLAMA_KV_CACHE_TYPE"], "q8_0")
@@ -245,8 +248,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
         ):
-            self.assertEqual(values[key], "32768", key)
-        self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "32768")
+            self.assertEqual(values[key], "65536", key)
+        self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "65536")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
@@ -256,10 +259,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(manifest["active_operator_mode"], "speech")
         self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "speech")
         self.assertEqual(manifest["mode_file"], "env/modes/speech.env")
-        self.assertEqual(
-            manifest["active_ollama_models"],
-            ["gemma4:12b", "qwen3.5:9b"],
-        )
+        self.assertEqual(manifest["active_ollama_models"], [])
+        self.assertEqual(manifest["active_inference_models"], ["chromie-gemma4-12b"])
+        self.assertEqual(values["AGENT_LLM_PROVIDER"], "sglang")
+        self.assertEqual(values["AGENT_SGLANG_URL"], "http://chromie-llm:30000/v1")
+        self.assertEqual(values["WARM_OLLAMA_BEFORE_ORCH"], "0")
+        self.assertEqual(values["ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED"], "1")
         self.assertEqual(manifest["fingerprint"], values["CHROMIE_RUNTIME_ENV_FINGERPRINT"])
         self.assertEqual(
             manifest["cognitive_budgets"]["CHROMIE_COGNITIVE_BUDGET_PROFILE"],
@@ -285,7 +290,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["OLLAMA_NUM_CTX"],
-            "32768",
+            "65536",
         )
         self.assertEqual(
             manifest["cognitive_budgets"]["AGENT_DEEP_PLANNER_NUM_PREDICT"],

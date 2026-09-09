@@ -127,10 +127,12 @@ for name in \
   check_value chromie-agent "$name"
 done
 
-for name in \
-  OLLAMA_CONTEXT_LENGTH; do
-  check_value chromie-llm "$name"
-done
+check_value chromie-agent AGENT_LLM_PROVIDER
+if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
+  check_value chromie-agent AGENT_SGLANG_URL
+else
+  check_value chromie-llm OLLAMA_CONTEXT_LENGTH
+fi
 
 for name in \
   OLLAMA_CONTEXT_LENGTH \
@@ -181,5 +183,9 @@ echo "[profile-check] Auto-detected profile: ${CHROMIE_ACTIVE_PROFILE}"
 echo "[profile-check] Runtime timezone: ${TZ}"
 echo "[profile-check] Runtime fingerprint: ${CHROMIE_RUNTIME_ENV_FINGERPRINT}"
 echo "[profile-check] TTS: backend=${tts_backend} service=${tts_service} provider=${tts_provider} built_profile=${built_profile} cuda_arch=${built_cuda_arch}"
-echo "[profile-check] Active Ollama models: $(./scripts/list_runtime_ollama_models.sh | paste -sd, -)"
+if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
+  echo "[profile-check] Active SGLang model: ${AGENT_MODEL}"
+else
+  echo "[profile-check] Active Ollama models: $(./scripts/list_runtime_ollama_models.sh | paste -sd, -)"
+fi
 echo "[profile-check] All container environments match .env.runtime."

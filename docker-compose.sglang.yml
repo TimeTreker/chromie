@@ -1,0 +1,72 @@
+# RTX 5090 runtime selected by its hardware profile. Keep the same service owner
+# so Agent health dependencies, lifecycle and diagnostics follow the chosen LLM.
+services:
+  chromie-llm:
+    image: chromie-sglang:gemma4-fp8
+    build:
+      context: ./llm/sglang
+      dockerfile: Dockerfile
+    ipc: host
+    entrypoint: [python3, -m, sglang.launch_server]
+    command:
+      - --model-path
+      - google/gemma-4-12B-it
+      - --revision
+      - 707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7
+      - --served-model-name
+      - ${AGENT_MODEL:?AGENT_MODEL must be generated}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "30000"
+      - --quantization
+      - fp8
+      - --dtype
+      - bfloat16
+      - --context-length
+      - "65536"
+      - --max-total-tokens
+      - "65536"
+      - --max-running-requests
+      - "2"
+      - --swa-full-tokens-ratio
+      - "0.125"
+      - --mem-fraction-static
+      - "0.80"
+      - --chunked-prefill-size
+      - "2048"
+      - --schedule-policy
+      - fcfs
+      - --enable-priority-scheduling
+      - --default-priority-value
+      - "0"
+      - --abort-on-priority-when-disabled
+      - --priority-scheduling-preemption-threshold
+      - "10"
+      - --reasoning-parser
+      - gemma4
+      - --tool-call-parser
+      - gemma4
+      - --enable-metrics
+      - --enable-request-time-stats-logging
+    ports: !override
+      - "127.0.0.1:30000:30000"
+    volumes: !override
+      - /etc/localtime:/etc/localtime:ro
+      - ./hf_cache:/root/.cache/huggingface
+      - ./.chromie/sglang-kernel-cache:/root/.cache/flashinfer
+    environment: !override
+      CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?CHROMIE_ACTIVE_PROFILE must be generated}
+      CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?CHROMIE_RUNTIME_ENV_FINGERPRINT must be generated}
+      TZ: ${CHROMIE_HOST_TIMEZONE:?CHROMIE_HOST_TIMEZONE must be detected}
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:30000/health >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 300s

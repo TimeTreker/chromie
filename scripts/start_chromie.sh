@@ -188,8 +188,13 @@ show_shared_gpu_startup_diagnostics() {
   nvidia-smi \
     --query-compute-apps=pid,process_name,used_memory \
     --format=csv,noheader 2>/dev/null >&2 || true
-  echo "[chromie][diagnostic] Ollama resident runners:" >&2
-  docker compose "${COMPOSE_ARGS[@]}" exec -T chromie-llm ollama ps >&2 2>/dev/null || true
+  if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
+    echo "[chromie][diagnostic] SGLang service log:" >&2
+    docker compose "${COMPOSE_ARGS[@]}" logs --tail=20 chromie-llm >&2 2>/dev/null || true
+  else
+    echo "[chromie][diagnostic] Ollama resident runners:" >&2
+    docker compose "${COMPOSE_ARGS[@]}" exec -T chromie-llm ollama ps >&2 2>/dev/null || true
+  fi
 }
 
 reset_ollama_before_tts_warmup() {
@@ -562,6 +567,9 @@ esac
 
 export CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE="$SERVICE_OVERRIDE"
 export CHROMIE_COMPOSE_OVERRIDE_FILES="${CHROMIE_COMPOSE_OVERRIDE_FILES:+${CHROMIE_COMPOSE_OVERRIDE_FILES},}${COMPOSE_OVERRIDE}"
+# start_services refreshes and sources the hardware profile. Preserve the
+# additional generated voice overlay after that profile has been sourced.
+printf 'CHROMIE_COMPOSE_OVERRIDE_FILES=%q\n' "$CHROMIE_COMPOSE_OVERRIDE_FILES" >> "$SERVICE_OVERRIDE"
 export CHROMIE_PULL_POLICY=never
 
 if [ "$BUILD_IMAGES" = "1" ]; then
@@ -673,14 +681,18 @@ run_soridormi_capability_probe() {
   return "$rc"
 }
 
-if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
+if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${AGENT_LLM_PROVIDER:-ollama}" = "ollama" ]; then
   reset_ollama_before_tts_warmup
 fi
 
 wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"
 wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts 1200 "$TTS_READY_LABEL"
 wait_for_http 127.0.0.1 8092 /health 300 "Agent"
-wait_for_tcp 127.0.0.1 11434 300 "Ollama"
+if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
+  wait_for_http 127.0.0.1 30000 /health 1200 "SGLang"
+else
+  wait_for_tcp 127.0.0.1 11434 300 "Ollama"
+fi
 
 if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
   # CosyVoice lazily initializes language/reference-specific inference paths.

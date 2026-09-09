@@ -34,9 +34,19 @@
         "weight_format": "safetensors",
         "quantization": "none",
         "dtype": "bfloat16"
+      },
+      "chromie-gemma4-12b": {
+        "source_model_id": "google/gemma-4-12B-it",
+        "revision": "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
+        "weight_format": "safetensors",
+        "quantization": "fp8_online",
+        "dtype": "bfloat16",
+        "source_safetensors_sha256": "5a84cb313260ac447237b890387116dfa8682e49a6b44bc585ae8353abbff18d",
+        "runtime_image": "chromie-sglang:gemma4-fp8",
+        "runtime_build": "llm/sglang/Dockerfile"
       }
     },
-    "promotion_status": "candidate_only"
+    "promotion_status": "runtime_selected_release_unqualified"
   },
   "tts": {
     "default": {
