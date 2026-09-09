@@ -752,6 +752,47 @@ class GoalExecutionContractTests(unittest.TestCase):
         modify["updated_description"] = "Walk for five seconds."
         self.assertTrue(Draft202012Validator(association).is_valid(modify))
 
+    def test_decoder_multi_goal_array_enforces_items_and_cardinality(self):
+        for count in (2, 8):
+            for mode in ("speech", "body_action"):
+                refs = [f"r{index}" for index in range(1, count + 1)]
+                schema = ga_schema.goal_association_response_schema(
+                    GoalSegmentationModelOutput, [], [],
+                    responsibility_count=count, responsibility_refs=refs,
+                    responsibility_output_modes={ref: mode for ref in refs},
+                )
+                goals = [
+                    goal("Accepted responsibility.", mode, source_responsibility_refs=[ref])
+                    for ref in refs
+                ]
+                payload = {
+                    **create_goals(*goals), "referent_updates": [], "resolved_references": [],
+                }
+                complete = Draft202012Validator(schema)
+                self.assertTrue(complete.is_valid(payload))
+                array = schema["properties"]["new_goals"]
+                with self.subTest(count=count, mode=mode):
+                    self.assertIn("anyOf", array)
+                    # Exercise the alternative selected by the pinned decoder.
+                    exposed = Draft202012Validator({
+                        "$defs": schema["$defs"], **array["anyOf"][0],
+                    })
+                    for valid in (goals, list(reversed(goals))):
+                        self.assertTrue(exposed.is_valid(valid))
+                        self.assertTrue(complete.is_valid({**payload, "new_goals": valid}))
+                    for invalid in (
+                        {}, None, [], goals[:-1], goals + [goals[0]],
+                        [None, *goals[1:]], [7, *goals[1:]], [{}, *goals[1:]],
+                        [{**goals[0], "output_mode": "unknown"}, *goals[1:]],
+                        [{**goals[0], "source_responsibility_refs": ["unknown"]}, *goals[1:]],
+                        [{**goals[0], "bindings": "invalid"}, *goals[1:]],
+                    ):
+                        with self.subTest(invalid=invalid):
+                            self.assertFalse(exposed.is_valid(invalid))
+                            self.assertFalse(complete.is_valid({**payload, "new_goals": invalid}))
+                    duplicate = [goals[0], *goals[:-1]]
+                    self.assertFalse(complete.is_valid({**payload, "new_goals": duplicate}))
+
     def test_physical_resource_schema_preserves_entity_recipient_and_source(self):
         schema = ga_schema.goal_association_response_schema(
             GoalSegmentationModelOutput,
@@ -3187,6 +3228,29 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertFalse(
             result.metadata["goal_semantic_transaction"]
             ["contract_repair_attempted"]
+        )
+
+    def test_duplicate_new_goal_responsibility_fails_closed_without_repair(self):
+        ollama = ScriptedOllama([
+            create_goals(
+                goal("Tell me a joke.", "speech"),
+                goal("Tell me another joke.", "speech"),
+            )
+        ])
+        result = asyncio.run(
+            GoalAssociationResolver(ollama).resolve(
+                request(
+                    "Tell me a joke and greet me.", language="en-US",
+                    responsibility_outcomes=["Tell me a joke.", "Greet me."],
+                )
+            )
+        )
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(result.associations, [])
+        self.assertEqual(result.new_goals, [])
+        self.assertEqual(len(ollama.prompts), 1)
+        self.assertFalse(
+            result.metadata["goal_semantic_transaction"]["contract_repair_attempted"]
         )
 
     def test_explicit_location_preserves_referent_provenance(self):

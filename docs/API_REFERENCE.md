@@ -190,6 +190,13 @@ A clarification Communicative Act owns one
 or more typed Planner `InformationGap` records and no `response_text`. A semantic gap
 must cite one exact GI `unresolved` string; an execution-input gap must cite one exact
 available Capability ID and its genuinely absent, required, non-defaulted schema input.
+Before accepting terminal work, Host validation requires every supplied GI unresolved
+meaning to appear in an exact semantic-gap citation. A clarification blocks completion
+and Capability execution for its own Responsibility refs; a mixed result may execute
+independent refs. The request Schema excludes pure `execute`/`respond` when GI meaning
+is unresolved and permits enough gap records for the supplied meanings, within the
+existing eight-gap DTO bound. Cross-Activity conservation is enforced by Host validation;
+omission fails closed without a semantic repair call. Escalation itself authorizes no Work.
 The gap records which authorized context, observation/query, preference, schema, or
 safe-default sources were considered. Goal Association starts concurrently from the same
 GI result and remains the sole canonical

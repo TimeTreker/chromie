@@ -78,31 +78,36 @@ def _prune_unreferenced_definitions(schema: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _expose_intersection_object_shapes(node: Any) -> None:
-    """Keep object fields visible to decoders that prioritize intersections.
+def _expose_intersection_shapes(node: Any) -> None:
+    """Keep object and array shapes visible to intersection-first decoders.
 
-    The single alternative repeats existing object constraints, so all original
-    conditions remain authoritative. This does not add decoder support for
-    cross-field conditions; DTO and Host validation still enforce those.
+    The single alternative repeats existing constraints, so all original
+    conditions remain authoritative. Cross-field and cross-item conservation
+    still require full Schema and Host checks; this does not implement them
+    in a decoder that lacks support for those conditions.
     """
     if isinstance(node, list):
         for value in node:
-            _expose_intersection_object_shapes(value)
+            _expose_intersection_shapes(value)
     elif isinstance(node, dict):
         # Visit existing children first; the redundant branch must not recurse
         # into another copy of itself.
         for value in list(node.values()):
-            _expose_intersection_object_shapes(value)
+            _expose_intersection_shapes(value)
+        shape_keys: tuple[str, ...] = ()
+        if node.get("type") == "object" and "properties" in node:
+            shape_keys = ("type", "properties", "required", "additionalProperties")
+        elif node.get("type") == "array" and "items" in node:
+            shape_keys = ("type", "items", "prefixItems", "minItems", "maxItems", "uniqueItems")
         if (
             node.get("allOf")
-            and node.get("type") == "object"
-            and "properties" in node
+            and shape_keys
             and "oneOf" not in node
             and "anyOf" not in node
         ):
             node["anyOf"] = [{
                 key: copy.deepcopy(node[key])
-                for key in ("type", "properties", "required", "additionalProperties")
+                for key in shape_keys
                 if key in node
             }]
 
@@ -883,7 +888,7 @@ def goal_association_response_schema(
             if isinstance(branch, dict):
                 branch["type"] = "object"
                 branch["additionalProperties"] = False
-    _expose_intersection_object_shapes(schema)
+    _expose_intersection_shapes(schema)
     return _prune_unreferenced_definitions(schema)
 
 

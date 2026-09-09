@@ -1062,6 +1062,10 @@ flag or environment variable is added. This candidate requires the full qualific
 record in the checkpoint before promotion; the earlier global compact experiment
 was rejected for GI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
+The isolated GA schema candidate exposes existing object and array shape constraints
+through redundant alternatives for intersection-first decoders. Array item and length
+checks do not imply cross-item or cross-collection Responsibility conservation in the
+decoder; the original full Schema conditions and Host exact-once checks remain required.
 The checkpoint must be cached in `hf_cache` before offline startup. Normal launch is
 `./scripts/start_chromie.sh --build`; `--no-orchestrator --keep-services` provides
 service-only startup with unplayed speech readiness probes. The launcher uses SGLang

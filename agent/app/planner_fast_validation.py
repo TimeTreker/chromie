@@ -745,6 +745,36 @@ def validate_fast_advance_output(
                     f"binding: {activity.capability_id}.{parameter}"
                 )
 
+    # WHAT uncertainty belongs to GI. A terminal HOW result may preserve it in
+    # clarification provenance, but cannot silently decide or discard it. Check
+    # after individual gap validation so invented citations keep their diagnosis.
+    if output.disposition in {"execute", "respond", "clarify", "mixed"}:
+        cited_meaning = {
+            gap.source_reference
+            for activity in clarification_activities
+            for gap in activity.information_gaps
+            if gap.source_kind == "unresolved_meaning"
+        }
+        missing_meaning = unresolved_meaning - cited_meaning
+        if missing_meaning:
+            raise AuthoritativeGroundingValidationError(
+                "Fast Planner terminal work omitted GI unresolved meaning: "
+                + ",".join(sorted(missing_meaning))
+            )
+    blocked_refs = {
+        ref for activity in clarification_activities
+        for ref in activity.source_responsibility_refs
+    }
+    conflicting_refs = {
+        ref for activity in terminal_activities
+        for ref in activity.source_responsibility_refs if ref in blocked_refs
+    }
+    if conflicting_refs:
+        raise AuthoritativeGroundingValidationError(
+            "Fast Planner cannot complete or execute a Responsibility blocked "
+            "by its clarification: " + ",".join(sorted(conflicting_refs))
+        )
+
 
 def capability_argument_errors(
     plan: CanonicalPlan,
