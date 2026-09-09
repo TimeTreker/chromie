@@ -632,6 +632,30 @@ def validate_fast_advance_output(
             )
         input_schema = definition.get("input_schema") or {}
         properties = input_schema.get("properties") or {}
+        # Numeric conservation must retain field identity. An unrelated argument
+        # (for example intensity=1.0) cannot witness a requested count=1.
+        # Check each source independently, including optional/defaulted inputs.
+        for source_ref in activity.source_responsibility_refs:
+            for name, expected in by_ref[source_ref].bindings.items():
+                parameter_schema = properties.get(name)
+                if (
+                    isinstance(expected, bool)
+                    or not isinstance(expected, (int, float))
+                    or not isinstance(parameter_schema, dict)
+                    or parameter_schema.get("type") not in ("number", "integer")
+                ):
+                    continue
+                actual = activity.args.get(name)
+                if (
+                    isinstance(actual, bool)
+                    or not isinstance(actual, (int, float))
+                    or Decimal(str(actual)) != Decimal(str(expected))
+                ):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner numeric Capability input contradicts GI binding: "
+                        f"{activity.capability_id}.{name}; source_ref={source_ref} "
+                        f"expected={expected!r} actual={actual!r}"
+                    )
         required_inputs = set(input_schema.get("required") or [])
         authoritative_bindings = {
             str(name): value
