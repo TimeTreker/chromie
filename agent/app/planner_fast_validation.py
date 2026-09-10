@@ -488,6 +488,18 @@ def validate_fast_advance_output(
             if source_ref in numeric_args_by_ref:
                 numeric_args_by_ref[source_ref].update(activity_numbers)
     for source_ref, source in by_ref.items():
+        if semantic_numeric_values(source.bindings.get("count")):
+            for activity in capability_activities:
+                if source_ref not in activity.source_responsibility_refs:
+                    continue
+                definition = allowed.get(activity.capability_id, {})
+                properties = (definition.get("input_schema") or {}).get("properties") or {}
+                if "count" not in properties:
+                    raise PlannerDTOContractError(
+                        "Fast Planner cannot validate repetition through an unrelated "
+                        "numeric argument: Capability has no count input; "
+                        f"source_ref={source_ref} capability_id={activity.capability_id}"
+                    )
         required_numbers = semantic_numeric_values(source.bindings)
         missing_numbers = sorted(required_numbers - numeric_args_by_ref.get(source_ref, set()))
         if missing_numbers and any(

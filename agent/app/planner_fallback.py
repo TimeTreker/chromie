@@ -102,6 +102,7 @@ def materialize_deep_unavailable(
             "resolver": "deep_planner",
             "status": "unavailable",
             "authority": "advisory",
+            "execution_allowed": False,
             "attempt_count": attempts,
             "reason": reason,
         }
@@ -144,6 +145,7 @@ def materialize_deep_clarify(
             "resolver": "deep_planner",
             "status": "clarify",
             "authority": "advisory",
+            "execution_allowed": False,
             "attempt_count": attempts,
             "reason": reason,
         }

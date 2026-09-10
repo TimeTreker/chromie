@@ -3599,6 +3599,37 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "not_applicable",
         )
 
+    def test_deep_failure_producers_preserve_safe_silence_and_original_error(self):
+        from agent.app.planner_fallback import (
+            materialize_deep_clarify, materialize_deep_unavailable,
+        )
+        from tests.test_fast_planner_pr3 import _work_request
+
+        request = _work_request(sid="deep-failure", text="Bring that to me.")
+        feedback = [{"type": "parallel_resource_claim_conflict"}]
+        for producer in (materialize_deep_clarify, materialize_deep_unavailable):
+            for error in (None, ValueError("original invalid output")):
+                with self.subTest(producer=producer.__name__, error=error):
+                    plan = producer(
+                        "rejected-plan", request, "original_rejection",
+                        unresolved=["parallel_resource_claim_conflict"],
+                        error=error,
+                        metadata={"validation_feedback": feedback, "execution_allowed": True},
+                    )
+                    self.assertIs(plan.metadata["execution_allowed"], False)
+                    self.assertEqual(plan.metadata["reason"], "original_rejection")
+                    self.assertEqual(plan.metadata["validation_feedback"], feedback)
+                    if error is not None:
+                        self.assertEqual(plan.metadata["error"], str(error))
+                    response = asyncio.run(
+                        CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
+                            plan=plan, session_id=request.sid, language="en-US", context={},
+                        )
+                    )
+                    self.assertEqual(response.speech, [])
+                    self.assertEqual(response.capabilities, [])
+                    self.assertFalse(response.requires_confirmation)
+
     def test_unmarked_missing_planner_text_remains_a_contract_error(self):
         plan = CanonicalPlan(
             plan_id="plan-clarify-missing-text",

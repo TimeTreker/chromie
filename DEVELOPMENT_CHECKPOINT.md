@@ -1,146 +1,102 @@
 # Chromie Development Checkpoint
 
-## Root-cause audit — 2026-09-10, after 3c70093e
+## Current repair — Deep failure containment and repetition validation
 
-Owner requested continued root-cause finding. This iteration is Audit mode: no
-production source, prompt, model, Schema, runtime or scenario changes. Baseline
-`3c70093e9ff7460b1f20af7cf0cbf0f71b6dd56d` remains deployed as recorded below.
-Active Issue #35 and branch `codex/ga-request-format` are unchanged. Root-cause
-findings below supersede provisional attribution in the previous evidence ledger.
+The Goal-driven single-authority architecture remains binding. Active Issue #35,
+branch `codex/ga-request-format`, baseline `0f5d3988` (audit) / runtime source
+`3c70093e`. Owner requested implementation after the root-cause audit. Commit/push
+remain authorized; main promotion is not authorized by a count of preview passes.
+Resume from the latest delivery containing both checkpoint and handoff. Preserve
+unrelated Soridormi work and the fixed RTX 5090 / Gemma4-12B FP8/SGLang profile.
 
-Evidence: `.chromie/acceptance/root-cause-audit-20260910/probe.py`, per-variant JSON
-packets, `results.json`, `probe.log`, and `existing-tests.log`. Replays use retained
-real transaction inputs from `skill-single-call-20260910/reviewed-cases/`, current
-production validators and Runtime adapter; there are no model/provider calls or
-physical dispatches. Prompt catalog `args_schema` is restored to Host `input_schema`
-without changing the schema. Three existing regressions / seven subtests pass;
-they do not cover the newly reproduced cross-boundary gaps. Earlier full canonical
-2324 / 399 results remain the unchanged-code baseline, not a new run this iteration.
+## Root cause and implemented boundaries
 
-| Actual episode boundary | Input -> actual output | Verdict / expected contract |
+| Actual workflow | Evidence / earliest wrong boundary | Implemented result |
 | --- | --- | --- |
-| Turn GI -> Fast, walk_then_turn_right | Retained Chinese walk-three-seconds then turn-right-once; GI r2 count=1, direction=向右, location=原地 | Supplied repetition reaches Fast; it is not lost at handoff |
-| Fast -> Host numeric check | One turn Activity, duration_s=2, yaw_radps=.12; turn input schema has duration/yaw but no count | Host rejects because number 1 is absent from all args; changing only duration to 1 makes it pass |
-| Host numeric implementation | All numeric binding values compared against a set of numbers from all matching Activity args | Confirmed field/quantity identity loss: seconds can witness a repetition count. Negative yaw alone does not change rejection. Acceptance in this probe is only Host validation, never proof of correct direction/execution |
-| Object GI -> concurrent GA/Fast | 那个 has no resolved referent; GI unresolved=[]; GA retains unknown physical source; Fast escalates without Work | Earliest semantic omission remains GI; no Skill model call occurs because discovery has zero candidates |
-| Deep -> plan validation, ambiguous_object_bring_that | Two duplicate delivery steps marked parallel, same Goal and exclusive body/carried-object resources | Host correctly rejects parallel_exclusive_group_conflict and parallel_resource_claim_conflict; no delivery is authorized |
-| Deep fallback -> Runtime response adapter | materialize_deep_clarify produces clarify, empty steps/text, but no execution_allowed=False | Confirmed failure-contract omission: adapter requires that marker for safe silent failure, then raises missing exact text instead |
-| Counterfactual adapter replay | Same retained rejected plan, only execution_allowed=False supplied | Zero speech and zero capabilities, no secondary exception; original rejection feedback retained |
+| GI count=1 -> Fast turn Activity duration=2/yaw=.12 -> Host | Numeric values from unrelated fields were pooled; changing only duration to1 made the count check pass | A count-bound Capability without a count input is rejected independently of other numeric args. Existing same-name numeric validation remains; no Host inference of repeated action meaning |
+| GI unresolved object -> concurrent GA/Fast -> Deep | GI omitted referent ambiguity; GA retained unknown physical source, Fast escalated, Skill discovery returned zero candidates; Deep proposed duplicate parallel deliveries | No upstream semantic rewrite or second selection/model call added |
+| Deep parallel-resource validation -> failure producer -> Runtime | Resource conflict correctly rejected, but empty Plan omitted execution_allowed=False; adapter then raised missing exact text | Both Deep failure producers force execution_allowed=False and preserve original error/feedback, empty steps/text; existing adapter returns zero speech and zero capabilities |
 
-The numeric defect is in `planner_fast_validation.py`'s value-set conservation,
-not proof that repetition semantics should be deleted or arbitrary arguments added.
-The later field-name equality check protects count only when the chosen Capability
-has a numeric count field; it cannot repair this case where that field is absent.
-A future repair must preserve quantity identity and explicitly justify representation
-of repetition through Activity structure; do not weaken the gate or add Host semantic
-inference. The supplied model catalog also lacks a documented yaw sign convention;
-previous claims that the sign failure is solely model inference remain unproven.
+The failure producer owns mechanical containment, not a clarification sentence.
+Both semantic rejection and exception paths use the corrected producer; unavailable
+also obeys this invariant. Caller metadata cannot accidentally mark these empty
+failure results executable. Unmarked successful Plans still cannot omit required
+communication or confirmation. No adapter weakening, new flag, public DTO, current
+document, Capability, model call, runtime switch or architecture layer was added.
 
-The failure-path defect is in the Deep fallback producer, not a requirement for the
-Runtime to invent a clarification sentence. The existing adapter already supports
-marked silent non-executable failures. Next minimal repair should enforce that
-existing producer contract and test producer-to-adapter integration, retaining the
-original failure and no second model invocation. Audit both Deep rejection and
-exception paths. Do not broaden silent acceptance for unmarked successful plans.
-This requires no change to semantic ownership; if subsequent work changes canonical
-repetition meaning or authority, obtain owner authorization before that change.
+Repetition validation now closes the demonstrated false acceptance; it does not
+claim that a turn with no count parameter can realize count through node cardinality.
+That representation remains a contract gap. Allowing repeated or composite Activity
+structures must be justified against existing responsibility/cardinality authority
+before implementation; do not assume one arbitrary node always means one repetition.
+The model-visible turn catalog lacks an explicit yaw sign convention, so direction
+error attribution remains incomplete. Neither gap is an LLM-only limitation.
 
-Attribution correction: the raw Deep output also fails the retained dynamic Schema
-(`user_confirmation_required=False`, schema permits True), but the observed runtime
-rejection feedback is parallel-resource validation, not that Schema error. Schema,
-DTO and runtime verdicts must remain separate. The model's bad proposal initiated the
-episode; the missing failure marker caused the secondary exception. These confirmed
-project defects rule out an all-model-only explanation. Main promotion remains blocked.
-No fix or new live/robot qualification is claimed by this audit delivery.
+The previous audit's Deep raw-schema failure (confirmation False where True was
+required) is separate from the observed Host parallel-resource rejection. Do not
+replace original error provenance with the later response-text symptom. Both are
+retained in the real `ambiguous_object_bring_that` episode.
 
-## Current resume point — owner-authorized single-call Skill selection
+## Evidence and qualification
 
-The Goal-driven single-authority architecture remains binding. Active Issue #35;
-branch `codex/ga-request-format`; pre-delivery baseline
-`c829ff29bf8be2519a8aaf672eb913e2b76bf3ed`. On 2026-09-10 the owner explicitly
-authorized the necessary removal of semantic Skill reselection after the workflow
-and impact explanation. This supersedes the earlier pending-authorization state.
-Commit/push remain authorized; main merge still requires unresolved behavior and
-current target-evidence closure. Resume at the latest commit containing both handoff
-owners. Preserve unrelated Soridormi work.
+Prior immutable baseline: `.chromie/acceptance/skill-single-call-20260910/`, 51 cases,
+28 mechanical /17 reviewed acceptable initial previews, all159 linked calls inspected.
+Prior audit: `.chromie/acceptance/root-cause-audit-20260910/`, four numeric counterfactuals
+and original/marked failure adapter replay; no model call or execution.
+New repair evidence: `.chromie/acceptance/root-cause-repair-20260910/` (private,
+transfer separately across machines). Focused Fast/Deep/Runtime tests pass 248 tests /
+26 subtests, including eight count/duration/yaw contrasts and four failure-producer
+integration contrasts. Level A:19/19 across stable grounding, natural uncertainty and
+evidence discipline. Full canonical gates pass:2326 tests /411 subtests, 140 benchmarks,
+20 legacy Agent tests, repository policy, ownership, static analysis and documentation.
+`canonical.log` retains the observed run; later changes are documentation only.
+The immutable deployed cohort completed51 cases:28 mechanical /17 reviewed acceptable
+initial previews, all154 linked calls reviewed (GI53, Fast49, GA48 Schema passes/1 failure,
+Skill1, Deep2). All154 transport calls completed; transport acceptance is not semantic
+or Host acceptance. Exactly one bundle followed:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_181025.tar.gz`.
+`cohort-exits.json`:exit1, bundle0, source_stable=true. `behavior-review.json` contains
+all cases. Continuation and tired support recovered; polite walk gained an extra
+thanks Goal and outside-people response invented absent visual sensors. Other residual
+failures remain. No causal claim attributes those unchanged-model output variations
+to these two Host/fallback changes.
 
-## Implemented workflow and authority
+The current live ambiguous-object case failed in Fast before Deep (missing resource
+kind); right-turn failed at GI duration provenance. Consequently the cohort does not
+prove those exact repaired branches were entered. `focused-replay.py` / `results.json`
+replay the original packet through current Host and current Deep failure producer:
+all four count/duration/yaw variants now reject unrelated-number evidence; regenerated
+Deep failure passes the existing Runtime adapter with zero speech/capabilities and
+original feedback. The unchanged historical unmarked failure still errors, as intended.
+Focused producer-to-adapter tests also cover rejection, exception, unavailable and
+conflicting caller metadata. No Runtime acceptance weakening is used.
+No full behavior, model-only, physical voice/robot or promotion claim is made.
 
-`AgentSkillSelectionService.select` makes zero model calls for no candidates,
-otherwise exactly one primary call. Its primary prompt, candidate discovery, model,
-Schema, token budget and valid-result validation remain unchanged from c829ff29.
-Any malformed output, semantic/identity/Goal/confidence rejection returns
-`model_contract_failed` with the original error and an empty selected list.
-Provider failures remain `model_unavailable`. No rejected result becomes a new
-semantic selection. Existing deterministic JSON parsing remains unchanged.
+## Runtime and resume commands
 
-| Owner / handoff | Reproduced old output -> new behavior | Why this fixes the boundary |
-| --- | --- | --- |
-| Candidate discovery -> model | Approved weather Skill, exact version/projection/Goal -> one primary selection | Discovery remains typed and model-independent; no Host choice of method |
-| Model -> Skill Host | Primary selects an unlisted ID; a queued second result selects the listed ID | Old code accepted the replacement after two calls; new code rejects the first result and never consumes the queued result |
-| Host -> disclosure | Failed selection with original error, no selected Skills -> zero loaded projections/characters | No invented method provenance, no content loaded from an invalid selection |
-| Disclosure -> downstream Planner | Optional method omitted -> normal existing Planner input/authority | No new Capability, permission, Plan or execution authority; this boundary does not repair upstream meaning |
+Agent tag `chromie-agent:root-cause-repair-20260910`;
+image `sha256:78f877a18712ef307a77166df21a0a59e621c372ab6b30d7167302fb6e88175a`,
+container `8cdd1cbc6b6324537f04c01b05e3074214f0849526e073fa9cebc9d85186bb10`.
+`runtime-identity.json` retains identity; `source-verification.json` verifies all112
+Python files match source. The final running implementation is the aggregate version.
+Fixed model `chromie-gemma4-12b`, revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`,
+65536 context/cache, two requests. SGLang/ASR/TTS/Soridormi remain unchanged.
+Canonical: `./scripts/run_tests.sh`; explicit policies/docs/ownership checks remain
+required. Cohort: this root's `run-cohort.py` runs all directory-discovered must-pass
+live-text previews once, with no source/runtime changes, then exactly one debug bundle.
+Inspect every raw transaction and mechanical pass before another broad source change.
+Unsafe previews are not physical execution; supervised voice/robot evidence is absent.
 
-The general failure matrix covers wrong Skill/version/projection/Goal IDs, low item
-or aggregate confidence, empty rationale, inconsistent decision/list, malformed list,
-missing list, non-object result and JSON parse error. Every case retains exactly one
-call and the original failure; the valid second result remains unused. The second
-model repair prompt and call were removed. No model-based format regeneration remains:
-the previous flow could not guarantee preservation of every authored semantic claim.
-Public repair-history fields remain false. Charter principle 30 is enforced, not
-weakened; the canonical Skill architecture and API/configuration documents now agree.
-
-Repository policy rejects extra model-call sites, second selection helpers and retry
-loops. The broad-handler inventory was re-audited: the removed repair handler is
-removed from the inventory; the remaining provider-failure handler still logs and
-returns typed failure. No blanket ignore or exception was added. No new runtime flag,
-public contract field, architecture layer or current document was introduced.
-
-## Evidence and current claim boundary
-
-Implemented Skill repair and shared-client diagnostic correction retain full canonical
-2324 tests / 399 subtests, 140 benchmarks, 20 legacy tests; focused Skill 53 / 15,
-client 30 / 3, Level A 19/19. These are previous observed runs, not new audit tests.
-`skill-single-call-20260910/behavior-review.json`: immutable 51-case aggregate,
-28 mechanical / 17 reviewed acceptable initial previews, all 159 linked calls reviewed.
-One bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_160447.tar.gz`.
-Two prior acceptable cases recovered and four regressed. Full per-case changes,
-11 frozen before/after Skill Host contrasts, diagnostic evidence and identities
-remain in HANDOFF.md and the private evidence root. Transfer artifacts separately.
-The aggregate precedes the final diagnostic-only correction; do not relabel it.
-Semantic, provenance, Goal coverage, numeric validation, failure presentation,
-progress/latency, integrity and physical target-evidence gaps remain. Main is not
-merged; the audit above confirms project defects, not an all-model-only residual.
-
-## Runtime and next commands
-
-Fixed RTX 5090 / Gemma4-12B FP8/SGLang, served as `chromie-gemma4-12b`, model revision
-`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`; 65536 context/cache and two requests.
-Aggregate Agent image: `sha256:351209df29ed2c666df161f1ba218a0609a8db8d984286b5c8072491073aed8b`,
-container `ce3371bb6a79dc07f776df14f9f83aab386b038bbbb643bd6f37a6a4ffdd9c2d`.
-Final diagnostic correction image tag: `chromie-agent:single-skill-call-final-20260910`,
-image `sha256:6791ac7283f2bd781c03cf80664c6c52b3033261e1f83431b5915d019bffd857`,
-container `69ac8e6b3d49e1fb2a4e131cf7c58541eb7bff8e3b96c8220eda8854fbe0aeb9`.
-ASR/TTS/Soridormi and SGLang are unchanged. Both `source-verification.json` and
-`final-source-verification.json` verify all 112 deployed Python files against source;
-`runtime-identity.json` and `final-runtime-identity.json` retain their separate identities.
-Final narrow proof under `final-focused/` mechanically passes 1/1 but fails semantic
-review: GI leaves ambiguity empty, GA invents person type, Skill rationale guesses
-weather. Its one primary call completes in 3812.630 ms; Deep asks clarification and
-emits zero actions. All five linked calls are retained, Schema-valid and transport
-accepted with no call error. This proves final deployed path operation, not semantic
-qualification or physical voice/robot behavior. `final-focused/behavior-review.json`
-retains the adjudication. Resume with the numeric-binding and invalid-Deep failure
-presentation audits before assigning residual failures exclusively to the model.
-
-Canonical: `./scripts/run_tests.sh`; explicit checks:
-`python scripts/check_repository_policies.py`, `python scripts/check_test_ownership.py`,
-`python scripts/check_docs.py`. Read focused and all-case evidence before continuing
-any semantic optimization. Investigate earliest responsible boundaries, including
-numeric repetition validation, without Host meaning repair or a second semantic judge.
-Update both handoff owners before delivery. A new aggregate uses a fresh evidence
-root, complete directory-discovered cohort, unchanged source/runtime throughout,
-exactly one debug bundle after completion, then review of every case/raw output.
 Compose prefix: `docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml -f .chromie/voice-runtime/compose.voice-mujoco.yaml`.
-Never edit generated `.env.runtime`. Identity capture:
+Never edit generated `.env.runtime`. Identity:
 `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.
+Delivery checks and all-case review are complete; commit/push include both handoff
+owners. A separate owner question is pending: extend Soridormi turn Capability with
+bounded count (default1), Planner authors count once, provider performs sequential
+repetition, Host only validates. No reply is authorization; that expansion is not
+implemented in this delivery. The semantic qualification Skill requires owner approval
+before making a previously unrepresentable valid outcome expressible. Continue only
+after that approval, auditing Soridormi's contract and preserving unrelated changes.
+Retain the repetition-representation and catalog-direction evidence gaps,
+GI ambiguity/prohibition/omission, GA continuity, Planner integrity/progress/truth,
+and target-evidence blockers instead of declaring residual failures model-only.

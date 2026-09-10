@@ -2041,6 +2041,39 @@ class FastPlannerResolverTests(unittest.TestCase):
                     self.assertIn("numeric Capability input contradicts GI binding", result.metadata["error"])
 
 
+    def test_repetition_cannot_be_witnessed_by_duration_without_count_input(self):
+        capability = {
+            "capability_id": "soridormi.turn_in_place",
+            "input_schema": {"type": "object", "additionalProperties": False,
+                "properties": {"duration_s": {"type": "number", "default": 2.0},
+                               "yaw_radps": {"type": "number", "default": 0.12}}},
+        }
+        for count in (1, 2):
+            for duration in (1.0, 2.0):
+                for yaw in (-0.12, 0.12):
+                    with self.subTest(count=count, duration=duration, yaw=yaw):
+                        request = _work_request(
+                            sid="turn-count", text="Turn in place.",
+                            responsibilities=[{"local_ref": "r1", "outcome": "turn in place",
+                                "output_mode": "body_action", "bindings": {"count": count},
+                                "confidence": 1.0}],
+                        )
+                        output = FastPlannerAdvanceModelOutput.model_validate({
+                            "disposition": "execute", "coverage": "complete",
+                            "covered_responsibility_refs": ["r1"],
+                            "activities": [{"role": "capability", "activity_id": "turn",
+                                "capability_id": capability["capability_id"],
+                                "args": {"duration_s": duration, "yaw_radps": yaw},
+                                "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                            "continuations": [], "confidence": 1.0, "unresolved": [],
+                            "reason_summary": "Turn as requested.",
+                        })
+                        with self.assertRaisesRegex(PlannerDTOContractError, "no count input"):
+                            planner_fast_validation.validate_fast_advance_output(
+                                output, request=request, responsibilities=list(request.responsibilities),
+                                capabilities=[capability],
+                            )
+
     @staticmethod
     def _clarification_output(
         *,
