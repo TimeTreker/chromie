@@ -1056,13 +1056,15 @@ unified Gemma constructor, preserving the existing GPU branch predicate. Remove 
 repair when a reviewed upstream image implements that constructor contract.
 The request-format candidate also makes the pinned XGrammar dispatcher honor
 `x-guidance.whitespace_flexible` per schema, retaining the complete schema as its
-cache key. The Agent adds `false` only to the two GA output-contract titles;
-GI, Planner and other requests retain their existing formatting. No global compact
+cache key. The Agent adds `false` to the two GA output-contract titles and the
+Deep Planner and Agent Skill Selection output-contract titles. Deep/Skill calls
+also reproduced outside-string whitespace loops that exhausted their output budgets.
+GI and other unannotated requests retain their existing formatting. No global compact
 flag or environment variable is added. This candidate requires the full qualification
 record in the checkpoint before promotion; the earlier global compact experiment
 was rejected for GI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
-GA decoder schemas expose existing object fields and array item/cardinality constraints
+GA, Deep Planner and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
 as redundant single alternatives beside intersections. This preserves the full Schema
 contract while making those shapes visible to the pinned decoder; cross-item identity
 conservation still requires the original Schema clauses and deterministic Host checks.
@@ -1112,3 +1114,7 @@ SGLang stream once on completion or failure, including partial generated text,
 finish reason and failure classification. Existing canonical reference hashes stay
 unchanged; use the retained ordered request for decoder replay. Failed streams must
 remain in qualification denominators even when no complete JSON payload exists.
+Non-stream SGLang requests are likewise retained on timeout, cancellation, truncation,
+HTTP failure and parse failure. Available provider bodies are retained even when they
+are not JSON objects; missing responses are not fabricated. A successfully completed
+call does not inherit an unrelated exception already handled by its caller.

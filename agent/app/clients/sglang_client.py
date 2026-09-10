@@ -167,12 +167,16 @@ class SGLangClient(OllamaClient):
         )
         url = f"{self.base_url}/chat/completions"
         started = time.perf_counter()
+        data: Any = None
+        parsed: dict[str, Any] | None = None
+        completed = False
         try:
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout_ms / 1000.0),
                 trust_env=False,
             ) as client:
                 response = await client.post(url, json=payload)
+            data = {"http_status": response.status_code, "body": response.text}
             if response.status_code >= 400:
                 body = response.text[:1000]
                 raise SGLangGenerationError(
@@ -187,9 +191,10 @@ class SGLangClient(OllamaClient):
                         "status_code": response.status_code,
                     },
                 )
-            data = response.json()
-            if not isinstance(data, dict):
+            decoded = response.json()
+            if not isinstance(decoded, dict):
                 raise ValueError("SGLang completion response is not an object")
+            data = decoded
             text, finish_reason = sglang_completion_content(data)
             if finish_reason == "length":
                 raise SGLangGenerationError(
@@ -202,22 +207,9 @@ class SGLangClient(OllamaClient):
                 )
             if prefix_probe_call_id:
                 _PREFIX_CACHE_TRACKER.record_response(prefix_probe_call_id, data)
-            parsed: dict[str, Any] | None = None
             if response_format != "text":
                 parsed = self._parse_json(text)
-            log_llm_call_evidence(
-                logger,
-                call_id=prefix_probe_call_id or "llmcall_untracked",
-                purpose=self.purpose,
-                stage=str((evidence_context or {}).get("prompt_family") or self.purpose),
-                transport="sglang.chat",
-                request=payload,
-                response=data,
-                status="accepted",
-                elapsed_ms=(time.perf_counter() - started) * 1000.0,
-                correlations=evidence_context,
-                parsed_output=parsed,
-            )
+            completed = True
             return text.strip() if response_format == "text" else parsed or {}
         except asyncio.CancelledError:
             raise
@@ -232,6 +224,28 @@ class SGLangClient(OllamaClient):
                 retryable=True,
                 details={"purpose": self.purpose, "model": self.model},
             ) from exc
+
+        finally:
+            active_error = None if completed else sys.exc_info()[1]
+            log_llm_call_evidence(
+                logger,
+                call_id=prefix_probe_call_id or "llmcall_untracked",
+                purpose=self.purpose,
+                stage=str((evidence_context or {}).get("prompt_family") or self.purpose),
+                transport="sglang.chat",
+                request=payload,
+                response=data,
+                status=("accepted" if active_error is None else
+                        "cancelled" if isinstance(active_error, asyncio.CancelledError) else "failed"),
+                error=({
+                    "error_type": type(active_error).__name__,
+                    "message": str(active_error),
+                    **(llm_failure_metadata(active_error) if isinstance(active_error, Exception) else {}),
+                } if active_error is not None else None),
+                elapsed_ms=(time.perf_counter() - started) * 1000.0,
+                correlations=evidence_context,
+                parsed_output=parsed,
+            )
 
     async def generate_stream(
         self,
@@ -381,7 +395,7 @@ class SGLangClient(OllamaClient):
                 details={"purpose": self.purpose, "model": self.model},
             ) from exc
         finally:
-            active_error = sys.exc_info()[1]
+            active_error = None if status == "completed" else sys.exc_info()[1]
             log_llm_call_evidence(
                 logger,
                 call_id=call_id,

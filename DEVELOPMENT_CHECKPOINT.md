@@ -1,160 +1,137 @@
 # Chromie Development Checkpoint
 
-## Current resume point — scoped whitespace repair accepted; release qualification open
+## Current resume point — Deep/Skill decoder repairs; semantic qualification still blocked
 
+The Goal-driven single-authority architecture remains binding.
 Active Issue #35; delivery branch `codex/ga-request-format`; pre-delivery baseline
-`9a4b73a160e2ef1337026b5149cf039f8257145a`. On 2026-09-10 the owner approved
-accepting the scoped code repair separately from whole-runtime qualification,
-with documented model limitations where established. Commit and push remain authorized.
-Resume at the latest commit containing both checkpoint and handoff.
-The bounded-whitespace implementation is accepted for its demonstrated mechanical
-scope on this delivery branch. This decision does not merge main or qualify a release.
-Preserve unrelated Soridormi edits. The Goal-driven single-authority architecture
-and fixed candidate model remain binding; no Host meaning repair or extra judge.
+`849f31230fcb1101c18553c0b481bd9654e8deeb`. The owner authorized repairs and commit/push,
+but requires explicit authorization for architecture changes and evidence that remaining
+failures are solely model limitations before merging main. That condition is NOT met.
+No main merge, model replacement, semantic Host fallback, or acceptance-threshold change.
+Resume at the latest commit containing both checkpoint and handoff. Preserve unrelated
+Soridormi changes. Earlier scoped Fast-whitespace acceptance remains historical and scoped.
 
-## Implemented scope and actual failure workflow
+## Implemented repairs and responsible boundaries
 
-Retained prior repairs cover GA/GI decoder shapes, GI visible-dialogue provenance,
-complete Fast Goal context, two-frame decoding and exact failed-stream evidence.
-The new change bounds only Fast structural-decoder whitespace. It changes no prompt,
-model, token budget, semantic fields, original schemas, retry or Host acceptance.
+- `sglang_protocol.py` exposes existing Deep/Skill object/array shapes beside native
+  intersections. Original Schema/DTO/Host constraints remain authoritative.
+- Deep and Skill requests now use the existing request-local compact JSON annotation.
+  Both roles reproduced outside-string whitespace loops; no token/timeout increase,
+  new configuration switch, provider rebuild, or change to string content is required.
+- Skill selection's primary prompt now names `selected_agent_skills`, matching the actual
+  output contract, instead of the conflicting `selected_items` instruction.
+- Non-stream SGLang calls retain their exact request and available response on failure,
+  timeout, truncation, parse failure, or cancellation. An absent response is not invented.
+  Final diagnostic corrections retain non-object provider bodies and prevent an outer
+  handled exception from contaminating successful stream/non-stream call evidence.
+- A GI prohibition prompt candidate was tested and rejected. GI source is unchanged;
+  no Capability catalog is added to GI. All 53 GI requests in the intermediate aggregate
+  lacked the known catalog keys and concrete namespaced capability IDs.
 
-| Owner / handoff | Actual observed input and output | Assessment |
+| Actual episode / owner | Input -> actual output and downstream handoff | Contract and result |
 | --- | --- | --- |
-| GI -> concurrent GA/Fast | Chongqing tonight rain question -> weather Responsibility; GA preserves weather Goal | Question retained; invented polarity/duplicated temporal bindings are separate semantic failures |
-| Fast -> SGLang | Exact two-frame request at 2048 tokens -> weather action plus markup inside reason_summary, then whitespace after its closing quote | Native grammar permits unlimited whitespace, enabling budget exhaustion |
-| Client -> parser/Host | length finish, exact 3474-character partial output -> output_truncated | Correct containment and evidence retention; no complete terminal Plan/provider dispatch |
-| Bounded decoder | Same schema meaning; maximum eight whitespace characters at each JSON boundary and frame separator | Captured loop rejected at character 641; strings untouched |
+| Native decoder -> original validators | Frozen Deep/Skill schemas with intersections admitted invalid object/array shapes | Redundant existing shapes close reproduced decoding gaps; validators retain authority |
+| Skill client -> SGLang | Exact retained primary packet, 512-token budget -> list followed by 517 trailing whitespace characters, length finish after 12.5 s | Compact annotation rejects this prefix; corrected prompt alone also exhausted the budget |
+| Compact Skill -> Host | Same retained identity/Goal contract -> completed JSON in 4.33 s | Original Schema and Skill Host identity validation pass; rationale still guesses an external platform and is not semantically qualified |
+| Latest full-cohort GI -> Deep GI | Tianxin primary output guesses platform and marks ambiguity; Deep GI removes uncertainty without new referent evidence | First semantic boundary remains wrong; GI owns WHAT, never Capability selection |
+| Concurrent GA/Fast -> Skill -> Deep | GA creates an external-information Goal; Fast escalates; Skill selects a listed method in 4478.99 ms; Deep returns unavailable | Skill IDs/version/Goal binding and Deep output shape valid; platform/permission assumptions remain ungrounded |
+| Host -> Runtime/provider | Complete unavailable Plan with no steps -> initial response only | No Capability execution, physical sensor/voice proof, or successful request fulfillment is claimed |
 
-Fast sends `x-guidance.max_whitespace_cnt=8`. The existing pinned SGLang bridge uses
-XGrammar's bounded JSON-to-grammar conversion only for annotated structural nodes;
-unannotated requests keep their existing formatting. Runs over eight whitespace
-characters outside strings are intentionally excluded. The bridge is necessary for
-this reproduced integrity blocker because the pinned structural API lacks the option;
-remove it when that API supports the option. No new source/current document, environment
-variable, ordinary behavior flag or semantic authority is introduced.
+The previously unretained Skill timeout `llmcall_agent_909fb4e1c6664e6c` lasted
+10020 ms. A later exact retained request reproduces a whitespace loop lasting more than
+10 seconds, but the missing original timeout packet prevents identifying that earlier
+call's cause conclusively. This gap is not converted into a model-only finding.
 
-## Evidence and qualification limits
+## Evidence actually observed
 
-Automated verification: canonical gate passes 2319 tests / 368 subtests, 20 legacy
-tests and 140 benchmarks, including policies, static analysis, docs and test ownership.
-Focused production tests: 40 / 10 subtests; applicable Level A: 11 distinct cases.
-All 198 frozen native framing contrasts pass. Built-image tests preserve 100 spaces
-and quoted frame markers inside strings, reject nine boundary spaces and invalid
-limits, and leave unannotated input unchanged. Twelve frozen model packets complete
-with original-Schema-valid frames. One date replay still contains markup in its
-rationale but closes, proving completion only; semantic content remains defective.
+All evidence roots below are private local artifacts under `.chromie/acceptance/` and
+are not included in Git. Transfer them separately when changing machines.
 
-Target validation before change: complete immutable 51-case preview on 26fe1cee,
-25 mechanical / 20 reviewed acceptable initial previews. All raw cases reviewed.
-158 linked calls include 49 completed valid Fast streams and one logged truncation.
-Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_134729.tar.gz`.
-Three separate unchanged contextless-request probes complete with incorrect stand_idle
-choices; valid escalation is representable. The older unlogged truncation remains unknown.
+`deep-skill-shape-20260910/`: 344 native contrasts (293 invalid Deep / 38 invalid
+Skill rejected; 9 valid Deep / 4 valid Skill preserved). Four frozen old packets initially
+fail original Schema. Shape-only fixes complete both Skill packets but both Deep calls
+reach 4096 tokens on whitespace. Compact Deep completes all four packets with valid
+original Schema (Deep about 14 seconds). Intermediate immutable 51-case preview:
+26 mechanical / 18 reviewed acceptable initial previews, 155 linked raw calls plus
+one unretained Skill timeout. All cases reviewed. Exactly one bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_150231.tar.gz`.
 
-Target validation after change: complete immutable 51-case preview, 25 mechanical /
-19 reviewed acceptable initial previews. Every case/raw transaction reviewed; 160
-linked calls: GI 54 valid (one Deep GI), GA 50 valid / 1 invalid, Fast 51 complete valid,
-Deep Planner 2 invalid, skill selection 2 invalid. One warm-up record is outside linkage.
-No Fast truncation in this cohort; local-time rationale still contains markup/frame
-markers. Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_140820.tar.gz`.
-Both walk-continuation cases pass. Four reflex cases remain preview-limited.
+`gi-constraint-20260910/`: 16 frozen bilingual positive/negative primary-GI contrasts;
+all references were Schema/Host-valid before inference. Baseline and candidate each
+have 16/16 Schema and 14/16 Host passes, but only 2/8 negative cases preserve the limiting
+prohibition in the owning outcome; those two still have binding defects. Candidate
+rejected, original prompt restored. No full-GI or model-only qualification.
 
-Full-cohort regressions are retained: look-then-blink omits two-second gaze duration;
-compound motion uses wrong left-turn yaw. Both exact origin packets per case replay
-correctly with bounded and unbounded formatting (eight replays). Causes remain unproven;
-isolated replay success does not erase the full-cohort regression. No complete
-transaction/nonregression or LLM-integrity closure is claimed. The owner-approved
-scoped acceptance retains this regression uncertainty explicitly; it is not a
-retrospective semantic pass or a finding that the model alone caused the failures.
+`skill-prompt-field-20260910/`: field-name-only before/after replays both exhaust 512
+tokens (12.50/12.40 s); adding compact formatting completes in 4.33 s. All 344 native
+contrasts preserve expected verdicts; captured loop rejected and 100 spaces inside a
+string preserved. Latest immutable 51-case preview: **27 mechanical / 19 reviewed
+acceptable initial previews**. All cases and 157 linked calls reviewed: GI 54 valid
+(including Deep GI), Fast 50 complete valid frames, GA 49 valid / 1 invalid, Deep 2
+valid, Skill 1 valid. One warm-up call is outside linkage. Exactly one bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_152934.tar.gz`.
+Read `behavior-review.json`, `reviewed-cases/`, `raw-calls.jsonl`, `source.patch`,
+`runtime-identity.json`, `cohort-exits.json`, `native/compact-summary.json` and
+`compact/host-review.json`. Native/wire shape validity is not semantic correctness.
 
-Release readiness remains blocked by GI prohibition/ambiguity/provenance, invented
-motions, resource meaning, false reminder/completion promises, omitted Goals, GI/GA
-continuity, Deep/skill contracts, progress and latency. Physical voice/provider/robot
-and default target-evidence closure are missing. Preview is not execution evidence.
+Latest full-cohort changes: single blink, polite walk, and date preview recover;
+two-second gaze is omitted again, and short-joke length becomes a spurious time_scope.
+Incorrect prohibited/unrelated motion, lost Goal meaning, false reminder promises,
+GI provenance/continuity, GA duplicate ownership, and Fast rationale markup remain.
+Four reflex cases require actual execution evidence and remain preview-limited.
+The full aggregate ended before two final diagnostic-only corrections; those changes
+modify evidence status/serialization only, not packets, model outputs or validators.
+Final focused live proof is retained separately and never replaces the aggregate.
+The final Tianxin preview is mechanically 1/1 with five complete call records and
+Skill completion in 4300.177 ms, but semantic review fails: GA guesses person and
+Deep invents a personal-data permission premise. No Capability executes.
 
-## Scoped acceptance decision and remaining attribution
+Local canonical before those final diagnostic corrections: 2321 tests / 379 subtests,
+20 legacy tests and 140 benchmarks passed. Final canonical validation also passed:
+2321 tests / 381 subtests, 20 legacy tests, 140 benchmarks and all included policy,
+static-analysis, ownership and documentation checks. The first final gate stopped
+on missing architecture-focus wording in two updated documents; wording was corrected
+and the full gate rerun successfully. Log: `skill-prompt-field-20260910/canonical-final-corrected.log`.
+Two existing FastAPI deprecation warnings remain. Remote delivery branch matched
+the pre-delivery baseline; remote main remains `ab5caeab` and is not merged.
+Final focused client/Skill tests: 30 tests / 23 subtests passed. Level A: 19/19 distinct
+cases across evidence coverage, natural uncertainty and stable capability grounding.
+Physical microphone/speaker/robot, complete provider execution, current-revision live
+voice and default target-evidence closure remain unproven. Main promotion stays blocked.
 
-Accepted scope: the request-local bound excludes the captured outside-string whitespace
-loop while preserving string content, semantic ownership and original Host validation.
-Evidence: captured-prefix rejection at character 641, 198 native contrasts, 12 frozen
-completed packets, all 51 Fast streams complete in the full candidate preview, and the
-retained canonical gate. No scene expectation, test result or safety gate is waived.
-The 20-to-19 preview change is a retained diagnostic, not a numeric code-acceptance
-threshold. This decision accepts the limited repair with unresolved regression risk;
-it does not establish general behavioral nonregression or qualify the complete model role.
+## Runtime identity and next work
 
-| Remaining observation / earliest visible boundary | Attribution supported now | Disposition |
-| --- | --- | --- |
-| Captured weather stream stalls on grammar-valid whitespace after a closed string | runtime_or_provider: reproduced decoder mechanism | Scoped repair accepted; rationale markup and all other truncation causes remain outside the claim |
-| Gaze duration omitted / left yaw negative in candidate Fast output | unresolved: eight exact bounded/unbounded replays are correct | Preserve both cohort failures; investigate aggregate variability before whole-runtime qualification |
-| GI guesses ambiguous meaning, creates a separate prohibition Responsibility, or changes provenance; GA duplicates ownership | unresolved at GI/GA primary transaction; wrong outputs observed, exact prompt/context/contract soundness not fully established | Freeze contrasts at the earliest owner; do not label all of these model_inference |
-| Fast substitutes unrelated motion or promises unperformed/future work | unresolved or mixed: wrong model decisions observed; upstream meaning and supplied contracts also require audit | Deployment blockers remain; preview containment is not successful behavior |
-| Deep/skill malformed results | contract_or_schema candidate plus unresolved inference; native intersection-shape evidence exists, qualification/implementation incomplete | Repair and prove the decoder/DTO boundary before attributing remaining failures solely to the model |
-| Missing progress, latency, four reflex preview limits and physical evidence | Mixed behavioral/performance gaps and missing execution evidence | Keep required target profiles open; no inference from preview to execution |
-
-A confirmed model_inference limitation may be retained without more prompt changes
-when exact prompt, context, representability, provider and oracle are shown sound.
-Only safely contained limitations within the declared acceptance scope can be accepted;
-unsafe movement, provenance, Goal omission, fabricated success and service-integrity
-failures still block the affected deployment. No residual cluster here is newly certified
-as exclusively a model limitation. Original reports and scores remain historical evidence;
-this owner-approved decision supersedes their blanket rejection of the scoped repair.
-
-This delivery changes acceptance/status documentation only; runtime source, prompts,
-model and deployed images are unchanged from 9a4b73a1. No new GPU or live cohort was run
-for this decision. The documentation revision passed `./scripts/run_tests.sh`:
-2319 tests / 368 subtests, 140 benchmark tests, 20 legacy tests, and all included
-policy, static-analysis, ownership and documentation checks. Two existing FastAPI
-deprecation warnings remain. Retained log:
-`.chromie/acceptance/scoped-acceptance-20260910/canonical.log`.
-Remote delivery branch matched the pre-delivery baseline at preflight.
-
-## Current runtime and artifact locations
-
-RTX 5090, 32607 MiB, driver 595.84 (CUDA 13.2 support reported by driver). Fixed
-Gemma4-12B FP8/SGLang, served `chromie-gemma4-12b`, model revision
-`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, 65536 context/cache and two requests.
-ASR/TTS retain their models. Agent, SGLang, speech and headless Soridormi are running;
-maintained-main restoration has NOT occurred. Verify health before resuming.
-Agent `chromie-agent:bounded-stream-20260910`, image
-`sha256:fd462a11e9f95617eaa10eb7ab79fc334888c89ee9721fffc013a76d54ad7be9`,
-container `f3dec9267a3df211af9099ec80a766909d726c348f0030c31983d4662514b568`.
-SGLang `chromie-sglang:bounded-stream-20260910`, image
-`sha256:41fbd910662483a125184a00611029225ee102a928421eaeaec70ab27a844edf`,
+RTX 5090 profile; fixed Gemma4-12B FP8/SGLang served as `chromie-gemma4-12b`, model
+revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, 65536 context/cache and two requests.
+ASR/TTS/Soridormi were not replaced. Final Agent image
+`sha256:cffbc8c7e1ca56f3adb4b5b5f56b2421d37ff21e669849f448d64bc694b0aea5`, container
+`8fdb47be59e0a63693585b67c63e7cd4f718a0becd513e8471998a6df0af1635`;
+all 112 Python files in the checked Agent/shared image scope match local source.
+SGLang remains image `sha256:41fbd910662483a125184a00611029225ee102a928421eaeaec70ab27a844edf`,
 container `a67606112fd19eb895a6be6d3e1a057d6771b9255bb6bb2bf60072a7863fbfdc`.
-All 113 Agent/shared source files match the image. Runtime identity and source patch
-bind the cohort; later documentation updates do not imply a rerun on a clean commit.
+Final diagnostic revision identity/source proof: `final-runtime-identity.json` and
+`final-source-verification.json` in the latest evidence root. These do not relabel the
+full cohort as having run after the final diagnostic-only corrections.
 
-Evidence is local, not included in Git; transfer it separately across machines.
-Under `.chromie/acceptance/`, read `stream-length-20260910/report.md`, its all-case
-behavior-review.json, regression-replay/, source.patch, runtime-identity.json and
-source-verification.json. Pre-change full baseline: `stream-baseline-20260910/`;
-natural repeatability probes: `stream-natural-20260910/`. Earlier GA, GI provenance,
-GI shape, Fast context/framing and stream diagnostics roots remain retained:
-`ga-array-20260910/`, `gi-referents-20260910/`, `gi-followup-shape-20260910/`,
-`fast-continuity-20260910/`, `fast-tagged-20260910/`, `stream-evidence-20260910/`.
-Deep/skill native preparation in `decoder-shapes-20260910/` is not implemented.
+Pending owner authorization: Skill selection currently retries semantic/identity/Goal
+validation errors through a second model selection. The maintained unknown-selection
+unit test demonstrates unlisted -> listed reselection; this conflicts with Charter 30.
+The owner requested workflow/impact explanation, which was provided, but has not yet
+explicitly authorized changing that architecture flow. Proposed behavior: reject
+semantic/identity errors without reselection; only demonstrably meaning-preserving
+mechanical format repair could remain. Do not silently change this pending boundary.
+Other semantic clusters remain unresolved/mixed; do not certify them all as LLM-only.
 
-## Next work and exact operational commands
-
-The scoped repair is accepted; do not reopen it solely to increase an aggregate pass
-count. Continue Issue #35 evidence closure. First read the full-cohort regressions
-and prohibition-audit.md in the pre-change baseline. Freeze bilingual primary GI
-positive/negative constraint contrasts and establish representability before any semantic edit. Investigate full-cohort variability;
-do not infer that formatting fixes unsupported meaning. Keep the fixed model and
-primary semantic ownership. No keyword semantic routing or second same-authority judge.
-
-Canonical: `./scripts/run_tests.sh`, `python scripts/check_repository_policies.py`,
-`python scripts/check_test_ownership.py`, `python scripts/check_docs.py`.
-For a new immutable preview, copy the retained run-cohort.py into a fresh directory,
-capture fresh identity, run the complete directory-discovered cohort, then collect
-exactly one debug bundle and judge every case. Do not edit/rebuild/restart between cases.
-Keep unsafe candidates in preview. Retain all failures, including mechanical passes
-that fail semantic review, and update both delivery owners before commit/push.
-
+Continue with the pending architecture decision and earliest-boundary semantic audits,
+including the generic numeric-binding guard's handling of a single turn Activity.
+Do not increase a pass count with keyword meaning repair, an extra judge, weakened
+assertions or omission of failed cases. Keep unsafe candidates in preview.
+Canonical command: `./scripts/run_tests.sh`; explicit checks:
+`python scripts/check_repository_policies.py`, `python scripts/check_test_ownership.py`,
+`python scripts/check_docs.py`. Update both handoff owners before every delivery.
+For another aggregate, copy the latest `run-cohort.py` into a fresh evidence directory,
+capture identity there, run all discovered cases unchanged, then retain exactly one
+bundle and review every case before editing behavior again.
 Compose prefix: `docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml -f .chromie/voice-runtime/compose.voice-mujoco.yaml`.
-Use service names `chromie-llm`, `chromie-agent`, `chromie-asr`, `chromie-tts`.
-Stop speech before replacing SGLang; restart it after model health. Never edit generated
-`.env.runtime`. Capture with `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.
-Historical recovery images/commands in HANDOFF.md are context, not current runtime claims.
+Never edit generated `.env.runtime`. Capture with
+`python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.

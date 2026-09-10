@@ -498,7 +498,7 @@ class AgentSkillSelectionService:
             ],
             "selection_contract": {
                 "decision": "select_skills or no_skill",
-                "selected_items": (
+                "selected_agent_skills": (
                     "Use exact candidate agent_skill_id and version, projection equal "
                     "to agent_role, relevant Goal IDs from the supplied goals, a "
                     "concise rationale, and confidence."

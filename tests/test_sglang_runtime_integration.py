@@ -21,6 +21,44 @@ from orchestrator.runtime.presentation_compute_lease import PresentationComputeL
 
 
 class SGLangProtocolTests(unittest.TestCase):
+    def test_deep_and_skill_wire_preserve_shapes_and_original_validation(self) -> None:
+        import copy
+        from jsonschema import Draft202012Validator
+
+        for title in ("DeepPlannerModelOutput", "AgentSkillSelectionModelOutput"):
+            with self.subTest(title=title):
+                schema = {
+                    "title": title, "type": "object",
+                    "properties": {
+                        "decision": {"enum": ["select", "none"]},
+                        "items": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["decision", "items"], "additionalProperties": False,
+                    "allOf": [{
+                        "if": {"properties": {"decision": {"const": "none"}}},
+                        "then": {"properties": {"items": {"maxItems": 0}}},
+                    }],
+                }
+                original = copy.deepcopy(schema)
+                payload = build_sglang_chat_payload(
+                    model="fixed", messages=[],
+                    compute_class=CognitionComputeClass.DELIBERATIVE,
+                    options={}, response_format=schema, stream=False, priority_step=100,
+                )
+                wire = payload["response_format"]["json_schema"]["schema"]
+                self.assertEqual(wire["anyOf"][0]["required"], schema["required"])
+                self.assertFalse(wire["anyOf"][0]["additionalProperties"])
+                self.assertEqual(schema, original)
+                for value, expected in (
+                    ({"decision": "none", "items": []}, True),
+                    ({"decision": "select", "items": ["a"]}, True),
+                    ({"decision": "none", "items": ["a"]}, False),
+                    ({"decision": "none"}, False),
+                    ({"decision": "none", "selected_items": []}, False),
+                ):
+                    self.assertEqual(Draft202012Validator(wire).is_valid(value), expected)
+                    self.assertEqual(Draft202012Validator(schema).is_valid(value), expected)
+
     def test_tagged_wire_keeps_schema_authority_and_decoder_compatible_shapes(self) -> None:
         import copy
         from jsonschema import Draft202012Validator
@@ -64,9 +102,10 @@ class SGLangProtocolTests(unittest.TestCase):
                 options={}, response_format=declared, stream=False, priority_step=100,
             )
 
-    def test_compact_formatting_is_scoped_to_ga_without_mutating_contract(self) -> None:
+    def test_compact_formatting_is_scoped_without_mutating_contract(self) -> None:
         for title in (
             "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "GoalInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
         ):
             with self.subTest(title=title):
@@ -79,7 +118,10 @@ class SGLangProtocolTests(unittest.TestCase):
                 )
                 wire = payload["response_format"]["json_schema"]["schema"]
                 expected = dict(schema)
-                if title in {"GoalSegmentationModelOutput", "GoalAssociationModelOutput"}:
+                if title in {
+                    "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
+                    "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+                }:
                     expected["x-guidance"] = {"whitespace_flexible": False}
                 self.assertEqual(wire, expected)
                 self.assertNotIn("x-guidance", schema)
@@ -191,6 +233,57 @@ class SGLangProtocolTests(unittest.TestCase):
 
 
 class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_nonstream_failures_retain_request_and_available_response(self) -> None:
+        import httpx
+
+        for mode in ("stop", "nested_stop", "length", "invalid_json", "http_error", "invalid_response", "nonobject_response", "timeout", "cancel"):
+            with self.subTest(mode=mode):
+                data = {"choices": [{"message": {"content": "broken" if mode == "invalid_json" else '{"ok":true}'},
+                                     "finish_reason": "length" if mode == "length" else "stop"}]}
+                response = Mock(status_code=503 if mode == "http_error" else 200,
+                                text="provider body")
+                response.json.return_value = [1, 2] if mode == "nonobject_response" else data
+                if mode == "invalid_response":
+                    response.json.side_effect = ValueError("invalid provider JSON")
+                transport = AsyncMock()
+                transport.__aenter__.return_value = transport
+                transport.post.return_value = response
+                if mode == "timeout":
+                    transport.post.side_effect = httpx.ReadTimeout("test timeout")
+                elif mode == "cancel":
+                    transport.post.side_effect = asyncio.CancelledError()
+                client = SGLangClient("http://sglang.invalid/v1", "fixed", timeout_ms=1000,
+                                      purpose="agent_skill_selection")
+                with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=transport), \
+                     patch("agent.app.clients.sglang_client.log_llm_call_evidence") as evidence:
+                    call = client._generate("exact prompt", response_format="json",
+                                            prefix_probe_call_id="test-call",
+                                            evidence_context={"turn_id": "test-turn", "attempt": 1})
+                    if mode == "nested_stop":
+                        try:
+                            raise ValueError("caller already handling an unrelated error")
+                        except ValueError:
+                            self.assertEqual(await call, {"ok": True})
+                    elif mode == "stop":
+                        self.assertEqual(await call, {"ok": True})
+                    else:
+                        error_type = asyncio.CancelledError if mode == "cancel" else (ValueError if mode in {"invalid_json", "invalid_response", "nonobject_response"} else SGLangGenerationError)
+                        with self.assertRaises(error_type):
+                            await call
+                evidence.assert_called_once()
+                record = evidence.call_args.kwargs
+                self.assertEqual(record["request"], transport.post.call_args.kwargs["json"])
+                expected_response = (None if mode in {"timeout", "cancel"} else
+                                     {"http_status": response.status_code, "body": "provider body"}
+                                     if mode in {"http_error", "invalid_response", "nonobject_response"} else data)
+                self.assertEqual(record["response"], expected_response)
+                self.assertEqual(record["status"], "accepted" if mode in {"stop", "nested_stop"} else "cancelled" if mode == "cancel" else "failed")
+                self.assertEqual(record["correlations"], {"turn_id": "test-turn", "attempt": 1})
+                transport.post.assert_called_once()
+                self.assertEqual(record["error"] is None, mode in {"stop", "nested_stop"})
+                if mode in {"timeout", "length"}:
+                    self.assertEqual(record["error"]["failure_class"], "timeout" if mode == "timeout" else "output_truncated")
+
     async def test_each_stream_exit_retains_one_exact_request_and_partial_output(self) -> None:
         import json
         import httpx
@@ -234,7 +327,10 @@ class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=client_context), \
                      patch("agent.app.clients.sglang_client.log_llm_call_evidence") as evidence:
                     if mode == "stop":
-                        self.assertEqual(await consume(), ["<terminal_plan>{"])
+                        try:
+                            raise ValueError("caller already handling an unrelated error")
+                        except ValueError:
+                            self.assertEqual(await consume(), ["<terminal_plan>{"])
                     else:
                         expected = asyncio.CancelledError if mode == "cancel" else SGLangGenerationError
                         with self.assertRaises(expected):

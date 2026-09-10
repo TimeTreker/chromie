@@ -200,6 +200,10 @@ class AgentSkillSelectionTests(unittest.TestCase):
             request = self._request()
             candidates, _, _ = service._discover_candidates(request)
             schema = service._response_schema(request, candidates)
+            prompt_contract = json.loads(service._selection_prompt(request, candidates))["selection_contract"]
+
+        self.assertIn("selected_agent_skills", prompt_contract)
+        self.assertNotIn("selected_items", prompt_contract)
 
         branch = schema["allOf"][-1]
         self.assertEqual(

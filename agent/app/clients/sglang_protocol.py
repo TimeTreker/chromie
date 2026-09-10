@@ -93,10 +93,18 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
     if isinstance(response_format, dict):
         schema, _ = candidate_compatible_schema(response_format)
         if schema.get("title") in {
-            "GoalAssociationModelOutput", "GoalSegmentationModelOutput"
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput"
+        }:
+            # Native intersections can hide required object/array fields. Repeat
+            # their existing shape for decoding; original DTO/Host rules remain.
+            expose_intersection_shapes(schema)
+        if schema.get("title") in {
+            "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
         }:
             # Formatting belongs to this request, never to the shared model's
-            # global settings. Other roles retain their existing decoding.
+            # global settings. This also prevents the reproduced Deep/Skill JSON
+            # whitespace loop; strings retain their exact model-authored content.
             schema["x-guidance"] = {"whitespace_flexible": False}
         return {
             "type": "json_schema",
