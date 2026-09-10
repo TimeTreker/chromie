@@ -1067,7 +1067,7 @@ flag or environment variable is added. This candidate requires the full qualific
 record in the checkpoint before promotion; the earlier global compact experiment
 was rejected for GI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
-GA, Deep Planner and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
+GA, canonical Fast Planner (single and multiple Goals), Deep Planner and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
 as redundant single alternatives beside intersections. This preserves the full Schema
 contract while making those shapes visible to the pinned decoder; cross-item identity
 conservation still requires the original Schema clauses and deterministic Host checks.

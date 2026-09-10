@@ -1,113 +1,132 @@
 # Chromie Development Checkpoint
 
-## Authorized repair — bounded turn count and lossless evidence
+## Explicit argument coverage and Fast decoder repair
 
-The Goal-driven single-authority architecture remains binding.
-Active Issue #35; Chromie branch `codex/ga-request-format`, pre-delivery base
-`156720b543644f6b448272fa3cb231799da1cb82`. The owner explicitly authorized the
-previously proposed turn-count contract expansion ("you have my authorization
-now, please go on"). Commit/push remain authorized. Resume from the latest commit
-containing both checkpoint and handoff; this is not a main-promotion approval.
-The paired Soridormi base is `d03c7e3b7da73b777b1e923044340fa9c8d66fa7`;
-its delivered branch is `codex/turn-count`, commit
-`578198ad1d52f4b5d2f9b63cacf87a23c3b5b224`, pushed to origin. Its unrelated dirty
-work is preserved and excluded from that commit.
+The Goal-driven single-authority architecture remains binding. Active Issue #35.
+Chromie branch `codex/ga-request-format`, pre-delivery base
+`46bafad15567ac74ff59e7f1c22108d067c208fa`; resume from the latest commit containing
+both checkpoint and handoff. Commit/push remain authorized; main promotion is not
+established. Paired Soridormi branch `codex/turn-count`, base
+`578198ad1d52f4b5d2f9b63cacf87a23c3b5b224`; paired delivery: `284273bc344cc94012347c75ab270a9f4ac8ffdb` (pushed to origin).
 
-### Reconstructed workflow and implemented repair
+### Actual workflows and repairs
 
-| Boundary / owner | Actual evidence and expected contract | Result |
+| Owner / handoff | Observed input -> wrong output | Expected boundary and implemented change |
 | --- | --- | --- |
-| GI -> Planner | Originating right-turn episode had count=1, but the provider exposed only yaw/duration. GI must own WHAT without a Capability catalog | GI prompt/context unchanged; no catalog or second semantic call added |
-| GI -> GA and Fast (parallel) | GI Responsibility supplies continuity and planning independently; results join at Host | Focused turns used no Deep Planner or Skill Selection; GA retains Goal ownership |
-| Soridormi catalog -> Planner | Count could not be represented and yaw direction lacked explicit guidance | Add integer count 1-8/default1; duration is per repetition; total count × duration <=20 seconds. Positive yaw is left, negative is right |
-| Planner -> Host | A matching duration formerly masqueraded as count | Keep same-name count validation and legacy no-count rejection. Planner authors count once; Host does not infer repetitions from node count |
-| Provider -> body runtime | Count must be realized, not merely admitted by schema | Validate finite integer/bounds, expand sequential segments, retain existing locomotion lock, stop, cancellation, timeout and safe hold. No implied pause, heading reset or full revolution |
-| Runtime -> acceptance observations | All three focused MuJoCo requests completed, but the observation map discarded count and falsely failed matching | Preserve count beside yaw/duration; re-adjudicate retained executions without changing the expected counts or original failed reports |
-| Model client -> container logs -> reviewer | Three raw-copy digests disagreed; intact provider copies matched. Corruption starts at byte98303, crossing a16KiB frame | Emit ASCII JSON escapes only at the log boundary. Parsing recovers original Unicode and hashes; model packets and responses are unchanged |
+| GI -> GA and Fast in parallel | Exact “Look at me for two seconds, then blink twice.” -> r1 duration="two seconds", r2 count=2, ordered r1 then r2 | Correct WHAT; GA preserves two separate body Goals. GI still receives no Capability catalog; prompts/semantic ownership unchanged |
+| Soridormi catalog -> Fast | Gaze duration_s had default4 but only target realization metadata; Fast omitted duration_s | Provider declares duration -> duration_s, minimum1. Planner alone converts the bound value and units |
+| Fast/Deep -> Host validation | Defaulted optional inputs and body Goals bypassed declared minimum_arguments | One shared mechanical presence check applies every matching provider declaration to each owned Responsibility/Goal before admission. No fill, translation, new parameter value, or model retry |
+| Runtime -> observation/Evidence | Repaired gaze2 then blink2 and gaze3 completed in MuJoCo; safe_idle=true | Exact requested arguments retained, no physical hardware claim; original headless speech failure remains recorded |
+| Runtime result -> canonical Fast reentry -> SGLang | Two actual completion-evidence requests supplied single/multiple Goal DTO schemas, but native XGrammar allowed internal CanonicalPlan-shaped replies | Existing intersection-shape exposure was missing for FastPlannerModelOutput/FastPlannerMultiGoalPlanOutput; both now use the same semantics-preserving decoder shaping as Deep/Skill |
+| Fast parser/Host -> downstream | Previously rejected Fast shape then called Deep; repaired reentry yields valid primary Fast DTOs and truthful completed-outcome responses, with no new motion | Two focused reentries now pass original Schema/DTO/Host, with zero Deep calls; no semantic repair stage added |
 
-The source logger supplied identical original text to both evidence copies; the
-framed transport corrupted one occurrence. A deterministic replay produced24
-replacement characters before the fix and zero afterwards. This is a project
-logging defect, not a model-generation error. No new architecture layer, runtime
-flag, document, Capability or model call was added. The existing turn Capability
-has one additional argument (2 ->3); the existing observation map is extended.
-Soridormi's single-segment shell export still rejects repeated multi-segment plans;
-the maintained runtime MCP path realizes them. `turn_to_heading` forwards count.
+The repaired focused path is:
 
-### Observed evidence and limits
+```mermaid
+flowchart LR
+  U[Exact admitted turn] --> GI[GI WHAT]
+  GI --> GA[GA Goal identity]
+  GI --> FA[Fast initial HOW]
+  GA --> H[Host validates and joins]
+  FA --> H
+  H --> S[Soridormi MuJoCo execution]
+  S --> E[Trusted completion Evidence]
+  E --> FR[Fast scoped completion response]
+  FR --> V[Schema and Host validation]
+```
 
-First repaired-provider aggregate: `.chromie/acceptance/turn-count-20260910/`.
-All51 scenarios completed on stable Chromie/provider source:27 mechanical passes,
-18 reviewed acceptable initial previews; all154 linked calls reviewed. Three
-raw-output digest mismatches exposed the logging defect. Exactly one debug bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20260910_190114.tar.gz`.
-The original walk-then-right-turn case still failed upstream at GI (`三秒` -> `3秒`),
-while the compound left-turn primary Planner packet used the new count=1 contract.
+In the two-Goal episode, the first motion event is retained while result reentry
+is deferred until batch closure after the blink. One scoped Fast invocation then
+consumes both results. The single-gaze episode reenters after its sole terminal
+event; neither repaired path invokes Skill Selection or Deep.
 
-Implementation, local gates and focused evidence root:
-`.chromie/acceptance/turn-count-evidence-20260910/`.
-Canonical gates pass2329 tests /420 subtests,140 benchmarks and20 legacy Agent tests;
-repository policy, test ownership, static analysis and documentation checks pass.
-Soridormi governance/body-concurrency/compile pass; full suite788 passed /2 skipped,
-body-focused155 passed. An isolated delivery snapshot excluding pre-existing
-Soridormi changes passes80 focused tests. Relevant Level A:13 distinct scenarios
-pass across grounding, composition and deterministic safety (memberships overlap).
+The first defect combines an omitted provider declaration and an unimplemented
+existing Host invariant; the model's omitted argument is its initiating trigger.
+The second is a reproduced native decoder deficiency plus incomplete application
+of an existing client adaptation. Neither change alters GI/GA WHAT authority,
+Planner HOW authority, source wording, model/profile, physical lifecycle, or the
+canonical valid-outcome set. No new document, environment variable, layer,
+Capability or architecture term was added. Presence does not prove correctness of
+arbitrary natural-language unit conversion; semantic review remains necessary.
 
-Three frozen direction/count contrasts executed through GI -> GA/Fast -> Host ->
-Soridormi in MuJoCo: left2, right1, right2, each segment1 second; all completed and
-returned safe_idle=true. Nine model-call request/output digests match. The original
-runner0/3 was an observation-map omission; corrected replay is3/3 for bounded
-motion realization (`focused/motion-review.json`), preserving original reports.
-Right-turn reason strings contain markup/channel fragments: these are not erased
-and this motion proof is not whole-transaction qualification or measured physical
-hardware/voice proof. A separate direct MCP count2/0.5-second smoke also completed.
+### Retained evidence
 
-A later aggregate in that root was stopped after 4 completed cases because
-its identity capture finished one second after the first case initialized; the
-documentation focus check also failed. It is incomplete, not a qualification run.
-One bundle was collected at that stop:
-`/home/chromie/Downloads/chromie_debug_bundle_20260910_191129.tar.gz`.
-Both defects in collection setup are corrected before the final run.
+Initial unchanged baseline: `.chromie/acceptance/turn-count-final-20260910/`,
+51 cases /26 mechanical /16 acceptable previews, 155 linked calls.
 
-The final lossless51-case aggregate root is
-`.chromie/acceptance/turn-count-final-20260910/`. All 51 cases and 155 linked
-calls were reviewed: 26 mechanical passes and 16 acceptable initial previews.
-All request/output digests match; both repositories remained stable throughout.
-Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_192333.tar.gz`.
-Compared with the first aggregate, joke composition recovered; look-then-blink,
-tired-social and three-second gaze regressed. These are observed run-to-run
-differences, not proven effects of the logging/observation repair.
+Argument repair: `.chromie/acceptance/argument-coverage-20260910/`.
+`origin-replay.json` replays the exact original primary output unchanged: admitted
+with the old declaration, rejected with the repaired declaration. Eight missing
+argument test contrasts fail before the repair; relevant tests pass after it.
+The stable whole cohort completed51 /27 mechanical /17 reviewed acceptable initial
+previews, 156 linked calls, zero request/output digest mismatches. Exactly one
+bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_220038.tar.gz`.
+All cases reviewed in `behavior-review.json`; four recoveries and three regressions
+are retained. Quick versus fast_limited speed presets differ (0.16 vs0.18m/s), so
+that mechanical regression needs an explicit semantic/oracle decision rather than
+silently changing its target. All other model semantics remain visible.
 
-The look-then-blink case exposes an unresolved provider/Host grounding gap: GI
-preserved `duration: two seconds`, Fast omitted `duration_s`, and Host admitted the
-provider default of four seconds. Provider-owned argument-realization metadata
-and deterministic validation need further audit; do not introduce Host semantic
-inference or claim this is exclusively a model defect. Tianxin used one explicitly
-designated deep GI delegation from source after unresolved meaning, not a
-same-stage semantic retry. See `behavior-review.json` for every case and exact
-raw-transaction references.
+Fast decoder repair: `.chromie/acceptance/fast-reentry-format-20260910/`.
+The exact running inference image's XGrammar0.2.1 accepted10 malformed frozen
+structures before and rejects all10 after; both valid structures remain accepted.
+Original/candidate JSON Schema validity agrees on all12 contrasts; actual production
+wire schemas equal the frozen candidates. `native/summary.json` and
+`production-wire-proof.json` retain the proof, with no additional model inference.
+Two focused live-text/MuJoCo episodes retain8 calls, all raw schemas and digests
+valid, no Deep invocation. Exact gaze2/blink2 and gaze3 motions completed and
+returned safe idle. Two-goal episode remains a whole-run failure because1 required
+TTS item was skipped in headless mode; this is not physical speaker evidence.
+Final aggregate: 51 cases /27 mechanical /19 reviewed acceptable initial previews,
+154 linked calls, all request/output digests valid; source stable in both repos.
+Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_221659.tar.gz`.
+Three reviewed recoveries (joke, continuation, quick preset); one regression
+(walk_then_turn_right: GI again rewrites 三秒 as3秒, rejected before GA/Fast).
+Gaze2 and gaze3 stay correct. These preview variations are not proven effects of
+the canonical Fast decoder repair; `behavior-review.json` retains every verdict.
 
-### Runtime, delivery and next boundary
+Canonical Chromie gate:2331 tests /437 subtests,140 benchmarks,20 legacy Agent tests;
+repository policies, test ownership, pinned static analysis and docs pass. Relevant
+Level A:19 distinct scenarios pass (composition5, multi-Goal10, grounding7 overlap).
+Soridormi: governance/compile pass, body suite156 passed, full suite789 passed /2
+skipped. Own-only provider snapshot excluding unrelated dirty metadata passes31
+skill execution tests. The initial provider test omitted required target_ref and
+failed; its fixture was corrected, and the final full gate passed. See the retained
+before/final logs; no failure is hidden or converted into hardware qualification.
 
-Fixed RTX5090 / Gemma4-12B FP8/SGLang model and role budgets remain unchanged.
-Agent tag `chromie-agent:turn-count-evidence-20260910`; image `sha256:2a514a24145165fe8d0b279457567f36462fbd20641d059ce73a56740185433f`,
-container `517df9a934b0eb1715743d97fd2462ec6a402bd3dd5c28c54f9caa80b7d9393d`. All112 deployed Agent/shared Python files match source.
-Soridormi source is live-mounted and was restarted before the aggregate; its
-advertised source revision remains the pre-delivery base plus the retained dirty
-patch. Do not equate that base string alone with the evaluated source tree.
+### Runtime identity and next work
 
-Evidence is private and retained locally; transfer it separately across machines.
-Provider pre-existing edits to manifest argument-realization metadata, taxonomy,
-manifest validation/tests and the Open Duck submodule are outside this patch.
-The own-only staged patch must leave those edits intact. Do not merge main: GI
-ambiguity/prohibition/segmentation, GA continuity/source preservation, Planner
-progress/grounding/reason quality and supervised target-evidence closure remain
-unqualified. Remaining failures have not all been proven model-only.
+RTX5090, fixed Gemma4-12B FP8/SGLang, model revision
+`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, 65536 context and existing role budgets.
+Agent tag `chromie-agent:fast-reentry-format-20260910`; image `sha256:7238076e254ce71e0a87445d951c3694a1d4a56e4ea8d026d768c477aa655507`,
+container `02de20612d0a3ee6faa3ab71e92c0ff0551bb8caabe3b304a831cc6ff81378f7`.
+All112 deployed Agent/shared Python files match source. Soridormi source/config
+remain live-mounted; `containers.json`, `provider-source.patch` and runtime identity
+retain the evaluated tree. Its old advertised source_revision alone is not that
+identity. Pre-existing Soridormi metadata/taxonomy/manifest/tests and Open Duck
+submodule edits are preserved, excluded from this delivery, and retained separately.
 
-Commands: `./scripts/run_tests.sh`; `python scripts/check_repository_policies.py`;
-`python scripts/check_test_ownership.py`; `python scripts/check_docs.py`.
-Capture with `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.
-The final evidence root's `run-cohort.py` runs the whole directory-discovered
-must-pass preview cohort and collects exactly one debug bundle afterwards.
-Review every linked raw request/output, recompute its recorded digests, and inspect
-semantic failures before any next broad source change. Never edit `.env.runtime`.
+Do not merge main or claim all remaining defects are model-only. Continue with
+remaining tagged Fast reason contamination, GI provenance/ambiguity/prohibition and
+Goal coverage, GA continuity/typed-binding conservation, and unresolved oracle
+scope. Supervised physical voice/target evidence remains open. Preserve the whole
+cohort before another broad change; no pass-count threshold overrides hard failures.
+
+Resume validation: `./scripts/run_tests.sh`, `python scripts/check_repository_policies.py`,
+`python scripts/check_test_ownership.py`, `python scripts/check_docs.py`.
+Capture a new identity with `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.
+Wait for capture completion before running the evidence root's `run-cohort.py`;
+it runs the directory-discovered51-case preview and collects exactly one bundle.
+`review_inputs.py`, `field-diff.py`, per-case raw records and `behavior-review.json`
+support all-case review; independently judge new output rather than copying old
+verdicts. Artifacts are local/private and must be transferred separately across
+machines. Never edit `.env.runtime` directly.
+
+Paired provider gate command: `docker run --rm --gpus all -v /home/chromie/github/soridormi:/app -w /app -e PYTHONPATH=/app/src soridormi-runtime-mcp:cuda13.1-cudnn-dev bash -c 'python scripts/validate_repository_governance.py && ./scripts/validate_body_concurrency.sh && python -m pytest -q && python -m compileall -q src'`.
+Both repair roots retain `focused-command.json`; the final root also retains
+`containers.json`, `source-verification.json` and the original/candidate decoder
+corpus. The source-stable aggregate snapshots precede delivery-only doc edits.
+
+For the evaluated provider's remaining tracked edits, the final evidence root also
+retains `provider-uncommitted-after-delivery.patch` against the paired delivery
+commit. Review/apply it only to that matching base when reconstructing the exact
+local tree; the untracked Open Duck submodule content needs separate transfer.

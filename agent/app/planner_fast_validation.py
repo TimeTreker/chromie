@@ -41,6 +41,7 @@ from .planner_context import planner_goal_execution_requirements
 from .planner_grounding import (
     _argument_realization_contract,
     _material_values_equal,
+    missing_argument_realizations,
     semantic_numeric_values,
 )
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
@@ -644,6 +645,16 @@ def validate_fast_advance_output(
             )
         input_schema = definition.get("input_schema") or {}
         properties = input_schema.get("properties") or {}
+        for source_ref in activity.source_responsibility_refs:
+            missing = missing_argument_realizations(
+                definition, activity.args, list(by_ref[source_ref].bindings),
+            )
+            if missing:
+                raise AuthoritativeGroundingValidationError(
+                    "Fast Planner omitted declared argument realization: "
+                    f"{activity.capability_id}; source_ref={source_ref}; "
+                    + ",".join(missing)
+                )
         # Numeric conservation must retain field identity. An unrelated argument
         # (for example intensity=1.0) cannot witness a requested count=1.
         # Check each source independently, including optional/defaulted inputs.

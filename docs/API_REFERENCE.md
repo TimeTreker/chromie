@@ -305,7 +305,13 @@ that every declared target exists in the exact input schema and then projects it
 unchanged to Planner. For example, Soridormi declares human `speed -> vx_mps` and
 `duration -> duration_s` for `walk_velocity`, so an explicit numeric request must
 not be replaced by a provider default. The Host does not invent or repair the
-semantic transformation.
+semantic transformation. Both Fast advance and canonical Fast/Deep validation
+require `minimum_arguments` from every applicable realization contract whenever
+an owned Responsibility/Goal explicitly binds its `source_entity_type`, including
+optional and defaulted inputs. Other arguments and sibling Activities cannot
+witness that presence. The provider declares gaze `duration -> duration_s` as well;
+omitting it cannot silently select the four-second default. This is a presence
+check; interpretation and unit conversion remain Planner-owned.
 
 Terminal Capability results do not enter a separate interpretation endpoint. The
 Host validates and correlates the result, binds a `ToolResultEvidence` object to

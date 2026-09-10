@@ -2115,6 +2115,84 @@ class FastPlannerResolverTests(unittest.TestCase):
                         with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "numeric Capability input contradicts GI binding"):
                             validate()
 
+    def test_advance_declared_realization_cannot_fall_back_to_defaults(self):
+        capability = {
+            "capability_id": "provider.bounded_action",
+            "input_schema": {"type": "object", "additionalProperties": False,
+                "properties": {"hold_seconds": {"type": "number", "default": 4.0},
+                               "other_value": {"type": "number", "default": 2.0}}},
+            "hints": {"argument_realization": {"hold": {
+                "source_entity_type": "duration", "planner_owned": True,
+                "arguments": ["hold_seconds"], "minimum_arguments": 1,
+            }}},
+        }
+        for value, seconds in (("two seconds", 2.0), ("两秒", 2.0), ("one hundred and twenty milliseconds", 0.12)):
+            for args in ({}, {"other_value": seconds}, {"hold_seconds": seconds}):
+                with self.subTest(value=value, args=args):
+                    request = _work_request(
+                        sid="realization-coverage", text="Perform the bounded action.",
+                        responsibilities=[{"local_ref": "r1", "outcome": "bounded action",
+                            "output_mode": "body_action", "bindings": {"duration": value},
+                            "confidence": 1.0}],
+                    )
+                    output = FastPlannerAdvanceModelOutput.model_validate({
+                        "disposition": "execute", "coverage": "complete",
+                        "covered_responsibility_refs": ["r1"],
+                        "activities": [{"role": "capability", "activity_id": "action",
+                            "capability_id": capability["capability_id"], "args": args,
+                            "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                        "continuations": [], "confidence": 1.0, "unresolved": [],
+                        "reason_summary": "Perform the bounded action.",
+                    })
+                    before = output.model_dump()
+                    def validate():
+                        planner_fast_validation.validate_fast_advance_output(
+                            output, request=request, responsibilities=list(request.responsibilities),
+                            capabilities=[capability],
+                        )
+                    if "hold_seconds" in args:
+                        # Presence is mechanical; this check must not convert natural-language units.
+                        validate()
+                    else:
+                        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "omitted declared argument realization"):
+                            validate()
+                    self.assertEqual(output.model_dump(), before)
+
+    def test_canonical_declared_realization_requires_each_bound_contract(self):
+        capability = {
+            "capability_id": "provider.bounded_action",
+            "input_schema": {"type": "object", "properties": {
+                "start": {"type": "number", "default": 0},
+                "end": {"type": "number", "default": 4}}},
+            "hints": {"argument_realization": {"window": {
+                "source_entity_type": "interval", "planner_owned": True,
+                "arguments": ["start", "end"], "minimum_arguments": 2,
+            }}},
+        }
+        for bound in (False, True):
+            for args in ({}, {"start": 0}, {"start": 0, "end": 2}):
+                with self.subTest(bound=bound, args=args):
+                    raw = multi_goal_plan(
+                        disposition="execute", coverage="complete", goal_summary="Use the interval.",
+                        steps=[execute_step("action", capability["capability_id"], args,
+                                            ["goal-action"], "Use the interval.")],
+                        goal_outcomes={"goal-action": execute_outcome("goal-action", ["action"], "Covered.")},
+                        goal_satisfaction=exact_satisfaction(["goal-action"]),
+                    )
+                    output = PlannerModelOutput.model_validate(raw)
+                    goal = {"goal_id": "goal-action", "object": {"bindings": {
+                        "window": {"entity_type": "interval", "value": "the requested interval"}
+                    } if bound else {}}}
+                    before = output.model_dump()
+                    def validate():
+                        validate_goal_binding_argument_grounding(output, authoritative_goals=[goal], capabilities=[capability])
+                    if bound and len(args) < 2:
+                        with self.assertRaisesRegex(PlannerDTOContractError, "omitted declared argument realization"):
+                            validate()
+                    else:
+                        validate()
+                    self.assertEqual(output.model_dump(), before)
+
     @staticmethod
     def _clarification_output(
         *,

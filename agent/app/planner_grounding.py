@@ -166,6 +166,35 @@ def _argument_realization_contract(
             return contract
     return None
 
+def missing_argument_realizations(
+    capability: dict[str, Any],
+    arguments: dict[str, Any],
+    entity_types: list[str],
+) -> list[str]:
+    """Check declared argument presence without interpreting source values.
+
+    Defaults may supply unspecified inputs, but cannot stand in for an explicit
+    semantic binding whose selected provider declares a realization contract.
+    Each applicable contract is checked, including multiple contracts per type.
+    """
+
+    contracts = (capability.get("hints") or {}).get("argument_realization")
+    if not isinstance(contracts, dict):
+        return []
+    bound_types = {_normalized_entity_type(value) for value in entity_types}
+    missing = []
+    for name, contract in contracts.items():
+        if not isinstance(contract, dict) or _normalized_entity_type(
+            contract.get("source_entity_type")
+        ) not in bound_types:
+            continue
+        declared = set(contract.get("arguments") or [])
+        minimum = max(1, int(contract.get("minimum_arguments") or 1))
+        if sum(argument in arguments for argument in declared) < minimum:
+            missing.append(str(name))
+    return missing
+
+
 def _argument_schema_accepts_canonical_binding(
     argument_schema: dict[str, Any],
     value: Any,

@@ -21,11 +21,14 @@ from orchestrator.runtime.presentation_compute_lease import PresentationComputeL
 
 
 class SGLangProtocolTests(unittest.TestCase):
-    def test_deep_and_skill_wire_preserve_shapes_and_original_validation(self) -> None:
+    def test_planner_and_skill_wire_preserve_shapes_and_original_validation(self) -> None:
         import copy
         from jsonschema import Draft202012Validator
 
-        for title in ("DeepPlannerModelOutput", "AgentSkillSelectionModelOutput"):
+        for title in (
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
+        ):
             with self.subTest(title=title):
                 schema = {
                     "title": title, "type": "object",

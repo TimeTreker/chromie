@@ -53,6 +53,7 @@ from .planner_grounding import (
     _goal_binding_map,
     _material_values_equal,
     _normalized_entity_type,
+    missing_argument_realizations,
     semantic_numeric_values,
 )
 from .planner_model_contract import (
@@ -1217,6 +1218,17 @@ def validate_goal_binding_argument_grounding(
                         f"Goal bindings for {name!r}"
                     )
                 required[name] = binding
+
+        capability = capabilities_by_id.get(step.capability_id) or {}
+        missing = missing_argument_realizations(
+            capability, step.args,
+            [binding["entity_type"] for binding in required.values()],
+        )
+        if missing:
+            raise PlannerDTOContractError(
+                "planner step omitted declared argument realization: "
+                f"{step.step_id}; " + ",".join(missing)
+            )
 
         for name, binding in required.items():
             capability = capabilities_by_id.get(step.capability_id) or {}

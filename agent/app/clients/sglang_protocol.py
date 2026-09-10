@@ -93,7 +93,8 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
     if isinstance(response_format, dict):
         schema, _ = candidate_compatible_schema(response_format)
         if schema.get("title") in {
-            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput"
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
         }:
             # Native intersections can hide required object/array fields. Repeat
             # their existing shape for decoding; original DTO/Host rules remain.
