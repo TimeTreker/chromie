@@ -1,99 +1,118 @@
 # Chromie Development Checkpoint
 
-## Current resume point — promotion blocked by retained evidence
+## Current resume point — bounded whitespace tested; promotion rejected
 
 Active Issue #35; delivery branch `codex/ga-request-format`; pre-delivery baseline
-`4dd7685d93d1bb530f7e186994497c8c7c7adc5c`. Owner authorized commit and push of
-the completed repairs. Resume at the latest commit containing this checkpoint and
-handoff. This is a development delivery; promotion remains blocked.
-Remote delivery branch matched the baseline at preflight. Remote main advanced to
-`ab5caeab`; this delivery neither merges into main nor qualifies that revision.
-The Goal-driven single-authority architecture remains binding. Preserve unrelated
-Soridormi edits. No model replacement, extra semantic judge or Host meaning repair.
+`26fe1ceec19b0c6ffbe7560db0a5b390c75c8bf7`. Owner authorized commit and push when
+finished. Resume at the latest commit containing both checkpoint and handoff.
+This is an unpromoted development delivery, not a merge to main or release claim.
+Preserve unrelated Soridormi edits. The Goal-driven single-authority architecture
+and fixed candidate model remain binding; no Host meaning repair or extra judge.
 
-Implementation: retained repairs cover GA decoder object shapes, GI visible-dialogue
-location provenance and continuity shapes, complete required Fast Goal context,
-SGLang two-frame decoding, and failed-stream evidence with schema property order.
-The Fast context defect dropped a 1322+ character Goal snapshot through a 600-character
-optional projection; the repair preserves semantic fields and fails explicitly on
-required-context overflow. Decoder projection leaves original acceptance schemas
-unchanged; omitted string-pattern/fractional-range hints address demonstrated native
-grammar defects. This is mechanical repair, not full semantic qualification.
+## Implemented scope and actual failure workflow
 
-Automated verification: latest canonical gate passes 2319 tests / 368 subtests,
-20 legacy tests and 140 benchmarks, including repository policies, static analysis,
-documentation and test ownership. Latest focused diagnostics tests: 41 / 10 subtests.
-Fast framing frozen exact packets improve 5/11 to 11/11 original-Schema-valid;
-198/198 native framing contrasts pass. Fast context contrasts improve 4/12 to 12/12.
-GI production-order replays improve 8/12 to 12/12; all 98 valid and 724 invalid
-mechanical contrasts receive the intended decoder verdict. These counts are scoped.
+Retained prior repairs cover GA/GI decoder shapes, GI visible-dialogue provenance,
+complete Fast Goal context, two-frame decoding and exact failed-stream evidence.
+The new change bounds only Fast structural-decoder whitespace. It changes no prompt,
+model, token budget, semantic fields, original schemas, retry or Host acceptance.
 
-Target validation: latest immutable full 51-case preview (framing Agent) has
-28 mechanical passes and 19 reviewed acceptable initial previews; every case and
-available raw call reviewed. Both continuation cases pass. Fifty completed Fast
-streams are original-Schema-valid, but the 51st truncates and old success-only
-logging omitted its request and partial output. Thus full stream integrity remains
-open. GI: 53 valid; GA: 50 valid / 1 invalid; Deep: 3 invalid; skill: 2 invalid.
-160 retained calls / 159 linked. Exactly one post-cohort bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20260910_122434.tar.gz`.
-Four deterministic reflex cases need execution evidence beyond preview.
+| Owner / handoff | Actual observed input and output | Assessment |
+| --- | --- | --- |
+| GI -> concurrent GA/Fast | Chongqing tonight rain question -> weather Responsibility; GA preserves weather Goal | Question retained; invented polarity/duplicated temporal bindings are separate semantic failures |
+| Fast -> SGLang | Exact two-frame request at 2048 tokens -> weather action plus markup inside reason_summary, then whitespace after its closing quote | Native grammar permits unlimited whitespace, enabling budget exhaustion |
+| Client -> parser/Host | length finish, exact 3474-character partial output -> output_truncated | Correct containment and evidence retention; no complete terminal Plan/provider dispatch |
+| Bounded decoder | Same schema meaning; maximum eight whitespace characters at each JSON boundary and frame separator | Captured loop rejected at character 641; strings untouched |
 
-The diagnostic candidate is deployed; 113 Agent/shared files matched at verification.
-Final cleanup removes one extra EOF blank line in shared json_schema.py only;
-the deployed code is behaviorally identical, with this byte-level difference recorded.
-Its focused `contextless_turn_it_up` replay completes, but wrongly selects walking
-for an ambiguous increase request; it does not reproduce or explain the original
-2048-token truncation. A separate exact-request fault test changes only max_tokens
-to 16 and proves one failed record retains exact partial output, request order,
-length finish reason and output_truncated classification. No dispatch occurs in
-that fault test. No full 51-case rerun of this diagnostics-only image is claimed.
+Fast sends `x-guidance.max_whitespace_cnt=8`. The existing pinned SGLang bridge uses
+XGrammar's bounded JSON-to-grammar conversion only for annotated structural nodes;
+unannotated requests keep their existing formatting. Runs over eight whitespace
+characters outside strings are intentionally excluded. The bridge is necessary for
+this reproduced integrity blocker because the pinned structural API lacks the option;
+remove it when that API supports the option. No new source/current document, environment
+variable, ordinary behavior flag or semantic authority is introduced.
 
-Release readiness: blocked by semantic/safety errors (negative blink admitted,
-ungrounded destination/velocity, wrong capabilities, omitted Goals, false promises,
-resource meaning and continuity), Deep/skill contracts, the historical truncation,
-and missing current-revision physical voice/default target-evidence closure.
-Preview and schema validity do not establish provider execution or robot behavior.
+## Evidence and qualification limits
 
-## Current runtime and retained artifacts
+Automated verification: canonical gate passes 2319 tests / 368 subtests, 20 legacy
+tests and 140 benchmarks, including policies, static analysis, docs and test ownership.
+Focused production tests: 40 / 10 subtests; applicable Level A: 11 distinct cases.
+All 198 frozen native framing contrasts pass. Built-image tests preserve 100 spaces
+and quoted frame markers inside strings, reject nine boundary spaces and invalid
+limits, and leave unannotated input unchanged. Twelve frozen model packets complete
+with original-Schema-valid frames. One date replay still contains markup in its
+rationale but closes, proving completion only; semantic content remains defective.
 
-RTX 5090, 32607 MiB, driver 595.84 / CUDA 13.2. Fixed Gemma4-12B FP8/SGLang,
-served `chromie-gemma4-12b`, revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`,
-65536 context/cache and two requests. Specialized ASR/TTS unchanged.
-Agent tag `chromie-agent:stream-evidence-20260910`, image
-`sha256:93a76fbf9c172c98ba098aedec300450629875273733cb53bcb510a3ac2196a4`,
-container `e253f0e784d23e1763c3cccc7288ef97185495913bac8a61bcea7a4f91e1afa4`.
-SGLang image `sha256:6f449f469487fe9f5d4565c2dfb14f62a08ed4f8b581681d3e3fd0bda6df7303`.
-Agent, SGLang, ASR/TTS and headless Soridormi remain running; maintained-main
-restoration has NOT occurred in this continuation. Verify health before resuming.
+Target validation before change: complete immutable 51-case preview on 26fe1cee,
+25 mechanical / 20 reviewed acceptable initial previews. All raw cases reviewed.
+158 linked calls include 49 completed valid Fast streams and one logged truncation.
+Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_134729.tar.gz`.
+Three separate unchanged contextless-request probes complete with incorrect stand_idle
+choices; valid escalation is representable. The older unlogged truncation remains unknown.
 
-Raw evidence is retained locally and is not included in this Git delivery; transfer
-these artifacts separately when resuming on another machine. The summary below
-remains available from Git. Evidence roots beneath `.chromie/acceptance/`:
-- `stream-evidence-20260910/`: latest gate, identity, source verification, natural
-  focused replay and controlled failed-stream proof; read report.md first.
-- `fast-tagged-20260910/`: latest full cohort, all-case review, ordered frozen
-  packets, native grammar experiments, implementation equality and source patch.
-- `fast-continuity-20260910/`: dropped-Goal diagnosis, focused proof and prior cohort.
-- `gi-followup-shape-20260910/`: corrected production-order GI packets and cohort.
-- `gi-referents-20260910/`: retained provenance repair; rejected ambiguity wording.
-- `ga-array-20260910/`: GA decoder contrasts and primary-role qualification.
-- `decoder-shapes-20260910/`: mechanical Deep/skill preparation, not implemented.
+Target validation after change: complete immutable 51-case preview, 25 mechanical /
+19 reviewed acceptable initial previews. Every case/raw transaction reviewed; 160
+linked calls: GI 54 valid (one Deep GI), GA 50 valid / 1 invalid, Fast 51 complete valid,
+Deep Planner 2 invalid, skill selection 2 invalid. One warm-up record is outside linkage.
+No Fast truncation in this cohort; local-time rationale still contains markup/frame
+markers. Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_140820.tar.gz`.
+Both walk-continuation cases pass. Four reflex cases remain preview-limited.
 
-## Next work and commands
+Full-cohort regressions are retained: look-then-blink omits two-second gaze duration;
+compound motion uses wrong left-turn yaw. Both exact origin packets per case replay
+correctly with bounded and unbounded formatting (eight replays). Causes remain unproven;
+isolated replay success does not erase the full-cohort regression. No complete
+transaction/nonregression or LLM-integrity closure is claimed. Whole candidate promotion
+is rejected; the whitespace mechanism is retained only as an unpromoted development repair.
 
-Read latest all-case review before selecting another semantic change. Reproduce the
-natural failed-stream class with current exact logging; do not infer its historical
-cause from the deliberate 16-token test. Use fresh artifact directories and runtime
-identity. Freeze contrasts at the earliest responsible boundary; keep the fixed model.
-Before another broad change or revision-level claim, run and judge one complete
-immutable directory-discovered cohort, then collect exactly one debug bundle. Do not
-edit source, rebuild or restart between cases. Keep unsafe candidates in preview.
+Release readiness remains blocked by GI prohibition/ambiguity/provenance, invented
+motions, resource meaning, false reminder/completion promises, omitted Goals, GI/GA
+continuity, Deep/skill contracts, progress and latency. Physical voice/provider/robot
+and default target-evidence closure are missing. Preview is not execution evidence.
 
-Canonical checks: `./scripts/run_tests.sh`, `python scripts/check_repository_policies.py`,
+## Current runtime and artifact locations
+
+RTX 5090, 32607 MiB, driver 595.84 (CUDA 13.2 support reported by driver). Fixed
+Gemma4-12B FP8/SGLang, served `chromie-gemma4-12b`, model revision
+`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, 65536 context/cache and two requests.
+ASR/TTS retain their models. Agent, SGLang, speech and headless Soridormi are running;
+maintained-main restoration has NOT occurred. Verify health before resuming.
+Agent `chromie-agent:bounded-stream-20260910`, image
+`sha256:fd462a11e9f95617eaa10eb7ab79fc334888c89ee9721fffc013a76d54ad7be9`,
+container `f3dec9267a3df211af9099ec80a766909d726c348f0030c31983d4662514b568`.
+SGLang `chromie-sglang:bounded-stream-20260910`, image
+`sha256:41fbd910662483a125184a00611029225ee102a928421eaeaec70ab27a844edf`,
+container `a67606112fd19eb895a6be6d3e1a057d6771b9255bb6bb2bf60072a7863fbfdc`.
+All 113 Agent/shared source files match the image. Runtime identity and source patch
+bind the cohort; later documentation updates do not imply a rerun on a clean commit.
+
+Evidence is local, not included in Git; transfer it separately across machines.
+Under `.chromie/acceptance/`, read `stream-length-20260910/report.md`, its all-case
+behavior-review.json, regression-replay/, source.patch, runtime-identity.json and
+source-verification.json. Pre-change full baseline: `stream-baseline-20260910/`;
+natural repeatability probes: `stream-natural-20260910/`. Earlier GA, GI provenance,
+GI shape, Fast context/framing and stream diagnostics roots remain retained:
+`ga-array-20260910/`, `gi-referents-20260910/`, `gi-followup-shape-20260910/`,
+`fast-continuity-20260910/`, `fast-tagged-20260910/`, `stream-evidence-20260910/`.
+Deep/skill native preparation in `decoder-shapes-20260910/` is not implemented.
+
+## Next work and exact operational commands
+
+First read the full-cohort regressions and prohibition-audit.md in the pre-change
+baseline. Freeze bilingual primary GI positive/negative constraint contrasts and
+establish representability before any semantic edit. Investigate full-cohort variability;
+do not infer that formatting fixes unsupported meaning. Keep the fixed model and
+primary semantic ownership. No keyword semantic routing or second same-authority judge.
+
+Canonical: `./scripts/run_tests.sh`, `python scripts/check_repository_policies.py`,
 `python scripts/check_test_ownership.py`, `python scripts/check_docs.py`.
-Use `scripts/capture_runtime_identity.py --help` and the retained latest identity
-capture/cohort commands to bind the next fresh directory. Compose uses generated
-`.env.runtime`, `docker-compose.yml`, `docker-compose.sglang.yml` and
-`.chromie/voice-runtime/compose.voice-mujoco.yaml`; never edit generated env directly.
-Stop ASR/TTS before replacing SGLang, then restart speech after model health.
-HANDOFF.md retains historical recovery commands; its current section overrides them.
+For a new immutable preview, copy the retained run-cohort.py into a fresh directory,
+capture fresh identity, run the complete directory-discovered cohort, then collect
+exactly one debug bundle and judge every case. Do not edit/rebuild/restart between cases.
+Keep unsafe candidates in preview. Retain all failures, including mechanical passes
+that fail semantic review, and update both delivery owners before commit/push.
+
+Compose prefix: `docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml -f .chromie/voice-runtime/compose.voice-mujoco.yaml`.
+Use service names `chromie-llm`, `chromie-agent`, `chromie-asr`, `chromie-tts`.
+Stop speech before replacing SGLang; restart it after model health. Never edit generated
+`.env.runtime`. Capture with `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.
+Historical recovery images/commands in HANDOFF.md are context, not current runtime claims.

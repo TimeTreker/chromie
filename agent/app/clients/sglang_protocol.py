@@ -64,12 +64,13 @@ def _tagged_response_format(response_format: TaggedJSONResponseFormat) -> dict[s
             for value in node:
                 compatible(value)
 
-    whitespace = {"type": "regex", "pattern": r"[ \t\r\n]*"}
+    whitespace = {"type": "regex", "pattern": r"[ \t\r\n]{0,8}"}
     elements: list[dict[str, Any]] = [dict(whitespace)]
     for name, original in response_format.frames:
         schema = copy.deepcopy(original)
         expose_intersection_shapes(schema)
         compatible(schema)
+        schema["x-guidance"] = {"max_whitespace_cnt": 8}
         elements.append({
             "type": "tag", "begin": f"<{name}>",
             "content": {"type": "sequence", "elements": [

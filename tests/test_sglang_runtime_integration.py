@@ -46,6 +46,8 @@ class SGLangProtocolTests(unittest.TestCase):
         self.assertEqual([elements[i]["begin"] for i in (1, 3)],
                          ["<presentation_commit>", "<terminal_plan>"])
         wire_schema = elements[1]["content"]["elements"][1]["json_schema"]
+        self.assertEqual(wire_schema["x-guidance"], {"max_whitespace_cnt": 8})
+        self.assertEqual(elements[0]["pattern"], r"[ \t\r\n]{0,8}")
         self.assertEqual(wire_schema["required"], ["text", "duration"])
         self.assertFalse(wire_schema["additionalProperties"])
         self.assertIn("anyOf", wire_schema)

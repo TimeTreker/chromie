@@ -1098,6 +1098,15 @@ separate and decoder validity alone does not establish semantic correctness. Oll
 retains its existing unconstrained tagged text stream; no constrained-decoder claim is
 made for that provider. No new environment setting or extra model call is introduced.
 
+Tagged Fast requests bound each inter-token JSON whitespace region and each frame
+separator to eight characters. String contents are unaffected. The request carries
+`x-guidance.max_whitespace_cnt=8`; the pinned SGLang bridge converts only annotated
+structural JSON nodes to XGrammar's equivalent bounded-whitespace grammar. Unannotated
+requests keep their existing formatting. This prevents an observed whitespace loop
+after a closed JSON string from consuming the output budget; it does not repair
+semantic content or guarantee completion. Whitespace runs above eight characters
+outside strings are intentionally excluded from this decoder format.
+
 Private model-call evidence preserves request/schema property order and records each
 SGLang stream once on completion or failure, including partial generated text,
 finish reason and failure classification. Existing canonical reference hashes stay
