@@ -399,8 +399,10 @@ mechanically conserves the authoritative GI Responsibilities and their integrate
 source/coverage evidence; it does not invoke a coverage reviewer, critic, fresh
 interpretation, or final semantic recheck. A semantic, grounding, or conservation
 rejection fails closed and cannot be repaired at the same authority. The current
-development implementation follows this primary-result contract; repository policy
-rejects restoration of the older certificate/reconsideration path. Live model quality
+repair gate accepts only extra-field and list/dictionary-shape errors. Missing
+semantic fields, invalid values, semantic validator failures, and mixed failures
+are terminal after the primary call; unknown validation error types fail closed.
+Repository policy rejects restoration of the older certificate/reconsideration path. Live model quality
 still requires current-revision qualification.
 
 `GoalAssociationResolution.resolution_status` is the terminal contract:
@@ -429,9 +431,17 @@ The host context now includes compact prompt-memory fields:
 `session_memory.memory_summary`, `session_memory.extracted_memory`, and
 top-level `extracted_memory`. These are process-local session/task memory
 summaries, not durable user-profile memory and not authorization for side
-effects. Fast Goal Interpretation prompts sanitize raw `history` and `conversation` fields
-from their bounded context payload and rely on these compact memory fields
-instead.
+effects. Goal Interpretation projects accepted dialogue and retained Goal semantics
+separately from ambient context. Root `conversation_id`, `session_id`, `turn_id`,
+and `sid` are excluded from its primary and Deep semantic prompts; they remain
+on the authoritative request for host correlation and logging. These bookkeeping
+labels cannot supply user meaning. Raw `history` and `conversation` containers
+remain excluded from the ambient context payload.
+The separate identity projection preserves the configured
+`identity.model_identity_boundary` alongside self-reference facts in both
+interpretation prompts. Its required JSON fails explicitly above 1,200 characters
+instead of dropping identity truth. Robotic embodiment does not establish any
+particular Capability's availability.
 Durable or session memory is not a Goal Interpretation route. Explicit memory
 changes flow through typed, consent-bound memory proposals and the existing
 Conversation State / memory capability boundary. The Host validates persistence

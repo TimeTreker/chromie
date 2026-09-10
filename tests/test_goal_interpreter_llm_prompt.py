@@ -506,6 +506,24 @@ class GoalInterpreterPromptTests(unittest.TestCase):
             timeout_ms=800,
         )
 
+    def test_runtime_correlation_labels_do_not_change_model_input(self) -> None:
+        interpreter = self._interpreter()
+        for key in ("conversation_id", "session_id", "turn_id", "sid"):
+            first = GoalInterpretationRequest(
+                text="Blink twice.",
+                context={key: "a-session-label", "discourse_focus": []},
+            )
+            second = first.model_copy(deep=True)
+            second.context[key] = "an-unrelated-test-label"
+            for build in (
+                interpreter.build_interpretation_payload,
+                interpreter.build_deep_interpretation_payload,
+            ):
+                with self.subTest(key=key, variant=build.__name__):
+                    self.assertEqual(build(first), build(second))
+                    self.assertEqual(first.context[key], "a-session-label")
+                    self.assertEqual(second.context[key], "an-unrelated-test-label")
+
     def test_primary_prompt_owns_what_and_source_evidence(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(text="边走边唱歌", language="zh-CN")
@@ -515,6 +533,47 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("source_evidence", all_text)
         self.assertIn("one primary semantic decision", all_text)
         self.assertNotIn("Common Ability Catalog", all_text)
+
+    def test_identity_boundary_is_lossless_in_both_interpretation_prompts(self) -> None:
+        boundary = (
+            "Chromie's body is robotic. Her social identity is not a claim "
+            "of biological human age, birth history, or physiology."
+        )
+        request = GoalInterpretationRequest(
+            text="Blink twice.",
+            context={"mind": {"identity": {
+                "name": "Chromie", "model_identity_boundary": boundary,
+            }}},
+        )
+        interpreter = self._interpreter()
+        for build in (
+            interpreter.build_interpretation_payload,
+            interpreter.build_deep_interpretation_payload,
+        ):
+            with self.subTest(variant=build.__name__):
+                _, user_text, _ = _payload_message_texts(build(request))
+                projection = json.loads(
+                    user_text.split("Bounded Identity Context:\n", 1)[1].split("\n", 1)[0]
+                )
+                self.assertEqual(
+                    projection["self_identity"].get("model_identity_boundary"), boundary
+                )
+
+    def test_identity_projection_overflow_fails_instead_of_dropping_truth(self) -> None:
+        request = GoalInterpretationRequest(
+            text="Blink twice.",
+            context={"mind": {"identity": {
+                "name": "Chromie", "model_identity_boundary": "x" * 1201,
+            }}},
+        )
+        interpreter = self._interpreter()
+        for build in (
+            interpreter.build_interpretation_payload,
+            interpreter.build_deep_interpretation_payload,
+        ):
+            with self.subTest(variant=build.__name__):
+                with self.assertRaisesRegex(ValueError, "identity.*projection budget"):
+                    build(request)
 
     def test_primary_prompt_matches_schema_when_no_candidate_goal_exists(self) -> None:
         payload = self._interpreter().build_interpretation_payload(

@@ -1,130 +1,108 @@
 # Development Checkpoint
 
-## Current resume boundary — additional 18 laptop iterations complete
+## Current resume boundary — iterations 29–46 complete and unqualified
 
 Updated 2026-09-11. Active Issue #35. The Goal-driven single-authority architecture
-remains binding. The original ten iterations and **all 18 additional iterations
-(11–28) are complete**. Iteration 28 repeated the unchanged final GI candidate to
-check observed request-identical output variation. The owner now authorizes
-committing and pushing this completed batch, then up to **18 further iterations
-(29–46)** because the target remains unqualified. No main merge is requested.
+remains binding. The owner-requested first delivery was
+committed and pushed as `9e3d3971e48ce4ffff53723dc99cd4db7279888c` before this batch.
+All **18 further iterations (29–46)** are now complete. Budget remaining: **0**.
+No further candidate optimization is authorized by this exhausted batch.
+This delivery retains three narrow source repairs; it does **not** qualify the
+fixed model, live interaction, supervised voice, or default target-evidence profile.
 
-Pre-delivery HEAD/upstream on `codex/ga-request-format` is
-`c2128a5166bde7fdb071d8dbeb9ef5e7efa2fcbd`; main remains
+Branch `codex/ga-request-format`, pre-delivery HEAD/upstream
+`9e3d3971e48ce4ffff53723dc99cd4db7279888c`; main remains
 `ab5caeab49e46be9c77bd87c488e693c156c2eca`. Expected resume revision is the latest
-commit containing this checkpoint and HANDOFF.md, pushed to the same remote
-branch. The implementation/test diff from the pre-delivery base has SHA-256
-`f06735f7cb5f3eb393fdd41fc3ae75769ef9005c13c640b7590b01c8b6e77992`
-(excludes documentation and ignored evidence). Its code is unchanged from the
-retained passing gate and unqualified target runs below.
+commit containing this checkpoint and HANDOFF.md, pushed to the same branch.
+Final implementation/test patch SHA-256 from that base: `b9c3c7bffedbd22cf8fa8e1babb4c7cafdf349ccc33c3b1f1c71669bc691fafb`.
+The exact final tracked tree before documentation updates equals iteration 43's
+passing tree; the retained restoration proof binds its gate to this code.
 
+Target remains RTX 4090 Laptop 16 GB, fixed Qwen3.5:4b Q4_K_M/Ollama.
 Soridormi remains `codex/turn-count` at
-`284273bc344cc94012347c75ab270a9f4ac8ffdb`. Preserve pre-existing
-` ? workspace/Open_Duck_Playground`; no provider implementation was changed.
-Target: RTX 4090 Laptop 16 GB, fixed Qwen3.5:4b Q4_K_M / Ollama.
-Other-machine Gemma/SGLang/RTX 5090 evidence is historical.
+`284273bc344cc94012347c75ab270a9f4ac8ffdb`; preserve existing
+` ? workspace/Open_Duck_Playground`. No provider edit, model substitution,
+main merge, runtime flag, new current document, or architecture layer was added.
 
-## Authorized scope and actual repairs
+## Retained repairs and actual responsibility boundaries
 
-The owner explicitly authorized speech Goals to clarify, report unavailable, or
-refuse, and to preserve an independent spoken response without executable steps.
-That bounded amendment is recorded in the existing Charter and Planner owners.
-Planner remains the sole author; Goal identities, execution, safety and
-confirmation authority are preserved. No second semantic critic or repair call
-was added. The separate tagged-stream wire amendment remains unapproved and
-**was not implemented**; the concrete proposal is retained in the private root.
-
-| Boundary / observed failure | Existing-owner repair and retained proof |
+| Observed failure / earliest responsible boundary | Implemented mechanism and proof |
 | --- | --- |
-| Canonical speech Goals -> Deep Schema/DTO/Host -> Runtime: valid limitations were unrepresentable; mixed required Work and became pre-action speech | Authorized per-Goal limitations and independent zero-step mixed response; no hidden execution, scheduling or confirmation. Runtime retains question/waiting or final limitation lifecycle. Legal references 4/16 -> 16/16; Fast response-plus-clarification references 4/8 -> 8/8 |
-| Full Schema -> deployed native decoder: object properties bypassed root intersection constraints | Complete native union branches preserve the full Schema/Host intersection; per-Goal outcomes precede aggregate. Final diagnostic Deep 16/16 and Fast 7/8 raw Schema-valid; semantic qualification remains lower |
-| Model limitation -> satisfaction -> aggregate: unmet Goals falsely satisfied or lost | Shared DTO/Host and dynamic Schema conserve unmet IDs and reject false exact completion. Frozen checks 6/18 -> 18/18. Primary guidance states existing score bands and distinguishes fulfillment from confidence/refusal quality |
-| GI -> CWR -> Planner: unresolved meaning omitted; canonical Fast language omitted; Deep clarification incorrectly required a Capability for ordinary speech | Exact bounded GI unresolved projection, existing response-language projection, and corrected authored-speech clarification prerequisite. No upstream semantic rewriting |
-| Raw Fast stream -> parser -> typed commitment: duplicate keys silently replaced earlier values | Duplicate object keys, including escaped/nested names, rejected before typed commitment. Ten frozen checks: 2/10 -> 10/10; four early false admissions removed |
-| Canonical Fast model -> Host: nonempty escalation reason accepted on non-escalating output | Host now matches the existing Schema invariant. Eight frozen contrasts: 4/8 -> 8/8; invalid raw output is rejected, never rewritten |
-| First-class CWR.history -> Deep primary prompt: all three supplied history states erased | Last six retained records preserve exact text, speaker and delivery-source metadata under a 6,000-character fail-closed bound. Twelve controls: 0 -> 4 qualified, all recorded-assistant controls correct. User-owned/absent history still fails; separate speech suite regresses 8/16 -> 7/16 |
-| GI dynamic Schema -> Qwen -> Host: 三秒 translated to three seconds and rejected | Existing bounded untyped source-substring constraint also covers duration/speed string branches on short fresh turns. Numeric branches and long/context-backed paths remain. Four reproduction failures pass after repair; all 44 legal references pass. Correct spelling still allows wrong dimensions such as duration=while or speed=走 |
+| Iteration 30 `Blink twice.` primary reads `conversation_id=ga-live-user_probe_unknown_people_outside` as purpose/ambiguity evidence. GI ambient projection exposed a bookkeeping label as human meaning. | Iteration 31 excludes root conversation_id/session_id/turn_id/sid from both interpretation prompts. Original request and logging identities remain. Eight label-substitution subtests failed before and pass after. |
+| Actual `MindProfile.prompt_context()` already carries the owner-approved robotic embodiment boundary; GI identity projection drops it. Twenty complete-Mind contrasts prove the omission. | Iteration 32 projects existing model_identity_boundary losslessly in primary/Deep, with a required 1,200-character JSON bound that fails instead of dropping identity truth. Four lossless/overflow checks fail before/pass after. No new identity fact or Capability availability inference. |
+| Live 42 GA primary speed=`走边` fails a semantic value validator; broad ValidationError handling wrongly invokes another GA call under mechanical repair. | Iteration 43 permits the existing one regeneration only for recognized extra-field/list/dictionary-shape errors. Invalid/missing meaning, range/literal/semantic and mixed errors fail closed after one call. Seven regression failures now pass; frozen 11 transaction checks improve 3/11 -> 11/11 and pass again on 46. |
 
-Original count-provenance and observed-availability repairs remain. Equal count
-and duration magnitudes do not establish provenance; 32/32 frozen resolver checks
-pass. Dry-run mode no longer fabricates robot availability. No original GI prompt
-experiment was retained; iteration 27 changes only GI response Schema spelling,
-not the system/user prompt, model, options or Host semantic decisions.
+The captured42 second call only reordered bindings and failed again; it did not
+repair the meaning. The defect is its eligibility, not an inferred successful
+semantic rewrite. The replay includes the exact captured DTO but uses a synthetic
+CWR; it is Level A invocation-control proof, not a replay of the complete live
+request. GA/Planner remain concurrent downstream consumers of immutable GI meaning.
 
-## Observed evidence and remaining failures
+The absent-Mind `blink_twice_plain` response triggered the identity audit but cannot
+prove causality for a missing Mind field. Twenty supplied-Mind and 24 absent-Mind
+cases stay distinct. Correct robotic identity also does not establish available
+Capabilities. Playback `current_generation` contamination remains a known gap:
+experimental 38 removed it, but full-cohort regressions left that change unselected.
 
-Final code gate (iteration 27): **2,362 tests, 582 subtests, 20 legacy Agent tests**;
-140 benchmark tests and pinned static, policy, test-ownership and documentation
-gates pass. Final documentation checks are retained separately after this update.
-Relevant Level A: 29 distinct cases across five existing classes; GI robust-intent
-class additionally passes8/8 (memberships overlap; do not sum as unique cases).
-All existing frozen reference suites pass: Deep 16, Fast 8, unmet 18, repetition 32,
-duplicate 10, escalation-field8 and history 12. These are contract assertions.
+Previously delivered 9e3 repairs remain: authorized speech limitations plus independent
+zero-step response, count/availability provenance, unmet-Goal satisfaction,
+duplicate Fast JSON rejection, native canonical Schema intersections, unresolved/
+language/history projection and bounded GI duration/speed source spelling.
+The separate native Fast wire amendment is still pending its existing owner question.
+Charter principle 23's two tagged frames are unchanged; speech approval did not
+amend that rule. No extra semantic reviewer/critic was introduced.
 
-Actual fixed-model results remain **unqualified**:
+## Observed verification and qualification limits
 
-- Final unchanged Fast transaction (24): 8 calls; Schema7, Host7, qualified2.
-- Final Deep speech transaction (26): 16 calls; Schema16, Host13, qualified7.
-  Earlier22 had8 qualified: Chinese clarification controls regress while English
-  mixed refusal improves. These are retained failures, not averaged into a pass.
-- Deep history (26): 12 calls; Schema12, Host12, qualified4. Missing history is
-  fabricated and user speech is misattributed despite correct context projection.
-- GI baseline 09:44 cases/64 calls, 5 mechanical/3 qualified; candidate 27:44/66,
-  5 mechanical/4 qualified. Repeat 28: **44 cases / 63 calls / 6 mechanical / 4 reviewed qualified**.
-  All88 repeat primary/deep packets match27 exactly. Request-identical output
-  variation is retained; not every changed score is attributable to the repair.
+Canonical code gate 43: **2,366 tests, 601 subtests, 140 benchmark tests and 20
+legacy Agent tests passed**, including pinned static, policy, docs and ownership
+checks. Final restoration reproduces that exact tracked tree before the docs
+refresh. Focused 43:165 tests/120 subtests. Retained-source robust-intent Level A:
+8/8. Frozen GA replay 46:11/11. Final documentation/delivery checks are retained
+separately; these counts never imply model or robot qualification.
 
-Repeat 28 retained62 complete responses and one failed Deep call at 512 tokens
-(`engagement_blink_en_inactive`). The exact request and truncation exception are
-retained, but the offline harness discarded the exception's partial response;
-its unseen content and why it grew are unknown. The private runner now preserves
-request-bound incident responses for future failures, verified with the production
-truncation exception and zero model calls. No failed result was replaced or retried.
-Only 10/44 cases have identical raw outputs across 27/28; three qualified cases
-are common. This is repeatability evidence, not an inferred provider root cause.
+Final GI 46, with all 88 request packets byte-identical32: **44 cases / 61 calls; 61 complete Schema-valid / 60 Host-admitted; 5 mechanical / 3 reviewed qualified**.
+Selected 32 had 5/44 reviewed qualified. Request-identical output variation persists;
+changed answers in this repeat cannot be attributed to the unchanged GI source.
+Every raw primary and designated Deep output, including mechanical passes and
+failures, was reviewed. No reference/rubric was changed after inference.
 
-Latest deployed full 51-case preview invocation (27) stopped at Fast output
-truncation: **one complete failure, one next case started without a retained
-model call, 49 unrun; all 3 retained calls reviewed; zero qualified**. GI merged
-walk/nod into r1 and kept turn in r2; GA committed two Goals. Fast produced32
-complete Activities plus a partial 33rd, including unrequested gaze, stand and
-repeated walk/nod cycles, then exhausted2048 tokens. Its first commit was silent;
-Host admitted no Work. Source/provider trees were stable. Exactly one bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20260911_025659.tar.gz`.
-Read-only repeat 28 reuses this source-identical deployment evidence.
+Unchanged earlier role diagnostics remain unqualified: canonical Fast 24 qualified 2/8;
+Deep 26 speech7/16 and history4/12. New-batch Fast 33 zero-penalty experiment did not
+qualify the role and was restored. All GI wording/order/profile/spelling experiments
+outside 31/32 were unselected;44 reviewed 3/44 and 45 reviewed 2/44 versus 32's5/44.
+Iteration 41's local gate failed one existing literal prompt assertion; that candidate
+was restored, not relabeled passed.39–41 were not deployed after frozen hard failures.
 
-Unresolved: decomposition/count/concurrency loss, speaker/referent mistakes,
-unknown-scene fabricated observations, invented speech prerequisites, incorrect
-satisfaction/parameter resolutions, and malformed/unbounded tagged Fast output.
-Native Fast schemas grow to~637KB/3.14MB at four/six Goals; only one/two-Goal
-native inference was measured. Long/history-rich GI turns, broader history
-windows, undelivered assistant records and physical delivery remain unqualified.
-Release is development only. Current-revision supervised voice and default
-target-evidence closure are still open. No microphone, audible speaker, physical
-robot or executed-motion claim follows from this text/preview evidence.
+Final stable 51-case live preview 46: **1 complete failure, 1 partial case with one retained GI response and unproven Host/terminal outcome, 49 unrun; 2 retained calls reviewed, 2 Schema-valid, zero qualified**.
+Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260911_051238.tar.gz`.
+See HANDOFF.md and the retained per-module review for the exact failure and
+non-invoked downstream owners. No Work was admitted for completed final cases.
+Partial-case outcome is unknown; no full-cohort pass is claimed. The profile uses
+synthetic text, discarded audio and no execution request.
+
+Open failures include atomic decomposition/count/parallel loss, invented actors or
+bindings, unknown facts mistaken for speech, fabricated/misattributed history,
+false execution-prerequisite ambiguity, and malformed/unbounded tagged Fast output.
+Schema validity and fail-closed containment are insufficient behavior evidence.
+Release remains development only. Current-revision supervised microphone/speaker,
+physical robot and default target-evidence closure remain unproven.
 
 ## Next resume order
 
-1. Read this checkpoint, HANDOFF.md, active Issue35 and canonical project truth;
-   verify branch, implementation diff and paired provider before editing.
-2. Commit and push the completed batch first. Then establish the new batch as
-   iterations 29–46, with a separate budget ledger; zero are used at this delivery
-   boundary. Start with one revision-bound full live baseline and retain the
-   fixed Qwen model. Stop early only on qualification or an actual authority blocker.
-3. The separate native-stream proposal awaits its existing owner question. The
-   speech-outcome approval does not authorize changing Charter principle23's
-   two-tagged-frame wire rule. No duplicate permission request is needed.
-4. Use the retained whole-cohort failures to choose the earliest owner: GI WHAT
-   decomposition/provenance, Deep history/independent-speech semantics, or Fast
-   primary output integrity. No phrase routing, Host semantic rewriting, extra
-   model critic or output-budget increase without evidence.
-5. Any later behavioral candidate requires focused proof and complete frozen
-   reruns, then one stable full live invocation and one bundle at its stop.
-   Preserve regressions and unrun cases; never label fail-closed containment as
-   qualified robot behavior. The present commit/push is owner-authorized; record
-   any subsequent delivery and its actual evidence explicitly.
+1. Read canonical project truth, this checkpoint and HANDOFF.md; verify the pushed
+   branch, final implementation identity and paired provider before editing.
+2. Preserve the completed 29–46 ledger and all failed/rejected evidence. This batch
+   is exhausted; further optimization or a model comparison needs a new owner request.
+3. Resolve the existing separate Fast wire proposal only if the owner answers it;
+   do not repeat the question or infer authorization from speech repair/commit.
+4. For newly authorized work, select an earliest demonstrated boundary from the
+   retained aggregate; keep the fixed-model distinction explicit. Do not add phrase
+   routing, Host semantic rewriting, same-owner critics or speculative budget growth.
+5. Freeze new labels before inference, prove focused behavior and rerun complete
+   frozen/live cohorts without mid-cohort source changes. Physical evidence remains
+   supervised; never convert text/simulator evidence into that claim.
 
 Private root: `/home/chromie/github/chromie/.chromie/acceptance/laptop-more18-20260911/`.
 Original root: `.chromie/acceptance/laptop-iterations-20260910/`.
-Evidence is local and ignored; transfer it separately across machines. HANDOFF.md
-owns exact operational commands, identities, episode correlations and the ledger.
+Artifacts are ignored and local; Git does not transfer them across machines.

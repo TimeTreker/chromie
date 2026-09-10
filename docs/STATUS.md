@@ -1,21 +1,22 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-11
-**Current focus:** Goal-driven single-authority architecture, Issue #35. Original ten plus all 18 additional RTX 4090 Laptop iterations (11–28) are complete. Final source is 27; 28 repeats the identical candidate. The completed batch is being committed/pushed from `codex/ga-request-format` pre-delivery base `c2128a51`, paired with Soridormi `codex/turn-count` at `284273bc`. Fixed Qwen3.5:4b Q4_K_M/Ollama; no model substitution or main promotion. The bounded speech-outcome amendment is authorized and implemented; separate tagged-stream wire amendment is pending and unimplemented. Budget exhausted; no iteration 29 authorization.
+**Current focus:** Goal-driven single-authority architecture, Issue #35. The first requested batch was pushed as 9e3d3971; all 18 further RTX 4090 Laptop iterations 29–46 are complete and unqualified. Final source retains31/32 GI projection repairs and 43 GA retry eligibility. Branch codex/ga-request-format, pre-delivery base9e3d3971; Soridormi codex/turn-count at 284273bc. Fixed Qwen3.5:4b Q4_K_M/Ollama. Budget exhausted; no further candidate iteration, model substitution or main promotion. Speech-outcome amendment implemented; separate tagged-stream wire amendment pending/unimplemented.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Existing owners repair count/availability provenance; authorized speech limitations and independent zero-step response; unmet satisfaction; duplicate Fast JSON fields; escalation-field validation; unresolved/language/history projection; native canonical Schema constraints; short-turn GI duration/speed source spelling. | Final code gate 2362 tests/582 subtests/20 legacy plus 140 benchmarks; pinned checks pass. Frozen Deep 16/Fast 8/unmet 18/repetition 32/duplicate 10/escalation 8/history 12 references pass. Level A 29 distinct cases plus overlapping GI class 8/8. Final docs checks retained separately. | Unqualified. Final Fast diagnostic2/8, Deep speech 7/16 (regresses from 8/16), history 4/12; GI 27 reviewed4/44, repeat 28 reviewed4/44. Latest full 51 live invocation stops on Fast output truncation:1 complete failure, 1started without calls, 49 unrun; 3 calls reviewed, stable trees, zero qualified. Host blocks Work. | Development only. No release/main promotion. Semantic, current-revision supervised voice and default target-evidence closure remain open. No physical microphone/audible speaker/robot or executed-motion proof. |
+| Existing delivered speech/provenance/Schema/history repairs remain. GI omits four root correlation labels and preserves configured robotic identity; GA permits one structural-only repair and rejects semantic/mixed errors after one call. | Exact final pre-doc tree equals passing43:2366 tests/601 subtests/140 benchmarks/20 legacy; pinned gates pass. Focused 165/120; LevelA8/8; frozen GA 11/11. Final docs checks retained separately. | Unqualified. GI 46: 44 cases / 61 calls; 61 complete Schema-valid / 60 Host-admitted; 5 mechanical / 3 reviewed qualified. Identical32 packets still vary. Earlier unchanged Fast 2/8, Deep speech7/16/history4/12. Final 51live: 1 complete failure, 1 partial case with one retained GI response and unproven Host/terminal outcome, 49 unrun; 2 retained calls reviewed, 2 Schema-valid, zero qualified. Host blocks Work. | Development only; no main promotion. Current-revision supervised voice/default target-evidence closure open. No physical microphone/audible speaker/robot or executed-motion proof. |
 
-Correct source spelling and schema validity do not establish correct meaning.
-GI still merges effects and confuses unknown facts with speech; Deep still invents
-missing history, misattributes user speech and loses independent responses. Tagged
-Fast can generate repeated unrelated Activities and exhaust its output budget.
-Unknown-scene fabricated observations remain open. Request-identical model
-controls varied; the frozen repeats retain this limitation instead of claiming
-all changed scores as causal improvements. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
-owns the exact resume boundary; the [handoff](../HANDOFF.md) owns all 18 iterations,
-actual module I/O, revision/runtime identities, commands and artifact paths.
+Correct source projection and Schema validity do not establish correct meaning.
+GI still merges effects, invents bindings/uncertainty and confuses unknown facts with
+speech; tagged Fast can return invalid or repeated unrelated Activities. Deep history
+and independent-response failures remain. Playback-generation contamination remains
+open after the38 experiment was unselected. Rejected41's failed local gate is retained;
+final source did not weaken its test. All 88final GI packets match32 byte for byte, so
+repeat differences cannot be credited to unchanged GI code. The
+[checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the current resume boundary; the
+[handoff](../HANDOFF.md) owns all 18 iterations, workflows, actual evidence, commands
+and identities. Text-preview failure containment is not robot qualification.
 
 Previous RTX 5090 evidence (2026-09-10; different model/provider and local tree): Goal-driven single-authority architecture, Issue #35, fixed RTX 5090 / Gemma4-12B. Explicit provider argument realizations now enforce minimum argument presence in Fast advance and canonical Fast/Deep validation; gaze duration is declared instead of silently using its default. Canonical Fast single/multiple-Goal decoder schemas now expose existing intersection shapes, closing a native decoder omission. Two focused MuJoCo episodes complete exact gaze2/blink2 and gaze3 with valid primary Fast result DTOs and zero Deep calls. Canonical gates pass2331 tests /437 subtests,140 benchmarks,20 legacy tests; Soridormi789 passed /2 skipped. Final stable51-case preview:27 mechanical /19 reviewed acceptable,154 call digests intact. GI/GA/Planner semantic defects, headless speech and supervised target-evidence gaps remain; no model-only or main-promotion claim. Checkpoint/handoff own exact workflows, paired commits and evidence.
 Earlier different-model comparison: three canary trials showed lower SGLang foreground latency, but model/precision/topology differed. The 51-case preview produced zero reviewer-qualified complete transactions on either deployment. The sole SGLang mechanical pass dropped GA bindings and admitted unresolved GI actor meaning downstream; preview prevented dispatch. See the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) for retained evidence. Error containment is not successful behavior.

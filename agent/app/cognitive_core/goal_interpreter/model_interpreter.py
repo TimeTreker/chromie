@@ -46,7 +46,7 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
-from ...prompt_projection import bounded_json
+from ...prompt_projection import bounded_json, required_json
 from .errors import InterpretationUnavailableError
 from .schema import (
     GoalInterpretationDecision,
@@ -58,6 +58,11 @@ logger = logging.getLogger("chromie.agent.goal_interpreter.llm")
 
 
 _CONTEXT_OMIT_KEYS = {
+    # Correlation labels belong to request/log joins, never human meaning.
+    "conversation_id",
+    "session_id",
+    "turn_id",
+    "sid",
     "candidate_capabilities",
     "common_ability_catalog",
     "common_ability_ids",
@@ -2000,6 +2005,7 @@ def _goal_interpretation_identity_context(mind: Any) -> str:
                         "kind",
                         "age_description",
                         "family_role",
+                        "model_identity_boundary",
                     )
                     if raw_identity.get(key) not in (None, "", [], {})
                 }
@@ -2012,7 +2018,7 @@ def _goal_interpretation_identity_context(mind: Any) -> str:
                     identity[key] = speaker.get(key)
     profile = {"self_identity": identity or {"name": "Chromie"}}
     return (
-        f"{_bounded_json(profile, max_chars=420)}\n"
+        f"{required_json(profile, max_chars=1200, label='Goal Interpretation identity')}\n"
         "These semantic self facts may resolve identity or self-reference. "
         "Presentation style and internal profile identifiers are intentionally absent."
     )
