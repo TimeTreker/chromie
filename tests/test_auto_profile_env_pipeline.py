@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
+
 
 ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = ROOT / "scripts" / "generate_runtime_env.py"
@@ -335,7 +337,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         ):
             self.assertEqual(values[key], shared_model, key)
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
-        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "32768")
+        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "49152")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", values)
@@ -349,15 +351,43 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
             "OLLAMA_NUM_CTX",
-            "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
-            "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
+        ):
+            self.assertEqual(values[key], "49152", key)
+        for key in (
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
+            "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_TASK_CONTINUITY_NUM_CTX",
             "AGENT_SKILL_SELECTION_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
+        # Retained complete re-entry requests, including source Plan and terminal
+        # Evidence, must fit without reducing their output allowance or margin.
+        for role, input_chars, output_tokens in (
+            ("FAST", 62557, 2048),
+            ("DEEP", 72056, 4096),
+        ):
+            with self.subTest(reentry_role=role):
+                options = {
+                    "num_ctx": int(values[f"AGENT_{role}_PLANNER_NUM_CTX"]),
+                    "num_predict": output_tokens,
+                }
+                diagnostics = ollama_prompt_preflight_diagnostics(
+                    prompt_chars=input_chars,
+                    options=options,
+                    chars_per_token=float(values["AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE"]),
+                    safety_margin_tokens=int(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"]),
+                )
+                self.assertFalse(any(item.event == "llm_prompt_budget_exceeded" for item in diagnostics))
+                oversized = ollama_prompt_preflight_diagnostics(
+                    prompt_chars=options["num_ctx"] * 2,
+                    options=options,
+                    chars_per_token=2.0,
+                    safety_margin_tokens=2048,
+                )
+                self.assertTrue(any(item.event == "llm_prompt_budget_exceeded" for item in oversized))
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "60000")

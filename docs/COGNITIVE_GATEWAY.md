@@ -295,6 +295,25 @@ It first assigns one closed cancellation scope:
 | Exact structured target selected by Core | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
 | `Emergency stop`, `急停` | `global_emergency` | Every unfinished request and host interaction workflow plus a dispatch attempt through the dedicated Soridormi E-stop path |
 
+A compound output stop, such as “don't speak, nod twice,” applies cancellation
+immediately and then admits the unchanged whole utterance through the existing
+`reflex_and_admit` envelope. The Host must not discard its
+`residual_semantic_input` or replace it with a normally admitted attention
+envelope. Core retains sole authority over the requested residual meaning.
+After urgent cancellation, the normal hard-idle boundary is evaluated before
+recording the protective receipt, which otherwise refreshes the activity clock.
+Active Goals preserve their conversation through the existing boundary policy.
+The retained receipt is current-turn evidence and is excluded from prior history
+in the admitted context.
+The source turn's `should_speak=false` survives early presentation, terminal
+materialization, failure handling, and evidence-driven Planner re-entry.
+Suppressed speech is not delivered evidence; a plan containing a forbidden
+vocal Capability fails closed rather than executing a partial coordinated plan.
+Confirmation requirements still hold. Pure stop/emergency commands bypass
+cognition, and subsequent ordinary turns and independent earlier Goals retain
+their own output constraints. The live text harness retains the actual compound
+continuation and execution instead of reporting a reflex-only projection.
+
 `ReflexOutcome` carries only the fixed reflex scopes. The trusted runtime
 contract accepts `specific_goal` only from the Core-managed cognitive path. The
 Core resolves semantic Goal IDs; the host supplies the exact committed

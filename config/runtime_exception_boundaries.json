@@ -765,9 +765,9 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Contain Host commit/cancellation failure, retain diagnostics and failure state, and authorize no unvalidated work. Preserve the admitted source envelope so operational fallback honors an existing protective silence constraint.",
       "review_status": "reviewed",
-      "body_sha256": "ad0c323a15da6833e96bf2a2bf0a0698b5072990be6a9c342411641ad0a93b85",
+      "body_sha256": "09e59917d8b83c97f130616ac3498de14f0c7503acc81b26c688ab2d5c23be58",
       "failure_signals": [
         "diagnostic",
         "return",

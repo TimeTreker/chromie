@@ -3835,6 +3835,19 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("ledger-fast-marker", prompt)
         self.assertIn("plan only the still-needed conversational and effectful delta", prompt)
 
+    def test_canonical_prompt_preserves_requested_response_language(self):
+        for language in ("zh-CN", "en-US"):
+            for goal_ids in (["goal-blink"], ["goal-blink", "goal-nod"]):
+                with self.subTest(language=language, goal_count=len(goal_ids)):
+                    planner_request = request("The supplied work completed.", goal_ids=goal_ids)
+                    planner_request.language = language
+                    prompt = planner_prompt.fast_plan_prompt(
+                        planner_request, [], response_schema={}
+                    )
+                    self.assertIn(f"Required response language: {language}.", prompt)
+                    for goal_id in goal_ids:
+                        self.assertIn(goal_id, prompt)
+
     def test_canonical_revision_prompt_exposes_provisional_safe_work_for_reuse_decision(
         self,
     ):

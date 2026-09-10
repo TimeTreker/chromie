@@ -52,12 +52,23 @@ CosyVoice currently uses one resident model worker. The supported host
 concurrency is therefore `ORCH_TTS_CONCURRENCY=1`; increasing host concurrency
 would only add hidden queueing. CosyVoice emits native streamed audio chunks,
 but its upstream inference call remains synchronous inside the worker. The
-current Host also accumulates every PCM chunk for one request and enqueues
-playback only after the provider `end` event, so provider transport streaming is
-not yet end-to-end audible incremental playback.
+current Host enqueues an ordered PCM stream when the first non-empty chunk
+arrives and may begin playback before the provider `end` event. Physical audible
+delivery still needs correlated playback evidence and supervised listening.
 
-CosyVoice lazily initializes language- and reference-specific inference paths.
-Normal startup therefore performs one no-playback synthesis for each committed
+Each worker prepares all validated voice references in CosyVoice's native
+in-memory speaker cache before reporting ready. Requests reuse the selected
+profile's conditioning without changing its transcript or reference audio.
+Preparation failure prevents readiness; a restarted worker prepares its own
+cache again. Nothing is written into the model artifact or voice catalog.
+
+The worker restores the native model's initial token chunk size before each
+serialized synthesis request. CosyVoice may still grow chunks within that
+request, but a previous utterance cannot make the next request start with an
+enlarged chunk. An invalid initial chunk size prevents readiness.
+
+Native generation paths still need warming. Normal startup performs one
+no-playback synthesis for each committed
 profile (`chromie_zh`, `chromie_en`, and `chromie_mixed`) before the microphone
 opens. Warming only `speaker_id=default` with a Chinese language hint primes the
 Chinese profile but leaves the first English or mixed request cold under shared
@@ -67,11 +78,14 @@ no-playback warm-up for the effective `TTS_SPEAKER_ID` after service readiness
 and before starting its microphone-owning Orchestrator. This keeps acceptance
 self-contained when `--start-services` is used instead of the normal launcher.
 
-When a request is cancelled, Chromie first holds the singleton worker lock for
-a bounded drain. A nearly complete result is discarded without unloading the
-model. If the worker does not finish within the drain bound, it is restarted
-fail-closed before another request begins. This prevents stale audio, although
-a hard cancellation can still pay a model cold-reload cost.
+When a request is cancelled, Chromie signals the native token generator and
+holds the singleton worker lock for a bounded drain. Native generation closes
+its token stream, skips further acoustic work, joins its token thread, and
+clears request state before the worker can be reused. Cancelled audio is
+discarded. The parent clears the signal only before sending the next request,
+so cancellation before generation starts cannot be lost. If cleanup exceeds
+the drain bound, the existing fail-closed restart still applies; such a request
+can still pay a model cold-reload cost.
 
 OuteTTS owns mutable llama.cpp/DAC state in restartable worker processes and may
 use more than one worker on a high-memory diagnostic profile. Qwen3-TTS returns

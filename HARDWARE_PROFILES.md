@@ -100,10 +100,15 @@ context-window, output-budget, and residency topology; they do **not** own
 human-facing interaction deadlines. Both profiles reserve each stage's complete
 declared output budget plus a 2048-token safety margin before inference and
 reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
-its declared Qwen/Gemma role split. RTX 4090 Laptop assigns every LLM role to
+its declared shared Gemma4-12B SGLang profile. RTX 4090 Laptop assigns every LLM role to
 one `qwen3.5:4b` model, retains the 16K/512 Goal Interpretation request budget,
-and uses the existing 32K downstream role budgets. One resident runner avoids
-cross-role model swaps. Ollama 0.32.14 creates only one sequence slot for the
+and reserves 48K for Fast/Deep Planner, retaining 32K for other downstream roles.
+The shared runner is warmed at 48K. This admits retained complete re-entry packets
+requiring up to 42172 estimated tokens without dropping context or reducing the
+output allowance or safety margin. A resource probe with CosyVoice peaked at
+11397 MiB; this is capacity evidence, not live behavior qualification.
+One resident model avoids cross-role weight swaps; different request context
+sizes can still cause runner reloads. Ollama 0.32.14 creates only one sequence slot for the
 `qwen35` architecture even when configured for two, so the maintained profile
 retains one provider request slot. Current-revision qualification must prove GPU
 coexistence and latency with CosyVoice. The

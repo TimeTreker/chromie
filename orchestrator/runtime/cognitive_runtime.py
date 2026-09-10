@@ -69,6 +69,7 @@ from shared.chromie_contracts.user_turn import (
     AttentionReviewResult,
     GatewayContextSnapshot,
     UserTurnEnvelope,
+    user_turn_prohibits_speech,
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
@@ -1129,11 +1130,16 @@ class CanonicalPlanRuntimeAdapter:
             raise ValueError("Fast Planner vocal response requires a non-executable Plan")
         runtime_context = context if isinstance(context, dict) else {}
         preexecuted = set(preexecuted_activity_ids or ())
+        speech_prohibited = user_turn_prohibits_speech(
+            runtime_context.get("user_turn_envelope")
+        )
         refs_to_goals = plan.metadata.get("goal_ids_by_responsibility")
         if not isinstance(refs_to_goals, dict):
             refs_to_goals = {}
         speech: list[InteractionSpeech] = []
         for activity in advance.activities:
+            if speech_prohibited:
+                continue
             if activity.role == "capability" or activity.activity_id in preexecuted:
                 continue
             source_goal_ids: list[str] = []
@@ -1621,9 +1627,7 @@ class CanonicalPlanRuntimeAdapter:
             and isinstance(reflex, dict)
             and reflex.get("action") == "interrupt"
         )
-        speech_prohibited = bool(
-            deterministic_interrupt and reflex.get("should_speak") is not True
-        )
+        speech_prohibited = user_turn_prohibits_speech(envelope)
         residual_effects_permitted = bool(
             deterministic_interrupt
             and reflex.get("cancellation_scope") == "output_only"
@@ -2125,6 +2129,8 @@ class CanonicalPlanRuntimeAdapter:
                 continue
             definition = self.interaction_runtime.capability_definition(step.capability_id)
             execution_lane = str(definition.metadata.get("execution_lane") or "activity").strip()
+            if speech_prohibited and execution_lane == "vocal":
+                raise ValueError("protective silence forbids a vocal Capability in this turn")
             if execution_lane not in {"vocal", "activity"}:
                 raise ValueError(
                     "canonical plan capability has unsupported execution lane: "
@@ -4303,7 +4309,11 @@ class GoalDrivenRuntimeCoordinator:
                         activity = frame.activity
                         if activity is not None:
                             fast_communicative_realization_status = "planner_owned"
-                        if activity is not None and self.policy.mode == "apply":
+                        if (
+                            activity is not None
+                            and self.policy.mode == "apply"
+                            and not user_turn_prohibits_speech(context.get("user_turn_envelope"))
+                        ):
                             ready_execution = await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
                                 activity,
                                 session_id=sid,

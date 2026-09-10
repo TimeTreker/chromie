@@ -166,9 +166,13 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `chromie_mixed` is the catalog default; `speaker_id=default` routes `zh` and
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
-The RTX 4090 Laptop profile uses one shared 32768-token `qwen3.5:4b` model with
-one provider request slot and quantized KV cache. Generated role contexts remain
-authoritative, including the qualification-only Deep Planner context. The RTX
+The RTX 4090 Laptop profile warms one shared 49152-token `qwen3.5:4b` model with
+one provider request slot and quantized KV cache. Fast and Deep Planner use 48K;
+GI retains 16K and the other roles retain 32K. The complete retained Planner
+requests needed up to 42172 estimated tokens including output and safety margin,
+so the former 32K profile rejected them before inference. A 48K resource probe
+with resident CosyVoice peaked at 11397 MiB; full live qualification remains required.
+Generated role contexts remain authoritative. The RTX
 5090 profile opts out of compact cognition and assigns every reasoning role to
 one shared `chromie-gemma4-12b` SGLang FP8 model with a 65536-token context. This does not merge role
 authority or change ASR/TTS models; the all-role topology remains under qualification.

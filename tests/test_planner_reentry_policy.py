@@ -109,12 +109,12 @@ def _current_binding() -> list[dict[str, object]]:
     ]
 
 
-def test_successful_multi_capability_result_waits_for_aggregate_closure() -> None:
+def test_successful_result_waits_for_aggregate_closure_and_postconditions() -> None:
     assert terminal_result_waits_for_batch_closure(
         source_capability_count=2,
         status="completed",
     )
-    assert not terminal_result_waits_for_batch_closure(
+    assert terminal_result_waits_for_batch_closure(
         source_capability_count=1,
         status="completed",
     )
@@ -122,6 +122,10 @@ def test_successful_multi_capability_result_waits_for_aggregate_closure() -> Non
         source_capability_count=2,
         status="failed",
     )
+    for status in ("running", "failed", "cancelled", "blocked", "timed_out"):
+        assert not terminal_result_waits_for_batch_closure(
+            source_capability_count=1, status=status,
+        )
 
 
 def test_typed_reentry_scope_bounds_full_association_to_affected_goals() -> None:

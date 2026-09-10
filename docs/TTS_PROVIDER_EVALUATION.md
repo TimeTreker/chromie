@@ -24,8 +24,8 @@ CosyVoice is selected as the current engineering default because it combines:
   in Chromie's repeated isolated comparisons.
 
 This decision does not claim that CosyVoice is universally the best TTS system.
-Its hard-cancellation recovery remains slower because synchronous inference may
-require a worker restart. Qwen3-TTS remains an explicit alternative and OuteTTS
+Cooperative cancellation now stops native token generation; a stalled native
+operation can still require a worker restart. Qwen3-TTS remains an explicit alternative and OuteTTS
 remains a low-resource GGUF fallback.
 
 Native provider chunking does not by itself prove low-latency audible streaming.
@@ -106,6 +106,17 @@ The default CosyVoice service reads the Git-controlled catalog under
 profiles. Every profile binds its AI-generated WAV to the exact prompt text and
 SHA-256 digest.
 
+The native worker prepares each validated reference once, in memory, before its
+`ready` event and reuses that speaker's conditioning for synthesis. A preparation
+failure blocks readiness. Worker replacement rebuilds the cache from the same
+verified catalog; it does not persist derived state into model artifacts.
+The pinned native streaming loop grows its token chunk size in model state.
+The adapter restores that initial size at each serialized request boundary;
+within-request growth remains native. Evaluate long
+utterances followed by short ones and cancellation recovery separately under
+the target's actual shared GPU load; a reset alone does not prove the playback
+deadline or audible quality.
+
 The initial repository migration is performed once on the owner's checkout:
 
 ```bash
@@ -170,11 +181,16 @@ CosyVoice exposes one singleton model worker. Chromie therefore sets host TTS
 concurrency to one, validates application health over WebSocket, and performs a
 no-playback warm synthesis before declaring the default provider ready.
 
-Cancellation uses a bounded drain while retaining the singleton lock. An
-almost-complete result is discarded without unloading the model. Timeout,
-malformed output, or a dead worker causes a fail-closed restart. Health reports
-drain and restart counters. This guarantees stale-audio isolation but does not
-yet eliminate the cold-reload tail of a hard cancellation.
+Cancellation signals the native token generator while retaining the singleton
+lock for a bounded drain. The adapter closes cancelled token streams and skips
+further acoustic work; the pinned native loop still joins its thread and clears
+its request dictionaries before reuse. The parent clears the signal before
+dispatching the next request, preserving cancellation that arrives before
+generation starts. All cancelled output is discarded. Cleanup timeout or a
+dead worker retains the fail-closed restart fallback. Health reports drain and
+restart counters. CPU regressions cover cleanup ordering, early cancellation,
+stale output, and the fallback; GPU recovery latency requires separate retained
+provider evidence and does not establish audible quality.
 
 ## Mandarin quality gate
 

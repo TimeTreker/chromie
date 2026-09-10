@@ -178,6 +178,11 @@ def fast_plan_prompt(
     response_schema: dict[str, Any],
 ) -> str:
     context = request.context if isinstance(request.context, dict) else {}
+    response_language_instruction = (
+        f"\n\nRequired response language: {str(request.language or 'auto')[:32]}. "
+        "Write every user-facing response_text in that language. "
+        "Internal Goal and Capability text does not change this."
+    )
     goal_context = planner_goal_context(
         context,
         reentry_scope=request.planner_reentry_scope,
@@ -392,6 +397,7 @@ def fast_plan_prompt(
             f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
             f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
             f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}"
+            f"{response_language_instruction}"
         )
     return (
         f"Goal association advisory JSON:\n{bounded_json(association, 3000)}\n\n"
@@ -448,6 +454,7 @@ def fast_plan_prompt(
         f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}\n\n"
         f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n"
         f"FINAL CONTROL-EVIDENCE WORDING CONTRACT:\n{control_evidence_contract or 'not_applicable'}"
+        f"{response_language_instruction}"
     )
 
 

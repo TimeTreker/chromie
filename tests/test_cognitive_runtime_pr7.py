@@ -4987,6 +4987,53 @@ class DeterministicInterruptResponseTests(unittest.TestCase):
             },
         }
 
+    def test_silence_blocks_both_streamed_and_terminal_communicative_activities(self):
+        for quiet in (True, False):
+            with self.subTest(quiet=quiet):
+                core, envelope = admitted_core("hello", sid="quiet", language="en-US")
+                if quiet:
+                    from shared.chromie_contracts.reflex import ReflexFilter
+                    envelope = envelope.model_copy(update={
+                        "admission": "reflex_and_admit",
+                        "reflex": ReflexFilter().evaluate("Don't speak, blink twice."),
+                    })
+                client = ScriptedClient(
+                    association=new_goal_association(), fast_plans=[respond_plan()]
+                )
+                activity = client.fast_advances[0].activities[0]
+                client.presentation_commits[0] = client.presentation_commits[0].model_copy(
+                    update={"activity": activity}
+                )
+                runtime = FastAdvanceRuntime()
+                coordinator = GoalDrivenRuntimeCoordinator(
+                    agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
+                    policy=CognitiveRuntimePolicy(mode="apply"),
+                )
+                result = asyncio.run(coordinator.resolve(
+                    object(), text="hello", sid="quiet", core_interpretation=core,
+                    turn_envelope=envelope, context={"history": [], "active_goal_snapshots": []},
+                    history=[], language="en-US",
+                ))
+                self.assertEqual(result.status, "applied", result.fallback_reason)
+                self.assertEqual(len(runtime.started_fast_activities), 0 if quiet else 1)
+                self.assertEqual(result.interaction_response.speech, [])
+                self.assertEqual(result.interaction_response.capabilities, [])
+                if quiet:
+                    self.assertFalse(result.metadata.get("fast_vocal_activity_ids"))
+
+    def test_silent_turn_rejects_vocal_capability_instead_of_running_partial_plan(self):
+        plan = execute_plan()
+        definition = blink_definition()
+        definition = definition.model_copy(update={
+            "metadata": {**definition.metadata, "execution_lane": "vocal"}
+        })
+        with self.assertRaisesRegex(ValueError, "protective silence forbids"):
+            asyncio.run(CanonicalPlanRuntimeAdapter(FakeRuntime([definition])).build_response(
+                plan=plan, planner_response=self._planner_response(plan),
+                session_id="silent", language="en-US",
+                context={"user_turn_envelope": self._envelope(scope="output_only", residual=True)},
+            ))
+
     def test_plain_cancellation_cannot_materialize_replacement_work_or_speech(self):
         plan = execute_plan(plan_id="plan-cancel")
         response = asyncio.run(

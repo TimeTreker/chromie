@@ -5,11 +5,14 @@ import json
 import unittest
 from collections import deque
 from contextlib import nullcontext
-from types import MethodType
+from types import MethodType, SimpleNamespace
 from typing import Any
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.input_session_runtime import input_session_runtime_for
+from orchestrator.runtime.conversation_state import ConversationStateManager
+from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+from shared.chromie_contracts.user_turn import CoreTurnRequest
 from orchestrator.runtime.confirmation import (
     ConfirmationDialogue,
     revoke_pending_confirmation_for_reflex,
@@ -164,6 +167,139 @@ class ReflexFilterTests(unittest.TestCase):
 
 
 class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
+    async def test_compound_silence_admits_whole_turn_once_after_cancellation(self):
+        for text, prior_state in (
+            (text, prior_state)
+            for text in ("别说话，点两下头。", "Don't speak, blink twice.")
+            for prior_state in ("fresh", "expired", "active")
+        ):
+            with self.subTest(text=text, prior_state=prior_state):
+                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                events = []
+                admitted = []
+                state = ConversationStateManager(enabled=True)
+                if prior_state != "fresh":
+                    state.record_user_turn("earlier", "An older conversation.")
+                if prior_state == "active":
+                    state.apply_semantic_task_operations_atomically([{
+                        "operation_id": "create-waiting-goal",
+                        "operation": "create",
+                        "goal": {
+                            "goal_id": "goal-reminder",
+                            "description": "Wait for the reminder time.",
+                            "source_text": "提醒我。",
+                        },
+                        "status_update": "waiting_for_user",
+                        "commitment_state": "waiting_for_user",
+                    }], sid="earlier", user_text="提醒我。")
+                state.last_activity_ms -= 901000
+                previous_conversation_id = state.conversation_id
+                expected_history = state.get_history() if prior_state == "active" else []
+                assistant.conversation_state = state
+                assistant.sessions = SimpleNamespace(
+                    state={"silent-turn": {"llm_done": False}},
+                    update_trace_correlations=lambda *a, **k: None,
+                )
+                assistant.session_log = lambda *a, **k: None
+                assistant._log_goal_list = lambda *a, **k: None
+                assistant.maybe_session_done = lambda sid: events.append("done")
+                assistant.build_context = lambda sid: {
+                    "conversation_id": state.conversation_id,
+                    "history": state.get_history(),
+                }
+
+                async def cancel(outcome, *, source_turn_id):
+                    events.append("cancel")
+                    return CancellationDispatchReceipt(
+                        source_turn_id=source_turn_id,
+                        requested_scope=outcome.cancellation_scope,
+                        effective_scope=outcome.cancellation_scope,
+                    )
+
+                async def session():
+                    events.append("session")
+                    return object()
+
+                async def interpret(session, *, turn_envelope, context_snapshot):
+                    events.append("core")
+                    self.assertEqual(context_snapshot.context["history"], expected_history)
+                    CoreTurnRequest(
+                        turn_envelope=turn_envelope, context_snapshot=context_snapshot
+                    )
+                    admitted.append(turn_envelope)
+                    return CoreInterpretationResult(
+                        turn_id=turn_envelope.turn_id,
+                        session_id=turn_envelope.session_id,
+                        language=turn_envelope.normalized_input.language,
+                        confidence=1.0,
+                        responsibilities=[{
+                            "local_ref": "r1", "outcome": "requested body action",
+                            "output_mode": "body_action", "confidence": 1.0,
+                        }],
+                    )
+
+                async def resolve(session, **kwargs):
+                    events.append("runtime")
+                    self.assertEqual(kwargs["user_text"], text)
+                    self.assertEqual(kwargs["turn_envelope"], admitted[0])
+                    self.assertEqual(kwargs["context"]["user_turn_envelope"]["reflex"]["action"], "interrupt")
+                    return True
+
+                assistant._apply_reflex_cancellation = cancel
+                assistant._reconcile_reflex_cancellation_receipt = lambda *a, **k: {}
+                assistant.get_http_session = session
+                assistant.agent_client = SimpleNamespace(interpret_turn=interpret)
+                assistant._try_apply_cognitive_runtime = resolve
+                await assistant.handle_routed_text(text, "silent-turn", channel="text")
+                self.assertEqual(events, ["cancel", "session", "core", "runtime"])
+                self.assertEqual(len(admitted), 1)
+                self.assertEqual(admitted[0].original_input.text, text)
+                self.assertEqual(admitted[0].normalized_input.text, text)
+                self.assertEqual(admitted[0].admission, "reflex_and_admit")
+                self.assertFalse(admitted[0].reflex.should_speak)
+                self.assertEqual(
+                    state.conversation_id == previous_conversation_id,
+                    prior_state != "expired",
+                )
+                self.assertEqual(admitted[0].conversation_id, state.conversation_id)
+                self.assertEqual(len(state.get_history()), len(expected_history) + 1)
+                self.assertIn("cancellation_dispatch_receipt", state.get_history()[-1]["metadata"])
+                if prior_state == "active":
+                    self.assertEqual(
+                        [goal["goal_id"] for goal in state.active_goal_snapshots()],
+                        ["goal-reminder"],
+                    )
+
+    async def test_silent_turn_failure_and_host_dispatch_do_not_emit_speech(self):
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        envelope = {
+            "admission": "reflex_and_admit",
+            "reflex": {"action": "interrupt", "should_speak": False},
+        }
+        quiet = assistant._cognitive_core_exception_safe_response(
+            "别说话，点头。", context={"user_turn_envelope": envelope},
+            failure_stage="goal_interpretation", failure_class="unavailable",
+        )
+        self.assertEqual(quiet.speech, [])
+        self.assertEqual(quiet.metadata["semantic_status"], "failed")
+        ordinary = assistant._cognitive_core_exception_safe_response("Hello")
+        self.assertTrue(ordinary.speech)
+        observed = []
+
+        async def dispatch(response, sid, **kwargs):
+            observed.append(response)
+
+        assistant._dispatch_detached_interaction = dispatch
+        assistant._interaction_task_done = lambda task: None
+        proposed = ordinary.model_copy(update={"metadata": {"user_turn_envelope": envelope}})
+        assistant._launch_interaction(proposed, "quiet")
+        await assistant.active_interaction_task
+        self.assertEqual(observed[0].speech, [])
+        self.assertTrue(proposed.speech)  # Immutable Planner evidence remains intact.
+        assistant._launch_interaction(ordinary, "next-turn")
+        await assistant.active_interaction_task
+        self.assertTrue(observed[1].speech)
+
     def _blocked_reflex_assistant(
         self,
     ) -> tuple[VoiceAssistant, dict[str, asyncio.Event], list[str]]:
