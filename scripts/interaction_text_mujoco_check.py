@@ -656,7 +656,8 @@ async def dispatch_initial_reflex(
     evidence.  A matched reflex must still be dispatched by
     ``VoiceAssistant.handle_routed_text``: that is the owner of output
     invalidation, trusted cancellation, Goal reconciliation, and the guarantee
-    that cognition is bypassed.
+    that pure controls bypass cognition. Compound output stops retain their
+    production semantic continuation and actual Runtime evidence.
     """
 
     from shared.chromie_contracts.interaction import (  # noqa: PLC0415
@@ -667,20 +668,69 @@ async def dispatch_initial_reflex(
     if outcome.action == "continue":
         raise ValueError("dispatch_initial_reflex requires a matched reflex")
 
-    await assistant.handle_routed_text(text, sid, channel="text")
-    await wait_for_session_done(
-        assistant,
-        sid,
-        timeout_s=timeout_s,
-        allow_interrupted=True,
+    residual = bool(
+        outcome.action == "interrupt"
+        and outcome.cancellation_scope == "output_only"
+        and outcome.metadata.get("residual_semantic_input") is True
     )
+    resolutions: list[Any] = []
+    dispatches: list[tuple[Any, list[Any]]] = []
+    originals: dict[str, Any] = {}
+    missing = object()
+    previous_attributes: dict[str, Any] = {}
+    if residual:
+        # Observe the real Host path without replacing semantic or execution
+        # owners. The old reflex-only projection hid dropped residual work.
+        for name in ("_run_cognitive_runtime_pipeline", "_dispatch_detached_interaction"):
+            originals[name] = getattr(assistant, name)
+            previous_attributes[name] = vars(assistant).get(name, missing)
+
+        async def capture_resolution(*args: Any, **kwargs: Any) -> Any:
+            result = await originals["_run_cognitive_runtime_pipeline"](*args, **kwargs)
+            resolutions.append(result)
+            return result
+
+        async def capture_dispatch(response: Any, *args: Any, **kwargs: Any) -> Any:
+            before = set(getattr(assistant, "active_cognitive_runtime_tasks", {}))
+            receipt = await originals["_dispatch_detached_interaction"](response, *args, **kwargs)
+            tasks = [
+                task for task in getattr(assistant, "active_cognitive_runtime_tasks", {})
+                if task not in before
+            ]
+            dispatches.append((response, tasks))
+            return receipt
+
+        assistant._run_cognitive_runtime_pipeline = capture_resolution
+        assistant._dispatch_detached_interaction = capture_dispatch
+
+    try:
+        await assistant.handle_routed_text(text, sid, channel="text")
+        await wait_for_session_done(
+            assistant, sid, timeout_s=timeout_s, allow_interrupted=not residual,
+        )
+        if residual:
+            # Keep strong references even after the normal done callback removes
+            # each result task from the active registry.
+            async def finish_dispatches() -> None:
+                for _, tasks in dispatches:
+                    if tasks:
+                        await asyncio.gather(*tasks)
+
+            await asyncio.wait_for(finish_dispatches(), timeout=timeout_s)
+    finally:
+        for name, previous in previous_attributes.items():
+            if previous is missing:
+                delattr(assistant, name)
+            else:
+                setattr(assistant, name, previous)
 
     recorded_turn: dict[str, Any] = {}
     for item in reversed(assistant.conversation_state.get_history()):
         metadata = item.get("metadata") if isinstance(item, dict) else None
         if (
             isinstance(metadata, dict)
-            and metadata.get("source") == "cognitive_gateway_reflex"
+            and isinstance(metadata.get("reflex_outcome"), dict)
+            and (item.get("sid") in (None, sid))
         ):
             recorded_turn = item
             break
@@ -725,7 +775,7 @@ async def dispatch_initial_reflex(
     reflex_evidence = {
         "captured_outcome": outcome.model_dump(mode="json"),
         "recorded_turn": recorded_turn,
-        "goal_interpretation_bypassed": True,
+        "goal_interpretation_bypassed": not residual,
     }
     reflex_projection = outcome.model_dump(mode="json")
     response = InteractionResponse(
@@ -735,6 +785,26 @@ async def dispatch_initial_reflex(
             "no_interaction_response": True,
         }
     )
+    if residual:
+        if not resolutions:
+            errors.append("compound output stop did not reach the cognitive runtime")
+        elif resolutions[0].status != "applied":
+            errors.append("compound output stop cognitive runtime failed: " + resolutions[0].fallback_reason)
+        if not dispatches:
+            errors.append("compound output stop retained no production dispatch")
+        else:
+            response = dispatches[0][0]
+        executions = [task.result() for _, tasks in dispatches for task in tasks]
+        if any(item.status != "completed" for item in executions):
+            errors.append("compound output stop Runtime execution did not complete")
+        if any(item.speech for item, _ in dispatches):
+            errors.append("compound output stop admitted forbidden speech")
+        reflex_evidence.update({
+            "cognitive_runtime": resolutions[0].model_dump(mode="json", exclude_none=True) if resolutions else None,
+            "interaction_responses": [item.model_dump(mode="json") for item, _ in dispatches],
+            "executions": [item.model_dump(mode="json") for item in executions],
+            "execution": executions[0].model_dump(mode="json") if executions else None,
+        })
     return reflex_projection, response, reflex_evidence, errors
 
 
@@ -921,8 +991,8 @@ async def run_check(
                 "reflex_outcome": reflex_projection,
                 "interaction_response": response.model_dump(mode="json"),
                 "reflex": reflex_evidence,
-                "cognitive_runtime": None,
-                "execution": None,
+                "cognitive_runtime": reflex_evidence.get("cognitive_runtime"),
+                "execution": reflex_evidence.get("execution"),
                 "interrupt": None,
                 "cognitive_events": str(
                     evidence_dir / "cognitive_runtime_events.jsonl"
@@ -933,7 +1003,7 @@ async def run_check(
                 "provenance": collect_run_provenance(
                     manifest=Path(args.manifest),
                     cognitive_runtime=bool(args.cognitive_runtime),
-                    cognitive_runtime_selected=False,
+                    cognitive_runtime_selected=bool(reflex_evidence.get("cognitive_runtime")),
                     soridormi_repo=(
                         Path(raw_soridormi_repo)
                         if raw_soridormi_repo
@@ -945,7 +1015,11 @@ async def run_check(
                         if getattr(args, "runtime_identity", None)
                         else None
                     ),
-                    semantic_runtime_path="cognitive_gateway_reflex",
+                    semantic_runtime_path=(
+                        "goal_driven_cognitive_runtime"
+                        if reflex_evidence.get("cognitive_runtime")
+                        else "cognitive_gateway_reflex"
+                    ),
                 ),
             }
             _write_json(evidence_dir / "summary.json", summary)

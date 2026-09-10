@@ -112,6 +112,71 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertFalse(response.capabilities)
         self.assertTrue(evidence["goal_interpretation_bypassed"])
 
+    def test_compound_reflex_retains_real_continuation_and_completed_execution(self) -> None:
+        from shared.chromie_contracts.interaction import InteractionResponse
+
+        text = "别说话，点两下头。"
+        outcome = ReflexFilter().evaluate(text)
+        response = InteractionResponse(capabilities=[{
+            "capability_id": "soridormi.nod_yes", "args": {"count": 2},
+        }])
+        execution = SimpleNamespace(
+            status="completed", model_dump=lambda **kwargs: {
+                "status": "completed", "results": [{"capability_id": "soridormi.nod_yes"}],
+            },
+        )
+        resolution = SimpleNamespace(
+            status="applied", fallback_reason="",
+            model_dump=lambda **kwargs: {"status": "applied"},
+        )
+
+        class Assistant:
+            def __init__(self):
+                self.sessions = SimpleNamespace(state={"compound": {}})
+                self.active_cognitive_runtime_tasks = {}
+                self.conversation_state = SimpleNamespace(get_history=lambda: [{
+                    "sid": "compound", "text": text,
+                    "metadata": {
+                        "source": "goal_driven_cognitive_runtime",
+                        "reflex_outcome": outcome.model_dump(mode="json"),
+                        "cancellation_dispatch_receipt": {"requested_scope": "output_only"},
+                    },
+                }])
+
+            async def _run_cognitive_runtime_pipeline(self):
+                return resolution
+
+            async def _dispatch_detached_interaction(self, actual):
+                self.actual_response = actual
+                async def complete():
+                    await asyncio.sleep(0)
+                    self.sessions.state["compound"]["done_logged"] = True
+                    return execution
+                task = asyncio.create_task(complete())
+                self.active_cognitive_runtime_tasks[task] = "body"
+                task.add_done_callback(lambda done: self.active_cognitive_runtime_tasks.pop(done, None))
+                return "receipt"
+
+            async def handle_routed_text(self, actual_text, sid, *, channel):
+                if (actual_text, sid, channel) != (text, "compound", "text"):
+                    raise AssertionError("harness rewrote input")
+                await self._run_cognitive_runtime_pipeline()
+                await self._dispatch_detached_interaction(response)
+
+        assistant = Assistant()
+        _, actual, evidence, errors = asyncio.run(dispatch_initial_reflex(
+            assistant=assistant, text=text, sid="compound",
+            turn_capture=SimpleNamespace(reflex_candidate=outcome), timeout_s=1,
+        ))
+        self.assertEqual(errors, [])
+        self.assertIs(actual, response)
+        self.assertFalse(evidence["goal_interpretation_bypassed"])
+        self.assertEqual(evidence["execution"]["status"], "completed")
+        self.assertEqual(evidence["cognitive_runtime"]["status"], "applied")
+        self.assertEqual(evidence["interaction_responses"][0]["capabilities"][0]["args"], {"count": 2})
+        self.assertNotIn("_run_cognitive_runtime_pipeline", vars(assistant))
+        self.assertNotIn("_dispatch_detached_interaction", vars(assistant))
+
     def test_goal_driven_runtime_is_the_only_runtime(self) -> None:
         parser = build_parser()
         parsed = parser.parse_args([])

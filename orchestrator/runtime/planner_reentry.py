@@ -29,15 +29,15 @@ def terminal_result_waits_for_batch_closure(
     source_capability_count: int,
     status: str,
 ) -> bool:
-    """Defer successful sibling results until their dispatch closes as one fact set.
+    """Defer successful results until dispatch closure supplies the complete facts.
 
     Provider progress and terminal failures still re-enter immediately.  A successful
-    result from a multi-Capability dispatch is incomplete presentation evidence while
-    its siblings remain in flight; the existing dispatch-closure path already owns the
-    aggregate outcome and can give Planner the whole immutable result set once.
+    result can still lack required provider postconditions even when it is the only
+    Capability. The existing dispatch-closure path collects those postconditions and
+    owns aggregate completion qualification before Planner can report the outcome.
     """
 
-    return source_capability_count > 1 and _normalized_text(status) == "completed"
+    return source_capability_count >= 1 and _normalized_text(status) == "completed"
 
 
 def execution_outcome_user_text(

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
+from functools import partial
 import os
 import sys
 import threading
@@ -137,7 +139,40 @@ def tensor_pcm16(tensor: Any) -> bytes:
     return (np.clip(array, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
 
 
-def worker_target(connection: Connection) -> None:
+def _enable_native_cancellation(native_model: Any, cancellation_event: Any, torch: Any) -> None:
+    """Stop native token production and skip unneeded acoustic work on cancel.
+
+    The pinned native tts loop still joins its token thread and clears its
+    request dictionaries normally before the worker sends its terminal event.
+    """
+    def wrap_tokens(original: Any) -> Any:
+        def tokens(*args: Any, **kwargs: Any) -> Any:
+            if cancellation_event.is_set():
+                return
+            stream = original(*args, **kwargs)
+            try:
+                for token in stream:
+                    if cancellation_event.is_set():
+                        return
+                    yield token
+            finally:
+                stream.close()
+        return tokens
+
+    for name in ("inference", "inference_bistream"):
+        setattr(native_model.llm, name, wrap_tokens(getattr(native_model.llm, name)))
+    original_token2wav = native_model.token2wav
+
+    def token2wav(*args: Any, **kwargs: Any) -> Any:
+        if cancellation_event.is_set():
+            # This placeholder is internal to native cleanup and is never PCM.
+            return torch.zeros(1, 0)
+        return original_token2wav(*args, **kwargs)
+
+    native_model.token2wav = token2wav
+
+
+def worker_target(connection: Connection, *, cancellation_event: Any = None) -> None:
     try:
         import torch
         from cosyvoice.cli.cosyvoice import AutoModel
@@ -169,10 +204,26 @@ def worker_target(connection: Connection) -> None:
             model_dir=model_path,
             fp16=required_env("COSYVOICE3_FP16", "1") == "1",
         )
+        initial_token_hop_len = model.model.token_hop_len
+        if type(initial_token_hop_len) is not int or initial_token_hop_len <= 0:
+            raise RuntimeError("CosyVoice initial token hop must be a positive integer")
+        if cancellation_event is not None:
+            _enable_native_cancellation(model.model, cancellation_event, torch)
         sample_rate = int(model.sample_rate)
         prompt_prefix = required_env(
             "COSYVOICE3_PROMPT_PREFIX", "You are a helpful assistant."
         )
+        # Reference conditioning also initializes shape-specific native paths.
+        # Prepare each verified voice before readiness, including after restart,
+        # so the first request does not pay that cost under the playback deadline.
+        for profile in voices.profiles.values():
+            prompt_text = prompt_prefix + "<|endofprompt|>" + profile.text
+            if not model.add_zero_shot_spk(
+                prompt_text, str(profile.wav_path), profile.speaker_id
+            ):
+                raise RuntimeError(
+                    f"CosyVoice could not prepare voice: {profile.speaker_id}"
+                )
         connection.send(
             {
                 "type": "ready",
@@ -213,12 +264,19 @@ def worker_target(connection: Connection) -> None:
                 text=text,
             )
             prompt_text = prompt_prefix + "<|endofprompt|>" + profile.text
+            # Native streaming grows this field within an utterance. The worker
+            # serializes and drains each request; restore its initial chunk size
+            # here so a previous utterance cannot delay the next first chunk.
+            model.model.token_hop_len = initial_token_hop_len
             for output in model.inference_zero_shot(
                 text,
                 prompt_text,
                 str(profile.wav_path),
+                zero_shot_spk_id=profile.speaker_id,
                 stream=True,
             ):
+                if cancellation_event is not None and cancellation_event.is_set():
+                    continue
                 pcm = tensor_pcm16(output["tts_speech"])
                 if first_audio_at is None:
                     first_audio_at = time.perf_counter()
@@ -290,8 +348,10 @@ def create_provider() -> WorkerBackedCandidateProvider:
         speaker_profiles=True,
         voice_cloning=True,
     )
+    cancellation_event = multiprocessing.get_context("spawn").Event()
     worker = StreamingProcessWorker(
-        worker_target,
+        partial(worker_target, cancellation_event=cancellation_event),
+        cancellation_event=cancellation_event,
         name="cosyvoice3-worker",
         startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "1200")),
         cancel_drain_timeout_s=float(

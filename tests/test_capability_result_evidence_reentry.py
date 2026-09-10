@@ -192,7 +192,9 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 return replanned
 
         class Adapter:
+            context = None
             async def build_planner_owned_response(self, **_kwargs):
+                self.context = _kwargs.get("context")
                 return InteractionResponse(
                     interaction_id="answer",
                     status="ok",
@@ -323,6 +325,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             request.text,
             "Determine whether rain is expected this morning.",
         )
+        self.assertEqual(request.context["user_turn_envelope"], source.metadata["user_turn_envelope"])
+        self.assertEqual(assistant.cognitive_runtime.adapter.context["user_turn_envelope"], source.metadata["user_turn_envelope"])
         source_provenance = request.context["source_turn_provenance"]
         exact_source = "  今天上午会下雨吗？然后眨两次眼。  "
         self.assertEqual(source_provenance["original_text"], exact_source)

@@ -407,6 +407,94 @@ async def test_multi_capability_success_results_wait_for_batch_closure():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("terminal_status", ["completed", "failed", "cancelled"])
+async def test_single_body_result_collects_post_status_before_completion_reentry(
+    terminal_status,
+):
+    """A sole result must not invoke Planner before its postcondition is available."""
+    coordinator = InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})
+    assistant = _assistant(coordinator)
+    response = InteractionResponse(
+        interaction_id="single-body-result",
+        capabilities=[{
+            "request_id": "body-request",
+            "capability_id": "soridormi.blink_eyes",
+        }],
+    )
+    result = CapabilityResult(
+        request_id="body-request",
+        capability_id="soridormi.blink_eyes",
+        provider_id="soridormi.mcp",
+        status=terminal_status,
+    )
+    execution = CapabilityRuntimeResult(
+        interaction_id=response.interaction_id,
+        status=terminal_status,
+        results=[result],
+    )
+    dispatch = SimpleNamespace(
+        source_response=response,
+        runtime_response=response,
+        receipt=SimpleNamespace(event_cursor=0, dispatch_id="single-body-dispatch"),
+        preexecuted_results=[],
+    )
+    events = []
+    status_requested = asyncio.Event()
+    release_status = asyncio.Event()
+    post_status = {"safe_idle": True, "active_task": None, "fallen": False}
+
+    async def wait_event(*_args, **_kwargs):
+        events.append("terminal_result")
+        return SimpleNamespace(
+            sequence=1, request_id=result.request_id,
+            capability_id=result.capability_id, type=terminal_status,
+            terminal=True, result=result,
+        )
+
+    async def wait_dispatch(_dispatch):
+        events.append("dispatch_closed")
+        return execution
+
+    async def incremental(**_kwargs):
+        events.append("incremental_reentry")
+
+    async def collect_status(_session_id):
+        events.append("status_requested")
+        status_requested.set()
+        await release_status.wait()
+        events.append("status_received")
+        return post_status
+
+    async def close_execution(**kwargs):
+        assert kwargs["provider_status"] is post_status
+        assert kwargs["execution"] is execution
+        events.append("aggregate_reentry")
+        return "final_closed"
+
+    coordinator.runtime.wait_runtime_event = wait_event
+    coordinator.wait_dispatch = wait_dispatch
+    assistant._reenter_cognition_for_terminal_capability = incremental
+    assistant._record_soridormi_post_status = collect_status
+    assistant._close_cognitive_execution = close_execution
+    task = asyncio.create_task(assistant._consume_detached_cognitive_dispatch(
+        dispatch, session_id="sid-detached", generation=0,
+        confirmed_request_ids=None,
+    ))
+    await asyncio.wait_for(status_requested.wait(), timeout=1)
+    prefix = ["terminal_result"]
+    if terminal_status != "completed":
+        prefix.append("incremental_reentry")
+    assert events == [*prefix, "dispatch_closed", "status_requested"]
+    assert not task.done()
+    release_status.set()
+    assert await asyncio.wait_for(task, timeout=1) is execution
+    assert events == [
+        *prefix, "dispatch_closed", "status_requested", "status_received",
+        "aggregate_reentry",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_current_interaction_runtime_ownership_survives_foreground_cleanup():
     coordinator = InteractionRuntimeCoordinator(
         lambda _args: {"scheduled": True, "playback_started": True}

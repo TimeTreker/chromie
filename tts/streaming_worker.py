@@ -21,8 +21,9 @@ class StreamingProcessWorker:
 
     The target sends one ``ready`` object, then zero or more ``audio`` objects
     followed by exactly one ``complete`` or ``error`` object per request.
-    Cancellation either drains one almost-complete request under a bounded
-    grace period or terminates and reloads the process. Both paths complete
+    A provider may supply a process-shared cancellation event. Cancellation
+    signals it before draining under a bounded grace period, or terminates and
+    reloads the process when cleanup does not finish. Both paths complete
     before the singleton lock is released, so stale native work cannot leak
     audio or contaminate the next request after barge-in.
     """
@@ -39,7 +40,9 @@ class StreamingProcessWorker:
         cold_first_audio_timeout_s: float = 0.0,
         cold_request_timeout_s: float = 0.0,
         context_name: str = "spawn",
+        cancellation_event: Any = None,
     ) -> None:
+        self._cancellation_event = cancellation_event
         self._target = target
         self._name = name
         self._startup_timeout_s = startup_timeout_s
@@ -72,6 +75,8 @@ class StreamingProcessWorker:
     @property
     def cancellation_mode(self) -> str:
         if self._cancel_drain_timeout_s > 0:
+            if self._cancellation_event is not None:
+                return "signal_then_bounded_drain_then_restart_worker"
             return "bounded_drain_then_restart_worker"
         return "terminate_and_restart_worker"
 
@@ -109,6 +114,10 @@ class StreamingProcessWorker:
             )
             started_at = time.monotonic()
             try:
+                # Clear under the same request lock before sending. Clearing in
+                # the child could erase cancellation received before it starts.
+                if self._cancellation_event is not None:
+                    self._cancellation_event.clear()
                 connection.send(payload)
                 while True:
                     if connection.poll(0):
@@ -197,6 +206,8 @@ class StreamingProcessWorker:
                 raise
 
     async def _recover_after_cancellation(self, connection: Connection) -> None:
+        if self._cancellation_event is not None:
+            self._cancellation_event.set()
         if await self._drain_cancelled_request(connection):
             self.cancel_drain_count += 1
             logger.info(
@@ -210,8 +221,8 @@ class StreamingProcessWorker:
         """Discard one cancelled request up to its terminal worker event.
 
         Candidate-model inference is synchronous inside the child process. A
-        short bounded drain lets an almost-complete request finish without a
-        costly model reload. The connection remains private under ``_lock``;
+        short bounded drain lets cooperative cancellation or an almost-complete
+        request finish cleanup without a costly model reload. The connection remains private under ``_lock``;
         timeout, process death, malformed data, or I/O failure all fall back to
         the existing terminate-and-restart behavior.
         """

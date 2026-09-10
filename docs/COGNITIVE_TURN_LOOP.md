@@ -990,11 +990,12 @@ stages that have not begun; speech already heard remains delivery evidence.
 
 ### 8.2 Evidence-bound post-execution speech
 
-For a dispatch containing multiple sibling Capabilities, successful terminal results are
-retained as immutable Runtime facts but do not each trigger a separate user-facing
-Planner turn. Provider progress and any failure may still re-enter immediately; ordinary
-success waits until dispatch closure so Planner receives the complete sibling result set
-once and does not narrate a partial completion while related Work is still finishing.
+Successful terminal results are retained as immutable Runtime facts and wait for dispatch
+closure before reactivating Planner. This includes a single Capability: its result can
+still lack the required post-execution provider status until the Host collects it at
+closure. Planner receives the complete result set and its completion qualification
+together. Provider progress and any failure may still re-enter immediately; successful
+siblings do not narrate partial completion while related Work is still finishing.
 
 After terminal results have been joined and every executable Goal reconciled, the Host
 reactivates Planner with the immutable Goal/Evidence result bundle, beginning with the
@@ -1009,6 +1010,12 @@ treat the result as a new user turn, reassign it to another Goal, or add executi
 authority. The Fast or Deep primary result owns its exact Goal/Evidence interpretation
 and wording. No second model qualifies or repairs that semantic decision. The Host only
 validates provenance, structured claim boundaries, and delivery.
+
+The canonical Fast prompt preserves the request's response-language value for
+both single-Goal and multiple-Goal plans. Internal English Goal descriptions,
+Capability metadata, or provider results do not change the requested language
+of user-facing completion speech. This is part of the same primary invocation;
+there is no later translation call.
 
 The final response must:
 

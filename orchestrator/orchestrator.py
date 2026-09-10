@@ -178,7 +178,10 @@ from shared.chromie_contracts.reflex import (
     CancellationDispatchReceipt,
     ReflexOutcome,
 )
-from shared.chromie_contracts.user_turn import UserTurnEnvelope
+from shared.chromie_contracts.user_turn import (
+    UserTurnEnvelope,
+    user_turn_prohibits_speech,
+)
 from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
     context_with_semantic_authority,
@@ -2441,6 +2444,7 @@ class VoiceAssistant:
             fast_first_scheduled = fast_planner_vocal_scheduled
             safe_response = self._cognitive_core_exception_safe_response(
                 user_text,
+                context=context,
                 failure_stage=str(
                     resolution.metadata.get("failure_stage")
                     or "cognitive_runtime"
@@ -2880,6 +2884,7 @@ class VoiceAssistant:
             else:
                 safe_response = self._cognitive_core_exception_safe_response(
                     user_text,
+                    context=context,
                     failure_stage="host_commit",
                     failure_class=type(exc).__name__,
                     failure_error=str(exc),
@@ -3008,6 +3013,12 @@ class VoiceAssistant:
             channel=channel,
         )
         reflex_outcome = turn_capture.reflex_candidate
+        residual_semantic_input = bool(
+            reflex_outcome.action == "interrupt"
+            and reflex_outcome.cancellation_scope == "output_only"
+            and reflex_outcome.metadata.get("residual_semantic_input") is True
+        )
+        boundary = None
         if reflex_outcome.action == "interrupt":
             self.session_log(
                 session_id,
@@ -3083,6 +3094,16 @@ class VoiceAssistant:
                 turn_capture,
                 reflex_outcome,
             )
+            if residual_semantic_input:
+                # Cancel first, then evaluate idle expiry before this receipt
+                # updates last_activity_ms. Active work keeps its existing
+                # conversation through the usual boundary owner.
+                boundary = self.conversation_state.prepare_for_user_text(
+                    user_text, session_id
+                )
+                turn_capture = gateway.with_conversation_id(
+                    turn_capture, boundary.get("conversation_id")
+                )
             turn_envelope = gateway.for_reflex(turn_capture)
             record_cognitive_gateway_evidence(
                 getattr(self, "cognitive_evidence", None),
@@ -3110,23 +3131,26 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s goal_interpretation_bypassed=True",
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s goal_interpretation_bypassed=%s",
                 reflex_outcome.action,
                 reflex_outcome.trigger,
+                not residual_semantic_input,
             )
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(session_id)
-            return
+            if not residual_semantic_input:
+                state = self.sessions.state.get(session_id)
+                if state is not None:
+                    state["llm_done"] = True
+                self.maybe_session_done(session_id)
+                return
 
-        confirmation_envelope = gateway.for_confirmation(turn_capture)
-        if await self._handle_confirmation_reply(
-            user_text,
-            session_id,
-            turn_envelope=confirmation_envelope,
-        ):
-            return
+        if not residual_semantic_input:
+            confirmation_envelope = gateway.for_confirmation(turn_capture)
+            if await self._handle_confirmation_reply(
+                user_text,
+                session_id,
+                turn_envelope=confirmation_envelope,
+            ):
+                return
 
         if reflex_outcome.action == "ignore":
             turn_envelope = gateway.for_suppression(turn_capture)
@@ -3160,7 +3184,8 @@ class VoiceAssistant:
             self.maybe_session_done(session_id)
             return
 
-        boundary = self.conversation_state.prepare_for_user_text(user_text, session_id)
+        if boundary is None:
+            boundary = self.conversation_state.prepare_for_user_text(user_text, session_id)
         turn_capture = gateway.with_conversation_id(
             turn_capture,
             boundary.get("conversation_id"),
@@ -3175,6 +3200,13 @@ class VoiceAssistant:
 
         session = await self.get_http_session()
         context = self.build_context(session_id)
+        if residual_semantic_input:
+            # The protective receipt is retained before admission. It is this
+            # turn's evidence, not a previously accepted dialogue turn.
+            context["history"] = [
+                item for item in context.get("history", [])
+                if not (item.get("role") == "user" and item.get("sid") == session_id)
+            ]
         interaction_ledger = getattr(
             getattr(self, "cognitive_runtime", None),
             "interaction_ledger",
@@ -3213,84 +3245,98 @@ class VoiceAssistant:
             recent_terminal_goals=context.get("recent_goal_snapshots") or [],
         )
         context_snapshot = gateway.assemble_context(turn_capture, context)
-        attention_request = gateway.attention_request(
-            turn_capture,
-            context_snapshot,
-        )
-        attention_started_ms = now_ms()
-        attention_errors: list[dict[str, str]] = []
-        try:
-            review_attention = self.agent_client.review_attention
-            attention_review = await review_attention(
-                session,
-                request=attention_request,
+        if residual_semantic_input:
+            # The protective control has already run. Preserve its envelope and
+            # admit the unchanged whole utterance to the one semantic authority.
+            turn_envelope = gateway.for_reflex(turn_capture, context=context)
+            record_cognitive_gateway_evidence(
+                getattr(self, "cognitive_evidence", None),
+                turn_envelope,
+                user_text=user_text,
+                context_snapshot=context_snapshot,
+                session_log=self.session_log,
             )
-        except Exception as exc:
-            attention_errors.append(
-                {"error_type": type(exc).__name__, "error": str(exc)}
+        else:
+            attention_request = gateway.attention_request(
+                turn_capture,
+                context_snapshot,
             )
-            logger.warning(
-                "Cognitive Gateway attention review failed open: %s",
-                exc,
-            )
-            attention_review = gateway.attention_fail_open(
-                attention_request,
-                reason=f"attention review unavailable: {type(exc).__name__}",
-            )
-        record_session_workflow_stage(
-            self,
-            session_id,
-            stage="cognitive_gateway_attention",
-            started_monotonic_ms=attention_started_ms,
-            finished_monotonic_ms=now_ms(),
-            status=("failed_open" if attention_errors else "accepted"),
-            input_payload={
-                "user_turn": turn_capture,
-                "context_snapshot": context_snapshot,
-            },
-            output_payload=attention_review,
-            errors=attention_errors,
-        )
-        turn_envelope = gateway.admit_attention(
-            turn_capture,
-            context_snapshot,
-            attention_review,
-        )
-        record_cognitive_gateway_evidence(
-            getattr(self, "cognitive_evidence", None),
-            turn_envelope,
-            user_text=user_text,
-            context_snapshot=context_snapshot,
-            attention_review=attention_review,
-            session_log=self.session_log,
-        )
-        self.session_log(
-            session_id,
-            "cognitive_gateway_attention_done: disposition=%s speech_act=%s confidence=%.2f source=%s",
-            attention_review.disposition,
-            attention_review.speech_act,
-            attention_review.confidence,
-            attention_review.source,
-        )
-        if turn_envelope.admission == "suppress":
-            self.conversation_state.record_user_turn(
+            attention_started_ms = now_ms()
+            attention_errors: list[dict[str, str]] = []
+            try:
+                review_attention = self.agent_client.review_attention
+                attention_review = await review_attention(
+                    session,
+                    request=attention_request,
+                )
+            except Exception as exc:
+                attention_errors.append(
+                    {"error_type": type(exc).__name__, "error": str(exc)}
+                )
+                logger.warning(
+                    "Cognitive Gateway attention review failed open: %s",
+                    exc,
+                )
+                attention_review = gateway.attention_fail_open(
+                    attention_request,
+                    reason=f"attention review unavailable: {type(exc).__name__}",
+                )
+            record_session_workflow_stage(
+                self,
                 session_id,
-                user_text,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": attention_review.source,
-                        "confidence": attention_review.confidence,
-                        "speech_act": attention_review.speech_act,
-                        "reason": attention_review.reason,
-                    },
-                    turn_envelope,
-                ),
+                stage="cognitive_gateway_attention",
+                started_monotonic_ms=attention_started_ms,
+                finished_monotonic_ms=now_ms(),
+                status=("failed_open" if attention_errors else "accepted"),
+                input_payload={
+                    "user_turn": turn_capture,
+                    "context_snapshot": context_snapshot,
+                },
+                output_payload=attention_review,
+                errors=attention_errors,
             )
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(session_id)
-            return
+            turn_envelope = gateway.admit_attention(
+                turn_capture,
+                context_snapshot,
+                attention_review,
+            )
+            record_cognitive_gateway_evidence(
+                getattr(self, "cognitive_evidence", None),
+                turn_envelope,
+                user_text=user_text,
+                context_snapshot=context_snapshot,
+                attention_review=attention_review,
+                session_log=self.session_log,
+            )
+            self.session_log(
+                session_id,
+                "cognitive_gateway_attention_done: disposition=%s speech_act=%s confidence=%.2f source=%s",
+                attention_review.disposition,
+                attention_review.speech_act,
+                attention_review.confidence,
+                attention_review.source,
+            )
+            if turn_envelope.admission == "suppress":
+                self.conversation_state.record_user_turn(
+                    session_id,
+                    user_text,
+                    metadata=self._metadata_with_turn_envelope(
+                        {
+                            "source": attention_review.source,
+                            "confidence": attention_review.confidence,
+                            "speech_act": attention_review.speech_act,
+                            "reason": attention_review.reason,
+                        },
+                        turn_envelope,
+                    ),
+                )
+                state = self.sessions.state.get(session_id)
+                if state is not None:
+                    state["llm_done"] = True
+                self.maybe_session_done(session_id)
+                return
+
+        context["user_turn_envelope"] = turn_envelope.model_dump(mode="json")
 
         # Admission is already trusted dialogue evidence even though Goal
         # Association has not run yet. Publish only the user utterance here so a
@@ -3433,6 +3479,7 @@ class VoiceAssistant:
         # retired route/intent projection or entering a second semantic pipeline.
         safe_response = self._cognitive_core_exception_safe_response(
             user_text,
+            context=context,
             failure_stage="cognitive_runtime_entry",
             failure_class="runtime_unavailable",
         )
@@ -3499,6 +3546,8 @@ class VoiceAssistant:
             update={
                 "metadata": {
                     **prompt_response.metadata,
+                    **({"user_turn_envelope": response.metadata["user_turn_envelope"]}
+                       if isinstance(response.metadata.get("user_turn_envelope"), dict) else {}),
                     "history_after_successful_delivery": True,
                     "confirmation_id": pending.confirmation_id,
                 }
@@ -3870,7 +3919,7 @@ class VoiceAssistant:
         # Cognition is unavailable at this boundary. Keep this emergency
         # fail-closed utterance tiny and natural; authoritative safety facts stay
         # in metadata rather than leaking workflow vocabulary into Chromie's voice.
-        del context
+        envelope = (context or {}).get("user_turn_envelope")
         zh = self._looks_zh(user_text)
         text = (
             "咦，刚才没接上。你再跟我说一遍嘛。"
@@ -3894,8 +3943,10 @@ class VoiceAssistant:
             }
         return response.model_copy(
             update={
+                "speech": [] if user_turn_prohibits_speech(envelope) else response.speech,
                 "metadata": {
                     **response.metadata,
+                    **({"user_turn_envelope": envelope} if isinstance(envelope, dict) else {}),
                     "effect_execution": "not_authorized",
                     "semantic_fallback": False,
                     **failure_metadata,
@@ -5465,6 +5516,8 @@ class VoiceAssistant:
         )
         context.update(context_updates)
         source_envelope = metadata.get("user_turn_envelope")
+        if isinstance(source_envelope, dict):
+            context["user_turn_envelope"] = dict(source_envelope)
         source_original_input = (
             source_envelope.get("original_input")
             if isinstance(source_envelope, dict)
@@ -6079,6 +6132,9 @@ class VoiceAssistant:
         mark_session_done: bool = True,
     ) -> None:
         """Launch every InteractionResponse through the non-blocking dispatch boundary."""
+
+        if user_turn_prohibits_speech(response.metadata.get("user_turn_envelope")):
+            response = response.model_copy(update={"speech": []})
 
         task = asyncio.create_task(
             self._dispatch_detached_interaction(

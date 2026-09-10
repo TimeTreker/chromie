@@ -4,15 +4,19 @@ import asyncio
 import importlib.util
 import hashlib
 import json
+import multiprocessing
+from functools import partial
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from collections.abc import AsyncIterator
 from multiprocessing.connection import Connection
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,13 +35,29 @@ from provider import (  # noqa: E402
 from streaming_worker import StreamingProcessWorker  # noqa: E402
 
 
-def stream_fixture_target(connection: Connection) -> None:
+def stream_fixture_target(connection: Connection, *, cancellation_event=None) -> None:
     connection.send({"type": "ready", "fixture": True})
     while True:
         payload = connection.recv()
         if payload.get("type") == "shutdown":
             connection.send({"type": "stopped"})
             return
+        if payload.get("text") in {"cooperative-cancel", "cooperative-after-audio"}:
+            if payload["text"] == "cooperative-after-audio":
+                connection.send({"type": "audio", "pcm": b"old", "sample_rate": 8000})
+            while not cancellation_event.is_set():
+                time.sleep(0.005)
+            # Cleanup must keep the event set and own the request lock until its
+            # terminal event; a queued successor must not clear it early.
+            time.sleep(0.04)
+            if not cancellation_event.is_set():
+                connection.send({"type": "error", "message": "next request raced cleanup"})
+                continue
+            connection.send({"type": "complete"})
+            continue
+        if payload.get("text") == "check-cleared" and cancellation_event.is_set():
+            connection.send({"type": "error", "message": "stale cancellation"})
+            continue
         if payload.get("text") in {"block", "silent"}:
             while True:
                 time.sleep(1)
@@ -124,6 +144,72 @@ def load_provider_impl(relative: str, name: str):
 
 
 class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cooperative_cancel_preserves_worker_and_serializes_cleanup(self) -> None:
+        signal = multiprocessing.get_context("spawn").Event()
+        worker = StreamingProcessWorker(
+            partial(stream_fixture_target, cancellation_event=signal),
+            name="cooperative-test", startup_timeout_s=5,
+            cancellation_event=signal, cancel_drain_timeout_s=0.5,
+        )
+        await worker.start()
+        initial_pid = worker._process.pid
+        try:
+            for early in (False, True):
+                with self.subTest(early=early):
+                    text = "cooperative-cancel" if early else "cooperative-after-audio"
+                    stream = worker.stream({"type": "synthesize", "text": text})
+                    if early:
+                        task = asyncio.create_task(anext(stream))
+                        await asyncio.sleep(0.02)
+                        task.cancel()
+                        with self.assertRaises(asyncio.CancelledError):
+                            await task
+                    else:
+                        self.assertEqual((await anext(stream))["pcm"], b"old")
+                        cleanup = asyncio.create_task(stream.aclose())
+                        await asyncio.sleep(0)
+                    current = [event async for event in worker.stream({
+                        "type": "synthesize", "text": "check-cleared",
+                    })]
+                    if not early:
+                        await cleanup
+                    self.assertEqual(
+                        [event["pcm"] for event in current if event["type"] == "audio"],
+                        [b"\x01\x00" * 80],
+                    )
+                    self.assertEqual(worker._process.pid, initial_pid)
+            self.assertEqual(worker.cancel_drain_count, 2)
+            self.assertEqual(worker.restart_count, 0)
+            self.assertEqual(
+                worker.cancellation_mode, "signal_then_bounded_drain_then_restart_worker"
+            )
+        finally:
+            await worker.stop()
+
+    async def test_cooperative_cancel_timeout_keeps_restart_fallback(self) -> None:
+        signal = multiprocessing.get_context("spawn").Event()
+        worker = StreamingProcessWorker(
+            partial(stream_fixture_target, cancellation_event=signal),
+            name="cooperative-fallback-test", startup_timeout_s=5,
+            cancellation_event=signal, cancel_drain_timeout_s=0.05,
+        )
+        await worker.start()
+        initial_pid = worker._process.pid
+        try:
+            async def consume():
+                return [event async for event in worker.stream({"text": "block"})]
+            task = asyncio.create_task(consume())
+            await asyncio.sleep(0.02)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            self.assertNotEqual(worker._process.pid, initial_pid)
+            self.assertEqual(worker.cancel_restart_count, 1)
+            events = [event async for event in worker.stream({"text": "check-cleared"})]
+            self.assertEqual(events[-1]["type"], "complete")
+        finally:
+            await worker.stop()
+
     async def test_worker_backed_provider_maps_audio_and_comparable_metrics(self) -> None:
         provider = WorkerBackedCandidateProvider(
             capabilities=fixture_capabilities(),
@@ -546,6 +632,180 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                 ).speaker_id,
                 "chromie_en",
             )
+
+    def test_cosyvoice_cancel_closes_tokens_and_skips_only_cancelled_acoustics(self) -> None:
+        cosy = load_provider_impl(
+            "tts_candidates/cosyvoice/provider_impl.py", "cosy_cancel_fixture"
+        )
+        signal = threading.Event()
+        entered, closed = [], []
+        def tokens(**kwargs):
+            entered.append(kwargs)
+            try:
+                yield from (1, 2, 3)
+            finally:
+                closed.append(True)
+        waveform, empty = object(), object()
+        acoustic = Mock(return_value=waveform)
+        native = SimpleNamespace(
+            llm=SimpleNamespace(inference=tokens, inference_bistream=tokens),
+            token2wav=acoustic,
+        )
+        torch = SimpleNamespace(zeros=Mock(return_value=empty))
+        cosy._enable_native_cancellation(native, signal, torch)
+        for name in ("inference", "inference_bistream"):
+            with self.subTest(name=name):
+                signal.clear()
+                stream = getattr(native.llm, name)(text="original")
+                self.assertEqual(next(stream), 1)
+                self.assertIs(native.token2wav(token="original"), waveform)
+                signal.set()
+                self.assertEqual(list(stream), [])
+                self.assertEqual(len(entered), len(closed))
+                before = acoustic.call_count
+                self.assertIs(native.token2wav(token="cancelled"), empty)
+                self.assertEqual(acoustic.call_count, before)
+                self.assertEqual(list(getattr(native.llm, name)(text="cancelled")), [])
+                signal.clear()
+                self.assertEqual(list(getattr(native.llm, name)(text="next")), [1, 2, 3])
+                self.assertIs(native.token2wav(token="next"), waveform)
+                self.assertEqual(len(entered), len(closed))
+
+    def test_cosyvoice_worker_prepares_then_reuses_selected_voice_conditioning(self) -> None:
+        cosy = load_provider_impl(
+            "tts_candidates/cosyvoice/provider_impl.py", "cosy_cached_voice_fixture"
+        )
+        requests = [
+            ("你好。", "default", "chromie_zh"),
+            ("Hello.", "default", "chromie_en"),
+            ("你好，Chromie.", "default", "chromie_mixed"),
+            ("再次问好。", "default", "chromie_zh"),
+            ("你好。", "chromie_en", "chromie_en"),
+        ]
+        environment = {
+            "TTS_VOICE_ROOT": str(ROOT / "assets/tts/voices"),
+            "TTS_DEFAULT_SPEAKER": "chromie_mixed",
+            "COSYVOICE3_PROMPT_PREFIX": "You are a helpful assistant.",
+        }
+        with patch.dict(os.environ, environment):
+            voices = cosy.runtime_voices()
+            # A replacement worker must prepare its own cache before readiness.
+            for generation in range(2):
+                with self.subTest(generation=generation):
+                    prepared = {}
+                    events = []
+                    initial_hops = []
+                    native_model = SimpleNamespace(token_hop_len=25)
+
+                    def prepare(prompt, wav, speaker):
+                        prepared[speaker] = (prompt, wav)
+                        events.append(("prepare", speaker))
+                        return True
+
+                    def infer(text, prompt, wav, *, zero_shot_spk_id, stream):
+                        self.assertTrue(stream)
+                        self.assertEqual(prepared[zero_shot_spk_id], (prompt, wav))
+                        initial_hops.append(native_model.token_hop_len)
+                        native_model.token_hop_len = 100
+                        events.append(("infer", text, zero_shot_spk_id))
+                        yield {"tts_speech": object()}
+                        self.assertEqual(native_model.token_hop_len, 100)
+
+                    model = SimpleNamespace(
+                        model=native_model,
+                        sample_rate=24000,
+                        add_zero_shot_spk=prepare,
+                        inference_zero_shot=infer,
+                    )
+                    connection = Mock()
+                    connection.recv.side_effect = [
+                        {"type": "synthesize", "text": text, "speaker_id": speaker}
+                        for text, speaker, _expected in requests
+                    ] + [{"type": "shutdown"}]
+                    connection.send.side_effect = lambda item: events.append(
+                        ("send", item)
+                    )
+                    modules = {
+                        "torch": SimpleNamespace(OutOfMemoryError=MemoryError),
+                        "cosyvoice.cli.cosyvoice": SimpleNamespace(
+                            AutoModel=lambda **_kwargs: model
+                        ),
+                        "huggingface_hub": SimpleNamespace(
+                            snapshot_download=lambda **_kwargs: "/fixture-model"
+                        ),
+                    }
+                    with (
+                        patch.dict(sys.modules, modules),
+                        patch.object(threading, "excepthook"),
+                        patch.object(cosy, "tensor_pcm16", return_value=b"\x01\x00"),
+                    ):
+                        cosy.worker_target(connection)
+
+                    self.assertEqual(set(prepared), set(voices.profiles))
+                    self.assertEqual(initial_hops, [25] * len(requests))
+                    profile_count = len(voices.profiles)
+                    self.assertEqual(events[profile_count][0], "send")
+                    self.assertEqual(events[profile_count][1]["type"], "ready")
+                    self.assertEqual(
+                        sum(e[0] == "prepare" for e in events), profile_count
+                    )
+                    self.assertEqual(
+                        [e[1:] for e in events if e[0] == "infer"],
+                        [(text, expected) for text, _speaker, expected in requests],
+                    )
+                    completed = [
+                        e[1]["provider_metadata"] for e in events
+                        if e[0] == "send" and e[1]["type"] == "complete"
+                    ]
+                    self.assertEqual(len(completed), len(requests))
+                    for metadata, (_text, _speaker, expected) in zip(completed, requests):
+                        self.assertEqual(metadata["speaker_id"], expected)
+                        self.assertEqual(
+                            metadata["reference_sha256"],
+                            voices.profiles[expected].audio_sha256,
+                        )
+                    for speaker, (prompt, wav) in prepared.items():
+                        profile = voices.profiles[speaker]
+                        self.assertEqual(
+                            prompt,
+                            environment["COSYVOICE3_PROMPT_PREFIX"]
+                            + "<|endofprompt|>" + profile.text,
+                        )
+                        self.assertEqual(wav, str(profile.wav_path))
+
+    def test_cosyvoice_reference_preparation_failure_prevents_readiness(self) -> None:
+        cosy = load_provider_impl(
+            "tts_candidates/cosyvoice/provider_impl.py", "cosy_cache_failure_fixture"
+        )
+        for failure in (False, RuntimeError("reference preparation failed")):
+            with self.subTest(failure=failure):
+                prepare = Mock(return_value=failure)
+                if isinstance(failure, Exception):
+                    prepare.side_effect = failure
+                modules = {
+                    "torch": SimpleNamespace(OutOfMemoryError=MemoryError),
+                    "cosyvoice.cli.cosyvoice": SimpleNamespace(
+                        AutoModel=lambda **_kwargs: SimpleNamespace(
+                            model=SimpleNamespace(token_hop_len=25),
+                            sample_rate=24000, add_zero_shot_spk=prepare
+                        )
+                    ),
+                    "huggingface_hub": SimpleNamespace(
+                        snapshot_download=lambda **_kwargs: "/fixture-model"
+                    ),
+                }
+                connection = Mock()
+                with (
+                    patch.dict(os.environ, {"TTS_VOICE_ROOT": str(ROOT / "assets/tts/voices")}),
+                    patch.dict(sys.modules, modules),
+                    patch.object(threading, "excepthook"),
+                ):
+                    cosy.worker_target(connection)
+                connection.recv.assert_not_called()
+                connection.send.assert_called_once()
+                result = connection.send.call_args.args[0]
+                self.assertEqual(result["type"], "error")
+                self.assertIn("CosyVoice startup failed", result["message"])
 
     def test_candidate_reference_metadata_preserves_authorized_license(self) -> None:
         for relative, name in (

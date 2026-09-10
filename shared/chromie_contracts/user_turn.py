@@ -40,6 +40,20 @@ def normalize_turn_text(value: str) -> str:
     return " ".join((value or "").strip().split())
 
 
+def user_turn_prohibits_speech(envelope: Any) -> bool:
+    """Read the trusted protective control without interpreting the utterance."""
+
+    if not isinstance(envelope, dict):
+        return False
+    reflex = envelope.get("reflex")
+    return bool(
+        envelope.get("admission") == "reflex_and_admit"
+        and isinstance(reflex, dict)
+        and reflex.get("action") == "interrupt"
+        and reflex.get("should_speak") is not True
+    )
+
+
 class OriginalTurnInput(BaseModel):
     """Immutable input evidence exactly as received by the Gateway."""
 
@@ -386,4 +400,5 @@ __all__ = [
     "UserTurnChannel",
     "UserTurnEnvelope",
     "normalize_turn_text",
+    "user_turn_prohibits_speech",
 ]
