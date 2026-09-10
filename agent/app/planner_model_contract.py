@@ -19,6 +19,7 @@ try:
         PlannedGoalTimeCondition,
         PlanStepPurpose,
         PlanTiming,
+        validate_goal_satisfaction_conservation,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.interaction import CapabilityIdentityModel
@@ -34,6 +35,7 @@ except ImportError:  # pragma: no cover
         PlannedGoalTimeCondition,
         PlanStepPurpose,
         PlanTiming,
+        validate_goal_satisfaction_conservation,
     )
 
 PlannerTier = Literal["fast", "deep"]
@@ -93,8 +95,10 @@ class PlannerGoalSatisfaction(GoalSatisfactionAssessment):
     )
     status: GoalSatisfactionStatus = Field(
         description=(
-            "Prospective plan-adequacy band. Use exact with score 0.95-1.0 when "
-            "the proposed plan fully covers the goals, even though execution is pending."
+            "Prospective Goal-fulfillment band, not confidence or refusal quality. "
+            "Inclusive score ranges: unsatisfied=0; partial=0.01-0.749999; "
+            "substantial=0.75-0.949999; exact=0.95-1.0. Pending execution "
+            "alone does not reduce adequacy; unresolved Goals remain unmet."
         )
     )
     satisfied_goal_ids: list[str] = Field(
@@ -275,8 +279,19 @@ class PlannerModelOutput(BaseModel):
                 )
         if self.disposition == "execute" and not self.steps:
             raise ValueError("execute planner output requires at least one step")
-        if self.disposition == "mixed" and (not self.steps or not self.goal_outcomes):
-            raise ValueError("mixed planner output requires steps and goal_outcomes")
+        if self.disposition == "mixed":
+            if not self.goal_outcomes:
+                raise ValueError("mixed planner output requires goal_outcomes")
+            if not self.steps:
+                dispositions = {item.disposition for item in self.goal_outcomes.values()}
+                if not (
+                    "respond" in dispositions
+                    and dispositions.intersection({"clarify", "unavailable", "refused"})
+                    and dispositions <= {"respond", "clarify", "unavailable", "refused"}
+                ):
+                    raise ValueError("mixed output without steps requires response and limitation outcomes")
+                if self.user_confirmation_required or self.plan_relation != "exact" or self.time_conditions:
+                    raise ValueError("mixed output without steps cannot authorize or schedule Work")
         if self.disposition == "respond" and not self.response_text.strip():
             raise ValueError("respond planner output requires response_text")
         if self.disposition in {"clarify", "unavailable", "refused"} and not (
@@ -353,6 +368,10 @@ class PlannerModelOutput(BaseModel):
             )
             if self.disposition != expected_disposition:
                 raise ValueError("top-level disposition must match per-goal outcome dispositions")
+            validate_goal_satisfaction_conservation(
+                [(goal_id, item.disposition, item.satisfaction) for goal_id, item in self.goal_outcomes.items()],
+                self.goal_satisfaction,
+            )
         return self
 
 class PlannerDTOContractError(ValueError):

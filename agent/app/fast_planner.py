@@ -183,6 +183,17 @@ def presentation_commit_id(request: CognitiveWorkRequest) -> str:
     return f"present_{digest}"
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous member ownership before a parsed value can be exposed."""
+
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise PlannerDTOContractError(f"Fast Planner JSON object repeats key: {key}")
+        value[key] = item
+    return value
+
+
 def _tagged_json_frame(
     buffer: str,
     *,
@@ -221,7 +232,7 @@ def _tagged_json_frame(
         saw_close = True
         candidate = buffer[payload_start:payload_end].strip()
         try:
-            value = json.loads(candidate)
+            value = json.loads(candidate, object_pairs_hook=_unique_json_object)
         except json.JSONDecodeError:
             # A literal closing tag may occur inside a JSON string. Keep looking
             # for the real frame boundary instead of committing a partial value.
@@ -743,6 +754,7 @@ class FastPlannerResolver:
         response_schema = canonical_goal_binding_argument_response_schema(
             response_schema,
             authoritative_goals=authoritative_goals,
+            capabilities=capability_payload,
         )
         if reentry_goal_ids:
             evidence_wording_description = (

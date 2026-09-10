@@ -1,7 +1,23 @@
 # Chromie Current Status
 
-**Updated:** 2026-09-10
-**Current focus:** Goal-driven single-authority architecture, Issue #35, fixed RTX 5090 / Gemma4-12B. Explicit provider argument realizations now enforce minimum argument presence in Fast advance and canonical Fast/Deep validation; gaze duration is declared instead of silently using its default. Canonical Fast single/multiple-Goal decoder schemas now expose existing intersection shapes, closing a native decoder omission. Two focused MuJoCo episodes complete exact gaze2/blink2 and gaze3 with valid primary Fast result DTOs and zero Deep calls. Canonical gates pass2331 tests /437 subtests,140 benchmarks,20 legacy tests; Soridormi789 passed /2 skipped. Final stable51-case preview:27 mechanical /19 reviewed acceptable,154 call digests intact. GI/GA/Planner semantic defects, headless speech and supervised target-evidence gaps remain; no model-only or main-promotion claim. Checkpoint/handoff own exact workflows, paired commits and evidence.
+**Updated:** 2026-09-11
+**Current focus:** Goal-driven single-authority architecture, Issue #35. Original ten plus all 18 additional RTX 4090 Laptop iterations (11–28) are complete. Final source is 27; 28 repeats the identical candidate. The completed batch is being committed/pushed from `codex/ga-request-format` pre-delivery base `c2128a51`, paired with Soridormi `codex/turn-count` at `284273bc`. Fixed Qwen3.5:4b Q4_K_M/Ollama; no model substitution or main promotion. The bounded speech-outcome amendment is authorized and implemented; separate tagged-stream wire amendment is pending and unimplemented. Budget exhausted; no iteration 29 authorization.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Existing owners repair count/availability provenance; authorized speech limitations and independent zero-step response; unmet satisfaction; duplicate Fast JSON fields; escalation-field validation; unresolved/language/history projection; native canonical Schema constraints; short-turn GI duration/speed source spelling. | Final code gate 2362 tests/582 subtests/20 legacy plus 140 benchmarks; pinned checks pass. Frozen Deep 16/Fast 8/unmet 18/repetition 32/duplicate 10/escalation 8/history 12 references pass. Level A 29 distinct cases plus overlapping GI class 8/8. Final docs checks retained separately. | Unqualified. Final Fast diagnostic2/8, Deep speech 7/16 (regresses from 8/16), history 4/12; GI 27 reviewed4/44, repeat 28 reviewed4/44. Latest full 51 live invocation stops on Fast output truncation:1 complete failure, 1started without calls, 49 unrun; 3 calls reviewed, stable trees, zero qualified. Host blocks Work. | Development only. No release/main promotion. Semantic, current-revision supervised voice and default target-evidence closure remain open. No physical microphone/audible speaker/robot or executed-motion proof. |
+
+Correct source spelling and schema validity do not establish correct meaning.
+GI still merges effects and confuses unknown facts with speech; Deep still invents
+missing history, misattributes user speech and loses independent responses. Tagged
+Fast can generate repeated unrelated Activities and exhaust its output budget.
+Unknown-scene fabricated observations remain open. Request-identical model
+controls varied; the frozen repeats retain this limitation instead of claiming
+all changed scores as causal improvements. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+owns the exact resume boundary; the [handoff](../HANDOFF.md) owns all 18 iterations,
+actual module I/O, revision/runtime identities, commands and artifact paths.
+
+Previous RTX 5090 evidence (2026-09-10; different model/provider and local tree): Goal-driven single-authority architecture, Issue #35, fixed RTX 5090 / Gemma4-12B. Explicit provider argument realizations now enforce minimum argument presence in Fast advance and canonical Fast/Deep validation; gaze duration is declared instead of silently using its default. Canonical Fast single/multiple-Goal decoder schemas now expose existing intersection shapes, closing a native decoder omission. Two focused MuJoCo episodes complete exact gaze2/blink2 and gaze3 with valid primary Fast result DTOs and zero Deep calls. Canonical gates pass2331 tests /437 subtests,140 benchmarks,20 legacy tests; Soridormi789 passed /2 skipped. Final stable51-case preview:27 mechanical /19 reviewed acceptable,154 call digests intact. GI/GA/Planner semantic defects, headless speech and supervised target-evidence gaps remain; no model-only or main-promotion claim. Checkpoint/handoff own exact workflows, paired commits and evidence.
 Earlier different-model comparison: three canary trials showed lower SGLang foreground latency, but model/precision/topology differed. The 51-case preview produced zero reviewer-qualified complete transactions on either deployment. The sole SGLang mechanical pass dropped GA bindings and admitted unresolved GI actor meaning downstream; preview prevented dispatch. See the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) for retained evidence. Error containment is not successful behavior.
 ## 2026-09-06 transaction-fidelity source closure
 The archive audit did not reopen the authority architecture; it found six implementation mismatches at the existing GA/Fast/Runtime boundaries. The current worktree closes them as follows:
@@ -114,67 +130,22 @@ The streaming architecture, early request-scope commit validation, and terminal 
 Core/challenge did not start; release readiness remains development only.
 
 The RTX 4090 Laptop profile now assigns every LLM role to one `qwen3.5:4b` runner.
-GI retains its 16K/512 request budget; GA, Fast, and Deep retain their declared 32K
-contexts and stage output limits. Ollama 0.32.14 reports that `qwen35` does not support
+For the current laptop run, GI retains 16,384 context / 512 output, GA 32,768 /
+2,048, and canonical Fast/Deep 40,960 / 4,096; streamed Fast still applies its
+existing 2,048 output clamp. Historical 32K measurements below are separate. Ollama 0.32.14 reports that `qwen35` does not support
 parallel requests and creates `n_seq_max=1` even when `OLLAMA_NUM_PARALLEL=2`; the
 maintained profile therefore declares one provider slot and one resident model. This
 fits beside CosyVoice on the 16 GB laptop GPU, but it cannot realize the architecture's
 concurrent GA/Fast inference.
 
-The current-source aggregate is retained at
-`.chromie/acceptance/general-ability/qwen35-all-roles-current-20260829T133621Z/live-text`,
-bound to runtime identity
-`2ab46a7cb42053391fe9fc0acbef77bc8d562bc3e9f6fd30c70f7f9becbeee91` and dirty
-source-tree SHA-256
-`428c51bb87cffe96d42f3f20f324eccfa0ec44a64c3f99e8cfbb7d50d4186c42`.
-It hard-passed 0/50 must-pass cases; core/challenge were gated off. Mutually exclusive
-earliest failures were 18 GI `ReadTimeout`s, eight invalid location-provenance outputs,
-five dropped/rewritten numeric bindings, two overlapping independent source spans, one
-invented duration, 14 typed Fast-stream timeouts after accepted GI, and two preview-only
-reflex limitations. All 14 accepted GI outputs were low confidence and ten retained
-unresolved meaning. The exactly one post-cohort bundle is
-`/home/chromie/Downloads/chromie_debug_bundle_20260829_214253.tar.gz`. This is diagnostic
-C-preview evidence only; no Capability was dispatched and no simulator, audio, or physical
-behavior is qualified.
-
-An isolated RTX 4090 Laptop vLLM 0.24.0 qualification now proves the candidate transport
-can enforce strict JSON, stream SSE, overlap two short sequences, isolate cancellation,
-and remain healthy. It does not yet qualify a production model. The unchanged five-case
-primary GI screen scored Qwen3.5-4B 1/5, Qwen3.5-9B 2/5, Gemma-3-12B 0/5, and Qwen3-8B
-1/5. Short fresh-turn location spelling is now decoder-constrained to exact source
-surfaces, source provenance identifies user -> Chromie, and the Deep mechanical constraint
-uses wire `binding_items`; the remaining failures are model-authored semantic omissions,
-misclassification, invented ambiguity/location, or duplicate outcomes. Qwen3.5-4B plus
-TTS peaked at 14,953 MiB, while two long decode streams slowed generated-but-unplayed TTS
-first audio by 2.37x. Production remains on Ollama and the current profile.
-
-A no-HTTP-deadline Ollama follow-up used the same five-case current-checkout GI screen.
-Ministral-3-14B scored 2/5, Ministral-3-8B 1/5, Gemma4-e4B 1/5, and Gemma4-12B 2/5.
-GPT-OSS-20B returned empty content for all five required non-thinking requests; the
-provider documents that its reasoning cannot be disabled. A diagnostic `think: low` run
-scored 3/5 but still misbound the weather time scope and dropped an explicit duration.
-It used 12,951/16,376 MiB with TTS stopped, so it also lacks the measured resident budget
-to coexist with TTS. This is isolated provider/GI evidence, not authority approval or
-workflow qualification, and production remains unchanged.
-
-The primary GI prompt/schema now exposes decoder-visible `unresolved[]` and overlapping-binding
-contracts, then preflights atomic decomposition, typed modifier coverage, and uncertainty. That
-change added no Host semantic owner, but an older reachable source-based repair remains. On the
-unchanged screen, Qwen3.5-4B reached 3/5 once and 2/5 on a fresh rerun; the discarded typed-wire
-Ministral-3-14B prototype reached 5/5 mechanically but failed manual review and reached 6/8
-mechanically/about 4/8 manually on holdout. All other candidates were at most 3/5; none was promoted.
-
-An RTX 5090 dirty-checkout diagnostic separates raw GI model potential from production-contract
-compatibility through six dimensions. Under one simplified V2 prompt/schema, Ministral-3-14B
-retained 28/28 evaluable decomposition and output-mode passes over two repeats, 26/28 outcome
-and unresolved passes, 24/28 coordination passes, and 16/28 binding passes. Granite4.2-8B
-preserved all 15 outcomes and modes but passed only 3/15 binding cases and invented or mis-typed
-values. Its diagnostic-only Ollama digest is `f586c02fdecdf151b656207c339aa003997345774a41768bac1fd6d2fb85913b`.
-
-The selected GI base prompt is a 15,212-character provider-neutral decision procedure over
-all 25 binding dimensions, cross-clause outcomes, sparse grounded values, source perspective,
-decoder-safe order, and minimal predicate evidence. Context-only rules add no call. Digest:
-`73729710f5baef12ba690ff13ef949aeef00017643fb188e143ed3cc76626df6`.
+Earlier laptop/provider diagnostics remain unqualified: the August29 Ollama
+aggregate passed0/50; isolated vLLM transport checks did not qualify model meaning,
+concurrent long decoding delayed TTS, and the subsequent alternate-model screens
+promoted no candidate. Simplified RTX5090 prompts and assistant-reference tests
+also did not qualify the production transaction. Exact historical counts,
+identities, artifacts and prompt hashes now live in the handoff's
+[historical provider diagnostics](../HANDOFF.md#historical-provider-diagnostics-consolidated-from-status-2026-09-11).
+They are not current-source or current-model claims.
 
 An assistant-reference audit applied that prompt and each exact decoder schema to all 16 primary GI manifest cases without an external model/provider call. All 16 passed schema, Host validation, and six semantic dimensions. This proves only strong-reference prompt clarity, not deployed-model qualification: any candidate result measures the combined model + prompt + schema + decoder transaction and cannot alone prove the prompt correct or defective. Runtime contracts remain unchanged; no model was promoted.
 

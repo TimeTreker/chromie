@@ -230,6 +230,7 @@ class DeepPlannerResolver:
         response_schema = canonical_goal_binding_argument_response_schema(
             response_schema,
             authoritative_goals=authoritative_goals,
+            capabilities=payload,
         )
         generation_options = {
             "temperature": 0,

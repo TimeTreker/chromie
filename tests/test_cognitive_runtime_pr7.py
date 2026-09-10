@@ -3542,6 +3542,25 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "planner_selected_silence",
         )
 
+    def test_mixed_speech_limitations_deliver_without_capability_work(self):
+        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests
+        from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
+
+        for disposition in ("clarify", "unavailable", "refused"):
+            with self.subTest(disposition=disposition):
+                _, raw = CanonicalDeepPlanContractTests.speech_outcomes(disposition, sibling=True)
+                plan = CanonicalPlan.model_validate(materialize_planner_output(
+                    PlannerModelOutput.model_validate(raw), planner_tier="deep",
+                    plan_id="mixed-speech", expected_goal_ids_for_turn=list(raw["goal_outcomes"]),
+                ))
+                response = asyncio.run(CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
+                    plan=plan, session_id="mixed-speech", language="en", context={},
+                ))
+                self.assertEqual(response.capabilities, [])
+                self.assertEqual([item.text for item in response.speech], [raw["response_text"]])
+                self.assertEqual(plan.goal_outcomes[1].disposition, "respond")
+                self.assertEqual(plan.waiting_goal_ids(), ["goal-speech"] if disposition == "clarify" else [])
+
     def test_confirmation_gated_execution_cannot_be_silent(self):
         plan = execute_plan()
         plan.response_text = None

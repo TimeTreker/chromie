@@ -728,6 +728,37 @@ def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any
         return {}
 
 
+
+def recent_dialogue_prompt_projection(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep exact prior surface dialogue and its provenance, without retired labels."""
+
+    records: list[dict[str, Any]] = []
+    for item in history[-6:]:
+        role = str(item.get("role") or "").strip().lower()
+        text = item.get("text")
+        if role not in {"user", "assistant"} or not isinstance(text, str) or not text.strip():
+            continue
+        metadata = item.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        if role == "user" and metadata.get("cognitive_gateway_admission") == "suppress":
+            continue
+        record: dict[str, Any] = {"role": role, "text": text}
+        for name in ("sid", "ts_ms", "conversation_id"):
+            if name in item:
+                record[name] = copy.deepcopy(item[name])
+        record["metadata"] = {
+            name: copy.deepcopy(metadata[name])
+            for name in (
+                "source", "turn_id", "fast_activity_id", "delivery_role", "speech_act",
+                "truth_stage", "evidence_bound", "phase", "source_goal_ids",
+                "source_responsibility_refs", "canonical_plan_id", "cognitive_gateway_admission",
+            )
+            if name in metadata
+        }
+        records.append(record)
+    return records
+
+
 def evidence_bound_dialogue(
     context: dict[str, Any] | None,
     *,

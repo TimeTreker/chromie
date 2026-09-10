@@ -3,11 +3,15 @@ from __future__ import annotations
 from agent.app import planner_validation
 from agent.app import planner_deep_validation
 from agent.app import planner_schema
-from agent.app.planner_model_contract import materialize_planner_output
+from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 from agent.app import planner_prompt as planner_prompt
 
 import asyncio
+import copy
+import json
 import unittest
+
+from jsonschema import Draft202012Validator
 
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
@@ -237,6 +241,194 @@ def request(text="往前走15秒，然后眨眼。", *, goal_ids=None) -> Cognit
 
 
 class CanonicalDeepPlanContractTests(unittest.TestCase):
+    def test_deep_packet_preserves_prior_speaker_text_and_delivery_source(self):
+        for text in ("The code word is amber.", "这次的口令是琥珀。"):
+            for role in ("assistant", "user"):
+                with self.subTest(text=text, role=role):
+                    run_request, raw = self.speech_outcomes("unavailable")
+                    entry = {
+                        "role": role, "sid": "prior-turn", "text": text,
+                        "metadata": {"source": "fast_planner_communicative_delivery" if role == "assistant" else "gateway", "retired_route": "obsolete_private_lane"},
+                    }
+                    run_request = run_request.model_copy(update={
+                        "history": [entry],
+                        "context": {**run_request.context, "history": [{"role": "assistant", "text": "shadow_context_history"}]},
+                    })
+                    model = SequencedOllama([raw])
+                    asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
+                    packet = str(model.prompts[0][0])
+                    projected, _ = json.JSONDecoder().raw_decode(packet.split("Recent prior dialogue JSON:\n", 1)[1])
+                    self.assertEqual(projected, [{**entry, "metadata": {"source": entry["metadata"]["source"]}}])
+                    self.assertNotIn("obsolete_private_lane", packet)
+                    self.assertNotIn("shadow_context_history", packet)
+                    self.assertEqual(len(model.prompts), 1)
+
+    def test_deep_prior_dialogue_does_not_silently_truncate_required_text(self):
+        run_request, raw = self.speech_outcomes("unavailable")
+        run_request = run_request.model_copy(update={"history": [{"role": "assistant", "text": "x" * 6500}]})
+        model = SequencedOllama([raw])
+        plan = asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
+        self.assertEqual(len(model.prompts), 0)
+        self.assertIn("Deep Planner prior dialogue exceeds", plan.metadata["error"])
+        self.assertEqual(plan.steps, [])
+
+    def test_all_planner_packets_preserve_authoritative_unresolved_meaning(self):
+        marker = "GI unresolved-meaning evidence (exact strings or empty):\n"
+        for sibling in (False, True):
+            for unresolved in ([], ["Which content?", '对象含有引号："小明"'], ["x" * 1200]):
+                run_request, _ = self.speech_outcomes("clarify", sibling)
+                run_request = run_request.model_copy(update={"interpretation_unresolved": unresolved})
+                renderers = {
+                    "canonical_fast": lambda: planner_prompt.fast_plan_prompt(run_request, [], response_schema={}),
+                    "canonical_deep": lambda: planner_prompt.deep_plan_prompt(run_request, [], response_schema={}, expected_goal_ids=[]),
+                    "streaming_fast": lambda: planner_prompt.fast_advance_layered_prompt(run_request, responsibilities=run_request.responsibilities, capabilities=[]),
+                }
+                for variant, render in renderers.items():
+                    with self.subTest(sibling=sibling, unresolved=unresolved, variant=variant):
+                        if len(json.dumps(unresolved)) > 1200:
+                            with self.assertRaisesRegex(ValueError, "GI unresolved-meaning evidence exceeds required"):
+                                render()
+                            continue
+                        packet = str(render())
+                        self.assertEqual(packet.count(marker), 1)
+                        projected, _ = json.JSONDecoder().raw_decode(packet.split(marker, 1)[1])
+                        self.assertEqual(projected, unresolved)
+
+    @staticmethod
+    def speech_outcomes(disposition, sibling=False):
+        ids = ["goal-speech", "goal-goodnight"] if sibling else ["goal-speech"]
+        dispositions = [disposition, "respond"] if sibling else [disposition]
+
+        def satisfaction(goal_ids, complete):
+            return {
+                "score": 1.0 if complete else 0.0,
+                "status": "exact" if complete else "unsatisfied",
+                "satisfied_goal_ids": goal_ids if complete else [],
+                "unmet_goal_ids": [] if complete else goal_ids,
+                "unmet_requirements": [] if complete else ["Requested content is missing."],
+                "rationale": "Current content and limitation are preserved.",
+            }
+
+        texts = {"respond": "Hello.", "clarify": "Which sentence do you mean?",
+                 "unavailable": "I do not have the earlier sentence.", "refused": "I cannot supply that threat."}
+        fulfilled = disposition == "respond"
+        assessment = satisfaction(ids, fulfilled)
+        if sibling and not fulfilled:
+            assessment["satisfied_goal_ids"] = [ids[1]]
+            assessment["unmet_goal_ids"] = [ids[0]]
+        raw = {
+            "disposition": "mixed" if sibling and not fulfilled else disposition,
+            "coverage": "complete" if sibling or fulfilled else "partial",
+            "confidence": 1.0, "goal_summary": "Preserve independent speech outcomes.",
+            "response_text": texts[disposition] + (" Goodnight." if sibling else ""),
+            "steps": [], "auxiliary_activities": [], "escalation_reason": "",
+            "unresolved": [], "parameter_resolutions": [], "time_conditions": [],
+            "goal_outcomes": {
+                gid: {"disposition": value, "coverage": "complete" if value == "respond" else "partial",
+                      "response_text": texts[disposition] if index == 0 else "Goodnight.",
+                      "unresolved": [], "step_ids": [], "satisfaction": satisfaction([gid], value == "respond"),
+                      "rationale": "Preserve this Goal's outcome."}
+                for index, (gid, value) in enumerate(zip(ids, dispositions))
+            },
+            "goal_satisfaction": assessment, "plan_relation": "exact", "user_confirmation_required": False,
+        }
+        run_request = request("Say the sentence, then say goodnight.", goal_ids=ids)
+        for goal in run_request.context["goal_association_resolution"]["new_goals"]:
+            goal["metadata"] = {"output_mode": "speech"}
+        return run_request, raw
+
+    def test_deep_speech_limitations_survive_schema_host_and_materialization(self):
+        for disposition in ("respond", "clarify", "unavailable", "refused"):
+            for sibling in (False, True):
+                with self.subTest(disposition=disposition, sibling=sibling):
+                    run_request, raw = self.speech_outcomes(disposition, sibling)
+                    model = SequencedOllama([copy.deepcopy(raw)])
+                    plan = asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
+                    Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+                    self.assertNotIn("error", plan.metadata)
+                    self.assertEqual(plan.disposition, raw["disposition"])
+                    self.assertEqual(plan.steps, [])
+                    self.assertEqual(plan.goal_outcomes[0].disposition, disposition)
+                    self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, raw["goal_satisfaction"]["unmet_goal_ids"])
+                    self.assertEqual(len(model.prompts), 1)
+
+    def test_speech_schema_matches_host_aggregate_without_inventing_work(self):
+        for sibling in (False, True):
+            for disposition in ("respond", "clarify", "unavailable", "refused"):
+                run_request, raw = self.speech_outcomes(disposition, sibling)
+                fake = SequencedOllama([raw])
+                asyncio.run(DeepPlannerResolver(fake, FullCatalog()).resolve(run_request))
+                schema = fake.prompts[0][1]["response_format"]
+                # The deployed converter chooses anyOf before properties and
+                # does not intersect object allOf. Every native alternative
+                # must therefore be complete on its own.
+                native_union = {"$defs": schema["$defs"], "anyOf": schema["anyOf"]}
+                for aggregate in ("respond", "mixed", "clarify", "unavailable", "refused"):
+                    with self.subTest(sibling=sibling, outcome=disposition, aggregate=aggregate):
+                        candidate = copy.deepcopy(raw)
+                        candidate["disposition"] = aggregate
+                        self.assertEqual(
+                            Draft202012Validator(schema).is_valid(candidate),
+                            aggregate == raw["disposition"],
+                        )
+                        self.assertEqual(
+                            Draft202012Validator(native_union).is_valid(candidate),
+                            aggregate == raw["disposition"],
+                        )
+                for field, value in (
+                    ("user_confirmation_required", True),
+                    ("plan_relation", "alternative"),
+                ):
+                    with self.subTest(sibling=sibling, outcome=disposition, field=field):
+                        candidate = copy.deepcopy(raw)
+                        candidate[field] = value
+                        self.assertFalse(Draft202012Validator(schema).is_valid(candidate))
+
+    def test_noncompletion_satisfaction_cannot_be_lost_or_marked_fulfilled(self):
+        for sibling in (False, True):
+            for disposition in ("clarify", "unavailable", "refused"):
+                run_request, raw = self.speech_outcomes(disposition, sibling)
+                fake = SequencedOllama([raw])
+                plan = asyncio.run(DeepPlannerResolver(fake, FullCatalog()).resolve(run_request))
+                self.assertNotIn("error", plan.metadata)
+                schema = fake.prompts[0][1]["response_format"]
+                for fault in ("nested_satisfied", "aggregate_exact"):
+                    with self.subTest(sibling=sibling, disposition=disposition, fault=fault):
+                        candidate = copy.deepcopy(raw)
+                        goal_id = next(iter(candidate["goal_outcomes"]))
+                        if fault == "nested_satisfied":
+                            candidate["goal_outcomes"][goal_id]["satisfaction"].update(
+                                score=0.75, status="substantial", satisfied_goal_ids=[goal_id],
+                                unmet_goal_ids=[], unmet_requirements=[],
+                            )
+                        else:
+                            candidate["goal_satisfaction"].update(
+                                score=1.0, status="exact", satisfied_goal_ids=list(candidate["goal_outcomes"]),
+                                unmet_goal_ids=[], unmet_requirements=[],
+                            )
+                        self.assertFalse(Draft202012Validator(schema).is_valid(candidate))
+                        with self.assertRaisesRegex(ValueError, "satisfaction"):
+                            PlannerModelOutput.model_validate(candidate)
+                        canonical_candidate = plan.model_dump(mode="python")
+                        canonical_candidate["goal_satisfaction"] = candidate["goal_satisfaction"]
+                        canonical_candidate["goal_outcomes"][0]["satisfaction"] = candidate["goal_outcomes"][goal_id]["satisfaction"]
+                        with self.assertRaisesRegex(ValueError, "satisfaction"):
+                            CanonicalPlan.model_validate(canonical_candidate)
+
+    def test_speech_mixed_cannot_hide_execution_or_authorization(self):
+        _, raw = self.speech_outcomes("clarify", sibling=True)
+        for field, value in (("user_confirmation_required", True), ("plan_relation", "alternative")):
+            with self.subTest(field=field):
+                invalid = copy.deepcopy(raw)
+                invalid[field] = value
+                with self.assertRaisesRegex(ValueError, "cannot authorize or schedule Work"):
+                    PlannerModelOutput.model_validate(invalid)
+        invalid = copy.deepcopy(raw)
+        invalid["goal_outcomes"]["goal-speech"]["disposition"] = "execute"
+        invalid["goal_outcomes"]["goal-speech"]["coverage"] = "complete"
+        with self.assertRaises(ValueError):
+            PlannerModelOutput.model_validate(invalid)
+
     def test_deep_partial_plan_can_clarify_without_steps(self):
         plan = CanonicalPlan(
             plan_id="p",

@@ -1,6 +1,452 @@
 # Chromie Latest Handoff
 
-## Explicit argument coverage and Fast decoder repair
+## Active RTX 4090 Laptop boundary — additional iterations 11–28 complete
+
+Updated 2026-09-11; active Issue #35. Original ten plus all 18 additional
+iterations (11–28) are complete and unqualified. The owner now requests this
+commit and push, followed by up to 18 further iterations (29–46). Zero new
+iterations have been used at this delivery boundary. Commit/push precedes the
+new batch; no main merge or model change was requested. Final candidate source
+is 27 and 28 is its unchanged repeatability evaluation. The authorized speech
+repair is implemented; the separate tagged-stream wire proposal remains pending.
+
+Chromie: `/home/chromie/github/chromie`, branch `codex/ga-request-format`,
+pre-delivery HEAD/upstream `c2128a5166bde7fdb071d8dbeb9ef5e7efa2fcbd`; main
+`ab5caeab49e46be9c77bd87c488e693c156c2eca`. Expected resume revision is the latest
+commit containing both handoff owners on this same pushed branch. Implementation/
+test diff SHA-256 from that base:
+`f06735f7cb5f3eb393fdd41fc3ae75769ef9005c13c640b7590b01c8b6e77992`.
+The digest excludes documentation and ignored artifacts; the retained
+`final-implementation.patch` and identity JSON bind the unchanged tested code.
+The previous `final-worktree.patch` describes the completed uncommitted batch;
+this delivery additionally updates authorization/resume prose in both owners.
+Remote checked before delivery: origin/codex/ga-request-format still equals the
+pre-delivery base. No force-push or history rewrite is authorized.
+
+Soridormi: `/home/chromie/github/soridormi`, `codex/turn-count`,
+`284273bc344cc94012347c75ab270a9f4ac8ffdb`. Preserve pre-existing
+` ? workspace/Open_Duck_Playground`. No provider implementation edit. Existing
+MCP container `soridormi-runtime-mcp` (prefix 1764ad880547), image
+`soridormi-runtime-mcp:cuda13.1-cudnn-dev`, host8000, simulator TCP5555.
+Simulator `soridormi-sim-run-c0093fc6570a` is headless MuJoCo/open_duck_forward.
+The MCP status still advertises d03c7e3 as stale image metadata; it is not proof
+of the live-mounted284273bc source. Original provider file/mount verification
+and unchanged before/after trees bind that source. Final read-only status at
+2026-09-10T19:00:53Z reports sim, standing/safe_idle=true, fallen/emergency=false,
+active_task=null and no active lanes; this is simulator status only.
+ASR is stopped and unused; Agent, Ollama and TTS are running. Start simulator
+before MCP if restarting is later required. Do not edit generated `.env.runtime`.
+
+Private root throughout this section:
+`/home/chromie/github/chromie/.chromie/acceptance/laptop-more18-20260911/`.
+Original evidence remains in sibling `laptop-iterations-20260910/`.
+These ignored artifacts are not transferred by Git. Retain them and the bundles
+separately before moving machines. Baseline `/tmp/chromie-more18-base` is detached
+c212 plus the original10 starting.patch, whose SHA-256 is
+`256cd8294d14d7ca5fc3c8bbfeb99b615355da8e497662e2cefb4d78b4bfd821`.
+
+### Exact final evidence
+
+Code gate 27: **2362 passed, 582 subtests, 20 legacy; 140 benchmark tests**.
+Pinned static analysis, 15 policy families/zero exceptions, test ownership and
+102-document checks pass. Post-update checks are in `final-checks.log`.
+Focused27:102/61. Relevant Level A 29 distinct cases across five classes, plus
+robust-intent class 8/8 with overlapping membership. All frozen reference suites
+pass (Deep 16, Fast 8, unmet 18, repetition 32, duplicate 10, escalation-field8, history 12).
+No current document, environment variable or architectural term added:
+102 current Markdown documents before/after; environment additions0, term additions0.
+
+Actual-model final transactions: Fast 24 Schema7/Host7/qualified2 of 8;
+Deep 26 speech 16/13/7 of 16 and history 12/12/4 of 12. Deep speech regresses from
+8 qualified at 22: two Chinese clarification controls fail, English mixed refusal
+improves. History assistant controls improve0/4 ->4/4 but all absent/user-history
+contrasts still fail. These source repairs are unqualified development changes.
+GI 27:44 cases/66 calls, 66Schema-valid/65Host-admitted, 5 mechanical/4 qualified;
+GI 28 repeat: **44 cases / 63 calls / 6 mechanical / 4 reviewed qualified**. See exact raw reviews and unchanged-packet controls;
+temperature0 did not establish identical output across all retained runs.
+
+Repeat 28 contains62 complete responses plus one Deep 512-token truncation in
+`engagement_blink_en_inactive`. Its exact request and error are retained; partial
+raw output is unavailable because the offline runner discarded incident evidence
+when the production client raised. Do not infer its missing semantic content.
+`infer-gi.executed-through-28.py` preserves the executed harness; `infer-gi.py`
+now retains exact request-bound failed-provider responses separately from accepted
+results. The production-exception/mismatched-request check passed with zero model
+calls (`final-harness-retention-check.log`). No replay replaced the missing output.
+Only 10/44 cases and16/63 same-stage raw outputs match27; three qualified cases are
+common. Exact source packets do not by themselves establish repeatable semantics.
+
+Final source 27 deployment verifies 113 Agent/shared files. Identity and readiness
+are retained in `iteration-27/runtime-identity.json`, `source-verification.json`
+and `readiness.json`; final read-only source/provider verification is retained
+separately. Live profile is synthetic text preview with discarded audio and no
+`--execute`. The full 51-case invocation stopped on a hard failure:1 complete,
+1 next case started without a retained call, 49 unrun; 3 calls reviewed, 0 qualified.
+Both trees stable. Exactly one bundle collected after that stop:
+`/home/chromie/Downloads/chromie_debug_bundle_20260911_025659.tar.gz`.
+Read-only 28 reuses this unchanged-source live evidence; no redundant bundle.
+
+### Actual final live episode and earliest wrong boundary
+
+Input: “walk ahead at 0.2 speed for 10 seconds and then nod your head twice,
+then turn left”. Expected: three separately owned positive effects with speed,
+duration, count and sequence conserved. Exact inputs/raw outputs/call hashes are
+in `iteration-27/reviewed-calls/`, indexed by `call-case-index.json`.
+
+| Owner / handoff | Actual input and output | Expected / verdict |
+| --- | --- | --- |
+| Harness/Gateway -> GI | Admitted exact current turn, source token table, bounded target identity/status; sid=fcbc13ae | Source retained; correct input boundary |
+| GI WHAT primary -> GA and Fast | `llmcall_goal_interpreter_657d9ab1f94f44ab`: r1=t0..t15 combines walk/nod, duration=10 seconds, speed=0.2 speed, subtype=nod your head twice; r2=t17..t19 turn-left; sequence r1/r2 | Three Responsibilities and typed nod count required. First wrong semantic boundary; no Deep GI invoked because unresolved=[] |
+| GA continuity, concurrent with Fast | `llmcall_agent_bb38def10e7b446f`: two Goals retain GI fields; IDs goal_2a18749d10e820a4f04c and goal_80df4c354e75f704a29a | Correct preservation of accepted GI output; not authorized to split or repair its meaning |
+| Fast HOW primary -> typed stream parser/Host | `llmcall_agent_7361eb00aa224d79`: silent presentation; 32 complete Activities plus partial 33rd; initial walk10s/vx.2, nod2, turn followed by unrequested raw head gaze, invalid confirm_action response, stand and repeated walk/nod under r2 | Separate Planner failure: unrelated work/invalid DTO plus 2048-token truncation. No valid terminal frame. Every Activity shape, ID/order and partial suffix reviewed |
+| Host -> Runtime/TTS/Capability Runtime | Typed failure output_truncated/llm_budget; silent first commit; no Goal Work admitted | Correct fail-closed containment; GA truth retained. TTS/physical effect execution not invoked. Successful intended behavior remains unproven |
+| Cohort -> debug collection | Stop after first case, second initialized without a retained model call; 49 unrun; one bundle | Correct incomplete-cohort accounting; not a51-case pass |
+
+```mermaid
+sequenceDiagram
+    participant GI as Goal Interpretation
+    participant GA as Goal Association
+    participant FP as Fast Planner
+    participant H as Host
+    GI->>GA: r1 combines walk/nod; r2 turn
+    GI->>FP: Same immutable Responsibilities
+    par Identity commitment
+        GA->>H: Commit two canonical Goals
+    and One streaming HOW invocation
+        FP->>H: Valid silent presentation
+        FP->>H: Repeated Activities; truncated terminal
+    end
+    H->>H: Retain Goal truth; reject Work
+```
+
+This final long turn does not activate27's <=40-character spelling constraint.
+That repair is demonstrated separately by the frozen Chinese short-turn cases;
+it does not repair decomposition, missing count, dimensions or source coverage.
+The exact short gaze/blink case now preserves三秒 but still merges two effects.
+Some strings such as duration=while are source-backed yet semantically invalid;
+Host provenance acceptance is not semantic qualification.
+
+The checkpoint records the other reconstructed workflows: authorized speech
+representability and Runtime lifecycle; native Schema converter precedence;
+conserved unmet satisfaction; duplicate-key parsing; lost unresolved/language
+context; and missing history. History26 projects first-class CWR.history, last 6
+records, exact text/role/delivery metadata, fail-closed6000 characters. It does not
+turn historical text into current-world Evidence or prove audible delivery.
+Native Fast branch size~72KB/143KB for1/2 Goals,~637KB/3.14MB for4/6; only 1/2 Goal
+native inference measured. Larger schemas, broader history and undelivered
+records remain explicit gaps. Unknown-scene fabricated observations remain open.
+
+### Additional iteration ledger
+
+Planner actual figures below are Schema/Host/qualified, not pass percentages.
+Full counts, regressions, build/gate logs and incomplete cohorts are retained in
+`iteration-budget.json` and each candidate/iteration directory.
+
+| Overall iteration | Change or evaluation | Observed result |
+| --- | --- | --- |
+| 11 | Frozen speech baseline | 16 model calls; Schema9/Host9/qualified4; only 4/16 legal references admitted |
+| 12 | Authorized speech outcomes | Legal16/16; actual16/8/2; zero-step mixed lifecycle repaired |
+| 13 | Deep aggregate constraint | Actual10/8/2; native decoder did not enforce intersection |
+| 14 | Native complete Deep branches | Actual16/10/2; aggregate-first regression retained |
+| 15 | Per-Goal generation before aggregate | Actual16/9/4; same field meanings |
+| 16 | Unmet satisfaction conservation | Frozen18/18; actual16/9/4; startup-failure cohort and ready rerun both retained |
+| 17 | GI unresolved context projection | Actual16/10/4; exact1200-character bounded projection |
+| 18 | Fast speech plus clarification | FrozenFast8/8; actualFast6/6/1, Deep 16/10/4; corrected typing failure retained |
+| 19 | Strict duplicate-key parser | Frozen10/10; actualFast5/5/1 |
+| 20 | Fast response-language projection | ActualFast4/5/1; exposed Host escalation-field gap |
+| 21 | Deep clarification prerequisite | ActualDeep16/11/5 |
+| 22 | Existing satisfaction meaning/bands | ActualDeep16/15/8; Fast 3/5/0 |
+| 23 | Fast escalation-field Host parity | Frozen8/8; actualFast3/3/0; false admissions removed |
+| 24 | Canonical Fast native branches | ActualFast7/7/2; one/two-Goal inference only |
+| 25 | Frozen history baseline | 12/12 legal references; actualSchema12/Host12/qualified0; no source change |
+| 26 | Deep retained-history projection | History12/12/4; speech 16/13/7; regressions retained |
+| 27 | GI duration/speed string spelling | 44 cases/66 calls; 5 mechanical/4 qualified; no prompt change |
+| 28 | Unchanged-candidate repeatability | 44 cases / 63 calls / 6 mechanical / 4 reviewed qualified |
+
+Bundles are under `/home/chromie/Downloads/`, prefix
+`chromie_debug_bundle_20260911_`:12=011903; 13=012430; 14=012929; 15=013438;
+16 startup=014438 and ready=014605; 17=015028; 18=020543; 19=021011; 20=021611;
+21=022011; 22=022555; 23=022820; 24=023448; 26=025113; 27=025659 (all `.tar.gz`).
+Read-only 11/25/28 create no duplicate live bundle. Initial/interrupted18
+confirmations are also retained and are not substituted for its corrected gate.
+All live cohorts remain unqualified; no hard failure was averaged into a pass.
+
+### Operational resume commands and boundaries
+
+Read-only/current checks from repository root:
+
+```bash
+git status --short --branch
+git log -1 --oneline
+git -C /home/chromie/github/soridormi status --short --branch
+python scripts/check_repository_policies.py
+python scripts/check_docs.py
+python scripts/check_test_ownership.py
+```
+
+After this authorized push succeeds, start the new batch at29 with a separate
+`iteration-budget-29-46.json` in the private root. Preserve the completed11–28
+ledger. Retain a fresh evidence label, freeze inputs before inference and follow
+the existing harnesses; never overwrite a completed label. `infer-gi.py prepare N` validates references and freezes the exact
+primary/deep packets; `infer-gi.py run N` invokes production GI once plus only its
+designated unresolved-meaning depth delegation. `infer-speech.py LABEL` and
+`infer-fast-speech.py LABEL` retain actual Planner packets/output. Their reference
+runners and `run-frozen.py N` preserve the frozen contrast suites. Inspect every
+raw output, including mechanical passes and partial calls, before another edit.
+No source change during model batches/live cohorts.
+
+The observed27 deployment used:
+
+```bash
+docker compose --env-file .env.runtime -f docker-compose.yml -f .chromie/voice-runtime/compose.voice-mujoco.yaml build chromie-agent
+python .chromie/acceptance/laptop-more18-20260911/deploy-and-cohort.py 27
+```
+
+Do not repeat that completed label. The helper starts only Agent, verifies 113
+source files, captures explicit Agent/Ollama/TTS identity with `--allow-dirty`,
+checks Agent health at loopback 8092, then launches the complete frozen51-case
+preview once. It uses original-root `orchestrator.env`, existing compose override,
+local MCP 8000, and the paired provider checkout. On structured hard failure it
+stops and runs `collect_debug_bundle.sh` exactly once. Inside containers use
+service names; from host use loopback. Run Orchestrator only from repository root
+as `python -m orchestrator.orchestrator`.
+
+Model qwen3.5:4b Q4_K_M digest
+`2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd`;
+Ollama0.33.2, llama-server0.3.0-dev build 1 d222767c7, RTX 4090 Laptop16GB,
+driver 595.84. GI 16384/512; GA32768/2048; canonicalFast/Deep 40960/4096;
+taggedFast output2048. Deployed decoder source/version in `decoder-source.json`,
+`decoder-audit.json`, `deployed-json-schema-to-grammar.cpp`,
+`llama-server-version.log`. Full Schema/DTO/Host remain authoritative because
+native enforcement is partial. TaggedFast has no native Ollama format.
+
+The concrete `native-stream-contract-proposal.md` is still pending its existing
+owner question. Charter principle23 explicitly requires two tagged frames, not
+one JSON wrapper; the prior speech approval does not amend that rule. No second
+permission request and no unauthorized wire change. New budget/model/delivery
+instructions must be explicit. Release stays development-only until semantic,
+current-revision supervised voice and default target-evidence closure are retained.
+Physical microphone/speaker/robot evidence is absent.
+
+## Historical completed original 10-iteration run
+
+## RTX 4090 Laptop — bounded 10-iteration run complete (2026-09-11)
+
+Active Issue #35. Read the Project Charter, interaction contract, status and
+checkpoint before implementation. The owner requested continuation on this laptop
+with a maximum of 10 iterations; all 10 are consumed. Preserve this reviewable
+patch and stop candidate work at this boundary. No commit/push/main merge was
+performed. Historical delivery authorization below describes those earlier runs.
+
+### Branch, implemented scope and workflow
+
+Chromie repository `/home/chromie/github/chromie`, branch `codex/ga-request-format`,
+base/HEAD/upstream `c2128a5166bde7fdb071d8dbeb9ef5e7efa2fcbd`. Main remains
+`ab5caeab49e46be9c77bd87c488e693c156c2eca`. Source was initially clean. Kept edits:
+`planner_grounding.py`, `planner_validation.py`, `planner_schema.py`, Fast/Deep
+call sites, `orchestrator.py`, two regression files, API/status and both resume
+owners. All GI prompt experiments are restored to HEAD and never deployed.
+
+Soridormi repository `/home/chromie/github/soridormi` now uses `codex/turn-count`
+at `284273bc344cc94012347c75ab270a9f4ac8ffdb`, including bounded count and gaze
+duration declarations. It was initially old main `d03c7e3`; switching to the
+recorded pair required no implementation edits. Preserve pre-existing
+` ? workspace/Open_Duck_Playground`. Do not import the other machine's unrelated
+dirty provider metadata as though it were in this commit. In particular the exact
+paired walk catalog lacks its historical uncommitted realization metadata.
+
+| Owner / ordered handoff | Material input -> actual failure | Expected output and implemented mechanism |
+| --- | --- | --- |
+| Controlled fixture -> canonical Fast/Deep primary | Typed non-resource Goal count=2; catalog duration/yaw only; primary step duration_s=2, no count | Fixture isolates canonical HOW; GI/GA and physical provider are not invoked. Planner must author a representable repetition or nonexecution result |
+| Raw Schema -> shared provenance normalizer | Shape accepted; equal count/duration magnitude creates user_supplied duration provenance | First wrong Host boundary. Filter count matches by provider names, typed count input or declared mapping; equal magnitude does not establish quantity identity |
+| Canonical Host / dynamic Schema -> Runtime admission | Old canonical validation accepts execution, unlike existing streamed Fast no-count containment | Reject absent count applicability/realization and false cross-count provenance. Schema removes unsupported Goal ownership while retaining compatible sibling ownership and valid nonexecution. No argument filling, phrase parsing, inferred repetition from node count or new call |
+| Provider status -> Host build_context | Observed standing/safe_idle=true; Host separately maps dry-run=true to robot available=false, or dry-run=false to true | Execution configuration cannot establish availability. Delete the four-line synthetic state object; do not replace it with another guessed value |
+| Live harness -> Gateway ContextAssembly -> GI | Harness adds true mode/emergency facts but preserves the false availability; Gateway copies it into attributed context | Actual status projection remains; repaired base context omits unsupported availability. Case4 GI previously cited it to assign “边走边唱歌。” to the user. Independent decomposition/identity contamination persists |
+| GI -> GA and Fast concurrently -> Host | One merged singing Responsibility with ambiguity; GA preserves it, Fast authors unrelated/invalid proposals | Wrong GI WHAT and separate Fast errors. Host rejected invalid auxiliary target; no provider Work. Host-context fix removes a contributing input defect, not these semantic errors |
+
+The count regression reconstructs the exact common-normalization failure through
+both production resolvers with a scripted primary, never a candidate-model oracle.
+It covers typed aliases, declared mappings, omitted/default/conflicting count,
+duration/yaw decoys, no-count controls, equal valid count/duration and explicit
+false provenance. The context regression calls production build_context for both
+dry-run settings; both fail before/pass after, retaining dialogue and flags.
+Resource quantities retain their existing nested grounding. No broad claim about
+all unit conversions or arbitrary multi-step repetition totals is made.
+
+No new current document, runtime flag, architectural term, authority, Capability
+or model was added (each surface has delta 0). Existing 102 Markdown documents
+remain the documentation set. The consolidation opportunity is the dated status
+and handoff history; it is preserved as evidence, not used as current authority.
+
+### Iteration ledger and observed checks
+
+Private root: `/home/chromie/github/chromie/.chromie/acceptance/laptop-iterations-20260910/`.
+The directory name reflects UTC start; local work continued on September 11.
+
+| Iteration | Candidate / result |
+| --- | --- |
+| 1 | Unchanged laptop baseline failed provider preflight before any inference: 51 cases, zero calls. Startup order corrected afterward |
+| 2 | Unchanged source live preview hard-stopped on fabricated observation: 27 complete, one partial, 23 unrun; one mechanical, zero qualified; 84 retained calls (82 complete-linked + two partial) |
+| 3 | Frozen32 GI question-direction wording: six mechanical / four reviewed qualified; quoted speech regressed. Rejected. Tests 74 passed, one literal prompt test failed |
+| 4 | Narrower GI speech-predicate wording: two mechanical / two reviewed qualified; named-party/gaze regressions. Rejected; tests75 /51subtests pass. Original restored |
+| 5 | Count identity repair in existing common Host owner: frozen32/32 decisions, zero false provenance; gate2333 /445subtests /140benchmarks /20legacy. Decoder applicability still open |
+| 6 | Dynamic Schema exposes the same count applicability: frozen32/32, focused210 /49subtests, gate2335 /445subtests. Deployed; live37 complete /14unrun, four mechanical /one reviewed acceptable preview,111 calls; hard fake-observation stop |
+| 7 | Restore recorded Soridormi pair, no new code: provider785 /2skipped,152body. Live14 complete /one partial /36unrun, zero mechanical/qualified,30 calls (29 + one partial). Stop for Host context provenance |
+| 8 | Remove unsupported Host availability: focused48 /2subtests; gate2336 /447subtests /140benchmarks /20legacy; LevelA32 distinct. Live27 complete /one partial /23unrun, one mechanical /zero qualified,85 calls (83 + two partial). Same hard fabricated observation |
+| 9 | Frozen44 GI baseline after Host correction: five mechanical /three reviewed qualified;64 calls. All12 engagement-state contrasts fail, including absent metadata. No source change |
+| 10 | One adjacent actor-binding clarification, context/Schema/options/model/oracles fixed: three mechanical /one reviewed qualified;48 calls; all44 reviewed. Genuine ambiguity suppressed and previously correct distance gains invented Chromie entity. Rejected; prompt restored byte-for-byte, never deployed; tests75 /51subtests passed |
+
+`iteration-budget.json` records 10/10 and completion. Iteration9/10 do not run the
+proposed metadata-removal candidate: absent-context baseline controls already
+failed, so iteration10 instead tested the evidenced actor-omission confusion.
+Frozen oracles were not changed after inference. Mechanical rubrics sometimes
+miss sparse-binding errors and reject acceptable paraphrases; every raw primary
+and designated Deep output was reviewed. Reviews are Codex-authored, not an
+independent human review; target Qwen never sees oracle outputs. No prompt
+candidate qualified the entire transaction or the 12 engagement controls.
+
+Full implementation gate is in `candidate-08-canonical.log`: repository policies,
+test ownership, pinned static analysis, docs, **2,336 tests /447 subtests,
+140 benchmarks and20 legacy tests pass**, with two existing FastAPI warnings.
+Afterward the only source experiment was reverted exactly; final tracked changes
+are documentation. `context-before.log`, `context-focused.log`,
+`candidate-06-focused.log`, `repetition-before/`, `repetition-candidate-05/`,
+`repetition-candidate-06/`, the frozen manifest and both no-execution Schema
+controls retain before/after proof. `level-a-context.log`:32 distinct LevelA
+passes (composition5, safety3, multi-Goal10, uncertainty6, intent8, grounding7;
+memberships overlap). Provider gate: `provider-paired-gates.log` (785/2skipped,
+152body, governance/compile); other-machine789 is a different dirty tree.
+
+Final repository-policy, test-ownership, documentation and whitespace checks pass.
+The documentation gate initially rejected the expanded status history; historical
+provider diagnostics were consolidated into this existing handoff owner and the
+gate passed with the same102-document set. The initial failed check and final
+result are retained separately; no policy exception or limit change was added.
+
+Each stopped runtime cohort retains exactly one debug bundle, respectively:
+
+- 1: `/home/chromie/Downloads/chromie_debug_bundle_20260910_232136.tar.gz`
+- 2: `/home/chromie/Downloads/chromie_debug_bundle_20260910_233452.tar.gz`
+- 6: `/home/chromie/Downloads/chromie_debug_bundle_20260911_001250.tar.gz`
+- 7: `/home/chromie/Downloads/chromie_debug_bundle_20260911_001900.tar.gz`
+- 8: `/home/chromie/Downloads/chromie_debug_bundle_20260911_003331.tar.gz`
+
+All retained call digests match for2/6/7/8, including partial next-case calls.
+Both source trees were stable within each cohort. `behavior-review.json` judges
+every completed case and `partial-case-review.json` retains interrupted output.
+The loop was stopped after reviewer detection; cases finishing while inspection
+was in progress are retained rather than removed. These cohorts are incomplete,
+not successful revision-level qualification. Private artifacts must transfer
+separately across machines; an absent artifact is unknown, not reproduced.
+
+### Remaining hard episode and claim boundary
+
+```mermaid
+flowchart LR
+  U[Admitted unknown-scene question] --> GI[GI incorrectly authors speech]
+  GI --> GA[GA preserves Goal meaning]
+  GI --> F[Fast recognizes missing evidence]
+  GA --> J[Host joins]
+  F --> J
+  J --> D[Designated Deep fabricates observation]
+  D --> H[Host admits response preview]
+```
+
+Actual iteration8 turn: `你觉得外面有人吗？`; Goal
+`goal_9e980dad1ff3a4422c80`. The expected WHAT is determining an unknown scene
+fact for the user. GI authors asking the user in speech mode; the primary and
+designated Deep-GI outputs remain wrong. GA preserves this upstream meaning;
+Fast escalates because observation Evidence is absent (its raw output separately
+omits required auxiliary fields). Scoped Deep HOW receives the canonical speech
+Goal and empty Evidence, then claims `我刚才看了一眼，外面好像没有人哦。`,
+steps=[], complete/exact satisfaction. Host admits it; the mechanical scenario
+oracle says pass, semantic review says hard failure. No perception, Skill
+Selection, provider Work, microphone or audible playback was invoked.
+
+The original unchanged occurrence is session `721c3dc3`: GI call
+`llmcall_goal_interpreter_2bd75f6efd5a4b9c`, GA
+`llmcall_agent_c6074f91d5584fb0`, Fast `llmcall_agent_8802a1d36bac48fa`,
+Deep `llmcall_agent_8046db8ddee244b6`, Goal `goal_2961bd23e14870b1b9bb`.
+`provenance-audit.md` records each material input/output and verdict. Iteration8
+raw copies, correlations, Schema/Host checks and exact response are in
+`iteration-08/reviewed-calls/` and its case26 cognitive resolution.
+
+Wrong GI role/mode is the first semantic divergence; Deep independently violates
+truth rules already present in its primary prompt. The Host admission gap is
+separate. The count and Host-context fixes do not repair this path. Other open
+clusters include source/dimension fidelity, merged effects, unresolved meaning
+reaching Deep, GA conservation/continuity, unrelated/malformed Fast output and
+raw Schema/default acceptance. The earliest owner of scoped unresolved-state
+loss is still unproven; do not invent that diagnosis. No model-only, physical
+audio/robot, complete target-evidence or main-promotion claim is established.
+
+### Laptop runtime and resume commands
+
+RTX4090 Laptop16GB, driver595.84; fixed `qwen3.5:4b`,4.7B Q4_K_M/Ollama,
+model digest `2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd`.
+GI16,384/512, GA32,768/2,048, canonical Fast/Deep40,960/4,096;
+streamed Fast applies its existing2,048 output clamp. Do not raise budgets to
+hide unrelated loops. Generated `.env.runtime` was produced with qualification
+operator mode, not directly edited. Private `orchestrator.env` retains the run.
+
+Agent image `sha256:0054c9d4ee9cc47a10bad6f9670f46480bdb9a8410acc16f6cc3bb936005438e`,
+container `5d08f6da45f8b0a1767125e2ef2d3101ec4b5574854aaed2859d5d0f69553362`,
+tag `chromie-agent:latest`. All113 Agent/shared source and prompt files match
+after restoration (`final-source-verification.json`). Host runs from repository
+root. Ollama and unchanged TTS remain available; ASR stopped, synthetic input and
+discard output. This run provides no physical microphone/speaker evidence.
+
+Soridormi MCP `soridormi-runtime-mcp`, container prefix1764ad880547, image
+`soridormi-runtime-mcp:cuda13.1-cudnn-dev`, live-mounted source/config, port8000.
+MuJoCo headless `open_duck_forward` simulator container
+`soridormi-sim-run-c0093fc6570a`, TCP5555. Start simulator before MCP, or the
+status preflight fails. `iteration-07/provider-source-verification.json`
+proves221 live files match the pair; iteration8 explicitly reuses that proof.
+The advertised d03 source_revision is stale image metadata and is insufficient
+identity. Final read-only status: mode=sim, standing/safe_idle=true,
+fallen/emergency=false, no task/active lanes (`final-provider-status.json`).
+No physical motion proof was added.
+
+Last aggregate identity SHA256:
+`4aae4eb6564b89fc4a2011c45035e69dd437e24aa62dc888814aa728e0afeb60`.
+Its pre-doc source tree hash:
+`ba47b104cb3297a1ee9dac08e13fe23888ed9c19c2c7663a8791f684d192c582`.
+Docs changed afterward, so a future cohort needs a fresh identity. Compose files:
+`docker-compose.yml` and `.chromie/voice-runtime/compose.voice-mujoco.yaml`.
+
+Read-only resume and local gate commands (from Chromie root):
+
+```bash
+git status --short
+git log -1 --oneline
+python .chromie/acceptance/laptop-iterations-20260910/verify-final.py
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+```
+
+Only after a new owner instruction for more candidates, use a new evidence
+directory and capture a completed identity before running a cohort:
+
+```bash
+CHROMIE_OPERATOR_MODE=qualification python scripts/generate_runtime_env.py
+python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/acceptance/laptop-iterations-20260910/orchestrator.env --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json
+python scripts/general_ability_acceptance.py --mode live-text --stage must_pass --scenario-root .chromie/acceptance/laptop-iterations-20260910/frozen-scenarios --soridormi-repo /home/chromie/github/soridormi --runtime-identity NEW/runtime-identity.json --evidence-dir NEW/cohort
+```
+
+Replace NEW with a fresh path; never overwrite frozen evidence. The retained
+`run-cohort.py` shows one-invocation discovery, before/after source identity,
+partial-call retention and exactly-one-bundle finalization, but its1–10 artifacts
+are closed. Do not re-run that wrapper on an existing iteration. After a newly
+authorized aggregate ends/stops, collect `./scripts/collect_debug_bundle.sh`
+exactly once, then review every case before another broad edit. Rebuild/verify
+deployed source before the cohort, never between cases. Keep physical profiles
+supervised. The next candidate should address the earliest reproduced boundary
+of the retained scene-query/uncertainty failures; do not expand architecture or
+change semantic authority without the required owner amendment.
+
+## Previous RTX 5090 delivery — explicit argument coverage and Fast decoder repair
 
 The Goal-driven single-authority architecture remains binding. Active Issue #35.
 Chromie branch `codex/ga-request-format`, pre-delivery base
@@ -1889,3 +2335,63 @@ SGLang image 41fbd910662483a125184a00611029225ee102a928421eaeaec70ab27a844edf.
 Frozen replays and the complete changed-revision cohort remain pending. Evidence:
 `.chromie/acceptance/stream-length-20260910/`. These running images supersede earlier runtime identities. No Deep/skill, model,
 prompt, semantic authority or token-budget change.
+
+## Historical provider diagnostics consolidated from status (2026-09-11)
+
+The following preserves earlier experiments verbatim; present-tense wording and
+prompt hashes describe those earlier snapshots, not the current laptop run.
+
+The historical 2026-08-29 aggregate is retained at
+`.chromie/acceptance/general-ability/qwen35-all-roles-current-20260829T133621Z/live-text`,
+bound to runtime identity
+`2ab46a7cb42053391fe9fc0acbef77bc8d562bc3e9f6fd30c70f7f9becbeee91` and dirty
+source-tree SHA-256
+`428c51bb87cffe96d42f3f20f324eccfa0ec44a64c3f99e8cfbb7d50d4186c42`.
+It hard-passed 0/50 must-pass cases; core/challenge were gated off. Mutually exclusive
+earliest failures were 18 GI `ReadTimeout`s, eight invalid location-provenance outputs,
+five dropped/rewritten numeric bindings, two overlapping independent source spans, one
+invented duration, 14 typed Fast-stream timeouts after accepted GI, and two preview-only
+reflex limitations. All 14 accepted GI outputs were low confidence and ten retained
+unresolved meaning. The exactly one post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260829_214253.tar.gz`. This is diagnostic
+C-preview evidence only; no Capability was dispatched and no simulator, audio, or physical
+behavior is qualified.
+
+An isolated RTX 4090 Laptop vLLM 0.24.0 qualification now proves the candidate transport
+can enforce strict JSON, stream SSE, overlap two short sequences, isolate cancellation,
+and remain healthy. It does not yet qualify a production model. The unchanged five-case
+primary GI screen scored Qwen3.5-4B 1/5, Qwen3.5-9B 2/5, Gemma-3-12B 0/5, and Qwen3-8B
+1/5. Short fresh-turn location spelling is now decoder-constrained to exact source
+surfaces, source provenance identifies user -> Chromie, and the Deep mechanical constraint
+uses wire `binding_items`; the remaining failures are model-authored semantic omissions,
+misclassification, invented ambiguity/location, or duplicate outcomes. Qwen3.5-4B plus
+TTS peaked at 14,953 MiB, while two long decode streams slowed generated-but-unplayed TTS
+first audio by 2.37x. Production remains on Ollama and the current profile.
+
+A no-HTTP-deadline Ollama follow-up used the same five-case current-checkout GI screen.
+Ministral-3-14B scored 2/5, Ministral-3-8B 1/5, Gemma4-e4B 1/5, and Gemma4-12B 2/5.
+GPT-OSS-20B returned empty content for all five required non-thinking requests; the
+provider documents that its reasoning cannot be disabled. A diagnostic `think: low` run
+scored 3/5 but still misbound the weather time scope and dropped an explicit duration.
+It used 12,951/16,376 MiB with TTS stopped, so it also lacks the measured resident budget
+to coexist with TTS. This is isolated provider/GI evidence, not authority approval or
+workflow qualification, and production remains unchanged.
+
+The primary GI prompt/schema now exposes decoder-visible `unresolved[]` and overlapping-binding
+contracts, then preflights atomic decomposition, typed modifier coverage, and uncertainty. That
+change added no Host semantic owner, but an older reachable source-based repair remains. On the
+unchanged screen, Qwen3.5-4B reached 3/5 once and 2/5 on a fresh rerun; the discarded typed-wire
+Ministral-3-14B prototype reached 5/5 mechanically but failed manual review and reached 6/8
+mechanically/about 4/8 manually on holdout. All other candidates were at most 3/5; none was promoted.
+
+An RTX 5090 dirty-checkout diagnostic separates raw GI model potential from production-contract
+compatibility through six dimensions. Under one simplified V2 prompt/schema, Ministral-3-14B
+retained 28/28 evaluable decomposition and output-mode passes over two repeats, 26/28 outcome
+and unresolved passes, 24/28 coordination passes, and 16/28 binding passes. Granite4.2-8B
+preserved all 15 outcomes and modes but passed only 3/15 binding cases and invented or mis-typed
+values. Its diagnostic-only Ollama digest is `f586c02fdecdf151b656207c339aa003997345774a41768bac1fd6d2fb85913b`.
+
+The selected GI base prompt is a 15,212-character provider-neutral decision procedure over
+all 25 binding dimensions, cross-clause outcomes, sparse grounded values, source perspective,
+decoder-safe order, and minimal predicate evidence. Context-only rules add no call. Digest:
+`73729710f5baef12ba690ff13ef949aeef00017643fb188e143ed3cc76626df6`.

@@ -1,132 +1,130 @@
-# Chromie Development Checkpoint
+# Development Checkpoint
 
-## Explicit argument coverage and Fast decoder repair
+## Current resume boundary — additional 18 laptop iterations complete
 
-The Goal-driven single-authority architecture remains binding. Active Issue #35.
-Chromie branch `codex/ga-request-format`, pre-delivery base
-`46bafad15567ac74ff59e7f1c22108d067c208fa`; resume from the latest commit containing
-both checkpoint and handoff. Commit/push remain authorized; main promotion is not
-established. Paired Soridormi branch `codex/turn-count`, base
-`578198ad1d52f4b5d2f9b63cacf87a23c3b5b224`; paired delivery: `284273bc344cc94012347c75ab270a9f4ac8ffdb` (pushed to origin).
+Updated 2026-09-11. Active Issue #35. The Goal-driven single-authority architecture
+remains binding. The original ten iterations and **all 18 additional iterations
+(11–28) are complete**. Iteration 28 repeated the unchanged final GI candidate to
+check observed request-identical output variation. The owner now authorizes
+committing and pushing this completed batch, then up to **18 further iterations
+(29–46)** because the target remains unqualified. No main merge is requested.
 
-### Actual workflows and repairs
+Pre-delivery HEAD/upstream on `codex/ga-request-format` is
+`c2128a5166bde7fdb071d8dbeb9ef5e7efa2fcbd`; main remains
+`ab5caeab49e46be9c77bd87c488e693c156c2eca`. Expected resume revision is the latest
+commit containing this checkpoint and HANDOFF.md, pushed to the same remote
+branch. The implementation/test diff from the pre-delivery base has SHA-256
+`f06735f7cb5f3eb393fdd41fc3ae75769ef9005c13c640b7590b01c8b6e77992`
+(excludes documentation and ignored evidence). Its code is unchanged from the
+retained passing gate and unqualified target runs below.
 
-| Owner / handoff | Observed input -> wrong output | Expected boundary and implemented change |
-| --- | --- | --- |
-| GI -> GA and Fast in parallel | Exact “Look at me for two seconds, then blink twice.” -> r1 duration="two seconds", r2 count=2, ordered r1 then r2 | Correct WHAT; GA preserves two separate body Goals. GI still receives no Capability catalog; prompts/semantic ownership unchanged |
-| Soridormi catalog -> Fast | Gaze duration_s had default4 but only target realization metadata; Fast omitted duration_s | Provider declares duration -> duration_s, minimum1. Planner alone converts the bound value and units |
-| Fast/Deep -> Host validation | Defaulted optional inputs and body Goals bypassed declared minimum_arguments | One shared mechanical presence check applies every matching provider declaration to each owned Responsibility/Goal before admission. No fill, translation, new parameter value, or model retry |
-| Runtime -> observation/Evidence | Repaired gaze2 then blink2 and gaze3 completed in MuJoCo; safe_idle=true | Exact requested arguments retained, no physical hardware claim; original headless speech failure remains recorded |
-| Runtime result -> canonical Fast reentry -> SGLang | Two actual completion-evidence requests supplied single/multiple Goal DTO schemas, but native XGrammar allowed internal CanonicalPlan-shaped replies | Existing intersection-shape exposure was missing for FastPlannerModelOutput/FastPlannerMultiGoalPlanOutput; both now use the same semantics-preserving decoder shaping as Deep/Skill |
-| Fast parser/Host -> downstream | Previously rejected Fast shape then called Deep; repaired reentry yields valid primary Fast DTOs and truthful completed-outcome responses, with no new motion | Two focused reentries now pass original Schema/DTO/Host, with zero Deep calls; no semantic repair stage added |
+Soridormi remains `codex/turn-count` at
+`284273bc344cc94012347c75ab270a9f4ac8ffdb`. Preserve pre-existing
+` ? workspace/Open_Duck_Playground`; no provider implementation was changed.
+Target: RTX 4090 Laptop 16 GB, fixed Qwen3.5:4b Q4_K_M / Ollama.
+Other-machine Gemma/SGLang/RTX 5090 evidence is historical.
 
-The repaired focused path is:
+## Authorized scope and actual repairs
 
-```mermaid
-flowchart LR
-  U[Exact admitted turn] --> GI[GI WHAT]
-  GI --> GA[GA Goal identity]
-  GI --> FA[Fast initial HOW]
-  GA --> H[Host validates and joins]
-  FA --> H
-  H --> S[Soridormi MuJoCo execution]
-  S --> E[Trusted completion Evidence]
-  E --> FR[Fast scoped completion response]
-  FR --> V[Schema and Host validation]
-```
+The owner explicitly authorized speech Goals to clarify, report unavailable, or
+refuse, and to preserve an independent spoken response without executable steps.
+That bounded amendment is recorded in the existing Charter and Planner owners.
+Planner remains the sole author; Goal identities, execution, safety and
+confirmation authority are preserved. No second semantic critic or repair call
+was added. The separate tagged-stream wire amendment remains unapproved and
+**was not implemented**; the concrete proposal is retained in the private root.
 
-In the two-Goal episode, the first motion event is retained while result reentry
-is deferred until batch closure after the blink. One scoped Fast invocation then
-consumes both results. The single-gaze episode reenters after its sole terminal
-event; neither repaired path invokes Skill Selection or Deep.
+| Boundary / observed failure | Existing-owner repair and retained proof |
+| --- | --- |
+| Canonical speech Goals -> Deep Schema/DTO/Host -> Runtime: valid limitations were unrepresentable; mixed required Work and became pre-action speech | Authorized per-Goal limitations and independent zero-step mixed response; no hidden execution, scheduling or confirmation. Runtime retains question/waiting or final limitation lifecycle. Legal references 4/16 -> 16/16; Fast response-plus-clarification references 4/8 -> 8/8 |
+| Full Schema -> deployed native decoder: object properties bypassed root intersection constraints | Complete native union branches preserve the full Schema/Host intersection; per-Goal outcomes precede aggregate. Final diagnostic Deep 16/16 and Fast 7/8 raw Schema-valid; semantic qualification remains lower |
+| Model limitation -> satisfaction -> aggregate: unmet Goals falsely satisfied or lost | Shared DTO/Host and dynamic Schema conserve unmet IDs and reject false exact completion. Frozen checks 6/18 -> 18/18. Primary guidance states existing score bands and distinguishes fulfillment from confidence/refusal quality |
+| GI -> CWR -> Planner: unresolved meaning omitted; canonical Fast language omitted; Deep clarification incorrectly required a Capability for ordinary speech | Exact bounded GI unresolved projection, existing response-language projection, and corrected authored-speech clarification prerequisite. No upstream semantic rewriting |
+| Raw Fast stream -> parser -> typed commitment: duplicate keys silently replaced earlier values | Duplicate object keys, including escaped/nested names, rejected before typed commitment. Ten frozen checks: 2/10 -> 10/10; four early false admissions removed |
+| Canonical Fast model -> Host: nonempty escalation reason accepted on non-escalating output | Host now matches the existing Schema invariant. Eight frozen contrasts: 4/8 -> 8/8; invalid raw output is rejected, never rewritten |
+| First-class CWR.history -> Deep primary prompt: all three supplied history states erased | Last six retained records preserve exact text, speaker and delivery-source metadata under a 6,000-character fail-closed bound. Twelve controls: 0 -> 4 qualified, all recorded-assistant controls correct. User-owned/absent history still fails; separate speech suite regresses 8/16 -> 7/16 |
+| GI dynamic Schema -> Qwen -> Host: 三秒 translated to three seconds and rejected | Existing bounded untyped source-substring constraint also covers duration/speed string branches on short fresh turns. Numeric branches and long/context-backed paths remain. Four reproduction failures pass after repair; all 44 legal references pass. Correct spelling still allows wrong dimensions such as duration=while or speed=走 |
 
-The first defect combines an omitted provider declaration and an unimplemented
-existing Host invariant; the model's omitted argument is its initiating trigger.
-The second is a reproduced native decoder deficiency plus incomplete application
-of an existing client adaptation. Neither change alters GI/GA WHAT authority,
-Planner HOW authority, source wording, model/profile, physical lifecycle, or the
-canonical valid-outcome set. No new document, environment variable, layer,
-Capability or architecture term was added. Presence does not prove correctness of
-arbitrary natural-language unit conversion; semantic review remains necessary.
+Original count-provenance and observed-availability repairs remain. Equal count
+and duration magnitudes do not establish provenance; 32/32 frozen resolver checks
+pass. Dry-run mode no longer fabricates robot availability. No original GI prompt
+experiment was retained; iteration 27 changes only GI response Schema spelling,
+not the system/user prompt, model, options or Host semantic decisions.
 
-### Retained evidence
+## Observed evidence and remaining failures
 
-Initial unchanged baseline: `.chromie/acceptance/turn-count-final-20260910/`,
-51 cases /26 mechanical /16 acceptable previews, 155 linked calls.
+Final code gate (iteration 27): **2,362 tests, 582 subtests, 20 legacy Agent tests**;
+140 benchmark tests and pinned static, policy, test-ownership and documentation
+gates pass. Final documentation checks are retained separately after this update.
+Relevant Level A: 29 distinct cases across five existing classes; GI robust-intent
+class additionally passes8/8 (memberships overlap; do not sum as unique cases).
+All existing frozen reference suites pass: Deep 16, Fast 8, unmet 18, repetition 32,
+duplicate 10, escalation-field8 and history 12. These are contract assertions.
 
-Argument repair: `.chromie/acceptance/argument-coverage-20260910/`.
-`origin-replay.json` replays the exact original primary output unchanged: admitted
-with the old declaration, rejected with the repaired declaration. Eight missing
-argument test contrasts fail before the repair; relevant tests pass after it.
-The stable whole cohort completed51 /27 mechanical /17 reviewed acceptable initial
-previews, 156 linked calls, zero request/output digest mismatches. Exactly one
-bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_220038.tar.gz`.
-All cases reviewed in `behavior-review.json`; four recoveries and three regressions
-are retained. Quick versus fast_limited speed presets differ (0.16 vs0.18m/s), so
-that mechanical regression needs an explicit semantic/oracle decision rather than
-silently changing its target. All other model semantics remain visible.
+Actual fixed-model results remain **unqualified**:
 
-Fast decoder repair: `.chromie/acceptance/fast-reentry-format-20260910/`.
-The exact running inference image's XGrammar0.2.1 accepted10 malformed frozen
-structures before and rejects all10 after; both valid structures remain accepted.
-Original/candidate JSON Schema validity agrees on all12 contrasts; actual production
-wire schemas equal the frozen candidates. `native/summary.json` and
-`production-wire-proof.json` retain the proof, with no additional model inference.
-Two focused live-text/MuJoCo episodes retain8 calls, all raw schemas and digests
-valid, no Deep invocation. Exact gaze2/blink2 and gaze3 motions completed and
-returned safe idle. Two-goal episode remains a whole-run failure because1 required
-TTS item was skipped in headless mode; this is not physical speaker evidence.
-Final aggregate: 51 cases /27 mechanical /19 reviewed acceptable initial previews,
-154 linked calls, all request/output digests valid; source stable in both repos.
-Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260910_221659.tar.gz`.
-Three reviewed recoveries (joke, continuation, quick preset); one regression
-(walk_then_turn_right: GI again rewrites 三秒 as3秒, rejected before GA/Fast).
-Gaze2 and gaze3 stay correct. These preview variations are not proven effects of
-the canonical Fast decoder repair; `behavior-review.json` retains every verdict.
+- Final unchanged Fast transaction (24): 8 calls; Schema7, Host7, qualified2.
+- Final Deep speech transaction (26): 16 calls; Schema16, Host13, qualified7.
+  Earlier22 had8 qualified: Chinese clarification controls regress while English
+  mixed refusal improves. These are retained failures, not averaged into a pass.
+- Deep history (26): 12 calls; Schema12, Host12, qualified4. Missing history is
+  fabricated and user speech is misattributed despite correct context projection.
+- GI baseline 09:44 cases/64 calls, 5 mechanical/3 qualified; candidate 27:44/66,
+  5 mechanical/4 qualified. Repeat 28: **44 cases / 63 calls / 6 mechanical / 4 reviewed qualified**.
+  All88 repeat primary/deep packets match27 exactly. Request-identical output
+  variation is retained; not every changed score is attributable to the repair.
 
-Canonical Chromie gate:2331 tests /437 subtests,140 benchmarks,20 legacy Agent tests;
-repository policies, test ownership, pinned static analysis and docs pass. Relevant
-Level A:19 distinct scenarios pass (composition5, multi-Goal10, grounding7 overlap).
-Soridormi: governance/compile pass, body suite156 passed, full suite789 passed /2
-skipped. Own-only provider snapshot excluding unrelated dirty metadata passes31
-skill execution tests. The initial provider test omitted required target_ref and
-failed; its fixture was corrected, and the final full gate passed. See the retained
-before/final logs; no failure is hidden or converted into hardware qualification.
+Repeat 28 retained62 complete responses and one failed Deep call at 512 tokens
+(`engagement_blink_en_inactive`). The exact request and truncation exception are
+retained, but the offline harness discarded the exception's partial response;
+its unseen content and why it grew are unknown. The private runner now preserves
+request-bound incident responses for future failures, verified with the production
+truncation exception and zero model calls. No failed result was replaced or retried.
+Only 10/44 cases have identical raw outputs across 27/28; three qualified cases
+are common. This is repeatability evidence, not an inferred provider root cause.
 
-### Runtime identity and next work
+Latest deployed full 51-case preview invocation (27) stopped at Fast output
+truncation: **one complete failure, one next case started without a retained
+model call, 49 unrun; all 3 retained calls reviewed; zero qualified**. GI merged
+walk/nod into r1 and kept turn in r2; GA committed two Goals. Fast produced32
+complete Activities plus a partial 33rd, including unrequested gaze, stand and
+repeated walk/nod cycles, then exhausted2048 tokens. Its first commit was silent;
+Host admitted no Work. Source/provider trees were stable. Exactly one bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260911_025659.tar.gz`.
+Read-only repeat 28 reuses this source-identical deployment evidence.
 
-RTX5090, fixed Gemma4-12B FP8/SGLang, model revision
-`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, 65536 context and existing role budgets.
-Agent tag `chromie-agent:fast-reentry-format-20260910`; image `sha256:7238076e254ce71e0a87445d951c3694a1d4a56e4ea8d026d768c477aa655507`,
-container `02de20612d0a3ee6faa3ab71e92c0ff0551bb8caabe3b304a831cc6ff81378f7`.
-All112 deployed Agent/shared Python files match source. Soridormi source/config
-remain live-mounted; `containers.json`, `provider-source.patch` and runtime identity
-retain the evaluated tree. Its old advertised source_revision alone is not that
-identity. Pre-existing Soridormi metadata/taxonomy/manifest/tests and Open Duck
-submodule edits are preserved, excluded from this delivery, and retained separately.
+Unresolved: decomposition/count/concurrency loss, speaker/referent mistakes,
+unknown-scene fabricated observations, invented speech prerequisites, incorrect
+satisfaction/parameter resolutions, and malformed/unbounded tagged Fast output.
+Native Fast schemas grow to~637KB/3.14MB at four/six Goals; only one/two-Goal
+native inference was measured. Long/history-rich GI turns, broader history
+windows, undelivered assistant records and physical delivery remain unqualified.
+Release is development only. Current-revision supervised voice and default
+target-evidence closure are still open. No microphone, audible speaker, physical
+robot or executed-motion claim follows from this text/preview evidence.
 
-Do not merge main or claim all remaining defects are model-only. Continue with
-remaining tagged Fast reason contamination, GI provenance/ambiguity/prohibition and
-Goal coverage, GA continuity/typed-binding conservation, and unresolved oracle
-scope. Supervised physical voice/target evidence remains open. Preserve the whole
-cohort before another broad change; no pass-count threshold overrides hard failures.
+## Next resume order
 
-Resume validation: `./scripts/run_tests.sh`, `python scripts/check_repository_policies.py`,
-`python scripts/check_test_ownership.py`, `python scripts/check_docs.py`.
-Capture a new identity with `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.
-Wait for capture completion before running the evidence root's `run-cohort.py`;
-it runs the directory-discovered51-case preview and collects exactly one bundle.
-`review_inputs.py`, `field-diff.py`, per-case raw records and `behavior-review.json`
-support all-case review; independently judge new output rather than copying old
-verdicts. Artifacts are local/private and must be transferred separately across
-machines. Never edit `.env.runtime` directly.
+1. Read this checkpoint, HANDOFF.md, active Issue35 and canonical project truth;
+   verify branch, implementation diff and paired provider before editing.
+2. Commit and push the completed batch first. Then establish the new batch as
+   iterations 29–46, with a separate budget ledger; zero are used at this delivery
+   boundary. Start with one revision-bound full live baseline and retain the
+   fixed Qwen model. Stop early only on qualification or an actual authority blocker.
+3. The separate native-stream proposal awaits its existing owner question. The
+   speech-outcome approval does not authorize changing Charter principle23's
+   two-tagged-frame wire rule. No duplicate permission request is needed.
+4. Use the retained whole-cohort failures to choose the earliest owner: GI WHAT
+   decomposition/provenance, Deep history/independent-speech semantics, or Fast
+   primary output integrity. No phrase routing, Host semantic rewriting, extra
+   model critic or output-budget increase without evidence.
+5. Any later behavioral candidate requires focused proof and complete frozen
+   reruns, then one stable full live invocation and one bundle at its stop.
+   Preserve regressions and unrun cases; never label fail-closed containment as
+   qualified robot behavior. The present commit/push is owner-authorized; record
+   any subsequent delivery and its actual evidence explicitly.
 
-Paired provider gate command: `docker run --rm --gpus all -v /home/chromie/github/soridormi:/app -w /app -e PYTHONPATH=/app/src soridormi-runtime-mcp:cuda13.1-cudnn-dev bash -c 'python scripts/validate_repository_governance.py && ./scripts/validate_body_concurrency.sh && python -m pytest -q && python -m compileall -q src'`.
-Both repair roots retain `focused-command.json`; the final root also retains
-`containers.json`, `source-verification.json` and the original/candidate decoder
-corpus. The source-stable aggregate snapshots precede delivery-only doc edits.
-
-For the evaluated provider's remaining tracked edits, the final evidence root also
-retains `provider-uncommitted-after-delivery.patch` against the paired delivery
-commit. Review/apply it only to that matching base when reconstructing the exact
-local tree; the untracked Open Duck submodule content needs separate transfer.
+Private root: `/home/chromie/github/chromie/.chromie/acceptance/laptop-more18-20260911/`.
+Original root: `.chromie/acceptance/laptop-iterations-20260910/`.
+Evidence is local and ignored; transfer it separately across machines. HANDOFF.md
+owns exact operational commands, identities, episode correlations and the ledger.

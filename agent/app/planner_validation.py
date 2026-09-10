@@ -50,7 +50,10 @@ from .planner_context import (
 from .planner_grounding import (
     _argument_realization_contract,
     _argument_schema_accepts_canonical_binding,
+    _count_argument_names,
+    _count_provenance_compatible,
     _goal_binding_map,
+    _is_count_binding,
     _material_values_equal,
     _normalized_entity_type,
     missing_argument_realizations,
@@ -113,11 +116,14 @@ def validate_goal_responsibility_outcomes(
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
             raise ValueError(f"vocal_output goal requires an explicit outcome: {goal_id}")
-        allowed_dispositions = {"escalate"} if output.disposition == "escalate" else {"respond"}
+        allowed_dispositions = (
+            {"escalate"} if output.disposition == "escalate"
+            else {"respond", "clarify", "unavailable", "refused"}
+        )
         if outcome.disposition not in allowed_dispositions:
             raise ValueError(
-                "vocal_output goal must use disposition=respond in a terminal "
-                "plan or disposition=escalate in a whole-plan Fast escalation, "
+                "speech goal requires a response, clarification, unavailable, or refusal "
+                "outcome, or escalation in a whole-plan Fast escalation, "
                 f"with no executable step: {goal_id}"
             )
     for goal_id in sorted(provider_vocal_goal_ids):
@@ -1176,6 +1182,7 @@ def validate_goal_binding_argument_grounding(
 
     bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
     information_goal_ids: set[str] = set()
+    resource_goal_ids: set[str] = set()
     time_condition_goal_ids = {item.goal_id for item in output.time_conditions}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
@@ -1184,6 +1191,8 @@ def validate_goal_binding_argument_grounding(
         if goal_id:
             bindings_by_goal[goal_id] = _goal_binding_map(goal)
             responsibility = goal.get("resource_responsibility")
+            if isinstance(responsibility, dict):
+                resource_goal_ids.add(goal_id)
             resource = responsibility.get("resource") if isinstance(responsibility, dict) else None
             if isinstance(resource, dict) and resource.get("kind") == "information":
                 information_goal_ids.add(goal_id)
@@ -1220,6 +1229,52 @@ def validate_goal_binding_argument_grounding(
                 required[name] = binding
 
         capability = capabilities_by_id.get(step.capability_id) or {}
+        if capabilities is not None:
+            # Structured resource arguments retain their own nested grounding;
+            # an item quantity in that DTO is not an execution repetition.
+            count_bindings = [
+                (name, binding)
+                for goal_id in claimed_goal_ids if goal_id not in resource_goal_ids
+                for name, binding in bindings_by_goal[goal_id].items()
+            ]
+            for name, binding in count_bindings:
+                if not _is_count_binding(name, binding):
+                    continue
+                count_arguments = _count_argument_names(capability, name)
+                if not count_arguments:
+                    raise ValueError(
+                        "selected Capability has no declared count input for "
+                        f"authoritative repetition: {step.step_id}.{name}"
+                    )
+                if not count_arguments.intersection(step.args):
+                    raise PlannerDTOContractError(
+                        "planner step omitted authoritative count realization: "
+                        f"{step.step_id}.{name}"
+                    )
+
+        for resolution in output.parameter_resolutions:
+            if (resolution.step_id != step.step_id or resolution.blocking
+                    or resolution.strategy != "user_supplied"):
+                continue
+            for goal_id in resolution.source_goal_ids:
+                if goal_id in resource_goal_ids:
+                    continue
+                matches = [
+                    (name, binding)
+                    for name, binding in bindings_by_goal.get(goal_id, {}).items()
+                    if _material_values_equal(resolution.value, binding["value"])
+                    or bool(semantic_numeric_values(resolution.value)
+                            & semantic_numeric_values(binding["value"]))
+                ]
+                if matches and not any(
+                    _count_provenance_compatible(
+                        capability, resolution.parameter, name, binding
+                    ) for name, binding in matches
+                ):
+                    raise ValueError(
+                        "user_supplied parameter provenance crosses count identity: "
+                        f"{step.step_id}.{resolution.parameter}, goal_id={goal_id!r}"
+                    )
         missing = missing_argument_realizations(
             capability, step.args,
             [binding["entity_type"] for binding in required.values()],
@@ -1895,6 +1950,7 @@ def normalize_missing_numeric_parameter_provenance(
     raw: dict[str, Any],
     *,
     authoritative_goals: list[dict[str, Any]],
+    capability_payload: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Add only mechanically provable duplicate provenance for Goal numbers.
 
@@ -1927,6 +1983,11 @@ def normalize_missing_numeric_parameter_provenance(
         return abs(left - right) <= Decimal("1e-12") * scale
 
     repairs: list[dict[str, Any]] = []
+    goals_by_id = {str(goal.get("goal_id") or ""): goal for goal in authoritative_goals}
+    capabilities_by_id = {
+        str(capability.get("capability_id") or ""): capability
+        for capability in capability_payload or []
+    }
     for goal_id, values in explicit_numeric_goal_values(authoritative_goals).items():
         outcome = outcomes.get(goal_id)
         if isinstance(outcome, dict) and outcome.get("disposition") != "execute":
@@ -1943,7 +2004,14 @@ def normalize_missing_numeric_parameter_provenance(
                     continue
                 for parameter, argument in args.items():
                     actual = numeric(argument)
-                    if actual is not None and equal(actual, expected):
+                    if actual is not None and equal(actual, expected) and any(
+                        expected in semantic_numeric_values(binding["value"])
+                        and _count_provenance_compatible(
+                            capabilities_by_id.get(str(step.get("capability_id") or ""), {}),
+                            str(parameter), name, binding,
+                        )
+                        for name, binding in _goal_binding_map(goals_by_id[goal_id]).items()
+                    ):
                         candidates.append((step_id, str(parameter)))
             if len(candidates) != 1:
                 continue
@@ -2051,6 +2119,7 @@ def normalize_mechanically_derivable_parameter_provenance(
             for value in step.get("source_goal_ids") or []
             if (goal_id := " ".join(str(value or "").strip().split())) in goals_by_id
         ]
+        capability = capabilities_by_id.get(capability_id) or {}
         for parameter, argument in args.items():
             key = (step_id, str(parameter))
             step_arguments[key] = argument
@@ -2065,6 +2134,10 @@ def normalize_mechanically_derivable_parameter_provenance(
                 ):
                     continue
                 for binding_name, binding in _goal_binding_map(goal).items():
+                    if not _count_provenance_compatible(
+                        capability, str(parameter), binding_name, binding
+                    ):
+                        continue
                     if _material_values_equal(
                         argument,
                         binding.get("value"),
@@ -2107,6 +2180,11 @@ def normalize_mechanically_derivable_parameter_provenance(
     repairs: list[dict[str, Any]] = []
     for key, raw_candidates in candidates.items():
         unique_candidates = list(dict.fromkeys(raw_candidates))
+        # A same-name binding fixes identity even when a different quantity has
+        # the same magnitude. Do not turn that coincidence into ambiguity.
+        same_name_candidates = [item for item in unique_candidates if item[2] == key[1]]
+        if same_name_candidates:
+            unique_candidates = same_name_candidates
         strategies = {item[0] for item in unique_candidates}
         goal_ids = list(dict.fromkeys(item[1] for item in unique_candidates))
         binding_names = {item[2] for item in unique_candidates}
@@ -2176,12 +2254,13 @@ def normalize_mechanically_derivable_parameter_provenance(
             }
         )
 
-    # Retain the migration adapter for older non-resource Goals whose explicit
-    # numeric value exists only in canonical description/success text. It is the
-    # same exact, unique duplicate-provenance projection and never edits args.
+    # Retain exact numeric projection for typed source values containing units.
+    # It uses the same count identity restriction and never mines Goal prose or
+    # changes model-authored arguments.
     normalized, numeric_repairs = normalize_missing_numeric_parameter_provenance(
         normalized,
         authoritative_goals=authoritative_goals,
+        capability_payload=capability_payload,
     )
     repairs.extend(
         {
@@ -2631,11 +2710,11 @@ def planner_contract_diagnostics(
             "execute planner output requires at least one step",
             value=steps,
         )
-    if disposition == "mixed" and not steps:
+    if disposition == "mixed" and not isinstance(raw.get("goal_outcomes"), dict):
         add(
-            ["steps"],
-            "mixed planner output requires steps and goal_outcomes",
-            value=steps,
+            ["goal_outcomes"],
+            "mixed planner output requires goal_outcomes",
+            value=raw.get("goal_outcomes"),
         )
     if disposition == "respond" and not response_text:
         add(
@@ -2985,9 +3064,12 @@ def validate_planner_model_output(
         raise ValueError(
             "fast multi-goal or escalation output requires an explicit goal_outcomes object"
         )
-    if planner_tier == "fast" and output.disposition == "escalate":
-        if output.coverage not in {"partial", "uncertain"}:
-            raise ValueError("fast semantic escalation requires partial or uncertain coverage")
+    if planner_tier == "fast":
+        if output.disposition == "escalate":
+            if output.coverage not in {"partial", "uncertain"}:
+                raise ValueError("fast semantic escalation requires partial or uncertain coverage")
+        elif output.escalation_reason:
+            raise ValueError("non-escalating fast plans require empty escalation_reason")
     if (
         len(expected_goal_id_set) > 1
         and output.disposition in {"execute", "respond", "mixed"}
@@ -3014,13 +3096,13 @@ def validate_planner_model_output(
                 + ",".join(sorted(unsupported))
             )
         if "clarify" in outcome_dispositions:
-            if outcome_dispositions != {"clarify"}:
+            if outcome_dispositions not in ({"clarify"}, {"respond", "clarify"}):
                 raise ValueError(
-                    "fast clarification must not mix clarify outcomes with "
-                    "execute or respond outcomes"
+                    "fast clarification may coexist only with independent response outcomes"
                 )
-            if output.disposition != "clarify":
-                raise ValueError("all-clarify goal outcomes require top-level disposition=clarify")
+            expected_disposition = "mixed" if "respond" in outcome_dispositions else "clarify"
+            if output.disposition != expected_disposition:
+                raise ValueError("fast clarification aggregate must preserve independent responses")
             if output.steps:
                 raise ValueError("fast clarification must not carry steps")
         elif "escalate" in outcome_dispositions:
@@ -3043,11 +3125,10 @@ def validate_planner_model_output(
                 raise ValueError("fast semantic escalation cannot claim exact goal satisfaction")
         elif output.disposition == "escalate":
             raise ValueError("multi-goal fast escalation requires one escalate outcome per goal")
-        if output.disposition == "mixed" and outcome_dispositions != {
-            "execute",
-            "respond",
-        }:
-            raise ValueError("fast mixed output requires at least one execute and one respond goal")
+        if output.disposition == "mixed" and outcome_dispositions not in (
+            {"execute", "respond"}, {"respond", "clarify"},
+        ):
+            raise ValueError("fast mixed output requires independent execute/respond or respond/clarify goals")
     for goal_id, outcome in output.goal_outcomes.items():
         if planner_tier == "fast" and (
             len(expected_goal_id_set) > 1 or output.disposition == "escalate"

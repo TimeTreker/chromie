@@ -29,7 +29,9 @@ except ImportError:  # pragma: no cover
 from .prompt_projection import bounded_json
 from .planner_grounding import (
     _argument_schema_accepts_canonical_binding,
+    _count_argument_names,
     _goal_binding_map,
+    _is_count_binding,
     _material_values_equal,
     _normalized_entity_type,
     semantic_numeric_values,
@@ -219,6 +221,7 @@ def canonical_goal_binding_argument_response_schema(
     base_schema: dict[str, Any],
     *,
     authoritative_goals: list[dict[str, Any]],
+    capabilities: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Project exact Goal bindings into compatible step branches.
 
@@ -259,12 +262,38 @@ def canonical_goal_binding_argument_response_schema(
         return base_schema
 
     constrained = False
+    capabilities_by_id = {
+        str(item.get("capability_id") or ""): item for item in capabilities or []
+    }
+    retained_branches = []
     for branch in branches:
         properties = branch.get("properties") if isinstance(branch, dict) else None
         args = properties.get("args") if isinstance(properties, dict) else None
         argument_properties = args.get("properties") if isinstance(args, dict) else None
         if not isinstance(argument_properties, dict):
+            retained_branches.append(branch)
             continue
+        capability_ids = (properties.get("capability_id") or {}).get("enum") or []
+        capability = capabilities_by_id.get(str(capability_ids[0])) if capability_ids else None
+        capability = capability or {"input_schema": args}
+        unsupported_goal_ids = {
+            str(goal.get("goal_id") or "") for goal in authoritative_goals
+            if not isinstance(goal.get("resource_responsibility"), dict)
+            and any(
+                _is_count_binding(name, binding)
+                and not _count_argument_names(capability, name)
+                for name, binding in _goal_binding_map(goal).items()
+            )
+        }
+        ownership = properties.get("source_goal_ids") or {}
+        allowed = (ownership.get("items") or {}).get("enum")
+        if isinstance(allowed, list) and unsupported_goal_ids.intersection(allowed):
+            constrained = True
+            allowed = [goal_id for goal_id in allowed if goal_id not in unsupported_goal_ids]
+            if not allowed:
+                continue
+            ownership["items"]["enum"] = allowed
+        retained_branches.append(branch)
         required = args.setdefault("required", [])
         for argument_name, argument_schema in list(argument_properties.items()):
             if not isinstance(argument_schema, dict):
@@ -302,6 +331,12 @@ def canonical_goal_binding_argument_response_schema(
             if isinstance(required, list) and name not in required:
                 required.append(name)
             constrained = True
+    if retained_branches:
+        step_schema["oneOf"] = retained_branches
+    elif constrained:
+        # Keep a valid, nonempty definition for providers that compile all $defs;
+        # no executable step is representable for this authoritative Goal set.
+        schema["properties"]["steps"]["maxItems"] = 0
     time_conditions = schema.get("properties", {}).get("time_conditions")
     time_condition_definition = schema.get("$defs", {}).get("PlannerModelTimeCondition")
     ready_conditions: list[tuple[str, int]] = []
@@ -414,6 +449,7 @@ def canonical_plan_response_schema(
         if response_only:
             disposition["enum"] = [
                 "respond",
+                *(["mixed"] if len(set(expected_goal_ids)) > 1 else []),
                 "clarify",
                 "unavailable",
                 "refused",
@@ -820,14 +856,14 @@ def canonical_plan_response_schema(
                 if goal_id in response_goal_set:
                     disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
-                        disposition_field["enum"] = ["respond"]
+                        disposition_field["enum"] = ["respond", "clarify", "unavailable", "refused"]
                     response_text_field = specialized_properties.get("response_text")
                     if isinstance(response_text_field, dict):
                         response_text_field.pop("maxLength", None)
                         response_text_field["minLength"] = 1
                         response_text_field["description"] = (
-                            "Required direct response that completes this "
-                            "Goal Association-authored spoken responsibility."
+                            "Required direct response or truthful clarification, "
+                            "unavailability, or refusal for this speech Goal."
                         )
                     step_ids_field = specialized_properties.get("step_ids")
                     if isinstance(step_ids_field, dict):
@@ -839,7 +875,7 @@ def canonical_plan_response_schema(
                             for branch in branches
                             if (
                                 branch.get("properties", {}).get("disposition", {}).get("enum")
-                                == ["respond"]
+                                in (["respond"], ["clarify"], ["unavailable"], ["refused"])
                             )
                         ]
                 if goal_id in single_step_goal_set:
@@ -985,6 +1021,42 @@ def canonical_plan_response_schema(
                     # invariant that execute owns at least one step ID and all
                     # non-executing outcomes own none.
                     specialized.setdefault("allOf", []).append({"anyOf": deep_outcome_branches})
+                limitation_condition = {
+                    "properties": {"disposition": {"enum": ["clarify", "unavailable", "refused"]}},
+                    "required": ["disposition"],
+                }
+                specialized.setdefault("allOf", []).append(
+                    {
+                        "if": limitation_condition,
+                        "then": {
+                            "properties": {
+                                "satisfaction": {
+                                    "properties": {
+                                        "status": {"enum": ["substantial", "partial", "unsatisfied"]},
+                                        "satisfied_goal_ids": {"maxItems": 0},
+                                        "unmet_goal_ids": {"minItems": 1},
+                                    }
+                                }
+                            }
+                        },
+                    }
+                )
+                schema.setdefault("allOf", []).append(
+                    {
+                        "if": {"properties": {"goal_outcomes": {"properties": {goal_id: limitation_condition}}}},
+                        "then": {
+                            "properties": {
+                                "goal_satisfaction": {
+                                    "properties": {
+                                        "status": {"enum": ["substantial", "partial", "unsatisfied"]},
+                                        "unmet_goal_ids": {"contains": {"const": goal_id}},
+                                        "satisfied_goal_ids": {"not": {"contains": {"const": goal_id}}},
+                                    }
+                                }
+                            }
+                        },
+                    }
+                )
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -1111,6 +1183,97 @@ def canonical_plan_response_schema(
     # Capability argument and Goal ownership. Requiring the model to restate the
     # same value in this decoder schema created a second, failure-prone authority.
     del required_numeric_goal_values
+    if planner_tier == "deep" and response_only:
+        # Match the existing Host aggregate without enumerating 4**N outcome
+        # assignments. A mixed speech result needs two distinct witnesses:
+        # an independently completed response and an unresolved limitation.
+        speech_dispositions = ["respond", "clarify", "unavailable", "refused"]
+        aggregate_branches: list[dict[str, Any]] = []
+        for aggregate in speech_dispositions:
+            aggregate_branches.append(
+                {
+                    "properties": {
+                        "disposition": {"enum": [aggregate]},
+                        "goal_outcomes": {
+                            "properties": {
+                                goal_id: {"properties": {"disposition": {"enum": [aggregate]}}}
+                                for goal_id in allowed_goals
+                            }
+                        },
+                    }
+                }
+            )
+        if len(allowed_goals) > 1:
+            aggregate_branches.append(
+                {
+                    "properties": {
+                        "disposition": {"enum": ["mixed"]},
+                        "coverage": {"enum": ["complete"]},
+                        "goal_outcomes": {
+                            "anyOf": [
+                                {
+                                    "properties": {
+                                        response_id: {"properties": {"disposition": {"enum": ["respond"]}}},
+                                        limitation_id: {"properties": {"disposition": {"enum": speech_dispositions[1:]}}},
+                                    }
+                                }
+                                for response_id in allowed_goals
+                                for limitation_id in allowed_goals
+                                if response_id != limitation_id
+                            ]
+                        },
+                    }
+                }
+            )
+        schema.setdefault("allOf", []).append({"anyOf": aggregate_branches})
+        properties["user_confirmation_required"] = {"type": "boolean", "const": False}
+        properties["plan_relation"] = {"type": "string", "enum": ["exact"]}
+        properties["time_conditions"]["maxItems"] = 0
+        # The deployed llama.cpp converter reads properties before allOf.
+        # Supply complete union branches so native decoding sees the same
+        # aggregate restriction. Keep the original schema as an independent
+        # intersection for full JSON Schema validation and other consumers.
+        base = copy.deepcopy(schema)
+        base.pop("$defs", None)
+        native_branches: list[dict[str, Any]] = []
+        for aggregate_branch in aggregate_branches:
+            variant = copy.deepcopy(base)
+            variant_properties = variant["properties"]
+            aggregate_properties = aggregate_branch["properties"]
+            variant_properties["disposition"] = aggregate_properties["disposition"]
+            if "coverage" in aggregate_properties:
+                variant_properties["coverage"] = aggregate_properties["coverage"]
+            outcome_constraint = aggregate_properties["goal_outcomes"]
+            outcome_branches = []
+            for witness in outcome_constraint.get("anyOf", [outcome_constraint]):
+                outcomes = copy.deepcopy(properties["goal_outcomes"])
+                for goal_id, constraint in witness["properties"].items():
+                    outcomes["properties"][goal_id]["properties"]["disposition"] = (
+                        constraint["properties"]["disposition"]
+                    )
+                    if "respond" not in constraint["properties"]["disposition"]["enum"]:
+                        satisfaction_fields = outcomes["properties"][goal_id]["properties"]["satisfaction"]["properties"]
+                        satisfaction_fields["status"] = {"type": "string", "enum": ["substantial", "partial", "unsatisfied"]}
+                        satisfaction_fields["satisfied_goal_ids"]["maxItems"] = 0
+                        satisfaction_fields["unmet_goal_ids"]["minItems"] = 1
+                outcome_branches.append(outcomes)
+            variant_properties["goal_outcomes"] = (
+                outcome_branches[0]
+                if len(outcome_branches) == 1
+                else {"anyOf": outcome_branches}
+            )
+            if aggregate_properties["disposition"]["enum"] != ["respond"]:
+                aggregate_satisfaction = variant_properties["goal_satisfaction"]["properties"]
+                aggregate_satisfaction["status"] = {"type": "string", "enum": ["substantial", "partial", "unsatisfied"]}
+                aggregate_satisfaction["unmet_goal_ids"]["minItems"] = 1
+            # Author the individual results before committing their redundant
+            # aggregate. Native object decoding follows this property order.
+            variant["properties"] = {
+                "goal_outcomes": variant_properties["goal_outcomes"],
+                **{key: value for key, value in variant_properties.items() if key != "goal_outcomes"},
+            }
+            native_branches.append(variant)
+        schema["anyOf"] = native_branches
     _constrain_terminal_unresolved(schema)
     return schema
 
@@ -1168,7 +1331,7 @@ def fast_multi_goal_response_schema(
     disposition = properties.get("disposition")
     if isinstance(disposition, dict):
         disposition["enum"] = (
-            ["respond", "clarify", "escalate"]
+            (["respond", "mixed", "clarify", "escalate"] if len(expected_goal_ids) > 1 else ["respond", "clarify", "escalate"])
             if response_only
             else ["execute", "mixed", "clarify", "escalate"]
             if requires_execution and response_goal_ids
@@ -1616,7 +1779,8 @@ def fast_multi_goal_response_schema(
         disposition["description"] = (
             "Aggregate the already-authored goal_outcomes: execute when all "
             "outcomes execute, respond when all respond, mixed when execute and "
-            "respond are both present, clarify when all clarify, and escalate when all escalate."
+            "respond are both present or independent respond and clarify outcomes coexist, "
+            "clarify when all clarify, and escalate when all escalate."
         )
 
     # Encode the aggregate invariant in the decoder grammar.  The model still
@@ -1626,10 +1790,10 @@ def fast_multi_goal_response_schema(
     # execute/respond assignment space avoids a host-side semantic compiler.
     # Larger turns are outside the Fast terminal surface and retain the normal
     # validator/Deep Planner path rather than exploding the response schema.
+    assignment_branches: list[dict[str, Any]] = []
     if 1 <= len(allowed_goals) <= 6:
-        assignment_branches: list[dict[str, Any]] = []
         assignment_choices = [
-            ("respond",)
+            ("respond", "clarify")
             if goal_id in response_goal_set
             else ("execute",)
             if goal_id in effectful_goal_set
@@ -1639,8 +1803,10 @@ def fast_multi_goal_response_schema(
         assignments = list(product(*assignment_choices))
         assignments.append(tuple("clarify" for _ in allowed_goals))
         assignments.append(tuple("escalate" for _ in allowed_goals))
-        for assignment in assignments:
+        for assignment in dict.fromkeys(assignments):
             assignment_set = set(assignment)
+            if "clarify" in assignment_set and "execute" in assignment_set:
+                continue
             if requires_execution and assignment_set == {"respond"}:
                 continue
             if assignment_set == {"execute"}:
@@ -1710,7 +1876,7 @@ def fast_multi_goal_response_schema(
                     "disposition": {"type": "string", "enum": [aggregate]},
                     "coverage": {
                         "type": "string",
-                        "enum": (["complete"] if terminal_assignment else ["partial", "uncertain"]),
+                        "enum": (["complete"] if terminal_assignment or aggregate == "mixed" else ["partial", "uncertain"]),
                     },
                     "steps": {
                         "type": "array",
@@ -1868,6 +2034,46 @@ def fast_multi_goal_response_schema(
     }
     _constrain_terminal_unresolved(schema)
     _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
+    if response_only and assignment_branches:
+        # Native object decoding ignores root allOf once properties is present.
+        # Materialize the existing speech assignments as complete alternatives;
+        # the unchanged outer schema still validates their full intersection.
+        native_base = copy.deepcopy(schema)
+        native_base.pop("$defs", None)
+        native_base.pop("allOf", None)
+        native_speech_branches: list[dict[str, Any]] = []
+        for assignment_branch in assignment_branches:
+            constraints = assignment_branch["properties"]
+            if constraints["steps"]["maxItems"] != 0:
+                continue
+            native_variant = copy.deepcopy(native_base)
+            native_properties = native_variant["properties"]
+            for field_name in ("disposition", "coverage", "steps", "escalation_reason"):
+                native_properties[field_name].update(constraints[field_name])
+            satisfaction_restrictions = [(
+                native_properties["goal_satisfaction"],
+                constraints["goal_satisfaction"]["properties"]["status"]["enum"],
+            )]
+            for goal_id, goal_constraint in constraints["goal_outcomes"]["properties"].items():
+                goal_fields = native_properties["goal_outcomes"]["properties"][goal_id]["properties"]
+                constrained_fields = goal_constraint["properties"]
+                for field_name in ("disposition", "coverage", "response_text", "step_ids"):
+                    goal_fields[field_name].update(constrained_fields[field_name])
+                satisfaction_restrictions.append((
+                    goal_fields["satisfaction"],
+                    constrained_fields["satisfaction"]["properties"]["status"]["enum"],
+                ))
+            for satisfaction_field, allowed_statuses in satisfaction_restrictions:
+                satisfaction_field["anyOf"] = [
+                    band for band in satisfaction_field["anyOf"]
+                    if set(band["properties"]["status"]["enum"]).issubset(allowed_statuses)
+                ]
+            native_variant["properties"] = {
+                "goal_outcomes": native_properties["goal_outcomes"],
+                **{key: value for key, value in native_properties.items() if key != "goal_outcomes"},
+            }
+            native_speech_branches.append(native_variant)
+        schema["anyOf"] = native_speech_branches
     return schema
 
 
@@ -2262,6 +2468,40 @@ def fast_presentation_commit_response_schema(
     return schema
 
 
+def _fast_terminal_activity_contract() -> dict[str, Any]:
+    """Require real Work or a complete response alongside a clarification."""
+
+    def contains_role(role: str) -> dict[str, Any]:
+        return {
+            "contains": {
+                "type": "object",
+                "properties": {"role": {"const": role}},
+                "required": ["role"],
+            },
+            "minContains": 1,
+        }
+
+    return {
+        "if": {
+            "properties": {"disposition": {"enum": ["execute", "mixed"]}},
+            "required": ["disposition"],
+        },
+        "then": {
+            "properties": {"coverage": {"const": "complete"}},
+            "anyOf": [
+                {"properties": {"activities": contains_role("capability")}},
+                {"properties": {
+                    "disposition": {"const": "mixed"},
+                    "activities": {"allOf": [
+                        contains_role("complete_response"),
+                        contains_role("clarification"),
+                    ]},
+                }},
+            ],
+        },
+    }
+
+
 def fast_advance_response_schema(
     responsibility_refs: list[str],
     *,
@@ -2333,24 +2573,7 @@ def fast_advance_response_schema(
                 },
                 "else": {"properties": {"continuations": {"maxItems": 0}}},
             },
-            {
-                "if": {
-                    "properties": {"disposition": {"enum": ["execute", "mixed"]}},
-                    "required": ["disposition"],
-                },
-                "then": {
-                    "properties": {
-                        "activities": {
-                            "contains": {
-                                "type": "object",
-                                "properties": {"role": {"const": "capability"}},
-                                "required": ["role"],
-                            },
-                            "minContains": 1,
-                        }
-                    }
-                },
-            },
+            _fast_terminal_activity_contract(),
         ]
     )
     reason_summary = top_properties.get("reason_summary")
@@ -2828,26 +3051,7 @@ def fast_streaming_advance_response_schema(
     # producing a shape the typed Fast DTO must reject.  The full canonical
     # condition tree is intentionally not copied into the streaming grammar.
     terminal_schema["allOf"] = [
-        {
-            "if": {
-                "properties": {"disposition": {"enum": ["execute", "mixed"]}},
-                "required": ["disposition"],
-            },
-            "then": {
-                "properties": {
-                    "coverage": {"enum": ["complete"]},
-                    "activities": {
-                        "contains": {
-                            "type": "object",
-                            "properties": {"role": {"enum": ["capability"]}},
-                            "required": ["role"],
-                        },
-                        "minContains": 1,
-                    },
-                },
-                "required": ["coverage", "activities"],
-            },
-        },
+        _fast_terminal_activity_contract(),
         {
             "if": {
                 "properties": {"disposition": {"enum": ["escalate"]}},

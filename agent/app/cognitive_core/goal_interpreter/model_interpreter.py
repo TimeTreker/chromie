@@ -509,8 +509,8 @@ def _short_exact_surface_substrings(text: str) -> list[str]:
     """Enumerate exact source slices for a bounded decoder constraint.
 
     This does not identify an entity or choose its meaning. It only makes an
-    invalid translated location impossible to emit when a short fresh turn has
-    no bounded semantic-context location to preserve. Longer or continuity-rich
+    invalid translated binding impossible to emit when a short fresh turn has
+    no bounded semantic-context string to preserve. Longer or continuity-rich
     turns retain the normal validator and fail closed without growing an
     unbounded response schema.
     """
@@ -2156,7 +2156,7 @@ class OllamaGoalInterpreter:
         allowed_goal_ids: tuple[str, ...] = (),
         prior_assistant_utterance: str | None = None,
         admitted_turn: str = "",
-        exact_location_surfaces: tuple[str, ...] = (),
+        exact_source_surfaces: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -2358,19 +2358,24 @@ class OllamaGoalInterpreter:
                         "code validates exact source/context provenance."
                     ),
                 }
-                if exact_location_surfaces:
+                if exact_source_surfaces:
                     binding_properties["location"] = {
                         "type": "string",
-                        "enum": list(exact_location_surfaces),
+                        "enum": list(exact_source_surfaces),
                         "description": (
                             "If present, copy one exact contiguous surface from the "
                             "authoritative current turn. This closed spelling constraint "
                             "does not decide whether any surface is a location."
                         ),
                     }
+                measurement_string: dict[str, Any] = (
+                    {"type": "string", "enum": list(exact_source_surfaces)}
+                    if exact_source_surfaces
+                    else {"$ref": "#/$defs/SourceBackedBindingString"}
+                )
                 binding_properties["duration"] = {
                     "anyOf": [
-                        {"$ref": "#/$defs/SourceBackedBindingString"},
+                        copy.deepcopy(measurement_string),
                         {"type": "number"},
                     ],
                     "description": (
@@ -2386,7 +2391,7 @@ class OllamaGoalInterpreter:
                 }
                 binding_properties["speed"] = {
                     "anyOf": [
-                        {"$ref": "#/$defs/SourceBackedBindingString"},
+                        copy.deepcopy(measurement_string),
                         {"type": "number"},
                     ],
                     "description": (
@@ -2802,7 +2807,7 @@ class OllamaGoalInterpreter:
         self, request: GoalInterpretationRequest
     ) -> dict[str, Any]:
         prior = _most_recent_assistant_utterance(request.context)
-        exact_location_surfaces = (
+        exact_source_surfaces = (
             tuple(_short_exact_surface_substrings(request.text))
             if not _semantic_context_string_values(request.context)
             else ()
@@ -2830,7 +2835,7 @@ class OllamaGoalInterpreter:
                     prior["text"] if prior is not None else None
                 ),
                 admitted_turn=request.text,
-                exact_location_surfaces=exact_location_surfaces,
+                exact_source_surfaces=exact_source_surfaces,
             ),
         }
         if self.keep_alive:

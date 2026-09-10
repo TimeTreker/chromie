@@ -473,6 +473,13 @@ Read the diagram with these boundaries:
   meaning itself. The pending act and its exact semantic or planner-input provenance
   remain in Interaction Context so the next GI can interpret the reply without
   transferring planning policy back into GI.
+  Speech Goals may receive an explicit Planner-authored clarification, unavailable,
+  or refusal outcome when their requested content cannot responsibly be supplied.
+  An independent completed speech outcome may coexist with such an outcome in a
+  canonical mixed Plan without executable steps. Complete coverage means every
+  Goal is accounted for, not that every Goal is satisfied. This owner-authorized
+  contract preserves per-Goal unmet requirements, prohibits invented execution,
+  and grants no confirmation, future Work, or completion Evidence from speech.
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
   GA independently associates, creates, continues, corrects, merges, splits, or
   supersedes canonical Goals from the same GI result without waiting for or

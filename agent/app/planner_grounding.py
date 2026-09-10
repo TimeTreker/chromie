@@ -195,6 +195,46 @@ def missing_argument_realizations(
     return missing
 
 
+def _is_count_binding(name: str, binding: dict[str, Any]) -> bool:
+    return name == "count" or _normalized_entity_type(binding.get("entity_type")) == "count"
+
+
+def _count_argument_names(
+    capability: dict[str, Any], binding_name: str = "count"
+) -> set[str]:
+    """Read repetition arguments only from provider names, types or mappings."""
+
+    properties = (capability.get("input_schema") or {}).get("properties") or {}
+    names = {
+        name for name, schema in properties.items()
+        if isinstance(schema, dict) and (
+            name in {"count", binding_name}
+            or _normalized_entity_type(schema.get("x-chromie-entity-type")) == "count"
+        )
+    }
+    contracts = (capability.get("hints") or {}).get("argument_realization") or {}
+    for contract in contracts.values():
+        if isinstance(contract, dict) and _normalized_entity_type(
+            contract.get("source_entity_type")
+        ) == "count":
+            names.update(name for name in contract.get("arguments") or [] if name in properties)
+    return names
+
+
+def _count_provenance_compatible(
+    capability: dict[str, Any], parameter: str, name: str, binding: dict[str, Any]
+) -> bool:
+    """Equal numbers cannot exchange count and another quantity's provenance.
+
+    This narrows the existing value comparison only for explicit repetition
+    identity. It does not infer mappings for other human-semantic quantities.
+    """
+
+    if _is_count_binding(name, binding):
+        return parameter == name or parameter in _count_argument_names(capability, name)
+    return parameter != "count" and parameter not in _count_argument_names(capability)
+
+
 def _argument_schema_accepts_canonical_binding(
     argument_schema: dict[str, Any],
     value: Any,

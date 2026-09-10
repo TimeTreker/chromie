@@ -748,9 +748,15 @@ def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
     assert "reason_summary" not in json.dumps(presentation)
     assert "reason_summary" in terminal["properties"]
     assert len(terminal["allOf"]) == 2
-    execute_branch = terminal["allOf"][0]["then"]["properties"]
-    assert execute_branch["coverage"]["enum"] == ["complete"]
-    assert execute_branch["activities"]["minContains"] == 1
+    from jsonschema import Draft202012Validator
+
+    empty_execution = {
+        "disposition": "execute", "coverage": "complete",
+        "covered_responsibility_refs": [responsibility.local_ref],
+        "activities": [], "auxiliary_activities": [], "continuations": [],
+        "confidence": 1.0, "unresolved": [], "reason_summary": "No Work.",
+    }
+    assert not Draft202012Validator(terminal).is_valid(empty_execution)
     escalation_branch = terminal["allOf"][1]["then"]["properties"]
     assert escalation_branch["coverage"]["enum"] == ["partial", "uncertain"]
     assert escalation_branch["activities"]["maxItems"] == 0
@@ -1185,6 +1191,41 @@ async def test_unclosed_presentation_frame_never_commits() -> None:
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert frames[0].failure_stage == "before_commit"
     assert frames[0].presentation_commit_id is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["presentation", "terminal"])
+@pytest.mark.parametrize("member", ["root", "text", "escaped_text"])
+@pytest.mark.parametrize("fragmented", [False, True])
+async def test_duplicate_json_members_fail_before_ambiguous_speech(
+    phase: str, member: str, fragmented: bool,
+) -> None:
+    output = _valid_output()
+    if phase == "terminal":
+        output["terminal_result"]["activities"] = [output["presentation_commit"]["activity"]]
+        output["presentation_commit"]["activity"] = None
+    first = json.dumps(output["presentation_commit"], ensure_ascii=False)
+    last = json.dumps(output["terminal_result"], ensure_ascii=False)
+    target = first if phase == "presentation" else last
+    if member == "root":
+        key, replacement = ("activity", "null") if phase == "presentation" else ("activities", "[]")
+        target = target.replace(f'"{key}":', f'"{key}":{replacement},"{key}":', 1)
+    else:
+        key = "text" if member == "text" else "\\u0074ext"
+        target = target.replace('"text":', f'"{key}":"Discarded wording.","text":', 1)
+    if phase == "presentation":
+        first = target
+    else:
+        last = target
+    payload = "<presentation_commit>" + first + "</presentation_commit><terminal_plan>" + last + "</terminal_plan>"
+    model = _StreamingModel(list(payload) if fragmented else [payload])
+    frames = [frame async for frame in FastPlannerResolver(model, _Catalog()).stream_advance(_request())]
+    assert not any(isinstance(frame, FastPlannerStreamTerminal) for frame in frames)
+    assert not any(isinstance(frame, PresentationCommit) and frame.activity is not None for frame in frames)
+    assert isinstance(frames[-1], FastPlannerStreamFailure)
+    assert "repeats key" in frames[-1].reason
+    assert frames[-1].failure_stage == ("before_commit" if phase == "presentation" else "after_commit")
+    assert model.calls == 1
 
 
 @pytest.mark.asyncio

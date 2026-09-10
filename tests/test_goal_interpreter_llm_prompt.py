@@ -1229,6 +1229,42 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         with self.assertRaises(JsonSchemaValidationError):
             Draft202012Validator(schema).validate(invalid)
 
+    def test_fresh_measurements_preserve_source_spelling_in_decoder(self) -> None:
+        for text, dimension, exact, translated in (
+            ("看着我三秒。", "duration", "三秒", "three seconds"),
+            ("持续大约三秒。", "duration", "大约三秒", "about three seconds"),
+            ("以每秒两米移动。", "speed", "每秒两米", "two meters per second"),
+            ("Move for three seconds.", "duration", "three seconds", "三秒"),
+        ):
+            with self.subTest(text=text, dimension=dimension):
+                request = GoalInterpretationRequest(text=text)
+                for build in (
+                    self._interpreter().build_interpretation_payload,
+                    self._interpreter().build_deep_interpretation_payload,
+                ):
+                    schema = build(request)["format"]
+                    field = schema["$defs"]["CognitiveResponsibilityProposal"][
+                        "properties"
+                    ]["binding_items"]["properties"][dimension]
+                    validator = Draft202012Validator({"$defs": schema["$defs"], **field})
+                    validator.validate(exact)
+                    validator.validate(3)
+                    with self.assertRaises(JsonSchemaValidationError):
+                        validator.validate(translated)
+
+    def test_long_measurement_turn_retains_host_provenance_validation(self) -> None:
+        schema = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="Please keep moving for three seconds and then wait for my next request.")
+        )["format"]
+        properties = schema["$defs"]["CognitiveResponsibilityProposal"][
+            "properties"
+        ]["binding_items"]["properties"]
+        for dimension in ("duration", "speed"):
+            self.assertEqual(
+                properties[dimension]["anyOf"][0],
+                {"$ref": "#/$defs/SourceBackedBindingString"},
+            )
+
     def test_binding_schema_forbids_hidden_effect_and_how_names(self) -> None:
         schema = self._interpreter().build_interpretation_payload(
             GoalInterpretationRequest(text="nod and blink")

@@ -527,16 +527,11 @@ def validate_fast_advance_output(
                 "disposition; missing=" + ",".join(sorted(missing_terminal_refs))
             )
     if clarification_activities:
-        expected_disposition = "mixed" if capability_activities else "clarify"
+        expected_disposition = "mixed" if capability_activities or complete_response_activities else "clarify"
         if output.disposition != expected_disposition:
             raise PlannerDTOContractError(
                 "clarification disposition must be clarify when it is the only "
-                "terminal work, or mixed when independent Capability work proceeds"
-            )
-        if complete_response_activities and not capability_activities:
-            raise PlannerDTOContractError(
-                "the current Fast contract cannot combine only response and "
-                "clarification outcomes without executable Work"
+                "terminal work, or mixed when independent Capability work or a complete response proceeds"
             )
     all_gap_ids = [
         gap.gap_id for activity in clarification_activities for gap in activity.information_gaps
