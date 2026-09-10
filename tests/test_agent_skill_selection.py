@@ -10,12 +10,14 @@ import yaml
 from pydantic import ValidationError
 
 from agent.app.agent_skills import (
+    AgentSkillDisclosureService,
     AgentSkillSelectionService,
     compute_agent_skill_content_digest,
     load_agent_skill_registry,
 )
 from agent.app.capabilities.local import build_chromie_registry
 from shared.chromie_contracts import (
+    AgentSkillDisclosureRequest,
     AgentSkillSelectionModelOutput,
     AgentSkillSelectionRequest,
 )
@@ -381,7 +383,7 @@ class AgentSkillSelectionTests(unittest.TestCase):
             ["chromie.weather-information", "chromie.grounded-information"],
         )
 
-    def test_unknown_model_selection_gets_one_bounded_repair(self):
+    def test_unknown_model_selection_is_rejected_without_reselection(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self._write_package(root, "weather-information")
@@ -424,13 +426,15 @@ class AgentSkillSelectionTests(unittest.TestCase):
             result = asyncio.run(
                 AgentSkillSelectionService(model, registry).select(self._request())
             )
-        self.assertEqual(len(model.prompts), 2)
-        self.assertTrue(result.contract_repair_attempted)
-        self.assertTrue(result.contract_repair_succeeded)
-        self.assertEqual(result.status, "selected")
-        self.assertIn("chromie.unlisted", model.prompts[1][0])
+        self.assertEqual(len(model.prompts), 1)
+        self.assertFalse(result.contract_repair_attempted)
+        self.assertFalse(result.contract_repair_succeeded)
+        self.assertEqual(result.status, "model_contract_failed")
+        self.assertEqual(result.selected_agent_skills, ())
+        self.assertIn("chromie.unlisted", result.error)
+        self.assertEqual(len(model.payloads), 1)
 
-    def test_invalid_output_after_repair_fails_to_no_skill(self):
+    def test_malformed_output_fails_without_semantic_regeneration(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self._write_package(root, "weather-information")
@@ -447,8 +451,59 @@ class AgentSkillSelectionTests(unittest.TestCase):
             )
         self.assertEqual(result.decision, "no_skill")
         self.assertEqual(result.status, "model_contract_failed")
-        self.assertTrue(result.contract_repair_attempted)
+        self.assertFalse(result.contract_repair_attempted)
         self.assertFalse(result.contract_repair_succeeded)
+
+    def test_rejected_primary_claims_never_consume_a_second_model_result(self):
+        import copy
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_package(root, "weather-information")
+            registry = self._registry(root)
+            valid = {
+                "decision": "select_skills",
+                "selected_agent_skills": [{
+                    "agent_skill_id": "chromie.weather-information",
+                    "version": "1.0.0", "projection": "fast_planner",
+                    "relevant_goal_ids": ["goal-1"],
+                    "rationale": "Use the weather method.", "confidence": 0.9,
+                }],
+                "confidence": 0.9, "reason_summary": "Weather method applies.",
+            }
+            variants = []
+            for field, value in (
+                ("agent_skill_id", "chromie.unlisted"),
+                ("version", "9.0.0"), ("projection", "deep_planner"),
+                ("relevant_goal_ids", ["unrelated-goal"]),
+                ("confidence", 0.1), ("rationale", ""),
+            ):
+                candidate = copy.deepcopy(valid)
+                candidate["selected_agent_skills"][0][field] = value
+                variants.append((field, candidate))
+            for field, value in (("decision", "no_skill"), ("confidence", 0.1),
+                                 ("selected_agent_skills", "malformed")):
+                candidate = copy.deepcopy(valid)
+                candidate[field] = value
+                variants.append(("root_" + field, candidate))
+            variants.extend([( "missing_list", {"decision": "select_skills"}),
+                             ("nonobject", []), ("parse_error", ValueError("invalid JSON"))])
+            for name, candidate in variants:
+                with self.subTest(case=name):
+                    model = ScriptedModel([candidate, copy.deepcopy(valid)])
+                    result = asyncio.run(AgentSkillSelectionService(model, registry).select(self._request()))
+                    self.assertEqual(len(model.prompts), 1)
+                    self.assertEqual(len(model.payloads), 1)
+                    self.assertEqual(result.status, "model_contract_failed")
+                    self.assertEqual(result.selected_agent_skills, ())
+                    self.assertFalse(result.contract_repair_attempted)
+                    self.assertFalse(result.contract_repair_succeeded)
+                    self.assertTrue(result.error)
+                    disclosure = AgentSkillDisclosureService(registry).disclose(
+                        AgentSkillDisclosureRequest(selection=result)
+                    )
+                    self.assertEqual(disclosure.projections, ())
+                    self.assertEqual(disclosure.total_chars, 0)
 
     def test_model_unavailable_fails_to_optional_no_skill(self):
         with tempfile.TemporaryDirectory() as temp_dir:

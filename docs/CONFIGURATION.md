@@ -412,7 +412,7 @@ retained. See
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
 | `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
 | `AGENT_SKILL_SELECTION_MODEL` | Ollama model used by the responsible Agent-role selection boundary; default `qwen3:4b`. |
-| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. Explicit qualification mode raises it to `120000`. |
+| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for the single primary Agent Skill selection call; default `10000`. No model repair or reselection is performed. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
 | `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, and Deep Planner; default `1`. |

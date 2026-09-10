@@ -1,137 +1,144 @@
 # Chromie Development Checkpoint
 
-## Current resume point — Deep/Skill decoder repairs; semantic qualification still blocked
+## Current resume point — owner-authorized single-call Skill selection
 
-The Goal-driven single-authority architecture remains binding.
-Active Issue #35; delivery branch `codex/ga-request-format`; pre-delivery baseline
-`849f31230fcb1101c18553c0b481bd9654e8deeb`. The owner authorized repairs and commit/push,
-but requires explicit authorization for architecture changes and evidence that remaining
-failures are solely model limitations before merging main. That condition is NOT met.
-No main merge, model replacement, semantic Host fallback, or acceptance-threshold change.
-Resume at the latest commit containing both checkpoint and handoff. Preserve unrelated
-Soridormi changes. Earlier scoped Fast-whitespace acceptance remains historical and scoped.
+The Goal-driven single-authority architecture remains binding. Active Issue #35;
+branch `codex/ga-request-format`; pre-delivery baseline
+`c829ff29bf8be2519a8aaf672eb913e2b76bf3ed`. On 2026-09-10 the owner explicitly
+authorized the necessary removal of semantic Skill reselection after the workflow
+and impact explanation. This supersedes the earlier pending-authorization state.
+Commit/push remain authorized; main merge still requires unresolved behavior and
+current target-evidence closure. Resume at the latest commit containing both handoff
+owners. Preserve unrelated Soridormi work.
 
-## Implemented repairs and responsible boundaries
+## Implemented workflow and authority
 
-- `sglang_protocol.py` exposes existing Deep/Skill object/array shapes beside native
-  intersections. Original Schema/DTO/Host constraints remain authoritative.
-- Deep and Skill requests now use the existing request-local compact JSON annotation.
-  Both roles reproduced outside-string whitespace loops; no token/timeout increase,
-  new configuration switch, provider rebuild, or change to string content is required.
-- Skill selection's primary prompt now names `selected_agent_skills`, matching the actual
-  output contract, instead of the conflicting `selected_items` instruction.
-- Non-stream SGLang calls retain their exact request and available response on failure,
-  timeout, truncation, parse failure, or cancellation. An absent response is not invented.
-  Final diagnostic corrections retain non-object provider bodies and prevent an outer
-  handled exception from contaminating successful stream/non-stream call evidence.
-- A GI prohibition prompt candidate was tested and rejected. GI source is unchanged;
-  no Capability catalog is added to GI. All 53 GI requests in the intermediate aggregate
-  lacked the known catalog keys and concrete namespaced capability IDs.
+`AgentSkillSelectionService.select` makes zero model calls for no candidates,
+otherwise exactly one primary call. Its primary prompt, candidate discovery, model,
+Schema, token budget and valid-result validation remain unchanged from c829ff29.
+Any malformed output, semantic/identity/Goal/confidence rejection returns
+`model_contract_failed` with the original error and an empty selected list.
+Provider failures remain `model_unavailable`. No rejected result becomes a new
+semantic selection. Existing deterministic JSON parsing remains unchanged.
 
-| Actual episode / owner | Input -> actual output and downstream handoff | Contract and result |
+| Owner / handoff | Reproduced old output -> new behavior | Why this fixes the boundary |
 | --- | --- | --- |
-| Native decoder -> original validators | Frozen Deep/Skill schemas with intersections admitted invalid object/array shapes | Redundant existing shapes close reproduced decoding gaps; validators retain authority |
-| Skill client -> SGLang | Exact retained primary packet, 512-token budget -> list followed by 517 trailing whitespace characters, length finish after 12.5 s | Compact annotation rejects this prefix; corrected prompt alone also exhausted the budget |
-| Compact Skill -> Host | Same retained identity/Goal contract -> completed JSON in 4.33 s | Original Schema and Skill Host identity validation pass; rationale still guesses an external platform and is not semantically qualified |
-| Latest full-cohort GI -> Deep GI | Tianxin primary output guesses platform and marks ambiguity; Deep GI removes uncertainty without new referent evidence | First semantic boundary remains wrong; GI owns WHAT, never Capability selection |
-| Concurrent GA/Fast -> Skill -> Deep | GA creates an external-information Goal; Fast escalates; Skill selects a listed method in 4478.99 ms; Deep returns unavailable | Skill IDs/version/Goal binding and Deep output shape valid; platform/permission assumptions remain ungrounded |
-| Host -> Runtime/provider | Complete unavailable Plan with no steps -> initial response only | No Capability execution, physical sensor/voice proof, or successful request fulfillment is claimed |
+| Candidate discovery -> model | Approved weather Skill, exact version/projection/Goal -> one primary selection | Discovery remains typed and model-independent; no Host choice of method |
+| Model -> Skill Host | Primary selects an unlisted ID; a queued second result selects the listed ID | Old code accepted the replacement after two calls; new code rejects the first result and never consumes the queued result |
+| Host -> disclosure | Failed selection with original error, no selected Skills -> zero loaded projections/characters | No invented method provenance, no content loaded from an invalid selection |
+| Disclosure -> downstream Planner | Optional method omitted -> normal existing Planner input/authority | No new Capability, permission, Plan or execution authority; this boundary does not repair upstream meaning |
 
-The previously unretained Skill timeout `llmcall_agent_909fb4e1c6664e6c` lasted
-10020 ms. A later exact retained request reproduces a whitespace loop lasting more than
-10 seconds, but the missing original timeout packet prevents identifying that earlier
-call's cause conclusively. This gap is not converted into a model-only finding.
+The general failure matrix covers wrong Skill/version/projection/Goal IDs, low item
+or aggregate confidence, empty rationale, inconsistent decision/list, malformed list,
+missing list, non-object result and JSON parse error. Every case retains exactly one
+call and the original failure; the valid second result remains unused. The second
+model repair prompt and call were removed. No model-based format regeneration remains:
+the previous flow could not guarantee preservation of every authored semantic claim.
+Public repair-history fields remain false. Charter principle 30 is enforced, not
+weakened; the canonical Skill architecture and API/configuration documents now agree.
 
-## Evidence actually observed
+Repository policy rejects extra model-call sites, second selection helpers and retry
+loops. The broad-handler inventory was re-audited: the removed repair handler is
+removed from the inventory; the remaining provider-failure handler still logs and
+returns typed failure. No blanket ignore or exception was added. No new runtime flag,
+public contract field, architecture layer or current document was introduced.
 
-All evidence roots below are private local artifacts under `.chromie/acceptance/` and
-are not included in Git. Transfer them separately when changing machines.
+## Evidence and current claim boundary
 
-`deep-skill-shape-20260910/`: 344 native contrasts (293 invalid Deep / 38 invalid
-Skill rejected; 9 valid Deep / 4 valid Skill preserved). Four frozen old packets initially
-fail original Schema. Shape-only fixes complete both Skill packets but both Deep calls
-reach 4096 tokens on whitespace. Compact Deep completes all four packets with valid
-original Schema (Deep about 14 seconds). Intermediate immutable 51-case preview:
-26 mechanical / 18 reviewed acceptable initial previews, 155 linked raw calls plus
-one unretained Skill timeout. All cases reviewed. Exactly one bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20260910_150231.tar.gz`.
+Local evidence root: `.chromie/acceptance/skill-single-call-20260910/` (private,
+not committed; transfer separately across machines). New regression assertions against
+the old code failed as expected: 14 failures / 15 passes, including 12 invalid-result
+contrasts and the retained unlisted-to-listed episode. After repair, focused selection,
+disclosure, runtime-surface, provenance and repository-policy tests pass:
+53 tests / 15 subtests. Level A passes 19/19 distinct cases in natural uncertainty,
+stable capability grounding and evidence coverage. These are not live model or robot
+claims. Full canonical checks passed: 2324 tests / 399 subtests, 20 legacy tests,
+140 benchmarks and the included policy, static-analysis, ownership and docs gates.
+The repaired semantic revision completed all 51 preview cases with unchanged source
+and runtime: 28 mechanical passes / 17 reviewed acceptable initial previews. All 159
+linked calls were inspected: GI 53 Schema passes, Fast 51 wire-Schema passes, GA 50
+passes / 1 failure, Skill 1 pass, Deep 2 passes / 1 failure. Transport acceptance is
+not Schema/Host/semantic acceptance. Skill selected once in 4139.127 ms with valid
+identity/Goal references; its rationale incorrectly interpreted Tianxin as weather.
+Deep asked a referent clarification with no actions; upstream ambiguity remains.
+`behavior-review.json` contains every case and raw transaction path. Exactly one
+bundle followed the aggregate:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_160447.tar.gz`.
+`cohort-exits.json` records cohort exit 1, bundle exit 0, source_stable true.
 
-`gi-constraint-20260910/`: 16 frozen bilingual positive/negative primary-GI contrasts;
-all references were Schema/Host-valid before inference. Baseline and candidate each
-have 16/16 Schema and 14/16 Host passes, but only 2/8 negative cases preserve the limiting
-prohibition in the owning outcome; those two still have binding defects. Candidate
-rejected, original prompt restored. No full-GI or model-only qualification.
+Compared with the previous 19 reviewed previews, blink-plus-joke and gaze-then-blink
+recovered; capability inventory, current date, recent-walk continuation and tired
+social response regressed. The first now asks/answers intended future actions;
+date and walk reasons contain channel/frame markup inside otherwise valid JSON;
+tired response uses an incompatible auxiliary anchor. These are observed changes,
+not causal evidence that the Skill retry removal changed the unchanged GI/Fast calls.
+The newly reachable ambiguous-object Deep result invents duplicate parallel delivery
+steps; Schema rejection is followed by missing exact communicative text in Runtime.
+The walking-completion case now passes mechanics but preauthors a completion claim
+without execution evidence. Neither is counted acceptable. Other known failures below
+remain blockers, regardless of overall count.
 
-`skill-prompt-field-20260910/`: field-name-only before/after replays both exhaust 512
-tokens (12.50/12.40 s); adding compact formatting completes in 4.33 s. All 344 native
-contrasts preserve expected verdicts; captured loop rejected and 100 spaces inside a
-string preserved. Latest immutable 51-case preview: **27 mechanical / 19 reviewed
-acceptable initial previews**. All cases and 157 linked calls reviewed: GI 54 valid
-(including Deep GI), Fast 50 complete valid frames, GA 49 valid / 1 invalid, Deep 2
-valid, Skill 1 valid. One warm-up call is outside linkage. Exactly one bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20260910_152934.tar.gz`.
-Read `behavior-review.json`, `reviewed-cases/`, `raw-calls.jsonl`, `source.patch`,
-`runtime-identity.json`, `cohort-exits.json`, `native/compact-summary.json` and
-`compact/host-review.json`. Native/wire shape validity is not semantic correctness.
+`host-proof.json` retains 11 frozen invalid-primary/valid-second fixture pairs replayed
+against c829ff29 and repaired Host: identical first packets, old two-call selection
+versus new one-call rejection, zero invalid disclosures. These are mock Host proofs,
+not 11 successful live model decisions.
 
-Latest full-cohort changes: single blink, polite walk, and date preview recover;
-two-second gaze is omitted again, and short-joke length becomes a spurious time_scope.
-Incorrect prohibited/unrelated motion, lost Goal meaning, false reminder promises,
-GI provenance/continuity, GA duplicate ownership, and Fast rationale markup remain.
-Four reflex cases require actual execution evidence and remain preview-limited.
-The full aggregate ended before two final diagnostic-only corrections; those changes
-modify evidence status/serialization only, not packets, model outputs or validators.
-Final focused live proof is retained separately and never replaces the aggregate.
-The final Tianxin preview is mechanically 1/1 with five complete call records and
-Skill completion in 4300.177 ms, but semantic review fails: GA guesses person and
-Deep invents a personal-data permission premise. No Capability executes.
+After the immutable aggregate, a diagnostic-only shared-client defect was corrected:
+inside a caller's already-handled exception, successful `OllamaClient.generate`
+(inherited by SGLang) read the outer `sys.exc_info()` and marked its prefix probe failed.
+`wrapper-probe-before.json` reproduces successful output with a false ValueError;
+`wrapper-probe-after.json` records completed. A local completion marker now distinguishes
+this invocation's result from its caller's exception. Model requests/results and
+exception propagation are unchanged; public-call tests cover success, actual failure
+and cancellation, each with one underlying invocation. Focused client/probe tests pass
+30 / 3 subtests; final canonical results above include this correction. No second model
+call or semantic repair was introduced. The full aggregate belongs to the preceding
+semantic source; final deployed diagnostic correction receives separate narrow proof.
 
-Local canonical before those final diagnostic corrections: 2321 tests / 379 subtests,
-20 legacy tests and 140 benchmarks passed. Final canonical validation also passed:
-2321 tests / 381 subtests, 20 legacy tests, 140 benchmarks and all included policy,
-static-analysis, ownership and documentation checks. The first final gate stopped
-on missing architecture-focus wording in two updated documents; wording was corrected
-and the full gate rerun successfully. Log: `skill-prompt-field-20260910/canonical-final-corrected.log`.
-Two existing FastAPI deprecation warnings remain. Remote delivery branch matched
-the pre-delivery baseline; remote main remains `ab5caeab` and is not merged.
-Final focused client/Skill tests: 30 tests / 23 subtests passed. Level A: 19/19 distinct
-cases across evidence coverage, natural uncertainty and stable capability grounding.
-Physical microphone/speaker/robot, complete provider execution, current-revision live
-voice and default target-evidence closure remain unproven. Main promotion stays blocked.
+The previous complete 51-case aggregate at
+`skill-prompt-field-20260910/behavior-review.json` is the unchanged semantic baseline:
+27 mechanical / 19 reviewed acceptable initial previews, all 157 linked calls reviewed.
+Its subsequent final diagnostic-only Tianxin probe retained five complete calls and
+still failed semantic review. The prior decoder/format and failed-call evidence fixes
+remain implemented. Rejected GI prohibition candidate remains reverted; neither GI
+nor its input contract is changed by this single-call Skill repair.
 
-## Runtime identity and next work
+Known semantic, provenance, omitted-Goal, unsupported-motion, false-reminder, continuity,
+rationale-integrity and progress/latency failures remain. Do not claim they are all
+model-only, raise a numeric promotion threshold, or convert preview containment into
+successful behavior. Four deterministic-reflex cases require execution evidence;
+physical voice/robot and default target-evidence closure remain unproven. Main is not
+merged. Scope of this change is removal of an unauthorized same-authority retry.
 
-RTX 5090 profile; fixed Gemma4-12B FP8/SGLang served as `chromie-gemma4-12b`, model
-revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, 65536 context/cache and two requests.
-ASR/TTS/Soridormi were not replaced. Final Agent image
-`sha256:cffbc8c7e1ca56f3adb4b5b5f56b2421d37ff21e669849f448d64bc694b0aea5`, container
-`8fdb47be59e0a63693585b67c63e7cd4f718a0becd513e8471998a6df0af1635`;
-all 112 Python files in the checked Agent/shared image scope match local source.
-SGLang remains image `sha256:41fbd910662483a125184a00611029225ee102a928421eaeaec70ab27a844edf`,
-container `a67606112fd19eb895a6be6d3e1a057d6771b9255bb6bb2bf60072a7863fbfdc`.
-Final diagnostic revision identity/source proof: `final-runtime-identity.json` and
-`final-source-verification.json` in the latest evidence root. These do not relabel the
-full cohort as having run after the final diagnostic-only corrections.
+## Runtime and next commands
 
-Pending owner authorization: Skill selection currently retries semantic/identity/Goal
-validation errors through a second model selection. The maintained unknown-selection
-unit test demonstrates unlisted -> listed reselection; this conflicts with Charter 30.
-The owner requested workflow/impact explanation, which was provided, but has not yet
-explicitly authorized changing that architecture flow. Proposed behavior: reject
-semantic/identity errors without reselection; only demonstrably meaning-preserving
-mechanical format repair could remain. Do not silently change this pending boundary.
-Other semantic clusters remain unresolved/mixed; do not certify them all as LLM-only.
+Fixed RTX 5090 / Gemma4-12B FP8/SGLang, served as `chromie-gemma4-12b`, model revision
+`707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`; 65536 context/cache and two requests.
+Aggregate Agent image: `sha256:351209df29ed2c666df161f1ba218a0609a8db8d984286b5c8072491073aed8b`,
+container `ce3371bb6a79dc07f776df14f9f83aab386b038bbbb643bd6f37a6a4ffdd9c2d`.
+Final diagnostic correction image tag: `chromie-agent:single-skill-call-final-20260910`,
+image `sha256:6791ac7283f2bd781c03cf80664c6c52b3033261e1f83431b5915d019bffd857`,
+container `69ac8e6b3d49e1fb2a4e131cf7c58541eb7bff8e3b96c8220eda8854fbe0aeb9`.
+ASR/TTS/Soridormi and SGLang are unchanged. Both `source-verification.json` and
+`final-source-verification.json` verify all 112 deployed Python files against source;
+`runtime-identity.json` and `final-runtime-identity.json` retain their separate identities.
+Final narrow proof under `final-focused/` mechanically passes 1/1 but fails semantic
+review: GI leaves ambiguity empty, GA invents person type, Skill rationale guesses
+weather. Its one primary call completes in 3812.630 ms; Deep asks clarification and
+emits zero actions. All five linked calls are retained, Schema-valid and transport
+accepted with no call error. This proves final deployed path operation, not semantic
+qualification or physical voice/robot behavior. `final-focused/behavior-review.json`
+retains the adjudication. Resume with the numeric-binding and invalid-Deep failure
+presentation audits before assigning residual failures exclusively to the model.
 
-Continue with the pending architecture decision and earliest-boundary semantic audits,
-including the generic numeric-binding guard's handling of a single turn Activity.
-Do not increase a pass count with keyword meaning repair, an extra judge, weakened
-assertions or omission of failed cases. Keep unsafe candidates in preview.
-Canonical command: `./scripts/run_tests.sh`; explicit checks:
+Canonical: `./scripts/run_tests.sh`; explicit checks:
 `python scripts/check_repository_policies.py`, `python scripts/check_test_ownership.py`,
-`python scripts/check_docs.py`. Update both handoff owners before every delivery.
-For another aggregate, copy the latest `run-cohort.py` into a fresh evidence directory,
-capture identity there, run all discovered cases unchanged, then retain exactly one
-bundle and review every case before editing behavior again.
+`python scripts/check_docs.py`. Read focused and all-case evidence before continuing
+any semantic optimization. Investigate earliest responsible boundaries, including
+numeric repetition validation, without Host meaning repair or a second semantic judge.
+Update both handoff owners before delivery. A new aggregate uses a fresh evidence
+root, complete directory-discovered cohort, unchanged source/runtime throughout,
+exactly one debug bundle after completion, then review of every case/raw output.
 Compose prefix: `docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml -f .chromie/voice-runtime/compose.voice-mujoco.yaml`.
-Never edit generated `.env.runtime`. Capture with
+Never edit generated `.env.runtime`. Identity capture:
 `python scripts/capture_runtime_identity.py --allow-dirty --orchestrator-env .chromie/voice-runtime/orchestrator.env --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`.

@@ -397,6 +397,7 @@ class OllamaClient:
             },
         ) as span:
             finish_probe = None
+            completed = False
             try:
                 result = await self._generate(
                     rendered_prompt,
@@ -413,8 +414,9 @@ class OllamaClient:
                         "attempt": attempt,
                     },
                 )
+                completed = True
             finally:
-                active_error = sys.exc_info()[1]
+                active_error = None if completed else sys.exc_info()[1]
                 if active_error is None:
                     finish_probe = _PREFIX_CACHE_TRACKER.finish(
                         call_id,

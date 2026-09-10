@@ -94,7 +94,9 @@ discovery: it filters by declared projection, validates explicit IDs, sorts and
 caps the candidate summaries, then lets the configured model author an explicit
 `no_skill` or ordered one/multi-Skill decision. The closed output is validated
 against the exact disclosed IDs, versions, projection, Goal IDs, confidence,
-and registry digest. One invalid result may receive one same-boundary repair;
+and registry digest. There is at most one primary model call and no model repair or
+reselection. Invalid output returns `model_contract_failed` with the original error;
+the existing repair-history flags are false. Deterministic JSON parsing is unchanged;
 model or contract failure returns an optional no-Skill resolution rather than
 fabricating method provenance. No `SKILL.md` or projection text is loaded, no
 Canonical Plan is changed, and no Capability is registered, authorized, or

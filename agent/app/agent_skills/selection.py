@@ -115,8 +115,6 @@ class AgentSkillSelectionService:
 
         prompt = self._selection_prompt(request, candidates)
         schema = self._response_schema(request, candidates)
-        initial_raw: Any = None
-        initial_error: str | None = None
 
         try:
             initial_raw = await self.client.generate(
@@ -140,18 +138,28 @@ class AgentSkillSelectionService:
                 candidate_total=candidate_total,
                 candidate_truncated=candidate_truncated,
                 model_name=model_name,
-                repair_attempted=False,
-                repair_succeeded=False,
             )
         except (ValidationError, ValueError, TypeError) as exc:
-            initial_error = self._validation_error_json(exc)
             logger.warning(
-                "agent_skill_selection_contract_repair sid=%s turn_id=%s role=%s "
-                "error=%s",
+                "agent_skill_selection_contract_failed sid=%s turn_id=%s role=%s error=%s",
                 request.sid,
                 request.turn_id,
                 request.agent_role,
-                initial_error,
+                self._validation_error_json(exc),
+            )
+            return self._failure_resolution(
+                request=request,
+                selection_id=selection_id,
+                candidates=candidates,
+                candidate_total=candidate_total,
+                candidate_truncated=candidate_truncated,
+                model_name=model_name,
+                status="model_contract_failed",
+                reason_summary=(
+                    "The primary Agent Skill selection did not satisfy the closed "
+                    "contract; no optional Skill was accepted and no reselection was attempted."
+                ),
+                exc=exc,
             )
         except Exception as exc:
             failure = llm_failure_metadata(exc)
@@ -178,75 +186,6 @@ class AgentSkillSelectionService:
                     "Agent Skill selection was unavailable; no optional Skill was accepted."
                 ),
                 exc=exc,
-                repair_attempted=False,
-            )
-
-        repair_prompt = self._repair_prompt(
-            request,
-            candidates,
-            initial_raw=initial_raw,
-            validation_error=initial_error or "unknown validation error",
-        )
-        try:
-            repaired_raw = await self.client.generate(
-                repair_prompt,
-                system=self._system_prompt(request.agent_role),
-                options={
-                    "temperature": 0.0,
-                    "num_ctx": self.num_ctx,
-                    "num_predict": self.num_predict,
-                },
-                response_format=schema,
-                prompt_family="agent_skill_selection.repair",
-                turn_id=request.turn_id,
-                attempt=2,
-            )
-            resolution = self._validate_output(
-                repaired_raw,
-                request=request,
-                candidates=candidates,
-                selection_id=selection_id,
-                candidate_total=candidate_total,
-                candidate_truncated=candidate_truncated,
-                model_name=model_name,
-                repair_attempted=True,
-                repair_succeeded=True,
-            )
-            logger.info(
-                "agent_skill_selection_contract_repair_done sid=%s turn_id=%s "
-                "role=%s status=success",
-                request.sid,
-                request.turn_id,
-                request.agent_role,
-            )
-            return resolution
-        except Exception as exc:
-            failure = llm_failure_metadata(exc)
-            logger.warning(
-                "agent_skill_selection_contract_failed sid=%s turn_id=%s role=%s "
-                "failure_class=%s failure_domain=%s error_type=%s error=%s",
-                request.sid,
-                request.turn_id,
-                request.agent_role,
-                failure.get("failure_class"),
-                failure.get("failure_domain"),
-                type(exc).__name__,
-                exc,
-            )
-            return self._failure_resolution(
-                request=request,
-                selection_id=selection_id,
-                candidates=candidates,
-                candidate_total=candidate_total,
-                candidate_truncated=candidate_truncated,
-                model_name=model_name,
-                status="model_contract_failed",
-                reason_summary=(
-                    "Agent Skill selection did not satisfy the closed contract after "
-                    "one repair attempt; no optional Skill was accepted."
-                ),
-                exc=exc,
-                repair_attempted=True,
             )
 
     def _discover_candidates(
@@ -320,8 +259,6 @@ class AgentSkillSelectionService:
         candidate_total: int,
         candidate_truncated: bool,
         model_name: str | None,
-        repair_attempted: bool,
-        repair_succeeded: bool,
     ) -> AgentSkillSelectionResolution:
         if not isinstance(raw, dict):
             raise TypeError("Agent Skill selection output must be a JSON object")
@@ -344,8 +281,8 @@ class AgentSkillSelectionService:
                 candidate_total=candidate_total,
                 candidate_truncated=candidate_truncated,
                 model=model_name,
-                contract_repair_attempted=repair_attempted,
-                contract_repair_succeeded=repair_succeeded,
+                contract_repair_attempted=False,
+                contract_repair_succeeded=False,
             )
             self._log_resolution(resolution)
             return resolution
@@ -435,8 +372,8 @@ class AgentSkillSelectionService:
             candidate_total=candidate_total,
             candidate_truncated=candidate_truncated,
             model=model_name,
-            contract_repair_attempted=repair_attempted,
-            contract_repair_succeeded=repair_succeeded,
+            contract_repair_attempted=False,
+            contract_repair_succeeded=False,
         )
         self._log_resolution(resolution)
         return resolution
@@ -511,37 +448,6 @@ class AgentSkillSelectionService:
             },
         }
         return json.dumps(payload, ensure_ascii=False, sort_keys=True)
-
-    def _repair_prompt(
-        self,
-        request: AgentSkillSelectionRequest,
-        candidates: tuple[AgentSkillSummary, ...],
-        *,
-        initial_raw: Any,
-        validation_error: str,
-    ) -> str:
-        payload = {
-            "instruction": (
-                "Repair the previous Agent Skill selection so it exactly satisfies "
-                "the same closed schema and supplied candidate/Goal identities. Do "
-                "not introduce a new Skill, version, projection, Goal, Capability, or "
-                "execution proposal. Return only the repaired JSON object."
-            ),
-            "agent_role": request.agent_role,
-            "allowed_candidates": [
-                {
-                    "agent_skill_id": item.agent_skill_id,
-                    "version": item.version,
-                    "available_projections": list(item.available_projections),
-                    "extends": list(item.extends),
-                }
-                for item in candidates
-            ],
-            "allowed_goal_ids": [item.goal_id for item in request.goals],
-            "previous_output": initial_raw,
-            "validation_error": validation_error,
-        }
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
 
     def _response_schema(
         self,
@@ -640,7 +546,6 @@ class AgentSkillSelectionService:
         status: str,
         reason_summary: str,
         exc: Exception,
-        repair_attempted: bool,
     ) -> AgentSkillSelectionResolution:
         return AgentSkillSelectionResolution(
             selection_id=selection_id,
@@ -656,7 +561,7 @@ class AgentSkillSelectionService:
             candidate_total=candidate_total,
             candidate_truncated=candidate_truncated,
             model=model_name,
-            contract_repair_attempted=repair_attempted,
+            contract_repair_attempted=False,
             contract_repair_succeeded=False,
             error_type=type(exc).__name__,
             error=str(exc)[:500],

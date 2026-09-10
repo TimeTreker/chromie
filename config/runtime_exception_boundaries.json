@@ -8,24 +8,9 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "contract": "Map failure of the single primary Skill model call to model_unavailable with diagnostics and no accepted optional Skill; never retry or reselect.",
       "review_status": "reviewed",
-      "body_sha256": "13e22ad09fc2a617df8464d9799afde8cb453848e6583cea57881a5dd181240e",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/agent_skills/selection.py",
-      "symbol": "AgentSkillSelectionService.select",
-      "ordinal": 2,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "5256d58854a9df9a5cd6566782fabc4482060df1d61cbbf3aaff649e6c950fbf",
+      "body_sha256": "f982b762d43c1c480c2819549b79d215fc01955e0a86048600bf2b471132859a",
       "failure_signals": [
         "diagnostic",
         "return",

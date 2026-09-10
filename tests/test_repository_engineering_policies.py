@@ -155,6 +155,30 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         )
 
 
+    def test_agent_skill_second_calls_and_retry_loops_are_rejected(self) -> None:
+        variants = (
+            "    async def select(self, request):\n"
+            "        await self.client.generate(request)\n"
+            "        return await self.client.generate(request)\n",
+            "    async def select(self, request):\n"
+            "        return await self.client.generate(request)\n"
+            "    async def repair(self, request):\n"
+            "        return await self.client.generate(request)\n",
+            "    async def select(self, request):\n"
+            "        for attempt in range(2):\n"
+            "            await self.client.generate(request)\n",
+        )
+        for body in variants:
+            with self.subTest(body=body), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                path = root / "agent/app/agent_skills/selection.py"
+                path.parent.mkdir(parents=True)
+                path.write_text("class AgentSkillSelectionService:\n" + body +
+                                "    def _discover_candidates(self, request):\n"
+                                "        return ()\n", encoding="utf-8")
+                findings = policies.audit_agent_skill_selection(root)
+                self.assertTrue(any("exactly one primary model call" in item.message for item in findings))
+
     def test_host_semantic_delegation_and_phrase_agents_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

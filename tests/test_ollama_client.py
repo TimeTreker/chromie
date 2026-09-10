@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import unittest
 from unittest import mock
@@ -16,6 +17,37 @@ from agent.app.inference_compute import CognitionComputeClass
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_records_only_its_own_completion_or_failure(self) -> None:
+        from agent.app.clients.ollama_client import _PREFIX_CACHE_TRACKER
+
+        for failure, expected in (
+            (None, "completed"),
+            (ValueError("current invocation failed"), "failed"),
+            (asyncio.CancelledError(), "cancelled"),
+        ):
+            with self.subTest(expected=expected):
+                client = OllamaClient("http://unused", "test-model")
+                generate = mock.AsyncMock(return_value={"ok": True}, side_effect=failure)
+                with mock.patch.object(client, "_generate", generate), mock.patch.object(
+                    _PREFIX_CACHE_TRACKER, "finish", wraps=_PREFIX_CACHE_TRACKER.finish
+                ) as finish:
+                    try:
+                        raise RuntimeError("already handled caller failure")
+                    except RuntimeError:
+                        if failure is None:
+                            self.assertEqual(await client.generate("prompt"), {"ok": True})
+                        else:
+                            with self.assertRaises(type(failure)) as caught:
+                                await client.generate("prompt")
+                            self.assertIs(caught.exception, failure)
+                generate.assert_awaited_once()
+                finish.assert_called_once()
+                self.assertEqual(finish.call_args.kwargs["status"], expected)
+                self.assertEqual(
+                    finish.call_args.kwargs.get("error_type"),
+                    type(failure).__name__ if failure is not None else None,
+                )
+
     def test_parse_json_accepts_one_complete_object_with_extra_closing_delimiter(self) -> None:
         client = OllamaClient(
             base_url="http://chromie-llm:11434",
