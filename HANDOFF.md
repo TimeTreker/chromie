@@ -1,121 +1,311 @@
 # Chromie Latest Handoff
 
-## Current continuation — GA object-shape candidate; promotion withheld
+## Current resume point — promotion blocked by retained evidence
 
-Active Issue #35. Candidate branch `codex/ga-request-format`; pre-delivery parents are
-`ea2ae1a080d18062fb75c8c7bf46fd5bf8a6c68c` and maintained main
-`08890f844d21eb75e939f36dbed03188e6abd2df`. Expected candidate resume revision is the
-latest commit containing both checkpoint and handoff. This merge brings the existing
-Fast numeric guard onto the candidate and adds one GA decoder-representation repair.
-Main remains the maintained deployment line. Fixed SGLang/shared Gemma4-12B on RTX 5090;
-ASR/TTS retain their own models. No prompt or model changes in this repair.
+Active Issue #35; delivery branch `codex/ga-request-format`; pre-delivery baseline
+`4dd7685d93d1bb530f7e186994497c8c7c7adc5c`. Owner authorized commit and push of
+the completed repairs. Resume at the latest commit containing this checkpoint and
+handoff. This is a development delivery; promotion remains blocked.
+Remote delivery branch matched the baseline at preflight. Remote main advanced to
+`ab5caeab`; this delivery neither merges into main nor qualifies that revision.
+The Goal-driven single-authority architecture remains binding. Preserve unrelated
+Soridormi edits. No model replacement, extra semantic judge or Host meaning repair.
 
-Confirmed initiating defect: the installed XGrammar parser prioritizes intersections
-before ordinary object fields. Candidate-aware GA schemas could admit abbreviated root
-objects while rejecting complete valid ones. `goal_association_schema.py` now exposes
-already-required object constraints as a single redundant `anyOf` alternative, recursively
-including nested association/binding/source objects. Original `allOf` conditions remain.
-This preserves full JSON Schema meaning and existing semantic authority; it does not
-implement all unsupported cross-field conditions in the decoder.
+Implementation: retained repairs cover GA decoder object shapes, GI visible-dialogue
+location provenance and continuity shapes, complete required Fast Goal context,
+SGLang two-frame decoding, and failed-stream evidence with schema property order.
+The Fast context defect dropped a 1322+ character Goal snapshot through a 600-character
+optional projection; the repair preserves semantic fields and fails explicitly on
+required-context overflow. Decoder projection leaves original acceptance schemas
+unchanged; omitted string-pattern/fractional-range hints address demonstrated native
+grammar defects. This is mechanical repair, not full semantic qualification.
 
-| Actual ordered owner / handoff | Before -> after evidence | Contract / verdict |
-|---|---|---|
-| Frozen GA input | “Continue the previous walk.”; same r1 continue and retained goal-walk | Constructed role input; GI not invoked |
-| GA prompt/Schema -> SGLang | Same messages/model/options; only response_format changes | GA owns continuity, not WHAT or HOW |
-| Gemma primary | Only associations/new_goals, wrong local_ref field -> complete object with source_responsibility_refs=[r1], continue goal-walk | First proven wrong boundary is decoder representation; after output is correct |
-| GA DTO/Host | Before repair still fails closed; after resolves in one call | No semantic rewriting or extra judge |
-| Downstream | Role probe returns resolution only | Planner, persistent Goal store and physical dispatch not invoked |
+Automated verification: latest canonical gate passes 2319 tests / 368 subtests,
+20 legacy tests and 140 benchmarks, including repository policies, static analysis,
+documentation and test ownership. Latest focused diagnostics tests: 41 / 10 subtests.
+Fast framing frozen exact packets improve 5/11 to 11/11 original-Schema-valid;
+198/198 native framing contrasts pass. Fast context contrasts improve 4/12 to 12/12.
+GI production-order replays improve 8/12 to 12/12; all 98 valid and 724 invalid
+mechanical contrasts receive the intended decoder verdict. These counts are scoped.
 
-Eight frozen English/Chinese role cases cover continue, modify, independent new blink and
-mixed continue+joke. Before: 0/8 resolved, 16 raw Schema failures. After: 8/8 correct
-continuity/ownership outcomes; 7 primary passes, 1 bounded mechanical repair. English
-modify's primary already chooses modify/r1/goal-walk and five-second change in rationale;
-repair adds missing updated_description. Do not call it a clean primary pass. Exact packets,
-raw outputs and review are retained; expectations never enter candidate requests. Corpus
-digest: `18a4403d8cbf3a2dc4773c8e39556c2cb93926af5390f6c774955e3be9b4632c`.
+Target validation: latest immutable full 51-case preview (framing Agent) has
+28 mechanical passes and 19 reviewed acceptable initial previews; every case and
+available raw call reviewed. Both continuation cases pass. Fifty completed Fast
+streams are original-Schema-valid, but the 51st truncates and old success-only
+logging omitted its request and partial output. Thus full stream integrity remains
+open. GI: 53 valid; GA: 50 valid / 1 invalid; Deep: 3 invalid; skill: 2 invalid.
+160 retained calls / 159 linked. Exactly one post-cohort bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_122434.tar.gz`.
+Four deterministic reflex cases need execution evidence beyond preview.
 
-Frozen installed-grammar proof: 2427 separate cases, zero changed full-Schema verdicts.
-Valid acceptance improves 183/229 -> 229/229. Invalid acceptance changes 169/2198 ->
-175/2198 (9 newly reachable, 3 newly rejected). Of those 9, four fail DTO checks, three
-fail existing Host ownership checks, and two repeated-identical-ID cases normalize but
-still fail strict raw Schema. This is not full decoder soundness. The outer-only prototype
-was rejected because it admitted malformed nested fields. Final helper matches all 11
-unique frozen schemas; fresh fixture comparison has 45 comparisons / 44 unique, no verdict
-changes. No new current document, environment variable or semantic authority is introduced.
+The diagnostic candidate is deployed; 113 Agent/shared files matched at verification.
+Final cleanup removes one extra EOF blank line in shared json_schema.py only;
+the deployed code is behaviorally identical, with this byte-level difference recorded.
+Its focused `contextless_turn_it_up` replay completes, but wrongly selects walking
+for an ambiguous increase request; it does not reproduce or explain the original
+2048-token truncation. A separate exact-request fault test changes only max_tokens
+to 16 and proves one failed record retains exact partial output, request order,
+length finish reason and output_truncated classification. No dispatch occurs in
+that fault test. No full 51-case rerun of this diagnostics-only image is claimed.
 
-Full immutable before/after 51-case live-text previews: 16 mechanical passes each;
-reviewed passes improve 9 -> 12, with all nine earlier positive cases retained. Added preview
-passes: tired social response, capability inventory, Chongqing-afternoon initial lookup.
-A lookup preview does not prove a weather-provider result or completed evidence re-entry.
-GA primary raw Schema passes improve 20/47 -> 38/48; after still has 10 primary plus 10
-repair Schema failures. All 51 cases were reviewed from raw calls, including mechanical
-passes. After retains 164 calls, 163 linked to the cohort, with no log JSON decode errors.
+Release readiness: blocked by semantic/safety errors (negative blink admitted,
+ungrounded destination/velocity, wrong capabilities, omitted Goals, false promises,
+resource meaning and continuity), Deep/skill contracts, the historical truncation,
+and missing current-revision physical voice/default target-evidence closure.
+Preview and schema validity do not establish provider execution or robot behavior.
 
-**Promotion is withheld:** an earlier GA Schema failure contained “去那边等我。”; now a
-valid GA object lets Fast's ungrounded two-second walk reach preview. GI had failed to mark
-the unknown destination unresolved; Fast substitutes walk_forward; Host admits the wrong
-semantic result. No physical dispatch occurs. “调大一点。” similarly reaches unrelated
-movement (before nod, after walk_velocity). These hard failures cannot be offset by more
-passes. Reminder promises, milk resource classification, GI framing/prohibition/multi-turn
-provenance, multi-Goal arrays, Fast DTO/latency and Deep capability inventions remain open.
-Main's previous full preview remains 0/51 qualified; neither branch is behavior-qualified.
+## Current runtime and retained artifacts
 
-Validation on the candidate: focused GA/Fast 202 tests / 45 subtests; canonical gate 2311
-tests / 318 subtests, 140 benchmark checks and 20 legacy tests passed. Policies, docs,
-test ownership and pinned static gates passed. Level A continuity 4/4 and robust intent
-8/8 (11 distinct). All 70 deployed Agent source files matched tested source. Evidence is
-Level A plus live model/Level C-preview, not physical microphone/speaker/robot, target
-closure, release readiness or a controlled backend performance comparison.
+RTX 5090, 32607 MiB, driver 595.84 / CUDA 13.2. Fixed Gemma4-12B FP8/SGLang,
+served `chromie-gemma4-12b`, revision `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`,
+65536 context/cache and two requests. Specialized ASR/TTS unchanged.
+Agent tag `chromie-agent:stream-evidence-20260910`, image
+`sha256:93a76fbf9c172c98ba098aedec300450629875273733cb53bcb510a3ac2196a4`,
+container `e253f0e784d23e1763c3cccc7288ef97185495913bac8a61bcea7a4f91e1afa4`.
+SGLang image `sha256:6f449f469487fe9f5d4565c2dfb14f62a08ed4f8b581681d3e3fd0bda6df7303`.
+Agent, SGLang, ASR/TTS and headless Soridormi remain running; maintained-main
+restoration has NOT occurred in this continuation. Verify health before resuming.
 
-Evidence root (local, not uploaded): `.chromie/acceptance/ga-root-fields-20260909/`.
-Start with `repair-report.md`, `role-review.json`, `role-comparison.json`,
-`nested-grammar-summary.json`, and both `baseline/behavior-review.json` and
-`after/behavior-review.json`; all raw transactions are in their `reviewed-cases/`.
-Exactly one bundle followed each full cohort:
-- Before: `/home/chromie/Downloads/chromie_debug_bundle_20260909_210540.tar.gz`.
-- After: `/home/chromie/Downloads/chromie_debug_bundle_20260909_212140.tar.gz`.
-Both preview exits are 1; both bundle exits are 0. No source edits/restarts occurred within
-cohorts. Candidate Agent image:
-`sha256:422b446a3a2be6279cdab7f969c598b824505db3c875c6a8a9b8a112fbe8f0c4`,
-retained as `chromie-agent:ga-object-shapes-20260909`.
+Raw evidence is retained locally and is not included in this Git delivery; transfer
+these artifacts separately when resuming on another machine. The summary below
+remains available from Git. Evidence roots beneath `.chromie/acceptance/`:
+- `stream-evidence-20260910/`: latest gate, identity, source verification, natural
+  focused replay and controlled failed-stream proof; read report.md first.
+- `fast-tagged-20260910/`: latest full cohort, all-case review, ordered frozen
+  packets, native grammar experiments, implementation equality and source patch.
+- `fast-continuity-20260910/`: dropped-Goal diagnosis, focused proof and prior cohort.
+- `gi-followup-shape-20260910/`: corrected production-order GI packets and cohort.
+- `gi-referents-20260910/`: retained provenance repair; rejected ambiguity wording.
+- `ga-array-20260910/`: GA decoder contrasts and primary-role qualification.
+- `decoder-shapes-20260910/`: mechanical Deep/skill preparation, not implemented.
 
-Next: use the completed cohort as the baseline for the multi-responsibility new-Goal array
-cluster, where malformed items and omitted Goals remain reachable. Prove exact installed
-grammar item/cardinality behavior with frozen valid/invalid contrasts before editing.
-Keep the ambiguous-destination case as a hard promotion blocker; separately diagnose GI
-unresolved meaning without a semantic reviewer or Host intent rules. Do not repeat the
-already-closed root-object diagnosis or promote this candidate from focused results alone.
+## Next work and commands
 
-Operational runtime: main Agent backup `chromie-agent:fast-numeric-guard-20260909`
-(image `sha256:63cabb1e5e863b204aa97e86acbb2f11eb2568dcaa18db2e9fffef4382d4cac7`)
-and maintained SGLang `chromie-sglang:guard-baseline-20260909`
-(image `sha256:2f425788c02f2502fd5541455f4917819759352b68e8b8b987bee750204c11ac`)
-were restored after the cohort. All four services are healthy, and all 70 packaged Agent
-files match main 08890f84; see `restoration-verification.json`. Candidate code remains
-isolated. Generated
-`.env.runtime` was not edited; no physical Orchestrator started; preserve unrelated
-Soridormi working-tree changes.
+Read latest all-case review before selecting another semantic change. Reproduce the
+natural failed-stream class with current exact logging; do not infer its historical
+cause from the deliberate 16-token test. Use fresh artifact directories and runtime
+identity. Freeze contrasts at the earliest responsible boundary; keep the fixed model.
+Before another broad change or revision-level claim, run and judge one complete
+immutable directory-discovered cohort, then collect exactly one debug bundle. Do not
+edit source, rebuild or restart between cases. Keep unsafe candidates in preview.
 
-Resume commands from the repository root:
-```bash
-git show origin/codex/ga-request-format:HANDOFF.md
-python scripts/check_repository_policies.py
-./scripts/run_tests.sh
-python scripts/check_docs.py
-python scripts/check_test_ownership.py
-```
-Live invocation after capturing a fresh identity and using a new evidence directory:
-```bash
-python scripts/general_ability_acceptance.py --mode live-text --stage must_pass \
-  --runtime-identity PATH_TO_FRESH_IDENTITY \
-  --soridormi-mcp-url http://127.0.0.1:8000/mcp \
-  --soridormi-repo /home/chromie/github/soridormi --evidence-dir NEW_EVIDENCE_DIRECTORY
-```
-Do not reuse old identity files after switching images. Stop ASR/TTS before restarting
-SGLang because transient model-load memory can exceed capacity. Restore cached speech
-using existing `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` overrides if needed. Compose uses
+Canonical checks: `./scripts/run_tests.sh`, `python scripts/check_repository_policies.py`,
+`python scripts/check_test_ownership.py`, `python scripts/check_docs.py`.
+Use `scripts/capture_runtime_identity.py --help` and the retained latest identity
+capture/cohort commands to bind the next fresh directory. Compose uses generated
 `.env.runtime`, `docker-compose.yml`, `docker-compose.sglang.yml` and
-`.chromie/voice-runtime/compose.voice-mujoco.yaml` in that order.
+`.chromie/voice-runtime/compose.voice-mujoco.yaml`; never edit generated env directly.
+Stop ASR/TTS before replacing SGLang, then restart speech after model health.
+HANDOFF.md retains historical recovery commands; its current section overrides them.
+
+## Historical iterations — not current runtime or resume instructions
+
+The entries below retain earlier evidence and recovery commands. Pending statements
+and current-service claims below apply only to their historical iteration; the current
+resume section above and DEVELOPMENT_CHECKPOINT.md are authoritative.
+
+
+## Latest continuation — GI decoder repair retained; Fast continuity under qualification
+
+This section supersedes the earlier runtime-restoration and resume statements below.
+Active Issue #35; branch `codex/ga-request-format`, HEAD `4dd7685d93d1bb530f7e186994497c8c7c7adc5c`, dirty candidate. No commit, push or promotion.
+Fixed Gemma4-12B FP8/SGLang on RTX 5090 (32607 MiB), 65536 context/cache, two requests.
+
+The retained GI continuity schema exposes the existing required object shape alongside
+unchanged allOf constraints. Installed XGrammar preserved all 98 valid contrasts and
+rejected all 724 invalid contrasts (previously accepted). Twelve production-order
+packet replays improved 8/12 to 12/12 Schema-valid; this is not semantic qualification.
+Initial logged-schema replays lost property order in the existing diagnostics and are
+retained only as diagnostics; corrected builder-reconstructed packets are authoritative.
+No GI prompt, formatting, model or semantic authority changed. Stable canonical gate:
+2314 tests / 363 subtests, 20 legacy tests, 140 benchmarks; focused 159 / 97 subtests;
+Level A 11 distinct cases. Evidence: `.chromie/acceptance/gi-followup-shape-20260910/`.
+
+The immutable full 51-case preview completed: 23 mechanical, 17 reviewed acceptable
+initial previews (previously 19 / 13). Every raw case reviewed; 159 calls retained,
+158 linked, no decode errors. GI 52 Schema-valid raw calls, no Deep GI; GA 50 valid
+and one invalid, no repair; both skill-selection calls and both Deep Planner calls
+invalid. Fast contract and semantic failures remain. Exactly one bundle retained:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_113254.tar.gz`.
+Source stable throughout cohort. Four reflex cases remain preview-limited. These
+counts do not establish complete semantic, execution, provider, voice or robot evidence.
+
+Next reproduced boundary: in `user_probe_continue_recent_walk`, GI and GA preserve
+`goal_dbc54fecb002ea74f55e`, but Fast receives `Active Goal continuity summary only: []`.
+The actual snapshot is at least 1322 serialized characters; the optional 600-character
+list projection drops it completely. Fast then asks which action to continue and its
+wrong disposition fails Host validation. Context assembly and transport retain the
+snapshot; planner prompt projection is the first wrong boundary.
+The current repair projects complete Goal meaning, status, open gaps and update text
+from active and recent snapshots, excluding snapshot diagnostics/task implementation
+identity. It preserves entries and versions without interpreting them. A required 16K
+character budget fails explicitly rather than deleting Goals or shortening meaning.
+Frozen 12 mechanical contrasts improve 4/12 to 12/12; focused tests 152 / 7 subtests.
+Full stable canonical gate now passes 2316 tests / 363 subtests, 20 legacy tests and
+140 benchmark checks; Level A 11 distinct cases passes. All 70 Agent files match.
+Complete immutable 51-case preview: 21 mechanical, 13 reviewed acceptable initial
+previews (prior 23 / 17). All raw cases reviewed: 158 calls, 157 linked; GI 52
+Schema-valid, GA 49 valid + 1 invalid, 50 Fast calls, three invalid Deep Planner
+calls and two invalid skill calls. No Deep GI. Exactly one bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_115712.tar.gz`.
+The continue probe now receives full Goal context and selects a ten-second walk,
+but forbidden presentation_activity_id still fails Fast DTO. GI also supplies a
+more specific outcome in this run, so model-output changes are not isolated causal
+proof of the context patch. The duplicate continuation case passes both turns.
+Repetition now has exact Fast wording but still fails GI/GA relationship. Thanks
+second turn was not reached. Lost prior positives include inventory, three-second
+gaze, quick/polite walk, heavy-rain query and joke binding; nod+hello and ten-second
+walk recover. Forbidden blink is again admitted in preview; no physical execution.
+Retain the projection repair as mechanically verified, not a whole-role promotion.
+
+Next output-format investigation: Fast sends unconstrained text despite retaining
+exact two-frame schemas in its prompt. Frozen 11 original streamed packets and
+198 native framing/field contrasts are under `.chromie/acceptance/fast-tagged-20260910/`.
+No production framing change yet. Candidate model/settings remain fixed. Read its
+actual results before selecting implementation; grammar compliance cannot repair
+invented motion, false promises, resource meaning or upstream ambiguity.
+
+
+Current services run the Fast-continuity candidate: Agent image
+`sha256:21204fbc06c253d10c25b598c4e63a5fe426d22032bc2d4415559825592f2154`,
+SGLang image `sha256:6f449f469487fe9f5d4565c2dfb14f62a08ed4f8b581681d3e3fd0bda6df7303`.
+Agent replacement for the new Fast projection completed. ASR/TTS and headless Soridormi
+are running. Maintained-main restoration has NOT occurred in this continuation.
+Preserve unrelated Soridormi edits. Follow the new iteration artifacts for exact
+replacement identity and cohort results before using earlier restoration commands.
+
+
+## Current continuation — GI location provenance repair; ambiguity still open
+
+The Goal-driven single-authority architecture remains the target. Active Issue #35.
+Existing candidate `codex/ga-request-format` at
+`4dd7685d93d1bb530f7e186994497c8c7c7adc5c` retains the earlier uncommitted GA array
+repair plus a new uncommitted GI location-provenance fix. No commit, push or promotion.
+Maintained main is `01145332288857c415cff3d0a4a1fe7ffd9d0ccd`; running services are
+restored to that line after testing, not to the dirty candidate. Fixed shared
+Gemma4-12B FP8/SGLang on RTX 5090 (32607 MiB), 65536 context/cache, two requests;
+ASR/TTS retain their own models. No final prompt, model or canonical DTO change.
+
+Completed 2026-09-10 continuation has two distinct outcomes:
+
+1. **Rejected wording experiment.** A frozen 24-case bilingual referent cohort misses
+   all seven materially ambiguous cases before and after proposed wording. Two
+   candidate primary calls identify missing referents, then the permitted fresh
+   source-based Deep GI removes uncertainty without new grounding. The patch was
+   removed, not retained as a claimed improvement. Nonempty unresolved is supported
+   by the installed decoder; exact reference outputs also pass Schema and Host.
+   The schema annotation was a hypothesis, not a confirmed inference cause: it
+   travels in response_format rather than ordinary model messages. Broader GI
+   primary/deep interpretation remains unqualified.
+2. **Retained mechanical fix.** Location provenance incorrectly compared model values
+   against whole raw context strings. It rejected a copied location substring from
+   visible dialogue, while accepting exact values found only in metadata, suppressed
+   or invisible history. It now reuses the same compact/bounded accepted dialogue
+   projection shown to GI. Current-turn surface and typed non-history context checks
+   remain; Host does not resolve or rewrite meaning.
+
+| Actual owner / handoff | Material input / expected | Observed before → after |
+|---|---|---|
+| Admitted turn + dialogue projection | 去那边等我。; prior 这里说的那边是门口。 | Exact accepted dialogue appears in packet; correct |
+| GI primary → Host | Model chooses location=门口 from supplied text | Same retained raw response; location choice is grounded |
+| Location provenance validator | Accept copied contiguous visible surface | Whole-string comparison rejects → projected-dialogue substring check accepts; earliest defect repaired |
+| Inverse history contrasts | 门口 only in hidden metadata/suppressed/old/truncated history | Raw-history acceptance → rejection; no new semantic author |
+| Downstream | Role probe only | Planner/physical dispatch not invoked; whole-role meaning separately reviewed |
+
+Fourteen frozen mechanical contrasts improve 5/14 → 14/14. They cover visible
+user/assistant text, exact values, typed context, absent context, suppressed turns,
+metadata, wrong wire field/role, last-six history, 260-character turn truncation,
+1800-character aggregate projection, and translated surfaces. The exact originally
+rejected raw response now passes the complete Host path with no further model call.
+A first oracle wrongly assumed a six-entry projection overflow; inspection corrected
+it to a fitting positive plus an actual omitted-entry negative, and both versions
+were rerun. Original evidence is retained, not overwritten.
+
+The restored-prompt 24-case model rerun has identical primary packets in all 24.
+The specific location rejection is fixed; another run emits whole-turn intensity
+and fails a different validator. Enumerated dimension checks remain 16/24, **not**
+16 full semantic passes. Binding roles, source-language conservation, prohibition
+representation and ambiguity remain wrong in some outputs. Do not claim the model's
+meaning became correct because the validator accepted one grounded location.
+
+Complete fixed-source 51-case live-text preview: 19 mechanical passes, **13 reviewed
+initial-preview passes**, versus prior 24 / 16. All 51 raw cases reviewed. Four prior
+reviewed positives are lost: capability inventory (GI changes can-do to will-do),
+blink+joke and nod+hello (wrong communication roles/source language), continuous
+weather (missing pending communication). Colloquial five-second walk is positive
+again. GA raw Schema remains clean: 47/47 primary, zero repairs; one fewer invocation
+because another GI duration-provenance failure prevents downstream work. 154 raw
+calls retained, 153 linked, no JSON-log decode errors. GI Deep ran once in the
+full cohort for Tianxin; skill selection primary/repair and all three Deep Planner
+calls fail Schema. Do not infer causation from changed model outputs; the mechanical
+location patch does not alter primary packets. Whole candidate promotion is rejected.
+
+Hard blockers remain: unknown 那边 → GI unresolved=[] → Fast invents two-second
+normal walk_forward → Host admits preview; contextless volume → unrelated velocity.
+Current prohibited-blink case types 不要 as intensity and Fast emits count=0, rejected
+by argument validation; prior negative-polarity/forbidden-blink admission remains
+retained as a distinct unsafe workflow. Reminder promises, wrong capability meaning,
+GI second-turn DTO/source provenance, resource classification, and Fast/Deep contracts
+remain open. No physical action, speaker output, live microphone or completed provider
+Evidence was run. Four reflex cases are limited by preview. Level C here means
+initial live-model preview only, not voice/target closure or release readiness.
+
+Validation: focused 77 tests / 25 subtests; canonical gate 2313 tests / 337 subtests,
+20 legacy tests, 140 benchmark checks, policies/docs/ownership/pinned static analysis
+passed. Level A natural_uncertainty_handling 6/6 and robust_intent_understanding 8/8
+(13 distinct) passed. Final document checks also pass. No new document, environment
+variable or architecture term; the existing validator and interaction contract own
+the change. Do not claim all prompt/semantic requirements passed.
+
+Evidence root `.chromie/acceptance/gi-referents-20260910/` (local, not uploaded).
+Start with `report.md`, `behavior-review.json`, `location-before.json`,
+`location-after.json`, `same-output-host-replay.json`, `location-packet-comparison.json`,
+and `before-semantic-review.json` / `after-semantic-review.json` /
+`location-after-semantic-review.json`. Exact role packets live in `before/`, `after/`
+(rejected wording), and `location-after/`; full transactions in `reviewed-cases/`.
+Semantic corpus digest `3a13f6f523b99ec7f9228cc2cfa2665a292c26851beecf6d02aac0ac9ad521c3`;
+mechanical digest `a4cbfa8ed64143deded119b6610b056a2cf9eb81de20d9977dbd2f0e3e4161fd`.
+Setup failures (wrong service URLs, history content/text mismatch, invalid Level A
+mode) and stopped preliminary runs are preserved and excluded from qualification.
+
+Exactly one bundle after the complete cohort:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_105727.tar.gz`.
+Cohort exit 1, bundle exit 0, source stable; command and patch are retained in
+`cohort-command.json`, `cohort-exits.json`, `source.patch`, `runtime-identity.json`.
+Tested source-tree SHA256 `4c8db07f7f2e1608f5025a0418f824ae3fba8ad32a481706bf1cdadac46ff88e`
+precedes final documentation updates. All 70 packaged Agent source/prompt files match.
+Candidate Agent image `sha256:a72c71c573c2534c2d8ee86b6ee6bcafa69a1dcffdc2f04580f4fe4830e62a94`
+is retained as `chromie-agent:gi-location-provenance-20260910`; candidate SGLang remains
+`chromie-sglang:ga-request-format` (`6f449f469487fe9f5d4565c2dfb14f62a08ed4f8b581681d3e3fd0bda6df7303`).
+Restoration uses main Agent `chromie-agent:fast-numeric-guard-20260909`
+(`63cabb1e5e863b204aa97e86acbb2f11eb2568dcaa18db2e9fffef4382d4cac7`) and SGLang
+`chromie-sglang:guard-baseline-20260909`
+(`2f425788c02f2502fd5541455f4917819759352b68e8b8b987bee750204c11ac`). Final observed
+health/source verification is in `restoration-verification.json`. Temporary headless
+Soridormi services are stopped; unrelated Soridormi edits remain intact. `.env.runtime`
+was not edited. No controlled performance comparison is claimed.
+
+Next: diagnose the still-failing primary/deep GI ambiguity transaction using the frozen
+referent contrasts, with explicit source/Context evidence and independent validation
+of WHAT versus missing execution information. Preserve the two primary→Deep uncertainty
+loss traces. Do not retry the rejected wording as a success, add a semantic judge,
+copy primary uncertainty into Deep by Host policy, or introduce phrase routing. Keep
+Fast negative-polarity and complete positive-Goal coverage blockers visible. A new
+repair needs focused proof and a new complete cohort before revision-level claims.
+
+Resume: inspect `git status --short`, this handoff and evidence; then use required
+`python scripts/check_repository_policies.py`, `./scripts/run_tests.sh`,
+`python scripts/check_docs.py`, `python scripts/check_test_ownership.py` after changes.
+For live preview, rebuild intended source, verify packaged files, capture a fresh
+runtime identity, and reuse the retained command with a new identity/evidence directory.
+Never reuse identity across image changes. Stop ASR/TTS before SGLang replacement,
+then restart speech after model health. Compose order remains `.env.runtime`,
+`docker-compose.yml`, `docker-compose.sglang.yml`,
+`.chromie/voice-runtime/compose.voice-mujoco.yaml`.
+
+Earlier GA proof remains in `.chromie/acceptance/ga-array-20260910/`: 2447 grammar
+cases, valid acceptance 229/229 preserved, invalid acceptance 196→13; 18/18 role
+primary passes and the earlier complete 51-case review. Do not repeat that diagnosis.
 
 
 ## Delivered migration baseline — SGLang/Gemma, before numeric guard
@@ -880,3 +1070,45 @@ all-Qwen profile is broadly unqualified—5/51 hard passes, with no retained Fas
 timing meeting target—but does not qualify a replacement or normal physical
 voice behavior. Clean committed-revision provenance, semantic review,
 robot/sim behavior, safety, and release readiness remain open.
+
+## Latest framing continuation — runtime rerun pending
+
+After the completed Fast-continuity aggregate, the next repair constrains the existing
+Fast two-frame stream through SGLang. Eleven frozen exact requests improve 5/11 to
+11/11 complete, original-Schema-valid streams. The first direct decoder experiment
+was rejected: 196/198 mechanical contrasts and a repeated-frame token-limit failure.
+Native grammar inspection proves unsafe JSON-string pattern translation and incorrect
+fractional bounds. Decoder-only omission of those hints plus existing shape exposure
+passes all 198 contrasts. Original schemas and parser/DTO/Host remain unchanged;
+not every schema keyword is asserted to be Host-enforced. Semantic blockers persist.
+Evidence: `.chromie/acceptance/fast-tagged-20260910/`, including before/after/compatible,
+manual report, native contrasts and exact final format equality. No prompt/model change.
+Production transport integration is implemented; focused tests 262 / 58 subtests pass.
+The GA shape helper was moved unchanged into shared schema utilities for reuse. No
+new files, documents, environment settings, runtime switches or semantic authority.
+Full canonical gate and complete cohort are pending. Framing Agent is deployed:
+`sha256:bad2666cf5a4c123cd3d7f786d1c96fa723dba24def6d702c8dd29d8ce98d16c`,
+container `6b2e7dcd14e063ec370d5a1871cc2de4ddfdb5adf0498d09952ecffc947fa370`.
+Agent and shared contract files match the worktree; see source-verification.json.
+SGLang is unchanged. These latest identities supersede earlier running-image prose.
+
+## Latest evidence closure — failed-stream investigation pending
+
+Framing full gate passes 2317 tests / 363 subtests; full 51-case preview is 28
+mechanical / 19 reviewed acceptable initial previews. All cases and available raw
+calls reviewed. Both continuation scenarios pass. Of 51 Fast invocations, 50
+completed streams pass original schemas; contextless_turn_it_up hits the token
+limit and its failed request/partial output was not retained. This is an integrity
+and provenance blocker, not a clean 50/50 pass. GI 53 valid; GA 50 valid + 1 invalid;
+Deep 3 invalid; skill 2 invalid. 160 retained calls / 159 linked. Exactly one bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260910_122434.tar.gz`.
+
+The current diagnostic repair logs each SGLang stream once in finally, including
+truncation, EOF, timeout and cancellation, with exact request and partial output.
+Evidence JSON preserves property order; existing canonical reference hashing is
+unchanged. OpenAI single-choice output is now exposed as raw text in the record.
+No model input, retry or acceptance behavior changes. Focused tests 41 / 10 subtests
+pass. Full gate, deployment and focused reproduction are pending under
+`.chromie/acceptance/stream-evidence-20260910/`. The framed Agent image above still
+runs until the next identity is recorded. Do not infer the truncation root cause
+without the missing stream evidence or promote while semantic/safety failures remain.

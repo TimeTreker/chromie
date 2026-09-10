@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app.clients.ollama_client import TaggedJSONResponseFormat
+
 import json
 from typing import Any
 
@@ -829,7 +831,10 @@ async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
     frames = [frame async for frame in resolver.stream_advance(_request())]
 
     assert model.calls == 1
-    assert model.last_kwargs["response_format"] == "text"
+    assert isinstance(model.last_kwargs["response_format"], TaggedJSONResponseFormat)
+    assert [name for name, _ in model.last_kwargs["response_format"].frames] == [
+        "presentation_commit", "terminal_plan",
+    ]
     assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in str(model.last_prompt)
     assert isinstance(frames[0], PresentationCommit)
     assert frames[0].activity is not None
@@ -1325,3 +1330,35 @@ async def test_runtime_keeps_committed_speech_but_never_dispatches_work_after_fa
     assert runtime.work_dispatch_count == 0
     assert resolution.metadata["failure_stage"] == "fast_planner_stream"
     assert resolution.metadata["presentation_commit"]["commit_id"] == commit.commit_id
+
+
+@pytest.mark.parametrize("recent", [False, True])
+def test_fast_continuity_preserves_large_goal_meaning_and_fails_on_overflow(recent: bool) -> None:
+    import copy
+
+    request, responsibility = _body_request()
+    goal = {
+        "goal_id": "goal_walk", "goal_version": 2,
+        "responsibility_status": "open", "work_status": "paused",
+        "goal": {"description": "walk forward for 10秒", "object": {
+            "bindings": {"direction": "前", "duration": "10秒"}},
+            "constraints": {"surface": "level"}},
+        "open_information_gaps": [{"gap_id": "where", "description": "destination"}],
+        "last_user_update": "向前走10秒", "metadata": {"diagnostic": "x" * 20000},
+    }
+    key = "recent_goal_snapshots" if recent else "active_goal_snapshots"
+    request.context[key] = [goal]
+    original = copy.deepcopy(request.context)
+    prompt = str(fast_advance_layered_prompt(
+        request, responsibilities=[responsibility], capabilities=[_walk_capability()],
+    ))
+    projected = json.JSONDecoder().raw_decode(
+        prompt.split("Active Goal continuity summary only:\n", 1)[1]
+    )[0]
+    assert projected == [{k: v for k, v in goal.items() if k != "metadata"}]
+    assert request.context == original
+    goal["goal"]["description"] = "x" * 17000
+    with pytest.raises(ValueError, match="Fast Planner Goal continuity exceeds"):
+        fast_advance_layered_prompt(
+            request, responsibilities=[responsibility], capabilities=[_walk_capability()],
+        )

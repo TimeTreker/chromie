@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -950,7 +951,16 @@ def _reject_unprovenanced_location_bindings(
     """
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
-    contextual_values = _semantic_context_string_values(request.context)
+    contextual_values = _semantic_context_string_values(
+        {key: value for key, value in request.context.items() if key != "history"}
+    )
+    # Dialogue provenance must match the accepted, bounded text shown to GI.
+    # Raw history also contains suppressed turns, metadata and truncated text;
+    # none of those are evidence for a model-authored location binding.
+    dialogue = json.loads(
+        _bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1800)
+    )
+    dialogue_surfaces = [str(item["text"]).casefold() for item in dialogue]
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1010,7 +1020,11 @@ def _reject_unprovenanced_location_bindings(
         if not location:
             continue
         folded = location.casefold()
-        if folded in current_turn or folded in contextual_values:
+        if (
+            folded in current_turn
+            or folded in contextual_values
+            or any(folded in surface for surface in dialogue_surfaces)
+        ):
             continue
         raise _GoalInterpretationLocationProvenanceViolation(
             "Goal Interpretation location binding has no authoritative surface "
@@ -2735,6 +2749,14 @@ class OllamaGoalInterpreter:
             # Work/evidence readiness is deliberately absent: Planner derives it later
             # from canonical Goal state, trusted Evidence, and available Capabilities.
             responsibility["additionalProperties"] = False
+            if responsibility.get("allOf"):
+                # The pinned decoder otherwise hides sibling object fields behind
+                # the continuity intersection. Repeat only the existing shape;
+                # original cross-field conditions and Host checks stay authoritative.
+                responsibility["anyOf"] = [{
+                    key: copy.deepcopy(responsibility[key])
+                    for key in ("type", "properties", "required", "additionalProperties")
+                }]
         local_refs = [f"r{index}" for index in range(1, 13)]
         properties = schema.setdefault("properties", {})
         properties["coordination"] = {

@@ -41,7 +41,7 @@ def _json_compatible(value: Any) -> Any:
         json.dumps(
             value,
             ensure_ascii=False,
-            sort_keys=True,
+            sort_keys=False,
             separators=(",", ":"),
             default=str,
         )
@@ -57,6 +57,11 @@ def _raw_model_output(response: Mapping[str, Any] | None) -> str | None:
     message = response.get("message")
     if isinstance(message, Mapping) and isinstance(message.get("content"), str):
         return str(message["content"])
+    choices = response.get("choices")
+    if isinstance(choices, list) and len(choices) == 1 and isinstance(choices[0], Mapping):
+        choice_message = choices[0].get("message")
+        if isinstance(choice_message, Mapping) and isinstance(choice_message.get("content"), str):
+            return str(choice_message["content"])
     return None
 
 
@@ -137,7 +142,7 @@ def log_llm_call_evidence(
             json.dumps(
                 record,
                 ensure_ascii=False,
-                sort_keys=True,
+                sort_keys=False,
                 separators=(",", ":"),
             ),
         )

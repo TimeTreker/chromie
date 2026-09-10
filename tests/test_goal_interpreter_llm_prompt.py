@@ -22,6 +22,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _reject_noncanonical_count_bindings,
     _reject_planner_shaped_goal_interpretation,
     _reject_unavailable_or_mismatched_prior_assistant_utterance,
+    _reject_unprovenanced_location_bindings,
     _reject_unprovenanced_duration_bindings,
     _reject_unprovenanced_speed_bindings,
     _source_tokens,
@@ -359,6 +360,39 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 request, json.dumps(nested_location)
             )
 
+    def test_location_provenance_uses_only_rendered_dialogue_text(self) -> None:
+        visible = {"role": "user", "text": "这里说的那边是门口。"}
+        for history, accepted in (
+            ([visible], True),
+            ([{**visible, "role": "assistant"}], True),
+            ([{"role": "user", "text": "门口"}], True),
+            ([{"role": "user", "text": "门口", "metadata": {
+                "cognitive_gateway_admission": "suppress"}}], False),
+            ([{"role": "user", "text": "另一个地方", "metadata": {
+                "label": "门口"}}], False),
+            ([{"role": "user", "content": "门口"}], False),
+            ([{"role": "system", "text": "门口"}], False),
+            ([{"role": "user", "text": "门口"}]
+             + [{"role": "user", "text": "最近对话"}] * 6, False),
+            ([{"role": "user", "text": "甲" * 270 + "门口"}], False),
+            ([{"role": "user", "text": "乙" * 260, "metadata": {
+                "semantic_status": "known" * 10}}] * 5
+             + [{"role": "user", "text": "门口"}], False),
+            ([{"role": "user", "text": "the doorway"}], False),
+        ):
+            with self.subTest(history=history, accepted=accepted):
+                request = GoalInterpretationRequest(
+                    text="去那边等我。", context={"history": history}
+                )
+                parsed = {"responsibilities": [{"bindings": {"location": "门口"}}]}
+                if accepted:
+                    _reject_unprovenanced_location_bindings(request, parsed)
+                    self.assertEqual(parsed["responsibilities"][0]["bindings"],
+                                     {"location": "门口"})
+                else:
+                    with self.assertRaisesRegex(ValueError, "no authoritative surface"):
+                        _reject_unprovenanced_location_bindings(request, parsed)
+
     def test_speed_requires_source_provenance(self) -> None:
         with self.assertRaisesRegex(ValueError, "no authoritative surface provenance"):
             _reject_unprovenanced_speed_bindings(
@@ -520,6 +554,47 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         self.assertIn("Preserve negation and lifecycle meaning", system_text)
         self.assertIn("cancellation, cessation, pause, continuation", system_text)
         self.assertIn("preserve the target Goal's output mode", system_text)
+
+    def test_continuity_decoder_shape_preserves_required_source_and_goal_fields(self) -> None:
+        request = GoalInterpretationRequest(
+            text="continue walking",
+            context={"active_goal_snapshots": [
+                {"goal_id": "goal-active", "outcome": "continue walking"}
+            ]},
+        )
+        interpreter = self._interpreter()
+        for build in (interpreter.build_interpretation_payload,
+                      interpreter.build_deep_interpretation_payload):
+            schema = build(request)["format"]
+            responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
+            exposed = Draft202012Validator({
+                "$defs": schema["$defs"], **responsibility["anyOf"][0],
+            })
+            full = Draft202012Validator({"$defs": schema["$defs"], **responsibility})
+            valid = _valid_output(request.text)["responsibilities"][0]
+            valid.pop("bindings")
+            valid.update(binding_items={}, relationship="continue",
+                         target_goal_ids=["goal-active"], confidence=1.0,
+                         outcome="continue walking", output_mode="body_action")
+            self.assertTrue(exposed.is_valid(valid))
+            self.assertTrue(full.is_valid(valid))
+            for field in responsibility["required"]:
+                missing = copy.deepcopy(valid)
+                del missing[field]
+                with self.subTest(build=build.__name__, missing=field):
+                    self.assertFalse(exposed.is_valid(missing))
+            for field, value in (
+                ("local_ref", "res_1"), ("source_evidence", ["t0"]),
+                ("target_goal_ids", ["unknown"]), ("relationship", "continued"),
+                ("unexpected", True),
+            ):
+                with self.subTest(build=build.__name__, invalid=field):
+                    self.assertFalse(exposed.is_valid({**valid, field: value}))
+            # Decoder shape alone does not enforce the conditional Goal contract.
+            self.assertFalse(full.is_valid({**valid, "target_goal_ids": []}))
+            self.assertFalse(full.is_valid({**valid, "relationship": "new"}))
+            self.assertTrue(full.is_valid({**valid, "relationship": "new",
+                                           "target_goal_ids": []}))
 
     def test_primary_prompt_projects_prior_utterance_rule_only_when_available(
         self,

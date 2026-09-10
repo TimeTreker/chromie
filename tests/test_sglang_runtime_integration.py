@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 import os
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.clients.model_client_factory import build_model_client
-from agent.app.clients.ollama_client import OllamaClient
-from agent.app.clients.sglang_client import SGLangClient
+from agent.app.clients.ollama_client import OllamaClient, TaggedJSONResponseFormat
+from agent.app.clients.sglang_client import SGLangClient, SGLangGenerationError
 from agent.app.clients.sglang_protocol import (
     build_sglang_chat_payload,
     candidate_compatible_schema,
@@ -21,6 +21,47 @@ from orchestrator.runtime.presentation_compute_lease import PresentationComputeL
 
 
 class SGLangProtocolTests(unittest.TestCase):
+    def test_tagged_wire_keeps_schema_authority_and_decoder_compatible_shapes(self) -> None:
+        import copy
+        from jsonschema import Draft202012Validator
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "pattern": "^[^?？]*$"},
+                "duration": {"type": "number", "minimum": 0.05, "maximum": 0.5},
+            },
+            "required": ["text", "duration"], "additionalProperties": False,
+            "allOf": [{"properties": {"text": {"minLength": 1}}}],
+        }
+        original = copy.deepcopy(schema)
+        declared = TaggedJSONResponseFormat((("presentation_commit", schema),
+                                              ("terminal_plan", schema)))
+        payload = build_sglang_chat_payload(
+            model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+            options={}, response_format=declared, stream=True, priority_step=100,
+        )
+        elements = payload["response_format"]["format"]["elements"]
+        self.assertEqual(payload["response_format"]["type"], "structural_tag")
+        self.assertEqual([elements[i]["begin"] for i in (1, 3)],
+                         ["<presentation_commit>", "<terminal_plan>"])
+        wire_schema = elements[1]["content"]["elements"][1]["json_schema"]
+        self.assertEqual(wire_schema["required"], ["text", "duration"])
+        self.assertFalse(wire_schema["additionalProperties"])
+        self.assertIn("anyOf", wire_schema)
+        self.assertNotIn("pattern", wire_schema["properties"]["text"])
+        self.assertNotIn("minimum", wire_schema["properties"]["duration"])
+        self.assertEqual(schema, original)
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid({"text": "checking", "duration": 0.12}))
+        self.assertFalse(validator.is_valid({"text": "checking?", "duration": 0.12}))
+        self.assertFalse(validator.is_valid({"text": "checking", "duration": 0.9}))
+        with self.assertRaisesRegex(ValueError, "require streaming"):
+            build_sglang_chat_payload(
+                model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+                options={}, response_format=declared, stream=False, priority_step=100,
+            )
+
     def test_compact_formatting_is_scoped_to_ga_without_mutating_contract(self) -> None:
         for title in (
             "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
@@ -145,6 +186,67 @@ class SGLangProtocolTests(unittest.TestCase):
             self.assertIsInstance(client, SGLangClient)
             self.assertEqual(client.base_url, "http://example.invalid/v1")
             self.assertEqual(client.compute_class, CognitionComputeClass.INTERACTIVE)
+
+
+class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_each_stream_exit_retains_one_exact_request_and_partial_output(self) -> None:
+        import json
+        import httpx
+
+        for mode in ("stop", "length", "eof", "timeout", "cancel"):
+            with self.subTest(mode=mode):
+                class StreamResponse:
+                    status_code = 200
+
+                    async def __aenter__(self):
+                        return self
+
+                    async def __aexit__(self, *args):
+                        return None
+
+                    async def aiter_lines(self):
+                        yield "data: " + json.dumps({"choices": [{
+                            "delta": {"content": "<terminal_plan>{"}, "finish_reason": None,
+                        }]})
+                        if mode == "timeout":
+                            raise httpx.ReadTimeout("test timeout")
+                        if mode == "cancel":
+                            raise asyncio.CancelledError()
+                        if mode != "eof":
+                            yield "data: " + json.dumps({"choices": [{
+                                "delta": {}, "finish_reason": mode,
+                            }]})
+
+                http_client = Mock()
+                http_client.stream.return_value = StreamResponse()
+                client_context = AsyncMock()
+                client_context.__aenter__.return_value = http_client
+                client = SGLangClient("http://sglang.invalid/v1", "fixed", timeout_ms=1000,
+                                      purpose="fast_planner")
+
+                async def consume():
+                    return [delta async for delta in client.generate_stream(
+                        "exact prompt", response_format="text", turn_id="turn-evidence", attempt=1,
+                    )]
+
+                with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=client_context), \
+                     patch("agent.app.clients.sglang_client.log_llm_call_evidence") as evidence:
+                    if mode == "stop":
+                        self.assertEqual(await consume(), ["<terminal_plan>{"])
+                    else:
+                        expected = asyncio.CancelledError if mode == "cancel" else SGLangGenerationError
+                        with self.assertRaises(expected):
+                            await consume()
+                evidence.assert_called_once()
+                record = evidence.call_args.kwargs
+                self.assertEqual(record["request"], http_client.stream.call_args.kwargs["json"])
+                self.assertEqual(record["response"]["choices"][0]["message"]["content"], "<terminal_plan>{")
+                self.assertEqual(record["correlations"], {"turn_id": "turn-evidence", "attempt": 1})
+                self.assertEqual(record["status"], "accepted" if mode == "stop" else
+                                 "cancelled" if mode == "cancel" else "failed")
+                self.assertEqual(record["error"] is None, mode == "stop")
+                if mode == "length":
+                    self.assertEqual(record["error"]["failure_class"], "output_truncated")
 
 
 class SGLangGoalInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):

@@ -234,6 +234,33 @@ def expected_goal_ids(context: dict[str, Any] | None) -> list[str]:
     return ordered
 
 
+def fast_goal_continuity_projection(context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Preserve retained Goal meaning before concurrent association commits.
+
+    Snapshot diagnostics and task implementation identity are not planning inputs.
+    Keep complete semantic Goals, lifecycle state and gaps, including recent Goals;
+    do not choose between versions or reinterpret GI's explicit target IDs here.
+    """
+
+    snapshots: list[dict[str, Any]] = []
+    for source in ("active_goal_snapshots", "recent_goal_snapshots"):
+        raw = context.get(source) or []
+        if not isinstance(raw, list):
+            raise ValueError(f"{source} must be a list")
+        for item in raw:
+            if not isinstance(item, dict):
+                raise ValueError(f"{source} entries must be objects")
+            snapshots.append({
+                key: copy.deepcopy(item[key])
+                for key in (
+                    "goal_id", "goal_version", "responsibility_status", "work_status",
+                    "goal", "open_information_gaps", "last_user_update", "updated_ms",
+                )
+                if key in item
+            })
+    return snapshots
+
+
 def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Build a compact immutable grounding block for planner prompts.
 

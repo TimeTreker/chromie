@@ -690,6 +690,37 @@ class GoalExecutionContractTests(unittest.TestCase):
             ],
         )
 
+    def test_decoder_array_alternative_preserves_item_shape_and_cardinality(self):
+        schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput, [], [],
+            responsibility_count=2, responsibility_refs=["r1", "r2"],
+            responsibility_output_modes={"r1": "body_action", "r2": "speech"},
+        )
+        array = schema["properties"]["new_goals"]
+        exposed = Draft202012Validator({
+            "$defs": schema["$defs"], **array["anyOf"][0],
+        })
+        full = Draft202012Validator({"$defs": schema["$defs"], **array})
+        values = [
+            goal("Blink twice.", "body_action"),
+            goal("Tell a joke.", "speech", source_responsibility_refs=["r2"]),
+        ]
+        for valid in (values, list(reversed(values))):
+            self.assertTrue(exposed.is_valid(valid))
+            self.assertTrue(full.is_valid(valid))
+        for invalid in ([], values[:1], values + values[:1], [False, values[1]]):
+            with self.subTest(invalid=invalid):
+                self.assertFalse(exposed.is_valid(invalid))
+                self.assertFalse(full.is_valid(invalid))
+        for field in ("description", "bindings", "resource_kind", "resource_responsibility"):
+            missing = copy.deepcopy(values)
+            del missing[0][field]
+            with self.subTest(missing=field):
+                self.assertFalse(exposed.is_valid(missing))
+        # The redundant branch cannot enforce cross-item identity. Keep the
+        # original conservation clauses and the downstream Host check intact.
+        self.assertFalse(full.is_valid([values[0], values[0]]))
+
     def test_decoder_object_alternative_requires_complete_association_result(self):
         for refs in (["r1"], ["r1", "r2"]):
             schema = ga_schema.goal_association_response_schema(

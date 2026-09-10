@@ -1062,6 +1062,14 @@ flag or environment variable is added. This candidate requires the full qualific
 record in the checkpoint before promotion; the earlier global compact experiment
 was rejected for GI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
+GA decoder schemas expose existing object fields and array item/cardinality constraints
+as redundant single alternatives beside intersections. This preserves the full Schema
+contract while making those shapes visible to the pinned decoder; cross-item identity
+conservation still requires the original Schema clauses and deterministic Host checks.
+GI likewise exposes its existing Responsibility object shape when supplied Goal context
+adds a continuity intersection. This preserves required source citations, relationship
+tokens and supplied Goal IDs in the decoder; it changes neither GI formatting nor the
+semantic contract. Conditional relationship checks remain independently enforced.
 The checkpoint must be cached in `hf_cache` before offline startup. Normal launch is
 `./scripts/start_chromie.sh --build`; `--no-orchestrator --keep-services` provides
 service-only startup with unplayed speech readiness probes. The launcher uses SGLang
@@ -1072,3 +1080,26 @@ This change adds one runtime Compose file and one reproducible image Dockerfile,
 and removes the obsolete candidate overlay. No new environment variable or semantic
 authority is introduced. The existing standalone SGLang qualification Compose remains
 available for explicitly isolated provider experiments.
+
+Fast Planner's pre-association Goal continuity context projects complete semantic Goals,
+lifecycle status, open information gaps and last-update text from active and recent
+snapshots. Snapshot diagnostics and task implementation identity are excluded. The
+required projection has a 16000-character budget: overflow fails prompt construction
+explicitly, without truncating fields, omitting a Goal suffix or resolving conflicting
+versions in the Host. This replaces the former optional 600-character list budget.
+
+Fast Planner declares the existing ordered `presentation_commit` and `terminal_plan`
+wire frames with their original payload schemas to the model client. SGLang constrains
+those frames using its structural-tag decoder. The adapter exposes existing intersection
+shapes and omits string `pattern` and numeric `number` bounds from this decoder only:
+installed XGrammar 0.2.1 miscompiles JSON-string escaping and fractional bounds. Original
+schemas, parser, DTO and Host checks remain unchanged; full-schema qualification is
+separate and decoder validity alone does not establish semantic correctness. Ollama
+retains its existing unconstrained tagged text stream; no constrained-decoder claim is
+made for that provider. No new environment setting or extra model call is introduced.
+
+Private model-call evidence preserves request/schema property order and records each
+SGLang stream once on completion or failure, including partial generated text,
+finish reason and failure classification. Existing canonical reference hashes stay
+unchanged; use the retained ordered request for decoder replay. Failed streams must
+remain in qualification denominators even when no complete JSON payload exists.

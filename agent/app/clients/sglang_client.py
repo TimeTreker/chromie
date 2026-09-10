@@ -368,6 +368,20 @@ class SGLangClient(OllamaClient):
                 },
             )
             status = "completed"
+
+        except asyncio.CancelledError:
+            raise
+        except httpx.TimeoutException as exc:
+            raise SGLangGenerationError(
+                "SGLang streaming request timed out",
+                failure_class="timeout",
+                failure_domain="inference_transport",
+                architecture_attribution="not_evaluated",
+                retryable=True,
+                details={"purpose": self.purpose, "model": self.model},
+            ) from exc
+        finally:
+            active_error = sys.exc_info()[1]
             log_llm_call_evidence(
                 logger,
                 call_id=call_id,
@@ -384,24 +398,17 @@ class SGLangClient(OllamaClient):
                         }
                     ],
                 },
-                status="accepted",
+                status=("accepted" if status == "completed" else
+                        "cancelled" if isinstance(active_error, asyncio.CancelledError) else "failed"),
+                error=({
+                    "error_type": type(active_error).__name__,
+                    "message": str(active_error),
+                    **(llm_failure_metadata(active_error) if isinstance(active_error, Exception) else {}),
+                } if active_error is not None else None),
                 elapsed_ms=(time.perf_counter() - started) * 1000.0,
                 correlations={"turn_id": turn_id, "attempt": attempt},
                 parsed_output=None,
             )
-        except asyncio.CancelledError:
-            raise
-        except httpx.TimeoutException as exc:
-            raise SGLangGenerationError(
-                "SGLang streaming request timed out",
-                failure_class="timeout",
-                failure_domain="inference_transport",
-                architecture_attribution="not_evaluated",
-                retryable=True,
-                details={"purpose": self.purpose, "model": self.model},
-            ) from exc
-        finally:
-            active_error = sys.exc_info()[1]
             finish_probe = _PREFIX_CACHE_TRACKER.finish(
                 call_id,
                 status=(

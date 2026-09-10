@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 
@@ -112,3 +113,38 @@ def json_schema_validation_errors(
                 )
 
     return errors
+
+
+def expose_intersection_shapes(node: Any) -> None:
+    """Keep object and array constraints visible before decoder intersections.
+
+    The single alternative repeats existing shape constraints, so all original
+    conditions remain authoritative. This does not add decoder support for
+    cross-field conditions; DTO and Host validation still enforce those.
+    """
+    if isinstance(node, list):
+        for value in node:
+            expose_intersection_shapes(value)
+    elif isinstance(node, dict):
+        # Visit existing children first; the redundant branch must not recurse
+        # into another copy of itself.
+        for value in list(node.values()):
+            expose_intersection_shapes(value)
+        shape_keys = (
+            ("type", "properties", "required", "additionalProperties")
+            if node.get("type") == "object" and "properties" in node
+            else ("type", "items", "prefixItems", "minItems", "maxItems", "uniqueItems")
+            if node.get("type") == "array" and "items" in node
+            else ()
+        )
+        if (
+            node.get("allOf")
+            and shape_keys
+            and "oneOf" not in node
+            and "anyOf" not in node
+        ):
+            node["anyOf"] = [{
+                key: copy.deepcopy(node[key])
+                for key in shape_keys
+                if key in node
+            }]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app.clients.ollama_client import TaggedJSONResponseFormat
+
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
@@ -2125,7 +2127,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertEqual(advance.activities[0].role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
-        self.assertEqual(ollama.prompts[0][1]["response_format"], "text")
+        self.assertIsInstance(ollama.prompts[0][1]["response_format"], TaggedJSONResponseFormat)
         presentation_schema, _ = _tagged_frame_schemas(ollama.prompts[0][0])
         presentation_activity = presentation_schema["properties"]["activity"][
             "anyOf"
@@ -3719,7 +3721,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.activities[1].args["period"], "evening")
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
-        self.assertEqual(ollama.prompts[0][1]["response_format"], "text")
+        self.assertIsInstance(ollama.prompts[0][1]["response_format"], TaggedJSONResponseFormat)
         presentation_schema, terminal_schema = _tagged_frame_schemas(
             ollama.prompts[0][0]
         )

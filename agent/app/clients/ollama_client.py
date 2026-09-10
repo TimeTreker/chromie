@@ -46,7 +46,21 @@ except ImportError:  # pragma: no cover - repository development path
 
 logger = logging.getLogger("chromie.agent.ollama")
 
-ResponseFormat = Literal["text", "json"] | dict[str, Any]
+@dataclass(frozen=True)
+class TaggedJSONResponseFormat:
+    """Ordered existing wire frames, with each frame's authoritative JSON schema."""
+
+    frames: tuple[tuple[str, dict[str, Any]], ...]
+
+    def __post_init__(self) -> None:
+        names = [name for name, _ in self.frames]
+        if not names or len(set(names)) != len(names) or any(
+            re.fullmatch(r"[a-z][a-z0-9_]*", name) is None for name in names
+        ):
+            raise ValueError("JSON response frame names must be unique wire identifiers")
+
+
+ResponseFormat = Literal["text", "json"] | dict[str, Any] | TaggedJSONResponseFormat
 
 
 @dataclass(frozen=True)
@@ -462,7 +476,7 @@ class OllamaClient:
         structured_output = response_format == "json" or isinstance(
             response_format, dict
         )
-        if not isinstance(response_format, dict) and response_format not in {
+        if not isinstance(response_format, (dict, TaggedJSONResponseFormat)) and response_format not in {
             "text",
             "json",
         }:

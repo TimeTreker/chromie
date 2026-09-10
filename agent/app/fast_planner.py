@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from .capabilities.catalog import CapabilityCatalog
 from .clients.ollama_client import (
     OllamaClient,
+    TaggedJSONResponseFormat,
     OllamaGenerationError,
     llm_failure_metadata,
 )
@@ -120,8 +121,8 @@ def validate_presentation_commit_request_scope(
 ) -> None:
     """Reject an early observable Activity that is invalid for this exact turn.
 
-    The streaming transport is free-form text, so the dynamic presentation Schema
-    is prompt guidance rather than a decoder-enforced boundary.  Re-run the small
+    The streaming transport may constrain framing and shape, but the Host remains
+    authoritative for observable effects. Re-run the small
     request-specific subset that can make an already validated DTO unsafe to yield
     before terminal-plan validation.
     """
@@ -421,7 +422,10 @@ class FastPlannerResolver:
                 prompt,
                 system=fast_streaming_advance_system_prompt(),
                 options=options,
-                response_format="text",
+                response_format=TaggedJSONResponseFormat((
+                    ("presentation_commit", response_schema["properties"]["presentation_commit"]),
+                    ("terminal_plan", response_schema["properties"]["terminal_result"]),
+                )),
                 prompt_family="fast_planner.streaming_advance",
                 turn_id=request.sid,
                 attempt=1,

@@ -16,10 +16,11 @@ from .cognitive_identity import (
     owner_approved_personality_context,
 )
 from .goal_progress_communication import goal_progress_communication_prompt
-from .prompt_projection import bounded_json
+from .prompt_projection import bounded_json, required_json
 from .planner_context import (
     canonical_goal_grounding,
     evidence_bound_dialogue,
+    fast_goal_continuity_projection,
     goal_association_prompt_projection,
     planner_goal_context,
     planner_provider_vocal_goal_ids,
@@ -474,7 +475,11 @@ def fast_advance_layered_prompt(
         sort_keys=False,
         separators=(",", ":"),
     )
-    active_goals = bounded_json(context.get("active_goal_snapshots") or [], 600)
+    active_goals = required_json(
+        fast_goal_continuity_projection(context),
+        16000,
+        label="Fast Planner Goal continuity",
+    )
     interaction_context = bounded_json(
         context.get("interaction_context") or {},
         1200,

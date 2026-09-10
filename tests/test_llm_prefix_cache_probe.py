@@ -5,12 +5,39 @@ import unittest
 from shared.chromie_runtime.llm_diagnostics import (
     PrefixCacheTracker,
     llm_call_evidence_payload,
+    log_llm_call_evidence,
 )
 
 
 class PrefixCacheTrackerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tracker = PrefixCacheTracker()
+
+    def test_exact_evidence_retains_schema_order_and_openai_partial_text(self) -> None:
+        import copy
+        import json
+        from unittest.mock import Mock
+
+        request = {"response_format": {"schema": {"properties": {
+            "z_first": {"type": "string"}, "a_last": {"type": "number"},
+        }}}}
+        original = copy.deepcopy(request)
+        logger = Mock()
+        record = log_llm_call_evidence(
+            logger, call_id="stream-failed", purpose="fast_planner", stage="stream",
+            transport="sglang.chat_stream", request=request,
+            response={"choices": [{"message": {"content": "<terminal_plan>{"},
+                                   "finish_reason": "length"}]},
+            status="failed", error={"failure_class": "output_truncated"},
+        )
+        self.assertEqual(request, original)
+        self.assertEqual(record["response"]["raw_model_output"], "<terminal_plan>{")
+        self.assertTrue(record["privacy"]["contains_raw_model_output"])
+        logged = json.loads(logger.info.call_args.args[2])
+        self.assertEqual(list(logged["request"]["response_format"]["schema"]["properties"]),
+                         ["z_first", "a_last"])
+        self.assertEqual(list(record["request"]["response_format"]["schema"]["properties"]),
+                         ["z_first", "a_last"])
 
     def test_failed_attempt_remains_the_previous_call(self) -> None:
         first = self.tracker.begin(
