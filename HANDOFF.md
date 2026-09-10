@@ -1,5 +1,58 @@
 # Chromie Latest Handoff
 
+## Root-cause audit — 2026-09-10, after 3c70093e
+
+Owner requested continued root-cause finding. This iteration is Audit mode: no
+production source, prompt, model, Schema, runtime or scenario changes. Baseline
+`3c70093e9ff7460b1f20af7cf0cbf0f71b6dd56d` remains deployed as recorded below.
+Active Issue #35 and branch `codex/ga-request-format` are unchanged. Root-cause
+findings below supersede provisional attribution in the previous evidence ledger.
+
+Evidence: `.chromie/acceptance/root-cause-audit-20260910/probe.py`, per-variant JSON
+packets, `results.json`, `probe.log`, and `existing-tests.log`. Replays use retained
+real transaction inputs from `skill-single-call-20260910/reviewed-cases/`, current
+production validators and Runtime adapter; there are no model/provider calls or
+physical dispatches. Prompt catalog `args_schema` is restored to Host `input_schema`
+without changing the schema. Three existing regressions / seven subtests pass;
+they do not cover the newly reproduced cross-boundary gaps. Earlier full canonical
+2324 / 399 results remain the unchanged-code baseline, not a new run this iteration.
+
+| Actual episode boundary | Input -> actual output | Verdict / expected contract |
+| --- | --- | --- |
+| Turn GI -> Fast, walk_then_turn_right | Retained Chinese walk-three-seconds then turn-right-once; GI r2 count=1, direction=向右, location=原地 | Supplied repetition reaches Fast; it is not lost at handoff |
+| Fast -> Host numeric check | One turn Activity, duration_s=2, yaw_radps=.12; turn input schema has duration/yaw but no count | Host rejects because number 1 is absent from all args; changing only duration to 1 makes it pass |
+| Host numeric implementation | All numeric binding values compared against a set of numbers from all matching Activity args | Confirmed field/quantity identity loss: seconds can witness a repetition count. Negative yaw alone does not change rejection. Acceptance in this probe is only Host validation, never proof of correct direction/execution |
+| Object GI -> concurrent GA/Fast | 那个 has no resolved referent; GI unresolved=[]; GA retains unknown physical source; Fast escalates without Work | Earliest semantic omission remains GI; no Skill model call occurs because discovery has zero candidates |
+| Deep -> plan validation, ambiguous_object_bring_that | Two duplicate delivery steps marked parallel, same Goal and exclusive body/carried-object resources | Host correctly rejects parallel_exclusive_group_conflict and parallel_resource_claim_conflict; no delivery is authorized |
+| Deep fallback -> Runtime response adapter | materialize_deep_clarify produces clarify, empty steps/text, but no execution_allowed=False | Confirmed failure-contract omission: adapter requires that marker for safe silent failure, then raises missing exact text instead |
+| Counterfactual adapter replay | Same retained rejected plan, only execution_allowed=False supplied | Zero speech and zero capabilities, no secondary exception; original rejection feedback retained |
+
+The numeric defect is in `planner_fast_validation.py`'s value-set conservation,
+not proof that repetition semantics should be deleted or arbitrary arguments added.
+The later field-name equality check protects count only when the chosen Capability
+has a numeric count field; it cannot repair this case where that field is absent.
+A future repair must preserve quantity identity and explicitly justify representation
+of repetition through Activity structure; do not weaken the gate or add Host semantic
+inference. The supplied model catalog also lacks a documented yaw sign convention;
+previous claims that the sign failure is solely model inference remain unproven.
+
+The failure-path defect is in the Deep fallback producer, not a requirement for the
+Runtime to invent a clarification sentence. The existing adapter already supports
+marked silent non-executable failures. Next minimal repair should enforce that
+existing producer contract and test producer-to-adapter integration, retaining the
+original failure and no second model invocation. Audit both Deep rejection and
+exception paths. Do not broaden silent acceptance for unmarked successful plans.
+This requires no change to semantic ownership; if subsequent work changes canonical
+repetition meaning or authority, obtain owner authorization before that change.
+
+Attribution correction: the raw Deep output also fails the retained dynamic Schema
+(`user_confirmation_required=False`, schema permits True), but the observed runtime
+rejection feedback is parallel-resource validation, not that Schema error. Schema,
+DTO and runtime verdicts must remain separate. The model's bad proposal initiated the
+episode; the missing failure marker caused the secondary exception. These confirmed
+project defects rule out an all-model-only explanation. Main promotion remains blocked.
+No fix or new live/robot qualification is claimed by this audit delivery.
+
 ## Current resume point — owner-authorized single-call Skill selection
 
 The Goal-driven single-authority architecture remains binding. Active Issue #35;
