@@ -54,7 +54,7 @@
     "soridormi.turn_in_place": {
       "type": "locomotion.turn",
       "domain": "locomotion",
-      "arg_fields": ["yaw_radps", "duration_s"]
+      "arg_fields": ["yaw_radps", "duration_s", "count"]
     },
     "soridormi.sidestep": {
       "type": "locomotion.sidestep",

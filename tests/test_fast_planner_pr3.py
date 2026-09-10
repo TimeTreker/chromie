@@ -2074,6 +2074,47 @@ class FastPlannerResolverTests(unittest.TestCase):
                                 capabilities=[capability],
                             )
 
+    def test_turn_count_contract_preserves_named_binding(self):
+        capability = {
+            "capability_id": "soridormi.turn_in_place",
+            "input_schema": {"type": "object", "additionalProperties": False,
+                "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 8, "default": 1},
+                               "duration_s": {"type": "number", "default": 2.0},
+                               "yaw_radps": {"type": "number", "default": 0.12}}},
+        }
+        for count in (1, 2):
+            for actual_count in (None, 1, 2):
+                with self.subTest(count=count, actual_count=actual_count):
+                    request = _work_request(
+                        sid="turn-count-contract", text="Turn in place.",
+                        responsibilities=[{"local_ref": "r1", "outcome": "turn in place",
+                            "output_mode": "body_action", "bindings": {"count": count},
+                            "confidence": 1.0}],
+                    )
+                    args = {"duration_s": float(count), "yaw_radps": -0.12}
+                    if actual_count is not None:
+                        args["count"] = actual_count
+                    output = FastPlannerAdvanceModelOutput.model_validate({
+                        "disposition": "execute", "coverage": "complete",
+                        "covered_responsibility_refs": ["r1"],
+                        "activities": [{"role": "capability", "activity_id": "turn",
+                            "capability_id": capability["capability_id"], "args": args,
+                            "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                        "continuations": [], "confidence": 1.0, "unresolved": [],
+                        "reason_summary": "Turn as requested.",
+                    })
+                    def validate():
+                        return planner_fast_validation.validate_fast_advance_output(
+                            output, request=request, responsibilities=list(request.responsibilities),
+                            capabilities=[capability],
+                        )
+                    if actual_count == count:
+                        validate()
+                        self.assertEqual(output.activities[0].args, args)
+                    else:
+                        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "numeric Capability input contradicts GI binding"):
+                            validate()
+
     @staticmethod
     def _clarification_output(
         *,

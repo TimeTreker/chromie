@@ -994,7 +994,10 @@ through its specialized model transport. Records correlate prompt-bearing reques
 schema/options, raw model output, parsed JSON when available, provider metadata, model,
 role/purpose, stage, call ID, and available trace/turn/session IDs. Provider `context` token
 vectors are omitted because they are not model-authored semantic output and can dwarf the
-useful record.
+useful record. The single-line log uses ASCII JSON escapes so container log framing
+cannot split a UTF-8 character; JSON decoding recovers the exact original Unicode
+request and response. Recompute the retained text references before attributing a
+logged difference to model inference. A digest mismatch is evidence corruption.
 
 These complete records are private diagnostic evidence and may contain family conversation
 or memory. `scripts/collect_debug_bundle.sh` extracts/deduplicates them as

@@ -259,7 +259,14 @@ Deep failure results contain no executable steps or invented response text and
 explicitly set `metadata.execution_allowed=False`; original rejection evidence is
 retained for the Runtime’s existing silent failure path. Fast repetition validation
 rejects a count-bound Capability without a count input: an unrelated duration or
-intensity value cannot witness repetition. Node-based repetition is not implied.
+intensity value cannot witness repetition. Node-based repetition is not implied. The
+owner-authorized Soridormi `turn_in_place` catalog now supplies integer `count`
+(1-8, default 1), per-repetition `duration_s`, and a 20-second aggregate limit.
+The Planner authors count; Soridormi expands sequential segments under its existing
+safety lifecycle. Positive yaw means left, negative means right. Host validation
+still requires an explicit matching argument for a GI-bound count; unrelated
+numeric arguments remain invalid witnesses. Acceptance observations retain count
+alongside duration and yaw, without deriving it from node cardinality.
 
 `POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association result, applicable Fast Planner continuation/escalation context, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. `vocal_output` Goals must use a response outcome containing the requested authored content and cannot own executable transport steps. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. A mechanically malformed planner DTO may be regenerated once in the same tier. Semantic grounding, responsibility coverage, capability applicability, confidence/satisfaction, and safety rejection are terminal in Deep and are not rewritten by another Deep model pass.
 

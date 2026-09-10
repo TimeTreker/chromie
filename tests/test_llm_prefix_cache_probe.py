@@ -39,6 +39,26 @@ class PrefixCacheTrackerTests(unittest.TestCase):
         self.assertEqual(list(record["request"]["response_format"]["schema"]["properties"]),
                          ["z_first", "a_last"])
 
+    def test_evidence_survives_container_log_frame_boundaries(self) -> None:
+        import json
+        from unittest.mock import Mock
+
+        logger = Mock()
+        record = log_llm_call_evidence(
+            logger, call_id="unicode-frames", purpose="fast_planner", stage="primary",
+            transport="sglang", request={"prompt": "中文🙂" * 10000},
+            response={"message": {"content": "你好🙂" * 10000}}, status="completed",
+        )
+        wire = logger.info.call_args.args[2].encode("utf-8")
+        # Reproduce a log collector decoding frames before joining the record.
+        for frame_size in (16384, 16383, 16385):
+            with self.subTest(frame_size=frame_size):
+                retained = "".join(
+                    wire[index:index + frame_size].decode("utf-8", errors="replace")
+                    for index in range(0, len(wire), frame_size)
+                )
+                self.assertEqual(json.loads(retained), record)
+
     def test_failed_attempt_remains_the_previous_call(self) -> None:
         first = self.tracker.begin(
             purpose="fast_planner",

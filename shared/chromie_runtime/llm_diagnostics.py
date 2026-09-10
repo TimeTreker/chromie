@@ -141,7 +141,9 @@ def log_llm_call_evidence(
             LLM_CALL_EVIDENCE_LOG_MARKER,
             json.dumps(
                 record,
-                ensure_ascii=False,
+                # Container log frames may split UTF-8 code points. JSON escapes
+                # keep transport bytes ASCII while decoding preserves exact text.
+                ensure_ascii=True,
                 sort_keys=False,
                 separators=(",", ":"),
             ),
