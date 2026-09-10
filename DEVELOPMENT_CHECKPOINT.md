@@ -1,11 +1,14 @@
 # Chromie Development Checkpoint
 
-## Current resume point — bounded whitespace tested; promotion rejected
+## Current resume point — scoped whitespace repair accepted; release qualification open
 
 Active Issue #35; delivery branch `codex/ga-request-format`; pre-delivery baseline
-`26fe1ceec19b0c6ffbe7560db0a5b390c75c8bf7`. Owner authorized commit and push when
-finished. Resume at the latest commit containing both checkpoint and handoff.
-This is an unpromoted development delivery, not a merge to main or release claim.
+`9a4b73a160e2ef1337026b5149cf039f8257145a`. On 2026-09-10 the owner approved
+accepting the scoped code repair separately from whole-runtime qualification,
+with documented model limitations where established. Commit and push remain authorized.
+Resume at the latest commit containing both checkpoint and handoff.
+The bounded-whitespace implementation is accepted for its demonstrated mechanical
+scope on this delivery branch. This decision does not merge main or qualify a release.
 Preserve unrelated Soridormi edits. The Goal-driven single-authority architecture
 and fixed candidate model remain binding; no Host meaning repair or extra judge.
 
@@ -61,13 +64,51 @@ Full-cohort regressions are retained: look-then-blink omits two-second gaze dura
 compound motion uses wrong left-turn yaw. Both exact origin packets per case replay
 correctly with bounded and unbounded formatting (eight replays). Causes remain unproven;
 isolated replay success does not erase the full-cohort regression. No complete
-transaction/nonregression or LLM-integrity closure is claimed. Whole candidate promotion
-is rejected; the whitespace mechanism is retained only as an unpromoted development repair.
+transaction/nonregression or LLM-integrity closure is claimed. The owner-approved
+scoped acceptance retains this regression uncertainty explicitly; it is not a
+retrospective semantic pass or a finding that the model alone caused the failures.
 
 Release readiness remains blocked by GI prohibition/ambiguity/provenance, invented
 motions, resource meaning, false reminder/completion promises, omitted Goals, GI/GA
 continuity, Deep/skill contracts, progress and latency. Physical voice/provider/robot
 and default target-evidence closure are missing. Preview is not execution evidence.
+
+## Scoped acceptance decision and remaining attribution
+
+Accepted scope: the request-local bound excludes the captured outside-string whitespace
+loop while preserving string content, semantic ownership and original Host validation.
+Evidence: captured-prefix rejection at character 641, 198 native contrasts, 12 frozen
+completed packets, all 51 Fast streams complete in the full candidate preview, and the
+retained canonical gate. No scene expectation, test result or safety gate is waived.
+The 20-to-19 preview change is a retained diagnostic, not a numeric code-acceptance
+threshold. This decision accepts the limited repair with unresolved regression risk;
+it does not establish general behavioral nonregression or qualify the complete model role.
+
+| Remaining observation / earliest visible boundary | Attribution supported now | Disposition |
+| --- | --- | --- |
+| Captured weather stream stalls on grammar-valid whitespace after a closed string | runtime_or_provider: reproduced decoder mechanism | Scoped repair accepted; rationale markup and all other truncation causes remain outside the claim |
+| Gaze duration omitted / left yaw negative in candidate Fast output | unresolved: eight exact bounded/unbounded replays are correct | Preserve both cohort failures; investigate aggregate variability before whole-runtime qualification |
+| GI guesses ambiguous meaning, creates a separate prohibition Responsibility, or changes provenance; GA duplicates ownership | unresolved at GI/GA primary transaction; wrong outputs observed, exact prompt/context/contract soundness not fully established | Freeze contrasts at the earliest owner; do not label all of these model_inference |
+| Fast substitutes unrelated motion or promises unperformed/future work | unresolved or mixed: wrong model decisions observed; upstream meaning and supplied contracts also require audit | Deployment blockers remain; preview containment is not successful behavior |
+| Deep/skill malformed results | contract_or_schema candidate plus unresolved inference; native intersection-shape evidence exists, qualification/implementation incomplete | Repair and prove the decoder/DTO boundary before attributing remaining failures solely to the model |
+| Missing progress, latency, four reflex preview limits and physical evidence | Mixed behavioral/performance gaps and missing execution evidence | Keep required target profiles open; no inference from preview to execution |
+
+A confirmed model_inference limitation may be retained without more prompt changes
+when exact prompt, context, representability, provider and oracle are shown sound.
+Only safely contained limitations within the declared acceptance scope can be accepted;
+unsafe movement, provenance, Goal omission, fabricated success and service-integrity
+failures still block the affected deployment. No residual cluster here is newly certified
+as exclusively a model limitation. Original reports and scores remain historical evidence;
+this owner-approved decision supersedes their blanket rejection of the scoped repair.
+
+This delivery changes acceptance/status documentation only; runtime source, prompts,
+model and deployed images are unchanged from 9a4b73a1. No new GPU or live cohort was run
+for this decision. The documentation revision passed `./scripts/run_tests.sh`:
+2319 tests / 368 subtests, 140 benchmark tests, 20 legacy tests, and all included
+policy, static-analysis, ownership and documentation checks. Two existing FastAPI
+deprecation warnings remain. Retained log:
+`.chromie/acceptance/scoped-acceptance-20260910/canonical.log`.
+Remote delivery branch matched the pre-delivery baseline at preflight.
 
 ## Current runtime and artifact locations
 
@@ -97,9 +138,10 @@ Deep/skill native preparation in `decoder-shapes-20260910/` is not implemented.
 
 ## Next work and exact operational commands
 
-First read the full-cohort regressions and prohibition-audit.md in the pre-change
-baseline. Freeze bilingual primary GI positive/negative constraint contrasts and
-establish representability before any semantic edit. Investigate full-cohort variability;
+The scoped repair is accepted; do not reopen it solely to increase an aggregate pass
+count. Continue Issue #35 evidence closure. First read the full-cohort regressions
+and prohibition-audit.md in the pre-change baseline. Freeze bilingual primary GI
+positive/negative constraint contrasts and establish representability before any semantic edit. Investigate full-cohort variability;
 do not infer that formatting fixes unsupported meaning. Keep the fixed model and
 primary semantic ownership. No keyword semantic routing or second same-authority judge.
 
