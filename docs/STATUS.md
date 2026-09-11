@@ -1,12 +1,12 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-11
-**Current focus:** Issue #45 owner-approved size-review policy and blocking ownership gates.
-All ten Runtime/documentation size ceilings are informational in every phase; reports retain measured baselines and signed deltas.
-Ownership, safety, typing, tests and the current evidence/feature constraint remain blocking.
-Focused 36 tests/30 subtests and canonical 2,465 tests/756 subtests, 140 benchmarks and 20 legacy passed. Runtime, prompts, Schemas, profiles and corpora are unchanged.
-Solved main-delivered #33/#37–#39/#41–#43 are closed; #45 closes with this delivery. Remaining #40 and #44/#46–#48 require separate decisions.
-Prior #43 primary-result/no-online-review documentation correction remains in force. No target qualification follows.
+**Current focus:** Issue #44 approved clarification of validation claims and semantic evidence.
+Principle 30 requires complete source-grounded primary coverage evidence; mechanical proof is limited to named invariants.
+ACCEPTANCE separates raw Schema, normalized DTO/Host, semantic, target and release verdicts. Observed semantic omissions remain failures even when structural checks pass.
+Audit: 12 scripted contrasts; focused 388 tests/385 subtests plus four Host containment tests passed. This delivery's canonical gate passed: 2,465 tests/756 subtests, 140 benchmarks, 20 legacy and policy/static/config/docs.
+No runtime, prompt, Schema/DTO, model/profile, report emitter, gate or corpus changed; no model, voice, simulator or physical qualification ran.
+#45 and prior completed main-delivered Issues are closed; #44 closes after verified delivery. Remaining #40 and #46–#48 need separate decisions.
 
 **Prior authorized local implementation (#37):** independent Planner tasks, scoped Work
 changes, pre-GA safe reads and role Memory projections on local `main`. GI and GA remain
@@ -20,7 +20,7 @@ was changed.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Prior #37–#43 retained; #45 aligns the size-reporting pass conditions and their policy owners. | Focused 36 tests/30 subtests; canonical 2,465 tests/756 subtests, 140 benchmarks, 20 legacy and policy/static/config/docs passed. Replayed audit: ten size-only cases now pass; seven ownership violations still reject. | No model inference, live service, supervised voice or target-runtime qualification was performed for this tooling patch. | Development only; default target-evidence closure remains open. |
+| Prior #37–#43 and #45 retained; #44 clarifies Charter proof scope and acceptance reporting in existing documents. | Audit-focused 388 tests/385 subtests and four Host containment tests pass. Scripted contrasts distinguish mechanical acceptance from semantic completeness. Canonical passed 2,465 tests/756 subtests, 140 benchmarks, 20 legacy and policy/static/config/docs. | No model inference, live service, supervised voice or target-runtime qualification ran for this documentation patch. | Development only; default target-evidence closure remains open. |
 
 The prior consolidation counts (2,392 tests / 671 subtests) describe the base
 revision only; historical evidence below is not qualification of this local patch.

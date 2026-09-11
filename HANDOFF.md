@@ -1,5 +1,114 @@
 # Chromie Latest Handoff
 
+## Issue #44 validation claims and semantic evidence, 2026-09-11
+
+The owner explicitly approved the audited principle-30 clarification. Scope is
+Charter wording, the existing acceptance/status/semantic-authority documents, both
+handoff owners, required verification and normal main delivery/Issue closure.
+No further decision is needed for this slice. Remaining #40 and #46–#48, model
+optimization, transport changes and deployment are outside this authorization.
+All later entries are historical snapshots, including their older authorization state.
+
+Repository `/home/chromie/github/chromie`, main / origin/main. Initially clean and
+synchronized base: `3a0012da10416a2f8b3d0e4c7d8f4f740d7f39ac`.
+Resume from the latest main commit containing both handoff owners; no predicted hash.
+Evidence root R: `.chromie/acceptance/issue44-guarantee-audit-20260911/`.
+`before.json`, `before/`, `issue-*-before.json`, `audit-review.md`,
+`audit-summary.json` and `authorization.json` retain the source audit and owner approval.
+The audit report's pending-approval language is historical; this section records the decision.
+
+### Observed ambiguity and actual workflow
+
+The originating case is a wording/assurance audit, not a reported deployed utterance.
+Principle 30 said primary decomposition must prove coverage, while its body restricts
+trusted code to mechanical checks. SEMANTIC_AUTHORITY and the qualification method
+already distinguish mechanical validity from arbitrary semantic completeness. The
+root cause is an insufficiently bounded Charter proof claim, not a demonstrated
+validator bug or candidate-model failure. The owner approved the clarification
+before any canonical wording changed.
+
+The public diagnostic input is `Say hello and tell me a joke.` The retained cases
+are isolated local boundary probes; they are not one executed robot conversation.
+
+| Boundary / owner | Material input and observed output | Expected contract / verdict |
+| --- | --- | --- |
+| Source -> GI dynamic Schema/DTO/Host | Complete scripted r1/greeting cites t0–t1 and r2/joke t3–t6. Removing r2, or replacing the meaning with an unrelated volcano explanation, still passes all three checks. | Shape and source references are accepted; the incomplete/unrelated meaning remains a semantic failure. The fixture authors the bad result; no evaluated model produced it. |
+| GI source validators | Unknown t999 rejects; overlapping otherwise valid sibling spans reject at Host. Missing raw top-level confidence fails Schema but is normalized before DTO/Host acceptance. | Record the actual representation and checker verdict. Do not infer raw-Schema validity from Host acceptance or decide remaining #40 normalizer policy here. |
+| Accepted GI -> GA resolver | Passing the incomplete GI object to a fresh request and returning one scripted Goal for r1 passes dynamic Schema and produces one greeting Goal. Two complete Responsibilities produce two Goals. | Correct conservation of emitted meaning; no proof that GI omitted nothing. Resolver returns a resolution; no canonical state commit or Runtime dispatch ran. |
+| Declared refs -> GA conservation | Two accepted Responsibilities with only one mapped Goal fail Schema and return fail_closed with zero Goals after one scripted invocation. | Exact-once declared coverage remains enforced; GA must not rediscover missing upstream meaning. |
+| Separate correct Goals -> canonical Fast Planner | Both correct Goal descriptions/success criteria, both per-Goal keys, coverage=complete and satisfaction=exact/1.0 pass Schema/DTO/Host and resolver with only Hello as aggregate and per-Goal reply. | Reference/cardinality checks pass, but the joke is absent: an unqualified semantic failure. Self-declared satisfaction is not independent evidence. No TTS or user-visible delivery ran. |
+| Missing Goal key -> Fast/Host containment | Removing goal-joke fails Schema/DTO; resolver returns no executable work and path_classification=contract_failure after one scripted call. Separate existing Host regressions return an error without invoking Deep. | Mechanical rejection remains terminal for this attempt. A disposition label does not authorize a reviewer or technical-failure repair. Those Host tests are separate fixtures, not this exact Plan replayed through services. |
+| Source qualification report | Existing run_source_qualification.py writes target_validated=false and release_qualified=false separately from source_qualified. | Preserve these reporting boundaries; an aggregate source pass is not a semantic, target or release verdict. |
+
+Probe flow: admitted-text fixture -> scripted GI output -> Schema/normalizer/DTO/Host;
+one accepted GI object -> scripted GA -> resolution only. A separate correctly scoped
+two-Goal request -> scripted Fast primary -> Schema/DTO/Host -> Plan or contract failure.
+ASR, real GI/GA/Planner models, TTS/playback, providers and Soridormi were not invoked.
+No online reviewer, runtime state writer or physical action was added to this workflow.
+
+### Implemented clarification and verification
+
+Principle 30 now names source-grounded primary coverage evidence and limits proof to
+an explicit invariant over the result and authoritative input. It retains complete
+semantic responsibility, single-primary ownership, no reviewer chain, no upstream
+reinterpretation, exact GA repair preservation and the existing depth/rejection rules.
+ACCEPTANCE owns the responsible-check/limit table and distinct raw-Schema, normalized
+DTO/Host, semantic, target and release verdicts. Unknown/skipped/unrun evidence cannot
+be promoted to a pass; observed semantic failures cannot be averaged away. The Charter
+and SEMANTIC_AUTHORITY link that owner instead of creating another guarantee document.
+No runtime/report-emitter behavior, validation pass condition, prompt, Schema/DTO,
+model/profile, static-analysis scope, test, corpus or configuration was edited.
+
+- `probe-results.json`: nine GI/Planner contrasts with inputs, raw outputs and exact
+  Schema/DTO/Host results; `ga-probe-results.json`: three downstream conservation
+  contrasts. Generated `*-schema.json` files retain the actual decoder grammars.
+- `initial-*` files retain fixture-development mismatches: omitted empty coordination,
+  auxiliary/time-condition collections, and the fixed GA create_goals discriminator.
+  Final fixtures explicitly supply those required fields. Initial drafts are not
+  represented as Schema-valid semantic contrasts; no source changed between drafts.
+- `focused.log`: 388 tests/385 subtests passed in the audit (GI, GA, Fast, Deep,
+  semantic authority and source-reporting tests).
+- `containment.log`: four Host contract-failure/terminal-path tests passed; 75 deselected.
+- `authority-audit.json`: the baseline bounded architecture audit passed. This checks
+  declared architecture surfaces; it does not prove arbitrary model semantics.
+- `canonical.log`: 2,465 tests/756 subtests, 140 benchmarks and 20 legacy Agent
+  tests passed, including policy/ownership, pinned Ruff/Mypy, config and docs. Two
+  existing FastAPI deprecation warnings remain; no failing gate remains. Final
+  handoff/document checks are in `docs-final.log`; policy/ownership/diff checks
+  are in `delivery-review.log`.
+
+Commands from repository root with pinned requirements-test.txt dependencies:
+
+```bash
+python -m pytest -q tests/test_goal_interpreter_llm_prompt.py tests/test_goal_association_pr2.py tests/test_fast_planner_pr3.py tests/test_deep_planner_pr4.py tests/test_semantic_authority.py tests/test_source_qualification.py
+python -m pytest -q tests/test_cognitive_runtime_pr7.py -k 'fast_contract_failure or goal_association_contract_failure or fast_terminal_multi_goal_mixed_plan_skips_deep'
+python scripts/semantic_authority_audit.py --json
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+git diff --check
+```
+
+The local interpreter is `/home/chromie/miniconda3/bin/python` 3.13.13. No new behavior
+regression or general-ability/model cohort was needed for a prose-only clarification;
+the required canonical suite still exercises its existing behavior cases. Audit probes
+retain the limitation being explained; this patch does not purport to fix their
+scripted semantic omissions. No candidate failure rate or qualification is claimed.
+Maintained Markdown count remains 102; no new current document, environment key or
+architectural term is introduced. Existing handoff history is a future consolidation
+opportunity. Four status axes and A–D environment levels remain unchanged.
+Soridormi is untouched; the previously recorded codex/turn-count revision and unrelated
+Open_Duck_Playground dirt are not evidence of this change. No deployed service, model
+residency, voice device, simulator or physical robot state was revalidated.
+
+After pushing, verify main's exact revision and close #44 as completed; update #36
+while preserving its historical evidence. #46 is the next suggested discussion.
+Remaining #40 and #46–#48 require separate decisions; #24/#28/#32/#35 retain their
+qualification gaps. The exhausted 29–46 model budget is not renewed. Closing #44
+settles guarantee wording, not model capability or target/release readiness. Ignored
+R artifacts need separate transfer; Git retains this workflow and the canonical policy.
+
 ## Issue #45 size measurements and blocking ownership, 2026-09-11
 
 The owner approved the concrete audited proposal: make the ten size ceilings

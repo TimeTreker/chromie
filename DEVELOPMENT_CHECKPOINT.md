@@ -1,43 +1,45 @@
 # Development Checkpoint
 
-## Current delivery boundary — Issue #45 size measurements and ownership gates
+## Current delivery boundary — Issue #44 validation claims and semantic evidence
 
-Updated 2026-09-11. After the retained audit, the owner explicitly approved making
-all ten Runtime/documentation size limits informational now, including before
-evidence closure. Ownership, safety, typing, tests and the current feature/evidence
-delivery constraint remain blocking. This replaces the prior phase ambiguity;
-no temporary size ceiling, phase switch, limit increase or exemption remains.
+Updated 2026-09-11. The owner approved the retained #44 audit and proposed Charter
+clarification. Principle 30 requires complete source-grounded Responsibility-coverage
+evidence in the primary result; proof at a trusted boundary means only its named
+mechanical invariant. Model-authored coverage/confidence/satisfaction are semantic
+claims. An observed semantic omission fails even when Schema and Host accept it.
+No completeness obligation, hard gate, semantic authority or no-review-chain rule
+is relaxed. The current evidence/feature constraint remains binding.
 
 Delivery base: main / origin/main at
-`bd9557407504f4ce28e955df726f1a3dc6b04af7`; initially clean and synchronized.
+`3a0012da10416a2f8b3d0e4c7d8f4f740d7f39ac`; initially clean and synchronized.
 Resume from the latest main commit containing this checkpoint and HANDOFF.
-Evidence: `.chromie/acceptance/issue45-count-gate-audit-20260911/`.
-The existing Runtime/docs checkers now print current sizes, revision-bound measured
-baselines and signed deltas. Runtime collaborator/lifecycle/legacy-model ownership
-and documentation authority/index/ownership still reject independently of size.
-AGENTS, engineering policy, documentation authority, ROADMAP and STATUS agree.
-No robot runtime, prompt, Schema, model, environment key or corpus changed.
+Evidence: `.chromie/acceptance/issue44-guarantee-audit-20260911/`.
+Existing ACCEPTANCE now owns the check/owner/limit table and separate reporting of
+raw Schema validity, normalized DTO/Host acceptance, semantic qualification, target
+validation and release readiness. Existing four status axes and A–D levels remain.
+SEMANTIC_AUTHORITY links that owner; STATUS records this documentation-only scope.
+No runtime, report emitter, prompt, Schema/DTO, model/profile, gate or corpus changed.
 
-The pre-change audit retained two valid baselines, ten size-only rejections and
-seven ownership rejections across 19 temporary fixtures. A two-comment initializer
-change had the same AST but failed at 306 lines against 305; the preceding #43 gate
-had stopped at a 261-line STATUS against 260. The new executable regressions first
-failed on the unchanged checkers, then passed after the authorized policy change.
-Focused: 36 tests/30 subtests passed. Canonical: 2,465 tests/756 subtests,
-140 benchmarks and 20 legacy Agent tests passed; policy/static/config/docs passed.
-The focused lint finding in a new test's loop-variable binding was corrected;
-final checks and any limitations are recorded in HANDOFF. This tooling change
-makes no runtime-repair claim. No model, voice, deployment, simulator
-or physical proof ran; existing target/release qualification gaps remain open.
+The audit retained 12 scripted contrasts, not a live model episode. GI can omit the
+joke from a greeting-plus-joke request while satisfying its mechanical checks; GA
+conserves that incomplete declared input. With two correct Goals, Planner can claim
+complete coverage while saying only Hello. Missing declared refs still fail. Raw
+Schema and normalized Host acceptance also differ on an omitted GI confidence field;
+this documents their distinction without changing the remaining #40 normalization policy.
+Audit-focused: 388 tests/385 subtests plus four Host containment tests passed.
+This delivery's canonical result: 2,465 tests/756 subtests, 140 benchmarks
+and 20 legacy Agent tests passed; policy/static/config/docs passed.
+No model inference, deployment, voice, simulator or physical proof ran. These fixtures
+show limits of the validators, not the failure rate of an evaluated model. Detailed
+workflow, initial fixture corrections, retained files and claim limits are in HANDOFF.
 
-#43 was delivered as bd955740 and is closed. #45 closes after this main delivery is
-pushed and verified. #36 remains the open audit index; the next suggested discussion
-is #44, followed by #46. Remaining #40 and #44/#46–#48 need separate decisions.
-#24, #28, #32 and #35 retain their acceptance or qualification gaps. The 29–46 model
-iteration budget is exhausted; this approval does not authorize optimization or
-transport/deployment changes. The prior #42 private evidence folder is absent on
-this machine; Git does not transfer ignored artifacts. See HANDOFF for historical
-workflow, failure and evidence records, including #43's complete local gate.
+#45 is delivered in 3a0012da and closed; #43 and the other previously verified source
+Issues remain closed. #44 closes after this main delivery is pushed and verified.
+#36 remains the open audit index. Next suggested discussion: #46; remaining #40 and
+#46–#48 require separate decisions. #24/#28/#32/#35 retain acceptance/qualification
+gaps. The 29–46 model budget is exhausted; no further optimization, transport amendment
+or deployment is authorized. The prior #42 private evidence folder remains absent on
+this machine; Git does not transfer ignored artifacts. Historical workflows remain in HANDOFF.
 
 ## Prior local implementation — Issue #37, 2026-09-11
 
@@ -113,8 +115,8 @@ The owner requested separate discussion and authorization for each audit finding
 [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) links #37 (this
 authorized local implementation) and #38 (completed documentation correction),
 #39 (semantic inheritance), #40 (GI speed and GA preservation), and #41 (speech
-authority). #45 is the current authorized correction; remaining #40 work and
-#44/#46–#48 need separate authorization. Solved main-delivered Issues are closed under
+authority). #44 is the current authorized correction; remaining #40 work and
+#46–#48 need separate authorization. Solved main-delivered Issues are closed under
 the owner's current instruction; historical acceptance wording below is superseded.
 
 1. Inspect `git status --short --branch`, this checkpoint, current Charter and

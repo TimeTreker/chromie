@@ -129,6 +129,9 @@ to Charter principles 30–31. A second model call must not audit, accept/reject
 complete, or repair that same semantic decision. Schema and Host checks enforce
 declared references, cardinality, provenance, Capability and execution invariants;
 passing them does not prove arbitrary natural-language semantic completeness.
+Use the [acceptance claim boundaries](ACCEPTANCE.md#scope-of-validation-and-semantic-evidence)
+to distinguish these checks from semantic qualification, target validation and
+release readiness; model-authored coverage and satisfaction are not independent proof.
 
 Before commitment, genuinely unresolved HOW may use the designated single
 source/context-based delegation to Deep Planner. Deep receives authoritative

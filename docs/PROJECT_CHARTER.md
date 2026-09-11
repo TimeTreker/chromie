@@ -1018,8 +1018,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    event important enough to change what Chromie should do must escalate through
    normal Cognitive Core / Goal reasoning. Unanchored baseline embodiment remains a
    separate concern.
-30. **Semantic decomposition must prove responsibility coverage in its primary
-   result, not through a reviewer chain.** The model that owns a semantic stage
+30. **Semantic decomposition must carry source-grounded Responsibility-coverage
+   evidence in its primary result, not through a reviewer chain.** The model that owns a semantic stage
    must author the complete set of independently satisfiable outcomes, their
    provider-neutral modes, material bindings, source-grounding evidence, and typed
    order/concurrency relations in that stage's primary result. That result is the
@@ -1028,6 +1028,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    semantic decision. Calling such an invocation an auditor, verifier, critic,
    qualification pass, or fresh interpretation does not create a distinct
    authority and does not exempt it from this rule.
+
+   At a trusted validation boundary, **proof** means only the explicitly named
+   invariant checked over the primary result and its authoritative input. It does
+   not establish that all natural-language obligations, qualifiers, or implicit
+   requirements were understood. Model-authored coverage, confidence, and
+   satisfaction remain semantic claims, not independent verification. Their
+   correctness requires separately retained semantic qualification evidence;
+   untested meaning remains unknown. An observed semantic omission is a failed
+   case even when Schema and Host checks pass. Sampled qualification cannot prove
+   correctness for all unseen language. The owning model's completeness obligation
+   remains unchanged. [Acceptance](ACCEPTANCE.md#scope-of-validation-and-semantic-evidence)
+   defines the mechanical owners, reporting distinctions, and evidence limits.
 
    Trusted code validates only mechanical invariants over the primary result:
    schema shape, bounded source provenance, exact references, typed cardinality,

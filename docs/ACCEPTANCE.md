@@ -3,6 +3,59 @@
 This document centralizes validation that was previously scattered across
 milestones and component notes.
 
+## Scope of validation and semantic evidence
+
+For implementers, reviewers, and operators, this section owns the validation-claim
+boundary required by Project Charter principle 30. A claim of proof must name the
+invariant, responsible checker, authoritative input, tested revision, and retained
+evidence. It must also state what remains unknown. Correct understanding of every
+requested obligation is still required; a mechanically accepted but semantically
+incomplete result is a failed semantic case.
+
+| Responsible owner | Deterministically checked scope | What acceptance does not establish |
+|---|---|---|
+| Dynamic response Schema: GI `model_interpreter.py`, `goal_association_schema.py`, `planner_schema.py` | Required fields, closed vocabulary, permitted branches, supplied IDs/token references and applicable cardinalities for that exact request. | That free-text meaning follows the source, that all obligations were emitted, or that a reply answers the request. Schema descriptions instruct the model; they do not execute semantic checks. |
+| GI DTO and source validator: `goal_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; declared binding, provenance, type and relationship restrictions. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
+| GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, declared binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of GI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation GI never emitted. |
+| Planner: `planner_validation.py`, `planner_fast_validation.py`, `planner_deep_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That response wording or an arbitrary action list realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
+| Host and Trusted Capability Runtime | Exact identities/versions, authorization/confirmation, contract validation, lifecycle, dispatch, and retained execution/delivery facts at the exercised boundaries. | User satisfaction or world/physical truth beyond the retained provider/device evidence. An accepted Plan is not completed execution. |
+
+These are scopes of the maintained checks, not proofs that every implementation or
+possible input is correct. The responsible validators retain their hard rejection
+rules for missing/foreign/duplicate declared refs, invalid typed contracts or source
+provenance, invalid Capability/argument/ownership relations, unauthorized effects,
+and inconsistent Evidence/state. No gate is weakened by this distinction. If a
+semantic omission or other hard failure is observed during qualification, a passing
+structural check or aggregate score cannot override or average it into a pass.
+
+For example, “Say hello and tell me a joke” may receive a Schema-valid GI result
+containing only the greeting. GA can conserve that one Responsibility exactly while
+the joke remains absent. Even with both correct Goals supplied, a Planner result
+can contain every Goal key and claim complete satisfaction while replying only
+“Hello.” These are semantic failures; reference coverage is a different invariant.
+Missing an already-declared Goal key remains a mechanical rejection. Neither
+downstream reconstruction of GI meaning nor an online reviewer is authorized.
+
+Reports must distinguish the following existing verdicts rather than collapse them
+into an unqualified “validation passed”:
+
+| Verdict | Required evidence and reporting limit |
+|---|---|
+| Raw Schema validity | Exact raw output and request-specific Schema identity/result. A valid parsed or normalized DTO does not establish that the raw output passed its Schema. |
+| DTO/Host acceptance | Name the parser/normalizer and validated representation, applied invariant checks, permitted repair if any, and acceptance/failure result. Do not treat a normalizer's acceptance as semantic qualification or as raw-Schema acceptance. |
+| Semantic qualification | Source/transaction and complete frozen cohort identities, declared semantic dimensions, retained outputs, reviewer identity/independence and case verdicts, aggregate coverage and remaining gaps. Model-authored confidence, coverage and satisfaction are claims to judge, not an independent oracle. |
+| Target validation | The actual revision/profile/provider/model and environment exercised, measured behavior, retained artifacts and untested paths. Scripted, offline-model, live-text, simulator and physical audio/robot evidence remain distinct. |
+| Release readiness | Explicit required closure results and unresolved blockers for the intended release scope. A source suite, semantic sample or target diagnostic cannot substitute for that closure. |
+
+An unrun, unavailable, skipped or unreviewed dimension remains unknown/unqualified;
+record its reason rather than infer a pass. Semantic judgments must not reinterpret
+an invalid contract as valid, repair candidate outputs or mutate Runtime state.
+Same-model review remains non-independent. Frozen-sample success supports only its
+declared coverage and does not prove correctness for unseen language. Use the
+[semantic qualification method](LLM_PROMPT_QUALIFICATION_METHOD.md) for this evidence.
+These reporting distinctions use the existing four status axes and A–D environment
+levels; they introduce no new evidence ladder or online model invocation.
+
 ## Evidence levels
 
 | Level | Environment | What it proves |
@@ -12,7 +65,9 @@ milestones and component notes.
 | C | Live simulator / MCP | Cross-project capability compatibility, named-skill execution, cancellation, and safe idle recovery. |
 | D | Target GPU/audio/hardware | Real latency, device behavior, hardware safety, recovery, and release supportability. |
 
-A higher level does not replace lower-level regression tests.
+A higher level does not replace lower-level regression tests. Each row describes
+evidence available in that environment for the paths actually exercised; reaching
+an environment alone proves none of its listed behavior or semantic correctness.
 
 Chromie's core embodied acceptance target is a qualified simulator provider.
 The cognitive and interaction layers must not know whether Soridormi's backend
