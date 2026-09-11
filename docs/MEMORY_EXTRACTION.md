@@ -71,6 +71,45 @@ The first implementation focuses on `session` and `task` memory. Durable
 preference and experience-fed memory still need consent, deletion, retention,
 and review rules before broad use.
 
+## Cognitive projections and storage lifetime
+
+The existing Memory owner supplies short/current context and relevant retained context.
+The role's question determines relevance; memory age or persistence does not assign a
+semantic responsibility to GI, GA or Planner.
+
+| Role | Core question | Supplied context and Memory |
+| --- | --- | --- |
+| GI | What does the person mean in the current utterance? | Current authoritative wording; recent accepted context, referents and corrections; currently activated relevant historical Memory. |
+| GA | How does that accepted meaning relate to existing Goals? | Accepted GI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; necessary, disclosure-permitted personal and relational Memory. |
+| Planner | Given the intent, Goals and actual state, what should happen now? | Relevant Responsibilities and available canonical Goals; prepared, queued, running and completed Work projections; trusted Evidence and delivered/pending communication records; applicable remembered preferences and constraints. |
+
+These are views of existing owners, not three Memory stores or exclusive retrieval
+partitions. GI can use an old fact to resolve a current reference; GA also needs a recent
+correction; Planner can need both. Existing Goal snapshots and interaction history supply
+bounded continuity, not a promise of complete historical replay. The initial GI-triggered
+Planner does not wait for canonical Goal state that GA has not yet committed.
+
+GI preserves a request for current information, a new observation, repeated action or a
+specific historical result as WHAT. Planner decides whether the available facts satisfy
+that request and whether further Work/Evidence is needed; merely lacking an answer does
+not make the user's meaning unresolved. A clear requirement to observe again cannot be
+fulfilled by substituting an older remembered result. Memory never grants execution
+authority, changes accepted meaning or substitutes remembered intent for completed Work.
+
+`role_memory_context` projects only the already activated, disclosure-filtered
+`session_memory.extracted_memory` entries. GI receives at most four whole entries within
+2,400 characters; GA and both Planner depths receive at most eight within 4,800 characters.
+Oversized entries are omitted whole, never cut into invalid JSON. Source IDs, confidence,
+scope, persistence policy, consent and expiry travel with the selected entry; raw stores,
+summary text and verified-tool indexes do not become a second source of facts.
+
+Short/long relevance and volatile/persistent storage are separate axes. Ephemeral Memory
+uses the existing conversation/TTL boundaries. Protected durable profile Memory retains
+its existing explicit-consent, expiry, forget and clear rules. A long-running Goal does
+not automatically promote Memory into persistent storage, and using historical Memory
+for GI does not change GI's current-turn WHAT authority. No new memory service or
+persistence default is introduced by these projections.
+
 ## Entry Shape
 
 Memory entries should be structured and small:

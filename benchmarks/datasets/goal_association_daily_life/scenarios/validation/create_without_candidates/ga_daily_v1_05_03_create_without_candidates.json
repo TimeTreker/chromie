@@ -113,7 +113,6 @@
               "value": "my brother"
             }
           ],
-          "description": "Draft a short message to my brother saying practice moved to Friday.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

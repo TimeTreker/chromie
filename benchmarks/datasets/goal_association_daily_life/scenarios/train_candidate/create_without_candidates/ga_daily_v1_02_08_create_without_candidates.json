@@ -113,7 +113,6 @@
               "value": "两小时后"
             }
           ],
-          "description": "创建一个两小时后吃药的提醒。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

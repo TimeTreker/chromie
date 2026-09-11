@@ -105,7 +105,6 @@
               "value": "迷路的风筝"
             }
           ],
-          "description": "讲一个关于迷路的风筝的短故事。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

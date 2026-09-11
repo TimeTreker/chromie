@@ -113,7 +113,6 @@
               "value": "李阿姨"
             }
           ],
-          "description": "为李阿姨起草一条说明“我找到钥匙了”的短消息。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

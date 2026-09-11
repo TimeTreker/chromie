@@ -154,7 +154,6 @@ def _request_schema(request: CognitiveWorkRequest) -> tuple[type[Any], dict[str,
             item.local_ref: {
                 str(name): value
                 for name, value in item.bindings.items()
-                if isinstance(value, (str, int, float, bool))
             }
             for item in request.responsibilities
         },

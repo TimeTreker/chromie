@@ -105,7 +105,6 @@
               "value": "晨光钢琴"
             }
           ],
-          "description": "播放《晨光钢琴》。",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

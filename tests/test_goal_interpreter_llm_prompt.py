@@ -26,7 +26,6 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _reject_unprovenanced_duration_bindings,
     _reject_unprovenanced_speed_bindings,
     _source_tokens,
-    _strip_mechanically_unprovenanced_speed_bindings,
     _without_goal_interpretation_authority,
 )
 from agent.app.cognitive_core.goal_interpreter.schema import (
@@ -424,18 +423,19 @@ class GoalInterpreterContractTests(unittest.TestCase):
                 {"responsibilities": [{"bindings": {"location": "往前", "speed": "往前"}}]},
             )
 
-    def test_unprovenanced_numeric_speed_is_removed(self) -> None:
+    def test_unprovenanced_numeric_speed_is_rejected_without_mutation(self) -> None:
         parsed = {"responsibilities": [{"bindings": {"count": 2, "speed": 1}}]}
-        _strip_mechanically_unprovenanced_speed_bindings(
-            GoalInterpretationRequest(text="Nod twice."), parsed
-        )
-        self.assertEqual(parsed["responsibilities"][0]["bindings"], {"count": 2})
+        original = copy.deepcopy(parsed)
+        with self.assertRaisesRegex(ValueError, "no authoritative surface provenance"):
+            _reject_unprovenanced_speed_bindings(
+                GoalInterpretationRequest(text="Nod twice."), parsed
+            )
+        self.assertEqual(parsed, original)
 
-    def test_explicit_numeric_speed_survives_both_provenance_gates(self) -> None:
+    def test_explicit_numeric_speed_survives_provenance_validation(self) -> None:
         request = GoalInterpretationRequest(text="move at speed 0.35")
         parsed = {"responsibilities": [{"bindings": {"speed": 0.35}}]}
 
-        _strip_mechanically_unprovenanced_speed_bindings(request, parsed)
         _reject_unprovenanced_speed_bindings(request, parsed)
 
         self.assertEqual(
@@ -1375,6 +1375,78 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.responsibilities[0].output_mode, "information")
         self.assertEqual(interpreter._chat.await_count, 1)
         self.assertEqual(interpreter._chat.await_args.kwargs["stage"], "goal_interpretation")
+
+    async def test_invalid_primary_speed_is_rejected_without_deletion_or_retry(self) -> None:
+        for text, bindings in (
+            ("Nod twice.", {"count": 2, "speed": 1}),
+            ("点两次头。", {"count": 2, "speed": "正常速度"}),
+            ("Nod.", {"speed": True}),
+            ("往前走。", {"location": "往前", "speed": "往前"}),
+        ):
+            with self.subTest(text=text, bindings=bindings):
+                interpreter = self._interpreter()
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(  # type: ignore[index]
+                    outcome=text, bindings=bindings, output_mode="body_action"
+                )
+                interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+                    return_value={"message": {"content": json.dumps(raw, ensure_ascii=False)}}
+                )
+                with self.assertRaisesRegex(
+                    InterpretationUnavailableError,
+                    "invalid_primary_goal_interpretation_semantics.*SpeedProvenanceViolation",
+                ):
+                    await interpreter.interpret_goal(GoalInterpretationRequest(text=text))
+                self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_invalid_deep_speed_is_terminal_without_repair_or_primary_fallback(self) -> None:
+        interpreter = self._interpreter()
+        text = "Nod like before."
+        primary = _valid_output(text, unresolved=["which earlier pace is intended"])
+        primary["responsibilities"][0].update(  # type: ignore[index]
+            outcome=text, bindings={}, output_mode="body_action"
+        )
+        deep = copy.deepcopy(primary)
+        deep["unresolved"] = []
+        deep["responsibilities"][0]["bindings"] = {"speed": "normal"}  # type: ignore[index]
+        interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+            side_effect=[
+                {"message": {"content": json.dumps(primary)}},
+                {"message": {"content": json.dumps(deep)}},
+            ]
+        )
+        with self.assertRaisesRegex(
+            InterpretationUnavailableError,
+            "invalid_deep_goal_interpretation.*SpeedProvenanceViolation",
+        ):
+            await interpreter.interpret_goal(GoalInterpretationRequest(text=text))
+        self.assertEqual(
+            [call.kwargs["stage"] for call in interpreter._chat.await_args_list],
+            ["goal_interpretation", "goal_interpretation_deep"],
+        )
+
+    async def test_absent_or_source_backed_speed_survives_primary_validation(self) -> None:
+        for text, bindings, context in (
+            ("Nod twice.", {"count": 2}, {}),
+            ("Nod slowly.", {"speed": "slowly"}, {}),
+            ("慢慢点头。", {"speed": "慢慢"}, {}),
+            ("Nod at speed 0.35", {"speed": 0.35}, {}),
+            ("再点头。", {"speed": "慢慢"}, {"history": [{"role": "user", "text": "慢慢"}]}),
+        ):
+            with self.subTest(text=text, bindings=bindings):
+                interpreter = self._interpreter()
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(  # type: ignore[index]
+                    outcome=text, bindings=bindings, output_mode="body_action"
+                )
+                interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
+                    return_value={"message": {"content": json.dumps(raw, ensure_ascii=False)}}
+                )
+                result = await interpreter.interpret_goal(
+                    GoalInterpretationRequest(text=text, context=context)
+                )
+                self.assertEqual(result.responsibilities[0].bindings, bindings)
+                self.assertEqual(interpreter._chat.await_count, 1)
 
     async def test_missing_source_evidence_fails_closed_without_second_call(self) -> None:
         interpreter = self._interpreter()

@@ -277,51 +277,13 @@ def normalize_optional_resource_quantity(
     return normalized, dropped
 
 
-def restore_missing_goal_descriptions(
-    raw: dict[str, Any],
-    *,
-    request: CognitiveWorkRequest,
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Restore a mechanically omitted description from its exact source outcome.
-
-    The source Responsibility remains the semantic authority.  Recovery is
-    permitted only when the candidate names exactly one admitted local_ref and
-    its description is absent or blank; no wording is generated or inferred.
-    Responsibility/output-mode and source-grounded conservation checks still
-    validate the resulting Goal.
-    """
-
-    normalized = copy.deepcopy(raw)
-    outcomes = {
-        item.local_ref: item.outcome
-        for item in request.responsibilities
-        if item.local_ref and item.outcome
-    }
-    recovered: list[dict[str, Any]] = []
-    goals = normalized.get("new_goals")
-    if not isinstance(goals, list):
-        return normalized, recovered
-    for index, goal in enumerate(goals):
-        if not isinstance(goal, dict):
-            continue
-        if str(goal.get("description") or "").strip():
-            continue
-        source_refs = goal.get("source_responsibility_refs")
-        if not isinstance(source_refs, list) or len(source_refs) != 1:
-            continue
-        source_ref = str(source_refs[0] or "").strip()
-        outcome = outcomes.get(source_ref)
-        if not outcome:
-            continue
-        goal["description"] = outcome
-        recovered.append(
-            {
-                "path": f"new_goals[{index}].description",
-                "source_responsibility_ref": source_ref,
-                "semantic_value_unchanged": True,
-            }
-        )
-    return normalized, recovered
+def inherited_goal_outcomes(goal: GoalAssociationModelGoal, request: CognitiveWorkRequest) -> list[str]:
+    """Read WHAT from the exact admitted Responsibility references, never GA prose."""
+    by_ref = {item.local_ref: item.outcome for item in request.responsibilities}
+    refs = goal.source_responsibility_refs
+    if not refs or len(refs) != len(set(refs)) or any(ref not in by_ref for ref in refs):
+        raise ValueError("new Goal requires exact unique GI Responsibility references")
+    return [by_ref[ref] for ref in refs]
 
 
 def drop_ungrounded_resource_query_locations(
@@ -965,7 +927,7 @@ def source_grounded_binding_conservation_conflicts(
                 for binding in goal.semantic_bindings
             }
             normalized_description = " ".join(
-                goal.description.strip().casefold().split()
+                "; ".join(inherited_goal_outcomes(goal, request)).strip().casefold().split()
             )
             actual_pairs.update(
                 (name, value)
@@ -994,7 +956,7 @@ def source_grounded_binding_conservation_conflicts(
                 for binding in resource.source.acquisition_bindings
             }
             normalized_description = " ".join(
-                goal.description.strip().casefold().split()
+                "; ".join(inherited_goal_outcomes(goal, request)).strip().casefold().split()
             )
             normalized_resource_description = " ".join(
                 resource.description.strip().casefold().split()

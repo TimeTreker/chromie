@@ -105,7 +105,6 @@
               "value": "朋友没有理我"
             }
           ],
-          "description": "在用户谈论“朋友没有理我”时给予倾听和支持。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

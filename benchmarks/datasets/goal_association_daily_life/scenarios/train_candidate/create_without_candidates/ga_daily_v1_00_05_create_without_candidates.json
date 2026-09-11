@@ -105,7 +105,6 @@
               "value": "月亮兔子"
             }
           ],
-          "description": "讲一个关于月亮兔子的短故事。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

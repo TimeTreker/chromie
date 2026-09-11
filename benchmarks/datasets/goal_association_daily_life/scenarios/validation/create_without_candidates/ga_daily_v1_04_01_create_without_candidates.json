@@ -105,7 +105,6 @@
               "value": "Ocean Sounds"
             }
           ],
-          "description": "Play Ocean Sounds.",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

@@ -113,7 +113,6 @@
               "value": "5秒"
             }
           ],
-          "description": "向右移动5秒。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

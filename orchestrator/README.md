@@ -13,6 +13,8 @@ For authoritative architecture, status, and configuration, see:
 - [`../docs/CONFIGURATION.md`](../docs/CONFIGURATION.md)
 - [`../docs/ACCEPTANCE.md`](../docs/ACCEPTANCE.md)
 
+Runtime retains validated pre-GA preparation, admits only contract-declared safe reads early, and binds independent Planner submissions to Goal/Work snapshots and exact Plan identities. Reuse preserves original execution; explicit scoped cancellation closes before replacement. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) for commit ownership and [Memory Extraction](../docs/MEMORY_EXTRACTION.md) for cognitive memory projections.
+
 ## Service boundaries
 
 - ASR converts complete PCM utterances to final text.

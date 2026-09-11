@@ -99,7 +99,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "从门口取得密封水瓶并交给我。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

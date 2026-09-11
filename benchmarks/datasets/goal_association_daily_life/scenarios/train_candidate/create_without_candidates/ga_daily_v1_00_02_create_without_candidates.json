@@ -105,7 +105,6 @@
               "value": "a lost kite"
             }
           ],
-          "description": "Tell a short story about a lost kite.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

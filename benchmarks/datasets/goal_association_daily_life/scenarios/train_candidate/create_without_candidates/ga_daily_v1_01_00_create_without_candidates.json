@@ -99,7 +99,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "Determine whether it will rain in Chongqing tonight.",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

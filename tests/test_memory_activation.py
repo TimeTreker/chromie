@@ -219,3 +219,38 @@ def test_build_context_uses_disclosure_safe_memory_projection_not_raw_snapshot()
 
     assert context["extracted_memory"] == []
     assert context["conversation"]["extracted_memory"][0]["disclosure_scope"] == "private"
+
+
+def test_role_memory_preserves_scope_independent_of_storage_and_provenance() -> None:
+    import json
+    from shared.chromie_contracts.memory import role_memory_context
+
+    entries = [
+        MemoryEntry(scope="session", kind="note", text="当前约束", source_turn_ids=["turn-current"]).to_prompt_dict(),
+        MemoryEntry(scope="profile", kind="preference", text="长期偏好", source_turn_ids=["turn-old"],
+                    persistence_policy="durable_with_explicit_consent", consent_basis="explicit_current_turn").to_prompt_dict(),
+    ]
+    for role in ("gi", "ga", "planner"):
+        prompt = role_memory_context({"session_memory": {"extracted_memory": entries}}, role=role)
+        projected = json.loads(prompt.split("\n")[1])
+        assert [entry["text"] for entry in projected] == ["当前约束", "长期偏好"]
+        assert projected[0]["source_turn_ids"] == ["turn-current"]
+        assert projected[1]["persistence_policy"] == "durable_with_explicit_consent"
+        assert projected[1]["source_turn_ids"] == ["turn-old"]
+        assert "Never infer completion" in prompt
+
+
+def test_role_memory_uses_only_activated_entries_and_keeps_whole_records() -> None:
+    import json
+    from shared.chromie_contracts.memory import role_memory_context
+
+    context = {
+        "extracted_memory": [{"text": "raw store must not be projected"}],
+        "session_memory": {"memory_summary": "unfiltered aggregate must not be used", "extracted_memory": [
+            {"text": "x" * 5000, "source_turn_ids": ["too-large"]},
+            {"text": "relevant filtered fact", "source_turn_ids": ["visible"]},
+        ]},
+    }
+    prompt = role_memory_context(context, role="gi")
+    assert json.loads(prompt.split("\n")[1]) == [{"text": "relevant filtered fact", "source_turn_ids": ["visible"]}]
+    assert "raw store" not in prompt and "unfiltered aggregate" not in prompt

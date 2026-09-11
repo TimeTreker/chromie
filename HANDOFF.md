@@ -1,6 +1,307 @@
 # Chromie Latest Handoff
 
-## Main consolidation — 2026-09-11
+## Issue #40 GI speed rejection and authorized delivery, 2026-09-11
+
+The owner approved the GI speed example/rule and requested commit/push of the
+agreed work. Deliver the existing #37 independent Planner/Runtime/Memory patch,
+#38 WHAT/context clarification, #39 source-bound Goal inheritance, and this narrow
+#40 fix together. Other GA/GI normalizers, GA repair equality, #41–#48, full
+merge/split, model optimization, provider changes and deployment remain excluded.
+The earlier entries below are historical pre-delivery snapshots, not current Git claims.
+
+Repository `/home/chromie/github/chromie`, branch/upstream `main` / `origin/main`.
+Pre-delivery base `a0c5d09fbb18fca8660aa43abb55bccca18924cc`; remote matched at
+initial fetch. Resume at the latest commit containing this checkpoint/handoff pair.
+The commit hash and push result must be verified after delivery, not predicted here.
+Evidence root R: `.chromie/acceptance/issue40-gi-speed-rejection-20260911/`.
+`before.patch` has SHA-256
+`4d6a2017c83d938e39896e94e14b652cb7985741db3cc459d15967d66c63ec37`,
+matching #39's final patch exactly; no intervening/unrelated changes were found.
+
+| Actual scripted boundary / owner | Material I/O before correction | After correction and evidence limit |
+| --- | --- | --- |
+| Admitted request -> GI primary | Inputs are `Nod twice.`, `点两次头。`, `往前走。`, with exact source-token refs. The scripted GI response adds speed `1`, `正常速度`, or the same `往前` location value. No live model made these outputs. | The same retained requests and raw results are replayed; upstream identity and meaning are unchanged. |
+| Primary DTO/source checks -> speed processing | DTO and source-ref checks pass. The speed stripping helper deletes the value; the speed validator then sees no value. This is the first wrong boundary: an invalid semantic field becomes an accepted omission. | The stripping helper and call are removed. The existing typed source/dimension validator rejects the original result without modifying it. No prompt, schema, classifier, retry, or provider change is needed. |
+| GI public transaction -> caller | The old public transaction accepted the modified result. Tests reproduce four primary forms and one Deep failure path. Downstream GA, Planner, Runtime, audio and providers are not invoked in these fixtures. | Primary returns the existing typed `invalid_primary_goal_interpretation_semantics` failure after exactly one call. A valid unresolved primary may still call Deep once; invalid Deep speed then returns `invalid_deep_goal_interpretation`, with no third call or fallback to primary. |
+| Valid GI -> accepted Responsibility | Speed may be absent, explicitly stated, or present in bounded history; defaults belong to Planner. | Five positive contrasts preserve absent speed, English/Chinese wording, a supported numeric surface and context-derived wording without changing binding values. Existing Goal/Work state is not mutated by these GI-only tests. |
+
+Baseline `baseline-tests.log`: 80 tests/67 subtests passed. Three
+`baseline-probes.json` records show deletion/acceptance; `replayed-probes.json`
+shows rejection on those identical inputs. `red-regression.log` reproduces the
+five incorrect acceptance paths before the fix. It also exposed a separate numeric
+source limitation: `Nod at speed 0.35.` excludes the decimal from the existing
+numeric extractor because a period immediately follows it. Before the fix speed
+was removed; after the fix it rejects. `focused-first.log` retains that finding.
+The supported numeric positive contrast uses `Nod at speed 0.35` without the
+period; the limitation is not fixed or hidden by weakening its validation.
+
+Focused command: `python -m pytest -q tests/test_goal_interpreter_llm_prompt.py`.
+`focused.log`: 83 tests/76 subtests passed. The original removal test now asserts
+rejection and input immutability. No compatibility helper or new runtime flag remains.
+Maintained Markdown remains 102; no service, config key or architectural owner added.
+Final canonical passed 2,415 tests/692 subtests, 140 benchmarks and 20 legacy
+Agent tests, including repository/test-ownership policies, pinned static gates,
+configuration and documentation checks. Two existing FastAPI deprecation warnings
+remain. Selected Level A passed 30/30 distinct cases; class memberships overlap.
+Final source identity is unchanged from the start of the complete canonical gate.
+
+Final commands from repository root:
+```bash
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class robust_intent_understanding --ability-class planner_goal_semantic_quality --ability-class human_like_cognitive_continuity --ability-class continuous_cognition_recovery --ability-class deterministic_safety_controls --ability-class multi_goal_daily_life --ability-class stable_capability_grounding --evidence-dir .chromie/acceptance/issue40-gi-speed-rejection-20260911/level-a
+```
+
+Retain `canonical.log`, `level-a.log`, `docs-final.log`, source-before/final identity,
+final patch and remote issue readbacks under R. These ignored artifacts do not travel
+with Git. A new checkout can reproduce the tracked tests with the documented pinned
+setup (`python -m venv .venv`, activate it, install `requirements-test.txt`). Fetch
+`origin`, inspect branch/status and this checkpoint before resuming; do not recreate
+old output from chat or infer deployment qualification. The 1,500 GA corpus edits
+remain the earlier reference-format-only migration; inputs/semantic expectations
+are unchanged. Local scripted/Level A evidence does not qualify live model behavior.
+The exhausted model-optimization budget and outstanding voice/target evidence remain.
+
+Next: keep #40 open for remaining normalization/repair decisions and the numeric
+source limitation. #41 remains a proposal. Verify the delivery commit includes both
+handoff owners, push only the authorized normal main update, and report the actual
+commit/upstream/cleanliness result. No new model/live run or deployment is authorized.
+
+## Issue #39 — authorized semantic inheritance, 2026-09-11
+
+The owner explicitly approved #39 after reviewing the GI-to-Goal ownership gap.
+Scope: new Goal WHAT inheritance; sourced partial Goal changes; preservation of
+prior meaning, provenance, resource identity and Work/Evidence. Full merge/split
+execution and #40–#48 remain excluded. No model/provider/configuration-default,
+service deployment, commit or push was performed; the exhausted model-optimization
+budget is unchanged. This is an authorized global-contract correction, not a
+prompt-tuning or live-behavior qualification run.
+
+Baseline: local main over `a0c5d09fbb18fca8660aa43abb55bccca18924cc`, with the prior
+#37/#38 patch preserved before editing. Evidence root R:
+`.chromie/acceptance/issue39-semantic-inheritance-20260911/`.
+`before.patch`, `before.json`, `baseline-tests.log` (149 tests/107 subtests) and
+`baseline-probes.json` retain the exact starting point. Baseline scripted probes
+show a changed proposition accepted as new Goal meaning, a description update
+retaining old criteria, and dropped Responsibility/related-Goal refs.
+
+| Boundary and owner | Observed failure and repaired workflow |
+| --- | --- |
+| GI -> GA primary contract | GI asks whether a result is correct; a scripted GA description asserts correctness and was accepted. GA no longer emits that description. Host copies exact referenced GI outcome into canonical description and criteria, retaining the complete accepted source record. Six bilingual contrasts cover polarity, new observation and historical result. This is representation proof, not inference. |
+| Candidate-aware GA -> source-bound update | Free updated_description could replace meaning without attributed requirement changes. GA now selects target Goal, zero-based retained criteria indices and exact current GI refs. Empty indices append; omitted criteria remain. Binding changes select a semantic path and accepted GI binding, without authoring values. Unknown refs, overlapping paths, conflicting named fields, unavailable criteria and changed modality reject. |
+| Agent materialization -> actual Goal owner | Materialization binds each target to its complete supplied Goal fingerprint. Host revalidates actual state and copies sourced values atomically. A changed snapshot produces a typed rejected update and transaction rollback; no semantic retry is introduced. |
+| Goal revision -> retained state | Reconstructing only selected SemanticGoal fields lost source/related/resource fields. Revisions retain the whole prior Goal, update selected meaning together, and append prior snapshot plus source update to goal_revision_history. Requirement provenance distinguishes current GI from older retained Goal/version facts. |
+| Goal state -> Planner and persistence | Effective criteria/fields and accepted source metadata reach typed/dictionary Planner projections. Scoped revision tests preserve existing Plan version and Evidence, reject stale submissions, and reload unchanged Goal/history from the existing task store. Actual Runtime dispatch and physical effects are not invoked by these fixtures. #37 regressions retain execution/Work compatibility ownership. |
+
+New-Goal and candidate-aware GA remain one primary call each, with the existing
+mechanical DTO-repair policy. The obsolete missing-description recovery helper and
+unreachable duplicate prompt body were removed with their redundant output fields.
+Other #40 normalization/retry rules were not redesigned. The existing reviewed
+GoalAssociationResolver failure boundary still logs and returns formal fail_closed;
+its reviewed body fingerprint is refreshed only because obsolete recovery metadata
+was removed. No exception classification or checker was relaxed.
+
+The model contract adds requirement/field-reference structures in its existing
+owner; the Goal-state helper lives in the existing shared semantic contract. No
+service, store, runtime switch, maintained document or independent authority was
+added. Existing success_criteria carries complete effective requirements; its
+source metadata and revision history are retained under ordinary Goal privacy,
+retention and deletion rules. The original Goal source_text is preserved.
+
+All 1,500 corpus reference files were mechanically migrated, including removal of
+empty retired fields. Inputs and semantic expectations remain unchanged; modified
+originals and input hashes are retained under R/original-corpus and
+R/reference-contract-migration.json. The migrated full corpus passes its nine
+checks; this does not upgrade historical inference or merge/split execution claims.
+Exact duplicate candidate text was removed so complete indexed requirements fit
+the existing 2,600-character projection budget; overflow now rejects explicitly.
+Focused coverage passed 181 tests/119 subtests; the final commit/source guard set
+passed 144/119. Structured GI binding coverage then passed 5 tests/13 subtests,
+including exact object/list value copying through Schema and Resolver; its log is
+`structured-source.log`. Final canonical passed 2,412 tests/683 subtests, 140 benchmarks and
+20 legacy Agent tests, including policy, test ownership, pinned Ruff/MyPy,
+configuration, runtime structure and docs. Selected Level A passed 21/21 distinct
+cases across continuity/recovery, safety, multiple Goals and capability grounding.
+`canonical.log`, `level-a-final.log`, `level-a-final/` and `docs-final.log` retain
+current evidence. `canonical-before-final-commit-guard.log` and
+`canonical-before-structured-source.log` retain prior passing states; intermediate
+failures are retained separately. `scope.json` and
+`qualified-source-before.json` bind the unchanged source used by the final full gate.
+`final.patch` and `final-identity.json` bind the final documentation-only closeout.
+Maintained Markdown count remains 102; config keys 381, public booleans 1, aliases 0.
+The public state entry rejects old-form payloads inside by_goal_id and source turns
+or refs outside the exact association before any state mutation.
+
+Resume: #39 is locally implemented and verified, awaiting owner acceptance. #39/#36
+record actual results; leave separate audit matters for owner discussion. No additional
+model-optimization budget or Git/deployment authorization is implied.
+
+## Issue #38 — authorized WHAT/context clarification, 2026-09-11
+
+The owner approved the #38 proposal and clarified the role inputs. GI interprets
+the current utterance using recent context and activated relevant history; GA
+relates accepted GI meaning to canonical Goals/continuity using necessary permitted
+personal/relational context; Planner decides action from intent, available Goals,
+actual Work, Evidence, communication records and applicable preferences. These
+are differing questions, not exclusive short-memory/long-memory partitions.
+
+The earliest confirmed wrong boundary was principle 34's requirement for GI to
+report whether Work/fresh Evidence remains, contradicting the main architecture.
+The existing production GI DTO, primary/Deep schemas/prompts and Planner handoff
+already preserve the intended division. The authorized repair changes existing
+Charter, Memory and turn-loop docs, with truthful status/Issue/resume updates.
+No production source, prompt, model, runtime setting or provider was changed.
+No commit, push or deployment occurred; #39–#48 remain unapproved proposals.
+
+| Observed local boundary | Actual input/output and claim |
+| --- | --- |
+| GI primary/Deep decoder -> Host | Six frozen English/Chinese current-temperature, new-measurement and historical-result fixtures pass both exact schemas and Host acceptance. Complete outcome and temporal bindings remain unchanged; unresolved=[] is legal without an answer. Work-required, fresh-Evidence-required and execution-ready fields reject at root, Responsibility and binding levels. Correct mechanical contract; no inferred model output. |
+| Accepted GI -> GA and GI-triggered Planner prompt | The exact outcome survives both actual prompt builders; no new semantic author or source change is introduced. |
+| Supplied canonical Goal -> Fast/Deep Planner prompt | Exact goal description survives both builders. The Goal is a fixture: this does not prove GA semantically inherits it, which remains #39. |
+| Activated Memory -> six role/depth inputs | Recent correction, durable consent-bound preference and public relational entry remain visible through GI primary/Deep, GA, streaming Planner and canonical Fast/Deep input builders. Existing privacy/activation tests also pass. This does not add retrieval, persistence or complete-history guarantees. |
+
+Evidence root: `.chromie/acceptance/issue38-what-context-20260911/`.
+`before.patch`/`before.json` retain the prior dirty tree; `probe.py`, six separate
+input files, per-case packets and `probe-results.json` retain the mechanical
+workflow. Inputs were frozen before assertions. No external model/service or
+Runtime dispatch was invoked. Focused current checks passed 375 tests and
+341 subtests (`focused.log`). Canonical verification passed 2,407 tests,
+671 subtests, 140 benchmarks and 20 legacy Agent tests, including repository
+policy, test ownership, pinned static, configuration and docs checks
+(`canonical.log`); final docs validation is retained in `docs-final.log`.
+The first canonical attempt stopped at the existing STATUS line limit; shortening
+status prose corrected that failure before the full passing rerun. Its log is
+retained as `canonical-first-docs-limit.log`; no gate or limit was changed.
+The prior #37 implementation/test patch identity below is unchanged.
+
+Resume at #38 acceptance; each other audit Issue needs its own
+discussion and authorization. No new model-optimization budget is implied.
+
+## Historical audit discussion index — 2026-09-11
+
+The owner authorized splitting the original top-level architecture audit into
+independent GitHub Issues, each discussed and approved separately. The completed
+[index #36](https://github.com/TimeTreker/chromie/issues/36) links #37–#48. #37
+records the already-authorized local Planner/Runtime/Memory amendment below;
+#38–#48 remain discussion proposals with evidence, options and acceptance bounds.
+No new implementation, model change, scenario audit or deployment was performed
+while creating these Issues. Existing Issue states and budgets remain unchanged.
+ROADMAP owns the index link; each Issue records its own future decision.
+Local draft and creation/verification records are retained under
+`.chromie/acceptance/architecture-audit-issues-20260911/`.
+
+## Current local amendment — independent Planner tasks, 2026-09-11
+
+Issue #35; current resume authority is DEVELOPMENT_CHECKPOINT.md. The owner
+explicitly authorized only the discussed Charter/implementation amendments and
+confirmed pre-GA execution for existing contract-declared safe reads. Other Work
+is prepared pending canonical Goal binding. GI and GA trigger distinct Planner
+calls; the wording does not mean GI or GA plans. No commit, push, deployment,
+provider/default/model change, optimization iteration or Soridormi edit occurred.
+The historical consolidation and laptop records below retain their original scope.
+
+Current checkout `/home/chromie/github/chromie`, `main`, uncommitted patch over
+`a0c5d09fbb18fca8660aa43abb55bccca18924cc`. Evidence root R:
+`/home/chromie/github/chromie/.chromie/acceptance/independent-planning-memory-20260911/`.
+`implementation.patch` excludes docs and includes every changed implementation,
+model-facing contract/prompt, test and Level A harness file. SHA-256:
+`16354fd4b0e52c96a30b7077675c2a344a99340b9fa86fe3f9b7f070409efcc6`.
+`source-identity.json` records base, branch, scope and verified counts.
+These artifacts are local/ignored and must be transferred separately from Git.
+
+### Actual local proof workflow and authority
+
+The originating problem was the top-level contradiction between principle 25
+and the pre-GA safe-read exception, followed by owner-approved independent
+planning and partial Work revisions. This was not a live utterance diagnosis or
+model optimization. The following episodes are production-owner local regressions
+with scripted model results/providers; model inference itself is unproven.
+
+| Episode / module owner | Authoritative input -> observed output, expected boundary and correlation |
+| --- | --- |
+| Independent calls: GI -> GA + Planner | Immutable GI r1; first Planner stream is deliberately held. GA returns a modify association for goal-1. The old task lifecycle waited for the first stream; the new GA-triggered call returns independent-goal-plan and closes while the GI-triggered task is cancelled. Distinct planning_task_id, preserved GA result and no reviewer call are asserted. Correct scheduling after amendment; model meaning unproven. |
+| Safe read: Planner -> coordinator -> Runtime | Complete read-weather Activity, immutable weather Responsibility, available side-effect-free safe_read contract, no confirmation. GA waits until provider start. Runtime calls provider before GA, then binds source_goal_ids=[goal-weather]. Earlier mismatched response identities lost seeded reuse and invoked twice; canonical interaction identity now consumes the original result exactly once. Correct local dispatch/identity; no external weather service invoked. |
+| Partial revision: Planner -> Runtime | Original requests keep/cancel/untouched share original Plan identity. New Plan explicitly reuses keep, cancels cancel and adds a new step. Runtime cancels only the named request, preserves untouched, marks reused Work for no redispatch. Completed keep is reusable Evidence with provider count one. Exact Capability/args/timing/Goal ownership validation precedes mutation. |
+| Stale result: Runtime -> Host publication -> dispatch | Two snapshots intersect goal-a; accepting the newer reservation rejects the older, while goal-b proceeds. Changed Goal truth, wrong Plan fingerprint and reused guards reject before publication/dispatch. The accepted Plan's own synchronous Goal bookkeeping does not invalidate its guard. Correct exact identity/version boundary. |
+| Shared Work: Runtime ownership | One request owns goal-a and goal-b. A cancellation naming only goal-a reports shared-owner conflict, selects no requests, and leaves one provider execution. No duplicate per-Goal execution identity is introduced. |
+| Retained progress: Host Goal owner -> Evidence | Original Plan Work is preserved while new Plan Work finishes first. Goal remains running with the old request pending; exact old outcome is accepted into retained_execution_outcomes, with the newest Plan evidence unchanged. Earlier latest-only bookkeeping dropped that continuity. Unbound stale outcomes still reject. |
+| Goal stop: Goal owner -> named cancellation -> Runtime | Goal holds current and preserved original Plan bindings. Goal cancellation expands both exact scopes and waits for both closure receipts before marking the Goal cancelled. Real local Runtime proves both requests stop; provider-global cancel cannot widen a partial Planner selection. |
+| Memory -> GI/GA/Planner prompts | Only activated, audience-filtered extracted entries enter role_memory_context. Source/subject/audience/consent/persistence fields survive. GI projects up to 4 complete entries/2400 chars; GA/Planner up to 8/4800. Oversized entries are skipped whole; raw stores and aggregate summaries cannot bypass activation. Existing extraction/retention and consent remain owners. |
+
+```mermaid
+sequenceDiagram
+    participant GI as GI WHAT
+    participant GA as GA Goal continuity
+    participant P as Planner HOW
+    participant R as Trusted Runtime
+    participant H as Host Goal and Evidence owner
+    par GI result starts independent consumers
+        GI->>GA: Immutable Responsibilities
+        GI->>P: GI-triggered task
+    end
+    P->>R: Complete validated plan, prepare Work
+    R->>R: Eligible safe reads only before GA
+    GA->>H: Canonical Goal transaction
+    H->>P: Distinct Goal change plus actual Work snapshot
+    Note over P: GA-triggered call can finish before unfinished GI-triggered call
+    P->>R: Explicit reuse, additions and cancellation IDs
+    R->>R: Validate scope, close cancellation, reserve exact Plan
+    R->>H: Validate guard and publish accepted bindings
+    H->>R: Submit same guarded Plan
+    R->>H: Original execution identities and terminal Evidence
+```
+
+The diagram shows one possible ordering; completion order does not grant semantic
+priority. Identity-only GA association can join the unchanged GI-derived plan
+without a second call. Early read binding still awaits that read's closure under
+the existing provider lifecycle. Only model invocation independence is claimed.
+No new layer, service, current document or runtime switch was introduced.
+Maintained Markdown remains 102 -> 102; configuration 381 keys, 1 public boolean,
+0 aliases. Existing Runtime, Goal-state and Memory owners carry the change.
+
+### Final evidence and resume commands
+
+R`canonical.log`: `./scripts/run_tests.sh` passed **2,407 tests, 671 subtests,
+140 benchmark tests and 20 legacy Agent tests**; policy, ownership, pinned static,
+configuration, runtime structure and docs passed. Two pre-existing FastAPI
+startup deprecation warnings remain. The earlier
+R`canonical-before-retained-evidence.log` (2,405) predates the final retained
+progress/Evidence and Goal-stop repairs; use the final log for this patch.
+R`baseline.log`: before-change focused baseline 150 tests/11 subtests.
+Focused retained logs: `publication.log`, `task-delta.log`,
+`retained-evidence.log`, `goal-stop.log`. The final full gate includes all of them.
+R`level-a.log` and R`level-a/`: **21/21 distinct cases** passed across continuous
+recovery 4/4, deterministic safety 3/3, human-like continuity 4/4, multi-Goal 10/10
+and capability grounding 7/7 (overlapping memberships).
+R`docs-final.log` records the final documentation-only refresh check.
+
+From repository root, inspect current state and retained identities before work:
+
+```bash
+git status --short --branch
+git rev-parse HEAD
+cat .chromie/acceptance/independent-planning-memory-20260911/source-identity.json
+python scripts/check_docs.py
+```
+
+After a further authorized source change, run `./scripts/run_tests.sh` and the
+relevant focused classes. The selected Level A command for this amendment was:
+
+```bash
+python scripts/general_ability_acceptance.py --mode level-a --ability-class continuous_cognition_recovery --ability-class multi_goal_daily_life --ability-class deterministic_safety_controls --ability-class stable_capability_grounding --ability-class human_like_cognitive_continuity --evidence-dir .chromie/acceptance/independent-planning-memory-20260911/level-a
+```
+
+The agreed local implementation is complete; current-model semantic quality,
+real service concurrency/latency, supervised voice and default target evidence
+remain unqualified. No deployment identity was rebound here. Historical runtime
+identities below do not establish the running source for this patch. A future
+model/live qualification must use a newly authorized frozen cohort and fresh
+source/runtime identities. Prior iteration budgets and the unrelated Fast wire
+proposal remain unchanged. Release remains development only.
+
+## Historical main consolidation — 2026-09-11
 
 The owner explicitly requested merging all Chromie branches to main. This authorizes
 source integration and supersedes earlier branch-only/no-main delivery instructions;

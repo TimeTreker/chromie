@@ -113,7 +113,6 @@
               "value": "走廊灯"
             }
           ],
-          "description": "将走廊灯设为关闭。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

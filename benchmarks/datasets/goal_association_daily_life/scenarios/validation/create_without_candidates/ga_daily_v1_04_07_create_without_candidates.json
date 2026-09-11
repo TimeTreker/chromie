@@ -105,7 +105,6 @@
               "value": "小星星"
             }
           ],
-          "description": "播放《小星星》。",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

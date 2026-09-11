@@ -113,7 +113,6 @@
               "value": "音箱音量"
             }
           ],
-          "description": "将音箱音量设为百分之三十。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

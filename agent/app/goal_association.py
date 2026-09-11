@@ -46,7 +46,7 @@ try:
         ResourceRecipient,
         ResourceSource,
     )
-    from chromie_contracts.semantic_task import SemanticGoal
+    from chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
     from chromie_contracts.situation import SituationProjection
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.discourse import (
@@ -68,7 +68,7 @@ except ImportError:  # pragma: no cover
         ResourceRecipient,
         ResourceSource,
     )
-    from shared.chromie_contracts.semantic_task import SemanticGoal
+    from shared.chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
     from shared.chromie_contracts.situation import SituationProjection
 
 logger = logging.getLogger("chromie.agent.goal_association")
@@ -90,7 +90,7 @@ from .goal_association_validation import (
     normalize_resource_binding_branches,
     resource_source_binding_contract_conflicts,
     responsibility_output_mode_conflicts,
-    restore_missing_goal_descriptions,
+    inherited_goal_outcomes,
     source_grounded_binding_conservation_conflicts,
     validation_error_json,
 )
@@ -191,7 +191,6 @@ class GoalAssociationResolver:
                 item.local_ref: {
                     str(name): value
                     for name, value in item.bindings.items()
-                    if isinstance(value, (str, int, float, bool))
                 }
                 for item in request.responsibilities
             },
@@ -210,7 +209,6 @@ class GoalAssociationResolver:
         optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
         invalid_optional_quantity_recovery: list[dict[str, Any]] = []
-        missing_description_recovery: list[dict[str, Any]] = []
 
         async def invoke(
             prompt: Any,
@@ -257,11 +255,6 @@ class GoalAssociationResolver:
                 normalized
             )
             invalid_optional_quantity_recovery.extend(recovered)
-            normalized, recovered = restore_missing_goal_descriptions(
-                normalized,
-                request=request,
-            )
-            missing_description_recovery.extend(recovered)
             return normalized
 
         try:
@@ -364,13 +357,7 @@ class GoalAssociationResolver:
                     "dropped_count": len(invalid_optional_quantity_recovery),
                     "entries": invalid_optional_quantity_recovery,
                 }
-            if missing_description_recovery:
-                metadata["missing_description_recovery"] = {
-                    "field": "new_goals[].description",
-                    "strategy": "copy_exact_source_responsibility_outcome",
-                    "changed_count": len(missing_description_recovery),
-                    "entries": missing_description_recovery,
-                }
+
             resolution = resolution.model_copy(update={"metadata": metadata})
             return self._validate(
                 resolution,
@@ -432,13 +419,7 @@ class GoalAssociationResolver:
                     "dropped_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
                 }
-            if missing_description_recovery:
-                metadata["missing_description_recovery"] = {
-                    "field": "new_goals[].description",
-                    "strategy": "copy_exact_source_responsibility_outcome",
-                    "changed_count": len(missing_description_recovery),
-                    "entries": missing_description_recovery,
-                }
+
             return GoalAssociationResolution(
                 turn_id=turn_id,
                 resolution_status="fail_closed",
@@ -630,8 +611,26 @@ class GoalAssociationResolver:
         )
         for index, item in enumerate(model_associations):
             goal_update: dict[str, Any] = {}
-            if item.updated_description:
-                goal_update["description"] = item.updated_description
+            if item.requirement_changes:
+                by_goal_id: dict[str, Any] = {}
+                for change in item.requirement_changes:
+                    snapshot = next((entry for entry in candidate_goals
+                                     if entry["goal_id"] == change.target_goal_id), None)
+                    if snapshot is None:
+                        raise ValueError("requirement change targets an unavailable Goal")
+                    retained = SemanticGoal.model_validate(snapshot["goal"])
+                    sources = [responsibility_by_ref[ref].model_dump(mode="json")
+                               for ref in change.source_responsibility_refs]
+                    update = {
+                        "base_goal_fingerprint": semantic_goal_fingerprint(retained),
+                        "replace_requirement_indices": change.replace_requirement_indices,
+                        "source_turn_id": turn_id,
+                        "source_responsibilities": sources,
+                        "binding_changes": [binding.model_dump(mode="json") for binding in change.binding_changes],
+                    }
+                    apply_goal_meaning_update(retained, update)
+                    by_goal_id[change.target_goal_id] = update
+                goal_update["by_goal_id"] = by_goal_id
             associations.append(
                 GoalAssociation(
                     association_id=stable_goal_operation_id(
@@ -655,7 +654,7 @@ class GoalAssociationResolver:
         generated_goal_ids: list[str] = []
         for index, item in enumerate(model_output.new_goals):
             digest = hashlib.sha256(
-                f"{turn_id}|goal|{index}|{item.description}".encode("utf-8")
+                f"{turn_id}|goal|{index}|{inherited_goal_outcomes(item, request)}".encode("utf-8")
             ).hexdigest()[:20]
             generated_goal_ids.append(f"goal_{digest}")
 
@@ -950,16 +949,21 @@ class GoalAssociationResolver:
                 SemanticGoal(
                     goal_id=goal_id,
                     source_responsibility_refs=item.source_responsibility_refs,
-                    description=item.description,
+                    description="; ".join(inherited_goal_outcomes(item, request)),
                     source_text=request.original_user_text,
                     object={"bindings": binding_map} if binding_map else {},
                     constraints={},
-                    success_criteria=[item.description],
+                    success_criteria=inherited_goal_outcomes(item, request),
                     resource_responsibility=resource_responsibility,
                     related_goal_ids=item.related_goal_ids,
                     supersedes_goal_ids=item.supersedes_goal_ids,
                     metadata={
                         "model_boundary": type(model_output).__name__,
+                        "requirement_sources": [
+                            {"origin": "gi", "turn_id": turn_id,
+                             "responsibility": responsibility_by_ref[ref].model_dump(mode="json")}
+                            for ref in item.source_responsibility_refs
+                        ],
                         "output_mode": item.output_mode,
                         "media_operation": item.media_operation,
                         "resolved_references": [

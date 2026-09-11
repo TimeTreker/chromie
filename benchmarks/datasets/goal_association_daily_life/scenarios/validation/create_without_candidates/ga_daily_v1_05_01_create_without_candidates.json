@@ -113,7 +113,6 @@
               "value": "Dad"
             }
           ],
-          "description": "Draft a short message to Dad saying I will be ten minutes late.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

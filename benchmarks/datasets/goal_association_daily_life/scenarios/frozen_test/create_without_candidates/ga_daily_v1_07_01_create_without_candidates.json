@@ -97,7 +97,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "Provide a simple explanation of why the sky looks blue.",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

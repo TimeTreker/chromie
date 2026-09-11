@@ -113,7 +113,6 @@
               "value": "reading light"
             }
           ],
-          "description": "Set the reading light to warm white.",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

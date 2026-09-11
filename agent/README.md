@@ -18,7 +18,20 @@ uniquely derivable duplicate parameter provenance. The Host Orchestrator owns tu
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
 provider behind the Capability boundary.
 
+GI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
+
 ## Authority boundary
+
+Primary and Deep GI reject a speed binding with invalid source or dimension
+provenance; Host does not delete the binding to accept the rest of the result.
+No speed requirement is invented when the user supplies none. Planner may select
+execution defaults only under the existing Capability and safety contracts.
+
+GA inherits new Goal WHAT directly from accepted GI references. Existing Goals use
+source-bound `requirement_changes`, without model-authored descriptions. Host validates
+the original Goal snapshot and commits the selected requirements, typed fields and
+provenance atomically; Planner retains Work decisions. See
+[Goal meaning inheritance](../docs/COGNITIVE_TURN_LOOP.md#goal-meaning-inheritance).
 
 ```text
 Perception

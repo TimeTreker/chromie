@@ -3506,3 +3506,144 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_overlapping_plans_reject_late_commit_but_other_goals_proceed(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        older = await runtime.planning_state_snapshot(["goal-a"], "turn-old")
+        newer = await runtime.planning_state_snapshot(["goal-a"], "turn-new")
+        unrelated = await runtime.planning_state_snapshot(["goal-b"], "turn-b")
+        async with runtime.planning_commit_scope(newer):
+            await runtime.reserve_planning_submission(newer, plan_id="new", fingerprint="fp-new", prepared_activity_ids=[])
+        with self.assertRaisesRegex(ValueError, "stale_planning_state"):
+            async with runtime.planning_commit_scope(older):
+                self.fail("obsolete Planner must not enter mutation scope")
+        async with runtime.planning_commit_scope(unrelated):
+            await runtime.reserve_planning_submission(unrelated, plan_id="b", fingerprint="fp-b", prepared_activity_ids=[])
+
+    async def test_submission_is_bound_to_exact_plan_and_consumed_once(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
+        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        response = InteractionResponse(interaction_id="response-a", metadata={
+            "planning_commit": guard, "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "other",
+        })
+        with self.assertRaisesRegex(ValueError, "identity_mismatch"):
+            await runtime.accept_completed_planning_submission(response)
+        response.metadata["canonical_plan_fingerprint"] = "fp-a"
+        await runtime.accept_completed_planning_submission(response)
+        with self.assertRaisesRegex(ValueError, "stale_planning_submission"):
+            await runtime.accept_completed_planning_submission(response)
+
+    async def test_owner_goal_change_after_reservation_rejected_at_dispatch(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        goal = {"goal_id": "goal-a", "description": "original"}
+        runtime.goal_state_provider = lambda: [goal]
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
+        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        goal["description"] = "changed by authoritative Goal owner"
+        with self.assertRaisesRegex(ValueError, "stale_planning_submission"):
+            await runtime.accept_completed_planning_submission(InteractionResponse(
+                interaction_id="response-a", metadata={"planning_commit": guard,
+                    "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "fp-a"},
+            ))
+
+    async def test_omitted_prepared_work_remains_visible_to_later_goal_planning(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        await runtime.prepare_planner_work("turn-a", [
+            {"activity_id": name, "source_responsibility_refs": ["r1"]} for name in ["keep", "adopt", "cancel"]
+        ])
+        await runtime.bind_prepared_planner_work("turn-a", {"r1": ["goal-a"]})
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
+        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=["adopt", "cancel"])
+        await runtime.accept_completed_planning_submission(InteractionResponse(
+            interaction_id="response-a", metadata={"planning_commit": guard,
+                "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "fp-a"},
+        ))
+        later = await runtime.planning_state_snapshot(["goal-a"], "turn-later")
+        self.assertEqual([item["activity_id"] for item in later["prepared"]], ["keep"])
+        self.assertEqual(later["prepared"][0]["source_goal_ids"], ["goal-a"])
+
+    async def test_shared_work_is_one_request_and_partial_owner_cannot_cancel(self) -> None:
+        registry = CapabilityRegistry()
+        registry.register(_body_definition(exclusive_group=None))
+        provider = MockCapabilityProvider("mock.body", delay_s=0.1)
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(provider)
+        response = InteractionResponse(interaction_id="shared", capabilities=[{
+            "request_id": "shared-work", "capability_id": "soridormi.nod_yes",
+            "metadata": {"source_goal_ids": ["goal-a", "goal-b"], "canonical_plan_id": "plan-shared", "canonical_plan_fingerprint": "fp-shared"},
+        }])
+        receipt = await runtime.submit(response)
+        snapshot = await runtime.planning_state_snapshot(["goal-a", "goal-b"], "turn-a")
+        activities = runtime.planning_work_activities(snapshot)
+        self.assertEqual(len(activities), 1)
+        self.assertEqual(activities[0]["source_goal_ids"], ["goal-a", "goal-b"])
+        cancelled = await runtime.cancel_scope(CancellationDirective(
+            source_turn_id="turn-a", requested_scope="specific_goal", foreground_interaction_id="shared",
+            target_goal_ids=("goal-a",), target_request_ids=("shared-work",),
+            expected_plan_id="plan-shared", expected_plan_fingerprint="fp-shared", reason="only one owner selected",
+        ))
+        self.assertEqual(len(cancelled.shared_owner_conflict_request_bindings), 1)
+        self.assertEqual(cancelled.selected_request_bindings, ())
+        await runtime.wait_terminal(receipt)
+        await runtime.validate_planning_state(snapshot)
+        self.assertEqual(len(provider.calls), 1)
+
+    async def test_own_publication_does_not_invalidate_guard_but_later_goal_change_does(self) -> None:
+        runtime = CapabilityRuntime(CapabilityRegistry())
+        goal = {"goal_id": "goal-a", "description": "respond", "responsibility_status": "open"}
+        runtime.goal_state_provider = lambda: [goal]
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
+        guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        response = InteractionResponse(interaction_id="response-a", metadata={"planning_commit": guard,
+            "canonical_plan_id": "plan-a", "canonical_plan_fingerprint": "fp-a"})
+        await runtime.record_planning_submission(response, lambda: goal.update(responsibility_status="refused"))
+        await runtime.accept_completed_planning_submission(response)
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-b")
+        response.metadata["planning_commit"] = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
+        goal["description"] = "new explicit request"
+        called = []
+        with self.assertRaisesRegex(ValueError, "stale_planning_submission"):
+            await runtime.record_planning_submission(response, lambda: called.append(True))
+        self.assertEqual(called, [])
+
+    async def test_partial_reuse_cancel_and_add_preserves_original_execution(self) -> None:
+        from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+        from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+        from shared.chromie_contracts.plan import CanonicalPlan
+
+        coordinator = InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})
+        definition = _tool_definition(capability_id="test.read").model_copy(update={"metadata": {
+            "parallel_metadata_declared": True, "cancellation_granularity": "request"}})
+        coordinator.registry.register(definition)
+        provider = MockCapabilityProvider("mock.tool", delay_s=0.1)
+        coordinator.runtime.register_provider(provider)
+        source = InteractionResponse(interaction_id="original", capabilities=[{
+            "request_id": name, "capability_id": "test.read", "timing": "parallel",
+            "metadata": {"source_goal_ids": ["goal-a"], "canonical_plan_id": "original-plan", "canonical_plan_fingerprint": "original-fp"},
+        } for name in ["keep", "cancel", "untouched"]])
+        receipt = await coordinator.runtime.submit(source)
+        snapshot = await coordinator.runtime.planning_state_snapshot(["goal-a"], "revision")
+        activities = coordinator.runtime.planning_work_activities(snapshot)
+        plan = CanonicalPlan(plan_id="revised", planner_tier="fast", disposition="execute", coverage="complete",
+            goal_ids=["goal-a"], confidence=0.99, cancel_activity_ids=["cancel"], steps=[
+                {"step_id": "existing", "capability_id": "test.read", "args": {}, "timing": "parallel", "source_goal_ids": ["goal-a"], "reuse_activity_id": "keep"},
+                {"step_id": "new", "capability_id": "test.read", "args": {}, "timing": "parallel", "source_goal_ids": ["goal-a"]},
+            ])
+        cognitive = GoalDrivenRuntimeCoordinator(agent_client=None, adapter=CanonicalPlanRuntimeAdapter(coordinator), policy=CognitiveRuntimePolicy(mode="apply"))
+        changed, status = await cognitive._apply_retained_work_reconciliation(plan=plan, activities=activities, turn_id="revision")
+        self.assertEqual(status, "retained_work_delta_applied")
+        self.assertTrue(changed.steps[0].metadata["retained_work_reused"])
+        self.assertNotIn("retained_work_reused", changed.steps[1].metadata)
+        terminal = await coordinator.runtime.wait_terminal(receipt)
+        statuses = {item.request_id: item.status for item in terminal.results}
+        self.assertEqual(statuses, {"keep": "completed", "cancel": "cancelled", "untouched": "completed"})
+        await coordinator.runtime.validate_planning_state(snapshot, cancelled_bindings={"original/cancel"})
+        # Completion during another Planner call remains immutable Evidence and
+        # can be acknowledged without re-executing the request.
+        finished = plan.model_copy(update={"cancel_activity_ids": [], "steps": [plan.steps[0]]})
+        reused, _ = await cognitive._apply_retained_work_reconciliation(plan=finished, activities=activities, turn_id="later")
+        self.assertEqual(reused.steps[0].metadata["retained_runtime_state"], "completed")
+        self.assertEqual([item.request_id for item in provider.calls].count("keep"), 1)

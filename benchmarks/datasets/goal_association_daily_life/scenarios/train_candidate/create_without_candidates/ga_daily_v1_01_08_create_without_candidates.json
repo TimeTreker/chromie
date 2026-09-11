@@ -99,7 +99,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "确定深圳明天下午是否会下雨。",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

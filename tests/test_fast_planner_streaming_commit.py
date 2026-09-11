@@ -1457,6 +1457,8 @@ async def test_runtime_keeps_committed_speech_but_never_dispatches_work_after_fa
         def __init__(self) -> None:
             self.spoken: list[str] = []
             self.work_dispatch_count = 0
+            from orchestrator.runtime.capability_runtime import CapabilityRuntime, CapabilityRegistry
+            self.runtime = CapabilityRuntime(CapabilityRegistry())
 
         async def start_fast_planner_communicative_act(
             self,

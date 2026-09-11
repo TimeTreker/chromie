@@ -113,7 +113,6 @@
               "value": "6 seconds"
             }
           ],
-          "description": "Move toward me for 6 seconds.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

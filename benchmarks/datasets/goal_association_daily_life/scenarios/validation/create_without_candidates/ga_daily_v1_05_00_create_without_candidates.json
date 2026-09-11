@@ -113,7 +113,6 @@
               "value": "Mom"
             }
           ],
-          "description": "Draft a short message to Mom saying dinner is ready.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

@@ -113,7 +113,6 @@
               "value": "阅读灯"
             }
           ],
-          "description": "将阅读灯设为暖白色。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

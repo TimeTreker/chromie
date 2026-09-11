@@ -60,6 +60,7 @@ PRODUCTION_TRANSACTION_FILES = (
     ROOT / "agent" / "app" / "clients" / "ollama_client.py",
     ROOT / "shared" / "chromie_contracts" / "core_interpretation.py",
     ROOT / "shared" / "chromie_contracts" / "goal.py",
+    ROOT / "shared" / "chromie_contracts" / "semantic_task.py",
 )
 HARNESS_FILES = (
     Path(__file__).resolve(),

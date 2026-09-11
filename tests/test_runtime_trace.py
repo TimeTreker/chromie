@@ -237,7 +237,7 @@ class RuntimeTraceTests(unittest.TestCase):
                                 "source_responsibility_refs": [
                                     "test_responsibility"
                                 ],
-                                "description": "Respond to the user.",
+
                                 "output_mode": "speech",
                             }
                         ],

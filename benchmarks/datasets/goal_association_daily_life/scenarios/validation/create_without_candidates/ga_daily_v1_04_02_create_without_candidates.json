@@ -105,7 +105,6 @@
               "value": "Little Star"
             }
           ],
-          "description": "Play Little Star.",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

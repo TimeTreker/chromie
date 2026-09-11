@@ -113,7 +113,6 @@
               "value": "3 seconds"
             }
           ],
-          "description": "Move forward for 3 seconds.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

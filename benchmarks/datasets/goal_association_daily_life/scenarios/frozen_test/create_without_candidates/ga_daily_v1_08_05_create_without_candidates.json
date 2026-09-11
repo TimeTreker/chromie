@@ -113,7 +113,6 @@
               "value": "书桌灯"
             }
           ],
-          "description": "将书桌灯设为打开。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

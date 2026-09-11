@@ -30,6 +30,7 @@ from .planner_model_contract import (
     stable_plan_id,
 )
 from .planner_schema import (
+    work_change_response_schema,
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
     deep_plan_response_schema,
@@ -57,6 +58,7 @@ from .planner_validation import (
     validate_planner_model_output,
 )
 from .planner_deep_validation import deep_plan_validation_errors
+from .planner_fast_validation import validate_work_reuse_selection
 from .planner_fallback import (
     materialize_deep_clarify,
     materialize_deep_unavailable,
@@ -232,6 +234,7 @@ class DeepPlannerResolver:
             authoritative_goals=authoritative_goals,
             capabilities=payload,
         )
+        response_schema = work_change_response_schema(response_schema, context=context)
         generation_options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -290,6 +293,7 @@ class DeepPlannerResolver:
                     planner_tier="deep",
                     expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                 )
+                validate_work_reuse_selection(validated_model_output, context=context)
                 plan = CanonicalPlan.model_validate(
                     materialize_planner_output(
                         validated_model_output,

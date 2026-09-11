@@ -113,7 +113,6 @@
               "value": "3秒"
             }
           ],
-          "description": "向前移动3秒。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

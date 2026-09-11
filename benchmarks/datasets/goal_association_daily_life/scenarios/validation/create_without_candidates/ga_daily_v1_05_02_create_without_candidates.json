@@ -113,7 +113,6 @@
               "value": "Grandma"
             }
           ],
-          "description": "Draft a short message to Grandma saying the parcel arrived.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

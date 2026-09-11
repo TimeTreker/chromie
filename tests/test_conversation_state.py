@@ -21,6 +21,20 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
 
 
+def sourced_goal_update(manager, goal_id, outcome, turn_id):
+    from shared.chromie_contracts.semantic_task import SemanticGoal, semantic_goal_fingerprint
+    snapshot = next(item for item in manager.active_goal_snapshots() + manager.recent_goal_snapshots()
+                    if item["goal_id"] == goal_id)
+    goal = SemanticGoal.model_validate(snapshot["goal"])
+    return {"by_goal_id": {goal_id: {
+        "base_goal_fingerprint": semantic_goal_fingerprint(goal),
+        "replace_requirement_indices": list(range(len(goal.success_criteria or [goal.description]))),
+        "source_turn_id": turn_id,
+        "source_responsibilities": [{"local_ref": "r-current", "outcome": outcome}],
+        "binding_changes": [],
+    }}}
+
+
 class ConversationStateTests(unittest.TestCase):
     def test_admitted_dialogue_is_visible_before_semantic_state_without_duplication(self) -> None:
         manager = ConversationStateManager(base_conversation_id="dialogue")
@@ -1422,7 +1436,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
         self.assertEqual(before["plan_status"], "proposed")
         self.assertEqual(before["status"], "planning")
 
-        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup.'}, 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
+        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-blue-cup', 'associations': [{'association_id': 'assoc-blue-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'source_responsibility_refs': ['r-current'], 'goal_update': sourced_goal_update(manager, 'goal-cup', 'Pick up the blue cup.', 'turn-blue-cup'), 'confidence': 0.99, 'reason_summary': 'The user refined the same cup responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility refinement.'}, sid='sid-blue', user_text='The blue one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1456,7 +1470,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             ),
         )
 
-        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the red cup instead.'}, 'confidence': 0.99, 'reason_summary': 'The user changed the target within the same responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility refinement; Planner owns Work compatibility.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
+        applied = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-red-cup', 'associations': [{'association_id': 'assoc-red-cup', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'source_responsibility_refs': ['r-current'], 'goal_update': sourced_goal_update(manager, 'goal-cup', 'Pick up the red cup instead.', 'turn-red-cup'), 'confidence': 0.99, 'reason_summary': 'The user changed the target within the same responsibility.'}], 'confidence': 0.99, 'reason_summary': 'Same responsibility refinement; Planner owns Work compatibility.'}, sid='sid-red', user_text='Actually, the red one.', atomic=True)
 
         self.assertTrue(all(item.get("applied") is True for item in applied))
         after = manager.snapshot()["task_contexts"][0]
@@ -1829,7 +1843,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "satisfied",
         )
 
-        correction = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'goal_update': {'description': 'Pick up the blue cup, not the red cup.'}, 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
+        correction = manager.apply_goal_association_resolution({'resolution_status': 'resolved', 'turn_id': 'turn-correction', 'associations': [{'association_id': 'assoc-correction', 'relationship': 'modify', 'target_goal_ids': ['goal-cup'], 'source_responsibility_refs': ['r-current'], 'goal_update': sourced_goal_update(manager, 'goal-cup', 'Pick up the blue cup, not the red cup.', 'turn-correction'), 'confidence': 0.99, 'reason_summary': 'The user corrected the intended cup.'}], 'confidence': 0.99, 'reason_summary': 'The same responsibility was misunderstood.'}, sid='sid-correction', user_text='No, I meant the blue cup.', atomic=True)
         self.assertTrue(all(item.get("applied") is True for item in correction))
         active = manager.active_goal_snapshots()
         self.assertEqual(len(active), 1)
@@ -2067,6 +2081,124 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             [task["status"] for task in pending if task["type"] == "goal_execution"],
             ["scheduled", "scheduled"],
         )
+
+    def test_partial_plan_preserves_old_work_progress_and_evidence_after_new_work_finishes(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="stale-outcome")
+        self._create_goals(manager, "goal-walk")
+
+        def response(
+            *,
+            interaction_id: str,
+            turn_id: str,
+            plan_id: str,
+            fingerprint: str,
+            request_id: str,
+        ) -> InteractionResponse:
+            return InteractionResponse(
+                interaction_id=interaction_id,
+                capabilities=[
+                    {
+                        "request_id": request_id,
+                        "capability_id": "soridormi.walk_forward",
+                        "metadata": {
+                            "source_goal_ids": ["goal-walk"],
+                            "canonical_plan_id": plan_id,
+                            "canonical_plan_fingerprint": fingerprint,
+                        },
+                    }
+                ],
+                metadata={
+                    "planning_result": "composed_plan",
+                    "planning_commit": {"versions": {"goal:goal-walk": 1}},
+                    "goal_ids": ["goal-walk"],
+                    "retained_work_activities": ([{
+                        "activity_id": "request-old", "origin": "retained_runtime",
+                        "capability_id": "soridormi.walk_forward", "args": {}, "timing": "sequential",
+                        "source_goal_ids": ["goal-walk"], "state": "running",
+                        "runtime_binding": {"interaction_id": "interaction-old", "canonical_plan_id": "plan-old", "canonical_plan_fingerprint": "a" * 64},
+                    }] if plan_id == "plan-new" else []),
+                    "turn_id": turn_id,
+                    "canonical_plan_id": plan_id,
+                    "canonical_plan_fingerprint": fingerprint,
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [
+                            {
+                                "goal_id": "goal-walk",
+                                "disposition": "execute",
+                                "coverage": "complete",
+                                "step_ids": ["step-walk"],
+                            }
+                        ],
+                    ),
+                },
+            )
+
+        manager.record_interaction_response(
+            "sid-current",
+            response(
+                interaction_id="interaction-old",
+                turn_id="turn-old",
+                plan_id="plan-old",
+                fingerprint="a" * 64,
+                request_id="request-old",
+            ),
+        )
+        manager.record_interaction_response(
+            "sid-current",
+            response(
+                interaction_id="interaction-new",
+                turn_id="turn-new",
+                plan_id="plan-new",
+                fingerprint="b" * 64,
+                request_id="request-new",
+            ),
+        )
+        stale_bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-old",
+            turn_id="turn-old",
+            interaction_id="interaction-old",
+            canonical_plan_id="plan-old",
+            canonical_plan_fingerprint="a" * 64,
+            canonical_goal_ids=["goal-walk"],
+            aggregate_status="completed",
+            evidence=[
+                {
+                    "evidence_id": "evidence-old",
+                    "request_id": "request-old",
+                    "step_id": "step-walk",
+                    "capability_id": "soridormi.walk_forward",
+                    "source_goal_ids": ["goal-walk"],
+                    "status": "completed",
+                }
+            ],
+            goal_outcomes=[
+                {
+                    "goal_id": "goal-walk",
+                    "status": "completed",
+                    "step_ids": ["step-walk"],
+                    "evidence_ids": ["evidence-old"],
+                    "completed_step_ids": ["step-walk"],
+                }
+            ],
+        )
+
+        context = manager.snapshot()["task_contexts"][0]
+        self.assertCountEqual(context["metadata"]["remaining_request_ids"], ["request-old", "request-new"])
+        manager.update_pending_task_status_for_request_id(request_id="request-new", status="completed")
+        context = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(context["status"], "running")
+        self.assertEqual(context["metadata"]["remaining_request_ids"], ["request-old"])
+        manager.record_execution_outcome_bundle(stale_bundle, sid="sid-current")
+        context = manager.snapshot()["task_contexts"][0]
+        self.assertEqual(context["metadata"]["canonical_plan_id"], "plan-new")
+        self.assertEqual(context["metadata"]["remaining_request_ids"], [])
+        self.assertEqual(context["status"], "done")
+        self.assertNotIn("execution_outcome", context["evidence_summary"])
+        retained = context["evidence_summary"]["retained_execution_outcomes"]
+        self.assertEqual(retained[0]["canonical_plan_id"], "plan-old")
+        self.assertEqual(retained[0]["evidence_ids"], ["evidence-old"])
+
 
     def test_not_run_never_creates_a_false_completed_memory(self) -> None:
         manager = ConversationStateManager(base_conversation_id="not-run-memory")

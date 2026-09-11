@@ -105,7 +105,6 @@
               "value": "I feel nervous about tomorrow"
             }
           ],
-          "description": "Listen supportively while the user discusses: I feel nervous about tomorrow.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

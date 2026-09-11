@@ -178,6 +178,8 @@ class _GoalAssociationStageResult:
     goal_state_commit_stage: str
     has_named_goal_cancellation: bool
     has_goal_replacement: bool
+    planning_task: asyncio.Task[CanonicalPlan] | None = None
+    planning_snapshot: dict[str, Any] | None = None
 
 
 class CognitiveAgentClient(Protocol):
@@ -1174,6 +1176,7 @@ class CanonicalPlanRuntimeAdapter:
                         ),
                         "source_goal_ids": source_goal_ids,
                         "canonical_plan_id": plan.plan_id,
+            "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
                         "canonical_goal_binding_pending": False,
                         "goal_completion_authority": activity.role
                         == "complete_response",
@@ -1191,6 +1194,7 @@ class CanonicalPlanRuntimeAdapter:
             "language": language,
             "canonical_plan": plan.model_dump(mode="json", exclude_none=True),
             "canonical_plan_id": plan.plan_id,
+            "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
             "goal_ids": list(plan.goal_ids),
             "planner_tier": "fast",
             "fast_activity_ids": [item.activity_id for item in advance.activities],
@@ -2359,6 +2363,7 @@ class CanonicalPlanRuntimeAdapter:
                 "planner_wording_runtime_validated"
             )
         response = InteractionResponse(
+            interaction_id=f"cognitive_{session_id}_{fingerprint[:20]}",
             status=status_map.get(plan.disposition, "error"),
             speech=speech,
             capabilities=capabilities,
@@ -3341,10 +3346,9 @@ class GoalDrivenRuntimeCoordinator:
 
         Fast Planner owns whether the canonical Goal still needs the provisional
         Work by explicitly citing stable Activity IDs. The Host may reuse
-        already-started safe Work only when every provisional Activity is selected
-        exactly once and its Capability/argument/Goal/timing identity still matches.
-        Extra newly planned steps are allowed. Ambiguous, partial, or changed
-        selections return ``None`` and follow the normal cancel/replace path.
+        already-started safe Work when a selected Activity's exact identity matches.
+        Omitted Activities continue unchanged; cancellation must be explicit.
+        Extra newly planned steps are allowed.
         """
 
         activities = list(getattr(execution, "activities", []) or [])
@@ -3377,8 +3381,10 @@ class GoalDrivenRuntimeCoordinator:
                 and set(step.source_goal_ids) == set(activity_goal_ids)
                 and step.timing == activity.timing
             ]
+            if not candidates and activity.activity_id not in {step.reuse_activity_id for step in plan.steps}:
+                continue
             if len(candidates) != 1:
-                return None
+                raise ValueError("Planner reuse changes provisional Work identity")
             index = candidates[0]
             matched_step_indexes.add(index)
             step = plan.steps[index]
@@ -3397,16 +3403,6 @@ class GoalDrivenRuntimeCoordinator:
                     }
                 },
             )
-        provisional_activity_ids = {
-            activity.activity_id for activity in activities
-        }
-        cited_activity_ids = {
-            step.reuse_activity_id
-            for step in plan.steps
-            if step.reuse_activity_id in provisional_activity_ids
-        }
-        if cited_activity_ids != provisional_activity_ids:
-            return None
         return plan.model_copy(deep=True, update={"steps": updated_steps})
 
     @staticmethod
@@ -3511,6 +3507,27 @@ class GoalDrivenRuntimeCoordinator:
                 by_activity_id[request_id] = activity
         return list(by_activity_id.values())
 
+    @staticmethod
+    def _validate_work_change_selection(plan: CanonicalPlan, activities: list[dict[str, Any]]) -> None:
+        by_id = {str(item.get("activity_id") or ""): item for item in activities}
+        if len(by_id) != len(activities):
+            raise ValueError("ambiguous existing Work identity")
+        if set(plan.cancel_activity_ids) - set(by_id):
+            raise ValueError("Planner cancellation names unknown Work")
+        for step in plan.steps:
+            if not step.reuse_activity_id:
+                continue
+            activity = by_id.get(step.reuse_activity_id)
+            if activity is None:
+                raise ValueError("Planner reuse names unknown Work")
+            if any(getattr(step, key) != activity.get(key) for key in ("capability_id", "args", "timing")):
+                raise ValueError("Planner reuse changes immutable Work identity")
+            if set(step.source_goal_ids) != set(activity.get("source_goal_ids") or []):
+                raise ValueError("Planner reuse changes shared Work Goal ownership")
+        for activity_id in plan.cancel_activity_ids:
+            if not set(by_id[activity_id].get("source_goal_ids") or []).issubset(plan.goal_ids):
+                raise ValueError("Planner cancellation exceeds shared Work Goal ownership")
+
     async def _apply_retained_work_reconciliation(
         self,
         *,
@@ -3518,193 +3535,110 @@ class GoalDrivenRuntimeCoordinator:
         activities: list[dict[str, Any]],
         turn_id: str,
     ) -> tuple[CanonicalPlan, str]:
-        """Validate and apply Planner decisions for retained Runtime Work.
+        """Apply only explicit, scope-bound Planner changes to existing Work.
 
-        The Planner's explicit ``reuse_activity_id`` is the only semantic
-        selection. Runtime performs exact live-state validation, preserves every
-        selected request without redispatch, or cancels the complete unselected
-        retained set before replacement Work can start.
+        Omitted Work is unchanged. Reuse may coexist with new steps. A cancellation
+        names exact requests and must close before replacement can dispatch.
         """
 
-        retained = [
-            item
-            for item in activities
-            if item.get("origin") == "retained_runtime"
-        ]
-        if not retained:
-            return plan, "not_applicable"
+        self._validate_work_change_selection(plan, activities)
         retained_by_id = {
-            str(item.get("activity_id") or ""): item for item in retained
+            str(item.get("activity_id") or ""): item
+            for item in activities if item.get("origin") == "retained_runtime"
         }
-        selected_steps = {
-            step.reuse_activity_id: step
-            for step in plan.steps
+        if not retained_by_id:
+            return plan, "not_applicable"
+        selected = {
+            step.reuse_activity_id: step for step in plan.steps
             if step.reuse_activity_id in retained_by_id
         }
-        if selected_steps and set(selected_steps) != set(retained_by_id):
-            raise CognitiveStageFailure(
-                "work_reconciliation",
-                {
-                    "failure_class": "partial_retained_work_reuse",
-                    "failure_domain": "model_contract",
-                    "architecture_attribution": "planner",
-                    "retryable": False,
-                },
-            )
-
+        cancelled = set(plan.cancel_activity_ids).intersection(retained_by_id)
+        if cancelled.intersection(selected):
+            raise ValueError("one Activity cannot be both reused and cancelled")
+        checked = set(selected) | cancelled
         live_by_id: dict[str, dict[str, Any]] = {}
-        for activity_id, activity in retained_by_id.items():
+        for activity_id in sorted(checked):
+            activity = retained_by_id[activity_id]
             runtime_binding = activity.get("runtime_binding")
             if not isinstance(runtime_binding, dict):
                 raise ValueError("retained Work lacks trusted runtime binding")
+            if not set(activity.get("source_goal_ids") or []).issubset(plan.goal_ids):
+                raise ValueError("Planner change exceeds shared Work Goal ownership")
             live = await self.adapter.interaction_runtime.reusable_request_snapshot(
                 interaction_id=str(runtime_binding.get("interaction_id") or ""),
                 request_id=activity_id,
             )
-            if live is None:
-                raise CognitiveStageFailure(
-                    "work_reconciliation",
-                    {
-                        "failure_class": "retained_work_state_changed",
-                        "failure_domain": "runtime_state",
-                        "architecture_attribution": "capability_runtime",
-                        "retryable": True,
-                        "request_id": activity_id,
-                    },
-                )
-            expected_goal_ids = set(activity.get("source_goal_ids") or [])
-            if (
-                live.get("capability_id") != activity.get("capability_id")
-                or live.get("args") != activity.get("args")
-                or live.get("timing") != activity.get("timing")
-                or set(live.get("source_goal_ids") or []) != expected_goal_ids
-                or live.get("canonical_plan_id")
-                != runtime_binding.get("canonical_plan_id")
-                or live.get("canonical_plan_fingerprint")
-                != runtime_binding.get("canonical_plan_fingerprint")
+            if live is None or any(
+                live.get(key) != activity.get(key)
+                for key in ("capability_id", "args", "timing")
+            ) or set(live.get("source_goal_ids") or []) != set(activity.get("source_goal_ids") or []) or any(
+                live.get(key) != runtime_binding.get(key)
+                for key in ("canonical_plan_id", "canonical_plan_fingerprint")
             ):
-                raise CognitiveStageFailure(
-                    "work_reconciliation",
-                    {
-                        "failure_class": "retained_work_identity_changed",
-                        "failure_domain": "runtime_state",
-                        "architecture_attribution": "capability_runtime",
-                        "retryable": True,
-                        "request_id": activity_id,
-                    },
-                )
+                raise CognitiveStageFailure("work_reconciliation", {
+                    "failure_class": "retained_work_identity_changed",
+                    "failure_domain": "runtime_state",
+                    "architecture_attribution": "capability_runtime",
+                    "retryable": False,
+                    "request_id": activity_id,
+                })
+            if activity_id in selected and live.get("state") in {"cancelled", "failed", "refused", "timed_out"}:
+                raise ValueError("failed terminal Work cannot be reused as successful planned Work")
             live_by_id[activity_id] = live
 
-        if selected_steps:
-            if len(selected_steps) != len(plan.steps):
-                raise CognitiveStageFailure(
-                    "work_reconciliation",
-                    {
-                        "failure_class": "retained_reuse_with_additional_steps",
-                        "failure_domain": "model_contract",
-                        "architecture_attribution": "planner",
-                        "retryable": False,
-                    },
-                )
-            updated_steps = list(plan.steps)
-            for index, step in enumerate(plan.steps):
-                activity = retained_by_id.get(step.reuse_activity_id)
-                if activity is None:
-                    continue
-                if (
-                    step.capability_id != activity.get("capability_id")
-                    or step.args != activity.get("args")
-                    or step.timing != activity.get("timing")
-                    or set(step.source_goal_ids)
-                    != set(activity.get("source_goal_ids") or [])
-                ):
-                    raise CognitiveStageFailure(
-                        "work_reconciliation",
-                        {
-                            "failure_class": "planner_reuse_identity_mismatch",
-                            "failure_domain": "model_contract",
-                            "architecture_attribution": "planner",
-                            "retryable": False,
-                            "request_id": step.reuse_activity_id,
-                        },
-                    )
-                updated_steps[index] = step.model_copy(
-                    deep=True,
-                    update={
-                        "metadata": {
-                            **step.metadata,
-                            "retained_work_reused": True,
-                            "retained_request_id": step.reuse_activity_id,
-                            "retained_runtime_state": live_by_id[
-                                step.reuse_activity_id
-                            ]["state"],
-                        }
-                    },
-                )
-            return (
-                plan.model_copy(
-                    deep=True,
-                    update={
-                        "steps": updated_steps,
-                        "metadata": {
-                            **plan.metadata,
-                            "retained_work_reconciliation_only": True,
-                        },
-                    },
-                ),
-                "retained_work_reused",
-            )
+        updated_steps = []
+        for step in plan.steps:
+            activity = retained_by_id.get(step.reuse_activity_id)
+            if activity is None:
+                updated_steps.append(step)
+                continue
+            if any(getattr(step, key) != activity.get(key) for key in ("capability_id", "args", "timing")) or set(step.source_goal_ids) != set(activity.get("source_goal_ids") or []):
+                raise ValueError("Planner reuse changes immutable Work identity")
+            updated_steps.append(step.model_copy(deep=True, update={"metadata": {
+                **step.metadata,
+                "request_id": step.reuse_activity_id,
+                "retained_work_reused": True,
+                "retained_request_id": step.reuse_activity_id,
+                "retained_runtime_state": live_by_id[step.reuse_activity_id]["state"],
+            }}))
 
         grouped: dict[tuple[str, str, str], dict[str, set[str]]] = {}
-        for activity_id, activity in retained_by_id.items():
-            runtime_binding = activity["runtime_binding"]
-            key = (
-                str(runtime_binding["interaction_id"]),
-                str(runtime_binding["canonical_plan_id"]),
-                str(runtime_binding["canonical_plan_fingerprint"]),
-            )
-            group = grouped.setdefault(
-                key,
-                {"goal_ids": set(), "request_ids": set()},
-            )
+        for activity_id in cancelled:
+            if live_by_id[activity_id].get("state") in {"completed", "cancelled", "failed", "refused", "timed_out"}:
+                continue  # Preserve terminal Evidence; there is no remaining execution to cancel.
+            activity = retained_by_id[activity_id]
+            binding = activity["runtime_binding"]
+            key = (str(binding["interaction_id"]), str(binding["canonical_plan_id"]), str(binding["canonical_plan_fingerprint"]))
+            group = grouped.setdefault(key, {"goal_ids": set(), "request_ids": set()})
             group["goal_ids"].update(activity.get("source_goal_ids") or [])
             group["request_ids"].add(activity_id)
-
         for (interaction_id, plan_id, fingerprint), group in grouped.items():
-            receipt = await self.adapter.interaction_runtime.cancel_scope(
-                CancellationDirective(
-                    source_turn_id=turn_id,
-                    requested_scope="specific_goal",
-                    foreground_interaction_id=interaction_id,
-                    target_goal_ids=tuple(sorted(group["goal_ids"])),
-                    expected_plan_id=plan_id,
-                    expected_plan_fingerprint=fingerprint,
-                    reason="Fast Planner replaced retained Work",
-                )
-            )
-            selected_request_ids = {
-                item.request_id for item in receipt.selected_request_bindings
-            }
-            failure = bool(
-                not group["request_ids"].issubset(selected_request_ids)
-                or receipt.stale_binding_request_bindings
-                or receipt.shared_owner_conflict_request_bindings
-                or receipt.non_interruptible_request_bindings
-                or receipt.provider_cancel_failure_evidence
-                or receipt.dispatch_failures
-            )
-            if failure:
-                raise CognitiveStageFailure(
-                    "work_reconciliation",
-                    {
-                        "failure_class": "retained_work_cancellation_not_closed",
-                        "failure_domain": "runtime_state",
-                        "architecture_attribution": "capability_runtime",
-                        "retryable": False,
-                        "interaction_id": interaction_id,
-                    },
-                )
-        return plan, "retained_work_cancelled_before_replacement"
+            receipt = await self.adapter.interaction_runtime.cancel_scope(CancellationDirective(
+                source_turn_id=turn_id,
+                requested_scope="specific_goal",
+                foreground_interaction_id=interaction_id,
+                target_goal_ids=tuple(sorted(group["goal_ids"])),
+                target_request_ids=tuple(sorted(group["request_ids"])),
+                expected_plan_id=plan_id,
+                expected_plan_fingerprint=fingerprint,
+                reason="Planner explicitly cancelled retained Work",
+            ))
+            actual = {item.request_id for item in receipt.selected_request_bindings}
+            if actual != group["request_ids"] or receipt.stale_binding_request_bindings or receipt.shared_owner_conflict_request_bindings or receipt.non_interruptible_request_bindings or receipt.provider_cancel_failure_evidence or receipt.dispatch_failures:
+                raise CognitiveStageFailure("work_reconciliation", {
+                    "failure_class": "retained_work_cancellation_not_closed",
+                    "failure_domain": "runtime_state",
+                    "architecture_attribution": "capability_runtime",
+                    "retryable": False,
+                    "interaction_id": interaction_id,
+                })
+        return plan.model_copy(deep=True, update={
+            "steps": updated_steps,
+            "metadata": {
+                **plan.metadata,
+                "retained_work_reconciliation_only": bool(selected) and len(selected) == len(plan.steps),
+            },
+        }), "retained_work_delta_applied" if cancelled else "retained_work_reused" if selected else "retained_work_unchanged"
 
     @staticmethod
     def _is_direct_spoken_association(
@@ -3891,6 +3825,51 @@ class GoalDrivenRuntimeCoordinator:
                         )
                     goal_state_commit_stage = "goal_association"
 
+        # Goal facts can wake their own planning call while the GI-triggered
+        # Planner is still running. No candidate Plan is passed for review.
+        context, history = self._refresh_continuity_context(context=context, sid=sid)
+        planning_context = {**context, "goal_association_resolution": association.prompt_projection()}
+        goal_ids = self._association_goal_ids(association)
+        runtime = self.adapter.interaction_runtime.runtime
+        for item in context.get("active_goal_snapshots") or []:
+            if isinstance(item, dict) and item.get("goal_id") in goal_ids:
+                runtime.record_goal_state(str(item["goal_id"]), item)
+        for goal in association.new_goals:
+            runtime.record_goal_state(goal.goal_id, goal.model_dump(mode="json"))
+        retained = self._retained_existing_work_activities(
+            context=planning_context,
+            goal_ids={*goal_ids, *(old for goal in association.new_goals for old in goal.supersedes_goal_ids)},
+        )
+        mapping = self._goal_ids_by_responsibility(association)
+        await runtime.bind_prepared_planner_work(turn_id, mapping)
+        planning_snapshot = await runtime.planning_state_snapshot(list({*goal_ids, *(old for goal in association.new_goals for old in goal.supersedes_goal_ids)}), turn_id)
+        actual_work = runtime.planning_work_activities(planning_snapshot)
+        by_id = {item["activity_id"]: item for item in retained}
+        by_id.update({item["activity_id"]: item for item in actual_work})
+        retained = [item for item in by_id.values() if item["origin"] == "retained_runtime"]
+        planning_context["existing_work_activities"] = list(by_id.values())
+        planning_context["interaction_context"] = self._interaction_context(sid=sid, context=planning_context, goal_ids=goal_ids)
+        planning_task = None
+        if not has_named_goal_cancellation and (
+            retained or any(item.get("turn_id") != turn_id for item in actual_work if item.get("origin") == "provisional_fast")
+            or has_goal_replacement or any(item.goal_update for item in association.associations)
+        ):
+            planning_context["canonical_fast_revision_reason"] = "goal_state_planning"
+            planning_task = asyncio.create_task(self._observe_workflow_stage(
+                sid=sid,
+                stage="fast_planner",
+                input_payload={"goal_association": association, "trigger": "goal_association", "existing_work_activities": planning_context["existing_work_activities"]},
+                operation=self.agent_client.resolve_fast_plan(
+                    session,
+                    request=work_request.model_copy(deep=True, update={
+                        "planning_task_id": "ga:" + goal_association_fingerprint(association),
+                        "context": planning_context,
+                        "history": history,
+                    }),
+                    timeout_ms=self.policy.fast_planner_timeout_ms,
+                ),
+            ), name="goal-planning:" + turn_id)
+
         return _GoalAssociationStageResult(
             association=association,
             context=context,
@@ -3901,6 +3880,8 @@ class GoalDrivenRuntimeCoordinator:
             goal_state_commit_stage=goal_state_commit_stage,
             has_named_goal_cancellation=has_named_goal_cancellation,
             has_goal_replacement=has_goal_replacement,
+            planning_task=planning_task,
+            planning_snapshot=planning_snapshot,
         )
 
     async def resolve(
@@ -4095,11 +4076,21 @@ class GoalDrivenRuntimeCoordinator:
         deep_planner_invocation_reasons: list[str] = []
         needs_deep_planner = False
         association_task: asyncio.Task[_GoalAssociationStageResult] | None = None
+        gi_planning_task: asyncio.Task[None] | None = None
+        gi_planning_superseded = False
+        planning_snapshot: dict[str, Any] | None = None
+        planning_commit: dict[str, Any] | None = None
+
+        def goal_planning_started() -> bool:
+            return bool(association_task is not None and association_task.done()
+                and not association_task.cancelled() and association_task.exception() is None
+                and association_task.result().planning_task is not None)
         fast_vocal_activity_ids: list[str] = []
         ready_fast_communicative_executions: list[Any] = []
         fast_communicative_realization_status = "not_started"
         ready_fast_capability_execution: Any | None = None
         ready_fast_capability_status = "not_started"
+        retained_work_activities: list[dict[str, Any]] = []
         retained_work_reconciliation_status = "not_applicable"
         work_reconciliation_required = False
         work_reconciliation_activity_count = 0
@@ -4177,6 +4168,11 @@ class GoalDrivenRuntimeCoordinator:
                     work_reconciliation_activity_count
                 ),
                 "gi_fanout_concurrent": True,
+                "gi_planning_superseded": gi_planning_superseded,
+                "independent_goal_planning": goal_planning_started(),
+                "planning_commit": planning_commit,
+                "retained_work_activities": [item for item in retained_work_activities
+                    if terminal_plan is not None and item["activity_id"] not in terminal_plan.cancel_activity_ids],
                 "goal_grouped_task_list": True,
             }
 
@@ -4187,6 +4183,17 @@ class GoalDrivenRuntimeCoordinator:
             nonlocal association, context, history, planning_context, situation
             nonlocal goal_state_results, goal_state_commit_stage
             nonlocal has_named_goal_cancellation, has_goal_replacement
+            if gi_planning_task is not None and not gi_planning_task.done():
+                gi_planning_task.cancel()
+                await asyncio.gather(gi_planning_task, return_exceptions=True)
+            if goal_planning_started():
+                pending_plan = association_task.result().planning_task
+                if pending_plan is not None:
+                    pending_plan.cancel()
+                    await asyncio.gather(pending_plan, return_exceptions=True)
+            await self.adapter.interaction_runtime.runtime.discard_prepared_planner_work(
+                self._context_turn_id(context, sid)
+            )
             if association_task is not None:
                 if not association_task.done():
                     association_task.cancel()
@@ -4260,159 +4267,200 @@ class GoalDrivenRuntimeCoordinator:
                     )
                 )
                 await asyncio.sleep(0)
-                stream_request = work_request.model_copy(
-                    update={
-                        "sid": turn_id,
-                        "context": context,
-                        "history": history,
-                    }
-                )
-                terminal_frame: FastPlannerStreamTerminal | None = None
-                async for frame in self.agent_client.stream_fast_advance(
-                    session,
-                    request=stream_request,
-                    timeout_ms=self.policy.fast_planner_timeout_ms,
-                ):
-                    if isinstance(frame, PresentationCommit):
-                        if presentation_commit is not None:
-                            raise CognitiveStageFailure(
-                                "fast_planner_stream",
-                                {
-                                    "failure_class": "duplicate_presentation_commit",
-                                    "failure_domain": "model_contract",
-                                    "architecture_attribution": "fast_planner",
-                                    "retryable": False,
+                async def plan_current_responsibilities() -> None:
+                    nonlocal presentation_commit, fast_advance, needs_deep_planner
+                    nonlocal fast_communicative_realization_status
+                    nonlocal ready_fast_capability_execution, ready_fast_capability_status
+                    stream_request = work_request.model_copy(
+                        deep=True, update={
+                            "planning_task_id": "gi:" + turn_id,
+                            "sid": turn_id,
+                            "context": context,
+                            "history": history,
+                        }
+                    )
+                    terminal_frame: FastPlannerStreamTerminal | None = None
+                    async for frame in self.agent_client.stream_fast_advance(
+                        session,
+                        request=stream_request,
+                        timeout_ms=self.policy.fast_planner_timeout_ms,
+                    ):
+                        if isinstance(frame, PresentationCommit):
+                            if presentation_commit is not None:
+                                raise CognitiveStageFailure(
+                                    "fast_planner_stream",
+                                    {
+                                        "failure_class": "duplicate_presentation_commit",
+                                        "failure_domain": "model_contract",
+                                        "architecture_attribution": "fast_planner",
+                                        "retryable": False,
+                                    },
+                                )
+                            presentation_commit = frame
+                            commit_finished_ms = time.perf_counter() * 1000.0
+                            timings["fast_planner_commit"] = (
+                                time.perf_counter() - fast_started
+                            ) * 1000.0
+                            self._record_workflow_stage(
+                                sid=sid,
+                                stage="fast_planner_presentation_commit",
+                                started_monotonic_ms=fast_started * 1000.0,
+                                finished_monotonic_ms=commit_finished_ms,
+                                status="accepted",
+                                input_payload={
+                                    "user_text": text,
+                                    "responsibilities": responsibility_proposals,
+                                },
+                                output_payload=frame,
+                                errors=[],
+                                attempt=1,
+                                metadata={
+                                    "semantic_owner": "fast_planner",
+                                    "model_invocation": "streaming_advance",
+                                    "immutable": True,
                                 },
                             )
-                        presentation_commit = frame
-                        commit_finished_ms = time.perf_counter() * 1000.0
-                        timings["fast_planner_commit"] = (
-                            time.perf_counter() - fast_started
-                        ) * 1000.0
-                        self._record_workflow_stage(
-                            sid=sid,
-                            stage="fast_planner_presentation_commit",
-                            started_monotonic_ms=fast_started * 1000.0,
-                            finished_monotonic_ms=commit_finished_ms,
-                            status="accepted",
-                            input_payload={
-                                "user_text": text,
-                                "responsibilities": responsibility_proposals,
-                            },
-                            output_payload=frame,
-                            errors=[],
-                            attempt=1,
-                            metadata={
-                                "semantic_owner": "fast_planner",
-                                "model_invocation": "streaming_advance",
-                                "immutable": True,
-                            },
-                        )
-                        activity = frame.activity
-                        if activity is not None:
-                            fast_communicative_realization_status = "planner_owned"
-                        if (
-                            activity is not None
-                            and self.policy.mode == "apply"
-                            and not user_turn_prohibits_speech(context.get("user_turn_envelope"))
-                        ):
-                            ready_execution = await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
-                                activity,
-                                session_id=sid,
-                                turn_id=turn_id,
-                                language=language,
-                            )
-                            if activity.role == "complete_response":
-                                ready_fast_communicative_executions.append(
-                                    ready_execution
+                            activity = frame.activity
+                            if activity is not None:
+                                fast_communicative_realization_status = "planner_owned"
+                            if (
+                                activity is not None
+                                and self.policy.mode == "apply"
+                                and not goal_planning_started()
+                                and not user_turn_prohibits_speech(context.get("user_turn_envelope"))
+                            ):
+                                ready_execution = await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
+                                    activity,
+                                    session_id=sid,
+                                    turn_id=turn_id,
+                                    language=language,
                                 )
-                            fast_vocal_activity_ids.append(activity.activity_id)
-                            self.schedule_presentation_commit_auxiliary_activities(
-                                frame,
-                                ready_execution=ready_execution,
-                                sid=sid,
-                                turn_id=turn_id,
-                                context=context,
+                                if activity.role == "complete_response":
+                                    ready_fast_communicative_executions.append(
+                                        ready_execution
+                                    )
+                                fast_vocal_activity_ids.append(activity.activity_id)
+                                self.schedule_presentation_commit_auxiliary_activities(
+                                    frame,
+                                    ready_execution=ready_execution,
+                                    sid=sid,
+                                    turn_id=turn_id,
+                                    context=context,
+                                )
+                        elif isinstance(frame, FastPlannerStreamFailure):
+                            raise CognitiveStageFailure(
+                                "fast_planner_stream",
+                                frame.model_dump(mode="json", exclude_none=True),
                             )
-                    elif isinstance(frame, FastPlannerStreamFailure):
+                        elif isinstance(frame, FastPlannerStreamTerminal):
+                            if terminal_frame is not None:
+                                raise CognitiveStageFailure(
+                                    "fast_planner_stream",
+                                    {
+                                        "failure_class": "duplicate_stream_terminal",
+                                        "failure_domain": "model_contract",
+                                        "architecture_attribution": "fast_planner",
+                                        "retryable": False,
+                                    },
+                                )
+                            terminal_frame = frame
+                            self._record_workflow_stage(
+                                sid=sid,
+                                stage="fast_planner_stream_terminal",
+                                started_monotonic_ms=fast_started * 1000.0,
+                                finished_monotonic_ms=time.perf_counter() * 1000.0,
+                                status="resolved",
+                                input_payload={
+                                    "presentation_commit_id": (
+                                        presentation_commit.commit_id
+                                        if presentation_commit is not None
+                                        else None
+                                    )
+                                },
+                                output_payload=frame,
+                                errors=[],
+                                attempt=1,
+                                metadata={
+                                    "semantic_owner": "fast_planner",
+                                    "model_invocation": "streaming_advance",
+                                    "work_dispatch_allowed": False,
+                                },
+                            )
+                    if presentation_commit is None or terminal_frame is None:
                         raise CognitiveStageFailure(
                             "fast_planner_stream",
-                            frame.model_dump(mode="json", exclude_none=True),
+                            {
+                                "failure_class": "incomplete_fast_planner_stream",
+                                "failure_domain": "model_contract",
+                                "architecture_attribution": "fast_planner",
+                                "retryable": False,
+                            },
                         )
-                    elif isinstance(frame, FastPlannerStreamTerminal):
-                        if terminal_frame is not None:
-                            raise CognitiveStageFailure(
-                                "fast_planner_stream",
-                                {
-                                    "failure_class": "duplicate_stream_terminal",
-                                    "failure_domain": "model_contract",
-                                    "architecture_attribution": "fast_planner",
-                                    "retryable": False,
-                                },
+                    if (
+                        terminal_frame.presentation_commit_id
+                        != presentation_commit.commit_id
+                        or terminal_frame.turn_id != presentation_commit.turn_id
+                        or str(
+                            terminal_frame.advance.metadata.get(
+                                "presentation_commit_id"
                             )
-                        terminal_frame = frame
-                        self._record_workflow_stage(
-                            sid=sid,
-                            stage="fast_planner_stream_terminal",
-                            started_monotonic_ms=fast_started * 1000.0,
-                            finished_monotonic_ms=time.perf_counter() * 1000.0,
-                            status="resolved",
-                            input_payload={
-                                "presentation_commit_id": (
-                                    presentation_commit.commit_id
-                                    if presentation_commit is not None
-                                    else None
-                                )
-                            },
-                            output_payload=frame,
-                            errors=[],
-                            attempt=1,
-                            metadata={
-                                "semantic_owner": "fast_planner",
-                                "model_invocation": "streaming_advance",
-                                "work_dispatch_allowed": False,
+                            or ""
+                        )
+                        != presentation_commit.commit_id
+                    ):
+                        raise CognitiveStageFailure(
+                            "fast_planner_stream",
+                            {
+                                "failure_class": "presentation_commit_reference_mismatch",
+                                "failure_domain": "model_contract",
+                                "architecture_attribution": "fast_planner",
+                                "retryable": False,
                             },
                         )
-                if presentation_commit is None or terminal_frame is None:
-                    raise CognitiveStageFailure(
-                        "fast_planner_stream",
-                        {
-                            "failure_class": "incomplete_fast_planner_stream",
-                            "failure_domain": "model_contract",
-                            "architecture_attribution": "fast_planner",
-                            "retryable": False,
-                        },
-                    )
-                if (
-                    terminal_frame.presentation_commit_id
-                    != presentation_commit.commit_id
-                    or terminal_frame.turn_id != presentation_commit.turn_id
-                    or str(
-                        terminal_frame.advance.metadata.get(
-                            "presentation_commit_id"
+                    fast_advance = terminal_frame.advance
+                    timings["fast_planner_activity_plan"] = (
+                        time.perf_counter() - fast_started
+                    ) * 1000.0
+                    timings["fast_planner_advance"] = timings[
+                        "fast_planner_activity_plan"
+                    ]
+                    ready_fast_capability_status = "prepared_until_canonical_validation"
+                    capability_activities = [item for item in fast_advance.activities if isinstance(item, FastPlannerCapabilityActivity)]
+                    if self.policy.mode == "apply" and capability_activities and not goal_planning_started():
+                        eligible = await self.adapter.interaction_runtime.prepare_fast_planner_capability_activities(
+                            capability_activities, turn_id=turn_id,
                         )
-                        or ""
-                    )
-                    != presentation_commit.commit_id
-                ):
-                    raise CognitiveStageFailure(
-                        "fast_planner_stream",
-                        {
-                            "failure_class": "presentation_commit_reference_mismatch",
-                            "failure_domain": "model_contract",
-                            "architecture_attribution": "fast_planner",
-                            "retryable": False,
-                        },
-                    )
-                fast_advance = terminal_frame.advance
-                timings["fast_planner_activity_plan"] = (
-                    time.perf_counter() - fast_started
-                ) * 1000.0
-                timings["fast_planner_advance"] = timings[
-                    "fast_planner_activity_plan"
-                ]
-                ready_fast_capability_status = "deferred_until_canonical_validation"
-                needs_deep_planner = "deep_planner" in fast_advance.continuations
+                        if eligible:
+                            ready_fast_capability_execution = await self.adapter.interaction_runtime.start_fast_planner_capability_activities(
+                                eligible, session_id=sid, turn_id=turn_id,
+                            )
+                            ready_fast_capability_status = "safe_reads_dispatched_before_goal_binding"
+                    needs_deep_planner = "deep_planner" in fast_advance.continuations
+
+                gi_planning_task = asyncio.create_task(plan_current_responsibilities(), name="gi-planning:" + turn_id)
+                done, _pending = await asyncio.wait(
+                    {gi_planning_task, association_task}, return_when=asyncio.FIRST_COMPLETED,
+                )
+                if gi_planning_task in done:
+                    await gi_planning_task
+                if association_task in done:
+                    early_association = await association_task
+                    if early_association.planning_task is not None:
+                        done, _pending = await asyncio.wait(
+                            {gi_planning_task, early_association.planning_task}, return_when=asyncio.FIRST_COMPLETED,
+                        )
+                        if early_association.planning_task in done and not gi_planning_task.done():
+                            # The new Goal-state task has a complete result. Its
+                            # predecessor cannot later overwrite that state.
+                            gi_planning_task.cancel()
+                            await asyncio.gather(gi_planning_task, return_exceptions=True)
+                            gi_planning_superseded = True
+                        else:
+                            await gi_planning_task
+                    else:
+                        await gi_planning_task
+                else:
+                    await gi_planning_task
 
             if association_task is None:
                 association_stage = await self._resolve_and_commit_goal_association(
@@ -4439,7 +4487,7 @@ class GoalDrivenRuntimeCoordinator:
             )
             has_goal_replacement = association_stage.has_goal_replacement
 
-            if fast_advance is None:
+            if fast_advance is None and association_stage.planning_task is None:
                 raise CognitiveStageFailure(
                     "fast_planner_advance",
                     {
@@ -4465,29 +4513,16 @@ class GoalDrivenRuntimeCoordinator:
                     )
 
             association_goal_ids = self._association_goal_ids(association)
-            retained_reconciliation_goal_ids = {
-                *association_goal_ids,
-                *(
-                    goal_id
-                    for goal in association.new_goals
-                    for goal_id in goal.supersedes_goal_ids
-                ),
-            }
-            retained_work_activities = self._retained_existing_work_activities(
-                context=planning_context,
-                goal_ids=retained_reconciliation_goal_ids,
-            )
-            work_reconciliation_required = (
-                not has_named_goal_cancellation
-                and (
-                    ready_fast_capability_execution is not None
-                    or bool(retained_work_activities)
-                )
+            retained_work_activities = [item for item in planning_context.get("existing_work_activities", [])
+                                        if item.get("origin") == "retained_runtime"]
+            work_reconciliation_required = not has_named_goal_cancellation and (
+                bool(retained_work_activities) or association_stage.planning_task is not None
             )
             goal_update_reconciliation_required = any(
                 bool(item.goal_update) for item in association.associations
             )
-            canonical_fast_revision_reason = ""
+            canonical_fast_revision_reason = "goal_state_planning" if association_stage.planning_task is not None else ""
+            planning_snapshot = association_stage.planning_snapshot
             if work_reconciliation_required:
                 canonical_fast_revision_reason = (
                     "provisional_work_goal_reconciliation"
@@ -4496,21 +4531,6 @@ class GoalDrivenRuntimeCoordinator:
                     if has_goal_replacement
                     else "retained_goal_work_reconciliation"
                 )
-                provisional_work_activities = (
-                    [
-                        {
-                            **item.model_dump(mode="json", exclude_none=True),
-                            "origin": "provisional_fast",
-                        }
-                        for item in ready_fast_capability_execution.activities
-                    ]
-                    if ready_fast_capability_execution is not None
-                    else []
-                )
-                planning_context["existing_work_activities"] = [
-                    *retained_work_activities,
-                    *provisional_work_activities,
-                ]
                 work_reconciliation_activity_count = len(
                     planning_context["existing_work_activities"]
                 )
@@ -4659,6 +4679,8 @@ class GoalDrivenRuntimeCoordinator:
                     },
                 )
 
+            if association_stage.planning_task is not None:
+                needs_deep_planner = False
             if needs_deep_planner:
                 deep_reason = "fast_planner_advance_complexity"
                 deep_planner_invocation_reasons.append(deep_reason)
@@ -4701,28 +4723,31 @@ class GoalDrivenRuntimeCoordinator:
                 # Work. A terminal unavailable/refused decision is not itself a revision
                 # trigger.
                 stage = time.perf_counter()
-                fast_plan = await self._observe_workflow_stage(
-                    sid=sid,
-                    stage="fast_planner",
-                    input_payload={
-                        "user_text": text,
-                        "goal_association": association,
-                        "revision_reason": canonical_fast_revision_reason,
-                        "interaction_context": planning_context.get(
-                            "interaction_context", {}
+                if association_stage.planning_task is not None:
+                    fast_plan = await association_stage.planning_task
+                else:
+                    fast_plan = await self._observe_workflow_stage(
+                        sid=sid,
+                        stage="fast_planner",
+                        input_payload={
+                            "user_text": text,
+                            "goal_association": association,
+                            "revision_reason": canonical_fast_revision_reason,
+                            "interaction_context": planning_context.get(
+                                "interaction_context", {}
+                            ),
+                        },
+                        operation=self.agent_client.resolve_fast_plan(
+                            session,
+                            request=work_request.model_copy(
+                                update={
+                                    "context": planning_context,
+                                    "history": history,
+                                }
+                            ),
+                            timeout_ms=self.policy.fast_planner_timeout_ms,
                         ),
-                    },
-                    operation=self.agent_client.resolve_fast_plan(
-                        session,
-                        request=work_request.model_copy(
-                            update={
-                                "context": planning_context,
-                                "history": history,
-                            }
-                        ),
-                        timeout_ms=self.policy.fast_planner_timeout_ms,
-                    ),
-                )
+                    )
                 timings["fast_planner"] = (
                     time.perf_counter() - stage
                 ) * 1000.0
@@ -4788,10 +4813,23 @@ class GoalDrivenRuntimeCoordinator:
                 terminal_plan = fast_plan
                 fast_planner_path = "terminal"
 
-            terminal_plan = bind_presentation_commit_reference(
-                terminal_plan,
-                commit_id=presentation_commit.commit_id,
-            )
+            known_work_ids = {item["activity_id"] for item in planning_context.get("existing_work_activities", [])}
+            if set(terminal_plan.cancel_activity_ids) - known_work_ids:
+                raise ValueError("Planner cancellation names unknown Work")
+
+            if presentation_commit is not None:
+                terminal_plan = bind_presentation_commit_reference(
+                    terminal_plan, commit_id=presentation_commit.commit_id,
+                )
+
+            runtime = self.adapter.interaction_runtime.runtime
+            if association_stage.planning_task is None:
+                # Joining unchanged Responsibility meaning to a canonical identity
+                # is mechanical. No second model authored a decision from this state.
+                await runtime.bind_prepared_planner_work(turn_id, self._goal_ids_by_responsibility(association))
+                planning_snapshot = await runtime.planning_state_snapshot(
+                    association_goal_ids, turn_id,
+                )
 
             # Runtime authority starts from the validated canonical Plan and is
             # bounded by registered Capability, authorization, confirmation, resource,
@@ -4825,63 +4863,68 @@ class GoalDrivenRuntimeCoordinator:
                     + json.dumps(runtime_errors, ensure_ascii=False)
                 )
 
-            if self.policy.mode == "apply" and retained_work_activities:
-                terminal_plan, retained_work_reconciliation_status = (
-                    await self._apply_retained_work_reconciliation(
-                        plan=terminal_plan,
-                        activities=retained_work_activities,
-                        turn_id=turn_id,
+            self._validate_work_change_selection(terminal_plan, planning_context.get("existing_work_activities", []))
+            if self.policy.mode == "apply" and planning_snapshot is not None:
+                async with runtime.planning_commit_scope(planning_snapshot):
+                    if ready_fast_capability_execution is not None:
+                        refs_to_goals: dict[str, list[str]] | None = None
+                        if terminal_plan.metadata.get("resolver") == "fast_planner_advance":
+                            raw_refs_to_goals = terminal_plan.metadata.get(
+                                "goal_ids_by_responsibility"
+                            )
+                            if isinstance(raw_refs_to_goals, dict):
+                                refs_to_goals = raw_refs_to_goals
+                            else:
+                                raise ValueError(
+                                    "Fast Activity Plan lacks canonical Goal grouping"
+                                )
+                        elif work_reconciliation_required:
+                            reusable_plan = (
+                                self._canonical_plan_reusing_fast_capability_execution(
+                                    execution=ready_fast_capability_execution,
+                                    plan=terminal_plan,
+                                    association=association,
+                                )
+                            )
+                            if reusable_plan is not None:
+                                terminal_plan = reusable_plan
+                            refs_to_goals = self._goal_ids_by_responsibility(association)
+                        if refs_to_goals is not None:
+                            ready_result = await self.adapter.interaction_runtime.bind_fast_planner_capability_execution(
+                                ready_fast_capability_execution,
+                                target_interaction_id=f"cognitive_{sid}_{canonical_plan_fingerprint(terminal_plan)[:20]}",
+                                canonical_plan_id=terminal_plan.plan_id,
+                                canonical_plan_fingerprint=canonical_plan_fingerprint(
+                                    terminal_plan
+                                ),
+                                goal_ids_by_responsibility=refs_to_goals,
+                                task_list_revision=int(
+                                    terminal_plan.metadata.get("task_list_revision") or 1
+                                ),
+                                cancel_activity_ids=terminal_plan.cancel_activity_ids,
+                            )
+                            ready_fast_capability_status = (
+                                "completed_before_canonical_dispatch:"
+                                + ready_result.status
+                            )
+                        else:
+                            raise ValueError("provisional Work lacks canonical Goal binding")
+                    terminal_plan, retained_work_reconciliation_status = await self._apply_retained_work_reconciliation(
+                        plan=terminal_plan, activities=planning_context.get("existing_work_activities", []), turn_id=turn_id,
                     )
-                )
-
-            if ready_fast_capability_execution is not None:
-                refs_to_goals: dict[str, list[str]] | None = None
-                if terminal_plan.metadata.get("resolver") == "fast_planner_advance":
-                    raw_refs_to_goals = terminal_plan.metadata.get(
-                        "goal_ids_by_responsibility"
-                    )
-                    if isinstance(raw_refs_to_goals, dict):
-                        refs_to_goals = raw_refs_to_goals
-                    else:
-                        raise ValueError(
-                            "Fast Activity Plan lacks canonical Goal grouping"
-                        )
-                elif work_reconciliation_required:
-                    reusable_plan = (
-                        self._canonical_plan_reusing_fast_capability_execution(
-                            execution=ready_fast_capability_execution,
-                            plan=terminal_plan,
-                            association=association,
-                        )
-                    )
-                    if reusable_plan is not None:
-                        terminal_plan = reusable_plan
-                        refs_to_goals = self._goal_ids_by_responsibility(
-                            association
-                        )
-                if refs_to_goals is not None:
-                    ready_result = await self.adapter.interaction_runtime.bind_fast_planner_capability_execution(
-                        ready_fast_capability_execution,
-                        target_interaction_id=f"cognitive_{sid}",
-                        canonical_plan_id=terminal_plan.plan_id,
-                        canonical_plan_fingerprint=canonical_plan_fingerprint(
-                            terminal_plan
-                        ),
-                        goal_ids_by_responsibility=refs_to_goals,
-                        task_list_revision=int(
-                            terminal_plan.metadata.get("task_list_revision") or 1
-                        ),
-                    )
-                    ready_fast_capability_status = (
-                        "completed_before_canonical_dispatch:"
-                        + ready_result.status
-                    )
-                else:
-                    await self.adapter.interaction_runtime.runtime.cancel_interaction(
-                        ready_fast_capability_execution.interaction_id
-                    )
-                    ready_fast_capability_status = (
-                        "cancelled_by_work_reconciliation"
+                    cancelled_bindings = {
+                        str(item["runtime_binding"]["interaction_id"]) + "/" + str(item["activity_id"])
+                        for item in retained_work_activities
+                        if item["activity_id"] in terminal_plan.cancel_activity_ids
+                    }
+                    await runtime.validate_planning_state(planning_snapshot, cancelled_bindings=cancelled_bindings)
+                    prepared_ids = [item["activity_id"] for item in planning_snapshot["prepared"] if item.get("turn_id", turn_id) == turn_id]
+                    selected_prepared = (prepared_ids if terminal_plan.metadata.get("resolver") == "fast_planner_advance"
+                                         else [step.reuse_activity_id for step in terminal_plan.steps])
+                    planning_commit = await runtime.reserve_planning_submission(
+                        planning_snapshot, plan_id=terminal_plan.plan_id,
+                        fingerprint=canonical_plan_fingerprint(terminal_plan),
+                        prepared_activity_ids=[*selected_prepared, *terminal_plan.cancel_activity_ids],
                     )
 
             if self.policy.mode == "apply" and self.interaction_ledger is not None:
@@ -5203,6 +5246,11 @@ class GoalDrivenRuntimeCoordinator:
         final_timings = dict(timings)
         final_timings["total"] = (time.perf_counter() - started) * 1000.0
         metadata_payload = dict(metadata or {})
+        if status == "applied" and interaction is not None and isinstance(metadata_payload.get("planning_commit"), dict):
+            interaction = interaction.model_copy(deep=True, update={"metadata": {
+                **interaction.metadata, "planning_commit": metadata_payload["planning_commit"],
+                "retained_work_activities": metadata_payload.get("retained_work_activities", []),
+            }})
         fast_advance = None
         raw_fast_advance = metadata_payload.get("fast_planner_advance")
         if isinstance(raw_fast_advance, dict):

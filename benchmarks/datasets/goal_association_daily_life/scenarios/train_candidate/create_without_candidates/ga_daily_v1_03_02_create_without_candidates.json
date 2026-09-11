@@ -113,7 +113,6 @@
               "value": "5 seconds"
             }
           ],
-          "description": "Move right for 5 seconds.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

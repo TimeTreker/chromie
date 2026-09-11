@@ -251,7 +251,7 @@ commitments remain consequence-bounded.
 
 ### Responsibility is what Chromie owes; Work is how it advances
 
-Goal Association answers the human semantic question:
+Goal Interpretation answers the human semantic question:
 
 > What independently observable outcome is still owed to the person?
 
@@ -259,6 +259,15 @@ A Goal is the persistent representation of that Responsibility when it must
 survive beyond immediate progress. The Planner does not get to redefine what the
 person asked for because one current Provider happens to expose a convenient
 capability granularity.
+
+Goal Association determines how accepted Responsibilities relate to retained Goals.
+It selects identity, continuity and source-bound changes, rather than authoring another
+WHAT description. New Goal descriptions and success criteria inherit the exact GI
+outcome. A revision preserves unselected requirements, names the current GI sources of
+new/replacement requirements and copies any changed semantic fields from those sources.
+The Goal owner checks the supplied state fingerprint, commits the consistent revision,
+and retains prior meaning/provenance and execution evidence. The concrete contract is in
+[Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md#goal-meaning-inheritance).
 
 For example, after a successful water delivery the semantic question "is the
 walk still independently owed?" belongs at the Goal boundary. If the user meant
@@ -917,10 +926,12 @@ streamed semantic result.
 
 Goal Interpretation has no progress-speech or response-authoring contract. Goal
 Association consumes the same authoritative GI result concurrently and alone commits
-canonical Goal continuity. Only after both the complete Fast terminal result and GA
-mapping exist may Host construct and validate a canonical Plan. No Capability Activity,
-including a safe read, starts before that join. Confirmation, authorization, resource,
-provider, and safety barriers remain unchanged. Retained Work from prior valid Plans may
+canonical Goal continuity. A complete validated GI-triggered Planner result may prepare
+Capability Work under Responsibility provenance before GA. Only available, explicitly
+side-effect-free safe reads requiring no confirmation may dispatch at that point;
+other Work waits for canonical Goal binding and Plan/Runtime validation. Partial streamed
+frames never authorize Capability Work. Confirmation, authorization, resource, provider,
+and safety barriers remain unchanged. Retained Work from prior valid Plans may
 still be projected into later Planner re-entry; GA never judges compatibility, and Host
 never invents semantic reuse.
 
@@ -2456,8 +2467,9 @@ It may:
 - derive execution-input needs only from the immutable Responsibility and applicable
   Plan/Agent-Skill/Capability/safety contracts, then resolve them from an authoritative
   source or ask a user-resolvable clarification;
-- select exact safe/read-only Capability Activities in the terminal result; dispatch
-  still waits for GA binding and complete canonical validation;
+- prepare exact Capability Activities from the complete validated terminal result;
+  contract-declared safe reads may execute before GA under Responsibility provenance,
+  while other Work waits for canonical Goal binding and Runtime validation;
 - request Deep Planner when HOW exceeds the fast planning budget;
 - produce a complete direct common-skill Activity Plan without a second Fast pass;
 - propose a low-consequence bounded default in canonical planning;

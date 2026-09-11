@@ -148,14 +148,25 @@
           "confidence": 1.0,
           "reason_summary": "The accepted GI relationship is modify.",
           "relationship": "modify",
+          "requirement_changes": [
+            {
+              "binding_changes": [],
+              "replace_requirement_indices": [
+                0
+              ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "target_goal_id": "goal_08_02_a"
+            }
+          ],
           "resolved_gap_ids": [],
           "source_responsibility_refs": [
             "r1"
           ],
           "target_goal_ids": [
             "goal_08_02_a"
-          ],
-          "updated_description": "Set the bedroom fan to low. Keep the result concise."
+          ]
         }
       ],
       "confidence": 1.0,

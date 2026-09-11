@@ -134,7 +134,7 @@ def goal(
 ) -> dict:
     payload = {
         "source_responsibility_refs": ["r1"],
-        "description": description,
+
         "output_mode": output_mode,
         "bindings": list(bindings or []),
         "resource_kind": resource.get("kind", "none") if resource else "none",
@@ -507,12 +507,12 @@ class GoalExecutionContractTests(unittest.TestCase):
         ]:
             self.assertEqual(branch["type"], "object")
             self.assertFalse(branch["additionalProperties"])
-            self.assertIn("description", branch["required"])
+            self.assertNotIn("description", branch["required"])
             self.assertIn("output_mode", branch["required"])
             self.assertIn("bindings", branch["required"])
             self.assertIn("resource_kind", branch["required"])
             self.assertIn("resource_responsibility", branch["required"])
-            self.assertIn("description", branch["properties"])
+            self.assertNotIn("description", branch["properties"])
             self.assertIn("bindings", branch["properties"])
             self.assertIn("resource_responsibility", branch["properties"])
         goal_branches = bounded_goal_schema["$defs"][
@@ -712,7 +712,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             with self.subTest(invalid=invalid):
                 self.assertFalse(exposed.is_valid(invalid))
                 self.assertFalse(full.is_valid(invalid))
-        for field in ("description", "bindings", "resource_kind", "resource_responsibility"):
+        for field in ("bindings", "resource_kind", "resource_responsibility"):
             missing = copy.deepcopy(values)
             del missing[0][field]
             with self.subTest(missing=field):
@@ -779,9 +779,9 @@ class GoalExecutionContractTests(unittest.TestCase):
             with self.subTest(field=field, value=value):
                 self.assertFalse(exposed.is_valid({**valid, field: value}))
         modify = {**valid, "relationship": "modify"}
-        self.assertFalse(Draft202012Validator(association).is_valid(modify))
-        modify["updated_description"] = "Walk for five seconds."
-        self.assertTrue(Draft202012Validator(association).is_valid(modify))
+        self.assertFalse(Draft202012Validator({"$defs": schema["$defs"], **association}).is_valid(modify))
+        modify["requirement_changes"] = [{"target_goal_id": "goal-a", "replace_requirement_indices": [0], "source_responsibility_refs": ["r1"]}]
+        self.assertTrue(Draft202012Validator({"$defs": schema["$defs"], **association}).is_valid(modify))
 
     def test_decoder_multi_goal_array_enforces_items_and_cardinality(self):
         for count in (2, 8):
@@ -1921,49 +1921,20 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertNotIn("quantity", resource)
         self.assertEqual(dropped[0]["reason"], "invalid_optional_quantity_scalar")
 
-    def test_missing_goal_description_copies_exact_source_outcome_only(self):
-        req = request("sing while moving", language="en-US").model_copy(
-            update={
-                "responsibilities": typed_responsibilities(
-                    {
-                        "local_ref": "sing",
-                        "outcome": "sing while moving",
-                        "bindings": {},
-                        "output_mode": "singing",
-                        "confidence": 0.98,
-                    }
-                )
-            }
-        )
-        raw = create_goals(goal("discarded", "singing", source_responsibility_refs=["sing"]))
-        raw["new_goals"][0].pop("description")
-
-        normalized, recovered = (
-            ga_validation.restore_missing_goal_descriptions(
-                raw,
-                request=req,
-            )
-        )
-
-        self.assertEqual(
-            normalized["new_goals"][0]["description"],
-            "sing while moving",
-        )
-        self.assertEqual(recovered[0]["source_responsibility_ref"], "sing")
-        self.assertTrue(recovered[0]["semantic_value_unchanged"])
-
-        ambiguous = copy.deepcopy(raw)
-        ambiguous["new_goals"][0]["source_responsibility_refs"] = ["sing", "other"]
-        unchanged, recovered = (
-            ga_validation.restore_missing_goal_descriptions(
-                ambiguous,
-                request=req,
-            )
-        )
-        self.assertNotIn("description", unchanged["new_goals"][0])
-        self.assertEqual(recovered, [])
-
-
+    def test_new_goal_inherits_source_outcome_and_forbids_reauthored_description(self):
+        req = request("Tell me whether this is correct.", language="en-US")
+        raw = create_goals(goal("fixture label", "speech"))
+        model = ScriptedOllama([raw])
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+        self.assertEqual(result.new_goals[0].description, req.responsibilities[0].outcome)
+        self.assertEqual(result.new_goals[0].success_criteria, [req.responsibilities[0].outcome])
+        self.assertEqual(len(model.prompts), 1)
+        raw["new_goals"][0]["description"] = "Tell the user this is correct."
+        with self.assertRaises(ValidationError):
+            GoalSegmentationModelOutput.model_validate(raw)
+        parsed = GoalAssociationModelGoal.model_validate(goal("label", "speech", source_responsibility_refs=["unknown"]))
+        with self.assertRaisesRegex(ValueError, "exact unique GI"):
+            ga_validation.inherited_goal_outcomes(parsed, req)
 
     def test_unentailed_resource_query_location_is_dropped_without_replacement(self):
         raw = create_goals(
@@ -2230,7 +2201,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                 "source_responsibility_refs",
                 "output_mode",
                 "resource_kind",
-                "description",
                 "bindings",
                 "resource_responsibility",
                 "media_operation",
@@ -2295,7 +2265,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             prompt,
         )
         self.assertIn(
-            "copy description from that Responsibility's current GI outcome",
+            "Host inherits the exact GI outcome",
             prompt,
         )
         self.assertIn(
@@ -2305,10 +2275,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("non-authoritative reason_summary", prompt)
         self.assertNotIn("First write compact reason_summary", prompt)
         for goal_branch in goal_schema["oneOf"]:
-            self.assertIn(
-                "Exact current GI outcome",
-                goal_branch["properties"]["description"]["description"],
-            )
+            self.assertNotIn("description", goal_branch["properties"])
             self.assertIn(
                 "Use [] for an additional or separate Responsibility",
                 goal_branch["properties"]["supersedes_goal_ids"]["description"],
@@ -2320,7 +2287,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             "new_goals": [
                 {
                     "source_responsibility_refs": ["r1"],
-                    "description": "Blink twice.",
+
                     "output_mode": "body_action",
                     "media_operation": "none",
                     "bindings": [
@@ -2387,9 +2354,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             "reason_summary": "The requested refinement is understood.",
         }
         self.assertTrue(list(validator.iter_errors(missing_modify_update)))
-        missing_modify_update["associations"][0]["updated_description"] = (
-            "Walk forward for ten seconds, then stop quietly."
-        )
+        missing_modify_update["associations"][0]["requirement_changes"] = [{"target_goal_id": "goal-walk", "replace_requirement_indices": [0], "source_responsibility_refs": ["r1"]}]
         self.assertEqual(list(validator.iter_errors(missing_modify_update)), [])
 
 
@@ -3373,7 +3338,7 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
                 "relationship": "modify",
                 "source_responsibility_refs": ["weather"],
                 "target_goal_ids": ["goal-weather"],
-                "updated_description": "Check a corrected location.",
+                "requirement_changes": [{"target_goal_id": "goal-weather", "replace_requirement_indices": [0], "source_responsibility_refs": ["weather"]}],
                 # Transport-noise compatibility must not restore authority that
                 # the decoder schema and canonical DTO deliberately removed.
                 "requires_replan": True,
@@ -3406,3 +3371,182 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GoalMeaningInheritanceTests(unittest.TestCase):
+    def test_bilingual_new_goal_preserves_polarity_freshness_and_historical_scope(self):
+        for outcome in (
+            "Tell me whether the result is correct.",
+            "Measure the value again, preserving the new observation requirement.",
+            "Report the previous measurement, without replacing it with a new one.",
+            "告诉我这个结果是否正确。",
+            "重新测量一次，必须使用新的观察。",
+            "告诉我上一次的测量结果，不要用新的结果替代。",
+        ):
+            with self.subTest(outcome=outcome):
+                req = request(outcome)
+                model = ScriptedOllama([create_goals(goal("unused label", "speech"))])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(result.resolution_status, "resolved")
+                inherited = result.new_goals[0]
+                self.assertEqual(inherited.description, outcome)
+                self.assertEqual(inherited.success_criteria, [outcome])
+                self.assertEqual(inherited.metadata["requirement_sources"][0]["responsibility"],
+                                 req.responsibilities[0].model_dump(mode="json"))
+                from agent.app.planner_context import goal_association_prompt_projection
+                projection = result.prompt_projection()
+                dictionary_projection = goal_association_prompt_projection({
+                    "goal_association_resolution": result.model_dump(mode="json")})
+                for packet in (projection, dictionary_projection):
+                    self.assertEqual(packet["new_goals"][0]["metadata"]["requirement_sources"],
+                                     inherited.metadata["requirement_sources"])
+                self.assertEqual(len(model.prompts), 1)
+                schema = model.prompts[0][1]["response_format"]
+                forged = create_goals(goal("unused label", "speech"))
+                forged["new_goals"][0]["description"] = "An independently authored interpretation."
+                self.assertFalse(Draft202012Validator(schema).is_valid(forged))
+
+    def test_partial_goal_change_retains_sources_evidence_and_survives_restart(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from orchestrator.runtime.conversation_state import ConversationStateManager
+        from shared.chromie_contracts.semantic_task import SemanticGoal
+
+        with TemporaryDirectory() as directory:
+            store = Path(directory) / "goals.json"
+            manager = ConversationStateManager(base_conversation_id="inheritance", task_store_enabled=True,
+                                               task_store_path=store)
+            original = SemanticGoal(
+                goal_id="goal-retained", description="Keep A; Do B three times.",
+                source_text="Original admitted source.", success_criteria=["Keep A", "Do B three times."],
+                source_responsibility_refs=["r-old"], related_goal_ids=["goal-context"],
+                object={"bindings": {"count": {"name": "count", "entity_type": "count", "value": "3"}}},
+                constraints={"style": "quiet"},
+                resource_responsibility=AcquireAndDeliverResource(
+                    resource=ResourceDescriptor(kind="physical_object", description="retained bottle"),
+                    source=ResourceSource(status="unknown"), recipient=ResourceRecipient(description="user"),
+                    delivery_mode="physical_handover"),
+                metadata={"output_mode": "body_action"},
+            )
+            manager.apply_goal_association_resolution(
+                GoalAssociationResolution(turn_id="turn-original", resolution_status="resolved", new_goals=[original]),
+                sid="sid-original", user_text=original.source_text, atomic=True)
+            context = manager._task_contexts[0]
+            context["evidence_summary"] = {"retained_execution_outcomes": [{"outcome_id": "observed-old"}]}
+            context["plan_version"] = 2
+            context["plan_status"] = "proposed"
+            req = request("Do B five times.", active_goals=manager.active_goal_snapshots()).model_copy(update={
+                "responsibilities": typed_responsibilities({"local_ref": "r1", "outcome": "Do B five times.",
+                    "bindings": {"count": "5"}, "output_mode": "body_action", "relationship": "modify",
+                    "target_goal_ids": ["goal-retained"], "confidence": 1.0})})
+            raw = {"associations": [{"relationship": "modify", "source_responsibility_refs": ["r1"],
+                "target_goal_ids": ["goal-retained"], "confidence": 1.0,
+                "requirement_changes": [{"target_goal_id": "goal-retained", "replace_requirement_indices": [1],
+                    "source_responsibility_refs": ["r1"], "binding_changes": [{
+                        "path": ["object", "bindings", "count", "value"],
+                        "source_responsibility_ref": "r1", "source_binding": "count"}]}]}],
+                "new_goals": [], "referent_updates": [], "resolved_references": [], "reason_summary": "Refine the second retained requirement.", "confidence": 1.0}
+            model = ScriptedOllama([raw])
+            resolution = asyncio.run(GoalAssociationResolver(model).resolve(req))
+            self.assertEqual(resolution.resolution_status, "resolved")
+            self.assertEqual([error.message for error in Draft202012Validator(model.prompts[0][1]["response_format"]).iter_errors(raw)], [])
+            applied = manager.apply_goal_association_resolution(resolution, sid=req.sid, user_text=req.text, atomic=True)
+            self.assertTrue(all(item.get("applied") for item in applied), applied)
+            after = manager._task_contexts[0]
+            current = after["semantic_goal"]
+            self.assertEqual(current["success_criteria"], ["Keep A", "Do B five times."])
+            self.assertEqual(current["description"], "Keep A; Do B five times.")
+            self.assertEqual(current["object"]["bindings"]["count"]["value"], "5")
+            for field in ("constraints", "resource_responsibility", "related_goal_ids", "source_text"):
+                self.assertEqual(current[field], original.model_dump(mode="json", exclude_none=True)[field])
+            self.assertEqual(current["source_responsibility_refs"], ["r-old", "r1"])
+            self.assertEqual(after["evidence_summary"]["retained_execution_outcomes"], [{"outcome_id": "observed-old"}])
+            self.assertEqual(after["plan_version"], 2)
+            self.assertEqual(after["plan_status"], "proposed")
+            self.assertEqual(after["goal_revision_history"][0]["prior_goal"]["success_criteria"], original.success_criteria)
+            self.assertEqual(len(model.prompts), 1)
+            for forged_update in (
+                {"by_goal_id": {"goal-retained": {"description": "Unattributed overwrite"}}},
+                {"by_goal_id": {"goal-retained": {**resolution.associations[0].goal_update["by_goal_id"]["goal-retained"],
+                                                  "source_turn_id": "foreign-turn"}}},
+            ):
+                forged = resolution.model_copy(deep=True)
+                forged.associations[0].association_id += "-forged"
+                forged.associations[0].goal_update = forged_update
+                rejected = manager.apply_goal_association_resolution(forged, sid="forged", user_text=req.text, atomic=True)
+                self.assertTrue(any(item.get("reason") == "source_bound_goal_update_required" for item in rejected))
+                self.assertEqual(manager._task_contexts[0]["semantic_goal"], current)
+            replay = resolution.model_copy(deep=True)
+            replay.associations[0].association_id += "-stale"
+            rejected = manager.apply_goal_association_resolution(replay, sid="stale", user_text=req.text, atomic=True)
+            self.assertTrue(any(item.get("applied") is False for item in rejected))
+            self.assertEqual(manager._task_contexts[0]["semantic_goal"], current)
+            restored = ConversationStateManager(base_conversation_id="inheritance", task_store_enabled=True,
+                                                task_store_path=store)
+            self.assertEqual(restored._task_contexts[0]["semantic_goal"], current)
+            self.assertEqual(restored._task_contexts[0]["goal_revision_history"], after["goal_revision_history"])
+
+    def test_source_bound_changes_reject_missing_requirement_binding_or_snapshot(self):
+        from shared.chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
+        original = SemanticGoal(goal_id="g", source_text="original", description="A; B", success_criteria=["A", "B"])
+        update = {"base_goal_fingerprint": semantic_goal_fingerprint(original), "replace_requirement_indices": [],
+                  "source_turn_id": "turn-current", "source_responsibilities": [{"local_ref": "r1", "outcome": "C"}],
+                  "binding_changes": []}
+        self.assertEqual(apply_goal_meaning_update(original, update).success_criteria, ["A", "B", "C"])
+        invalid_updates = [
+            {**update, "base_goal_fingerprint": "stale"},
+            {**update, "replace_requirement_indices": [2]},
+            {**update, "replace_requirement_indices": [0, 0]},
+            {**update, "source_responsibilities": []},
+            {**update, "description": "unattributed change"},
+            {**update, "binding_changes": [{"path": ["constraints", "count"],
+              "source_responsibility_ref": "r1", "source_binding": "missing"}]},
+            {**update, "binding_changes": [{"path": ["metadata", "output_mode"],
+              "source_responsibility_ref": "r1", "source_binding": "missing"}]},
+        ]
+        for invalid in invalid_updates:
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                apply_goal_meaning_update(original, invalid)
+        self.assertEqual(original.success_criteria, ["A", "B"])
+        typed = original.model_copy(update={"object": {"bindings": {"count": {"value": "3"}}}})
+        conflicting = {**update, "base_goal_fingerprint": semantic_goal_fingerprint(typed),
+                       "source_responsibilities": [{"local_ref": "r1", "outcome": "B five times.",
+                                                     "bindings": {"count": "5"}}]}
+        with self.assertRaisesRegex(ValueError, "conflicts with its accepted GI"):
+            apply_goal_meaning_update(typed, conflicting)
+
+    def test_association_cannot_hide_what_rewrite_or_drop_a_source(self):
+        base = {"relationship": "modify", "source_responsibility_refs": ["a", "b"], "target_goal_ids": ["g"],
+                "requirement_changes": [{"target_goal_id": "g", "replace_requirement_indices": [0],
+                                         "source_responsibility_refs": ["a", "b"]}]}
+        self.assertEqual(len(GoalAssociationModelAssociation.model_validate(base).requirement_changes), 1)
+        for change in ({**base, "updated_description": "new prose"},
+                       {**base, "requirement_changes": [{**base["requirement_changes"][0], "source_responsibility_refs": ["a"]}]},
+                       {**base, "relationship": "continue"}):
+            with self.assertRaises(ValidationError):
+                GoalAssociationModelAssociation.model_validate(change)
+
+    def test_structured_gi_binding_is_referenced_without_reauthoring(self):
+        retained = active_goal("goal-region", "Arrange the items in the specified region.")
+        retained["goal"]["constraints"] = {"region": {"room": "desk", "offset": [0, 0]}}
+        structured_value = {"room": "desk", "offset": [1, 2]}
+        req = request("Arrange them in this region.", active_goals=[retained]).model_copy(update={
+            "responsibilities": typed_responsibilities({"local_ref": "r1", "outcome": "Arrange the items in the specified region.",
+                "bindings": {"region": structured_value}, "output_mode": "body_action", "relationship": "modify",
+                "target_goal_ids": ["goal-region"], "confidence": 1.0})})
+        raw = {"associations": [{"relationship": "modify", "source_responsibility_refs": ["r1"],
+            "target_goal_ids": ["goal-region"], "confidence": 1.0, "requirement_changes": [{
+                "target_goal_id": "goal-region", "replace_requirement_indices": [0],
+                "source_responsibility_refs": ["r1"], "binding_changes": [{"path": ["constraints", "region"],
+                    "source_responsibility_ref": "r1", "source_binding": "region"}]}]}],
+            "new_goals": [], "referent_updates": [], "resolved_references": [], "confidence": 1.0,
+            "reason_summary": "Apply the accepted region to the retained requirement."}
+        model = ScriptedOllama([raw])
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual([e.message for e in Draft202012Validator(model.prompts[0][1]["response_format"]).iter_errors(raw)], [])
+        from shared.chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update
+        changed = apply_goal_meaning_update(SemanticGoal.model_validate(retained["goal"]),
+                    result.associations[0].goal_update["by_goal_id"]["goal-region"])
+        self.assertEqual(changed.constraints["region"], structured_value)
+        self.assertEqual(len(model.prompts), 1)

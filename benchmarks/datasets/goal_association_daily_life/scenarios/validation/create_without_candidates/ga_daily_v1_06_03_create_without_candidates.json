@@ -99,7 +99,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "Acquire the toy car from the low shelf and hand it to me.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

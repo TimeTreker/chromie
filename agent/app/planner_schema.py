@@ -42,6 +42,42 @@ from .planner_model_contract import (
 )
 
 
+def work_change_response_schema(
+    schema: dict[str, Any], *, context: dict[str, Any]
+) -> dict[str, Any]:
+    """Expose exact supplied cancellation identities in every native object branch."""
+
+    result = copy.deepcopy(schema)
+    identities = sorted({
+        str(item["activity_id"])
+        for item in context.get("existing_work_activities") or []
+        if isinstance(item, dict) and item.get("activity_id")
+    })
+    cancellation = {
+        "type": "array",
+        "items": {"type": "string", **({"enum": identities} if identities else {})},
+        "maxItems": len(identities),
+        "uniqueItems": True,
+        "description": "Explicitly cancel these supplied Activities. Omitted Work stays unchanged.",
+    }
+
+    def constrain(node: Any) -> None:
+        if not isinstance(node, dict):
+            return
+        properties = node.get("properties")
+        if isinstance(properties, dict) and "steps" in properties and node.get("type") == "object":
+            properties["cancel_activity_ids"] = copy.deepcopy(cancellation)
+            required = node.setdefault("required", [])
+            if identities and "cancel_activity_ids" not in required:
+                required.append("cancel_activity_ids")
+        for key in ("allOf", "anyOf", "oneOf"):
+            for branch in node.get(key, []):
+                constrain(branch)
+
+    constrain(result)
+    return result
+
+
 def _canonical_binding_argument_value(argument_schema: dict[str, Any], value: Any) -> Any:
     """Return the exact JSON value required by one provider argument schema.
 

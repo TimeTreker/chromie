@@ -160,14 +160,25 @@
           "confidence": 1.0,
           "reason_summary": "The accepted GI relationship is clarify.",
           "relationship": "clarify",
+          "requirement_changes": [
+            {
+              "binding_changes": [],
+              "replace_requirement_indices": [
+                0
+              ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "target_goal_id": "goal_09_09_a"
+            }
+          ],
           "resolved_gap_ids": [],
           "source_responsibility_refs": [
             "r1"
           ],
           "target_goal_ids": [
             "goal_09_09_a"
-          ],
-          "updated_description": "在用户谈论“我今天过得很难”时给予倾听和支持。 使用用户补充的缺失细节。"
+          ]
         }
       ],
       "confidence": 1.0,

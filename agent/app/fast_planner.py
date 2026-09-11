@@ -24,6 +24,7 @@ from .planner_model_contract import (
     stable_plan_id,
 )
 from .planner_schema import (
+    work_change_response_schema,
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
     canonical_plan_response_schema,
@@ -756,6 +757,7 @@ class FastPlannerResolver:
             authoritative_goals=authoritative_goals,
             capabilities=capability_payload,
         )
+        response_schema = work_change_response_schema(response_schema, context=context)
         if reentry_goal_ids:
             evidence_wording_description = (
                 "Exact natural answer grounded only in trusted terminal Evidence for "

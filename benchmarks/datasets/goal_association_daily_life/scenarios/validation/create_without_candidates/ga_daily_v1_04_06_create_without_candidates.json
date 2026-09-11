@@ -105,7 +105,6 @@
               "value": "海浪声"
             }
           ],
-          "description": "播放《海浪声》。",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

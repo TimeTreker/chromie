@@ -113,7 +113,6 @@
               "value": "午饭后"
             }
           ],
-          "description": "创建一个午饭后收拾书包的提醒。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

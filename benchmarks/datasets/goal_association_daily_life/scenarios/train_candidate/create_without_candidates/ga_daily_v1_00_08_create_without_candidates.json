@@ -105,7 +105,6 @@
               "value": "勇敢的小猫"
             }
           ],
-          "description": "讲一个关于勇敢的小猫的短故事。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

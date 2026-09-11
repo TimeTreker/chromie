@@ -113,7 +113,6 @@
               "value": "speaker volume"
             }
           ],
-          "description": "Set the speaker volume to 30 percent.",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

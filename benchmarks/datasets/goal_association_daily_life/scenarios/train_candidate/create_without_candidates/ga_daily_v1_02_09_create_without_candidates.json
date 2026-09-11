@@ -113,7 +113,6 @@
               "value": "上学前"
             }
           ],
-          "description": "创建一个上学前喂猫的提醒。",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

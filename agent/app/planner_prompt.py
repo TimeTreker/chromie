@@ -29,6 +29,12 @@ from .planner_context import (
 )
 
 try:
+    from chromie_contracts.memory import role_memory_context
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.memory import role_memory_context
+
+
+try:
     from chromie_contracts.core_interpretation import (
         CognitiveResponsibilityProposal,
         CognitiveWorkRequest,
@@ -339,19 +345,17 @@ def fast_plan_prompt(
     provisional_work_contract = (
         "The listed retained or provisional Runtime Activities may already be "
         "running or completed. Decide from the canonical Goals whether their Work "
-        "is still required. To preserve and reuse the complete provisional plan, "
+        "is still required. To reuse any supplied Activity, "
         "set each corresponding step.reuse_activity_id to the supplied stable "
         "activity_id and preserve the same Capability ID, exact arguments, Goal "
-        "ownership, and timing. Omitting reuse_activity_id means that Activity is "
-        "not selected for reuse. The Host will validate the explicit selection "
-        "mechanically and will not execute selected Work twice. If any Work is no "
-        "longer applicable or additional/different Work is required, author the "
-        "correct complete canonical Plan instead; Runtime will then cancel only "
-        "pending/cancellable provisional Work. Do not treat provisional execution "
-        "as Goal Evidence before Host binding. Reusing retained_runtime Work is a "
-        "reconciliation-only Plan and cannot add steps; when additional Work is "
-        "needed, omit all reuse_activity_id values and author the complete replacement "
-        "Plan so Runtime can cancel the old group before dispatch. When the retained "
+        "ownership, and timing. You may reuse a subset and add new steps. Omitted "
+        "existing Work remains unchanged. To cancel or replace Work, explicitly list "
+        "its stable activity_id in cancel_activity_ids; never cancel and reuse the same "
+        "Activity. Cancellation must stay within the supplied Goal scope, including "
+        "every owner of shared Work. Runtime validates current identity/state and "
+        "waits for cancellation closure before replacement dispatch. Completed Work "
+        "and already delivered speech remain immutable evidence; do not repeat them. "
+        "Do not treat provisional execution as Goal Evidence before Host binding. When the retained "
         "Activity is chromie.work_dag.execute, its args.dag is the current Planner-authored "
         "WorkDAG. If its topology remains valid, reuse that exact Activity and do not emit "
         "a duplicate DAG. If Goal/Evidence changes require semantic DAG modification, author "
@@ -753,7 +757,7 @@ def fast_advance_layered_prompt(
         "content. Stop immediately after </terminal_plan>."
     )
     return LayeredPrompt.promote(
-        rendered,
+        role_memory_context(context, role="planner") + rendered,
         operating_contract=(advance_contract,),
     )
 
@@ -986,7 +990,7 @@ def fast_layered_prompt(
         + bounded_json(capabilities, 9000)
         + "\n\n"
     )
-    rendered = fast_plan_prompt(
+    rendered = role_memory_context(context, role="planner") + fast_plan_prompt(
         request,
         capabilities,
         response_schema=response_schema,
@@ -1189,7 +1193,7 @@ def deep_plan_prompt(
         "Capability supports that requested mode. Apply this to aggregate and "
         "per-Goal response_text alike; state the limitation and preserve independent "
         "executable Goals without promising a substitute effect. "
-        "When retained or provisional Runtime Activities are supplied for Work reconciliation, decide whether they still advance the canonical Goals. Reuse is an explicit semantic choice: set reuse_activity_id to the supplied stable activity_id only while preserving its Capability ID, exact arguments, Goal ownership, and timing; omit reuse_activity_id when authoring replacement Work. Runtime validates live identity and state and never infers reuse from similarity. For retained chromie.work_dag.execute Work, reuse means NO_CHANGE to the current WorkDAG. A semantic change must be Planner-authored as the next revision of the same dag_id with revision incremented exactly once and parent_revision naming the retained revision; never ask DAGEngine to invent or recommend replacement topology. "
+        "When retained or provisional Runtime Activities are supplied for Work reconciliation, decide whether they still advance the canonical Goals. Reuse is an explicit semantic choice: set reuse_activity_id to the supplied stable activity_id only while preserving its Capability ID, exact arguments, Goal ownership, and timing; list the old activity_id in cancel_activity_ids when authoring replacement Work. You may reuse any subset and add new Work. Omitted Work remains unchanged. cancel_activity_ids must name exact supplied Activities, must not overlap reused Work, and must cover every owning Goal of shared Work. Completed Work and delivered speech remain immutable Evidence. Runtime validates live identity and state and never infers reuse from similarity. For retained chromie.work_dag.execute Work, reuse means NO_CHANGE to the current WorkDAG. A semantic change must be Planner-authored as the next revision of the same dag_id with revision incremented exactly once and parent_revision naming the retained revision; never ask DAGEngine to invent or recommend replacement topology. "
         "A plan step may contain only step_id, capability_id, args, timing, source_goal_ids, reuse_activity_id, step_purpose, expected_outcome, and reason_summary. When reality can resolve uncertainty more cheaply than guessing, use step_purpose=acquire_information with non-empty expected_outcome describing the concrete observation needed for progress and select only an exact registered Capability whose declared semantics acquire it. An unavailable composite Capability does not make its available component Capabilities unavailable. For a conditional effect whose predicate needs fresh safe-read Evidence, plan only that exact read first, name the predicate in expected_outcome, and wait for trusted re-entry before authoring the conditional effect; never declare the whole Goal unavailable or execute the effect unconditionally. Gaze/body/perception remains ordinary Capability Work and never bypasses normal safety or provider authority. expected_outcome is a prospective, falsifiable expectation rather than Evidence; on trusted result re-entry compare actual Evidence with it and revise the Plan/Situation when they disagree instead of rewriting Evidence. "
         "Use capability_id as the executable identity. Do not copy catalog-only fields such as input_schema, parameters, step_type, or effects into a plan step. "
         "Use exactly the supplied canonical goal IDs. Do not create goals for internal status checks, safety checks, capability lookups, or implementation preconditions; represent any justified internal operation only as a step owned by an existing user goal. "
@@ -1241,7 +1245,7 @@ def deep_layered_prompt(
         + bounded_json(prompt_capabilities, 12000)
         + "\n\n"
     )
-    rendered = deep_plan_prompt(
+    rendered = role_memory_context(context, role="planner") + deep_plan_prompt(
         request,
         capabilities,
         response_schema=response_schema,

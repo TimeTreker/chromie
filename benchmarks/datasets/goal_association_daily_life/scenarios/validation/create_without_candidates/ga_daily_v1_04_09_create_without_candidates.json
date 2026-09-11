@@ -105,7 +105,6 @@
               "value": "家庭歌单"
             }
           ],
-          "description": "播放《家庭歌单》。",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

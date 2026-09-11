@@ -113,7 +113,6 @@
               "value": "哥哥"
             }
           ],
-          "description": "为哥哥起草一条说明“练习改到周五”的短消息。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

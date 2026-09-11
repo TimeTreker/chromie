@@ -22,6 +22,12 @@ from ...inference_compute import goal_interpreter_compute_class
 from ...settings import agent_service_settings
 
 try:
+    from chromie_contracts.memory import role_memory_context
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.memory import role_memory_context
+
+
+try:
     from chromie_runtime.ollama_non_thinking import (
         OllamaNonThinkingViolation,
         enforce_non_thinking_ollama_response,
@@ -1153,61 +1159,6 @@ def _reject_unprovenanced_speed_bindings(
             )
 
 
-def _strip_mechanically_unprovenanced_speed_bindings(
-    request: GoalInterpretationRequest,
-    parsed: dict[str, Any],
-) -> None:
-    """Drop speed only when source/context mechanics prove it was invented.
-
-    This does not decide which wording means a pace. It removes an optional model
-    field only when its scalar is absent from both authoritative source and bounded
-    semantic context, or when it duplicates the already-owned location scalar.
-    The remaining WHAT still passes every normal validator.
-    """
-
-    current_turn = " ".join((request.text or "").strip().split()).casefold()
-    contextual_values = _semantic_context_string_values(request.context)
-    source_numbers = _decimal_values(request.text)
-    context_numbers = {
-        number
-        for key in _GOAL_INTERPRETATION_PROVENANCE_CONTEXT_KEYS
-        for number in _decimal_values(request.context.get(key))
-    }
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return
-    for item in responsibilities:
-        bindings = item.get("bindings") if isinstance(item, dict) else None
-        if not isinstance(bindings, dict) or "speed" not in bindings:
-            continue
-        raw_speed = bindings.get("speed")
-        if isinstance(raw_speed, bool):
-            bindings.pop("speed", None)
-            continue
-        if isinstance(raw_speed, (int, float, Decimal)):
-            try:
-                numeric_speed = Decimal(str(raw_speed))
-            except InvalidOperation:
-                numeric_speed = None
-            if numeric_speed not in source_numbers | context_numbers:
-                bindings.pop("speed", None)
-            continue
-        if not isinstance(raw_speed, str):
-            continue
-        speed = " ".join(raw_speed.strip().split())
-        folded = speed.casefold()
-        raw_location = bindings.get("location")
-        location = (
-            " ".join(raw_location.strip().split()).casefold()
-            if isinstance(raw_location, str)
-            else ""
-        )
-        if (location and folded == location) or not (
-            speed and (folded in current_turn or folded in contextual_values)
-        ):
-            bindings.pop("speed", None)
-
-
 def _reject_unprovenanced_duration_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
@@ -1987,8 +1938,10 @@ def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, An
         prompt_context["session_memory"] = {
             key: value
             for key, value in memory.items()
-            if key not in {"recent_user_request", "recent_assistant_response"}
+            if key not in {"recent_user_request", "recent_assistant_response", "extracted_memory", "memory_summary", "durable_profile_memory"}
         }
+    prompt_context.pop("extracted_memory", None)
+    prompt_context.pop("memory_summary", None)
     return prompt_context
 
 
@@ -2141,6 +2094,7 @@ class OllamaGoalInterpreter:
             "Bounded Identity Context:\n"
             f"{_goal_interpretation_identity_context(mind)}\n\n"
             "Semantic Continuity Context:\n"
+            f"{role_memory_context(request.context, role='gi')}"
             f"Bounded session/world context JSON:{_bounded_json(session_context, max_chars=900)}\n"
             "Interaction context JSON:"
             f"{_bounded_json(_without_goal_interpretation_authority(request.context.get('interaction_context') or {}), max_chars=2400)}\n"
@@ -2980,7 +2934,6 @@ class OllamaGoalInterpreter:
         _reject_unknown_goal_refs(request, parsed)
         _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
-        _strip_mechanically_unprovenanced_speed_bindings(request, parsed)
         _reject_unprovenanced_speed_bindings(request, parsed)
         _reject_unprovenanced_duration_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)

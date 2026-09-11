@@ -105,7 +105,6 @@
               "value": "我在学校犯了错"
             }
           ],
-          "description": "在用户谈论“我在学校犯了错”时给予倾听和支持。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

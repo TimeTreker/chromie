@@ -4139,7 +4139,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertIn("weather-provisional", prompt)
         self.assertIn("may already be running or completed", prompt)
         self.assertIn("step.reuse_activity_id", prompt)
-        self.assertIn("validate the explicit selection mechanically", prompt)
+        self.assertIn("Runtime validates current identity/state", prompt)
 
     def test_provisional_reuse_requires_explicit_exact_activity_identity(self):
         output = PlannerModelOutput.model_validate(

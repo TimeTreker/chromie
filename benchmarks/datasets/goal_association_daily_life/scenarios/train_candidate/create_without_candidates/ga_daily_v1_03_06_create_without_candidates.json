@@ -113,7 +113,6 @@
               "value": "4秒"
             }
           ],
-          "description": "向左移动4秒。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

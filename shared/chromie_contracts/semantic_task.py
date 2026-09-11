@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -91,6 +94,96 @@ PlanningResultKind = Literal[
 ]
 
 
+def semantic_goal_fingerprint(goal: "SemanticGoal") -> str:
+    payload = json.dumps(goal.model_dump(mode="json"), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "SemanticGoal":
+    """Apply source-selected requirements atomically, without interpreting text.
+
+    Requirement indices and field paths are GA continuity decisions. All new
+    values are exact copies of accepted GI; the supplied retained Goal snapshot
+    must still match. This function neither plans nor changes Work/Evidence.
+    """
+    from .core_interpretation import CognitiveResponsibilityProposal
+
+    allowed = {"base_goal_fingerprint", "replace_requirement_indices", "source_turn_id",
+               "source_responsibilities", "binding_changes"}
+    if set(update) != allowed or update["base_goal_fingerprint"] != semantic_goal_fingerprint(goal):
+        raise ValueError("Goal meaning update requires the exact unchanged source snapshot")
+    turn_id = str(update["source_turn_id"] or "").strip()
+    if not turn_id:
+        raise ValueError("Goal meaning update requires source turn identity")
+    sources = [CognitiveResponsibilityProposal.model_validate(item)
+               for item in update["source_responsibilities"]]
+    by_ref = {item.local_ref: item for item in sources}
+    if not sources or len(by_ref) != len(sources):
+        raise ValueError("Goal meaning update requires unique accepted GI sources")
+    retained_mode = goal.metadata.get("output_mode", "unspecified")
+    if any(item.output_mode not in {"unspecified", retained_mode}
+           for item in sources) and retained_mode != "unspecified":
+        raise ValueError("a changed outcome modality requires an explicitly sourced replacement Goal")
+    criteria = list(goal.success_criteria or [goal.description])
+    replaced = update["replace_requirement_indices"]
+    if (not isinstance(replaced, list) or any(type(index) is not int or index < 0 or index >= len(criteria)
+                                            for index in replaced)
+            or len(replaced) != len(set(replaced))):
+        raise ValueError("Goal meaning update references an unavailable requirement")
+    prior_sources = goal.metadata.get("requirement_sources")
+    if not isinstance(prior_sources, list) or len(prior_sources) != len(criteria):
+        prior_sources = [{"origin": "retained_goal", "goal_id": goal.goal_id,
+                          "goal_version": goal.version, "requirement_index": index,
+                          "outcome": outcome} for index, outcome in enumerate(criteria)]
+    kept = [index for index in range(len(criteria)) if index not in replaced]
+    criteria = [criteria[index] for index in kept] + [item.outcome for item in sources]
+    provenance = [copy.deepcopy(prior_sources[index]) for index in kept] + [
+        {"origin": "gi", "turn_id": turn_id, "responsibility": item.model_dump(mode="json")}
+        for item in sources
+    ]
+    values = goal.model_dump(mode="json")
+    seen_paths: set[tuple[str, ...]] = set()
+    for change in update["binding_changes"]:
+        path = change["path"]
+        if (not isinstance(path, list) or len(path) < 2
+                or path[0] not in {"object", "constraints", "resource_responsibility"}
+                or any(not isinstance(part, str) or not part or part.startswith("_") for part in path)):
+            raise ValueError("Goal binding change has an invalid semantic path")
+        key = tuple(path)
+        if any(key[:len(other)] == other or other[:len(key)] == key for other in seen_paths):
+            raise ValueError("Goal binding changes must not overlap")
+        seen_paths.add(key)
+        source = by_ref.get(change["source_responsibility_ref"])
+        if source is None or change["source_binding"] not in source.bindings:
+            raise ValueError("Goal binding change has no exact GI source")
+        parent: Any = values
+        for part in path[:-1]:
+            if not isinstance(parent, dict) or part not in parent:
+                raise ValueError("Goal binding change parent is absent from retained state")
+            parent = parent[part]
+        if not isinstance(parent, dict):
+            raise ValueError("Goal binding change parent must be a semantic object")
+        parent[path[-1]] = copy.deepcopy(source.bindings[change["source_binding"]])
+    values.update(description="; ".join(criteria), success_criteria=criteria,
+                  version=goal.version + 1,
+                  source_responsibility_refs=list(dict.fromkeys([*goal.source_responsibility_refs, *by_ref])))
+    values["metadata"]["requirement_sources"] = provenance
+    resource = values.get("resource_responsibility") or {}
+    named_surfaces = [values["object"].get("bindings", {}), values["constraints"],
+                      resource.get("resource", {}).get("attributes", {}),
+                      resource.get("source", {}).get("bindings", {})]
+    for source in sources:
+        for name, expected in source.bindings.items():
+            for surface in named_surfaces:
+                if name in surface:
+                    actual = surface[name]
+                    if isinstance(actual, dict) and "value" in actual:
+                        actual = actual["value"]
+                    if actual != expected:
+                        raise ValueError(f"Goal field {name!r} conflicts with its accepted GI binding")
+    return SemanticGoal.model_validate(values)
+
+
 class SemanticGoal(BaseModel):
     """Open semantic outcome retained independently from a concrete skill plan."""
 
@@ -170,12 +263,9 @@ class SemanticGoal(BaseModel):
         if not isinstance(value, list):
             raise ValueError("success_criteria must be a list or string")
         out: list[str] = []
-        seen: set[str] = set()
         for item in value:
             text = " ".join(str(item or "").strip().split())
-            key = text.casefold()
-            if text and key not in seen:
-                seen.add(key)
+            if text:
                 out.append(text)
         return out
 

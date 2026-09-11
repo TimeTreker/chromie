@@ -215,6 +215,33 @@ def goal_association_response_schema(
                 constrain(value)
 
     constrain(schema)
+    change_schema = schema.get("$defs", {}).get("GoalAssociationModelRequirementChange")
+    if isinstance(change_schema, dict):
+        change_schema["oneOf"] = [
+            {
+                "properties": {
+                    "target_goal_id": {"const": str(snapshot["goal_id"])},
+                    "replace_requirement_indices": {
+                        "type": "array", "uniqueItems": True,
+                        "items": {"type": "integer", "enum": list(range(len(
+                            (snapshot.get("goal") or {}).get("success_criteria")
+                            or [(snapshot.get("goal") or {}).get("description")]
+                        )))},
+                    },
+                },
+                "required": ["target_goal_id", "replace_requirement_indices"],
+            }
+            for snapshot in candidate_goals
+        ]
+    binding_change = schema.get("$defs", {}).get("GoalAssociationModelBindingChange")
+    if isinstance(binding_change, dict):
+        binding_change["oneOf"] = [
+            {"properties": {
+                "source_responsibility_ref": {"const": source_ref},
+                "source_binding": {"enum": list(bindings)},
+            }, "required": ["source_responsibility_ref", "source_binding"]}
+            for source_ref, bindings in responsibility_bindings.items() if bindings
+        ] or [{"not": {}}]
     association_schema = schema.get("$defs", {}).get(
         "GoalAssociationModelAssociation"
     )
@@ -238,12 +265,12 @@ def goal_association_response_schema(
                     "anyOf": [
                         {
                             "properties": {
-                                "updated_description": {
-                                    "type": "string",
-                                    "minLength": 1,
+                                "requirement_changes": {
+                                    "type": "array",
+                                    "minItems": 1,
                                 }
                             },
-                            "required": ["updated_description"],
+                            "required": ["requirement_changes"],
                         },
                         {
                             "properties": {
@@ -324,7 +351,6 @@ def goal_association_response_schema(
                     "source_responsibility_refs",
                     "output_mode",
                     "resource_kind",
-                    "description",
                     "bindings",
                     "resource_responsibility",
                     *(goal_schema.get("required") or []),
@@ -354,7 +380,8 @@ def goal_association_response_schema(
                 for name, value in responsibility_bindings.get(
                     source_ref, {}
                 ).items()
-                if " ".join(str(name).strip().split())
+                if isinstance(value, (str, int, float, bool))
+                and " ".join(str(name).strip().split())
                 and "_".join(
                     str(name).strip().casefold().replace("-", "_").split()
                 )
@@ -667,7 +694,6 @@ def goal_association_response_schema(
                 "source_responsibility_refs",
                 "output_mode",
                 "resource_kind",
-                "description",
                 "bindings",
                 "resource_responsibility",
                 "media_operation",

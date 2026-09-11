@@ -941,7 +941,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "new_goals": [
                     {
                         "source_responsibility_refs": ["resource"],
-                        "description": "Fetch a bottle of water and deliver it to the requester.",
+
                         "output_mode": "body_action",
                         "resource_kind": "physical_object",
                         "bindings": [],

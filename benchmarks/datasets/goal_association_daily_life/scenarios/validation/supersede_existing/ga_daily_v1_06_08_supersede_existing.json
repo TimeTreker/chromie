@@ -168,7 +168,6 @@
               "value": "2"
             }
           ],
-          "description": "眨两下眼睛。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

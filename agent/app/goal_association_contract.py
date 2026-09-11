@@ -106,12 +106,59 @@ GoalAssociationModelRelationship = Literal[
 ]
 
 
+class GoalAssociationModelBindingChange(BaseModel):
+    """Copy one accepted GI binding to a named retained Goal field."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: list[str] = Field(min_length=2, max_length=8)
+    source_responsibility_ref: str = Field(min_length=1)
+    source_binding: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_path(self) -> "GoalAssociationModelBindingChange":
+        if self.path[0] not in {"object", "constraints", "resource_responsibility"}:
+            raise ValueError("binding changes may target only Goal semantic fields")
+        if any(not part or part.startswith("_") for part in self.path):
+            raise ValueError("binding changes require explicit semantic field paths")
+        return self
+
+
+class GoalAssociationModelRequirementChange(BaseModel):
+    """Select retained requirements replaced by exact current GI outcomes.
+
+    Indices address the supplied Goal's success_criteria (or its sole description
+    when no criteria exist). Empty replacement indices mean additive refinement.
+    The Host binds the whole change to that supplied Goal version and snapshot.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_goal_id: str = Field(min_length=1)
+    replace_requirement_indices: list[Annotated[int, Field(strict=True, ge=0)]] = Field(default_factory=list)
+    source_responsibility_refs: list[str] = Field(min_length=1, max_length=8)
+    binding_changes: list[GoalAssociationModelBindingChange] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_indices(self) -> "GoalAssociationModelRequirementChange":
+        indices = self.replace_requirement_indices
+        if any(index < 0 for index in indices) or len(indices) != len(set(indices)):
+            raise ValueError("replacement requirement indices must be unique and nonnegative")
+        return self
+
+
 class GoalAssociationModelAssociation(BaseModel):
     """Minimal model-facing continuity decision for an existing goal."""
 
-    # The decoder schema forbids extras. Validation intentionally ignores harmless
-    # transport noise such as model-authored IDs; the host never trusts or copies it.
+    # Preserve the existing transport-noise policy; WHAT rewriting is never noise.
     model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_reauthored_meaning(cls, value: Any) -> Any:
+        if isinstance(value, dict) and "updated_description" in value:
+            raise ValueError("GA cannot author updated_description; reference accepted GI requirements")
+        return value
 
     relationship: GoalAssociationModelRelationship = Field(
         description=(
@@ -130,10 +177,10 @@ class GoalAssociationModelAssociation(BaseModel):
     target_goal_ids: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
-    updated_description: str = ""
+    requirement_changes: list[GoalAssociationModelRequirementChange] = Field(default_factory=list)
     resolved_gap_ids: list[str] = Field(default_factory=list)
 
-    @field_validator("reason_summary", "updated_description", mode="before")
+    @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -168,12 +215,24 @@ class GoalAssociationModelAssociation(BaseModel):
         if self.relationship == "merge" and len(self.target_goal_ids) < 2:
             raise ValueError("relationship=merge requires at least two target goals")
         if self.relationship in {"modify", "clarify"} and not (
-            self.updated_description or self.resolved_gap_ids
+            self.requirement_changes or self.resolved_gap_ids
         ):
             raise ValueError(
-                f"relationship={self.relationship} requires updated_description "
+                f"relationship={self.relationship} requires requirement_changes "
                 "or resolved_gap_ids"
             )
+        if self.requirement_changes and self.relationship not in {"modify", "clarify"}:
+            raise ValueError("only modify/clarify may change Goal requirements")
+        targets = [change.target_goal_id for change in self.requirement_changes]
+        if len(targets) != len(set(targets)) or set(targets) - set(self.target_goal_ids):
+            raise ValueError("requirement changes need distinct exact association targets")
+        if any(set(change.source_responsibility_refs) - set(self.source_responsibility_refs)
+               for change in self.requirement_changes):
+            raise ValueError("requirement changes may use only their association's GI refs")
+        if self.requirement_changes and {
+            ref for change in self.requirement_changes for ref in change.source_responsibility_refs
+        } != set(self.source_responsibility_refs):
+            raise ValueError("requirement changes must preserve every associated GI Responsibility")
         return self
 class GoalAssociationModelBinding(BaseModel):
     """Model-facing semantic binding resolved before planning."""
@@ -523,14 +582,7 @@ class GoalAssociationModelGoal(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    source_responsibility_refs: list[str] = Field(min_length=1, max_length=8)
-    description: str = Field(
-        min_length=1,
-        description=(
-            "Exact current GI outcome for this new Responsibility. Never copy a "
-            "candidate Goal description into an additional or replacement Goal."
-        ),
-    )
+    source_responsibility_refs: list[str] = Field(min_length=1, max_length=1)
     output_mode: GoalOutputMode = Field(
         description=(
             "Provider-neutral human outcome modality copied from Goal Interpretation. "
@@ -622,11 +674,6 @@ class GoalAssociationModelGoal(BaseModel):
         if resource.kind == "information":
             return list(resource.query_scope)
         return list(resource.source.acquisition_bindings)
-
-    @field_validator("description", mode="before")
-    @classmethod
-    def normalize_description(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
 
     @field_validator(
         "source_responsibility_refs",

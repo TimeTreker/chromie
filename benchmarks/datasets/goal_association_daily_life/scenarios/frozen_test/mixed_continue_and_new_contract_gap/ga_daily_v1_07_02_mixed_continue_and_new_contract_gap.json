@@ -188,8 +188,7 @@
           ],
           "target_goal_ids": [
             "goal_07_02_a"
-          ],
-          "updated_description": ""
+          ]
         }
       ],
       "confidence": 1.0,
@@ -204,7 +203,6 @@
               "value": "2"
             }
           ],
-          "description": "Blink twice.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

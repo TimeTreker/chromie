@@ -214,6 +214,7 @@ class PlannerModelOutput(BaseModel):
     goal_summary: str = ""
     response_text: str = ""
     steps: list[PlannerModelStep] = Field(default_factory=list)
+    cancel_activity_ids: list[str] = Field(default_factory=list, max_length=32)
     auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
         default_factory=list,
         max_length=3,
@@ -432,9 +433,14 @@ def materialize_goal_outcomes(
 def stable_plan_id(request: Any, planner_tier: PlannerTier) -> str:
     """Return the stable host-owned Plan ID for one Planner pass."""
 
-    digest = hashlib.sha256(
-        f"{request.sid or 'turn'}|{planner_tier}|{request.text}".encode()
-    ).hexdigest()[:20]
+    task_id = request.planning_task_id
+    scope = request.planner_reentry_scope
+    if not task_id and scope is not None:
+        task_id = scope.opportunity_id or "|".join(scope.evidence_refs)
+    identity = f"{request.sid or 'turn'}|{planner_tier}|{request.text}"
+    if task_id:
+        identity += "|" + task_id
+    digest = hashlib.sha256(identity.encode()).hexdigest()[:20]
     return f"plan_{digest}"
 
 

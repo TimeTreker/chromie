@@ -113,7 +113,6 @@
               "value": "爸爸"
             }
           ],
-          "description": "为爸爸起草一条说明“我会晚到十分钟”的短消息。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

@@ -13,6 +13,15 @@ expanded into the same 15-member Goal-continuity contrast set. Unlike the GI cor
 every case supplies a production-shaped `CognitiveWorkRequest` containing accepted GI
 Responsibilities and bounded existing/recent Goal state.
 
+The owner-authorized [#39](https://github.com/TimeTreker/chromie/issues/39) contract
+migration removes model-authored new-Goal descriptions and replaces
+`updated_description` with source-referenced requirement selection. Case inputs,
+semantic expectations, splits and review status are unchanged; the manifest digest
+identifies the migrated wire references. This is mechanical reference migration,
+not fresh model inference. Original references are retained in local Issue evidence
+and the prior Git revision. Merge/split references test model representation only;
+the runtime still rejects their unimplemented state transactions.
+
 The corpus covers new creation, continue, modify, clarification answers, confirm,
 reject, cancel, pause, resume, terminal reference, replacement, unrelated new work,
 merge, split, and a deliberately retained mixed association-plus-creation contract

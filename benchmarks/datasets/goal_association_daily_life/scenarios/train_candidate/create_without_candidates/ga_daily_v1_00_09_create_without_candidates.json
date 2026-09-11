@@ -105,7 +105,6 @@
               "value": "云朵村庄"
             }
           ],
-          "description": "讲一个关于云朵村庄的短故事。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

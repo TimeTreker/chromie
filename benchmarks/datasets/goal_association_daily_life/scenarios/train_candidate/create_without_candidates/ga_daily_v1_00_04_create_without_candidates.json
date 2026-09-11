@@ -105,7 +105,6 @@
               "value": "a cloud village"
             }
           ],
-          "description": "Tell a short story about a cloud village.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

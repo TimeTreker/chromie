@@ -113,7 +113,6 @@
               "value": "Aunt Li"
             }
           ],
-          "description": "Draft a short message to Aunt Li saying I found the keys.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

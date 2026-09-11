@@ -1795,3 +1795,30 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_only_explicit_safe_read_prefix_can_dispatch_before_ga(self):
+        from orchestrator.runtime.capability_runtime import CapabilityDefinition
+        from shared.chromie_contracts.plan import FastPlannerCapabilityActivity
+
+        coordinator = InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})
+        for name, metadata, confirmation in [
+            ("safe", {"safety_class": "safe_read", "side_effect_free": True}, False),
+            ("effect", {"safety_class": "effect", "side_effect_free": False}, False),
+            ("unqualified", {"safety_class": "safe_read"}, False),
+            ("confirmed", {"safety_class": "safe_read", "side_effect_free": True}, True),
+        ]:
+            coordinator.registry.register(CapabilityDefinition(capability_id="test." + name, provider_id="test",
+                input_schema={"type": "object"}, output_schema={"type": "object", "properties": {"value": {"type": "string"}}, "additionalProperties": False},
+                metadata=metadata, requires_confirmation=confirmation))
+        def activity(name, suffix=""):
+            return FastPlannerCapabilityActivity(activity_id=name + suffix, role="capability", capability_id="test." + name,
+                args={}, source_responsibility_refs=["r1"], timing="sequential")
+        for blocked in ["effect", "unqualified", "confirmed"]:
+            activities = [activity("safe"), activity(blocked), activity("safe", "-later")]
+            eligible = await coordinator.prepare_fast_planner_capability_activities(activities, turn_id=blocked)
+            self.assertEqual([item.activity_id for item in eligible], ["safe"])
+            snapshot = await coordinator.runtime.planning_state_snapshot([], blocked)
+            self.assertEqual(len(snapshot["prepared"]), 3)
+            self.assertEqual(snapshot["work"], {})

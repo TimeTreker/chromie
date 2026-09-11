@@ -113,7 +113,6 @@
               "value": "at 7 pm"
             }
           ],
-          "description": "Create a reminder to water the plants at 7 pm.",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

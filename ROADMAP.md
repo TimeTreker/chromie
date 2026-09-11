@@ -16,6 +16,23 @@ Soridormi/provider work and is not a Chromie milestone or release prerequisite.
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
+The 2026-09-11 owner-authorized local amendment implements independent GI-/GA-triggered
+Planner tasks, scoped Runtime Work changes, explicit safe-read admission before GA,
+and role Memory projections. This is the agreed authority correction within Issue #35;
+it does not reopen other audit findings or replace the remaining model/voice/target
+qualification order. See [Status](docs/STATUS.md) and the current
+[checkpoint](DEVELOPMENT_CHECKPOINT.md) for evidence and resume scope.
+
+The owner requested independent discussion and authorization of the remaining
+top-level audit findings. [Audit index #36](https://github.com/TimeTreker/chromie/issues/36)
+maps the report to Issues #37–#48: #37 records the already-authorized local
+amendment. #38 completed the authorized WHAT/Work and role-context documentation
+correction. The owner now authorized #39: direct GI-to-Goal WHAT inheritance,
+source-bound partial revisions, and preserved history/Evidence. Full merge/split
+execution remains excluded. The owner authorized #40's GI speed rejection fix and
+Git delivery of it with #37–#39. GA repair/normalization and #41–#48 still require
+separate decisions. These changes do not qualify a model or deployment.
+
 ## Current execution order
 
 The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:

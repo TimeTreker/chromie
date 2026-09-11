@@ -113,7 +113,6 @@
               "value": "妈妈"
             }
           ],
-          "description": "为妈妈起草一条说明“晚饭好了”的短消息。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

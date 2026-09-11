@@ -156,7 +156,6 @@
               "value": "2"
             }
           ],
-          "description": "Blink twice.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

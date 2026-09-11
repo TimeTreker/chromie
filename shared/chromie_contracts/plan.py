@@ -1152,6 +1152,7 @@ class CanonicalPlan(BaseModel):
         max_length=24,
     )
     steps: list[CanonicalPlanStep] = Field(default_factory=list)
+    cancel_activity_ids: list[str] = Field(default_factory=list, max_length=32)
     auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
         default_factory=list,
         max_length=3,
@@ -1258,6 +1259,16 @@ class CanonicalPlan(BaseModel):
 
     @model_validator(mode="after")
     def validate_coverage_contract(self) -> "CanonicalPlan":
+        if len(self.cancel_activity_ids) != len(set(self.cancel_activity_ids)):
+            raise ValueError("cancel_activity_ids must be unique")
+        if any(not item.strip() for item in self.cancel_activity_ids):
+            raise ValueError("cancel_activity_ids must contain exact non-empty identities")
+        if set(self.cancel_activity_ids).intersection(
+            step.reuse_activity_id for step in self.steps if step.reuse_activity_id
+        ):
+            raise ValueError("one Activity cannot be both reused and cancelled")
+        if self.disposition == "escalate" and self.cancel_activity_ids:
+            raise ValueError("an escalating Plan cannot cancel Work")
         if self.coverage != "complete":
             if self.steps:
                 raise ValueError("non-complete plans must not carry executable steps")

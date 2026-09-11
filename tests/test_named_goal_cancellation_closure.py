@@ -461,3 +461,47 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetainedGoalWorkCancellationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_goal_stop_cancels_current_and_preserved_prior_plan_work(self):
+        from orchestrator.runtime.capability_runtime import CapabilityDefinition, MockCapabilityProvider
+        from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+
+        state = ConversationStateManager(base_conversation_id="multi-plan-stop")
+        _create_goals(state)
+        coordinator = InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})
+        coordinator.registry.register(CapabilityDefinition(capability_id="test.work", provider_id="test",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            output_schema={"type": "object", "properties": {"args": {"type": "object", "properties": {}, "additionalProperties": False}}, "additionalProperties": False},
+            interruptible=True, metadata={"cancellation_granularity": "request"}))
+        coordinator.runtime.register_provider(MockCapabilityProvider("test", delay_s=1))
+        coordinator.runtime.goal_state_provider = lambda: [*state.active_goal_snapshots(), *state.recent_goal_snapshots()]
+
+        def response(name):
+            plan = CanonicalPlan(plan_id="plan-" + name, planner_tier="fast", disposition="execute", coverage="complete",
+                goal_ids=["goal-a"], confidence=0.99, steps=[{"step_id": name, "capability_id": "test.work", "source_goal_ids": ["goal-a"]}])
+            return InteractionResponse(interaction_id=name, capabilities=[{"request_id": name, "capability_id": "test.work",
+                "metadata": {"source_goal_ids": ["goal-a"], "canonical_plan_id": plan.plan_id, "canonical_plan_fingerprint": canonical_plan_fingerprint(plan)}}],
+                metadata={"goal_ids": ["goal-a"], "turn_id": "turn-" + name, "canonical_plan": plan.model_dump(mode="json"),
+                    "canonical_plan_id": plan.plan_id, "canonical_plan_fingerprint": canonical_plan_fingerprint(plan), "planning_result": "composed_plan"})
+
+        old = response("old")
+        state.record_interaction_response("old", old)
+        first = await coordinator.runtime.submit(old)
+        snapshot = await coordinator.runtime.planning_state_snapshot(["goal-a"], "turn-new")
+        new = response("new")
+        new.metadata["retained_work_activities"] = coordinator.runtime.planning_work_activities(snapshot)
+        new.metadata["planning_commit"] = await coordinator.runtime.reserve_planning_submission(snapshot,
+            plan_id=new.metadata["canonical_plan_id"], fingerprint=new.metadata["canonical_plan_fingerprint"], prepared_activity_ids=[])
+        await coordinator.runtime.record_planning_submission(new, lambda: state.record_interaction_response("new", new))
+        second = await coordinator.runtime.submit(new)
+        bindings = state.goal_cancellation_bindings(["goal-a"])[0]["runtime_bindings"]
+        self.assertEqual({item["interaction_id"] for item in bindings}, {"old", "new"})
+        await dispatch_named_goal_cancellation(conversation_state=state, interaction_runtime=coordinator,
+            confirmation_dialogue=None, resolution=_cancel_resolution(["goal-a"]), session_id="cancel", user_text="停止这个任务", language="zh-CN")
+        results = await asyncio.gather(coordinator.runtime.wait_terminal(first), coordinator.runtime.wait_terminal(second))
+        self.assertEqual([result.results[0].status for result in results], ["cancelled", "cancelled"])
+        goal = state.goal_cancellation_bindings(["goal-a"])[0]
+        self.assertEqual(goal["responsibility_status"], "cancelled")
+        self.assertEqual(goal["remaining_request_ids"], [])

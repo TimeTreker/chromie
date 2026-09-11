@@ -97,7 +97,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "用简单的话说明光合作用。",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

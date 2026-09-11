@@ -319,6 +319,7 @@ class GoalAssociationResolution(BaseModel):
                 for key in (
                     "output_mode",
                     "media_operation",
+                    "requirement_sources",
                 )
                 if key in metadata
             }

@@ -113,7 +113,6 @@
               "value": "7 seconds"
             }
           ],
-          "description": "Move backward for 7 seconds.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

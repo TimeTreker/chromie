@@ -353,7 +353,7 @@ example of the general contract, not a phrase- or domain-specific architecture r
 ```mermaid
 flowchart TD
     A["Person asks for changing information"] --> B["Goal Interpretation<br/>preserve human Responsibility and semantic scope"]
-    B --> C["Planner fast pass"]
+    B --> C["GI-triggered Planner call"]
     B --> G["Goal Association<br/>runs concurrently when persistent continuity is needed"]
     C --> D["optional truthful progress Communicative Activity"]
     C --> E["information Capability Activity"]
@@ -364,10 +364,11 @@ flowchart TD
     V --> EV["Trusted terminal Evidence"]
     G --> CG["Canonical Goal"]
     CG --> S["Current bounded state"]
+    CG -->|material Goal / Work change| NP
     EV --> S
     R --> S
     EV --> O["CognitiveOpportunity"]
-    O --> NP["Planner re-entry"]
+    O --> NP["GA / Evidence-triggered Planner call"]
     S --> NP
     NP --> A1["answer from Evidence"]
     NP --> A2["genuinely new follow-up Work"]
@@ -375,14 +376,48 @@ flowchart TD
     A2 --> R
 ```
 
-A safe read may begin under Responsibility provenance before Goal Association finishes
-when its current Capability contract explicitly permits that early execution. Once GA
+A complete validated GI-triggered Planner result may enter Runtime preparation under
+immutable Responsibility provenance before Goal Association finishes. Only an available,
+explicitly side-effect-free `safe_read` Capability whose current contract requires no
+confirmation may dispatch at that point; all other Work remains prepared until canonical
+Goal binding and its ordinary execution prerequisites hold. No partial model result
+authorizes Capability Work. Once GA
 commits Goal continuity, Planner may compare the canonical Goal with actual queued,
 running, or completed Work and decide whether to reuse, supplement, cancel, or replace
 that Work. **This comparison is a Planner operation, not a mandatory `Work
 Reconciliation` stage or another authority.** Runtime applies only the validated Activity
 delta and preserves stable execution identity; Host never infers semantic compatibility
-from Goal IDs, argument equality, or Plan omission.
+from Goal IDs, argument equality, or Plan omission. Planner may retain a subset of Work,
+add new Work, and explicitly cancel exact Activity IDs in the same revision. Omitted
+existing Activities remain unchanged. Shared Work is one Runtime instance viewed by
+several Goals; cancelling it requires authority over every owning Goal.
+
+GI output and committed GA output are independent Planner triggers, with distinct model
+invocations when planning is required. They share the HOW authority, not a single
+planning-task lifecycle. GA-triggered planning consumes canonical Goals and a current
+Runtime/communication/Evidence snapshot; it need not await an unfinished GI-triggered
+invocation. Identity-only association may bind a conserving initial plan without another
+model call. Trusted code owns invocation identity, snapshot versions, bounded event
+coalescing and stale-result rejection. New Goal/Work/Evidence facts justify another
+planning task; reviewing an earlier model answer does not. Concurrent model completion
+order never establishes semantic priority. Conflicting submissions must validate their
+source state before changing Work, and obsolete results cannot overwrite newer state.
+
+Memory provides both current working context and relevant retained context through its
+existing owner. GI primarily resolves the current utterance; GA primarily establishes
+Goal continuity, including longer intent, without excluding relevant recent context.
+Their distinction is the question each owns, not a short-memory/long-memory split.
+GI receives recent semantic context and currently activated relevant history. GA receives
+the accepted GI result, relevant canonical Goals and bounded continuity history, plus
+applicable personal/relational Memory. Planner receives the relevant Responsibilities
+and available Goals together with actual Runtime Work, Evidence, communication records
+and applicable remembered preferences. Accepted GI meaning may still carry explicitly
+unresolved material; neither Memory nor GA may silently resolve it as a planning choice.
+No role is restricted to one memory lifetime. Short/long cognitive relevance and
+volatile/persistent storage are independent axes; persistence keeps existing consent,
+retention and deletion contracts. Planner consumes Memory together with current Goal,
+Work, delivery and Evidence projections. Memory never becomes a second execution queue,
+Goal authority, or source of fabricated completion.
 
 When terminal Evidence later arrives, the async event path creates one bounded
 `CognitiveOpportunity` for the exact affected Goal set. Planner receives the original
@@ -418,7 +453,11 @@ Read the diagram with these boundaries:
   present in the turn/context, and whether the Responsibility creates, continues,
   modifies, clarifies, or otherwise relates to a supplied Goal. It may preserve a
   requested human-level modality such as speech, information, an embodied effect, or
-  a durable state change when that modality is part of WHAT. It does **not** decide
+  a durable state change when that modality is part of WHAT. Explicit requirements for
+  freshness, a new observation, repeated action, or a particular historical result remain
+  part of that outcome and its semantic constraints. GI must preserve them without
+  choosing an acquisition method or deciding that remembered information satisfies them.
+  It does **not** decide
   whether downstream work or fresh Evidence is required. It may interpret a reply
   against a pending clarification in Session Context and propose the resulting Goal
   relationship, but it does not create or resolve planning `InformationGap` objects,
@@ -449,8 +488,10 @@ Read the diagram with these boundaries:
   Responsibility; source wording can expose lost qualifiers but does not grant Planner a
   second WHAT authority. Failure before commit is silent. Failure after commit preserves
   only the already-launched truthful presentation and authorizes no Goal-owned Work.
-  Capability Work always waits for the complete terminal result, GA-owned canonical Goal
-  binding, and trusted validation. This is one Planner with typed incremental readiness,
+  Capability Work always waits for the complete terminal result and trusted validation.
+  Runtime may prepare it before GA; only contract-declared side-effect-free safe reads
+  without confirmation may execute before canonical Goal binding. Remaining Work waits
+  for that binding and its execution prerequisites. This is one Planner authority with typed incremental readiness,
   not a response module followed by a Planner. Fast Planner is the first **HOW /
   Work-advancement authority**. Planner owns
   execution-input completeness and source strategy against the immutable
@@ -886,15 +927,19 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    immutable result concurrently. A complete validated `PresentationCommit` may launch
    its exact communication before either branch finishes. The same Planner invocation
    then completes its terminal Activity Plan without re-authoring committed speech.
-   No Capability Activity—read-only or effectful—starts from the early commit or before
-   canonical Goal binding and full Plan validation. All Work retains confirmation,
+   No Capability Activity starts from the early presentation commit or before full
+   Plan validation. Runtime may prepare the completed initial plan under immutable
+   Responsibility provenance before GA. Only available, contract-declared side-effect-free
+   safe reads without confirmation may dispatch before canonical Goal binding; other
+   Work remains prepared. GA-triggered planning is a distinct task over committed Goals
+   and actual Work, independent of an unfinished initial Planner call. All Work retains confirmation,
    authorization, resource, provider, and safety barriers. GA never judges
    Work compatibility. When Canonical Goal commit intersects retained
    Work, Orchestrator structurally re-enters Fast Planner with the Goal and bounded
    actual Work snapshot. Planner explicitly selects reuse by stable Activity ID or
    authors replacement/supplemental Work; Runtime then validates exact identity,
    version, state, Capability, arguments, ownership, and timing. Runtime reuses selected
-   Work and cancels/replaces only pending or cancellable unselected Work after that
+   Work and cancels/replaces only explicitly selected pending or cancellable Work after that
    decision. Evidence from incompatible retained Work remains auditable
    but unbound and cannot support Goal completion or response claims. A one-turn greeting still receives a
    canonical conversational Goal; it does not need a second planning pass merely to
@@ -987,6 +1032,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    user-resolvable clarification, or fail closed; it must not enter a chain of
    same-authority model calls.
 
+   A GI speed binding that fails source or dimension validation rejects the
+   interpretation; Host must not delete it to salvage the remaining WHAT.
+   An absent speed binding is valid when no speed was requested; Planner owns
+   any permitted execution default under the Capability and safety contracts.
+
    Goal Interpretation therefore carries its own Responsibility-coverage evidence
    in the primary WHAT result. Goal Association must conserve those accepted
    Responsibilities while owning only canonical Goal identity and continuity. A
@@ -1037,6 +1087,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    copies of those Host projections are schema defects, not invitations for
    compatibility inference. Do not accept a reverse mapping that can silently
    manufacture or downgrade semantic intent.
+
+   Goal WHAT is inherited, not summarized again by Goal Association. New Goal
+   descriptions and success criteria are Host projections of the exact accepted GI
+   outcome; GA does not author a second description. Existing Goal requirements may
+   be retained, supplemented, or explicitly replaced using current GI sources. GA
+   selects the target Goal and affected requirements; unselected requirements remain.
+   A partial fragment cannot replace a complete retained requirement. Semantic field
+   changes copy a named accepted GI binding to an explicit Goal field, never a new
+   GA-authored value. Changed modality uses an explicitly sourced replacement Goal.
+   The existing Goal-state owner commits description, requirements, bindings and
+   provenance together against the exact supplied version/snapshot. It preserves
+   prior Goal revisions, resource fields and execution Evidence; stale updates reject.
+   Planner consumes the resulting complete requirements and actual Work/Evidence,
+   then decides Work compatibility. A display description is never another WHAT
+   authority. These guarantees do not add executable multi-Goal merge/split support.
 
    The same rule applies to parameter provenance. Planner owns Capability choice,
    exact executable argument values, semantic realization, and step-to-Goal
@@ -1128,8 +1193,12 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
    **Fast outcome types do not borrow authority from each other.** Fast Goal
    Interpretation emits provider-neutral Responsibility evidence with material
-   semantic bindings, bounded unresolved meaning, and whether work/fresh evidence
-   remains. It does not author the reply, declare execution inputs missing, create
+   semantic bindings and bounded unresolved meaning, preserving any user-required
+   freshness, new observation, repetition, or historical-result scope. Planner decides
+   whether additional Work or fresh Evidence is needed from that immutable meaning,
+   applicable Goal state, actual Work, trusted context/Evidence and Capability contracts.
+   Missing answer data is not by itself unresolved user meaning. GI does not author a
+   Work-required or execution-readiness judgment, author the reply, declare execution inputs missing, create
    planning InformationGaps, or choose their source/resolution policy. Fast Planner is
    the first HOW owner and may author a complete first Activity Plan with speaking and
    Capability Activities. It owns execution-input completeness and may use trusted

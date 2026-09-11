@@ -105,7 +105,6 @@
               "value": "我今天过得很难"
             }
           ],
-          "description": "在用户谈论“我今天过得很难”时给予倾听和支持。",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

@@ -752,7 +752,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "new_goals": [
                         {
                             "source_responsibility_refs": ["test_responsibility"],
-                            "description": "Respond naturally to F.",
+
                             "output_mode": "speech",
                         }
                     ],
@@ -770,7 +770,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(resolution.new_goals), 1)
         self.assertEqual(
             resolution.new_goals[0].description,
-            "Respond naturally to F.",
+            _clarify_request().responsibilities[0].outcome,
         )
         self.assertEqual(len(ollama.schemas), 1)
         self.assertEqual(

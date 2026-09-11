@@ -113,7 +113,6 @@
               "value": "4 seconds"
             }
           ],
-          "description": "Move left for 4 seconds.",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

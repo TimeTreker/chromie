@@ -47,7 +47,7 @@ def test_candidate_aware_contract_has_no_exclusive_branch_discriminant() -> None
             "new_goals": [
                 {
                     "source_responsibility_refs": ["r2"],
-                    "description": "Tell the user a joke.",
+
                     "output_mode": "speech",
                 }
             ],
@@ -66,7 +66,7 @@ def test_replacement_goal_cannot_retain_superseded_goal_as_related_context() -> 
         goal_association_contract.GoalAssociationModelGoal.model_validate(
             {
                 "source_responsibility_refs": ["r1"],
-                "description": "Blink twice.",
+
                 "output_mode": "body_action",
                 "related_goal_ids": ["goal-existing"],
                 "supersedes_goal_ids": ["goal-existing"],

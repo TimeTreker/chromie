@@ -113,7 +113,6 @@
               "value": "desk lamp"
             }
           ],
-          "description": "Set the desk lamp to on.",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

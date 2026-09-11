@@ -97,7 +97,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "用简单的话说明天空为什么是蓝色的。",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

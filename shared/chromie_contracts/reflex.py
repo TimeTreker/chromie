@@ -96,6 +96,7 @@ class CancellationDirective(BaseModel):
     requested_scope: CancellationScope
     foreground_interaction_id: str | None = None
     target_goal_ids: tuple[str, ...] = ()
+    target_request_ids: tuple[str, ...] = ()
     expected_plan_id: str | None = None
     expected_plan_fingerprint: str | None = None
     reason: str = ""
@@ -119,8 +120,13 @@ class CancellationDirective(BaseModel):
                 raise ValueError(
                     "specific_goal requires exact plan identity"
                 )
+            if len(self.target_request_ids) != len(set(self.target_request_ids)) or any(
+                not item.strip() for item in self.target_request_ids
+            ):
+                raise ValueError("target_request_ids must be exact unique identities")
         elif (
             self.target_goal_ids
+            or self.target_request_ids
             or self.expected_plan_id
             or self.expected_plan_fingerprint
         ):

@@ -117,6 +117,10 @@ class FakeRuntime:
     def __init__(self, definitions: list[CapabilityDefinition] | None = None):
         self.definitions = {item.capability_id: item for item in (definitions or [])}
         self.ensure_calls: list[list[str]] = []
+        registry = CapabilityRegistry()
+        for definition in definitions or []:
+            registry.register(definition)
+        self.runtime = CapabilityRuntime(registry)
 
     async def ensure_capability_definitions(self, capability_ids):
         ids = list(capability_ids)
@@ -129,6 +133,12 @@ class FakeRuntime:
         if skill_id not in self.definitions:
             raise ValueError(f"unknown skill {skill_id}")
         return self.definitions[skill_id]
+
+    async def prepare_fast_planner_capability_activities(self, activities, *, turn_id):
+        await self.runtime.prepare_planner_work(turn_id, [item.model_dump(mode="json") for item in activities])
+        # These adapter tests have no provider. Actual early dispatch is tested
+        # through InteractionRuntimeCoordinator and CapabilityRuntime.
+        return []
 
 
 class RecordingPlannerAdapter(CanonicalPlanRuntimeAdapter):
@@ -972,7 +982,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(client.calls[-1], "fast")
+        self.assertEqual(client.calls.count("fast"), 1)
         self.assertEqual(
             result.metadata["retained_work_reconciliation_status"],
             "retained_work_reused",
@@ -981,6 +991,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             result.terminal_plan.steps[0].metadata["retained_work_reused"]
         )
         self.assertEqual(result.interaction_response.capabilities, [])
+        self.assertEqual(result.interaction_response.metadata["retained_work_activities"][0]["activity_id"], "request-weather-existing")
         self.assertEqual(
             result.interaction_response.metadata["goal_interpretation"]
             ["responsibilities"][0]["local_ref"],
@@ -1144,6 +1155,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         plan = CanonicalPlan(
             plan_id="plan-weather-replacement",
             planner_tier="fast",
+            cancel_activity_ids=["request-weather-existing"],
             disposition="execute",
             coverage="complete",
             confidence=0.98,
@@ -1209,7 +1221,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertLess(events.index("planner_decided"), events.index("retained_cancelled"))
         self.assertEqual(
             result.metadata["retained_work_reconciliation_status"],
-            "retained_work_cancelled_before_replacement",
+            "retained_work_delta_applied",
         )
         self.assertEqual(
             result.interaction_response.capabilities[0].args["location"],
@@ -1770,7 +1782,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 super().__init__([weather_definition()])
                 self.started = []
                 self.bound = []
-                self.runtime = self
 
             async def cancel_interaction(self, interaction_id: str) -> None:
                 raise AssertionError(
@@ -1923,7 +1934,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             result.metadata["fast_capability_activity_status"],
-            "deferred_until_canonical_validation",
+            "prepared_until_canonical_validation",
         )
 
     def test_foreground_cancellation_cleans_unbound_provisional_fast_work(self):
@@ -1931,8 +1942,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             provisional_started = asyncio.Event()
             stream_finished = asyncio.Event()
 
-            class CancellationRuntime:
+            class CancellationRuntime(CapabilityRuntime):
                 def __init__(self) -> None:
+                    super().__init__(CapabilityRegistry())
                     self.cancelled: list[str] = []
 
                 async def cancel_interaction(self, interaction_id: str) -> None:
@@ -2042,8 +2054,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_ga_reconsideration_cancels_changed_work_only_after_fast_planner_revision(self):
         events: list[str] = []
 
-        class CancellationRuntime:
+        class CancellationRuntime(CapabilityRuntime):
             def __init__(self) -> None:
+                super().__init__(CapabilityRegistry())
                 self.cancelled: list[str] = []
 
             async def cancel_interaction(self, interaction_id: str) -> None:
@@ -2199,12 +2212,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.terminal_plan.plan_id, "canonical-weather-revision")
         self.assertEqual(
             result.metadata["fast_capability_activity_status"],
-            "deferred_until_canonical_validation",
+            "prepared_until_canonical_validation",
         )
 
     def test_ga_reconsideration_reuses_exact_work_selected_by_fast_planner(self):
-        class CancellationRuntime:
+        prepared = asyncio.Event()
+
+        class CancellationRuntime(CapabilityRuntime):
             def __init__(self) -> None:
+                super().__init__(CapabilityRegistry())
                 self.cancelled: list[str] = []
 
             async def cancel_interaction(self, interaction_id: str) -> None:
@@ -2215,6 +2231,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 super().__init__([weather_definition()])
                 self.runtime = CancellationRuntime()
                 self.bound: list[dict] = []
+
+            async def prepare_fast_planner_capability_activities(self, activities, *, turn_id):
+                result = await super().prepare_fast_planner_capability_activities(activities, turn_id=turn_id)
+                prepared.set()
+                return result
 
             async def start_fast_planner_capability_activities(
                 self, activities, *, session_id: str, turn_id: str
@@ -2306,7 +2327,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         runtime = ReadyRuntime()
-        client = ScriptedClient(
+        class PreparedClient(ScriptedClient):
+            async def resolve_goal_association(self, *args, **kwargs):
+                await prepared.wait()
+                return await super().resolve_goal_association(*args, **kwargs)
+
+        client = PreparedClient(
             association=association,
             fast_plans=[revised_plan],
             fast_advances=[advance],
@@ -2356,7 +2382,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             result.metadata["fast_capability_activity_status"],
-            "deferred_until_canonical_validation",
+            "prepared_until_canonical_validation",
         )
 
     def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):
@@ -5217,3 +5243,127 @@ class AtomicGoalStateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
+    async def test_goal_planner_finishes_while_gi_planner_is_still_waiting(self):
+        gi_started = asyncio.Event()
+        gi_cancelled = asyncio.Event()
+        goal_planned = asyncio.Event()
+        association = GoalAssociationResolution(
+            resolution_status="resolved", turn_id="turn-independent",
+            associations=[{"association_id": "update", "relationship": "modify",
+                "source_responsibility_refs": ["r1"], "target_goal_ids": ["goal-1"],
+                "goal_update": {"description": "Respond to the revised request."}, "confidence": 0.98}],
+            confidence=0.98,
+        )
+        plan = CanonicalPlan(plan_id="independent-goal-plan", planner_tier="fast", disposition="respond",
+            coverage="complete", goal_ids=["goal-1"], response_text="按新的要求来。", confidence=0.98)
+
+        class Client(ScriptedClient):
+            async def stream_fast_advance(self, *args, **kwargs):
+                gi_started.set()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    gi_cancelled.set()
+                async for frame in super().stream_fast_advance(*args, **kwargs):
+                    yield frame
+
+            async def resolve_goal_association(self, *args, **kwargs):
+                await gi_started.wait()
+                return await super().resolve_goal_association(*args, **kwargs)
+
+            async def resolve_fast_plan(self, *args, **kwargs):
+                self.request = kwargs["request"]
+                goal_planned.set()
+                return await super().resolve_fast_plan(*args, **kwargs)
+
+        client = Client(association=association, fast_plans=[plan])
+        coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()), policy=CognitiveRuntimePolicy(mode="apply"))
+        core, envelope = admitted_core("按新的要求来。", sid="turn-independent", language="zh-CN")
+        result = await asyncio.wait_for(coordinator.resolve(object(), text="按新的要求来。", sid="turn-independent",
+            core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN"), 1)
+        self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
+        self.assertTrue(goal_planned.is_set())
+        self.assertTrue(gi_cancelled.is_set())
+        self.assertTrue(result.metadata["gi_planning_superseded"])
+        self.assertTrue(client.request.planning_task_id.startswith("ga:"))
+        self.assertEqual(result.terminal_plan.plan_id, "independent-goal-plan")
+
+    async def test_safe_read_executes_before_ga_and_is_not_dispatched_again(self):
+        from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+        from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+
+        started = asyncio.Event()
+        association_returned = False
+
+        class Provider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):
+                self.assert_before_ga = not association_returned
+                started.set()
+                result = await super().execute(request, definition, context)
+                return result.model_copy(update={"output": {"temperature_c": 20}})
+
+        runtime = InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})
+        definition = weather_definition()
+        runtime.registry.register(definition)
+        provider = Provider("chromie.local")
+        runtime.runtime.register_provider(provider)
+        association = GoalAssociationResolution(resolution_status="resolved", turn_id="early-read",
+            new_goals=[SemanticGoal(goal_id="goal-weather", source_responsibility_refs=["weather"],
+                description="查询重庆天气", source_text="查询重庆天气", metadata={"output_mode": "information"})], confidence=0.99)
+        advance = FastPlannerAdvance(turn_id="early-read", disposition="execute", coverage="complete",
+            covered_responsibility_refs=["weather"], activities=[FastPlannerCapabilityActivity(
+                activity_id="read-weather", role="capability", capability_id="chromie.weather.lookup", args={"location": "重庆", "date": "today"},
+                source_responsibility_refs=["weather"], timing="sequential")], confidence=0.99)
+
+        class Client(ScriptedClient):
+            async def resolve_goal_association(self, *args, **kwargs):
+                nonlocal association_returned
+                await asyncio.wait_for(started.wait(), 1)
+                association_returned = True
+                return await super().resolve_goal_association(*args, **kwargs)
+
+        client = Client(association=association, fast_plans=[], fast_advances=[advance], presentation_commits=[PresentationCommit(commit_id="early-commit", turn_id="early-read", activity=None)])
+        coordinator = GoalDrivenRuntimeCoordinator(agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(mode="apply"))
+        core, envelope = admitted_core("查询重庆天气", sid="early-read", language="zh-CN", responsibilities=[{
+            "local_ref": "weather", "outcome": "查询重庆天气", "bindings": {"location": "重庆", "date": "today"}, "confidence": 0.99}])
+        result = await asyncio.wait_for(coordinator.resolve(object(), text="查询重庆天气", sid="early-read",
+            core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN"), 2)
+        self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
+        self.assertTrue(provider.assert_before_ga)
+        dispatch = await runtime.submit_response(result.interaction_response, session_id="early-read")
+        execution = await runtime.wait_dispatch(dispatch)
+        self.assertEqual(execution.status, "completed")
+        self.assertEqual(len(provider.calls), 1)
+        self.assertEqual(execution.results[0].metadata["source_goal_ids"], ["goal-weather"])
+        self.assertEqual((await runtime.runtime.execution_observation()).prepared_planner_work, [])
+
+    async def test_direct_chat_publication_and_dispatch_share_one_plan_identity(self):
+        from orchestrator.runtime.conversation_state import ConversationStateManager
+        from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+
+        spoken = []
+        def speak(args):
+            spoken.append(args["text"])
+            return {"scheduled": True}
+        runtime = InteractionRuntimeCoordinator(speak)
+        state = ConversationStateManager(base_conversation_id="planning-chat")
+        runtime.runtime.goal_state_provider = lambda: [*state.active_goal_snapshots(), *state.recent_goal_snapshots()]
+        plan = CanonicalPlan(plan_id="hello-plan", planner_tier="fast", disposition="respond",
+            coverage="complete", goal_ids=["goal-1"], response_text="你好。", confidence=0.99)
+        client = ScriptedClient(association=new_goal_association(), fast_plans=[plan])
+        coordinator = GoalDrivenRuntimeCoordinator(agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
+            policy=CognitiveRuntimePolicy(mode="apply"), goal_state_apply=state.apply_goal_association_resolution)
+        core, envelope = admitted_core("你好", sid="chat-publication", language="zh-CN")
+        resolution = await coordinator.resolve(object(), text="你好", sid="chat-publication", core_interpretation=core,
+            turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN")
+        self.assertEqual(resolution.status, "applied", resolution.fallback_reason)
+        response = resolution.interaction_response
+        await runtime.runtime.record_planning_submission(response, lambda: state.record_interaction_response("chat-publication", response))
+        dispatch = await runtime.submit_response(response, session_id="chat-publication")
+        await runtime.wait_dispatch(dispatch)
+        self.assertEqual(spoken, ["你好。"])

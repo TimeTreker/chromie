@@ -480,6 +480,10 @@ class VoiceAssistant:
             self.interaction_runtime
         )
         self.cognitive_gateway = CognitiveGateway()
+        self.interaction_runtime.runtime.goal_state_provider = lambda: [
+            *self.conversation_state.active_goal_snapshots(),
+            *self.conversation_state.recent_goal_snapshots(),
+        ]
         self.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=self.agent_client,
             adapter=CanonicalPlanRuntimeAdapter(
@@ -2604,6 +2608,7 @@ class VoiceAssistant:
                         language=core_interpretation.language,
                     )
                 )
+                self.interaction_runtime.runtime.refresh_planning_submission_after_goal_commit(response)
                 response = self.interaction_runtime.prepare_response(
                     response, session_id=session_id
                 )
@@ -2977,7 +2982,9 @@ class VoiceAssistant:
             reset_playback=not fast_first_scheduled,
         ):
             return True
-        self.conversation_state.record_interaction_response(session_id, response)
+        await self.interaction_runtime.runtime.record_planning_submission(
+            response, lambda: self.conversation_state.record_interaction_response(session_id, response),
+        )
         self._launch_interaction(
             response, session_id, reset_playback=not fast_first_scheduled
         )
@@ -5317,7 +5324,9 @@ class VoiceAssistant:
                 )
                 return "planner_reentry_confirmation_staged"
             return "planner_reentry_confirmation_required"
-        self.conversation_state.record_interaction_response(session_id, response)
+        await self.interaction_runtime.runtime.record_planning_submission(
+            response, lambda: self.conversation_state.record_interaction_response(session_id, response),
+        )
         await self._dispatch_detached_interaction(
             response,
             session_id,
@@ -5701,6 +5710,12 @@ class VoiceAssistant:
             context=context,
             history=list(context.get("history") or []),
         )
+        planning_runtime = self.cognitive_runtime.adapter.interaction_runtime.runtime
+        planning_snapshot = await planning_runtime.planning_state_snapshot(
+            normalized_goal_ids, str(metadata.get("turn_id") or request.sid),
+        )
+        context["existing_work_activities"] = planning_runtime.planning_work_activities(planning_snapshot)
+        request = request.model_copy(deep=True, update={"context": context})
         session = await self.get_http_session()
         planner_started_ms = now_ms()
         workflow_input = {
@@ -5811,6 +5826,27 @@ class VoiceAssistant:
             raise ValueError(
                 "Planner state re-entry attempted to repeat the completed terminal Activity"
             )
+        runtime_errors = await self.cognitive_runtime.adapter.validation_errors(replanned)
+        if runtime_errors:
+            raise ValueError("Runtime rejected state re-entry Plan: " + json.dumps(runtime_errors))
+        async with planning_runtime.planning_commit_scope(planning_snapshot):
+            known_ids = {item["activity_id"] for item in context["existing_work_activities"]}
+            if set(replanned.cancel_activity_ids) - known_ids:
+                raise ValueError("Planner cancellation names unknown Work")
+            replanned, _work_status = await self.cognitive_runtime._apply_retained_work_reconciliation(
+                plan=replanned, activities=context["existing_work_activities"],
+                turn_id=planning_snapshot["turn_id"],
+            )
+            cancelled_bindings = {
+                item["runtime_binding"]["interaction_id"] + "/" + item["activity_id"]
+                for item in context["existing_work_activities"]
+                if item["activity_id"] in replanned.cancel_activity_ids and item.get("origin") == "retained_runtime"
+            }
+            await planning_runtime.validate_planning_state(planning_snapshot, cancelled_bindings=cancelled_bindings)
+            planning_commit = await planning_runtime.reserve_planning_submission(
+                planning_snapshot, plan_id=replanned.plan_id, fingerprint=canonical_plan_fingerprint(replanned),
+                prepared_activity_ids=[*replanned.cancel_activity_ids, *(step.reuse_activity_id for step in replanned.steps)],
+            )
         response = await self.cognitive_runtime.adapter.build_planner_owned_response(
             plan=replanned,
             session_id=sid,
@@ -5819,6 +5855,9 @@ class VoiceAssistant:
         )
         response.metadata.update(
             {
+                "planning_commit": planning_commit,
+                "retained_work_activities": [item for item in context["existing_work_activities"]
+                    if item.get("origin") == "retained_runtime" and item["activity_id"] not in replanned.cancel_activity_ids],
                 "planner_state_reentry": True,
                 "planner_state_reentry_phase": phase,
                 "planner_state_reentry_ref": reentry_ref,

@@ -303,11 +303,13 @@ Goal completion or speech.
 
 This behaves like a person continuing an already-started check rather than starting it
 again merely because they thought about it once more. Retained-work reuse is explicit
-and reconciliation-only at the current Runtime boundary: Planner selects the complete
-retained Activity set and Host preserves the original execution binding. If Planner
-needs different or additional Work, it authors one complete replacement Plan without
-reuse selections; Host closes cancellable old Work before starting that Plan. Host does
-not derive either choice from matching words or arguments.
+and may preserve any subset alongside newly planned Work. The original execution
+binding survives reuse. Omitted Work remains unchanged; `cancel_activity_ids` explicitly
+names pending Work to cancel or replace. Host verifies every owner of shared Work,
+closes the selected cancellation before replacement dispatch, and preserves completed
+Evidence. Independent GI-, GA-, and Evidence-triggered planning tasks share this contract;
+a later-arriving obsolete result cannot overwrite a newer task list. The executable
+commit rules are owned by [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md).
 
 This is one iteration of the continuous Responsibility loop, not a turn-final repair.
 User corrections, provider Evidence, failure, timeout, dependency readiness, trusted

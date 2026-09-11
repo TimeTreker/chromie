@@ -335,6 +335,12 @@ class MemoryEntry:
 
     def to_prompt_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
+            "id": self.id,
+            "source_turn_ids": list(self.source_turn_ids),
+            "source_sids": list(self.source_sids),
+            "persistence_policy": self.persistence_policy,
+            "consent_basis": self.consent_basis,
+            "expires_ms": self.expires_ms,
             "scope": self.scope,
             "kind": self.kind,
             "key": self.key,

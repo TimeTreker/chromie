@@ -1,4 +1,7 @@
 from __future__ import annotations
+from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+
 
 import pytest
 from pydantic import ValidationError
@@ -156,7 +159,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
             self.request = request
             return followup
 
-    class Adapter:
+    class Adapter(CanonicalPlanRuntimeAdapter):
         async def build_planner_owned_response(self, **_kwargs):
             return InteractionResponse(interaction_id="after-observation", status="ok")
 
@@ -166,7 +169,11 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         fast_planner_timeout_ms=3000,
         deep_planner_timeout_ms=6000,
     )
-    assistant.cognitive_runtime = SimpleNamespace(adapter=Adapter(), interaction_ledger=None)
+    assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
+        agent_client=assistant.agent_client,
+        adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
     assistant.session_log = lambda *_args, **_kwargs: None
     assistant.build_context = lambda _sid: {"history": []}
     assistant._cognitive_core_authority_context = lambda context, **_kwargs: context

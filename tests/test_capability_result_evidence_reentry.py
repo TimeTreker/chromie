@@ -1,4 +1,7 @@
 from __future__ import annotations
+from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+
 
 import asyncio
 import hashlib
@@ -191,7 +194,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 self.request = request
                 return replanned
 
-        class Adapter:
+        class Adapter(CanonicalPlanRuntimeAdapter):
             context = None
             async def build_planner_owned_response(self, **_kwargs):
                 self.context = _kwargs.get("context")
@@ -204,8 +207,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000)
-        assistant.cognitive_runtime = SimpleNamespace(
-            adapter=Adapter(), interaction_ledger=None
+        assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
+            agent_client=assistant.agent_client,
+            adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         assistant.session_log = lambda *_args, **_kwargs: None
         assistant.build_context = lambda _sid: {"history": []}
@@ -400,7 +405,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 self.request = request
                 return replanned
 
-        class Adapter:
+        class Adapter(CanonicalPlanRuntimeAdapter):
             async def build_planner_owned_response(self, **_kwargs):
                 return InteractionResponse(
                     interaction_id="reminder-due",
@@ -414,8 +419,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             fast_planner_timeout_ms=3000,
             deep_planner_timeout_ms=6000,
         )
-        assistant.cognitive_runtime = SimpleNamespace(
-            adapter=Adapter(), interaction_ledger=None
+        assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
+            agent_client=assistant.agent_client,
+            adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         assistant.session_log = lambda *_args, **_kwargs: None
         assistant.build_context = lambda _sid: {"history": []}
@@ -517,7 +524,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 self.request = request
                 return replanned
 
-        class Adapter:
+        class Adapter(CanonicalPlanRuntimeAdapter):
             async def build_planner_owned_response(self, **_kwargs):
                 return InteractionResponse(
                     interaction_id="recover-deep",
@@ -531,8 +538,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             fast_planner_timeout_ms=3000,
             deep_planner_timeout_ms=6000,
         )
-        assistant.cognitive_runtime = SimpleNamespace(
-            adapter=Adapter(), interaction_ledger=None
+        assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
+            agent_client=assistant.agent_client,
+            adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
+            policy=CognitiveRuntimePolicy(mode="apply"),
         )
         assistant.session_log = lambda *_args, **_kwargs: None
         assistant.build_context = lambda _sid: {"history": []}

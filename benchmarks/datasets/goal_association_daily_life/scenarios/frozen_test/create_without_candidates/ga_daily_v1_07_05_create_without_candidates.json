@@ -97,7 +97,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "用简单的话说明分数。",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

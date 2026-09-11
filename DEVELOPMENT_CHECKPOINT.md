@@ -1,159 +1,137 @@
 # Development Checkpoint
 
-## Main consolidation — 2026-09-11
+## Current delivery boundary — Issue #40 GI speed rejection
 
-The owner explicitly requested merging all Chromie branches to main. This authorizes
-source integration and supersedes earlier branch-only/no-main delivery instructions;
-it does not qualify a model/provider, authorize the pending Fast wire amendment, or
-close supervised voice, physical robot, or default target-evidence gates. Issue #35
-remains active. No additional optimization iteration or deployment was performed.
+Updated 2026-09-11. The owner approved rejecting invalid/unprovenanced GI speed
+instead of deleting it, and authorized commit/push with the prior #37–#39 changes.
+Primary/Deep GI now use the existing source/dimension validator directly. A failed
+primary result cannot trigger Deep or a repair; a failed Deep result is terminal.
+Absent speed and supported source/context-backed speed remain valid; Planner owns
+permitted execution defaults. No model/prompt/schema/provider policy was changed.
+GA repair/normalization, other GI normalizers, #41–#48 and full merge/split remain
+outside this approval. Existing numeric source extraction misses a number followed
+immediately by a period; this now rejects instead of silently dropping speed.
 
-Pre-merge main: `ab5caeab49e46be9c77bd87c488e693c156c2eca`.
-Incoming branch: `origin/codex/ga-request-format` at
-`c2dc2e5c` (includes the newer `9e3d3971` and `c2dc2e5c` laptop repairs).
-All other fetched Chromie branch tips are already ancestors of pre-merge main;
-this one merge therefore includes every discovered local and origin branch.
-Expected resume is `main` at the latest commit containing both handoff owners.
-Soridormi is a separate repository and was not merged or edited by this request.
+Delivery base: `main` at `a0c5d09fbb18fca8660aa43abb55bccca18924cc`, tracked
+against `origin/main`. Resume from the latest commit containing this checkpoint and
+HANDOFF; this text does not predict a commit hash or claim a completed push.
+Evidence: `.chromie/acceptance/issue40-gi-speed-rejection-20260911/`.
+`before.patch` exactly matches the retained #39 final patch. Three scripted baseline
+probes accepted deleted speed; the same inputs now reject. Focused GI: 83 tests,
+76 subtests passed, covering primary/Deep termination and valid/absent speed.
+Final canonical passed 2,415/692 tests/subtests, 140 benchmarks, 20 legacy; Level A 30/30.
+This is local contract/state evidence; no new model, voice, provider, or target
+qualification or deployment is claimed. Ignored evidence does not transfer with Git.
 
-Conflict resolution retains the shared object/array intersection helper (the same
-mechanism previously local to GA), uses the newer primary response-language contract
-in both canonical Fast prompt branches, and preserves main's runtime/TTS/quiet-input
-repairs. Both prior evidence histories remain available below or in Git. No new
-semantic authority, provider default, runtime setting, document or term was added.
+Prior #39 directly inherits GI WHAT; source-bound partial updates bind the actual
+Goal fingerprint, preserve untouched requirements, provenance/history, resources and
+Work/Evidence, and retain Planner Work authority. All 1,500 reference outputs were
+mechanically migrated with inputs/semantic expectations unchanged. Its canonical
+2,412/683 tests/subtests, 140 benchmarks, 20 legacy tests and Level A 21/21 passed.
+Evidence: `.chromie/acceptance/issue39-semantic-inheritance-20260911/`.
+Prior #38 corrected WHAT/Work and role Memory context in seven existing docs;
+its canonical 2,407/671/140/20 passed. #37 implementation/history remains below.
 
-Validation for the combined tree is in
-`.chromie/acceptance/main-consolidation-20260911/`: `canonical.log` and
-`refs-before.txt`. `./scripts/run_tests.sh` passed: 2,392 tests, 671 subtests,
-140 benchmark tests and 20 legacy Agent tests; repository policy, ownership,
-pinned static analysis, configuration and documentation gates passed. Two existing
-FastAPI startup deprecation warnings remain. The selected Level A suite passed
-26/26 distinct scenarios across robust intent, continuous recovery, deterministic
-safety, multiple Goals and capability grounding (class memberships overlap);
-`level-a.log` and `level-a/` retain results. Documentation was checked after the
-merge-record update as well (`docs-integration.log` and `docs-final.log`).
-Historical test counts below apply only to their recorded revisions. No
-merged-revision live cohort or hardware proof was run.
+## Prior local implementation — Issue #37, 2026-09-11
 
-SGLang is already selected by the RTX 5090 profile; the RTX 4090 Laptop profile
-still selects Ollama. SGLang is a reasonable development direction, but the retained
-5090 Gemma FP8 and laptop Qwen GGUF results are not a controlled backend comparison.
-The earlier 5090 preview had 27 mechanical/19 reviewed acceptable initial previews
-out of 51; the latest laptop preview was incomplete and unqualified. Neither
-establishes a generally qualified replacement. Decoder, semantic and target-evidence
-blockers remain; schema validity alone is insufficient. No default was changed.
+Active Issue #35; Goal-driven single-authority architecture. The owner explicitly
+authorized the discussed Charter and
+implementation amendments: independent GI-/GA-triggered Planner calls, scoped
+Work revision, actual Runtime/Evidence continuity, and existing Memory role
+projections. The owner separately confirmed that existing Capability contracts
+may admit safe reads before GA; other Work may only be prepared. This specific
+amendment is authorized despite the prior evidence-only delivery constraint.
+Other audit findings and the separate Fast tagged-stream wire proposal remain
+outside scope. No additional optimization iteration, model/provider change,
+deployment, commit or push was performed.
 
-Resume by checking `git status --short --branch`, then reading the retained failures
-and original identities below before any newly authorized live work. The combined
-source requires a freshly bound runtime identity and full cohort before any new
-runtime-level claim. The pending Fast wire proposal remains unimplemented.
+Checkout: `/home/chromie/github/chromie`, branch `main`, uncommitted patch over
+`a0c5d09fbb18fca8660aa43abb55bccca18924cc`. Source and tests were initially clean.
+Implementation/test/harness patch SHA-256 (documentation excluded):
+`16354fd4b0e52c96a30b7077675c2a344a99340b9fa86fe3f9b7f070409efcc6`.
+Exact patch, identity and evidence are retained locally under
+`.chromie/acceptance/independent-planning-memory-20260911/`.
+Ignored artifacts do not transfer with Git; preserve them separately.
 
-## Historical pre-merge branch record
+## Implemented scope and earliest responsible boundaries
 
-Current resume and merge authorization are defined above; this record is historical.
-## Current resume boundary — iterations 29–46 complete and unqualified
-
-Updated 2026-09-11. Active Issue #35. The Goal-driven single-authority architecture
-remains binding. The owner-requested first delivery was
-committed and pushed as `9e3d3971e48ce4ffff53723dc99cd4db7279888c` before this batch.
-All **18 further iterations (29–46)** are now complete. Budget remaining: **0**.
-No further candidate optimization is authorized by this exhausted batch.
-This delivery retains three narrow source repairs; it does **not** qualify the
-fixed model, live interaction, supervised voice, or default target-evidence profile.
-
-Branch `codex/ga-request-format`, pre-delivery HEAD/upstream
-`9e3d3971e48ce4ffff53723dc99cd4db7279888c`; main remains
-`ab5caeab49e46be9c77bd87c488e693c156c2eca`. Expected resume revision is the latest
-commit containing this checkpoint and HANDOFF.md, pushed to the same branch.
-Final implementation/test patch SHA-256 from that base: `b9c3c7bffedbd22cf8fa8e1babb4c7cafdf349ccc33c3b1f1c71669bc691fafb`.
-The exact final tracked tree before documentation updates equals iteration 43's
-passing tree; the retained restoration proof binds its gate to this code.
-
-Target remains RTX 4090 Laptop 16 GB, fixed Qwen3.5:4b Q4_K_M/Ollama.
-Soridormi remains `codex/turn-count` at
-`284273bc344cc94012347c75ab270a9f4ac8ffdb`; preserve existing
-` ? workspace/Open_Duck_Playground`. No provider edit, model substitution,
-main merge, runtime flag, new current document, or architecture layer was added.
-
-## Retained repairs and actual responsibility boundaries
-
-| Observed failure / earliest responsible boundary | Implemented mechanism and proof |
+| Boundary | Former mismatch and current mechanism |
 | --- | --- |
-| Iteration 30 `Blink twice.` primary reads `conversation_id=ga-live-user_probe_unknown_people_outside` as purpose/ambiguity evidence. GI ambient projection exposed a bookkeeping label as human meaning. | Iteration 31 excludes root conversation_id/session_id/turn_id/sid from both interpretation prompts. Original request and logging identities remain. Eight label-substitution subtests failed before and pass after. |
-| Actual `MindProfile.prompt_context()` already carries the owner-approved robotic embodiment boundary; GI identity projection drops it. Twenty complete-Mind contrasts prove the omission. | Iteration 32 projects existing model_identity_boundary losslessly in primary/Deep, with a required 1,200-character JSON bound that fails instead of dropping identity truth. Four lossless/overflow checks fail before/pass after. No new identity fact or Capability availability inference. |
-| Live 42 GA primary speed=`走边` fails a semantic value validator; broad ValidationError handling wrongly invokes another GA call under mechanical repair. | Iteration 43 permits the existing one regeneration only for recognized extra-field/list/dictionary-shape errors. Invalid/missing meaning, range/literal/semantic and mixed errors fail closed after one call. Seven regression failures now pass; frozen 11 transaction checks improve 3/11 -> 11/11 and pass again on 46. |
+| Charter -> Planner contract | Principle 25 prohibited all pre-GA Capability execution while architecture/principle 34 allowed safe reads. The authorized rule now permits only complete, validated preparation and available, explicitly side-effect-free safe reads without confirmation; all ordinary Runtime barriers remain. |
+| GI/GA -> Planner invocation | GI output starts GA and its own Planner task concurrently. Material committed Goal/Work changes start a distinct Planner call without waiting for the first. Identity-only association remains a mechanical join; neither GI nor GA owns planning. |
+| Planner -> Work contract | Complete-group reuse/implicit replacement could not express the agreed partial revision. Planner can reuse a subset, add Work and explicitly select cancel_activity_ids. Omission means unchanged. DTO, dynamic Schema, prompts and Host validation agree. |
+| Planner result -> Runtime/Host publication | Scoped snapshots, serialized intersecting commits, exact Plan/fingerprint and single-use version guards reject obsolete submissions before publication and again before dispatch. Shared requests retain one execution identity and require every owning Goal for mutation. |
+| Pre-GA read -> canonical execution | Integration exposed different provisional/canonical interaction IDs, losing seeded result reuse. Exact shared identity now binds the original result; real local Runtime regression observes one provider call, before GA. |
+| Plan revision -> Goal progress/Evidence | A single latest-Plan binding lost preserved older progress/Evidence and Goal-stop coverage. Existing execution records retain original bindings; Goal views aggregate retained/current Work, accept only exact preserved old Evidence, and stop all owned Plan groups. |
+| Memory -> role context | Existing activated, privacy-filtered entries now reach GI, GA and Planner with source, consent and lifetime fields. Cognitive relevance and persistence remain separate; Memory cannot replace current Goal, Work or Evidence truth. |
 
-The captured42 second call only reordered bindings and failed again; it did not
-repair the meaning. The defect is its eligibility, not an inferred successful
-semantic rewrite. The replay includes the exact captured DTO but uses a synthetic
-CWR; it is Level A invocation-control proof, not a replay of the complete live
-request. GA/Planner remain concurrent downstream consumers of immutable GI meaning.
+The current execution sequence and snapshot contract are owned by
+[COGNITIVE_TURN_LOOP](docs/COGNITIVE_TURN_LOOP.md); the exact local proof workflow
+is retained in [HANDOFF](HANDOFF.md). No standalone design document, architecture
+layer, service or configuration switch was added. Maintained Markdown count is
+102 -> 102; configuration keys remain 381, public booleans 1, aliases 0.
+Existing Memory, Runtime and Goal-state owners were extended.
 
-The absent-Mind `blink_twice_plain` response triggered the identity audit but cannot
-prove causality for a missing Mind field. Twenty supplied-Mind and 24 absent-Mind
-cases stay distinct. Correct robotic identity also does not establish available
-Capabilities. Playback `current_generation` contamination remains a known gap:
-experimental 38 removed it, but full-cohort regressions left that change unselected.
+## Observed verification and limits
 
-Previously delivered 9e3 repairs remain: authorized speech limitations plus independent
-zero-step response, count/availability provenance, unmet-Goal satisfaction,
-duplicate Fast JSON rejection, native canonical Schema intersections, unresolved/
-language/history projection and bounded GI duration/speed source spelling.
-The separate native Fast wire amendment is still pending its existing owner question.
-Charter principle 23's two tagged frames are unchanged; speech approval did not
-amend that rule. No extra semantic reviewer/critic was introduced.
+Final `./scripts/run_tests.sh` passed: **2,407 tests, 671 subtests,
+140 benchmark tests and 20 legacy Agent tests**. Repository policy, test
+ownership, pinned Ruff/MyPy, configuration, runtime-structure and documentation
+checks passed. Two existing FastAPI startup deprecation warnings remain.
+`canonical.log` binds this result to the retained implementation patch;
+`canonical-before-retained-evidence.log` is an earlier intermediate result only.
 
-## Observed verification and qualification limits
+Focused evidence includes independent Planner completion, real local Runtime
+safe-read single execution, scoped partial reuse/cancel/add, stale submission
+rejection, shared ownership, preserved progress/Evidence, and multi-Plan Goal
+cancellation. Relevant files: `publication.log`, `task-delta.log`,
+`retained-evidence.log`, `goal-stop.log`; full final gate includes every regression.
+The pre-change focused baseline is `baseline.log` (150 tests, 11 subtests).
 
-Canonical code gate 43: **2,366 tests, 601 subtests, 140 benchmark tests and 20
-legacy Agent tests passed**, including pinned static, policy, docs and ownership
-checks. Final restoration reproduces that exact tracked tree before the docs
-refresh. Focused 43:165 tests/120 subtests. Retained-source robust-intent Level A:
-8/8. Frozen GA replay 46:11/11. Final documentation/delivery checks are retained
-separately; these counts never imply model or robot qualification.
+Selected Level A general-ability acceptance passed **21/21 distinct cases**:
+continuous recovery 4/4, deterministic safety 3/3, human-like continuity 4/4,
+multiple Goals 10/10, capability grounding 7/7. Class memberships overlap.
+`level-a.log` and `level-a/` retain the final run. These are deterministic local
+contracts and scheduling evidence, not model inference or interaction-quality
+qualification. Provider stubs and the existing Level A scenario fixtures were used;
+no physical actions, microphone, audible speaker or deployed service proof ran.
 
-Final GI 46, with all 88 request packets byte-identical32: **44 cases / 61 calls; 61 complete Schema-valid / 60 Host-admitted; 5 mechanical / 3 reviewed qualified**.
-Selected 32 had 5/44 reviewed qualified. Request-identical output variation persists;
-changed answers in this repeat cannot be attributed to the unchanged GI source.
-Every raw primary and designated Deep output, including mechanical passes and
-failures, was reviewed. No reference/rubric was changed after inference.
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Authorized architecture/contract amendment implemented locally. | Canonical gate and selected Level A classes pass; final documentation check retained separately. | Current patch unqualified for real model, live voice and target runtime. | Development only; default target-evidence closure remains open. |
 
-Unchanged earlier role diagnostics remain unqualified: canonical Fast 24 qualified 2/8;
-Deep 26 speech7/16 and history4/12. New-batch Fast 33 zero-penalty experiment did not
-qualify the role and was restored. All GI wording/order/profile/spelling experiments
-outside 31/32 were unselected;44 reviewed 3/44 and 45 reviewed 2/44 versus 32's5/44.
-Iteration 41's local gate failed one existing literal prompt assertion; that candidate
-was restored, not relabeled passed.39–41 were not deployed after frozen hard failures.
+## Next resume
 
-Final stable 51-case live preview 46: **1 complete failure, 1 partial case with one retained GI response and unproven Host/terminal outcome, 49 unrun; 2 retained calls reviewed, 2 Schema-valid, zero qualified**.
-Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260911_051238.tar.gz`.
-See HANDOFF.md and the retained per-module review for the exact failure and
-non-invoked downstream owners. No Work was admitted for completed final cases.
-Partial-case outcome is unknown; no full-cohort pass is claimed. The profile uses
-synthetic text, discarded audio and no execution request.
+The owner requested separate discussion and authorization for each audit finding.
+[Audit index #36](https://github.com/TimeTreker/chromie/issues/36) links #37 (this
+authorized local implementation) and #38 (completed documentation correction),
+#39 (semantic inheritance), and #40 (GI speed rejection only). Remaining #40 work
+and #41–#48 need separate authorization. Select the next topic with the owner.
 
-Open failures include atomic decomposition/count/parallel loss, invented actors or
-bindings, unknown facts mistaken for speech, fabricated/misattributed history,
-false execution-prerequisite ambiguity, and malformed/unbounded tagged Fast output.
-Schema validity and fail-closed containment are insufficient behavior evidence.
-Release remains development only. Current-revision supervised microphone/speaker,
-physical robot and default target-evidence closure remain unproven.
+1. Inspect `git status --short --branch`, this checkpoint, current Charter and
+   HANDOFF. Preserve any subsequent dirty work and existing evidence.
+2. Review the authorized amendment as one change. No unresolved owner decision
+   blocks this implemented slice; do not infer authorization for the other
+   architecture findings, Fast wire change, model optimization or deployment.
+3. For any further authorized source edit, run focused regression and the
+   canonical gate; keep evidence bound to the exact patch/revision.
+4. For newly authorized model/live qualification, bind fresh production prompt,
+   Schema, source, provider and runtime identities and run the full frozen cohort.
+   The old 29–46 budget remains exhausted; this local amendment does not renew it.
+5. Any later Git delivery must update both handoff owners in the same commit.
 
-## Next resume order
+## Historical evidence preserved
 
-1. Read canonical project truth, this checkpoint and HANDOFF.md; verify the pushed
-   branch, final implementation identity and paired provider before editing.
-2. Preserve the completed 29–46 ledger and all failed/rejected evidence. This batch
-   is exhausted; further optimization or a model comparison needs a new owner request.
-3. Resolve the existing separate Fast wire proposal only if the owner answers it;
-   do not repeat the question or infer authorization from speech repair/commit.
-4. For newly authorized work, select an earliest demonstrated boundary from the
-   retained aggregate; keep the fixed-model distinction explicit. Do not add phrase
-   routing, Host semantic rewriting, same-owner critics or speculative budget growth.
-5. Freeze new labels before inference, prove focused behavior and rerun complete
-   frozen/live cohorts without mid-cohort source changes. Physical evidence remains
-   supervised; never convert text/simulator evidence into that claim.
+The prior consolidation at the base revision passed 2,392 tests, 671 subtests,
+140 benchmarks and 20 legacy tests; selected Level A was 26/26. Its full resume
+record is available with `git show a0c5d09f:DEVELOPMENT_CHECKPOINT.md`, and its
+workflow remains below the current entry in HANDOFF. Those are base-only counts.
 
-Private root: `/home/chromie/github/chromie/.chromie/acceptance/laptop-more18-20260911/`.
-Original root: `.chromie/acceptance/laptop-iterations-20260910/`.
-Artifacts are ignored and local; Git does not transfer them across machines.
+The 4090 Laptop batch 29–46 remains complete and unqualified. Fixed
+Qwen3.5:4b Q4_K_M/Ollama; retained repairs 31/32 (GI context) and 43 (GA repair
+eligibility). Final GI 46: 44 cases / 61 calls, 3 reviewed qualified; final live
+preview: 1 complete failure, 1 partial, 49 unrun. Final original bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260911_051238.tar.gz`.
+Full failures, rejected candidates and provider identities remain in HANDOFF and
+`.chromie/acceptance/laptop-more18-20260911/`; none were requalified here.
+Soridormi was not edited. The separate native Fast wire proposal stays pending.

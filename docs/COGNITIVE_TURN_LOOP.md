@@ -261,12 +261,13 @@ response author.
 ```text
 validated GI result
   -> concurrently:
-       Goal Association
-       one Fast Planner stream
+       Goal Association -> canonical Goal continuity
+          -> distinct Goal/Work change may start its own Planner call
+       GI-triggered Fast Planner stream
           -> complete validated PresentationCommit -> non-silent presentation may launch
-          -> complete terminal Planner result
-  -> join terminal Planner result with applicable canonical Goal state
-  -> validate Plan before Goal-owned Work
+          -> complete terminal result -> prepare Work; admit eligible safe reads
+  -> bind accepted Planner Work to applicable canonical Goals
+  -> validate snapshot and commit the exact Plan before further Runtime dispatch
 ```
 
 The early item is a closed typed commit, never a raw text/token stream. Its accepted
@@ -278,7 +279,14 @@ failure after a truthful commit preserves delivery evidence but authorizes no Go
 Work or Host-authored replacement response.
 
 GI reports only bounded unresolved meaning; it does not turn every absent value into an
-InformationGap or decide which Capability inputs are required. Fast Planner compares the
+InformationGap or decide which Capability inputs are required. User-required freshness,
+new observation, repetition and historical-result scope travel in the accepted WHAT;
+missing answer data does not itself require deeper GI. Planner determines whether trusted
+context/Evidence already satisfies those conditions or new Work is needed. Relevant old
+Memory can resolve a current referent without becoming a fresh observation. Role-specific
+context responsibilities and the existing bounded Memory projections are described in
+[Memory Extraction](MEMORY_EXTRACTION.md#cognitive-projections-and-storage-lifetime).
+Fast Planner compares the
 immutable Responsibility with applicable planning, Agent-Skill, Capability, safety, and
 provider contracts. It owns planning InformationGaps and the resolution order: explicit
 or contextual evidence, trusted observation/query, an owner/schema default, a permitted
@@ -330,16 +338,50 @@ unbound audit Evidence and cannot support Goal completion or response claims. De
 revisions follow the same cancel-pending/preserve-completed rule; neither result payloads
 nor the Host infer a semantic correction.
 
+GI and GA trigger separate Planner tasks/calls when each has distinct planning input.
+A GA-triggered call may finish while the GI-triggered stream is still running; a complete
+new Goal plan supersedes the unfinished GI result. Already delivered or pending speech
+is retained in Interaction Context. An identity-only GA join of unchanged Responsibility
+meaning remains mechanical and does not require another call. No task reviews or repairs
+another task's semantic decision.
+
+Each GA/Evidence-triggered call receives actual Runtime Work plus canonical Goal state.
+Runtime snapshots carry Goal-owner state, queued/running request identities, prepared
+Activities, and per-Goal/turn commit versions. Intersecting commits serialize after model
+calls complete; unrelated Goals can progress independently. The exact Plan ID/fingerprint
+and a single-use version guard bind the returned response through Host publication and
+actual Runtime submission. Goal changes, new Work, or another accepted Plan reject an
+obsolete submission. Normal completion preserves terminal request identity and Evidence;
+explicit cancellation must close before replacement dispatch. Host publication of that
+same accepted Plan is recorded atomically with its guard. There is no automatic semantic
+retry or second reviewer call after rejection. Host publication also carries exact
+retained Work bindings into the existing Goal progress owner. Each original Plan keeps
+its own execution record; the Goal view aggregates still-owned requests across those
+records. Completion of a newly added request cannot hide an older running request.
+Evidence from explicitly preserved older Work is retained with its original Plan
+identity and cannot overwrite the current Plan's evidence summary. An unbound stale
+result still fails closed. Named Goal cancellation resolves all of those retained and
+current Plan bindings and requires an exact closure receipt for each before recording
+the Goal as cancelled. For a Goal replacement that defers GA persistence until Work
+stop, the Host finalizes the same submission guard only after that authorized Goal-owner
+transaction succeeds; a competing Planner reservation still invalidates it.
+
+Before GA, only a complete validated Planner result can enter Runtime preparation. Its
+leading eligible safe-read Activities may start under immutable Responsibility refs;
+an earlier held Activity also holds later reads to preserve ordering. Other Activities
+remain prepared. GA attaches canonical Goal IDs. A GI-derived canonical Plan adopts its
+prepared tasks; a later Planner explicitly reuses or cancels named prepared tasks.
+Omitted prepared tasks remain visible to later planning for their Goals, without dispatch
+authority. Preparation is volatile Runtime state, not durable Memory or execution Evidence.
+
 Retained Runtime Work and same-turn provisional Work share the bounded
 `existing_work_activities` Planner input. Each item exposes one stable Activity
 identity and its immutable Capability/argument/ownership/timing projection. A retained
-request may be reused only when Planner selects the complete retained set with no
-additional step; the new Plan is reconciliation-only, Runtime leaves the original
-submission and Goal execution binding in place, and Host records or dispatches no
-duplicate execution. If different or additional Work is needed, Planner omits all reuse
-selections and authors the complete replacement Plan; Runtime validates and cancels the
-old cancellable group before replacement dispatch. This atomic-group rule is the current
-safe Runtime boundary, not a semantic judgment by Host.
+request may be reused as part of a subset, together with new steps. Omission leaves
+Work unchanged. `cancel_activity_ids` explicitly selects cancellation/replacement;
+Runtime cancellation additionally binds exact request IDs, original Plan ID/fingerprint,
+and every owning Goal. Provider-global cancellation must not widen a Planner delta to
+unselected Work. Completed requests remain Evidence and are never replayed by reuse.
 
 Planner re-entry may repeat from meaningful state changes while Responsibility remains
 open. A user update may require GI/GA before planning; provider Evidence, failure,
@@ -956,6 +998,46 @@ barge-in may invalidate already-playing or obsolete queued audio, but it cannot
 make an independent Goal's later evidence-bound result stale. Only explicit
 scoped cancellation, supersession, or a Core-authorized semantic interruption
 may suppress that future result obligation.
+
+### Goal meaning inheritance
+
+GI authors current WHAT. GA authors its relationship to canonical Goals. A new GA
+model Goal contains `source_responsibility_refs` and provider-neutral representation
+fields, without `description`. The Host directly copies the one referenced GI outcome
+into canonical `description` and `success_criteria`; no second wording decision occurs.
+
+For `modify`/`clarify`, `requirement_changes` identifies a target Goal, zero-based
+`replace_requirement_indices` in its supplied `success_criteria` and current GI source
+refs. When criteria are absent, the retained description is one opaque requirement.
+Empty indices add requirements; unselected entries remain. Only a complete current GI
+outcome may replace a whole requirement. Unsupported/incomplete meaning is not repaired
+by Host concatenation or GA prose. `updated_description` is forbidden.
+
+Optional `binding_changes` name an explicit path under the retained Goal's `object`,
+`constraints` or `resource_responsibility`, plus the accepted GI ref and binding name
+whose value is copied. Overlapping paths, unavailable sources, conflicting named values,
+out-of-range requirements and changed modalities reject; modality replacement uses the
+existing explicit new-Goal/supersession contract. Requirement selection remains GA's
+semantic responsibility; exact reference/field validation is not a proof of model quality.
+
+The Agent materializes `goal_update.by_goal_id`, containing the supplied canonical Goal
+fingerprint, selected indices, source turn identity, copied Responsibilities and binding
+selectors. The Goal-state owner repeats validation against actual state before committing
+description, success criteria, semantic fields and provenance together. The description
+joins effective criteria for display; Planner receives the full criteria and Goal fields.
+`metadata.requirement_sources` retains each effective requirement's accepted GI record,
+qualified by turn, or explicitly identifies a retained Goal/version when older stored
+state has no GI record. It never invents historical GI provenance. `goal_revision_history`
+retains each replaced Goal snapshot and its source update under existing Goal retention,
+deletion and persistence rules. Existing resource identity, related/superseded Goal refs,
+Work, progress and Evidence remain unless their owner explicitly changes them. A stale
+or malformed update rejects atomically; it does not authorize another semantic repair call.
+
+Both candidate-aware and no-candidate GA still use one primary invocation and the existing
+mechanical DTO-repair policy. Candidate requirement context is lossless within its budget;
+only exact duplicate text is omitted, and overflow fails explicitly. Full `merge`/`split`
+state transactions remain unimplemented and reject. No new Memory store or Runtime queue
+is introduced by this contract.
 
 ### 8.1 Pre-execution speech
 

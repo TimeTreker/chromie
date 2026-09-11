@@ -113,7 +113,6 @@
               "value": "6秒"
             }
           ],
-          "description": "朝我这边移动6秒。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

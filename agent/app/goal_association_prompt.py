@@ -24,6 +24,12 @@ from .goal_association_contract import (
 from .prompt_projection import bounded_json, required_json
 
 try:
+    from chromie_contracts.memory import role_memory_context
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.memory import role_memory_context
+
+
+try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
     from chromie_contracts.discourse import DiscourseReferent
     from chromie_contracts.situation import SituationProjection
@@ -136,8 +142,9 @@ def build_segmentation_prompt(
         "acknowledgement, progress, delivery, personality, or implementation Goals. "
         "A manner, prohibition, timing, or social-presentation modifier stays on the "
         "outcome it constrains. A greeting attached to substantive work is framing; "
-        "a standalone social act is one speech Goal. One lookup and the requested "
-        "judgment of that same evidence are one Goal. Acquisition, carrying, return, "
+        "a standalone social act is one speech Goal. "
+        "Information acquisition and a requested interpretation of that same evidence "
+        "are one Goal. Acquisition, carrying, return, "
         "and handoff are stages of one requested physical delivery, not sibling Goals.\n\n"
         "Preserve the supplied Responsibility WHAT output_mode exactly in the canonical Goal. "
         "information keeps one information resource_responsibility when grounded "
@@ -146,8 +153,9 @@ def build_segmentation_prompt(
         "selects a Capability, provider, executable operation, or Plan. Preserve every supplied material "
         "binding verbatim, including counts, durations, speeds, directions, targets, "
         "severity, thresholds, negation, comparison, and scope. For a non-resource "
-        "Goal, put these in top-level typed bindings; the action itself may remain in "
-        "description. Do not claim completion or choose a Capability. "
+        "Goal, put these in top-level typed bindings; the action remains in GI outcome. "
+        "Do not emit a Goal description: Host inherits it and success_criteria from GI. "
+        "Do not claim completion or choose a Capability. "
         f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
         "Use resource_responsibility only when obtaining and making a resource "
         "available to a recipient is the human outcome. A physical_object is a "
@@ -277,14 +285,26 @@ def association_goal_projection(
             ),
             "work_status": snapshot.get("work_status"),
             "description": goal.get("description"),
+            "goal_version": goal.get("version"),
+            "success_criteria": goal.get("success_criteria") or [goal.get("description")],
+            "constraints": goal.get("constraints"),
+            "resource_responsibility": goal.get("resource_responsibility"),
+            "requirement_sources": metadata.get("requirement_sources"),
             "source_text": goal.get("source_text"),
-            "bindings": (goal.get("object") or {}).get("bindings", {}),
+            "object": goal.get("object"),
             "output_mode": metadata.get("output_mode"),
             "open_information_gaps": snapshot.get(
                 "open_information_gaps", []
             ),
             "last_user_update": snapshot.get("last_user_update"),
         }
+        # Requirements already carry the complete WHAT; remove only exact
+        # duplicate text, never truncate the version-addressed selection surface.
+        if item["success_criteria"] == [item["description"]]:
+            item.pop("description")
+        for field in ("source_text", "last_user_update"):
+            if item.get(field) == goal.get("description"):
+                item.pop(field, None)
         projected.append(
             {
                 key: value
@@ -350,7 +370,7 @@ def build_association_prompt(
         "policy, or completion claim. The Host owns IDs, versions, persistence, "
         "lifecycle mechanics, and canonical construction.\n\n"
         "Resolve each GI Responsibility independently in this order, then verify that "
-        "every local_ref occurs exactly once across associations and new_goals: (1) when "
+        "every GI Responsibility ref must map to exactly one association or new Goal: (1) when "
         "both the source directly says a specific candidate must stop and it presents the "
         "new outcome as that candidate's substitute, while GI supplies relationship=new "
         "with no target_goal_ids, emit a replacement new_goal with only that candidate in "
@@ -381,19 +401,23 @@ def build_association_prompt(
         "reject apply only to a pending proposal. Copy relationship exactly from "
         "continue, modify, clarify, confirm, reject, cancel, pause, resume, merge, "
         "split, or reference. Target only supplied Goal IDs. A modify association "
-        "must put the complete refined Goal outcome in non-empty "
-        "updated_description. A clarify association must put the supplied update "
-        "in non-empty updated_description or name at least one supplied "
-        "resolved_gap_id. Never leave the update only in reason_summary; rationale "
+        "must supply requirement_changes with target_goal_id, zero-based "
+        "replace_requirement_indices into supplied success_criteria, and current "
+        "source_responsibility_refs. Empty indices add; unselected requirements remain. "
+        "Replace only requirements completely restated by current GI; never substitute "
+        "a partial fragment for a long Goal. Host copies outcomes and derives description/criteria. "
+        "clarify supplies changes or resolved_gap_ids. binding_changes copy one exact GI "
+        "source_binding/source_responsibility_ref to a named path under object, constraints "
+        "or resource_responsibility; unselected fields remain. Keep those fields consistent "
+        "with GI. Never author updated_description or success_criteria. Rationale "
         "does not mutate Goal meaning. Association confidence measures certainty "
         "about Goal ownership and the continuity relationship, not whether linked "
         "Planner input gaps are resolved or the Goal is executable. Keep "
         "resolved_gap_ids empty when resolution is unproven, but do not lower an "
         "otherwise explicit targeted association's confidence for that reason.\n\n"
-        "An association preserves the existing Goal's description, typed bindings, "
-        "and output_mode; it cannot rewrite a material entity or parameter. When the "
-        "source explicitly changes such a binding on the same retained Responsibility, "
-        "create one complete replacement Goal and put the old ID in supersedes_goal_ids. "
+        "An association preserves unselected Goal requirements, provenance and resource "
+        "fields. Source-bound requirement_changes may refine the retained Responsibility; "
+        "GA does not decide whether its Work must be reused or cancelled. "
         "Explicit lifecycle replacement or abandonment remains replacement even when the "
         "new outcome's WHAT, modality, or entity is wholly different. Apply replacement "
         "only to that explicit same-Responsibility case; a separate new Responsibility is "
@@ -412,8 +436,8 @@ def build_association_prompt(
         "terminal Goal may be referenced but not reopened. Preserve unresolved human "
         "meaning in the narrowest provisional Goal; Fast Planner alone decides any "
         "question.\n\n"
-        "For a new Goal, copy description from that Responsibility's current GI outcome, "
-        "never from a candidate Goal. Preserve every material binding exactly and preserve the GI "
+        "For a new Goal, emit its source_responsibility_refs, never a description. Host "
+        "inherits the exact GI outcome and successful-outcome requirements. Preserve every material binding exactly and preserve the GI "
         "WHAT modality exactly: information keeps one information resource_responsibility "
         "when the outcome is grounded information acquisition; stateful_effect keeps "
         "ordinary typed bindings and no information resource; every other explicit "
@@ -436,7 +460,7 @@ def build_association_prompt(
         f"{identity_contract}"
         f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
         "Candidate Goal semantic evidence JSON:\n"
-        f"{bounded_json(association_goal_projection(candidate_goals), 2600)}\n\n"
+        f"{required_json(association_goal_projection(candidate_goals), 2600, label='Goal requirement evidence')}\n\n"
         "GI Responsibility evidence JSON:\n"
         f"{required_json(responsibilities, 16000, label='GI Responsibility evidence')}\n\n"
         "GI unresolved-meaning evidence JSON:\n"
@@ -465,102 +489,6 @@ def build_prompt(
     if output_type is GoalSegmentationModelOutput:
         return build_segmentation_prompt(request)
     return build_association_prompt(request, candidate_goals)
-
-    # The remaining source below is retained temporarily while the compact
-    # existing-Goal prompt is validated against the canonical behavior suite.
-    context = request.context if isinstance(request.context, dict) else {}
-    identity_json = bounded_identity_json(context)
-    personality_json = bounded_personality_json(context)
-    if output_type is GoalSegmentationModelOutput:
-        state_instructions = (
-            "There are no active or retained recent Goals, so no existing-goal relationship is possible and the contract intentionally has no associations field. "
-            "Segment the authoritative user turn into independent new Goals. When GI preserves unresolved material meaning, create the narrowest source-grounded provisional Goal without inventing the missing referent or scope; Fast Planner owns any clarification decision. "
-        )
-        output_instructions = (
-            "Return only JSON with decision, new_goals, referent_updates, resolved_references, confidence, and reason_summary. "
-            "Use decision=create_goals and preserve each source-grounded Responsibility, including a provisional Goal whose exact referent or scope remains unresolved. Do not author a question or decide input-resolution policy. "
-            "The decoder enforces the exact GoalSegmentationModelOutput JSON Schema. "
-        )
-    else:
-        state_instructions = (
-            "Resolve continuity before creation using semantic reasoning. "
-            "For continuity with an existing goal, emit an associations item with source_responsibility_refs, relationship, target_goal_ids, confidence, reason_summary, the applicable updated_description, and resolved_gap_ids fields. Goal Association owns canonical Goal continuity only: do not decide whether Work must be reused, replaced, cancelled, or replanned; Fast Planner owns that judgment from the committed Goal and actual Work state. "
-            "relationship must be copied exactly from [\"continue\",\"modify\",\"clarify\",\"confirm\",\"reject\",\"cancel\",\"pause\",\"resume\",\"merge\",\"split\",\"reference\"]. "
-            "Use continue only when the current turn advances unchanged unfinished active or recoverable work. Use reference when the current turn asks to retrieve, restate, explain, compare, verify, or otherwise answer from a retained Goal without changing its meaning or lifecycle. Do not use continue or reference merely because the topic overlaps with a previous Goal. When the latest turn is a social reaction, acknowledgement, personal feeling, practical decision, conversational evaluation, empathy-seeking comment, or another independently satisfiable communicative act, create a fresh vocal_output Goal that captures that latest intent; prior delivered information remains context for that answer. Use modify only when the same Responsibility is being refined and include updated_description or resolved_gap_ids. When the user abandons that Responsibility for a genuinely different outcome, emit a complete new Goal whose supersedes_goal_ids names the old Goal; never mutate the old Goal through an association. The association relationship clarify means the current user turn supplies missing information for a Goal and must include updated_description or resolved_gap_ids; it never means that the user is asking Chromie for more explanation. When GI preserves unresolved material meaning, create or associate the narrowest source-grounded provisional Goal without inventing that meaning; Fast Planner alone decides whether and how to ask. "
-            "Use confirm only when the current turn approves a pending proposal for the targeted Goal, and use reject only when it declines that proposal. "
-            "Associations may target only IDs from the bounded candidate-goal list. A recent terminal Goal may be referenced without reopening or changing its terminal lifecycle state. "
-            "An association cannot rewrite an existing Goal's typed material bindings. When your semantic judgment is that the current user meaning changes a material entity or parameter, preserve the old Goal and emit a complete replacement Goal with authoritative bindings. "
-        )
-        output_instructions = (
-            "Return only JSON with associations, new_goals, referent_updates, resolved_references, confidence, and reason_summary. Associations and new_goals may both be non-empty and must jointly map every accepted GI Responsibility exactly once. New Goals may copy related_goal_ids from the bounded active Goal list when that relationship helps later reasoning; this contextual relationship does not itself reopen or add the retained Goal to the current responsibility. "
-            "The decoder enforces the exact GoalAssociationModelOutput JSON Schema. "
-        )
-    return (
-        state_instructions
-        + "Goal Association receives provider-neutral Responsibility evidence, not a route or intent classification. "
-        "Each Responsibility also carries GI's context-grounded Goal relationship and target_goal_ids. Verify those proposals against the complete candidate Goal list and authoritative turn; preserve a correct answer to a pending Planner clarification as a Goal update instead of interpreting its short surface as a new Goal. Goal Association remains the sole canonical commit authority and may resolve a supplied pending gap only through its canonical association update. "
-        "No compatibility label may force a clarification branch or attach the turn to an existing Goal. "
-        "Create or associate a Goal for every source-grounded human Responsibility even when GI reports bounded unresolved meaning or Fast Planner later finds a missing execution input. That provisional Goal persists while Fast Planner asks the user. Goal Association never selects or words a clarification Activity and never creates a planning InformationGap. "
-        + "The model-facing contract is deliberately small. "
-        "The host owns all IDs, versions, source text, constraints, metadata, persistence fields, and canonical object construction. "
-        "Never emit id, goal_id, association_id, turn_id, schema_version, source_text, constraints, object, metadata, success_criteria, capabilities, or plans. Referent IDs may only be copied from the supplied discourse context; new referent IDs are Host-generated.\n\n"
-        "Create one new goal for each independently satisfiable user responsibility. Copy every owning GI local_ref into that Goal's source_responsibility_refs; every GI Responsibility ref must map to exactly one association or new Goal. The authoritative user turn plus Responsibility evidence are the only sources of human Responsibility here; Fast Planner Activity is HOW authored concurrently and must never become, justify, or be copied into a sibling Goal. Responsibility conservation is strict: never create an extra Goal for acknowledgement, progress, response delivery, personality, or any other outcome that is absent from the authoritative Responsibility evidence. Emit exactly one new_goals item containing source_responsibility_refs, description, typed bindings, and an optional provider-neutral resource_responsibility for each responsibility. "
-        "Every new Goal must declare one exact canonical output_mode that preserves the human-facing WHAT modality. It is not an execution lane, provider requirement, or Work decision. GI information/stateful_effect are preserved as provider-neutral WHAT categories; neither selects a concrete Capability or declares that provider Work is required. Media playback may also declare its exact media_operation; non-media Goals may omit media_operation and the Host supplies none. "
-        "When Responsibility evidence includes output_mode, preserve its human-level "
-        "WHAT while using the canonical Goal projection enforced by the decoder: "
-        "information -> information + information resource when applicable; stateful_effect -> "
-        "stateful_effect without an information resource; every other explicit mode is "
-        "copied exactly. Goal Association must not reinterpret or weaken the WHAT, and "
-        "this projection never chooses a concrete Capability/provider. "
-        "Use output_mode=speech for an ordinary authored conversational response, including a greeting, empathy, reassurance, restatement, explanation from supplied context, or acknowledgement of a person's feeling. The need to think or formulate words never makes ordinary conversation information. A person's report of their own state never becomes body_action, information, or stateful_effect unless the authoritative Responsibility separately asks Chromie to learn something or change the world. Preserve speaker, experiencer, actor, and addressee ownership exactly. "
-        f"{_EXECUTION_CONTRACT_PROMPT} "
-        "The eventual spoken delivery of information or an effect result remains part of that same Goal, never an additional speech Goal. Persona, tone, wording, and answer delivery are not independent Goals. "
-        "A requested manner, mood, persona, or social presentation attached to a substantive action or other effect is a constraint on how that effect should be expressed, not a second Goal. Keep it in the substantive Goal description. It becomes a separate vocal Goal only when the user independently asks to hear positive authored content or a vocal performance that remains satisfiable without the substantive effect. "
-        "A standalone social interaction such as a greeting, thanks, reassurance request, casual check-in, reaction, personal feeling, evaluation, or practical decision is itself one satisfiable conversational Goal: respond naturally to that current social act. This remains true when the act is grounded in information delivered by a previous Goal. Prior evidence may support the answer, but it does not replace the latest communicative responsibility. Do not treat it as an empty turn or fold it into an already completed task merely because the topic is related. "
-        "A new question about what Chromie previously said is a fresh speech Goal whose owed outcome is for Chromie to repeat or summarize the most recent accepted assistant/Chromie dialogue utterance. It references that utterance as content but does not continue, resume, or modify the old Goal merely because the old response supplies the answer. Never reverse this into asking the user to repeat, and never substitute the user's earlier utterance or current question for Chromie's delivered words. "
-        "A greeting or politeness preamble attached to a substantive request is conversational framing, not a separate Goal unless the user independently asks for a social response. Owner-approved identity and personality shape expression only; never create a Goal merely to mention age, identity, warmth, curiosity, or another style trait. "
-        "Information acquisition and a requested interpretation of that same evidence are one Goal when one result can satisfy both. Multiple requested aspects derived from one information result remain one information responsibility when the same result satisfies them. Do not split evidence acquisition, requested result aspects, or interpretation of that result into separate Goals. "
-        "A physical action and a conversational answer or spoken performance are independent goals when the answer or performance is genuinely requested. Separate independently requested outcomes that can be accepted or rejected on their own. However, acquisition and delivery stages that together constitute one human responsibility are one Goal: navigating/searching, locating, grasping or retrieving, carrying, returning, and handing over are provider-owned stages of one physical resource delivery; external search, evidence retrieval, evaluation, and spoken explanation are stages of one information resource delivery. Do not split those implementation stages into separate Goals unless the user independently requests one stage as its own outcome. A simple acknowledgement, confirmation, willingness statement, or progress prelude for capability work is not a separate vocal_output Goal; it is prospective conversational output attached to the existing responsibility and every cognitive stage must use Interaction Context to avoid repeating an already fulfilled act. Before returning, verify that every independently satisfiable user responsibility appears in exactly one new_goals item: no merged unrelated outcomes and no duplicated responsibility across Goals. "
-        "Every Goal must first state resource_kind as the explicit resource discriminator: none for non-resource outcomes, physical_object only for acquisition and physical handover of a distinct concrete object, or information for an information outcome. The declared discriminator and resource_responsibility kind must match exactly. For a responsibility whose human-level outcome is to obtain something and make it available to a recipient, include exactly one nested resource_responsibility. It is the sole writable resource authority. A physical_object resource means a distinct concrete object that exists independently of Chromie's body motion and whose acquisition plus handover completes the human outcome. It is never a generic wrapper for embodied work: locomotion, body motion, gaze, blinking, waving, turning, posture, and gestures are non-resource body_action Goals, use resource_kind=none, keep resource_responsibility absent, and preserve their material semantic parameters in top-level bindings. For kind=information, use output_mode=information, classify the provider-neutral information_domain from the evidence actually needed (local_clock, weather_forecast, external_grounded_information, direct_environment_perception, or private_runtime_information). Weather conditions and forecasts—including rain or precipitation, temperature, hot/cold, wind, humidity, and sky conditions—are always weather_forecast; external_grounded_information is only a public fact with no more specific owned domain. Write every requested query fact—location, time, requested aspect, comparison, threshold, or other answer-shaping scope—exactly once in query_scope. Current nearby person/object/event presence is direct_environment_perception, never weather merely because both concern outside. Its source object is intentionally narrow: source.status=provider_resolved delegates public/external source selection; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for a user- or discourse-named information source and then source_name is required. Never copy query_scope facts into source. For kind=physical_object, use output_mode=body_action and delivery_mode=physical_handover; identity and quantity live at resource_responsibility.description/quantity, while source.acquisition_bindings is the only writable location/distance/direction/route surface. When the user or a resolved discourse referent supplies any spatial acquisition fact, source.status must be known and acquisition_bindings must preserve every supplied distance, direction, location, or route. Preserve separately supplied GI bindings separately, but never decompose one GI-owned composite binding into model-normalized fragments: one location binding such as a relative place plus approximate distance remains one exact location/relative_location acquisition binding with its complete source value. source.status=unknown is valid only when no acquisition grounding was supplied. source.description is summary only and any numeric fact in it must also exist in acquisition_bindings. Resource Goals keep top-level bindings empty. No flat compatibility copy is created. resource_responsibility must never name or imply a Capability, provider implementation, website, search engine, coordinates, grasp pose, execution mode, or plan. Human-readable descriptions never override typed fields. "
-        "Also preserve semantic qualifiers such as temporal scope, comparison period, and requested answer shape. Keep source-grounded temporal wording as human semantic scope rather than translating it into provider date/day-part parameters. One compound source expression may remain one temporal_scope binding; separately stated independent scopes remain separate semantic constraints. Never silently narrow broader, historical, comparative, or otherwise scoped meaning. If the intended scope is materially ambiguous, preserve it in a provisional Goal without choosing a narrower interpretation. "
-        "Resolve references, pronouns, demonstratives, ellipsis, and task mentions before planning. Authority order is: explicit current user meaning; foreground scoped discourse referents; candidate Goal bindings; recent dialogue. First identify every material indirect referring expression, then require a unique value from that authority order before writing a resolved binding or supplied referent. Imperative grammar and a plausible generic noun such as device, object, person, task, or setting are never reference evidence. If two or more contextual candidates remain plausible, or none is supplied, preserve the unresolved reference in the provisional Goal description without selecting a candidate; Fast Planner owns the narrow clarification decision. Phrases such as ‘the last task I told you’ may semantically associate with an active, recoverable, or retained recent terminal Goal, but the model must decide that relationship from the supplied Goal state and dialogue—not from a Host phrase table. Tool-result memory is not reference-resolution authority and must never decide what an unresolved expression refers to. "
-        "When the user introduces or explicitly corrects a salient entity, emit referent_updates only when the required discourse-index provenance is available. Use operation=correct with non-empty target_referent_ids copied from supplied discourse context when a new value supersedes an earlier referent; never emit an unscoped correction when no target referent ID was supplied. The canonical Goal association and typed bindings still preserve a correction even when no discourse-index update can be authored. The old referent remains available in its own task scope but becomes background. Use operation=introduce for a new salient entity, and focus/background/retire only for supplied referent IDs. "
-        "Use resolved_references only for indirect references whose denotation is uniquely selected from a supplied discourse referent or active Goal binding, such as pronouns, demonstratives, ellipsis, aliases, corrections, or task mentions. Do not emit resolved_references for an ordinary explicit entity mention such as a directly named place; represent that meaning in the new Goal bindings and, when it is salient for future dialogue, in referent_updates. Every resolved_references item must copy a supplied referent_id and include explicit confidence. If resolution is materially ambiguous, omit the invented binding/reference and preserve a provisional Goal instead. "
-        "Each non-resource Goal must include top-level typed bindings for material entities and parameters already resolved here, including explicit counts, durations, speeds, directions, and targets. For a qualitative speed, use the provider-neutral canonical value slow, normal, or quick; retain more specific severity or intensity as a separate binding rather than hiding it in an inflected speed phrase. Preserve an explicit quantitative speed with its value and units. The action/effect itself belongs in the Goal description; it does not need a duplicate action binding when that exact source value is already retained there. A resource Goal keeps top-level bindings empty and owns every material resource fact only in resource_responsibility. For information, query_scope is the one query-fact surface. Preserve each resolved answer-shaping fact there exactly once as its own typed binding, including spatial, temporal, comparison, threshold, or requested-result scope when supplied. For physical acquisition, use the canonical name and entity_type distance/distance for a separately supplied distance and direction/direction for a separately supplied direction. A relative spatial place uses location/relative_location, including when its one authoritative GI value contains an inseparable approximate distance; generic labels such as measurement or string are not canonical substitutes for a known typed fact. Preserve every explicit severity, intensity, magnitude, threshold, subtype, negation, or comparison qualifier that changes satisfactory completion. Never generalize a narrower request. Downstream planners read the canonical resource directly; no persisted flat projection exists. "
-        "For a location named directly in the final authoritative user turn, copy the complete location value verbatim as one contiguous span in the user's language. Never translate, transliterate, shorten, or expand a directly named location. A directly supplied location is a resolved semantic binding, not a claim that provider canonicalization has already succeeded. Do not ask the user for administrative granularity merely because multiple real-world places might share that value; create the fully bound Goal and let the downstream Capability resolve the exact value or report provider ambiguity. When the user's intended location is genuinely underdetermined in the dialogue, preserve that unresolved scope in the provisional Goal and leave clarification selection to Fast Planner. Only an indirect reference resolved from a supplied referent may use the referent's canonical value instead. For an indirect location, copy the supplied referent_id into both the location binding and resolved_references, and copy the indirect user surface into resolved_references.surface_form. "
-        f"{IDENTITY_SEMANTIC_CONTRACT}"
-        f"{PERSONALITY_SEMANTIC_CONTRACT}"
-        "Do not split implementation steps into goals. Do not create goals for implementation mechanics, safety checks, status lookups, capability calls, or other internal work.\n\n"
-        "Goal Association must not author a clarification question, input-source policy, or planning InformationGap. Put only compact Goal-state rationale in reason_summary.\n\n"
-        + output_instructions
-        + "Each new_goals object contains description, output_mode, optional media_operation, bindings, explicit resource_kind, optional resource_responsibility, related_goal_ids only when retained Goals remain relevant context, and supersedes_goal_ids only when the old Responsibility is genuinely abandoned and replaced by this new independently owed outcome. bindings is an array of typed semantic parameters with name, entity_type, value, optional copied referent_id, and confidence. Use [] when no material binding exists. resource_kind is the exact discriminator for resource_responsibility; resource_responsibility is provider-neutral and must follow the contract above. For a physical resource, copy an explicit entity/item surface exactly into resource_responsibility.description and an explicit recipient surface exactly into recipient.description; never replace “me” or another supplied surface with “user” or “requester”. A vocal Goal must never carry resource_responsibility merely because rendering needs a provider. Every referent_updates item and every resolved_references item must include explicit confidence; never rely on an omitted-field default.\n\n"
-        "Owner-approved Chromie identity JSON:\n"
-        f"{identity_json}\n\n"
-        "Owner-approved Personality Expression JSON:\n"
-        f"{personality_json}\n\n"
-        + "Bounded active goals JSON:\n"
-        f"{bounded_json(candidate_goals, 6500)}\n\n"
-        "Responsibility evidence JSON (Core-authored provider-neutral semantic handoff from Goal Interpretation. These are not canonical Goals. Preserve the WHAT and material bindings; use the authoritative user turn, discourse, retained Goal state, and Situation only to associate continuity or identify a real representation mismatch, never to silently rewrite the Responsibility. Goal Association alone decides create/continue/modify/supersede canonical Goal state. Never infer a Capability, provider, execution method, executable argument, or response wording here):\n"
-        f"{bounded_json([item.model_dump(mode='json', exclude_none=True) for item in request.responsibilities], 4200)}\n\n"
-        "Bounded active task/progress snapshots JSON:\n"
-        f"{bounded_json(context.get('active_task_snapshots') or [], 5200)}\n\n"
-        f"{goal_progress_communication_prompt('Goal Association')}\n\n"
-        "Goal-scoped Interaction Context JSON (append-only facts about what Chromie already associated, planned, said, committed, completed, or failed; owner and event_type preserve evidence strength). Use it to identify the still-needed Goal/continuity delta. Generated or scheduled speech is not heard speech, and planned or committed work is not completed work. Do not reopen, repeat, or recreate an already fulfilled responsibility unless the current turn explicitly repeats it or new failure, correction, changed state, evidence, or clarification requires a new delta:\n"
-        f"{bounded_json(context.get('interaction_context') or {}, 7000)}\n\n"
-        "Scoped discourse referents JSON:\n"
-        f"{bounded_json(discourse_referents(request), 6500)}\n\n"
-        "Discourse focus stack JSON (most recent/foreground last):\n"
-        f"{bounded_json(context.get('discourse_focus') or [], 1800)}\n\n"
-        "Recent conversation JSON:\n"
-        f"{bounded_json((context.get('history') or request.history or [])[-8:], 3600)}\n\n"
-        "Recent conversation is accepted dialogue evidence for ellipsis, pronouns, corrections, and other follow-up meaning. Bounded Goal and Task state is stronger evidence of already-validated semantic continuity when it exists. A newer accepted turn whose metadata says semantic_status=failed or terminal_without_canonical_goal remains valid recent conversational evidence even though it has no canonical Goal; do not skip it solely because an older Goal is canonical. If an earlier admitted turn has not yet produced canonical Goal state, dialogue may still resolve the current reference, but never invent a Goal ID or pretend uncommitted work is canonical.\n\n"
-        "Tool-result contents are intentionally absent at this boundary. Resolve references and Goal bindings from user semantics, scoped referents, candidate Goals, and dialogue only. A later Planner may explicitly retrieve an exact verified memory record after bindings are fixed. "
-        "For an open safe-read Goal whose bound Work is scheduled, running, or recoverable, associate a semantic follow-up with that exact Goal when appropriate; do not answer from another task's result. "
-        "Do not reason from prior routing labels, planner states, validation failures, fallback states, or other runtime diagnostics; they are not user-semantic evidence.\n\n"
-        f"Language hint: {request.language or 'auto'}\n"
-        f"{immutable_source_turn_prompt(request)}\n\n"
-        f"FINAL CANDIDATE GOAL IDS JSON:\n{bounded_json([item.get('goal_id') for item in candidate_goals], 1600)}"
-    )
 
 
 def build_repair_prompt(
@@ -628,7 +556,7 @@ def layered_prompt(
         if identity_json != "null"
         else ()
     )
-    rendered = build_prompt(
+    rendered = role_memory_context(context, role="ga") + build_prompt(
         request,
         candidate_goals,
         output_type=output_type,

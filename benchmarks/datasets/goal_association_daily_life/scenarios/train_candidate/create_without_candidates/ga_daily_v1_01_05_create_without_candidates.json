@@ -99,7 +99,6 @@
       "new_goals": [
         {
           "bindings": [],
-          "description": "确定重庆今晚是否会下雨。",
           "media_operation": "none",
           "output_mode": "information",
           "related_goal_ids": [],

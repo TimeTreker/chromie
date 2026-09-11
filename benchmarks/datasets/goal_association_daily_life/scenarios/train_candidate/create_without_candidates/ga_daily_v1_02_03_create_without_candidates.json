@@ -113,7 +113,6 @@
               "value": "in two hours"
             }
           ],
-          "description": "Create a reminder to take the medicine in two hours.",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

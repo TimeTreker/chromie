@@ -105,7 +105,6 @@
               "value": "I miss my old class"
             }
           ],
-          "description": "Listen supportively while the user discusses: I miss my old class.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

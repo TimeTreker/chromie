@@ -113,7 +113,6 @@
               "value": "7秒"
             }
           ],
-          "description": "向后移动7秒。",
           "media_operation": "none",
           "output_mode": "body_action",
           "related_goal_ids": [],

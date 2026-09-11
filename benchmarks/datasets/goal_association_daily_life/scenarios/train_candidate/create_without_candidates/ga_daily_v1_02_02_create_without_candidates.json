@@ -113,7 +113,6 @@
               "value": "after lunch"
             }
           ],
-          "description": "Create a reminder to pack the schoolbag after lunch.",
           "media_operation": "none",
           "output_mode": "stateful_effect",
           "related_goal_ids": [],

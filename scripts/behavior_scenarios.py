@@ -231,6 +231,14 @@ class _CognitiveScenarioRuntime:
                 },
             )
             self.definitions[definition.capability_id] = definition
+        registry = CapabilityRegistry()
+        for definition in self.definitions.values():
+            registry.register(definition)
+        self.runtime = CapabilityRuntime(registry)
+
+    async def prepare_fast_planner_capability_activities(self, activities: list[Any], *, turn_id: str) -> list[Any]:
+        await self.runtime.prepare_planner_work(turn_id, [item.model_dump(mode="json") for item in activities])
+        return []  # Level A supplies contracts; no live provider executes here.
 
     async def ensure_capability_definitions(self, capability_ids: list[str]) -> None:
         missing = [capability_id for capability_id in capability_ids if capability_id not in self.definitions]

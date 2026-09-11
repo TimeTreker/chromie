@@ -105,7 +105,6 @@
               "value": "Morning Piano"
             }
           ],
-          "description": "Play Morning Piano.",
           "media_operation": "play",
           "output_mode": "media_playback",
           "related_goal_ids": [],

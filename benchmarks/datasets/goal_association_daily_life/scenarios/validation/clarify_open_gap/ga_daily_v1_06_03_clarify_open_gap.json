@@ -178,14 +178,25 @@
           "confidence": 1.0,
           "reason_summary": "The accepted GI relationship is clarify.",
           "relationship": "clarify",
+          "requirement_changes": [
+            {
+              "binding_changes": [],
+              "replace_requirement_indices": [
+                0
+              ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "target_goal_id": "goal_06_03_a"
+            }
+          ],
           "resolved_gap_ids": [],
           "source_responsibility_refs": [
             "r1"
           ],
           "target_goal_ids": [
             "goal_06_03_a"
-          ],
-          "updated_description": "Acquire the toy car from the low shelf and hand it to me. Use the supplied missing detail."
+          ]
         }
       ],
       "confidence": 1.0,

@@ -105,7 +105,6 @@
               "value": "my friend ignored me"
             }
           ],
-          "description": "Listen supportively while the user discusses: my friend ignored me.",
           "media_operation": "none",
           "output_mode": "speech",
           "related_goal_ids": [],

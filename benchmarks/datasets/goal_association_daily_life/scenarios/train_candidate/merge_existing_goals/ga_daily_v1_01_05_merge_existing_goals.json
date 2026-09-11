@@ -266,8 +266,7 @@
           "target_goal_ids": [
             "goal_01_05_a",
             "goal_01_05_b"
-          ],
-          "updated_description": ""
+          ]
         }
       ],
       "confidence": 1.0,

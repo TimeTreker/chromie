@@ -369,6 +369,7 @@ class CognitiveWorkRequest(BaseModel):
 
     schema_version: Literal[1] = 1
     sid: str | None = None
+    planning_task_id: str = Field(default="", max_length=200)
     text: str = ""
     language: str | None = None
     responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)

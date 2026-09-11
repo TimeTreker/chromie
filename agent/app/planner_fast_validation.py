@@ -865,19 +865,17 @@ def validate_work_reuse_selection(
         if step.timing != str(activity.get("timing") or "sequential"):
             raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes timing")
 
-    # The supplied reconciliation projection is one bounded snapshot.
-    # Reusing any member currently requires selecting every member; extra
-    # newly planned steps remain legal and execute beside the reused set.
-    if cited and cited != set(by_id):
-        raise PlannerDTOContractError("Work reuse must select the complete supplied Activity set")
-    if (
-        cited
-        and any(by_id[activity_id].get("origin") == "retained_runtime" for activity_id in cited)
-        and len(output.steps) != len(cited)
-    ):
-        raise PlannerDTOContractError(
-            "retained Runtime Work reuse cannot add steps to the reconciliation-only Plan"
-        )
+    cancelled = list(output.cancel_activity_ids)
+    if len(cancelled) != len(set(cancelled)):
+        raise PlannerDTOContractError("cancel_activity_ids must be unique")
+    if set(cancelled) - set(by_id):
+        raise PlannerDTOContractError("cancellation must cite supplied Runtime Activity IDs")
+    if set(cancelled).intersection(cited):
+        raise PlannerDTOContractError("one Activity cannot be both reused and cancelled")
+    if output.disposition == "escalate" and cancelled:
+        raise PlannerDTOContractError("an escalating Planner cannot cancel Work")
+    # Omission is NO_CHANGE. The Planner may reuse a subset and add Work;
+    # cancellation is a separate explicit decision, never inferred from a new Plan.
 
 
 def validated_fail_safe_progress(

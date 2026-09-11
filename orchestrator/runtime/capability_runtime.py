@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import copy
+import hashlib
+import json
 import logging
 from collections import deque
 from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
@@ -313,6 +317,7 @@ class CapabilityRuntimeEvent(CapabilityIdentityModel):
     message: str | None = None
     progress: dict[str, Any] = Field(default_factory=dict)
     result: CapabilityResult | None = None
+    request_snapshot: CapabilityRequest | None = None
 
     @property
     def terminal(self) -> bool:
@@ -375,6 +380,7 @@ class CapabilityRuntimeExecutionObservation(BaseModel):
     executing_interaction_ids: list[str] = Field(default_factory=list)
     requests: list[CapabilityRuntimeRequestObservation] = Field(default_factory=list)
     goal_task_lists: list[CapabilityRuntimeGoalTaskList] = Field(default_factory=list)
+    prepared_planner_work: list[dict[str, Any]] = Field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -417,6 +423,228 @@ class CapabilityRuntime:
             dict[str, tuple[CapabilityRequest, CapabilityDefinition]],
         ] = {}
         self._cancellation_rules: dict[str, list[_CancellationRule]] = {}
+        self._prepared_planner_work: dict[str, list[dict[str, Any]]] = {}
+        self.goal_state_provider: Callable[[], list[dict[str, Any]]] | None = None
+        self._goal_state_versions: dict[str, str] = {}
+        self._plan_commit_versions: dict[str, int] = {}
+        self._plan_commit_locks: dict[str, asyncio.Lock] = {}
+
+    async def prepare_planner_work(self, turn_id: str, activities: list[dict[str, Any]]) -> None:
+        """Retain validated complete Planner Work without granting dispatch authority."""
+        async with self._active_lock:
+            existing = self._prepared_planner_work.get(turn_id)
+            if existing is not None and existing != activities:
+                raise ValueError("one GI planning task cannot replace its prepared result")
+            self._prepared_planner_work[turn_id] = copy.deepcopy(activities)
+
+    async def discard_prepared_planner_work(self, turn_id: str) -> None:
+        async with self._active_lock:
+            self._prepared_planner_work.pop(turn_id, None)
+
+    async def bind_prepared_planner_work(self, turn_id: str, mapping: dict[str, list[str]]) -> None:
+        async with self._active_lock:
+            for item in self._prepared_planner_work.get(turn_id, []):
+                item["source_goal_ids"] = list(dict.fromkeys(
+                    goal_id for ref in item.get("source_responsibility_refs", [])
+                    for goal_id in mapping.get(ref, [])
+                ))
+                item["turn_id"] = turn_id
+
+    def record_goal_state(self, goal_id: str, state: dict[str, Any]) -> None:
+        """Publish GA/Goal-owner state identity; never derive meaning in Runtime."""
+        # Goal owner versions/meaning are authoritative. Execution bookkeeping
+        # in ActiveGoalSnapshot.metadata belongs to the Runtime snapshot below.
+        semantic_state = state.get("goal", state)
+        identity = hashlib.sha256(json.dumps(semantic_state, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        if self._goal_state_versions.get(goal_id) != identity:
+            self._goal_state_versions[goal_id] = identity
+            key = "goal:" + goal_id
+            self._plan_commit_versions[key] = self._plan_commit_versions.get(key, 0) + 1
+
+    def _refresh_goal_state(self, goal_ids: set[str]) -> None:
+        if self.goal_state_provider is None:
+            return
+        states = {str(item.get("goal_id", "")): item for item in self.goal_state_provider()}
+        for goal_id in goal_ids:
+            self.record_goal_state(goal_id, states.get(goal_id, {"goal_id": goal_id, "absent": True}))
+        closed = {goal_id for goal_id, state in states.items()
+                  if (state.get("goal", state)).get("responsibility_status") in {"cancelled", "superseded", "refused", "satisfied"}}
+        for turn_id, activities in list(self._prepared_planner_work.items()):
+            remaining = [item for item in activities if not item.get("source_goal_ids") or not set(item["source_goal_ids"]).issubset(closed)]
+            if remaining:
+                self._prepared_planner_work[turn_id] = remaining
+            else:
+                self._prepared_planner_work.pop(turn_id, None)
+
+    def _planning_state_locked(self, goal_ids: list[str], turn_id: str) -> dict[str, Any]:
+        goals = set(goal_ids)
+        self._refresh_goal_state(goals)
+        work: dict[str, Any] = {}
+        for interaction_id, requests in self._scheduled.items():
+            for request_id, (request, _definition) in requests.items():
+                if not (goals.intersection(self._request_goal_ids(request)) or request.metadata.get("turn_id") == turn_id):
+                    continue
+                active = self._active.get((interaction_id, request_id))
+                work[interaction_id + "/" + request_id] = {
+                    "request": request.model_dump(mode="json"),
+                    "started": bool(active is not None and active[3].provider_started),
+                    "done": bool(active is not None and active[0].done()),
+                }
+        scopes = [*("goal:" + goal_id for goal_id in sorted(goals)), "turn:" + turn_id]
+        return {
+            "goal_ids": sorted(goals),
+            "turn_id": turn_id,
+            "goals": {goal_id: self._goal_state_versions.get(goal_id, "") for goal_id in sorted(goals)},
+            "work": work,
+            "prepared": copy.deepcopy([
+                item for owner_turn, items in self._prepared_planner_work.items()
+                for item in items if owner_turn == turn_id or goals.intersection(item.get("source_goal_ids", []))
+            ]),
+            "commit_versions": {scope: self._plan_commit_versions.get(scope, 0) for scope in scopes},
+        }
+
+    async def planning_state_snapshot(self, goal_ids: list[str], turn_id: str) -> dict[str, Any]:
+        async with self._active_lock:
+            return self._planning_state_locked(goal_ids, turn_id)
+
+    @staticmethod
+    def planning_work_activities(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+        """One actual request per Activity, even when several Goals share it."""
+        activities = []
+        for key, value in snapshot["work"].items():
+            request = value["request"]
+            metadata = request.get("metadata") or {}
+            if not metadata.get("canonical_plan_id") or not metadata.get("source_goal_ids"):
+                continue
+            activities.append({
+                "activity_id": request["request_id"], "origin": "retained_runtime",
+                "capability_id": request["capability_id"], "args": request["args"],
+                "timing": request["timing"], "source_goal_ids": metadata["source_goal_ids"],
+                "state": "running" if value["started"] else "scheduled",
+                "runtime_binding": {
+                    "interaction_id": key.rsplit("/", 1)[0],
+                    "canonical_plan_id": metadata["canonical_plan_id"],
+                    "canonical_plan_fingerprint": metadata.get("canonical_plan_fingerprint", ""),
+                },
+            })
+        activities.extend({**item, "origin": "provisional_fast"} for item in snapshot["prepared"])
+        ids = [item["activity_id"] for item in activities]
+        if len(ids) != len(set(ids)):
+            raise ValueError("ambiguous Runtime Activity identities")
+        return activities
+
+    @asynccontextmanager
+    async def planning_commit_scope(self, snapshot: dict[str, Any]):
+        """Serialize intersecting Planner commits, while model calls stay concurrent."""
+        locks = [self._plan_commit_locks.setdefault(scope, asyncio.Lock()) for scope in sorted(snapshot["commit_versions"])]
+        acquired: list[asyncio.Lock] = []
+        try:
+            for lock in locks:
+                await lock.acquire()
+                acquired.append(lock)
+            await self.validate_planning_state(snapshot)
+            yield
+        finally:
+            for lock in reversed(acquired):
+                lock.release()
+
+    async def validate_planning_state(
+        self, snapshot: dict[str, Any], *, cancelled_bindings: set[str] | None = None
+    ) -> None:
+        async with self._active_lock:
+            current = self._planning_state_locked(snapshot["goal_ids"], snapshot["turn_id"])
+            ignored = cancelled_bindings or set()
+            expected = copy.deepcopy(snapshot)
+            expected["work"] = {key: value for key, value in expected["work"].items() if key not in ignored}
+            current["work"] = {key: value for key, value in current["work"].items() if key not in ignored}
+            # Provider progress/termination is immutable execution truth, not a
+            # competing Plan revision. Preserve its Evidence without replaying Work.
+            terminal_keys = {
+                event.interaction_id + "/" + event.request_id
+                for event in self._event_history if event.result is not None and event.type == "completed"
+            }
+            for key in list(expected["work"]):
+                if key not in current["work"] and key in terminal_keys:
+                    expected["work"].pop(key)
+            for work in (expected["work"], current["work"]):
+                for item in work.values():
+                    item.pop("started", None)
+                    item.pop("done", None)
+            if current != expected:
+                raise ValueError("stale_planning_state: Goal or Work changed during planning")
+
+    async def reserve_planning_submission(self, snapshot: dict[str, Any], *, plan_id: str, fingerprint: str, prepared_activity_ids: list[str]) -> dict[str, Any]:
+        """Reserve a single commit version for the exact affected Goal/turn scopes."""
+        async with self._active_lock:
+            versions = {}
+            for scope, expected in snapshot["commit_versions"].items():
+                if self._plan_commit_versions.get(scope, 0) != expected:
+                    raise ValueError("stale_planning_commit")
+            for scope, expected in snapshot["commit_versions"].items():
+                versions[scope] = expected + 1
+                self._plan_commit_versions[scope] = expected + 1
+            return {
+                "versions": versions, "plan_id": plan_id, "fingerprint": fingerprint,
+                "prepared_bindings": [
+                    {"turn_id": item.get("turn_id", snapshot["turn_id"]), "activity_id": item["activity_id"]}
+                    for item in snapshot["prepared"] if item["activity_id"] in prepared_activity_ids
+                ],
+            }
+
+    def _validate_planning_submission_locked(self, response: InteractionResponse) -> None:
+        guard = response.metadata.get("planning_commit")
+        if guard is None:
+            return
+        if not isinstance(guard, dict) or not isinstance(guard.get("versions"), dict) or not guard["versions"]:
+            raise ValueError("invalid_planning_commit")
+        self._refresh_goal_state({scope[5:] for scope in guard["versions"] if scope.startswith("goal:")})
+        if (response.metadata.get("canonical_plan_id") != guard.get("plan_id")
+                or response.metadata.get("canonical_plan_fingerprint") != guard.get("fingerprint")):
+            raise ValueError("planning_submission_identity_mismatch")
+        if any(self._plan_commit_versions.get(scope, 0) != version for scope, version in guard["versions"].items()):
+            raise ValueError("stale_planning_submission")
+
+    async def record_planning_submission(self, response: InteractionResponse, record: Callable[[], None]) -> None:
+        """Validate before Host publication; admit only that synchronous owner write.
+
+        Refusal/confirmation bookkeeping may change Goal state in this exact
+        publication. Capture those changes before yielding so they cannot be
+        confused with another planning task's revisions at dispatch.
+        """
+        async with self._active_lock:
+            self._validate_planning_submission_locked(response)
+            record()
+            self.refresh_planning_submission_after_goal_commit(response)
+
+    def refresh_planning_submission_after_goal_commit(self, response: InteractionResponse) -> None:
+        """Finalize the Host's just-completed, validated Goal-owner transaction."""
+        guard = response.metadata.get("planning_commit")
+        if not isinstance(guard, dict):
+            return
+        if any(self._plan_commit_versions.get(scope, 0) != version for scope, version in guard["versions"].items()):
+            raise ValueError("stale_planning_goal_commit")
+        self._refresh_goal_state({scope[5:] for scope in guard["versions"] if scope.startswith("goal:")})
+        guard["versions"] = {scope: self._plan_commit_versions.get(scope, 0) for scope in guard["versions"]}
+
+    async def accept_completed_planning_submission(self, response: InteractionResponse) -> None:
+        """Consume a guarded revision whose Work already has terminal Evidence."""
+        async with self._active_lock:
+            self._validate_planning_submission_locked(response)
+            guard = response.metadata.get("planning_commit")
+            if isinstance(guard, dict):
+                for scope, version in guard["versions"].items():
+                    self._plan_commit_versions[scope] = version + 1
+                self._consume_prepared_bindings_locked(guard)
+
+    def _consume_prepared_bindings_locked(self, guard: dict[str, Any]) -> None:
+        for binding in guard.get("prepared_bindings", []):
+            owner = binding["turn_id"]
+            remaining = [item for item in self._prepared_planner_work.get(owner, [])
+                         if item["activity_id"] != binding["activity_id"]]
+            if remaining:
+                self._prepared_planner_work[owner] = remaining
+            else:
+                self._prepared_planner_work.pop(owner, None)
 
     def register_provider(self, provider: CapabilityProvider) -> None:
         if provider.provider_id in self._providers:
@@ -489,6 +717,10 @@ class CapabilityRuntime:
                 open_interaction_ids=sorted(self._open_interactions),
                 executing_interaction_ids=sorted(self._executing_interactions),
                 requests=requests,
+                prepared_planner_work=[
+                    {"turn_id": turn_id, "activities": copy.deepcopy(activities)}
+                    for turn_id, activities in self._prepared_planner_work.items()
+                ],
                 goal_task_lists=[
                     CapabilityRuntimeGoalTaskList(
                         goal_id=goal_id,
@@ -580,9 +812,18 @@ class CapabilityRuntime:
         async with self._active_lock:
             scheduled = self._scheduled.get(interaction_id, {})
             item = scheduled.get(request_id)
+            terminal_state = ""
             if item is None:
-                return None
-            request, definition = item
+                terminal = next((event for event in reversed(self._event_history)
+                    if event.interaction_id == interaction_id and event.request_id == request_id
+                    and event.result is not None and event.request_snapshot is not None), None)
+                if terminal is None:
+                    return None
+                request = terminal.request_snapshot
+                definition = self.registry.get(request.capability_id)
+                terminal_state = terminal.type
+            else:
+                request, definition = item
             active = self._active.get((interaction_id, request_id))
             return {
                 "interaction_id": interaction_id,
@@ -598,7 +839,7 @@ class CapabilityRuntime:
                 "canonical_plan_fingerprint": str(
                     request.metadata.get("canonical_plan_fingerprint") or ""
                 ),
-                "state": (
+                "state": terminal_state or (
                     "running"
                     if active is not None and not active[0].done()
                     else "terminal_pending_join"
@@ -703,6 +944,7 @@ class CapabilityRuntime:
                 message=message,
                 progress=dict(progress or {}),
                 result=result.model_copy(deep=True) if result is not None else None,
+                request_snapshot=request.model_copy(deep=True) if result is not None else None,
             )
             self._event_history.append(event)
             self._event_condition.notify_all()
@@ -766,6 +1008,7 @@ class CapabilityRuntime:
         submission_task: asyncio.Task[CapabilityRuntimeResult] | None = None
         try:
             async with self._active_lock:
+                self._validate_planning_submission_locked(response)
                 if response.interaction_id in self._executing_interactions:
                     raise ValueError(
                         "concurrent CapabilityRuntime.submit calls cannot reuse "
@@ -781,6 +1024,16 @@ class CapabilityRuntime:
                 interaction_scheduled.update(
                     {request.request_id: (request, definition) for request, definition in validated}
                 )
+                guard = response.metadata.get("planning_commit")
+                if isinstance(guard, dict):
+                    for scope, version in guard["versions"].items():
+                        self._plan_commit_versions[scope] = version + 1
+                    self._consume_prepared_bindings_locked(guard)
+                else:
+                    scopes = {"goal:" + goal for request in scheduled for goal in self._request_goal_ids(request)}
+                    scopes.update("turn:" + str(request.metadata["turn_id"]) for request in scheduled if request.metadata.get("turn_id"))
+                    for scope in scopes:
+                        self._plan_commit_versions[scope] = self._plan_commit_versions.get(scope, 0) + 1
                 submission_task = asyncio.create_task(
                     self._run_submission(
                         response.interaction_id,
@@ -1170,6 +1423,18 @@ class CapabilityRuntime:
             ] = {}
 
             if global_domains_required and requested_scope != "global_emergency":
+                if directive.target_request_ids:
+                    selected_keys = {
+                        (interaction_id, request.request_id)
+                        for interaction_id, request, _definition in base_selected
+                    }
+                    collateral = any(
+                        (interaction_id, request.request_id) not in selected_keys
+                        and global_domains_required.intersection(definition.cancellation_domains)
+                        for interaction_id, request, definition in all_scheduled_items
+                    )
+                    if collateral:
+                        raise ValueError("scoped Planner cancellation cannot widen to other Work")
                 widened = True
                 ordered_domains = sorted(global_domains_required)
                 widening_reason = (
@@ -1596,6 +1861,8 @@ class CapabilityRuntime:
         "stale",
         "shared_owner_conflict",
     ]:
+        if directive.target_request_ids and request.request_id not in directive.target_request_ids:
+            return "no_match"
         goal_ids = cls._request_goal_ids(request)
         targets = set(directive.target_goal_ids)
         if not goal_ids.intersection(targets):

@@ -46,6 +46,7 @@ try:
     from chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
+        apply_goal_meaning_update,
         SemanticTaskOperation,
         TaskContextSnapshot,
     )
@@ -72,6 +73,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.semantic_task import (
         InformationGap,
         SemanticGoal,
+        apply_goal_meaning_update,
         SemanticTaskOperation,
         TaskContextSnapshot,
     )
@@ -1085,6 +1087,11 @@ class ConversationStateManager:
         user_text: str,
     ) -> SemanticGoal:
         update = dict(operation.goal_update or {})
+        if "base_goal_fingerprint" in update:
+            revised = apply_goal_meaning_update(goal, update)
+            if goal.responsibility_status == "satisfied":
+                revised = revised.model_copy(update={"responsibility_status": "open"})
+            return revised
         if operation.goal is not None:
             replacement = operation.goal
             update = {
@@ -1131,22 +1138,20 @@ class ConversationStateManager:
             and operation.operation in {"modify", "clarification_answer", "correct"}
             else goal.responsibility_status
         )
-        return SemanticGoal(
-            goal_id=goal.goal_id,
-            version=version,
-            responsibility_status=responsibility_status,
-            description=str(update.get("description") or goal.description),
-            source_text=str(update.get("source_text") or user_text or goal.source_text),
-            beneficiary=(
-                str(update.get("beneficiary"))
-                if update.get("beneficiary") is not None
-                else goal.beneficiary
-            ),
-            object=object_value,
-            constraints=constraints,
-            success_criteria=criteria,
-            metadata=metadata,
-        )
+        return SemanticGoal.model_validate({
+            **goal.model_dump(mode="json"),
+            "goal_id": goal.goal_id,
+            "version": version,
+            "responsibility_status": responsibility_status,
+            "description": str(update.get("description") or goal.description),
+            "source_text": str(update.get("source_text") or goal.source_text),
+            "beneficiary": str(update["beneficiary"]) if update.get("beneficiary") is not None else goal.beneficiary,
+            "object": object_value,
+            "constraints": constraints,
+            "success_criteria": criteria,
+            "metadata": metadata,
+        })
+
 
     def _apply_semantic_operation_to_context(
         self,
@@ -1216,7 +1221,16 @@ class ConversationStateManager:
             pass
         else:
             goal = self._semantic_goal_from_context(context)
-            revised = self._merge_semantic_goal(goal, operation, user_text=user_text)
+            try:
+                revised = self._merge_semantic_goal(goal, operation, user_text=user_text)
+            except (ValueError, TypeError, KeyError) as exc:
+                logger.warning("Goal meaning update rejected task_id=%s reason=%s", context.get("task_id"), exc)
+                result.update(reason="invalid_goal_meaning_update", detail=str(exc))
+                return result
+            history = context.setdefault("goal_revision_history", [])
+            history.append({"operation_id": operation.operation_id,
+                            "prior_goal": goal.model_dump(mode="json"),
+                            "source_update": copy.deepcopy(operation.goal_update)})
             context["semantic_goal"] = revised.model_dump(mode="json", exclude_none=True)
             if revised.responsibility_status == "open":
                 metadata = context.get("metadata")
@@ -1500,9 +1514,26 @@ class ConversationStateManager:
                 "paused",
                 "recoverable",
             }
+            retained_groups: dict[tuple[str, str, str], list[str]] = {}
+            for item in metadata.get("retained_work_activities", []):
+                if item.get("activity_id") not in remaining:
+                    continue
+                identity = item.get("runtime_binding") or {}
+                key = tuple(str(identity.get(field) or "") for field in ("interaction_id", "canonical_plan_id", "canonical_plan_fingerprint"))
+                retained_groups.setdefault(key, []).append(item["activity_id"])
+            retained_ids = {request_id for ids in retained_groups.values() for request_id in ids}
+            work_bindings = [
+                {"interaction_id": key[0], "canonical_plan_id": key[1], "canonical_plan_fingerprint": key[2], "remaining_request_ids": ids}
+                for key, ids in retained_groups.items()
+            ]
+            current_remaining = [request_id for request_id in remaining if request_id not in retained_ids]
+            if current_remaining or not work_bindings:
+                work_bindings.append({"interaction_id": interaction_id, "canonical_plan_id": plan_id,
+                    "canonical_plan_fingerprint": plan_fingerprint, "remaining_request_ids": current_remaining})
             bindings.append(
                 {
                     "goal_id": goal_id,
+                    "runtime_bindings": work_bindings,
                     "task_id": str(context.get("task_id") or ""),
                     "found": True,
                     "status": status,
@@ -1624,43 +1655,44 @@ class ConversationStateManager:
                 continue
             if not binding.get("requires_runtime_dispatch"):
                 continue
-            matching = [
-                receipt
-                for receipt in validated_receipts
-                if goal_id in receipt.target_goal_ids
-                and receipt.expected_plan_id
-                == binding.get("canonical_plan_id")
-                and receipt.expected_plan_fingerprint
-                == binding.get("canonical_plan_fingerprint")
-                and binding.get("interaction_id") in receipt.interaction_ids
-            ]
-            if len(matching) != 1:
-                validation_errors.append(
-                    f"{goal_id}:exact_cancellation_receipt_missing"
-                )
-                continue
-            receipt = matching[0]
-            failures = self._receipt_failure_reasons(receipt)
-            if failures:
-                validation_errors.extend(
-                    f"{goal_id}:{reason}" for reason in failures
-                )
-                continue
-            required_request_ids = set(
-                binding.get("remaining_request_ids") or ()
-            ) - cancelled_confirmation_ids
-            selected_request_ids = {
-                item.request_id
-                for item in receipt.selected_request_bindings
-                if item.interaction_id == binding.get("interaction_id")
-            }
-            missing = sorted(required_request_ids - selected_request_ids)
-            if missing:
-                validation_errors.append(
-                    f"{goal_id}:unselected_runtime_requests:{','.join(missing)}"
-                )
-                continue
-            receipt_by_goal[goal_id] = receipt
+            for work_binding in binding.get("runtime_bindings") or [binding]:
+                matching = [
+                    receipt
+                    for receipt in validated_receipts
+                    if goal_id in receipt.target_goal_ids
+                    and receipt.expected_plan_id
+                    == work_binding.get("canonical_plan_id")
+                    and receipt.expected_plan_fingerprint
+                    == work_binding.get("canonical_plan_fingerprint")
+                    and work_binding.get("interaction_id") in receipt.interaction_ids
+                ]
+                if len(matching) != 1:
+                    validation_errors.append(
+                        f"{goal_id}:exact_cancellation_receipt_missing"
+                    )
+                    continue
+                receipt = matching[0]
+                failures = self._receipt_failure_reasons(receipt)
+                if failures:
+                    validation_errors.extend(
+                        f"{goal_id}:{reason}" for reason in failures
+                    )
+                    continue
+                required_request_ids = set(
+                    work_binding.get("remaining_request_ids") or ()
+                ) - cancelled_confirmation_ids
+                selected_request_ids = {
+                    item.request_id
+                    for item in receipt.selected_request_bindings
+                    if item.interaction_id == work_binding.get("interaction_id")
+                }
+                missing = sorted(required_request_ids - selected_request_ids)
+                if missing:
+                    validation_errors.append(
+                        f"{goal_id}:unselected_runtime_requests:{','.join(missing)}"
+                    )
+                    continue
+                receipt_by_goal[goal_id] = receipt
 
         if validation_errors:
             raise ValueError(
@@ -2839,22 +2871,48 @@ class ConversationStateManager:
                     }
                 )
                 continue
-            operations.append(
-                SemanticTaskOperation(
-                    operation_id=association.association_id,
-                    operation=operation_name,
-                    target_task_ids=target_task_ids,
-                    confidence=association.confidence,
-                    relationship=association.relationship,
-                    goal_update=association.goal_update,
-                    resolved_gap_ids=association.resolved_gap_ids,
-                    reason_summary=association.reason_summary,
-                    metadata={
-                        "goal_association_turn_id": resolved.turn_id,
-                        "goal_association_authority": "applied_after_validation",
-                    },
+            updates = association.goal_update.get("by_goal_id", {})
+            invalid_source = False
+            if isinstance(updates, dict):
+                for payload in updates.values():
+                    if not isinstance(payload, dict) or "base_goal_fingerprint" not in payload:
+                        invalid_source = True
+                        break
+                    sources = payload.get("source_responsibilities")
+                    if (payload.get("source_turn_id") != resolved.turn_id
+                            or not isinstance(sources, list) or not sources
+                            or any(not isinstance(item, dict)
+                                   or item.get("local_ref") not in association.source_responsibility_refs
+                                   for item in sources)):
+                        invalid_source = True
+                        break
+            if association.goal_update and (
+                set(association.goal_update) != {"by_goal_id"}
+                or not isinstance(updates, dict)
+                or set(updates) - set(association.target_goal_ids)
+                or not updates or invalid_source
+            ):
+                results.append({"association_id": association.association_id,
+                                "applied": False, "reason": "source_bound_goal_update_required"})
+                continue
+            for goal_id, task_id in zip(association.target_goal_ids, target_task_ids, strict=True):
+                operations.append(
+                    SemanticTaskOperation(
+                        operation_id=(association.association_id if len(target_task_ids) == 1
+                                      else f"{association.association_id}:{goal_id}"),
+                        operation=operation_name,
+                        target_task_ids=[task_id],
+                        confidence=association.confidence,
+                        relationship=association.relationship,
+                        goal_update=updates.get(goal_id, {}),
+                        resolved_gap_ids=association.resolved_gap_ids,
+                        reason_summary=association.reason_summary,
+                        metadata={
+                            "goal_association_turn_id": resolved.turn_id,
+                            "goal_association_authority": "applied_after_validation",
+                        },
+                    )
                 )
-            )
 
         if operations:
             results.extend(
@@ -4093,7 +4151,15 @@ class ConversationStateManager:
             current_metadata = context.get("metadata")
             if not isinstance(current_metadata, dict):
                 current_metadata = {}
-            context["metadata"] = {**current_metadata, **metadata}
+            retained = list(current_metadata.get("retained_work_activities") or [])
+            retained_ids = [item["activity_id"] for item in retained]
+            context["metadata"] = {
+                **current_metadata, **metadata,
+                "request_ids": list(dict.fromkeys([*retained_ids, *request_ids])),
+                "remaining_request_ids": list(dict.fromkeys([*retained_ids, *request_ids])),
+                "request_statuses": {key: value for key, value in current_metadata.get("request_statuses", {}).items() if key in retained_ids},
+                "planned_capabilities": [*[{**item, "request_id": item["activity_id"]} for item in retained], *metadata["planned_capabilities"]],
+            }
             self._persist_task_contexts_if_enabled()
         self.last_activity_ms = timestamp_ms
 
@@ -4461,6 +4527,18 @@ class ConversationStateManager:
                     if isinstance(context_request_ids, list) and request_id in context_request_ids:
                         contexts.append(context)
             for context in contexts:
+                context_metadata = context.get("metadata") or {}
+                if context_metadata.get("retained_work_activities"):
+                    owned_ids = set(context_metadata.get("request_ids") or [])
+                    if request_id not in owned_ids:
+                        continue
+                    statuses = {**context_metadata.get("request_statuses", {}), request_id: final_status}
+                    remaining = [item for item in context_metadata.get("remaining_request_ids", []) if item != request_id]
+                    if remaining:
+                        task_status = "running"
+                    else:
+                        failures = [item for item in ("failed", "refused", "cancelled", "timed_out") if item in statuses.values()]
+                        task_status = failures[0] if failures else "done"
                 context["status"] = task_status
                 context["commitment_state"] = (
                     self._commitment_state_for_status(task_status)
@@ -4553,12 +4631,15 @@ class ConversationStateManager:
                     "execution outcome goal has no committed plan binding: "
                     f"{outcome.goal_id}"
                 )
-            for key, expected in expected_binding.items():
-                if str(context_metadata.get(key) or "").strip() != expected:
-                    raise ValueError(
-                        "execution outcome is stale or does not match the "
-                        f"current goal binding: {outcome.goal_id}:{key}"
-                    )
+            current_binding = all(str(context_metadata.get(key) or "").strip() == expected for key, expected in expected_binding.items())
+            retained_binding = any(
+                item.get("activity_id") in evidence_request_ids_by_goal.get(outcome.goal_id, set())
+                and all(str((item.get("runtime_binding") or {}).get(key) or "") == expected_binding[key]
+                        for key in ("interaction_id", "canonical_plan_id", "canonical_plan_fingerprint"))
+                for item in context_metadata.get("retained_work_activities", [])
+            )
+            if not current_binding and not retained_binding:
+                raise ValueError("execution outcome is stale or does not match the current or explicitly retained goal binding: " + outcome.goal_id)
 
             expected_request_ids = evidence_request_ids_by_goal.get(
                 outcome.goal_id,
@@ -4619,6 +4700,8 @@ class ConversationStateManager:
         try:
             for outcome in validated.goal_outcomes:
                 context, matching_tasks = bound_records[outcome.goal_id]
+                prior_context = copy.deepcopy(context)
+                is_retained_outcome = any(str((context.get("metadata") or {}).get(key) or "") != expected for key, expected in expected_binding.items())
                 referenced_evidence = [
                     evidence_by_id[evidence_id]
                     for evidence_id in outcome.evidence_ids
@@ -4710,6 +4793,24 @@ class ConversationStateManager:
                         "completion_qualification_established": qualification["established"],
                     }
                     matched_pending += 1
+
+                if is_retained_outcome:
+                    retained_summary = context["evidence_summary"]["execution_outcome"]
+                    context.clear()
+                    context.update(prior_context)
+                    summary = context.setdefault("evidence_summary", {})
+                    history = [item for item in summary.get("retained_execution_outcomes", []) if item.get("outcome_id") != validated.outcome_id]
+                    summary["retained_execution_outcomes"] = [*history, retained_summary][-8:]
+                if context.get("metadata", {}).get("retained_work_activities"):
+                    # Per-request Evidence is already exact-bound above. Reconcile
+                    # every preserved/current request without replacing Goal meaning.
+                    for item in referenced_evidence:
+                        self.update_pending_task_status_for_request_id(request_id=item.request_id, status=item.status)
+                    remaining = context.get("metadata", {}).get("remaining_request_ids", [])
+                    if remaining:
+                        context["status"] = "running"
+                        context["commitment_state"] = self._commitment_state_for_status("running")
+                        context["plan_status"] = "running"
 
                 results.append(
                     {
@@ -5763,6 +5864,14 @@ class ConversationStateManager:
             self._record_planner_time_conditions(result_metadata)
             goal_outcomes = self._canonical_goal_outcomes(result_metadata)
             self._record_nonexecuting_goal_outcomes(goal_outcomes)
+            if isinstance(result_metadata.get("planning_commit"), dict):
+                for goal_id in result_metadata.get("goal_ids") or []:
+                    goal_context = self._task_context_by_goal_id(str(goal_id))
+                    if goal_context is not None:
+                        goal_context.setdefault("metadata", {})["retained_work_activities"] = [
+                            self._json_safe(item) for item in result_metadata.get("retained_work_activities", [])
+                            if goal_id in item.get("source_goal_ids", [])
+                        ]
 
         speech_parts: list[str] = []
         for key in ("speak_immediate", "speak_after", "speech"):

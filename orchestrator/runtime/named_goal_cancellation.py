@@ -353,19 +353,20 @@ async def _dispatch_goal_work_stop(
     for binding in bindings:
         if not binding.get("requires_runtime_dispatch"):
             continue
-        interaction_id = str(binding.get("interaction_id") or "").strip()
-        plan_id = str(binding.get("canonical_plan_id") or "").strip()
-        fingerprint = str(
-            binding.get("canonical_plan_fingerprint") or ""
-        ).strip()
-        if not interaction_id or not plan_id or not fingerprint:
-            raise ValueError(
-                "named_goal_runtime_binding_incomplete:"
-                + str(binding.get("goal_id") or "")
-            )
-        grouped.setdefault(
-            (interaction_id, plan_id, fingerprint), set()
-        ).add(str(binding["goal_id"]))
+        for work_binding in binding.get("runtime_bindings") or [binding]:
+            interaction_id = str(work_binding.get("interaction_id") or "").strip()
+            plan_id = str(work_binding.get("canonical_plan_id") or "").strip()
+            fingerprint = str(
+                work_binding.get("canonical_plan_fingerprint") or ""
+            ).strip()
+            if not interaction_id or not plan_id or not fingerprint:
+                raise ValueError(
+                    "named_goal_runtime_binding_incomplete:"
+                    + str(binding.get("goal_id") or "")
+                )
+            grouped.setdefault(
+                (interaction_id, plan_id, fingerprint), set()
+            ).add(str(binding["goal_id"]))
 
     cancel_scope = getattr(interaction_runtime, "cancel_scope", None)
     if grouped and not callable(cancel_scope):

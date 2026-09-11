@@ -28,6 +28,7 @@ from shared.chromie_contracts.interaction import (
     CapabilityResult,
     CapabilityTrace,
     output_schema_sha256,
+    validate_output_schema_declaration,
 )
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
@@ -457,6 +458,35 @@ class InteractionRuntimeCoordinator:
         return goal_ids
 
 
+    async def prepare_fast_planner_capability_activities(
+        self, activities: list[FastPlannerCapabilityActivity], *, turn_id: str
+    ) -> list[FastPlannerCapabilityActivity]:
+        """Prepare the complete task list and return only its eligible safe-read prefix."""
+        await self.ensure_capability_definitions(item.capability_id for item in activities)
+        ready: list[FastPlannerCapabilityActivity] = []
+        blocked = False
+        for activity in activities:
+            definition = self.capability_definition(activity.capability_id)
+            errors = validate_args_for_schema(activity.args, definition.input_schema)
+            if errors or not definition.available:
+                raise ValueError("invalid or unavailable prepared Capability: " + activity.capability_id)
+            validate_output_schema_declaration(definition.output_schema)
+            output_schema_sha256(definition.output_schema)
+            metadata = definition.metadata
+            safe = (
+                not definition.requires_confirmation
+                and metadata.get("safety_class") == "safe_read"
+                and metadata.get("side_effect_free") is True
+            )
+            if not safe:
+                blocked = True
+            if safe and not blocked:
+                ready.append(activity)
+        await self.runtime.prepare_planner_work(
+            turn_id, [item.model_dump(mode="json") for item in activities]
+        )
+        return ready
+
     async def start_fast_planner_capability_activities(
         self,
         activities: list[FastPlannerCapabilityActivity],
@@ -578,6 +608,7 @@ class InteractionRuntimeCoordinator:
         canonical_plan_fingerprint: str,
         goal_ids_by_responsibility: dict[str, list[str]],
         task_list_revision: int = 1,
+        cancel_activity_ids: list[str] | None = None,
     ) -> CapabilityRuntimeResult:
         """Bind provisional Fast Work to Goal lists and preserve its Evidence."""
 
@@ -588,6 +619,23 @@ class InteractionRuntimeCoordinator:
             canonical_plan_fingerprint=canonical_plan_fingerprint,
             task_list_revision=task_list_revision,
         )
+        cancelled = set(cancel_activity_ids or []).intersection(activity.activity_id for activity in execution.activities)
+        if cancelled:
+            receipt = await self.runtime.cancel_scope(CancellationDirective(
+                source_turn_id=execution.turn_id,
+                requested_scope="specific_goal",
+                foreground_interaction_id=execution.interaction_id,
+                target_goal_ids=tuple(dict.fromkeys(goal_id for activity in execution.activities
+                    for ref in activity.source_responsibility_refs for goal_id in goal_ids_by_responsibility.get(ref, []))),
+                target_request_ids=tuple(fast_planner_activity_request_id(execution.turn_id, item) for item in sorted(cancelled)),
+                expected_plan_id=canonical_plan_id,
+                expected_plan_fingerprint=canonical_plan_fingerprint,
+                reason="Planner explicitly cancelled provisional safe Work",
+            ))
+            if (receipt.stale_binding_request_bindings or receipt.shared_owner_conflict_request_bindings
+                    or receipt.non_interruptible_request_bindings or receipt.provider_cancel_failure_evidence
+                    or receipt.dispatch_failures):
+                raise ValueError("provisional Work cancellation did not close")
         result = await execution.task
         traces_by_request = {
             trace.request_id: trace for trace in result.traces
@@ -649,10 +697,7 @@ class InteractionRuntimeCoordinator:
         remaining_speech: list[InteractionSpeech] = []
 
         def consume(request_id: str) -> bool:
-            seeded = self._preexecuted.pop(
-                (response.interaction_id, request_id),
-                None,
-            )
+            seeded = self._preexecuted.get((response.interaction_id, request_id))
             if seeded is None:
                 return False
             result, trace = seeded
@@ -872,6 +917,9 @@ class InteractionRuntimeCoordinator:
             self._consume_preexecuted(runtime_response)
         )
         if not runtime_response.capabilities and not runtime_response.speech:
+            await self.runtime.accept_completed_planning_submission(runtime_response)
+            for item in preexecuted_results:
+                self._preexecuted.pop((runtime_response.interaction_id, item.request_id), None)
             merged = CapabilityRuntimeResult(
                 interaction_id=prepared.interaction_id,
                 status=(
@@ -903,6 +951,8 @@ class InteractionRuntimeCoordinator:
                 confirmed_request_ids=set(confirmed_request_ids or ()),
             ),
         )
+        for item in preexecuted_results:
+            self._preexecuted.pop((runtime_response.interaction_id, item.request_id), None)
         return CapabilityInteractionDispatch(
             source_response=prepared,
             runtime_response=runtime_response,
