@@ -23,7 +23,6 @@ from shared.chromie_contracts.situation import (
     SituationalCognitionRequest,
 )
 
-from orchestrator.runtime.planner_reentry import suppress_already_delivered_speech
 from orchestrator.runtime.session import now_ms, record_session_workflow_stage
 
 
@@ -877,20 +876,6 @@ async def resolve_goal_free_situation_response(
             "language": language or "auto",
         },
     )
-    if ledger_scope:
-        response, suppressed = suppress_already_delivered_speech(
-            response,
-            (
-                item.get("text") or ""
-                for item in host._delivered_turn_speech_events(ledger_scope)
-            ),
-        )
-        if suppressed:
-            host.session_log(
-                session_id,
-                "situational_cognition_duplicate_speech_suppressed: count=%s",
-                suppressed,
-            )
     return response if response.speech else None
 
 

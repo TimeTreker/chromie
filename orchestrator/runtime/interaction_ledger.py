@@ -208,7 +208,8 @@ class InteractionLedger:
         event_type_by_status: dict[str, InteractionEventType] = {
             "scheduled": "speech_scheduled",
             "playback_started": "speech_playback_started",
-            "playback_completed": "speech_playback_started",
+            "playback_completed": "speech_playback_completed",
+            "playback_interrupted": "speech_playback_interrupted",
             "not_delivered": "speech_not_delivered",
         }
         event_type = event_type_by_status.get(status)
@@ -220,6 +221,7 @@ class InteractionLedger:
             "playback_delivery",
             session_id,
             speech_event_id,
+            _normalized_text(event.get("delivery_attempt_id")),
             status,
         )
         return self.append(
@@ -244,6 +246,8 @@ class InteractionLedger:
             text=_normalized_text(event.get("text")),
             evidence_refs=[speech_event_id],
             metadata={
+                "delivery_attempt_id": _normalized_text(event.get("delivery_attempt_id")),
+                "communicative_activity_ids": _normalized_ids(event.get("communicative_activity_ids")),
                 "delivery_role": _normalized_text(
                     event.get("delivery_role")
                 ),
@@ -573,7 +577,7 @@ class InteractionLedger:
                 if goal_set.intersection(event.goal_ids):
                     selected.append(event)
                 elif (
-                    not event.goal_ids
+                    (not event.goal_ids or event.event_type.startswith("speech_"))
                     and normalized_turn_id
                     and event.turn_id == normalized_turn_id
                 ):
@@ -586,7 +590,7 @@ class InteractionLedger:
         already_spoken = [
             item
             for item in projected_events
-            if item["event_type"] == "speech_playback_started"
+            if item["event_type"] == "speech_playback_completed"
         ]
         latest_by_subject = {
             item["subject_id"]: item for item in projected_events
@@ -594,7 +598,7 @@ class InteractionLedger:
         pending_speech = [
             item
             for item in latest_by_subject.values()
-            if item["event_type"] == "speech_scheduled"
+            if item["event_type"] in {"speech_scheduled", "speech_playback_started"}
         ]
         activity = [
             item
@@ -634,6 +638,8 @@ class InteractionLedger:
             waiting_for = ""
             if item["event_type"] == "speech_scheduled":
                 waiting_for = "speech_playback_start"
+            elif item["event_type"] == "speech_playback_started":
+                waiting_for = "speech_playback_completion"
             elif item["event_type"] == "activity_committed":
                 if item["subject_id"] not in terminal_evidence_refs:
                     waiting_for = "activity_terminal_result"

@@ -368,7 +368,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
         self.assertIsNotNone(duplicate)
         assert duplicate is not None
-        self.assertEqual(duplicate.speech, [])
+        self.assertEqual([speech.text for speech in duplicate.speech], ["上午不会下雨。"])
 
 
     def test_non_evidence_time_opportunity_can_reenter_without_false_post_evidence_truth(self) -> None:
@@ -909,3 +909,61 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlannerSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_host_preserves_planner_delta_after_successful_body_and_sibling_speech(self):
+        from orchestrator.runtime.interaction_ledger import InteractionLedger
+        for wording in ("I blinked twice.", "Correction: that earlier answer was incomplete.", "A joke."):
+            with self.subTest(wording=wording):
+                goal_id = "goal-body"
+                original = CanonicalPlan(plan_id="mixed", planner_tier="fast", disposition="mixed", coverage="complete",
+                    confidence=1.0, goal_ids=[goal_id, "goal-chat"],
+                    steps=[CanonicalPlanStep(step_id="blink", capability_id="soridormi.blink_eyes", args={"count": 2}, source_goal_ids=[goal_id])],
+                    goal_outcomes=[ExecuteGoalPlanOutcome(goal_id=goal_id, disposition="execute", coverage="complete", step_ids=["blink"]),
+                        RespondGoalPlanOutcome(goal_id="goal-chat", disposition="respond", coverage="complete", response_text="A joke.")])
+                replanned = CanonicalPlan(plan_id="body-result", planner_tier="fast", disposition="respond", coverage="complete",
+                    confidence=1.0, goal_ids=[goal_id], response_text=wording,
+                    goal_outcomes=[RespondGoalPlanOutcome(goal_id=goal_id, disposition="respond", coverage="complete", response_text=wording)])
+                class Client:
+                    request = None
+                    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+                        self.request = request
+                        return replanned
+                class Adapter(CanonicalPlanRuntimeAdapter):
+                    async def build_planner_owned_response(self, **kwargs):
+                        return InteractionResponse(interaction_id="body-result", speech=[InteractionSpeech(text=wording,
+                            metadata={"communicative_activity_ids": ["activity-new"], "turn_id": "turn"})])
+                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant.agent_client = Client()
+                assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000)
+                ledger = InteractionLedger()
+                assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(agent_client=assistant.agent_client,
+                    adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
+                    policy=CognitiveRuntimePolicy(mode="apply"), interaction_ledger=ledger)
+                assistant.session_log = lambda *args, **kwargs: None
+                assistant.build_context = lambda _sid: {"history": []}
+                async def session():
+                    return object()
+                assistant.get_http_session = session
+                delivered = dict(event_id="speech-sibling", session_id="sid", turn_id="turn", source_goal_ids=["goal-chat"],
+                    text="A joke.", status="playback_completed", communicative_activity_ids=["activity-old"])
+                assistant._playback_state().turn_speech_events["sid"] = [delivered]
+                ledger.record_playback_event(delivered)
+                source = InteractionResponse(interaction_id="mixed", metadata={"turn_id": "turn",
+                    "goal_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
+                        "bindings": {"count": 2}, "output_mode": "body_action", "relationship": "new", "confidence": 1.0}]},
+                    "goal_association": {"associations": [], "new_goals": [
+                        {"goal_id": goal_id, "source_responsibility_refs": ["r1"], "metadata": {"output_mode": "body_action"}},
+                        {"goal_id": "goal-chat", "source_responsibility_refs": ["r2"], "metadata": {"output_mode": "speech"}}]}})
+                evidence = ToolResultEvidence(evidence_id="blink-result", tool_id="soridormi.blink_eyes", status="completed",
+                    data={}, output_sha256=canonical_value_sha256({}))
+                response = await _planner_evidence_reentry(assistant, source_response=source, canonical_plan=original,
+                    user_request="Blink twice and tell a joke.", language="en-US", goal_ids=[goal_id], evidence=[evidence],
+                    session_id="sid", phase="post_execution")
+                self.assertIsNotNone(response)
+                self.assertEqual([s.text for s in response.speech], [wording])
+                context = assistant.agent_client.request.context["interaction_context"]
+                self.assertEqual(context["goal_ids"], [goal_id])
+                self.assertEqual(context["already_spoken"][0]["text"], "A joke.")
+                self.assertEqual(list(assistant.agent_client.request.planner_reentry_scope.goal_ids), [goal_id])

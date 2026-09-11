@@ -2925,7 +2925,7 @@ class GoalDrivenRuntimeCoordinator:
                     "turn_id": turn_id,
                     "owner": "playback_delivery",
                     "domain": "vocal",
-                    "event_type": "speech_playback_started",
+                    "event_type": "speech_playback_completed",
                     "state": "playback_completed",
                     "goal_ids": [],
                     "subject_id": activity_id or f"speech_{identity}",

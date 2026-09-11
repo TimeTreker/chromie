@@ -1,5 +1,99 @@
 # Chromie Latest Handoff
 
+## Issue #41 Planner speech authority and actual delivery, 2026-09-11
+
+The owner approved the discussed correction and asked to continue. Scope: remove
+Host semantic speech suppression; give Planner related delivery facts without
+expanding its mutation scope; enforce exact Activity identity and truthful playback
+completion. Continue the standing commit/push instruction. Remaining #40 decisions
+and #42–#48, model optimization, provider changes and deployment remain excluded.
+All entries below this section are historical delivery snapshots.
+
+Repository `/home/chromie/github/chromie`, branch/upstream `main` / `origin/main`.
+Clean pre-delivery base `4a1364028d6e59b09ac83ca470733f792a771f62`; the fetched
+remote matched. Resume from the latest commit containing this checkpoint/HANDOFF
+pair; verify the actual post-delivery commit rather than predicting its hash.
+Evidence root R: `.chromie/acceptance/issue41-speech-authority-20260911/`.
+This is an authorized Host/contract correction, not model prompt optimization.
+
+| Actual local boundary / owner | Material input, observed output and verdict | Repaired handoff / evidence limit |
+| --- | --- | --- |
+| Admitted request -> GI/GA/Planner fixtures | `Blink twice and tell a joke.`, `goal-body`/`goal-chat`, retained Responsibility `r1`, completed `blink-result`, and sibling Activity text `A joke.`. GI/GA/model/provider calls are scripted or absent; this does not establish live intent understanding or robot completion. | Real Host re-entry validates the retained request, exact Goal scope and Evidence. Scripted Planner returns a new result, correction, or intentional same-word Activity. |
+| Ledger -> bounded Planner input | The old Goal filter hid sibling-Goal speech; scoped Planner lacked the communication context used by the later Host suppression rule. This input boundary was incomplete. | Same-turn sibling speech becomes read-only context. Goal IDs remain exactly `goal-body`; sibling Work is excluded. Exact Activity IDs, wording, delivery attempt and delivery states remain available. Existing Fast/Deep projection and adapter consume this context; no second LLM decision is added. |
+| Valid Planner result -> Host response | The old body-success/sibling-speech helper deleted all three scripted replies. Its separate text filter also deleted equal words. This is the earliest wrong decision boundary: Host judged communication necessity after Planner. | Remove both helpers and their live re-entry/Situation calls. Preserve valid Planner speech, including new information, correction and intentional repetition. Existing safety, source, stale-output and completed-Work guards remain. |
+| Exact Activity -> speech scheduling | Two concurrent calls for one Activity previously scheduled twice; changed wording reused an earlier event. Different Activities/turns with equal words already had distinct identities. | Atomic lookup/schedule/register prevents duplicate scheduling. Changed wording rejects before synthesis even after a failed attempt. Same Activity after interruption reuses the interrupted receipt without automatic replay; Planner can author a new Activity. |
+| Audio transport -> delivery lifecycle | `playback_completed` was projected as started, and started speech counted as delivered. Callbacks could precede Activity registration. Chunk completion, failure and interruption were not reliable whole-utterance proof. | Actual transport publishes terminal results; per-order facts survive early callbacks and aggregate only after all chunks finish. Exact registration replay is idempotent; stale attempt callbacks cannot finish a newer attempt. Failure after partial playback remains interrupted. Audio writes are mocked in these tests. |
+| Complete speech -> history / Fast Goal observer | A scheduling/start receipt could previously populate conversation history and complete a bound Fast speech Goal. Resource release was not proof of full speech. | Both observers wait for the exact playback attempt's completion. Started/failed/interrupted/missing proof cannot become full history or speech-Goal completion. Existing action-start barriers continue using playback start. |
+| Deferred result -> detached playback -> original history | Existing deferred delivery uses a physical session of `None` after a newer turn; registration had no original owner for completion proof. This became a reproduced correlation gap under the stricter contract. | Retain Host-authored original session separately from physical playback session, generation and orders. Exact callbacks close the original event/history without changing Goal identity or replaying audio. |
+
+Ordered/concurrent local path:
+```text
+completed body Evidence + sibling speech facts -> scoped Planner request
+  -> scripted valid Plan/Activity -> Host validation -> unchanged speech
+concurrent submission A + submission A -> atomic identity lookup -> one TTS schedule
+  -> chunk start/terminal callbacks (possibly before registration)
+  -> exact Activity + delivery attempt -> all-chunk completion
+  -> completed history and Fast speech-Goal observer
+```
+
+The primary cause is Host policy overriding the Planner's semantic decision.
+Missing sibling context contributed; conflating started/completed delivery and
+non-atomic scheduling were independent mechanical defects exposed in the same
+approved boundary. The correction changes these existing owners; it does not make
+Host infer semantic equivalence or promote generation/scheduling to user-heard truth.
+Charter DELIVERED-CLAIM-001, interaction contract, turn-loop, Orchestrator README,
+Status and Roadmap now describe the same rule. No primary model prompt was tuned.
+
+Retained baseline: `baseline.log` passed 105 tests/13 subtests. `red-reentry.log`
+reproduces three actual discarded Planner responses; `red-submission.log` reproduces
+two identity failures and one passing different-identity contrast.
+`red-early-receipt.log` reproduces lost pre-registration completion.
+`red-delivery-context.log`, `fixture-phase-error.log`, `core-first.log` also include
+fixture errors (missing event ID, invalid phase, tuple/list expectation); those are
+not product root-cause evidence. `focused-fourth.log` is incomplete: a new test
+fixture lacked `trace_context` and hung before its output event, then was stopped.
+The corrected transport test bounds its wait and passes (`completion-proof.log`).
+First canonical (`canonical-first.log`) passed static/policy/config/docs and 140
+benchmarks but failed seven tests plus one suite subtest: old fixtures expected
+complete delivery from only a start receipt. First Level A was 28/30, with the two
+corresponding recovery cases failing (`level-a-first.log`, `level-a-first/`).
+These fixtures now register explicit scripted completed transport facts; scenarios
+and expected successful behavior are unchanged. The first expanded run retained
+one overly broad interrupted-event lookup expectation; the final exact scheduler
+checks interruption explicitly while the default deliverable lookup stays bounded.
+
+Final focused `focused-expanded-final.log`: 301 tests/44 subtests passed.
+Selected Level A (`level-a.log`, `level-a/`): 30/30 distinct cases passed; class
+memberships overlap. Final canonical (`canonical.log`) passed 2,442 tests/723 subtests,
+140 benchmarks, 20 legacy Agent tests, policy/ownership, pinned Ruff/MyPy, config
+and docs. No final gate failure remains. A trailing blank line was removed during
+the runner; `formatting-note.json` proves identical Python AST before/after. Final
+source hashes match `source-before.json`; final docs/patch checks are retained
+separately. Two pre-existing FastAPI deprecation warnings remain.
+
+Commands from repository root, with pinned `requirements-test.txt` dependencies:
+```bash
+python -m pytest -q tests/test_planner_reentry_policy.py tests/test_playback_delivery_lifecycle.py tests/test_interaction_ledger.py tests/test_orchestrator_tts_alignment.py tests/test_capability_result_evidence_reentry.py tests/test_situational_cognition.py tests/test_playback_transport_extraction.py tests/test_interaction_coordinator.py tests/test_cognitive_turn_loop_closure.py tests/test_cognitive_runtime_pr7.py tests/test_behavior_scenario_runner.py tests/test_general_ability_acceptance.py
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class robust_intent_understanding --ability-class planner_goal_semantic_quality --ability-class human_like_cognitive_continuity --ability-class continuous_cognition_recovery --ability-class deterministic_safety_controls --ability-class multi_goal_daily_life --ability-class stable_capability_grounding --evidence-dir .chromie/acceptance/issue41-speech-authority-20260911/level-a
+```
+
+Maintained Markdown remains 102 -> 102; configuration keys 381, public booleans 1,
+aliases 0. No new document, architectural owner/layer, model call, compatibility
+path or runtime switch was introduced. All 1,500 GA corpus inputs/references are
+unchanged. Deleted Host suppression and its obsolete helper tests are replaced by
+behavior assertions at actual re-entry and scheduling boundaries.
+Ignored artifacts need separate transfer. A new checkout can create/activate `.venv`,
+install `requirements-test.txt`, and run the tracked commands above. No microphone,
+audible speaker, physical body, simulator, live model or deployed-provider evidence
+was collected. Existing exhausted qualification budget and target-evidence gaps remain.
+Next: deliver the verified patch through the authorized normal main update, record
+actual commit/remote identity in #41/#36 and keep #41 open for owner acceptance.
+Do not infer authorization for other Issues or deployment from this delivery.
+
 ## Issue #40 GA structural repair preservation, 2026-09-11
 
 The owner approved the reported GA conflict and its correction: retain complete

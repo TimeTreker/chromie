@@ -1,10 +1,10 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-11
-**Current focus:** Issue #40 authorized GA structural-repair preservation.
-GA freezes primary claims, verifies exact preservation and rejects lossy preprocessing.
-Other GI normalization/numeric-source decisions and #41–#48 remain pending.
-GA focused 167/142 tests/subtests; canonical 2,428/715, 140 benchmarks, 20 legacy; Level A 30/30 passed.
+**Current focus:** Issue #41 authorized Planner speech authority and delivery truth.
+Host preserves valid Planner speech; Runtime uses exact Activity identity and complete playback proof.
+Other GI normalization/numeric-source decisions and #42–#48 remain pending.
+Current focused 301/44; canonical 2,442/723, 140 benchmarks, 20 legacy; Level A 30/30 passed.
 Numeric source extraction next to a period remains a known limitation; rejection preserves the failure.
 Prior #39 passed 2,412 tests/683 subtests, 140 benchmarks, 20 legacy tests and Level A 21/21.
 
@@ -20,7 +20,7 @@ was changed.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Independent Planner tasks, scoped Work, role Memory, source-bound Goal inheritance, GI speed rejection and GA repair preservation implemented. | GA focused 167 tests/142 subtests passed; new preservation 13/23. Current canonical 2,428/715, 140 benchmarks, 20 legacy, policy, ownership, pinned static, configuration and docs passed. Level A 30/30. | No model inference, live service, supervised voice or target-runtime qualification was performed for this patch. | Development only; default target-evidence closure remains open. |
+| Prior #37–#40 changes plus Planner speech ownership, exact Activity delivery identity, scoped speech context and completed-playback history implemented. | Focused 301 tests/44 subtests; canonical 2,442/723, 140 benchmarks, 20 legacy, policy/ownership, pinned static, configuration and docs passed; Level A 30/30. Old start-only fixtures now supply explicit scripted completion. | No model inference, live service, supervised voice or target-runtime qualification was performed for this patch. | Development only; default target-evidence closure remains open. |
 
 The prior consolidation counts (2,392 tests / 671 subtests) describe the base
 revision only; historical evidence below is not qualification of this local patch.

@@ -167,6 +167,7 @@ class InteractionRuntimeCoordinator:
         catalog_refresh_ttl_s: float | None = None,
         interaction_ledger: Any | None = None,
         communicative_delivery_recorder: CommunicativeDeliveryRecorder | None = None,
+        speech_delivery_waiter: Callable[[str | None, dict[str, Any]], Awaitable[bool]] | None = None,
         communicative_goal_completion_recorder: (
             CommunicativeGoalCompletionRecorder | None
         ) = None,
@@ -237,6 +238,7 @@ class InteractionRuntimeCoordinator:
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
         self.communicative_delivery_recorder = communicative_delivery_recorder
+        self.speech_delivery_waiter = speech_delivery_waiter
         self.communicative_goal_completion_recorder = (
             communicative_goal_completion_recorder
         )
@@ -318,7 +320,26 @@ class InteractionRuntimeCoordinator:
                 "goal_completion_authority": False,
             },
         )
-        task = asyncio.create_task(self._dispatch_to_terminal(response))
+        async def dispatch_with_delivery_evidence() -> CapabilityRuntimeResult:
+            execution = await self._dispatch_to_terminal(response)
+            if self.speech_delivery_waiter is None:
+                return execution
+            results = []
+            for result in execution.results:
+                if result.capability_id != "chromie.speak" or result.status != "completed":
+                    results.append(result)
+                    continue
+                output = result.output if isinstance(result.output, dict) else {}
+                delivered = await self.speech_delivery_waiter(session_id, output)
+                results.append(result.model_copy(update={
+                    "output": {**output, "playback_completed": delivered},
+                    **({"status": "failed", "reason_code": "speech_delivery_unverified",
+                        "message": "Complete speech playback was not observed."} if not delivered else {}),
+                }))
+            return execution.model_copy(update={"results": results,
+                "status": "failed" if any(item.status != "completed" for item in results) else execution.status})
+
+        task = asyncio.create_task(dispatch_with_delivery_evidence())
 
         def observe_completion(completed: asyncio.Task[CapabilityRuntimeResult]) -> None:
             if completed.cancelled():

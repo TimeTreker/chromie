@@ -160,6 +160,7 @@ def build_interaction_runtime(
         max_concurrency=settings.capability_runtime.capability_max_concurrency,
         catalog_refresh_ttl_s=settings.capability_runtime.catalog_refresh_ttl_s,
         interaction_ledger=interaction_ledger,
+        speech_delivery_waiter=lambda sid, receipt: assistant._playback_state().wait_for_speech_completion(sid, receipt),
         communicative_delivery_recorder=(
             lambda sid, text, metadata: assistant.conversation_state.record_assistant_turn(
                 sid,

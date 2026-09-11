@@ -87,3 +87,47 @@ class PlaybackTransportExtractionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlaybackCompletionEvidenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_actual_transport_completion_or_interrupt_qualifies_delivery(self):
+        import asyncio
+        for outcome in ("completed", "failed", "interrupted"):
+            with self.subTest(outcome=outcome):
+                from contextlib import nullcontext
+                lifecycle = PlaybackDeliveryLifecycle()
+                lifecycle.create_playback_start_waiter(generation=1, order=0, session_id="sid")
+                event = lifecycle.register_turn_speech_event(session_id="sid", generation=1, orders=[0],
+                    normalized_text="Hello.", stage="result", purpose="answer", communicative_activity_ids=["speech-a"])
+                def resolve(generation, order, sid, **kwargs):
+                    return lifecycle.resolve_playback_start_waiter(generation=generation, order=order, session_id=sid, **kwargs)
+                host = SimpleNamespace(_playback_state=lambda: lifecycle, playback_start_key=lifecycle.key,
+                    cancelled_playback_orders=set(), is_stale_playback=lambda *args: False,
+                    sessions=SimpleNamespace(state={"sid": {}}, trace_mark=lambda *args, **kwargs: None, trace_context=lambda *args: nullcontext()),
+                    output_rate=16000, session_log=lambda *args, **kwargs: None,
+                    resolve_playback_start_waiter=resolve, save_audio=lambda *args, **kwargs: None,
+                    maybe_session_done=lambda *args: None, is_playing_audio=False)
+                transport = PlaybackTransport(host)
+                started, finish = asyncio.Event(), asyncio.Event()
+                async def play(*args):
+                    started.set()
+                    await finish.wait()
+                    if outcome == "failed":
+                        raise RuntimeError("output failed")
+                    if outcome == "interrupted":
+                        raise asyncio.CancelledError()
+                async def abort():
+                    pass
+                transport.play_audio, transport.abort_output_stream = play, abort
+                playback = asyncio.create_task(transport.play_one_order(1, 0, b"\x00\x00", 16000, "sid"))
+                await asyncio.wait_for(started.wait(), timeout=1)
+                self.assertEqual(event["status"], "playback_started")
+                self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+                receipt = {"speech_event_id": event["event_id"], "generation": 1, "orders": [0]}
+                verified = asyncio.create_task(lifecycle.wait_for_speech_completion("sid", receipt, timeout_s=1))
+                await asyncio.sleep(0)
+                self.assertFalse(verified.done())
+                finish.set()
+                await playback
+                self.assertEqual(await verified, outcome == "completed")
+                self.assertEqual(event["status"], "playback_completed" if outcome == "completed" else "playback_interrupted")

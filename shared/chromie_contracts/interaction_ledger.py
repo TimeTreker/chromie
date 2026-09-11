@@ -27,6 +27,8 @@ InteractionEventType = Literal[
     "plan_resolved",
     "speech_scheduled",
     "speech_playback_started",
+    "speech_playback_completed",
+    "speech_playback_interrupted",
     "speech_not_delivered",
     "vocal_action_committed",
     "vocal_action_completed",

@@ -1,37 +1,35 @@
 # Development Checkpoint
 
-## Current delivery boundary — Issue #40 GA repair preservation
+## Current delivery boundary — Issue #41 speech authority and delivery truth
 
-Updated 2026-09-11. The owner approved freezing the complete first GA output,
-allowing at most one provably lossless structural repair, and deterministic
-comparison before acceptance. GA retains raw output before preprocessing;
-unknown fields, invalid optional meaning, malformed Goal references and conflicting
-segmentation decisions reject. Only existing object/singleton-array shape changes qualify after complete
-DTO/source/conservation preflight; changed semantics or over-budget input reject.
-Resource bindings may move only to an unambiguous active owner without data loss.
-No additional model invocation, architecture owner, service or switch was added.
+Updated 2026-09-11. The owner authorized returning ordinary speech necessity,
+correction and repetition to Planner. Host no longer deletes valid speech by
+body-Work category, sibling speech, or equal text. Same-turn sibling speech is
+read-only Planner context; exact Goal/Work scope and execution guards remain.
+Runtime atomically reuses one Activity's delivery, rejects changed wording under
+that identity and retains separate scheduled/started/completed/interrupted facts.
+Every chunk must complete before whole speech becomes history or completes a Fast
+speech Goal. Start barriers remain separate; interrupted Activities do not replay
+automatically. Deferred playback retains original ownership and transport identity.
 
-Delivery base: `main` at `15f2a45c73a38e63a7274639d07b2ad544025e92`, tracking
-`origin/main`. Continue the owner's existing commit/push instruction. Resume from
-the latest commit containing this checkpoint and HANDOFF; do not predict its hash.
-Evidence: `.chromie/acceptance/issue40-ga-semantic-preservation-20260911/`.
-The original two-return probe accepted continue -> cancel after an extra-key error.
-Both identical probes now reject after one call because unknown-key deletion is
-not provably lossless. Separate shape-only contrasts permit one repair and reject
-changed relation, target, scope, values, Goal count/order and source references.
-Focused 167 tests/142 subtests; canonical 2,428/715, 140 benchmarks, 20 legacy
-passed. New preservation 13/23 and selected Level A 30/30 also passed.
-Rejected cancellation leaves real local Goal state unchanged. This is scripted
-contract/state evidence, not model, voice, provider or target qualification.
-Ignored evidence does not transfer with Git; exact workflow/commands are in HANDOFF.
+Delivery base: `main` at `4a1364028d6e59b09ac83ca470733f792a771f62`, tracking
+`origin/main`. Continue the standing commit/push authorization. Resume from the
+latest commit containing this checkpoint and HANDOFF; do not predict its hash.
+Evidence: `.chromie/acceptance/issue41-speech-authority-20260911/`.
+Focused 301 tests/44 subtests and Level A 30/30 passed. Final canonical passed
+2,442 tests/723 subtests, 140 benchmarks and 20 legacy Agent tests.
+The first full gate failed seven tests through stale start-as-delivered fixtures;
+its failed cohort and first Level A 28/30 remain retained, not promoted to passes.
+Real transport code was tested with mocked audio writes, including interruption,
+partial chunks, early receipts, retries, concurrent submissions and deferred output.
+No model inference, service deployment, physical voice or target proof was run.
+Ignored artifacts need separate transfer; tracked commands/workflow are in HANDOFF.
 
-Prior #37–#39 and GI speed rejection were delivered in the baseline commit.
-Its canonical 2,415 tests/692 subtests, 140 benchmarks, 20 legacy tests and
-Level A 30/30 passed; those results do not qualify this new GA change.
-Other GI normalizers, numeric source extraction beside a period, #41–#48, full
-merge/split, model optimization and deployment remain outside this approval.
-No corpus input or reference output was changed in this GA patch. The earlier
-1,500-reference representation migration belongs to #39, with meaning unchanged.
+Prior #37–#40 changes are in the delivery base; their historical evidence remains
+below/in HANDOFF. Other GI normalizers, numeric source extraction beside a period,
+#42–#48, full merge/split, model optimization and deployment remain unapproved.
+No corpus inputs/reference outputs, provider profiles, config keys or runtime
+switches changed. Existing owners hold this amendment; no new architecture layer.
 Historical #37 implementation/evidence follows; use this top entry for current resume.
 
 ## Prior local implementation — Issue #37, 2026-09-11
@@ -107,8 +105,8 @@ no physical actions, microphone, audible speaker or deployed service proof ran.
 The owner requested separate discussion and authorization for each audit finding.
 [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) links #37 (this
 authorized local implementation) and #38 (completed documentation correction),
-#39 (semantic inheritance), and #40 (GI speed rejection only). Remaining #40 work
-and #41–#48 need separate authorization. Select the next topic with the owner.
+#39 (semantic inheritance), #40 (GI speed and GA preservation), and #41 (speech
+authority). Remaining #40 work and #42–#48 need separate authorization.
 
 1. Inspect `git status --short --branch`, this checkpoint, current Charter and
    HANDOFF. Preserve any subsequent dirty work and existing evidence.

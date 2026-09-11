@@ -7,7 +7,7 @@ from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 
 
 class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
-    async def test_speech_is_visible_only_after_playback_starts(self) -> None:
+    async def test_speech_is_delivered_only_after_playback_completes(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle()
         lifecycle.create_playback_start_waiter(
             generation=2,
@@ -33,9 +33,11 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 reason="playback_start",
             )
         )
+        self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+        lifecycle.complete_turn_speech_order(generation=2, order=4, session_id="sid", completed=True, reason="completed")
         delivered = lifecycle.delivered_turn_speech_events("sid")
         self.assertEqual(len(delivered), 1)
-        self.assertEqual(delivered[0]["status"], "playback_started")
+        self.assertEqual(delivered[0]["status"], "playback_completed")
 
     def test_speech_event_identity_is_structured_not_wording_based(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle()
@@ -49,19 +51,17 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             commitment="checking_only",
         )
         first_text = first["text"] if first is not None else ""
-        second = lifecycle.register_turn_speech_event(
-            session_id="sid",
-            generation=2,
-            orders=[4],
-            normalized_text="Okay, let me look.",
-            stage="fast_first",
-            purpose="acknowledge_and_check",
-            commitment="checking_only",
-        )
-
-        assert first is not None and second is not None
-        self.assertEqual(first["event_id"], second["event_id"])
-        self.assertNotEqual(first_text, second["text"])
+        with self.assertRaisesRegex(ValueError, "wording"):
+            second = lifecycle.register_turn_speech_event(
+                session_id="sid",
+                generation=2,
+                orders=[4],
+                normalized_text="Okay, let me look.",
+                stage="fast_first",
+                purpose="acknowledge_and_check",
+                commitment="checking_only",
+            )
+        self.assertEqual(first["text"], first_text)
         self.assertEqual(len(lifecycle.turn_speech_events["sid"]), 1)
 
         other_goal = lifecycle.register_turn_speech_event(
@@ -154,6 +154,8 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
             started=True,
             reason="playback_start",
         )
+        self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+        lifecycle.complete_turn_speech_order(generation=3, order=7, session_id="sid", completed=True, reason="completed")
         delivered = lifecycle.delivered_turn_speech_events("sid")
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["canonical_plan_id"], "plan-weather")
@@ -269,3 +271,73 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(lifecycle.output_duck_generation)
         self.assertTrue(lifecycle.output_duck_released.is_set())
+
+
+class SpeechDeliveryTruthTests(unittest.TestCase):
+    def make_event(self, *, orders=(1, 2)):
+        lifecycle = PlaybackDeliveryLifecycle()
+        event = lifecycle.register_turn_speech_event(session_id="sid", turn_id="turn", generation=1,
+            orders=list(orders), normalized_text="First. Second.", stage="result", purpose="answer",
+            communicative_activity_ids=["activity-a"])
+        return lifecycle, event
+
+    def test_started_and_partial_audio_never_count_as_complete(self):
+        lifecycle, event = self.make_event()
+        lifecycle.update_turn_speech_event_for_playback(generation=1, order=1, session_id="sid", started=True, reason="start")
+        self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+        lifecycle.complete_turn_speech_order(generation=1, order=1, session_id="sid", completed=True, reason="completed")
+        self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+        lifecycle.update_turn_speech_event_for_playback(generation=1, order=2, session_id="sid", started=True, reason="start")
+        lifecycle.complete_turn_speech_order(generation=1, order=2, session_id="sid", completed=False, reason="interrupted")
+        self.assertEqual(event["status"], "playback_interrupted")
+        self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+        self.assertIsNone(lifecycle.find_turn_speech_event_for_activities(session_id="sid", turn_id="turn", communicative_activity_ids=["activity-a"]))
+
+    def test_all_chunks_must_finish_and_late_start_cannot_regress_completion(self):
+        lifecycle, event = self.make_event()
+        for order in (1, 2):
+            lifecycle.update_turn_speech_event_for_playback(generation=1, order=order, session_id="sid", started=True, reason="start")
+            lifecycle.complete_turn_speech_order(generation=1, order=order, session_id="sid", completed=True, reason="completed")
+        self.assertEqual(event["status"], "playback_completed")
+        lifecycle.update_turn_speech_event_for_playback(generation=1, order=1, session_id="sid", started=True, reason="late callback")
+        self.assertEqual(len(lifecycle.delivered_turn_speech_events("sid")), 1)
+        self.assertEqual(event["status"], "playback_completed")
+
+    def test_same_activity_cannot_change_text(self):
+        lifecycle, event = self.make_event(orders=(1,))
+        with self.assertRaisesRegex(ValueError, "wording"):
+            lifecycle.register_turn_speech_event(session_id="sid", turn_id="turn", generation=1,
+                orders=[1], normalized_text="Different meaning.", stage="result", purpose="answer",
+                communicative_activity_ids=["activity-a"])
+        self.assertEqual(event["text"], "First. Second.")
+
+    def test_old_attempt_completion_does_not_complete_retry(self):
+        lifecycle, event = self.make_event(orders=(1,))
+        lifecycle.update_turn_speech_event_for_playback(generation=1, order=1, session_id="sid", started=False, reason="failed")
+        lifecycle.register_turn_speech_event(session_id="sid", turn_id="turn", generation=2,
+            orders=[3], normalized_text="First. Second.", stage="result", purpose="answer",
+            communicative_activity_ids=["activity-a"])
+        lifecycle.complete_turn_speech_order(generation=1, order=1, session_id="sid", completed=True, reason="late")
+        self.assertEqual(event["status"], "scheduled")
+        self.assertEqual(lifecycle.delivered_turn_speech_events("sid"), [])
+
+
+class EarlyPlaybackReceiptTests(unittest.TestCase):
+    def test_playback_finishing_before_speech_registration_keeps_its_facts(self):
+        lifecycle = PlaybackDeliveryLifecycle()
+        lifecycle.update_turn_speech_event_for_playback(generation=1, order=0, session_id="sid", started=True, reason="started")
+        lifecycle.complete_turn_speech_order(generation=1, order=0, session_id="sid", completed=True, reason="completed")
+        lifecycle.register_turn_speech_event(session_id="sid", generation=1, orders=[0], normalized_text="Hello.",
+            stage="result", purpose="answer", communicative_activity_ids=["a1"])
+        self.assertEqual(len(lifecycle.delivered_turn_speech_events("sid")), 1)
+
+    def test_exact_registration_replay_cannot_regress_completed_delivery(self):
+        lifecycle = PlaybackDeliveryLifecycle()
+        args = dict(session_id="sid", generation=1, orders=[0], normalized_text="Hello.",
+            stage="result", purpose="answer", communicative_activity_ids=["a1"])
+        event = lifecycle.register_turn_speech_event(**args)
+        lifecycle.complete_turn_speech_order(generation=1, order=0, session_id="sid", completed=True, reason="completed")
+        repeated = lifecycle.register_turn_speech_event(**args)
+        self.assertEqual(repeated["event_id"], event["event_id"])
+        self.assertEqual(repeated["status"], "playback_completed")
+        self.assertEqual(len(repeated["delivery_attempts"]), 1)

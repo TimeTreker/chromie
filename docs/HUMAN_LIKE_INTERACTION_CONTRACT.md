@@ -522,9 +522,10 @@ earlier claim should not stand -> retract it and repair
 `repair` is a typed Communicative Activity function. It points forward from immutable
 history; it does not edit the earlier Activity, mutate its `truth_stage`, or become a new
 Plan disposition. Pending but unheard speech can be cancelled/superseded without a spoken
-repair because it never became common ground. Host exact-text duplicate suppression remains
-a delivery safety net only; semantic equivalence and contradiction belong to the same Core
-communication authority that owns normal wording.
+repair because it never became common ground. Host prevents duplicate delivery by exact
+Activity/submission identity. A new Activity may intentionally repeat the same words;
+semantic equivalence, necessity and contradiction belong to the same Core communication
+authority that owns normal wording.
 
 Epistemic stance is separate from truth provenance and execution state. `tentative` describes
 how strongly Chromie currently commits to an otherwise supportable conversational judgment;
@@ -846,10 +847,13 @@ projects prior-turn assistant text into `already_spoken` only from the existing
 delivery-completed conversation record; generic authored or scheduled response history
 does not become heard-speech evidence. This lets later Planner turns reason from exact
 delivered wording without treating a proposal as something the person heard.
-may suppress/resume transport only by exact Activity identity and retained delivery
+Runtime may suppress/resume transport only by exact Activity identity and retained delivery
 evidence; wording similarity is never a de-duplication authority. A delivered or
 already-scheduled Activity must not be spoken again merely because GA reconciliation,
-plan projection, retry, or transport ordering created another delivery attempt.
+plan projection, retry, or transport ordering created another delivery attempt. Started,
+completed and interrupted playback remain distinct; partial playback cannot become a
+complete assistant-history record or completed speech Goal. Related same-turn speech is
+read-only context for Planner and grants no authority over sibling Goal/Work state.
 
 Issue [#32](https://github.com/TimeTreker/chromie/issues/32) proposes a different
 realization of this same courtesy contract: one Fast Planner streaming invocation may

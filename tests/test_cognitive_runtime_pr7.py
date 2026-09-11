@@ -2539,7 +2539,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 "event_id": "speech-existing",
                 "session_id": "sid-pr7",
                 "turn_id": "turn-1",
-                "status": "playback_started",
+                "status": "playback_completed",
                 "text": "你好。",
                 "source_goal_ids": ["goal-1"],
             }

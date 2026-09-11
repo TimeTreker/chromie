@@ -37,6 +37,7 @@ from orchestrator.runtime.cognitive_runtime import (
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.session import SessionTracker
+from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
     CapabilityDefinition,
@@ -304,6 +305,7 @@ class _CognitiveTurnScenarioRuntime:
         )
         self.definitions = catalog.definitions
         self.stub = stub
+        self.playback_delivery = PlaybackDeliveryLifecycle()
         self.mode = str(stub.get("execution_mode") or "scripted")
         self.calls: list[InteractionResponse] = []
         self.provider_started = asyncio.Event()
@@ -377,9 +379,27 @@ class _CognitiveTurnScenarioRuntime:
             if self.runtime is not None:
                 self.runtime.registry.upsert(updated)
 
+    def completed_speech_receipt(self, speech, session_id):
+        # Scripted complete transport proof; no physical audio is exercised here.
+        lifecycle = self.playback_delivery
+        order = lifecycle.synthesis_order
+        lifecycle.synthesis_order += 1
+        generation = lifecycle.playback_generation
+        event = lifecycle.register_turn_speech_event(session_id=session_id,
+            origin_session_id=speech.metadata.get("origin_session_id"),
+            generation=generation, orders=[order], normalized_text=speech.text,
+            stage="result", purpose="answer", communicative_activity_ids=[speech.id])
+        lifecycle.update_turn_speech_event_for_playback(generation=generation, order=order,
+            session_id=session_id, started=True, reason="scripted_start")
+        lifecycle.complete_turn_speech_order(generation=generation, order=order,
+            session_id=session_id, completed=True, reason="scripted_completion")
+        return {"speech_event_id": event["event_id"], "generation": generation,
+            "orders": [order], "playback_started": True}
+
     def _scripted_terminal_result(
         self,
         response: InteractionResponse,
+        session_id: str | None,
     ) -> CapabilityRuntimeResult:
         plan_requests = [
             request
@@ -397,7 +417,7 @@ class _CognitiveTurnScenarioRuntime:
                         capability_id="chromie.speak",
                         status="completed",
                         provider_id="chromie.local_speech",
-                        output={"playback_started": True},
+                        output=self.completed_speech_receipt(item, session_id),
                     )
                     for item in response.speech
                 ],
@@ -461,7 +481,6 @@ class _CognitiveTurnScenarioRuntime:
         session_id: str | None,
         confirmed_request_ids: set[str] | None = None,
     ) -> CapabilityInteractionDispatch:
-        del session_id
         self.calls.append(response)
         plan_requests = [
             request
@@ -486,7 +505,7 @@ class _CognitiveTurnScenarioRuntime:
                 preexecuted_results=[],
                 preexecuted_traces=[],
             )
-        execution = self._scripted_terminal_result(response)
+        execution = self._scripted_terminal_result(response, session_id)
         return CapabilityInteractionDispatch(
             source_response=response,
             runtime_response=response,
@@ -1749,6 +1768,7 @@ async def evaluate_cognitive_turn_loop_scenario(
     evidence = _CognitiveTurnEvidenceRecorder()
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.interaction_runtime = runtime
+    assistant.playback_delivery = runtime.playback_delivery
     assistant.playback_generation = 7
     assistant.sessions = sessions
     assistant.conversation_state = manager

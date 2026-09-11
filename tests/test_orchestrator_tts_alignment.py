@@ -69,9 +69,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             started=True,
             reason="playback_start",
         )
+        self.assertEqual(assistant._delivered_turn_speech_events("sid-fast"), [])
+        assistant._playback_state().complete_turn_speech_order(generation=3, order=7, session_id="sid-fast", completed=True, reason="completed")
         delivered = assistant._delivered_turn_speech_events("sid-fast")
         self.assertEqual(len(delivered), 1)
-        self.assertEqual(delivered[0]["status"], "playback_started")
+        self.assertEqual(delivered[0]["status"], "playback_completed")
         self.assertEqual(delivered[0]["text"], "好呀，我帮你看看。")
         self.assertEqual(delivered[0]["fast_activity_id"], "progress_weather")
 
@@ -1440,7 +1442,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-        delivered = assistant._record_successfully_delivered_speech(
+        delivered = await assistant._record_successfully_delivered_speech(
             response,
             execution,
             session_id="sid-confirmation-failed",
@@ -1711,6 +1713,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             started=True,
             reason="playback_start",
         )
+        self.assertEqual(assistant._delivered_turn_speech_events("sid-final"), [])
+        assistant._playback_state().complete_turn_speech_order(generation=4, order=9, session_id="sid-final", completed=True, reason="completed")
         delivered = assistant._delivered_turn_speech_events("sid-final")
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["text"], "The Moon reflects sunlight.")
@@ -2327,3 +2331,84 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
+    def make_assistant(self):
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.session_log = lambda *args, **kwargs: None
+        assistant.normalize_tts_candidate = lambda text: " ".join(text.split())
+        calls = []
+        async def schedule(text, sid):
+            order = len(calls)
+            calls.append((text, sid))
+            await asyncio.sleep(0)
+            return {"scheduled": True, "generation": 1, "order": order, "orders": [order], "chunks": 1}
+        assistant.schedule_tts_text = schedule
+        return assistant, calls
+
+    @staticmethod
+    def args(activity="activity-a", text="Okay.", turn="turn"):
+        return {"text": text, "metadata": {"session_id": "sid", "turn_id": turn, "communicative_activity_ids": [activity]}}
+
+    async def test_concurrent_same_activity_only_schedules_once(self):
+        assistant, calls = self.make_assistant()
+        first, second = await asyncio.gather(assistant._schedule_interaction_speech(self.args()),
+            assistant._schedule_interaction_speech(self.args()))
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(first["orders"], second["orders"])
+        self.assertEqual(first["speech_event_id"], second["speech_event_id"])
+
+    async def test_same_words_with_distinct_activity_or_turn_are_not_removed(self):
+        assistant, calls = self.make_assistant()
+        for args in (self.args(), self.args(activity="activity-b"), self.args(turn="turn-2")):
+            await assistant._schedule_interaction_speech(args)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual([text for text, sid in calls], ["Okay."] * 3)
+
+    async def test_same_activity_with_changed_text_rejects_before_synthesis(self):
+        assistant, calls = self.make_assistant()
+        await assistant._schedule_interaction_speech(self.args())
+        with self.assertRaisesRegex(ValueError, "wording"):
+            await assistant._schedule_interaction_speech(self.args(text="Cancel that."))
+        self.assertEqual(len(calls), 1)
+
+    async def test_failed_activity_wording_cannot_change_before_retry(self):
+        assistant, calls = self.make_assistant()
+        await assistant._schedule_interaction_speech(self.args())
+        assistant._playback_state().complete_turn_speech_order(generation=1, order=0,
+            session_id="sid", completed=False, reason="failed")
+        with self.assertRaisesRegex(ValueError, "wording"):
+            await assistant._schedule_interaction_speech(self.args(text="Cancel that."))
+        self.assertEqual(len(calls), 1)
+        await assistant._schedule_interaction_speech(self.args())
+        self.assertEqual(len(calls), 2)
+
+    async def test_interrupted_activity_is_not_automatically_replayed(self):
+        assistant, calls = self.make_assistant()
+        await assistant._schedule_interaction_speech(self.args())
+        lifecycle = assistant._playback_state()
+        lifecycle.update_turn_speech_event_for_playback(generation=1, order=0,
+            session_id="sid", started=True, reason="started")
+        lifecycle.complete_turn_speech_order(generation=1, order=0,
+            session_id="sid", completed=False, reason="interrupted")
+        result = await assistant._schedule_interaction_speech(self.args())
+        self.assertTrue(result["reused"])
+        self.assertEqual(result["status"], "playback_interrupted")
+        self.assertEqual(len(calls), 1)
+
+    async def test_detached_playback_preserves_original_speech_owner(self):
+        assistant, calls = self.make_assistant()
+        args = self.args()
+        args["metadata"].update(session_id=None, origin_session_id="sid")
+        result = await assistant._schedule_interaction_speech(args)
+        waiter = asyncio.create_task(assistant._playback_state().wait_for_speech_completion("sid", result))
+        await asyncio.sleep(0)
+        self.assertFalse(waiter.done())
+        assistant._playback_state().complete_turn_speech_order(generation=1, order=0,
+            session_id=None, completed=True, reason="completed")
+        self.assertTrue(await waiter)
+        repeated = await assistant._schedule_interaction_speech(args)
+        self.assertTrue(repeated["reused"])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(assistant._delivered_turn_speech_events("sid")), 1)

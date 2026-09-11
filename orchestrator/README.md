@@ -154,10 +154,17 @@ semantic path.
 terminal Runtime Evidence may reactivate Planner. It checks the exact current
 Goal/Plan/request binding, reuses only the originating GI Responsibility provenance,
 constructs an immutable typed scope for the exact affected Goal/Evidence/Plan set,
-rejects repetition of the completed Activity, and removes exact already-delivered speech
-deltas. It does not decide whether Evidence is interesting, reinterpret a Goal, author a
+rejects repeated completed Work, and leaves validated Planner speech intact. Related
+same-turn speech facts are read-only context and do not widen the re-entry scope.
+It does not decide whether Evidence is interesting, reinterpret a Goal, author a
 response, or execute Work. Missing Responsibility provenance retains the Evidence but
 suppresses that cognitive re-entry rather than inventing a synthetic callback request.
+
+Playback delivery owns atomic Activity lookup/scheduling, immutable wording per identity,
+and ordered playback facts. Same words under a new Activity are allowed. Completed
+conversation history and Fast speech-Goal completion require every audio chunk to finish;
+started, interrupted, failed or merely released playback cannot supply that proof.
+The existing playback-start barrier still controls action startup independently.
 
 ## Configuration precedence
 

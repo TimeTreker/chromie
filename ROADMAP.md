@@ -32,8 +32,9 @@ source-bound partial revisions, and preserved history/Evidence. Full merge/split
 execution remains excluded. #40's GI speed rejection was delivered with #37–#39.
 The owner subsequently authorized GA repair preservation: freeze primary claims,
 validate a lossless structural projection, compare before acceptance, and reject
-lossy preprocessing. Other GI normalizers, the numeric punctuation limitation and
-#41–#48 still require separate decisions. These changes do not qualify a model or deployment.
+lossy preprocessing. The owner also authorized #41: Planner owns speech necessity and
+repetition; Runtime enforces exact Activity identity and truthful playback completion.
+Other GI normalizers, numeric punctuation and #42–#48 remain pending. No model or deployment is qualified.
 
 ## Current execution order
 
@@ -229,8 +230,8 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    Pending Work whose unreturned result materially determines a factual answer forbids
    provisional result speech. Consequence/claim-qualification requirements cannot be
    weakened by a tentative stance. Implementation should share existing model transaction,
-   grounding, validation, and re-entry infrastructure; exact-text Host suppression remains
-   only a mechanical safety net. No source-complete or target-qualified claim is made by this
+   grounding, validation, and re-entry infrastructure; Host prevents repeat delivery only
+   by exact Activity/submission identity. No source-complete or target-qualified claim is made by this
    documentation patch.
 
 The already-settled implementation facts below remain constraints during that closure:
@@ -306,8 +307,8 @@ available.
    Evidence, timeout, refusal, cancellation, or an explicitly authorized provisional
    continuation, reactivate the same Core/Planner communication authority with the bounded
    current snapshot. Reconcile against actually delivered speech and emit only silence,
-   the still-needed delta, or a forward repair. Exact-text Host suppression remains a
-   mechanical final guard, not the semantic reconciliation policy. Safety/control
+   the still-needed delta, intentional repetition, or a forward repair. Host enforces exact
+   Activity/submission identity and delivery facts; Planner owns semantic reconciliation. Safety/control
    obligations retain deterministic pre-emption.
 4. **Make correction and waiting feel continuous.** Retain open Responsibility while
    waiting for user input, time, provider readiness, or trustworthy Evidence. A later

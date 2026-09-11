@@ -10,6 +10,7 @@ from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import CapabilityInteractionDispatch
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.session import SessionTracker
+from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
     CapabilityRuntimeResult,
@@ -157,6 +158,7 @@ class _Runtime:
         *,
         on_first_execute=None,
     ) -> None:
+        self.playback_delivery = PlaybackDeliveryLifecycle()
         self.first_result = first_result
         self.on_first_execute = on_first_execute
         self.calls: list[InteractionResponse] = []
@@ -173,6 +175,23 @@ class _Runtime:
 
     def capability_definition(self, capability_id: str) -> CapabilityDefinition:
         return self._definitions[capability_id]
+
+    def completed_speech_receipt(self, speech, session_id):
+        # Scripted complete transport proof; no physical audio is exercised here.
+        lifecycle = self.playback_delivery
+        order = lifecycle.synthesis_order
+        lifecycle.synthesis_order += 1
+        generation = lifecycle.playback_generation
+        event = lifecycle.register_turn_speech_event(session_id=session_id,
+            origin_session_id=speech.metadata.get("origin_session_id"),
+            generation=generation, orders=[order], normalized_text=speech.text,
+            stage="result", purpose="answer", communicative_activity_ids=[speech.id])
+        lifecycle.update_turn_speech_event_for_playback(generation=generation, order=order,
+            session_id=session_id, started=True, reason="scripted_start")
+        lifecycle.complete_turn_speech_order(generation=generation, order=order,
+            session_id=session_id, completed=True, reason="scripted_completion")
+        return {"speech_event_id": event["event_id"], "generation": generation,
+            "orders": [order], "playback_started": True}
 
     async def submit_response(
         self,
@@ -197,7 +216,7 @@ class _Runtime:
                         request_id=speech.id,
                         capability_id="chromie.speak",
                         status="completed",
-                        output={"playback_started": True},
+                        output=self.completed_speech_receipt(speech, session_id),
                     )
                     for speech in response.speech
                 ],
@@ -283,6 +302,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
     ) -> tuple[VoiceAssistant, str, _EvidenceRecorder]:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.interaction_runtime = runtime
+        assistant.playback_delivery = runtime.playback_delivery
         assistant.playback_generation = 4
         assistant.playback_queue = asyncio.Queue()
         assistant.active_synthesis_tasks = set()

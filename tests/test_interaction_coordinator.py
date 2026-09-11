@@ -1822,3 +1822,36 @@ class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
             snapshot = await coordinator.runtime.planning_state_snapshot([], blocked)
             self.assertEqual(len(snapshot["prepared"]), 3)
             self.assertEqual(snapshot["work"], {})
+
+
+class SpeechCompletionAuthorityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_history_and_goal_completion_wait_for_actual_delivery(self):
+        for completes in (True, False):
+            with self.subTest(completes=completes):
+                gate = asyncio.Event()
+                entered = asyncio.Event()
+                recorded, closed = [], []
+                async def delivery(sid, output):
+                    entered.set()
+                    await gate.wait()
+                    return completes
+                coordinator = InteractionRuntimeCoordinator(
+                    lambda args: {"scheduled": True, "playback_started": True, "voice_released": True},
+                    speech_delivery_waiter=delivery,
+                    communicative_delivery_recorder=lambda *args: recorded.append(args),
+                    communicative_goal_completion_recorder=lambda *args: closed.append(args))
+                ready = await coordinator.start_fast_planner_communicative_act(
+                    FastPlannerCompleteResponseAct.model_validate({"activity_id": "a1", "role": "complete_response",
+                        "speech_act": "respond", "text": "Hello.", "truth_stage": "context_grounded", "source_responsibility_refs": ["r1"]}),
+                    session_id="sid", turn_id="turn", language="en-US")
+                coordinator.bind_fast_planner_communicative_execution(ready, session_id="sid", goal_ids_by_responsibility={"r1": ["goal-a"]})
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                self.assertEqual(recorded, [])
+                self.assertEqual(closed, [])
+                self.assertFalse(ready.task.done())
+                gate.set()
+                result = await ready.task
+                await asyncio.sleep(0)
+                self.assertEqual(len(recorded), int(completes))
+                self.assertEqual(len(closed), int(completes))
+                self.assertEqual(result.status, "completed" if completes else "failed")

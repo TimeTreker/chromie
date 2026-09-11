@@ -446,164 +446,173 @@ class PlaybackTransport:
     @_trace_session_async(PLAYBACK_TRACE_MODULE, "play_one_order", "session_id")
     async def play_one_order(self, generation: int, order: int, audio: bytes | ProviderPcmStream, source_rate: int, session_id: Optional[str], skip_reason: Optional[str] = None) -> bool:
         host = self.host
-        key = host.playback_start_key(generation, order, session_id)
-        cancelled_orders = getattr(host, "cancelled_playback_orders", set())
-        if key in cancelled_orders:
-            cancelled_orders.discard(key)
-            if isinstance(audio, ProviderPcmStream):
-                audio.cancel("cancelled_before_playback")
-            host.session_log(
-                session_id,
-                "playback_skip_cancelled: order=%s generation=%s",
-                order,
-                generation,
-            )
-            host.maybe_session_done(session_id)
-            return True
-        if host.is_stale_playback(generation, session_id):
-            host.resolve_playback_start_waiter(
-                generation,
-                order,
-                session_id,
-                started=False,
-                reason="stale_playback",
-            )
-            return False
-        state = host.sessions.state.get(session_id or "")
-        first_stream_chunk: bytes | None = None
-        if isinstance(audio, ProviderPcmStream):
-            source_rate = audio.source_rate
-            while first_stream_chunk is None:
-                if audio.finished and audio.chunks.empty():
-                    break
-                if host.is_stale_playback(generation, session_id):
-                    audio.cancel("stale_before_first_pcm")
-                    host.resolve_playback_start_waiter(
-                        generation,
-                        order,
-                        session_id,
-                        started=False,
-                        reason="stale_before_first_pcm",
-                    )
-                    return False
-                try:
-                    first_stream_chunk = await asyncio.wait_for(audio.read(), timeout=0.1)
-                except TimeoutError:
-                    continue
-            if first_stream_chunk is None:
-                skip_reason = audio.error_reason or skip_reason or "tts_empty_audio"
-        if (isinstance(audio, bytes) and not audio) or (
-            isinstance(audio, ProviderPcmStream) and first_stream_chunk is None
-        ):
-            reason = skip_reason or "empty_audio"
-            host.resolve_playback_start_waiter(
-                generation,
-                order,
-                session_id,
-                started=False,
-                reason=reason,
-            )
-            if state is not None:
-                if reason in {"tts_error", "tts_exception", "playback_exception"}:
-                    state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
-                else:
-                    state["skipped_tts"] = int(state.get("skipped_tts", 0)) + 1
-            host.session_log(session_id, "playback_skip_empty: order=%s reason=%s", order, reason)
-            host.maybe_session_done(session_id)
-            return True
-
-        initial_audio = first_stream_chunk if isinstance(audio, ProviderPcmStream) else audio
-        if initial_audio is None:
-            reason = "playback_missing_initial_pcm"
-            host.resolve_playback_start_waiter(
-                generation,
-                order,
-                session_id,
-                started=False,
-                reason=reason,
-            )
-            if state is not None:
-                state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
-            host.session_log(
-                session_id,
-                "playback_skip_empty: order=%s reason=%s",
-                order,
-                reason,
-            )
-            host.maybe_session_done(session_id)
-            return True
-        audio_ms = (len(initial_audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
-        host.sessions.trace_mark(
-            session_id,
-            "first_audio_playback" if not state or not state.get("trace_first_audio_marked") else "audio_playback_started",
-            kind="user_observable",
-            attributes={"order": order, "audio_ms": round(audio_ms, 3)},
-        )
-        if state is not None:
-            state["trace_first_audio_marked"] = True
-        host.session_log(
-            session_id,
-            "playback_start: order=%s source_rate=%s output_rate=%s audio_ms=%.1f generation=%s",
-            order,
-            source_rate,
-            host.output_rate,
-            audio_ms,
-            generation,
-        )
-        host.resolve_playback_start_waiter(
-            generation,
-            order,
-            session_id,
-            started=True,
-            reason="playback_start",
-        )
-        playback_start_ms = now_ms()
+        completed = False
         try:
-            host.is_playing_audio = True
-            try:
+            key = host.playback_start_key(generation, order, session_id)
+            cancelled_orders = getattr(host, "cancelled_playback_orders", set())
+            if key in cancelled_orders:
+                cancelled_orders.discard(key)
                 if isinstance(audio, ProviderPcmStream):
-                    chunk = first_stream_chunk
-                    while chunk is not None:
-                        await self.play_audio(chunk, source_rate, generation, session_id)
-                        chunk = await audio.read()
-                else:
-                    await self.play_audio(audio, source_rate, generation, session_id)
-            finally:
-                host.is_playing_audio = False
-        except asyncio.CancelledError:
-            host.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, now_ms() - playback_start_ms, generation)
-            return False
-        except Exception as exc:
-            await self.abort_output_stream()
-            if state is not None:
-                state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
-            host.session_log(session_id, "playback_exception: order=%s playback_ms=%.1f error=%s", order, now_ms() - playback_start_ms, exc)
-            logger.error("Playback exception: %s", exc, exc_info=True)
-            host.maybe_session_done(session_id)
-            return True
+                    audio.cancel("cancelled_before_playback")
+                host.session_log(
+                    session_id,
+                    "playback_skip_cancelled: order=%s generation=%s",
+                    order,
+                    generation,
+                )
+                host.maybe_session_done(session_id)
+                return True
+            if host.is_stale_playback(generation, session_id):
+                host.resolve_playback_start_waiter(
+                    generation,
+                    order,
+                    session_id,
+                    started=False,
+                    reason="stale_playback",
+                )
+                return False
+            state = host.sessions.state.get(session_id or "")
+            first_stream_chunk: bytes | None = None
+            if isinstance(audio, ProviderPcmStream):
+                source_rate = audio.source_rate
+                while first_stream_chunk is None:
+                    if audio.finished and audio.chunks.empty():
+                        break
+                    if host.is_stale_playback(generation, session_id):
+                        audio.cancel("stale_before_first_pcm")
+                        host.resolve_playback_start_waiter(
+                            generation,
+                            order,
+                            session_id,
+                            started=False,
+                            reason="stale_before_first_pcm",
+                        )
+                        return False
+                    try:
+                        first_stream_chunk = await asyncio.wait_for(audio.read(), timeout=0.1)
+                    except TimeoutError:
+                        continue
+                if first_stream_chunk is None:
+                    skip_reason = audio.error_reason or skip_reason or "tts_empty_audio"
+            if (isinstance(audio, bytes) and not audio) or (
+                isinstance(audio, ProviderPcmStream) and first_stream_chunk is None
+            ):
+                reason = skip_reason or "empty_audio"
+                host.resolve_playback_start_waiter(
+                    generation,
+                    order,
+                    session_id,
+                    started=False,
+                    reason=reason,
+                )
+                if state is not None:
+                    if reason in {"tts_error", "tts_exception", "playback_exception"}:
+                        state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+                    else:
+                        state["skipped_tts"] = int(state.get("skipped_tts", 0)) + 1
+                host.session_log(session_id, "playback_skip_empty: order=%s reason=%s", order, reason)
+                host.maybe_session_done(session_id)
+                return True
 
-        playback_ms = now_ms() - playback_start_ms
-        if host.is_stale_playback(generation, session_id):
-            host.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, playback_ms, generation)
-            return False
-        retained_audio = audio.audio_bytes if isinstance(audio, ProviderPcmStream) else audio
-        if isinstance(audio, ProviderPcmStream) and audio.error_reason:
+            initial_audio = first_stream_chunk if isinstance(audio, ProviderPcmStream) else audio
+            if initial_audio is None:
+                reason = "playback_missing_initial_pcm"
+                host.resolve_playback_start_waiter(
+                    generation,
+                    order,
+                    session_id,
+                    started=False,
+                    reason=reason,
+                )
+                if state is not None:
+                    state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+                host.session_log(
+                    session_id,
+                    "playback_skip_empty: order=%s reason=%s",
+                    order,
+                    reason,
+                )
+                host.maybe_session_done(session_id)
+                return True
+            audio_ms = (len(initial_audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
+            host.sessions.trace_mark(
+                session_id,
+                "first_audio_playback" if not state or not state.get("trace_first_audio_marked") else "audio_playback_started",
+                kind="user_observable",
+                attributes={"order": order, "audio_ms": round(audio_ms, 3)},
+            )
             if state is not None:
-                state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+                state["trace_first_audio_marked"] = True
             host.session_log(
                 session_id,
-                "playback_stream_incomplete: order=%s reason=%s bytes=%s generation=%s",
+                "playback_start: order=%s source_rate=%s output_rate=%s audio_ms=%.1f generation=%s",
                 order,
-                audio.error_reason,
-                len(retained_audio),
+                source_rate,
+                host.output_rate,
+                audio_ms,
                 generation,
             )
-        if state is not None:
-            state["played_tts"] = int(state.get("played_tts", 0)) + 1
-        host.session_log(session_id, "playback_end: order=%s playback_ms=%.1f played_tts=%s", order, playback_ms, state.get("played_tts", 0) if state else "unknown")
-        host.save_audio(retained_audio, "output", session_id=session_id)
-        host.maybe_session_done(session_id)
-        return True
+            host.resolve_playback_start_waiter(
+                generation,
+                order,
+                session_id,
+                started=True,
+                reason="playback_start",
+            )
+            playback_start_ms = now_ms()
+            try:
+                host.is_playing_audio = True
+                try:
+                    if isinstance(audio, ProviderPcmStream):
+                        chunk = first_stream_chunk
+                        while chunk is not None:
+                            await self.play_audio(chunk, source_rate, generation, session_id)
+                            chunk = await audio.read()
+                    else:
+                        await self.play_audio(audio, source_rate, generation, session_id)
+                finally:
+                    host.is_playing_audio = False
+            except asyncio.CancelledError:
+                host.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, now_ms() - playback_start_ms, generation)
+                return False
+            except Exception as exc:
+                await self.abort_output_stream()
+                if state is not None:
+                    state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+                host.session_log(session_id, "playback_exception: order=%s playback_ms=%.1f error=%s", order, now_ms() - playback_start_ms, exc)
+                logger.error("Playback exception: %s", exc, exc_info=True)
+                host.maybe_session_done(session_id)
+                return True
+
+            playback_ms = now_ms() - playback_start_ms
+            if host.is_stale_playback(generation, session_id):
+                host.session_log(session_id, "playback_aborted_by_interrupt: order=%s playback_ms=%.1f generation=%s", order, playback_ms, generation)
+                return False
+            retained_audio = audio.audio_bytes if isinstance(audio, ProviderPcmStream) else audio
+            if isinstance(audio, ProviderPcmStream) and audio.error_reason:
+                if state is not None:
+                    state["failed_tts"] = int(state.get("failed_tts", 0)) + 1
+                host.session_log(
+                    session_id,
+                    "playback_stream_incomplete: order=%s reason=%s bytes=%s generation=%s",
+                    order,
+                    audio.error_reason,
+                    len(retained_audio),
+                    generation,
+                )
+            if state is not None:
+                state["played_tts"] = int(state.get("played_tts", 0)) + 1
+            host.session_log(session_id, "playback_end: order=%s playback_ms=%.1f played_tts=%s", order, playback_ms, state.get("played_tts", 0) if state else "unknown")
+            completed = not (isinstance(audio, ProviderPcmStream) and audio.error_reason)
+            host.save_audio(retained_audio, "output", session_id=session_id)
+            host.maybe_session_done(session_id)
+            return True
+        finally:
+            host._playback_state().complete_turn_speech_order(
+                generation=generation, order=order, session_id=session_id,
+                completed=bool(completed),
+                reason="playback_completed" if completed else (skip_reason or "playback_incomplete"),
+            )
 
     @_trace_session_async(TTS_TRACE_MODULE, "synthesize_one", "session_id")
     async def synthesize_one(self, text: str, order: int, session_id: Optional[str], generation: int):

@@ -512,10 +512,11 @@ state/user event or another explicitly authorized bounded continuation.
 
 The current result is reconciled against `InteractionContext.already_spoken` and exact
 Interaction-Ledger delivery state by the same ordinary communication authority. Semantic
-results are `silence`, a still-needed additive delta, `repair`, or `retract + repair`.
+results are `silence`, a still-needed additive delta, intentional repetition, `repair`, or `retract + repair`.
 Pending unheard speech may be superseded rather than verbally repaired. Delivered speech
-remains append-only history. Host literal-text duplicate suppression is a final mechanical
-guard only and must not substitute for this semantic decision.
+remains append-only history. Host prevents duplicate delivery of the same Activity/submission;
+text equality alone cannot suppress a new Planner Activity. Related same-turn speech facts
+remain visible across sibling Goals without expanding the exact re-entry Goal/Work scope.
 
 ### 3.2 General Progress inside the Continuous Mind baseline
 
@@ -1136,9 +1137,16 @@ prompts: a scheduler, provider, or playback-start failure cannot create an
 assistant turn that the user never heard. When re-entry follows earlier delivered speech,
 the model-facing bounded context must preserve exact delivered Activity identity and
 wording so the same communication authority can decide whether new meaning is unchanged,
-additive, or contradictory. Host may suppress an exact textual duplicate after that
-decision, but it cannot infer that paraphrases are equivalent or that a contradiction is
-a repair.
+additive, contradictory, or worth intentionally repeating. Host reuses the same Activity's
+scheduled/completed delivery and rejects changed wording under that identity. A new Activity
+may carry the same words. Started speech remains pending; interrupted or partially played
+speech is retained as such and cannot certify the whole utterance or close its speech Goal.
+All chunks must complete, including playback that finishes before Activity registration.
+Playback start remains a separate action-start barrier; voice-resource release alone is
+not complete-delivery evidence. Deferred delivery preserves the original speech owner
+separately from the physical playback session; both remain bound to the same exact attempt.
+An interrupted Activity is retained without automatic whole-utterance replay; Planner
+may author a new Activity when a repetition or repair is needed.
 
 Delivered post-execution tool speech is retained with a Host-authored
 evidence-bound marker plus its source Goal and Canonical Plan IDs. A later turn

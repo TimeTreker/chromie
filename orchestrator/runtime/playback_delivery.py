@@ -1,7 +1,7 @@
 """Playback delivery state and current-turn speech provenance.
 
 The collaborator owns transport lifecycle facts only: order allocation, playback
-barriers, cancellation, and whether speech actually started. It never decides
+barriers, cancellation, and whether speech started, completed, or was interrupted. It never decides
 whether two utterances mean the same thing; later model stages receive the
 playback-qualified speech events and make that semantic judgment.
 """
@@ -43,7 +43,11 @@ class PlaybackDeliveryLifecycle:
     turn_speech_event_by_playback_key: dict[PlaybackKey, str] = field(
         default_factory=dict
     )
+    speech_order_facts: dict[PlaybackKey, list[tuple[str, str]]] = field(
+        default_factory=dict
+    )
     order_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    speech_submission_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     playback_queue: asyncio.Queue[Any] = field(default_factory=asyncio.Queue)
     playback_task: asyncio.Task[Any] | None = None
     active_synthesis_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
@@ -119,8 +123,9 @@ class PlaybackDeliveryLifecycle:
         cognitive_opportunity_id: str = "",
         situation_signature: str = "",
         subject_refs: list[str] | None = None,
+        origin_session_id: str | None = None,
     ) -> dict[str, Any] | None:
-        sid = str(session_id or "").strip()
+        sid = str(origin_session_id or session_id or "").strip()
         text = str(normalized_text or "").strip()
         if not sid or not orders or not text:
             return None
@@ -196,6 +201,7 @@ class PlaybackDeliveryLifecycle:
                 "event_id": event_id,
                 "generation": int(generation),
                 "orders": normalized_orders,
+                "playback_session_id": session_id,
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -208,6 +214,8 @@ class PlaybackDeliveryLifecycle:
             "generation": int(generation),
             "orders": normalized_orders,
             "status": "scheduled",
+            "playback_session_id": session_id,
+            "order_states": {str(order): "scheduled" for order in normalized_orders},
         }
         events = self.turn_speech_events.setdefault(sid, [])
         existing = next(
@@ -220,6 +228,7 @@ class PlaybackDeliveryLifecycle:
                 "delivery_attempt_id": delivery_attempt_id,
                 "delivery_attempts": [attempt],
                 "session_id": sid,
+                "playback_session_id": session_id,
                 "turn_id": normalized_turn_id,
                 "stage": str(stage or ""),
                 "purpose": str(purpose or ""),
@@ -245,7 +254,12 @@ class PlaybackDeliveryLifecycle:
             if len(events) > 12:
                 del events[:-12]
         else:
+            if existing.get("text") != text:
+                raise ValueError("Communicative Activity wording cannot change under one identity")
+            if existing.get("delivery_attempt_id") == delivery_attempt_id:
+                return existing
             event = existing
+            event.pop("playback_reason", None)
             attempts = event.setdefault("delivery_attempts", [])
             if not any(
                 item.get("delivery_attempt_id") == delivery_attempt_id
@@ -262,12 +276,24 @@ class PlaybackDeliveryLifecycle:
                     "text": text,
                     "generation": int(generation),
                     "orders": normalized_orders,
+                    "playback_session_id": session_id,
                 }
             )
-        self.turn_speech_event_by_playback_key[
-            self.key(generation, normalized_orders[0], session_id)
-        ] = event_id
+        for order in normalized_orders:
+            self.turn_speech_event_by_playback_key[
+                self.key(generation, order, session_id)
+            ] = event_id
         self._publish_interaction_event(event)
+        # Playback may finish while the caller is still scheduling later chunks.
+        # Bind the retained transport facts after all orders have an Activity owner.
+        for order in normalized_orders:
+            for state, reason in self.speech_order_facts.get(
+                self.key(generation, order, session_id), ()
+            ):
+                self._update_speech_order(
+                    generation=generation, order=order, session_id=session_id,
+                    state=state, reason=reason, retain_fact=False,
+                )
         return event
 
     @staticmethod
@@ -352,30 +378,103 @@ class PlaybackDeliveryLifecycle:
         started: bool,
         reason: str,
     ) -> None:
+        self._update_speech_order(
+            generation=generation, order=order, session_id=session_id,
+            state="playback_started" if started else "not_delivered", reason=reason,
+        )
+
+    def complete_turn_speech_order(
+        self, *, generation: int, order: int, session_id: str | None,
+        completed: bool, reason: str,
+    ) -> None:
+        """Record the actual terminal playback result, never a resource release."""
+        self._update_speech_order(
+            generation=generation, order=order, session_id=session_id,
+            state="playback_completed" if completed else "not_delivered", reason=reason,
+        )
+        self.resolve_playback_release_waiter(generation=generation, order=order,
+            session_id=session_id, reason=reason)
+
+    async def wait_for_speech_completion(
+        self, session_id: str | None, scheduled: dict[str, Any], *, timeout_s: float = 30.0,
+    ) -> bool:
+        """Qualify one exact delivery attempt after its scheduling/start receipt."""
+        events = self.turn_speech_events.get(str(session_id or ""), [])
+        event = next((item for item in reversed(events)
+            if item.get("event_id") == scheduled.get("speech_event_id")), None)
+        if event is None:
+            return False
+        generation = scheduled.get("generation")
+        orders = scheduled.get("orders")
+        if not isinstance(orders, list) or not orders or generation != event.get("generation") or orders != event.get("orders"):
+            return False
+        attempt_id = event.get("delivery_attempt_id")
+        playback_session_id = event.get("playback_session_id", session_id)
+        if event.get("status") == "playback_completed":
+            return True
+        if event.get("status") not in {"scheduled", "playback_started"}:
+            return False
+        for order in orders:
+            key = self.key(generation, order, playback_session_id)
+            if key not in self.playback_released_keys:
+                self.create_playback_release_waiter(generation=generation, order=order, session_id=playback_session_id)
+        await asyncio.gather(*(self.wait_for_playback_release(
+            generation=generation, order=order, session_id=playback_session_id, timeout_s=timeout_s,
+        ) for order in orders))
+        return event.get("delivery_attempt_id") == attempt_id and event.get("status") == "playback_completed"
+
+    def _update_speech_order(
+        self, *, generation: int, order: int, session_id: str | None,
+        state: str, reason: str, retain_fact: bool = True,
+    ) -> None:
         key = self.key(generation, order, session_id)
-        event_id = self.turn_speech_event_by_playback_key.pop(key, None)
-        sid = str(session_id or "").strip()
-        if not event_id or not sid:
+        if retain_fact:
+            facts = self.speech_order_facts.setdefault(key, [])
+            if facts and facts[-1][0] != "playback_started":
+                return
+            if not facts or facts[-1][0] != state:
+                facts.append((state, reason))
+        event_id = self.turn_speech_event_by_playback_key.get(key)
+        if not event_id:
             return
-        for event in reversed(self.turn_speech_events.get(sid, [])):
+        # Physical playback may be detached from its original conversation session.
+        # The exact playback key still binds it to one retained speech event.
+        for event in (item for events in self.turn_speech_events.values() for item in reversed(events)):
             if event.get("event_id") != event_id:
                 continue
-            status = "playback_started" if started else "not_delivered"
+            # A late callback from an old attempt cannot rewrite a current retry.
+            if event.get("generation") != generation or order not in event.get("orders", []):
+                self.turn_speech_event_by_playback_key.pop(key, None)
+                return
+            attempt = next((item for item in reversed(event.get("delivery_attempts", []))
+                if item.get("delivery_attempt_id") == event.get("delivery_attempt_id")), None)
+            if attempt is None:
+                return
+            states = attempt["order_states"]
+            previous = states.get(str(order))
+            if previous in {"playback_completed", "not_delivered", "playback_interrupted"}:
+                return
+            if state == "not_delivered" and previous == "playback_started":
+                state = "playback_interrupted"
+            states[str(order)] = state
+            if state != "playback_started":
+                self.turn_speech_event_by_playback_key.pop(key, None)
+            values = set(states.values())
+            heard = bool(values & {"playback_started", "playback_completed", "playback_interrupted"})
+            if values == {"playback_completed"}:
+                status = "playback_completed"
+            elif values & {"scheduled", "playback_started"}:
+                status = "playback_started" if heard else "scheduled"
+            else:
+                status = "playback_interrupted" if heard else "not_delivered"
+            attempt["status"] = status
+            if event.get("status") == status:
+                return
             event["status"] = status
             event["playback_reason"] = str(reason or "")
-            for attempt in reversed(event.get("delivery_attempts") or []):
-                if not isinstance(attempt, dict):
-                    continue
-                if int(attempt.get("generation", -1)) != int(generation):
-                    continue
-                attempt_orders = attempt.get("orders")
-                if not isinstance(attempt_orders, list) or int(order) not in attempt_orders:
-                    continue
-                attempt["status"] = status
-                attempt["playback_reason"] = str(reason or "")
-                break
+            attempt["playback_reason"] = str(reason or "")
             self._publish_interaction_event(event)
-            break
+            return
 
     def delivered_turn_speech_events(
         self,
@@ -384,7 +483,7 @@ class PlaybackDeliveryLifecycle:
         return [
             dict(event)
             for event in self.turn_speech_events.get(str(session_id or ""), [])
-            if event.get("status") in {"playback_started", "playback_completed"}
+            if event.get("status") == "playback_completed"
         ]
 
     def resolve_playback_start_waiter(
@@ -533,8 +632,12 @@ class PlaybackDeliveryLifecycle:
         )
 
     def reset_order_state(self) -> None:
+        for generation, order, session_id in list(self.turn_speech_event_by_playback_key):
+            self.complete_turn_speech_order(generation=generation, order=order,
+                session_id=session_id, completed=False, reason="output_reset")
         self.resolve_all_playback_release_waiters(reason="reset_order_state")
         self.playback_released_keys.clear()
+        self.speech_order_facts.clear()
         self.synthesis_order = 0
         self.next_playback_order = 0
         self.pending_audio.clear()

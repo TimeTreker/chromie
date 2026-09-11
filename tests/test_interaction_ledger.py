@@ -43,6 +43,8 @@ class InteractionLedgerTests(unittest.TestCase):
             reason="playback_start",
         )
 
+        self.assertEqual(ledger.context("sid").already_spoken, [])
+        lifecycle.complete_turn_speech_order(generation=1, order=1, session_id="sid", completed=True, reason="completed")
         context = ledger.context("sid")
 
         self.assertEqual(len(context.already_spoken), 1)
@@ -90,11 +92,15 @@ class InteractionLedgerTests(unittest.TestCase):
             goal_ids=["goal-walk"],
             turn_id="turn-1",
         )
+        self.assertEqual(context.already_spoken, [])
+        self.assertEqual(len(context.pending_speech), 1)
+        lifecycle.complete_turn_speech_order(generation=2, order=4, session_id="sid", completed=True, reason="completed")
+        context = ledger.context("sid", goal_ids=["goal-walk"], turn_id="turn-1")
         self.assertEqual(len(context.already_spoken), 1)
         self.assertEqual(context.pending_speech, [])
         self.assertEqual(context.already_spoken[0]["text"], "好的，我往前走十五秒。")
 
-    def test_goal_projection_includes_only_bound_goal_and_same_turn_unbound_events(
+    def test_goal_projection_includes_same_turn_speech_without_widening_goal_scope(
         self,
     ) -> None:
         ledger = InteractionLedger()
@@ -109,7 +115,7 @@ class InteractionLedgerTests(unittest.TestCase):
                     "event_id": speech_id,
                     "session_id": "sid",
                     "turn_id": turn_id,
-                    "status": "playback_started",
+                    "status": "playback_completed",
                     "text": speech_id,
                     "source_goal_ids": goal_ids,
                 }
@@ -122,7 +128,7 @@ class InteractionLedgerTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["subject_id"] for item in context.already_spoken],
-            ["speech-walk", "speech-fast"],
+            ["speech-walk", "speech-weather", "speech-fast"],
         )
 
     def test_committed_request_remains_unresolved_until_trusted_outcome(self) -> None:
@@ -321,3 +327,35 @@ class InteractionLedgerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SpeechContextAuthorityTests(unittest.TestCase):
+    def test_related_speech_is_read_only_context_without_sibling_work(self):
+        ledger = InteractionLedger()
+        for kind, domain, subject, goal in (
+            ("speech_scheduled", "vocal", "speech-sibling", "goal-b"),
+            ("activity_committed", "activity", "work-sibling", "goal-b"),
+            ("speech_scheduled", "vocal", "speech-scope", "goal-a"),
+        ):
+            ledger.append(session_id="sid", turn_id="turn", owner="playback_delivery" if domain == "vocal" else "trusted_capability_runtime",
+                domain=domain, event_type=kind, state="scheduled", subject_id=subject, event_id=subject, goal_ids=[goal], text="Hello.")
+        context = ledger.context("sid", goal_ids=["goal-a"], turn_id="turn")
+        self.assertEqual(context.goal_ids, ["goal-a"])
+        self.assertEqual({item["subject_id"] for item in context.events}, {"speech-sibling", "speech-scope"})
+        self.assertEqual(context.activity, [])
+
+    def test_started_completed_interrupted_and_retry_are_distinct_facts(self):
+        ledger = InteractionLedger()
+        base = dict(event_id="speech-a", session_id="sid", turn_id="turn", text="Hello.", communicative_activity_ids=["activity-a"])
+        for attempt, status in (("attempt-1", "scheduled"), ("attempt-1", "playback_started"),
+            ("attempt-1", "playback_interrupted"), ("attempt-2", "scheduled"),
+            ("attempt-2", "playback_started"), ("attempt-2", "playback_completed")):
+            ledger.record_playback_event({**base, "delivery_attempt_id": attempt, "status": status})
+            context = ledger.context("sid")
+            if status != "playback_completed":
+                self.assertEqual(context.already_spoken, [])
+        self.assertEqual(len(ledger.events("sid")), 6)
+        self.assertEqual(len(context.already_spoken), 1)
+        self.assertEqual(context.already_spoken[0]["event_type"], "speech_playback_completed")
+        self.assertEqual(context.already_spoken[0]["metadata"]["communicative_activity_ids"], ["activity-a"])
+        self.assertEqual(context.pending_speech, [])

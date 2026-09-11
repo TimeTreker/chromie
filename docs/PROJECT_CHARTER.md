@@ -230,14 +230,18 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   authority merely because it is deliberative.
 - **DELIVERED-CLAIM-001** — Actually delivered speech is immutable conversation evidence.
   On later cognition, the same ordinary speech semantic authority reconciles current
-  meaning against delivered Communicative Activities: unchanged meaning produces silence;
+  meaning against delivered Communicative Activities: unchanged meaning normally produces silence
+  unless the current communicative purpose calls for intentional repetition;
   useful additive meaning produces only the delta; a material contradiction produces a
   forward repair; and a claim that should no longer stand is explicitly retracted and
   repaired. Pending but unheard speech may instead be cancelled or superseded and is not
   treated as common ground. Repair is a Communicative-Activity function, not a top-level
   Plan disposition or a new `Reconciler`/`BeliefManager`. Host/Runtime may enforce exact
-  identity, provenance, delivery state, and literal duplicate suppression as mechanical
-  safety checks, but semantic equivalence, contradiction, and wording remain Core-owned.
+  Activity/submission identity, provenance and delivery state as mechanical safety checks.
+  Text equality alone never cancels a new Activity; wording is immutable payload under
+  one identity. Planner owns semantic equivalence, necessity, correction and intentional
+  repetition. Generated, scheduled, started, completed and interrupted speech remain
+  distinct facts; only complete playback qualifies the whole utterance as delivered.
 - **INFERENCE-ATTENTION-001** — Chromie has one semantic mind and may run many
   peripheral/runtime processes concurrently, but central LLM inference is a limited compute
   resource. Foreground cognition must never be trapped behind deliberative or background

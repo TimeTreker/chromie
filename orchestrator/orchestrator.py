@@ -126,8 +126,6 @@ from orchestrator.runtime.planner_reentry import (
     planner_reentry_responsibilities,
     meaningful_provider_state,
     provider_state_relevance,
-    suppress_already_delivered_speech,
-    suppress_redundant_completed_body_followup,
     terminal_evidence_relevance,
     terminal_result_waits_for_batch_closure,
 )
@@ -634,9 +632,11 @@ class VoiceAssistant:
         cognitive_opportunity_id: str = "",
         situation_signature: str = "",
         subject_refs: list[str] | None = None,
+        origin_session_id: str | None = None,
     ) -> dict[str, Any] | None:
         return self._playback_state().register_turn_speech_event(
             session_id=session_id,
+            origin_session_id=origin_session_id,
             generation=generation,
             orders=orders,
             normalized_text=self.normalize_tts_candidate(text),
@@ -1229,6 +1229,7 @@ class VoiceAssistant:
             if isinstance(metadata, dict)
             else None
         )
+        origin_session_id = metadata.get("origin_session_id") if isinstance(metadata, dict) else None
         voice_release_required = bool(
             isinstance(metadata, dict)
             and metadata.get("wait_for_voice_release") is True
@@ -1286,7 +1287,7 @@ class VoiceAssistant:
 
             def current_status() -> str:
                 events = self._playback_state().turn_speech_events.get(
-                    str(session_id or ""),
+                    str(origin_session_id or session_id or ""),
                     [],
                 )
                 for item in reversed(events):
@@ -1302,6 +1303,8 @@ class VoiceAssistant:
                     item_orders = item.get("orders")
                     if not isinstance(item_orders, list) or orders[0] not in item_orders:
                         continue
+                    if self.normalize_tts_candidate(str(args.get("text") or "")) != item.get("text"):
+                        raise ValueError("Communicative Activity wording cannot change under one identity")
                     return str(item.get("status") or "")
                 return ""
 
@@ -1420,143 +1423,153 @@ class VoiceAssistant:
             fast_activity_id = str(metadata.get("fast_activity_id") or "").strip()
             if fast_activity_id and fast_activity_id not in semantic_activity_ids:
                 semantic_activity_ids.append(fast_activity_id)
-        if semantic_activity_ids:
-            existing_event = self._playback_state().find_turn_speech_event_for_activities(
-                session_id=session_id,
-                turn_id=(
-                    str(metadata.get("turn_id") or session_id or "")
-                    if isinstance(metadata, dict)
-                    else str(session_id or "")
-                ),
-                communicative_activity_ids=semantic_activity_ids,
-            )
-            if existing_event is not None:
-                existing_orders = existing_event.get("orders")
-                if isinstance(existing_orders, list) and existing_orders:
-                    reuse_metadata = dict(metadata or {})
-                    reuse_metadata.update(
-                        {
-                            "reuse_current_turn_speech": True,
-                            "reused_speech_event_id": existing_event.get("event_id"),
-                            "reused_speech_generation": existing_event.get("generation"),
-                            "reused_speech_orders": list(existing_orders),
-                            "reused_speech_status": existing_event.get("status"),
-                            "semantic_idempotent_reuse": True,
-                        }
+        reuse_args = None
+        async with self._playback_state().speech_submission_lock:
+            if semantic_activity_ids:
+                existing_event = self._playback_state().find_turn_speech_event_for_activities(
+                    session_id=origin_session_id or session_id,
+                    turn_id=(
+                        str(metadata.get("turn_id") or session_id or "")
+                        if isinstance(metadata, dict)
+                        else str(session_id or "")
+                    ),
+                    communicative_activity_ids=semantic_activity_ids,
+                    reusable_statuses={"scheduled", "playback_started", "playback_completed", "playback_interrupted", "not_delivered"},
+                )
+                if existing_event is not None:
+                    if self.normalize_tts_candidate(str(args.get("text") or "")) != existing_event.get("text"):
+                        raise ValueError("Communicative Activity wording cannot change under one identity")
+                    if existing_event.get("status") == "not_delivered":
+                        existing_event = None
+                if existing_event is not None:
+                    existing_orders = existing_event.get("orders")
+                    if isinstance(existing_orders, list) and existing_orders:
+                        reuse_metadata = dict(metadata or {})
+                        reuse_metadata.update(
+                            {
+                                "reuse_current_turn_speech": True,
+                                "reused_speech_event_id": existing_event.get("event_id"),
+                                "reused_speech_generation": existing_event.get("generation"),
+                                "reused_speech_orders": list(existing_orders),
+                                "reused_speech_status": existing_event.get("status"),
+                                "semantic_idempotent_reuse": True,
+                            }
+                        )
+                        reuse_args = dict(args)
+                        reuse_args["metadata"] = reuse_metadata
+            if reuse_args is None:
+                text = str(args.get("text") or "")
+                scheduled = await self.schedule_tts_text(text, session_id)
+                if scheduled.get("scheduled") is True:
+                    raw_orders = scheduled.get("orders")
+                    if not isinstance(raw_orders, list):
+                        raw_orders = [scheduled.get("order")]
+                    orders = [
+                        int(item)
+                        for item in raw_orders
+                        if isinstance(item, int)
+                        or (isinstance(item, str) and item.isdigit())
+                    ]
+                    speech_event = self._register_turn_speech_event(
+                        session_id=session_id,
+                        origin_session_id=origin_session_id,
+                        generation=int(scheduled.get("generation") or 0),
+                        orders=orders,
+                        text=text,
+                        stage=(
+                            str(metadata.get("phase") or "interaction_speech")
+                            if isinstance(metadata, dict)
+                            else "interaction_speech"
+                        ),
+                        purpose=(
+                            str(
+                                metadata.get("speech_act")
+                                or metadata.get("delivery_role")
+                                or "response"
+                            )
+                            if isinstance(metadata, dict)
+                            else "response"
+                        ),
+                        commitment=(
+                            str(metadata.get("commitment_state") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        fast_activity_id=(
+                            str(metadata.get("fast_activity_id") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        communicative_activity_ids=(
+                            list(metadata.get("communicative_activity_ids") or [])
+                            if isinstance(metadata, dict)
+                            and isinstance(metadata.get("communicative_activity_ids"), list)
+                            else []
+                        ),
+                        turn_id=(
+                            str(metadata.get("turn_id") or session_id or "")
+                            if isinstance(metadata, dict)
+                            else str(session_id or "")
+                        ),
+                        source_goal_ids=(
+                            list(metadata.get("source_goal_ids") or [])
+                            if isinstance(metadata, dict)
+                            and isinstance(metadata.get("source_goal_ids"), list)
+                            else []
+                        ),
+                        canonical_plan_id=(
+                            str(metadata.get("canonical_plan_id") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        canonical_plan_fingerprint=(
+                            str(metadata.get("canonical_plan_fingerprint") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        goal_association_fingerprint=(
+                            str(metadata.get("goal_association_fingerprint") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        delivery_role=(
+                            str(metadata.get("delivery_role") or "response")
+                            if isinstance(metadata, dict)
+                            else "response"
+                        ),
+                        claims=(
+                            list(metadata.get("claims") or [])
+                            if isinstance(metadata, dict)
+                            and isinstance(metadata.get("claims"), list)
+                            else []
+                        ),
+                        must_not_claim_completion=(
+                            metadata.get("must_not_claim_completion")
+                            if isinstance(metadata, dict)
+                            and isinstance(metadata.get("must_not_claim_completion"), bool)
+                            else None
+                        ),
+                        cognitive_opportunity_id=(
+                            str(metadata.get("cognitive_opportunity_id") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        situation_signature=(
+                            str(metadata.get("situation_signature") or "")
+                            if isinstance(metadata, dict)
+                            else ""
+                        ),
+                        subject_refs=(
+                            list(metadata.get("subject_refs") or [])
+                            if isinstance(metadata, dict)
+                            and isinstance(metadata.get("subject_refs"), list)
+                            else []
+                        ),
                     )
-                    reuse_args = dict(args)
-                    reuse_args["metadata"] = reuse_metadata
-                    return await self._schedule_interaction_speech(reuse_args)
-
-        text = str(args.get("text") or "")
-        scheduled = await self.schedule_tts_text(text, session_id)
-        if scheduled.get("scheduled") is True:
-            raw_orders = scheduled.get("orders")
-            if not isinstance(raw_orders, list):
-                raw_orders = [scheduled.get("order")]
-            orders = [
-                int(item)
-                for item in raw_orders
-                if isinstance(item, int)
-                or (isinstance(item, str) and item.isdigit())
-            ]
-            speech_event = self._register_turn_speech_event(
-                session_id=session_id,
-                generation=int(scheduled.get("generation") or 0),
-                orders=orders,
-                text=text,
-                stage=(
-                    str(metadata.get("phase") or "interaction_speech")
-                    if isinstance(metadata, dict)
-                    else "interaction_speech"
-                ),
-                purpose=(
-                    str(
-                        metadata.get("speech_act")
-                        or metadata.get("delivery_role")
-                        or "response"
-                    )
-                    if isinstance(metadata, dict)
-                    else "response"
-                ),
-                commitment=(
-                    str(metadata.get("commitment_state") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                fast_activity_id=(
-                    str(metadata.get("fast_activity_id") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                communicative_activity_ids=(
-                    list(metadata.get("communicative_activity_ids") or [])
-                    if isinstance(metadata, dict)
-                    and isinstance(metadata.get("communicative_activity_ids"), list)
-                    else []
-                ),
-                turn_id=(
-                    str(metadata.get("turn_id") or session_id or "")
-                    if isinstance(metadata, dict)
-                    else str(session_id or "")
-                ),
-                source_goal_ids=(
-                    list(metadata.get("source_goal_ids") or [])
-                    if isinstance(metadata, dict)
-                    and isinstance(metadata.get("source_goal_ids"), list)
-                    else []
-                ),
-                canonical_plan_id=(
-                    str(metadata.get("canonical_plan_id") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                canonical_plan_fingerprint=(
-                    str(metadata.get("canonical_plan_fingerprint") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                goal_association_fingerprint=(
-                    str(metadata.get("goal_association_fingerprint") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                delivery_role=(
-                    str(metadata.get("delivery_role") or "response")
-                    if isinstance(metadata, dict)
-                    else "response"
-                ),
-                claims=(
-                    list(metadata.get("claims") or [])
-                    if isinstance(metadata, dict)
-                    and isinstance(metadata.get("claims"), list)
-                    else []
-                ),
-                must_not_claim_completion=(
-                    metadata.get("must_not_claim_completion")
-                    if isinstance(metadata, dict)
-                    and isinstance(metadata.get("must_not_claim_completion"), bool)
-                    else None
-                ),
-                cognitive_opportunity_id=(
-                    str(metadata.get("cognitive_opportunity_id") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                situation_signature=(
-                    str(metadata.get("situation_signature") or "")
-                    if isinstance(metadata, dict)
-                    else ""
-                ),
-                subject_refs=(
-                    list(metadata.get("subject_refs") or [])
-                    if isinstance(metadata, dict)
-                    and isinstance(metadata.get("subject_refs"), list)
-                    else []
-                ),
-            )
-            if speech_event is not None:
-                scheduled["speech_event_id"] = speech_event["event_id"]
+                    if speech_event is not None:
+                        scheduled["speech_event_id"] = speech_event["event_id"]
+        if reuse_args is not None:
+            return await self._schedule_interaction_speech(reuse_args)
         if (
             isinstance(metadata, dict)
             and (
@@ -4086,6 +4099,11 @@ class VoiceAssistant:
                 # dropping every detached delivery to sid=None makes valid
                 # evidence-bound speech stale immediately.
                 delivery_session_id = None
+                response = response.model_copy(update={"speech": [
+                    speech.model_copy(update={"metadata": {
+                        **speech.metadata, "origin_session_id": session_id,
+                    }}) for speech in response.speech
+                ]})
             dispatch = await self.interaction_runtime.submit_response(
                 response,
                 session_id=delivery_session_id,
@@ -4107,7 +4125,7 @@ class VoiceAssistant:
             )
             return "speech_runtime_failed"
 
-        delivered_count = self._record_successfully_delivered_speech(
+        delivered_count = await self._record_successfully_delivered_speech(
             response,
             execution,
             session_id=session_id,
@@ -4139,7 +4157,7 @@ class VoiceAssistant:
             return "speech_runtime_delivery_unverified"
         return f"speech_runtime_{execution.status}"
 
-    def _record_successfully_delivered_speech(
+    async def _record_successfully_delivered_speech(
         self,
         response: InteractionResponse,
         execution: CapabilityRuntimeResult,
@@ -4157,29 +4175,15 @@ class VoiceAssistant:
         results_by_request = {
             result.request_id: result for result in execution.results
         }
-        delivered_speech = [
-            speech
-            for speech in response.speech
-            if (
-                (result := results_by_request.get(speech.id)) is not None
-                and result.capability_id == "chromie.speak"
-                and result.status == "completed"
-                and (
-                    not (
-                        speech.metadata.get(
-                            "playback_start_required_for_delivery"
-                        )
-                        is True
-                        or speech.metadata.get("wait_for_playback_start")
-                        is True
-                    )
-                    or (
-                        isinstance(result.output, dict)
-                        and result.output.get("playback_started") is True
-                    )
-                )
-            )
-        ]
+        delivered_speech = []
+        for speech in response.speech:
+            result = results_by_request.get(speech.id)
+            if result is None or result.capability_id != "chromie.speak" or result.status != "completed":
+                continue
+            if not isinstance(result.output, dict):
+                continue
+            if await self._playback_state().wait_for_speech_completion(session_id, result.output):
+                delivered_speech.append(speech)
         if not delivered_speech:
             self.session_log(
                 session_id,
@@ -5884,45 +5888,6 @@ class VoiceAssistant:
             response.metadata["goal_interpretation"] = dict(
                 metadata["goal_interpretation"]
             )
-        response, suppressed_speech_count = suppress_already_delivered_speech(
-            response,
-            (
-                item.get("text") or ""
-                for item in self._delivered_turn_speech_events(sid)
-            ),
-        )
-        if suppressed_speech_count:
-            self.session_log(
-                session_id,
-                "planner_state_reentry_duplicate_speech_suppressed: "
-                "phase=%s count=%s",
-                phase,
-                suppressed_speech_count,
-            )
-        body_followup_suppressed_count = 0
-        if (
-            source_response is not None
-            and canonical_plan is not None
-            and repeat_check_evidence
-        ):
-            response, body_followup_suppressed_count = (
-                suppress_redundant_completed_body_followup(
-                    response,
-                    source_response=source_response,
-                    source_plan=canonical_plan,
-                    reentry_goal_ids=normalized_goal_ids,
-                    evidence=repeat_check_evidence,
-                    delivered_events=self._delivered_turn_speech_events(sid),
-                )
-            )
-        if body_followup_suppressed_count:
-            self.session_log(
-                session_id,
-                "planner_state_reentry_redundant_body_followup_suppressed: "
-                "phase=%s count=%s",
-                phase,
-                body_followup_suppressed_count,
-            )
         evidence_goal_set = set(normalized_evidence_goal_ids)
         for speech in response.speech:
             existing_source_goal_ids = {
@@ -6345,7 +6310,7 @@ class VoiceAssistant:
                 request_id=result.request_id, status=result.status
             )
         if response.metadata.get("history_after_successful_delivery") is True:
-            self._record_successfully_delivered_speech(
+            await self._record_successfully_delivered_speech(
                 response, execution, session_id=session_id,
                 log_event="interaction_history_after_delivery",
             )
