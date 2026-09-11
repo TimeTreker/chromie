@@ -69,6 +69,12 @@ model call.
 
 Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
 
+GA may regenerate one unambiguously malformed object/array container only after
+the complete original claims pass deterministic preflight. Acceptance compares
+every authored field/value with that lossless projection. Unknown fields, invalid
+optional meaning, conflicting decisions and any semantic change reject; preprocessing
+cannot delete them to salvage the result. See the [turn-loop contract](../docs/COGNITIVE_TURN_LOOP.md#30-fastdeep-escalation-is-cognition-depth-not-repair).
+
 WorkDAG endpoints are deterministic validation/execution infrastructure. The retired LLM `WorkDAGPlanner` bridge has been removed; WorkDAG infrastructure does not own cognitive planning.
 
 ## Current HTTP surface

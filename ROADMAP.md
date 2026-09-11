@@ -29,9 +29,11 @@ maps the report to Issues #37–#48: #37 records the already-authorized local
 amendment. #38 completed the authorized WHAT/Work and role-context documentation
 correction. The owner now authorized #39: direct GI-to-Goal WHAT inheritance,
 source-bound partial revisions, and preserved history/Evidence. Full merge/split
-execution remains excluded. The owner authorized #40's GI speed rejection fix and
-Git delivery of it with #37–#39. GA repair/normalization and #41–#48 still require
-separate decisions. These changes do not qualify a model or deployment.
+execution remains excluded. #40's GI speed rejection was delivered with #37–#39.
+The owner subsequently authorized GA repair preservation: freeze primary claims,
+validate a lossless structural projection, compare before acceptance, and reject
+lossy preprocessing. Other GI normalizers, the numeric punctuation limitation and
+#41–#48 still require separate decisions. These changes do not qualify a model or deployment.
 
 ## Current execution order
 

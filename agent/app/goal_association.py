@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import logging
 from typing import Any
@@ -84,9 +85,9 @@ from .goal_association_validation import (
     action_collection_bindings,
     binding_semantic_contract_conflicts,
     is_mechanical_contract_failure,
+    mechanical_repair_projection,
+    require_repair_semantic_preservation,
     non_verbatim_explicit_location_bindings,
-    normalize_optional_referent_updates,
-    normalize_optional_resource_quantity,
     normalize_resource_binding_branches,
     resource_source_binding_contract_conflicts,
     responsibility_output_mode_conflicts,
@@ -203,12 +204,14 @@ class GoalAssociationResolver:
         }
         logical_invocations = 0
         invocation_families: list[str] = []
-        initial_raw: dict[str, Any] | None = None
+        initial_raw: Any = None
+        repaired_raw: Any = None
         accepted_raw: dict[str, Any] | None = None
         contract_repair_attempted = False
-        optional_referent_recovery: list[dict[str, Any]] = []
         redundant_resource_binding_recovery: list[dict[str, Any]] = []
-        invalid_optional_quantity_recovery: list[dict[str, Any]] = []
+        repair_semantics_verified = False
+        repair_rejection = ""
+        repair_shape_errors: list[dict[str, Any]] = []
 
         async def invoke(
             prompt: Any,
@@ -241,62 +244,61 @@ class GoalAssociationResolver:
                     failure_class="structured_output_invalid",
                     failure_domain="model_contract",
                     architecture_attribution="not_evaluated",
-                    retryable=True,
+                    retryable=False,
                 )
-            normalized, recovered = normalize_optional_referent_updates(
-                value
+            normalized, recovered = normalize_resource_binding_branches(value)
+            redundant_resource_binding_recovery.extend(
+                {"stage": stage, **entry} for entry in recovered
             )
-            optional_referent_recovery.extend(recovered)
-            normalized, recovered = normalize_resource_binding_branches(
-                normalized
-            )
-            redundant_resource_binding_recovery.extend(recovered)
-            normalized, recovered = normalize_optional_resource_quantity(
-                normalized
-            )
-            invalid_optional_quantity_recovery.extend(recovered)
             return normalized
 
         try:
-            initial_raw = normalize_raw(
-                await invoke(
-                    layered_prompt(
-                        request,
-                        candidate_goals,
-                        output_type=output_type,
-                    ),
-                    system=system_prompt(output_type),
-                    response_format=response_schema,
-                    prompt_family="goal_association.primary",
-                ),
-                stage="primary",
-            )
+            initial_raw = copy.deepcopy(await invoke(
+                layered_prompt(request, candidate_goals, output_type=output_type),
+                system=system_prompt(output_type),
+                response_format=response_schema,
+                prompt_family="goal_association.primary",
+            ))
+            normalized = normalize_raw(initial_raw, stage="primary")
             try:
-                model_output = output_type.model_validate(initial_raw)
-                accepted_raw = initial_raw
+                model_output = output_type.model_validate(normalized)
+                accepted_raw = normalized
             except ValidationError as initial_exc:
                 if not is_mechanical_contract_failure(initial_exc):
                     raise
-                contract_repair_attempted = True
-                repaired = normalize_raw(
-                    await invoke(
-                        layered_repair_prompt(
-                            request=request,
-                            candidate_goals=candidate_goals,
-                            turn_id=turn_id,
-                            output_type=output_type,
-                            raw=initial_raw,
-                            validation_error=validation_error_json(
-                                initial_exc
-                            ),
-                        ),
-                        system=repair_system_prompt(output_type),
-                        response_format=response_schema,
-                        prompt_family="goal_association.contract_repair",
-                    ),
-                    stage="contract repair",
+                repair_shape_errors = [
+                    {"type": error["type"], "path": list(error["loc"])}
+                    for error in initial_exc.errors(include_url=False)
+                ]
+                repair_rejection = "unrecoverable_primary"
+                expected = normalize_raw(
+                    mechanical_repair_projection(normalized, initial_exc), stage="repair basis"
                 )
+                expected_model = output_type.model_validate(expected)
+                # A shape error must not hide a grounding/conservation failure.
+                # This materialization is pure: no Goal state or Runtime is changed.
+                provisional = await self._materialize_primary_output(
+                    expected_model, request=request, turn_id=turn_id
+                )
+                checked = self._validate(provisional, candidate_goals=candidate_goals, request=request)
+                if checked.resolution_status != "resolved" or checked.metadata.get("rejected_associations"):
+                    raise ValueError("GA repair basis fails primary semantic acceptance")
+                repair_prompt = layered_repair_prompt(
+                    request=request, candidate_goals=candidate_goals, turn_id=turn_id,
+                    output_type=output_type, raw=initial_raw,
+                    validation_error=validation_error_json(initial_exc),
+                )
+                contract_repair_attempted = True
+                repair_rejection = "semantic_preservation"
+                repaired_raw = copy.deepcopy(await invoke(
+                    repair_prompt, system=repair_system_prompt(output_type),
+                    response_format=response_schema, prompt_family="goal_association.contract_repair",
+                ))
+                repaired = normalize_raw(repaired_raw, stage="contract repair")
+                require_repair_semantic_preservation(expected, repaired)
                 model_output = output_type.model_validate(repaired)
+                repair_semantics_verified = True
+                repair_rejection = ""
                 accepted_raw = repaired
 
             resolution = await self._materialize_primary_output(
@@ -325,6 +327,10 @@ class GoalAssociationResolver:
                         "logical_invocation_budget": 2,
                         "prompt_families": invocation_families,
                         "contract_repair_attempted": contract_repair_attempted,
+                        "repair_semantics_verified": repair_semantics_verified,
+                        "repair_shape_errors": repair_shape_errors,
+                        "initial_raw_output_ref": cognition_text_reference(initial_raw),
+                        "repaired_raw_output_ref": cognition_text_reference(repaired_raw),
                         "terminal_state": "commit",
                     },
                     "responsibility_conservation": {
@@ -336,26 +342,12 @@ class GoalAssociationResolver:
                     },
                 }
             )
-            if optional_referent_recovery:
-                metadata["optional_contract_recovery"] = {
-                    "field": "referent_updates",
-                    "strategy": "drop_invalid_unreferenced_introduce",
-                    "dropped_count": len(optional_referent_recovery),
-                    "entries": optional_referent_recovery,
-                }
             if redundant_resource_binding_recovery:
                 metadata["mechanical_contract_recovery"] = {
                     "field": "new_goals[].bindings",
-                    "strategy": "normalize_inactive_resource_binding_branch",
-                    "dropped_count": len(redundant_resource_binding_recovery),
+                    "strategy": "normalize_active_resource_binding_branch",
+                    "normalized_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
-                }
-            if invalid_optional_quantity_recovery:
-                metadata["optional_quantity_contract_recovery"] = {
-                    "field": "new_goals[].resource_responsibility.quantity",
-                    "strategy": "drop_invalid_optional_scalar",
-                    "dropped_count": len(invalid_optional_quantity_recovery),
-                    "entries": invalid_optional_quantity_recovery,
                 }
 
             resolution = resolution.model_copy(update={"metadata": metadata})
@@ -391,9 +383,13 @@ class GoalAssociationResolver:
                     "logical_invocation_budget": 2,
                     "prompt_families": invocation_families,
                     "contract_repair_attempted": contract_repair_attempted,
+                    "repair_semantics_verified": repair_semantics_verified,
+                    "repair_shape_errors": repair_shape_errors,
                     "terminal_state": "fail_closed",
                 },
+                "repair_rejection": repair_rejection,
                 "initial_raw_output_ref": cognition_text_reference(initial_raw),
+                "repaired_raw_output_ref": cognition_text_reference(repaired_raw),
                 "accepted_raw_output_ref": cognition_text_reference(accepted_raw),
             }
             if isinstance(exc, (ValidationError, ValueError)):
@@ -405,18 +401,11 @@ class GoalAssociationResolver:
                         "retryable": False,
                     }
                 )
-            if optional_referent_recovery:
-                metadata["optional_contract_recovery"] = {
-                    "field": "referent_updates",
-                    "strategy": "drop_invalid_unreferenced_introduce",
-                    "dropped_count": len(optional_referent_recovery),
-                    "entries": optional_referent_recovery,
-                }
             if redundant_resource_binding_recovery:
                 metadata["mechanical_contract_recovery"] = {
                     "field": "new_goals[].bindings",
-                    "strategy": "normalize_inactive_resource_binding_branch",
-                    "dropped_count": len(redundant_resource_binding_recovery),
+                    "strategy": "normalize_active_resource_binding_branch",
+                    "normalized_count": len(redundant_resource_binding_recovery),
                     "entries": redundant_resource_binding_recovery,
                 }
 

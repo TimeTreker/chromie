@@ -1,5 +1,92 @@
 # Chromie Latest Handoff
 
+## Issue #40 GA structural repair preservation, 2026-09-11
+
+The owner approved the reported GA conflict and its correction: retain complete
+primary meaning, permit only one provably lossless container repair, compare before
+acceptance, and apply that same preservation rule to preprocessing. Continue the
+standing authorized Git delivery; no new model/live run or deployment is included.
+Other GI normalizers, the numeric punctuation limitation, #41–#48 and full merge/split
+remain pending. All entries below this section are historical delivery snapshots.
+
+Repository `/home/chromie/github/chromie`, branch/upstream `main` / `origin/main`.
+Pre-delivery base `15f2a45c73a38e63a7274639d07b2ad544025e92`; initial tree was clean
+and synced. Resume from the latest commit containing this checkpoint/handoff pair;
+verify the actual commit and remote ref after delivery rather than predicting a hash.
+Evidence root R: `.chromie/acceptance/issue40-ga-semantic-preservation-20260911/`.
+This is an approved global Host/contract correction, not model prompt optimization.
+
+| Actual local boundary / owner | Observed input/output and correctness | Change and downstream handoff |
+| --- | --- | --- |
+| Accepted request -> GA primary | Scripted `Continue the existing task.`, GI ref `r1`, retained `goal-a`; primary says `continue`, with an unknown extra key. No live model supplied this result. Correct retained input; malformed output. | Preserve original parsed response before preprocessing. Correlate through existing request/turn IDs. |
+| GA DTO failure -> repair admission | Extra-key error previously admitted a second output; `cancel` passed its own DTO and source checks. Earliest wrong boundary: shape-error classification plus independent revalidation could not prove unchanged claims. | Unknown fields now reject after one call. Only an existing object/singleton-object-array mismatch at a concrete field can qualify. The unchanged projection must pass DTO and pure materialization/source/conservation checks before another call. |
+| Repair response -> GA acceptance | The former result accepted `cancel` for `goal-a` from the repair despite primary `continue`. No actual Goal mutation was performed in the original probe. | Compare every authored field/value after lossless resource normalization, ignoring object-key order only. Relation, refs, targets, replacement indices, values, array order/cardinality and optional content remain fixed. Reject any difference; never call a third time. |
+| Preprocessing -> DTO | Invalid optional referent updates/quantities and explicit decision conflicts could be dropped/overwritten; unknown nested fields were ignored; malformed new-Goal reference containers became empty lists. Resource bindings could be deleted for unknown sources or lost when a destination was malformed/missing. | Reject those inputs without modifying the original. Retain only exact binding relocation/duplicate-copy consolidation with an unambiguous active owner. Explicit null/malformed destinations reject; no semantic replacement is invented. |
+| Rejected GA -> canonical Goal owner | Focused state fixture supplies the rejected cancellation to real ConversationStateManager. | No operation applies and the complete Goal snapshot remains unchanged. Planner, Runtime dispatch, providers, audio and physical devices are not invoked in this fixture. Their live behavior is unproven. |
+
+The repair prompt contains the complete original result plus mechanical errors;
+budget overflow rejects before a second invocation instead of truncating evidence.
+It supplies neither another writable interpretation nor a semantic reviewer.
+Existing diagnostic output references now distinguish initial/repaired/accepted
+results, shape-error paths and preservation outcome. The existing broad exception
+handler remains `fail_closed_boundary`: logs the cause, returns no Goal operations,
+and marks validation failures nonretryable. Only its reviewed body hash changes in
+the exception inventory; no classification or checker exception was added.
+
+`before.json`, `original-scripted-probe.json`, and `replayed-probes.json` retain the
+baseline and identical replay: two old acceptances become two one-call rejections.
+`baseline-tests.log` passed 101 tests/113 subtests. `red-regression.log` exposes
+17 failing contrasts before the main fix; `resource-destination-red.log` exposes
+four additional lossy-destination paths before correction. New preservation tests
+passed 13 tests/23 subtests (`preservation-final.log`). Pure shape repairs pass;
+changed relation/target/confidence/refs/scope/values/count/order fail. Intermediate
+logs retain the obsolete requires_replan-extra acceptance assertion and reviewed
+handler-hash failure; neither is hidden or used as passing evidence.
+`related-id-baseline.json`/`related-id-red.log` also reproduce dropped malformed
+related/superseded Goal references. The new guard rejects these rather than replacing
+them with empty lists. The first canonical run was stopped before source edits;
+`canonical-interrupted-before-id-guard.log` is incomplete, not a pass.
+Final `focused-final.log` passed 167 tests/142 subtests. `canonical.log` passed
+2,428 tests/715 subtests, 140 benchmarks and 20 legacy Agent tests, including
+repository/test-ownership policies, pinned Ruff/MyPy, configuration and docs.
+The 140 benchmarks include all nine GA corpus checks on the final source and all
+1,500 reference outputs through Schema/DTO/Host. `corpus-final.log` is an earlier
+nine-test pass before the final malformed-reference guard, not the final identity.
+Selected Level A passed 30/30 distinct cases (`level-a.log`, `level-a/`); class
+memberships overlap. Two existing FastAPI deprecation warnings remain. Source
+hashes are unchanged since the final full gate began (`source-before.json`); final
+documents/patch identity and docs recheck are retained separately. No local gate
+failure remains on the final source.
+
+Commands from repository root (pinned dependencies in `requirements-test.txt`):
+```bash
+python -m pytest -q tests/test_goal_association_pr2.py tests/test_goal_association_contract_module.py tests/test_conversation_state.py
+python -m pytest -q benchmarks/tests/test_goal_association_daily_life_dataset.py
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class robust_intent_understanding --ability-class planner_goal_semantic_quality --ability-class human_like_cognitive_continuity --ability-class continuous_cognition_recovery --ability-class deterministic_safety_controls --ability-class multi_goal_daily_life --ability-class stable_capability_grounding --evidence-dir .chromie/acceptance/issue40-ga-semantic-preservation-20260911/level-a
+```
+
+The 1,500 corpus inputs/reference outputs are unchanged. Its repair-capture fixture
+now uses an association object instead of its singleton array, since unknown-key
+removal is no longer permitted. Schema/DTO/Host corpus checks are mechanical proof,
+not model inference. No primary prompt or serving profile changed; only the existing
+repair prompt explains the stricter Host contract. Maintained Markdown remains
+102 -> 102; config keys 381, public booleans 1, aliases 0. Existing owners hold all
+changes, with no new architecture term, compatibility path or runtime switch.
+
+Retain source-before/final identities, final patch, focused/corpus/canonical/Level A
+logs and Issue readbacks under R. Ignored artifacts need separate transfer. A fresh
+checkout can create/activate `.venv`, install `requirements-test.txt`, then rerun the
+tracked commands above. Fetch origin and read this checkpoint before resuming.
+Next: deliver the verified patch through the authorized normal main update and
+record the actual commit/remote identity in #40/#36. Keep #40 open for remaining
+GI/normalization decisions; resume from the delivered checkpoint/handoff pair.
+Do not infer exhausted-budget model qualification, supervised voice or target-evidence
+closure from these local tests; those existing gaps remain.
+
 ## Issue #40 GI speed rejection and authorized delivery, 2026-09-11
 
 The owner approved the GI speed example/rule and requested commit/push of the

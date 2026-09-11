@@ -113,7 +113,7 @@ def test_goal_association_qualification_captures_only_permitted_repair() -> None
         if item["category"] == "mixed_continue_and_new_contract_gap"
     )
     raw = dict(case["target"]["reference_model_output"])
-    raw["decision"] = "associate"
+    raw["associations"] = raw["associations"][0]
 
     repair = asyncio.run(
         _capture_repair_call(

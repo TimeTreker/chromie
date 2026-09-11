@@ -944,24 +944,14 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("local/private/runtime source", execution_contract)
         self.assertIn("source.status=unknown", execution_contract)
 
-    def test_unscoped_optional_referent_correction_is_dropped(self):
-        normalized, dropped = (
-            ga_validation.normalize_optional_referent_updates(
-                {
-                    "decision": "create_goals",
-                    "referent_updates": [
-                        {
-                            "operation": "correct",
-                            "canonical_value": "Dad",
-                            "target_referent_ids": [],
-                        }
-                    ],
-                }
-            )
-        )
-
-        self.assertEqual(normalized["referent_updates"], [])
-        self.assertEqual(dropped[0]["reason"], "missing_target_referent_ids")
+    def test_unscoped_optional_referent_correction_is_rejected(self):
+        raw = create_goals(goal("label", "speech"))
+        raw["referent_updates"] = [{"operation": "correct", "entity_type": "person",
+            "canonical_value": "Dad", "target_referent_ids": [], "confidence": 1.0}]
+        before = copy.deepcopy(raw)
+        with self.assertRaisesRegex(ValidationError, "requires target_referent_ids"):
+            GoalSegmentationModelOutput.model_validate(raw)
+        self.assertEqual(raw, before)
 
     def test_resource_semantic_binding_view_is_transient(self):
         canonical = AcquireAndDeliverResource(
@@ -1865,7 +1855,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             binding("carrier", "organization", "ParcelCo"),
         )
 
-    def test_unknown_physical_source_grounding_is_cleared_for_coverage_audit(self):
+    def test_unknown_physical_source_grounding_is_rejected_without_deletion(self):
         raw = create_goals(
             goal(
                 "Walk forward for ten seconds.",
@@ -1885,20 +1875,12 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
         )
 
-        normalized, dropped = (
+        before = copy.deepcopy(raw)
+        with self.assertRaisesRegex(ValueError, "inactive physical source"):
             ga_validation.normalize_resource_binding_branches(raw)
-        )
+        self.assertEqual(raw, before)
 
-        candidate = normalized["new_goals"][0]
-        self.assertEqual(candidate["bindings"], [])
-        self.assertNotIn(
-            "acquisition_bindings",
-            candidate["resource_responsibility"]["source"],
-        )
-        self.assertEqual(dropped[0]["migrated_count"], 0)
-        self.assertEqual(dropped[0]["inactive_acquisition_binding_count"], 1)
-
-    def test_invalid_optional_resource_quantity_is_dropped_without_inference(self):
+    def test_invalid_optional_resource_quantity_is_rejected_without_deletion(self):
         raw = create_goals(
             goal(
                 "Bring the bottle from ahead.",
@@ -1913,13 +1895,10 @@ class GoalExecutionContractTests(unittest.TestCase):
             )
         )
 
-        normalized, dropped = (
-            ga_validation.normalize_optional_resource_quantity(raw)
-        )
-
-        resource = normalized["new_goals"][0]["resource_responsibility"]
-        self.assertNotIn("quantity", resource)
-        self.assertEqual(dropped[0]["reason"], "invalid_optional_quantity_scalar")
+        before = copy.deepcopy(raw)
+        with self.assertRaisesRegex(ValidationError, "resource quantity"):
+            GoalSegmentationModelOutput.model_validate(raw)
+        self.assertEqual(raw, before)
 
     def test_new_goal_inherits_source_outcome_and_forbids_reauthored_description(self):
         req = request("Tell me whether this is correct.", language="en-US")
@@ -2402,7 +2381,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
     def test_primary_dto_gets_exactly_one_contract_repair(self):
         valid = create_goals(goal("Blink twice.", "body_action"))
         invalid = copy.deepcopy(valid)
-        invalid["unexpected_transport_field"] = "must be removed"
+        invalid["new_goals"] = invalid["new_goals"][0]
         ollama = ScriptedOllama([invalid, valid])
         req = request("Please blink exactly twice.", language="en-US")
         result = self._resolve(
@@ -2492,7 +2471,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
                     self.assertEqual(result.resolution_status, "fail_closed")
                     self.assertEqual(result.new_goals, [])
                     self.assertNotIn("responsibility_conservation", result.metadata)
-                    self.assertEqual(len(ollama.prompts), 2 if repaired else 1)
+                    self.assertEqual(len(ollama.prompts), 1)
                     self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
 
     def test_numeric_gi_binding_keeps_value_and_responsibility_identity(self):
@@ -2864,7 +2843,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
 
     def test_invalid_contract_repair_fails_closed_without_third_call(self):
         invalid = create_goals(goal("Blink twice.", "body_action"))
-        invalid["unexpected_transport_field"] = "must be removed"
+        invalid["new_goals"] = invalid["new_goals"][0]
         ollama = ScriptedOllama([invalid, invalid])
         result = self._resolve(
             ollama,
@@ -3333,18 +3312,13 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
             "requires_replan",
             GoalAssociationModelAssociation.model_json_schema()["properties"],
         )
-        parsed = GoalAssociationModelAssociation.model_validate(
-            {
-                "relationship": "modify",
-                "source_responsibility_refs": ["weather"],
+        with self.assertRaisesRegex(ValidationError, "requires_replan"):
+            GoalAssociationModelAssociation.model_validate({
+                "relationship": "modify", "source_responsibility_refs": ["weather"],
                 "target_goal_ids": ["goal-weather"],
                 "requirement_changes": [{"target_goal_id": "goal-weather", "replace_requirement_indices": [0], "source_responsibility_refs": ["weather"]}],
-                # Transport-noise compatibility must not restore authority that
-                # the decoder schema and canonical DTO deliberately removed.
                 "requires_replan": True,
-            }
-        )
-        self.assertNotIn("requires_replan", parsed.model_dump())
+            })
 
     def test_fail_closed_is_the_only_empty_terminal_resolution(self):
         failed = GoalAssociationResolution(
@@ -3550,3 +3524,225 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
                     result.associations[0].goal_update["by_goal_id"]["goal-region"])
         self.assertEqual(changed.constraints["region"], structured_value)
         self.assertEqual(len(model.prompts), 1)
+
+
+class GoalAssociationRepairPreservationTests(unittest.TestCase):
+    @staticmethod
+    def candidate_case():
+        req = request("Continue the existing task.", language="en-US", active_goals=[
+            active_goal("goal-a", "Prepare the report."),
+            active_goal("goal-b", "Prepare another report."),
+        ])
+        valid = {
+            "associations": [{"relationship": "continue", "source_responsibility_refs": ["r1"],
+                              "target_goal_ids": ["goal-a"], "confidence": 1.0}],
+            "new_goals": [], "referent_updates": [], "resolved_references": [],
+            "confidence": 1.0, "reason_summary": "Continue the same goal.",
+        }
+        malformed = copy.deepcopy(valid)
+        malformed["associations"] = malformed["associations"][0]
+        return req, valid, malformed
+
+    def test_shape_repair_cannot_change_existing_goal_decisions(self):
+        req, valid, malformed = self.candidate_case()
+        for field, replacement in (
+            ("relationship", "cancel"), ("target_goal_ids", ["goal-b"]),
+            ("confidence", 0.9), ("source_responsibility_refs", ["r2"]),
+        ):
+            with self.subTest(field=field):
+                repaired = copy.deepcopy(valid)
+                repaired["associations"][0][field] = replacement
+                model = ScriptedOllama([malformed, repaired])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(result.resolution_status, "fail_closed")
+                self.assertEqual(result.associations, [])
+                self.assertEqual(len(model.prompts), 2)
+                self.assertFalse(result.metadata["retryable"])
+                self.assertIn("semantic_preservation", result.metadata.get("repair_rejection", ""))
+
+    def test_shape_only_repair_preserves_complete_primary_result(self):
+        req, valid, malformed = self.candidate_case()
+        before = copy.deepcopy(malformed)
+        model = ScriptedOllama([malformed, valid])
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+        self.assertEqual(result.resolution_status, "resolved")
+        self.assertEqual(result.associations[0].relationship, "continue")
+        self.assertTrue(result.metadata["goal_semantic_transaction"]["repair_semantics_verified"])
+        self.assertEqual(malformed, before)
+        self.assertEqual(len(model.prompts), 2)
+
+    def test_shape_repair_cannot_change_requirement_replacement_scope(self):
+        req, valid, _ = self.candidate_case()
+        req.context["active_goal_snapshots"][0]["goal"]["success_criteria"] = ["Requirement A", "Requirement B"]
+        item = valid["associations"][0]
+        item["relationship"] = "modify"
+        item["requirement_changes"] = [{"target_goal_id": "goal-a",
+            "replace_requirement_indices": [0], "source_responsibility_refs": ["r1"]}]
+        malformed = copy.deepcopy(valid)
+        malformed["associations"] = malformed["associations"][0]
+        repaired = copy.deepcopy(valid)
+        repaired["associations"][0]["requirement_changes"][0]["replace_requirement_indices"] = [1]
+        model = ScriptedOllama([malformed, repaired])
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(result.associations, [])
+        self.assertEqual(len(model.prompts), 2)
+        self.assertIn("semantic_preservation", result.metadata.get("repair_rejection", ""))
+
+    def test_rejected_cancel_repair_preserves_retained_goal_state(self):
+        from orchestrator.runtime.conversation_state import ConversationStateManager
+        manager = ConversationStateManager(base_conversation_id="ga-repair-containment")
+        manager.apply_goal_association_resolution({
+            "turn_id": "create", "resolution_status": "resolved", "confidence": 1.0,
+            "new_goals": [{"goal_id": "goal-a", "description": "Prepare the report.",
+                           "source_text": "Prepare the report."}],
+        }, sid="create", user_text="Prepare the report.", atomic=True)
+        req, valid, malformed = self.candidate_case()
+        req.context["active_goal_snapshots"] = manager.active_goal_snapshots()
+        repaired = copy.deepcopy(valid); repaired["associations"][0]["relationship"] = "cancel"
+        model = ScriptedOllama([malformed, repaired])
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+        before = copy.deepcopy(manager.active_goal_snapshots())
+        applied = manager.apply_goal_association_resolution(
+            result, sid="repair", user_text=req.text, atomic=True
+        )
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(applied, [])
+        self.assertEqual(manager.active_goal_snapshots(), before)
+
+    def test_unknown_fields_are_not_erased_as_transport_noise(self):
+        req, valid, _ = self.candidate_case()
+        for nested in (False, True):
+            with self.subTest(nested=nested):
+                raw = copy.deepcopy(valid)
+                surface = raw["associations"][0] if nested else raw
+                surface["unrecognized_goal_decision"] = "cancel goal-a"
+                model = ScriptedOllama([raw, valid])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(result.resolution_status, "fail_closed")
+                self.assertEqual(len(model.prompts), 1)
+
+    def test_semantic_failure_hidden_inside_wrong_container_never_retries(self):
+        req, valid, malformed = self.candidate_case()
+        malformed["associations"]["source_responsibility_refs"] = ["missing"]
+        model = ScriptedOllama([malformed, valid])
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(len(model.prompts), 1)
+        self.assertFalse(result.metadata["goal_semantic_transaction"]["contract_repair_attempted"])
+
+    def test_invalid_optional_semantics_are_not_deleted_before_validation(self):
+        req = request("Bring the bottle from ahead.", language="en-US")
+        base = create_goals(goal("label", "body_action"))
+        cases = []
+        for update in (
+            {"operation": "introduce", "confidence": 1.0},
+            {"operation": "correct", "entity_type": "person", "canonical_value": "Dad", "confidence": 1.0},
+        ):
+            raw = copy.deepcopy(base); raw["referent_updates"] = [update]; cases.append(raw)
+        bad_quantity = create_goals(goal("label", "body_action", resource=resource_responsibility(
+            description="bottle", quantity=",", source_status="known", source_description="ahead",
+            source_bindings=[binding("direction", "direction", "ahead")],
+        )))
+        cases.append(bad_quantity)
+        wrong_decision = copy.deepcopy(base); wrong_decision["decision"] = "cancel"; cases.append(wrong_decision)
+        for raw in cases:
+            with self.subTest(raw=raw):
+                before = copy.deepcopy(raw)
+                model = ScriptedOllama([raw])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(result.resolution_status, "fail_closed")
+                self.assertEqual(result.new_goals, [])
+                self.assertEqual(raw, before)
+                self.assertEqual(len(model.prompts), 1)
+
+    def test_unrecoverable_container_does_not_authorize_new_meaning(self):
+        req, valid, _ = self.candidate_case()
+        for value in (None, "continue goal-a", 1):
+            with self.subTest(value=value):
+                raw = copy.deepcopy(valid); raw["associations"] = value
+                model = ScriptedOllama([raw, valid])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(result.resolution_status, "fail_closed")
+                self.assertEqual(len(model.prompts), 1)
+
+    def test_repair_prompt_never_truncates_the_primary_result(self):
+        req, _, malformed = self.candidate_case()
+        malformed["associations"]["reason_summary"] = "x" * 7100
+        with self.assertRaisesRegex(ValueError, "required prompt projection budget"):
+            ga_prompt.build_repair_prompt(request=req, candidate_goals=[], turn_id="turn",
+                output_type=GoalAssociationModelOutput, raw=malformed, validation_error="[]")
+
+    def test_shape_repair_cannot_change_new_goal_values_or_cardinality(self):
+        req = request("点头1次，眨眼2次。", responsibility_outcomes=["点头1次", "眨眼2次"])
+        req = req.model_copy(update={"responsibilities": typed_responsibilities(
+            {"local_ref": "r1", "outcome": "点头1次", "output_mode": "body_action", "bindings": {"count": 1}, "confidence": 1.0},
+            {"local_ref": "r2", "outcome": "眨眼2次", "output_mode": "body_action", "bindings": {"count": 2}, "confidence": 1.0},
+        )})
+        valid = create_goals(
+            goal("label", "body_action", bindings=[binding("count", "count", "1")]),
+            goal("label", "body_action", bindings=[binding("count", "count", "2")], source_responsibility_refs=["r2"]),
+        )
+        malformed = copy.deepcopy(valid)
+        malformed["new_goals"][0]["bindings"] = malformed["new_goals"][0]["bindings"][0]
+        changed = copy.deepcopy(valid); changed["new_goals"][0]["bindings"][0]["value"] = "3"
+        omitted = copy.deepcopy(valid); omitted["new_goals"].pop()
+        reordered = copy.deepcopy(valid); reordered["new_goals"].reverse()
+        for repaired, accepted in ((valid, True), (changed, False), (omitted, False), (reordered, False)):
+            with self.subTest(repaired=repaired):
+                model = ScriptedOllama([malformed, repaired])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(len(model.prompts), 2)
+                self.assertEqual(result.resolution_status, "resolved" if accepted else "fail_closed")
+                if accepted:
+                    self.assertEqual([g.source_responsibility_refs for g in result.new_goals], [["r1"], ["r2"]])
+                else:
+                    self.assertEqual(result.new_goals, [])
+                    self.assertIn("semantic_preservation", result.metadata.get("repair_rejection", ""))
+
+    def test_malformed_active_resource_branch_is_not_overwritten(self):
+        resource = resource_responsibility(kind="information", description="package status",
+            attributes=[binding("tracking_number", "identifier", "ABC123")], source_status="provider_resolved")
+        resource["query_scope"] = {"authored_but_malformed": "ABC123"}
+        raw = create_goals(goal("label", "information", resource=resource,
+            bindings=[binding("carrier", "organization", "ParcelCo")]))
+        before = copy.deepcopy(raw)
+        with self.assertRaisesRegex(ValueError, "malformed active resource"):
+            ga_validation.normalize_resource_binding_branches(raw)
+        self.assertEqual(raw, before)
+
+    def test_resource_binding_move_requires_an_unambiguous_destination(self):
+        resources = []
+        information = resource_responsibility(kind="information", source_status="provider_resolved")
+        information["query_scope"] = None
+        resources.append(information)
+        for source in (None, "unknown"):
+            physical = resource_responsibility()
+            physical["source"] = source
+            resources.append(physical)
+        missing_source = resource_responsibility()
+        del missing_source["source"]
+        resources.append(missing_source)
+        for resource in resources:
+            with self.subTest(resource=resource):
+                raw = create_goals(goal("label", "body_action", resource=resource,
+                    bindings=[binding("location", "location", "ahead")]))
+                before = copy.deepcopy(raw)
+                with self.assertRaises(ValueError):
+                    ga_validation.normalize_resource_binding_branches(raw)
+                self.assertEqual(raw, before)
+
+    def test_malformed_new_goal_references_cannot_be_deleted(self):
+        req = request("Tell a joke.", active_goals=[active_goal("goal-a", "Old task.")], language="en-US")
+        for field in ("related_goal_ids", "supersedes_goal_ids"):
+            with self.subTest(field=field):
+                raw = create_goals(goal("label", "speech"))
+                raw.pop("decision", None)
+                raw["new_goals"][0][field] = {"goal_id": "goal-a"}
+                before = copy.deepcopy(raw)
+                model = ScriptedOllama([raw])
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+                self.assertEqual(result.resolution_status, "fail_closed")
+                self.assertEqual(result.new_goals, [])
+                self.assertEqual(len(model.prompts), 1)
+                self.assertEqual(raw, before)

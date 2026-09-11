@@ -11,12 +11,11 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .prompt_projection import bounded_json
+from .prompt_projection import required_json
 from .goal_association_contract import (
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
-    _validate_model_resource_quantity,
 )
 
 try:
@@ -64,65 +63,6 @@ def _ordinary_source_binding_pairs(
     }
 
 
-def normalize_optional_referent_updates(
-    raw: dict[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Drop only semantically unusable optional referent-index updates.
-
-    Referent focus changes, retirements, and introductions with actual entity
-    content remain contract-authoritative and still fail closed. A correction
-    without any supplied target referent cannot update the discourse index; the
-    canonical Goal association remains responsible for the actual correction
-    meaning.
-    A model-added ``introduce`` item with neither an entity type nor canonical
-    value cannot ground any Goal binding and must not discard otherwise valid
-    Goals.
-    """
-
-    normalized = copy.deepcopy(raw)
-    updates = normalized.get("referent_updates")
-    if not isinstance(updates, list):
-        return normalized, []
-    kept: list[Any] = []
-    dropped: list[dict[str, Any]] = []
-    for index, item in enumerate(updates):
-        if not isinstance(item, dict):
-            kept.append(item)
-            continue
-        operation = str(item.get("operation") or "").strip()
-        entity_type = str(item.get("entity_type") or "").strip()
-        canonical_value = str(item.get("canonical_value") or "").strip()
-        target_referent_ids = item.get("target_referent_ids") or []
-        target_goal_ids = item.get("target_goal_ids") or []
-        if (
-            operation == "introduce"
-            and not entity_type
-            and not canonical_value
-            and not target_referent_ids
-            and not target_goal_ids
-        ):
-            dropped.append(
-                {
-                    "path": f"referent_updates[{index}]",
-                    "operation": "introduce",
-                    "reason": "missing_entity_type_and_canonical_value",
-                }
-            )
-            continue
-        if operation == "correct" and not target_referent_ids:
-            dropped.append(
-                {
-                    "path": f"referent_updates[{index}]",
-                    "operation": "correct",
-                    "reason": "missing_target_referent_ids",
-                }
-            )
-            continue
-        kept.append(item)
-    normalized["referent_updates"] = kept
-    return normalized, dropped
-
-
 def normalize_resource_binding_branches(
     raw: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -148,7 +88,8 @@ def normalize_resource_binding_branches(
             continue
         top_level = goal.get("bindings")
         if not isinstance(top_level, list):
-            top_level = []
+            # Do not erase a malformed branch before the DTO can reject it.
+            continue
         resource = goal.get("resource_responsibility")
         if not isinstance(resource, dict):
             continue
@@ -156,9 +97,13 @@ def normalize_resource_binding_branches(
         if kind not in {"information", "physical_object"}:
             continue
         if kind == "information":
+            binding_owner = resource
+            binding_key = "query_scope"
             target = resource.get("query_scope")
         else:
             source = resource.get("source")
+            binding_owner = source if isinstance(source, dict) else None
+            binding_key = "acquisition_bindings"
             target = (
                 source.get("acquisition_bindings")
                 if isinstance(source, dict)
@@ -175,36 +120,18 @@ def normalize_resource_binding_branches(
             and target
         )
         if physical_source_unknown and (top_level or has_inactive_physical_grounding):
-            # `status` is the discriminant: unknown/provider-resolved sources
-            # cannot own acquisition grounding. Clear model content from that
-            # inactive branch so deterministic conservation validation can reject
-            # an unjustified or incomplete resource wrapper. Never
-            # flip unknown to known or reinterpret body-motion parameters as an
-            # object-acquisition location.
-            source = resource["source"]
-            existing = source.pop("acquisition_bindings", [])
-            goal["bindings"] = []
-            dropped.append(
-                {
-                    "path": f"new_goals[{index}].bindings",
-                    "resource_kind": kind,
-                    "binding_count": len(top_level),
-                    "migrated_count": 0,
-                    "inactive_acquisition_binding_count": (
-                        len(existing) if isinstance(existing, list) else 0
-                    ),
-                    "reason": "unknown_physical_source_has_no_grounding_branch",
-                }
+            raise ValueError(
+                f"new_goals[{index}] inactive physical source contains authored bindings"
             )
-            continue
         if not top_level:
             continue
-        if not isinstance(target, list):
+        if binding_owner is None:
+            raise ValueError(f"new_goals[{index}] has no resource binding destination")
+        if binding_key in binding_owner and not isinstance(target, list):
+            raise ValueError(f"new_goals[{index}] has a malformed active resource binding branch")
+        if target is None:
             target = []
-            if kind == "information":
-                resource["query_scope"] = target
-            elif isinstance(resource.get("source"), dict):
-                resource["source"]["acquisition_bindings"] = target
+            binding_owner[binding_key] = target
         fingerprints = {
             json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             for item in target
@@ -232,48 +159,6 @@ def normalize_resource_binding_branches(
                 "reason": "normalized_into_active_resource_binding_branch",
             }
         )
-    return normalized, dropped
-
-
-def normalize_optional_resource_quantity(
-    raw: dict[str, Any],
-) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Drop only malformed optional quantity scalars before validation.
-
-    No replacement quantity is inferred. Deterministic Responsibility conservation
-    still checks any source-grounded quantity, so removing decoder noise
-    cannot silently erase a quantity the human actually supplied.
-    """
-
-    normalized = copy.deepcopy(raw)
-    goals = normalized.get("new_goals")
-    if not isinstance(goals, list):
-        return normalized, []
-    dropped: list[dict[str, Any]] = []
-    for index, goal in enumerate(goals):
-        if not isinstance(goal, dict):
-            continue
-        resource = goal.get("resource_responsibility")
-        if not isinstance(resource, dict) or "quantity" not in resource:
-            continue
-        value = resource.get("quantity")
-        if value is None or value == "":
-            continue
-        try:
-            if not isinstance(value, str):
-                raise ValueError("quantity is not a string")
-            _validate_model_resource_quantity(value.strip())
-        except (TypeError, ValueError):
-            resource.pop("quantity", None)
-            dropped.append(
-                {
-                    "path": (
-                        f"new_goals[{index}].resource_responsibility.quantity"
-                    ),
-                    "reason": "invalid_optional_quantity_scalar",
-                    "input_type": type(value).__name__,
-                }
-            )
     return normalized, dropped
 
 
@@ -1084,7 +969,7 @@ def is_mechanical_contract_failure(exc: ValidationError) -> bool:
     """
     errors = exc.errors(include_url=False)
     return bool(errors) and all(
-        error["type"] in {"extra_forbidden", "list_type", "dict_type"}
+        error["type"] in {"list_type", "dict_type"}
         for error in errors
     )
 
@@ -1094,4 +979,51 @@ def validation_error_json(exc: Exception) -> str:
         payload: Any = exc.errors(include_url=False)
     else:
         payload = [{"type": type(exc).__name__, "message": str(exc)[:1000]}]
-    return bounded_json(payload, 6000)
+    return required_json(payload, 6000, label="GA mechanical validation errors")
+
+
+def mechanical_repair_projection(raw: dict[str, Any], exc: ValidationError) -> dict[str, Any]:
+    """Project only unambiguous container corrections, preserving every value.
+
+    Unknown fields, missing meaning and null/scalar containers are not removable
+    noise. The caller validates this complete projection before a repair call.
+    """
+    if not is_mechanical_contract_failure(exc):
+        raise ValueError("GA primary errors do not permit mechanical repair")
+    projected = copy.deepcopy(raw)
+    for error in exc.errors(include_url=False):
+        path = error["loc"]
+        parent: Any = projected
+        if not path:
+            raise ValueError("GA mechanical repair has no concrete field path")
+        for part in path[:-1]:
+            if isinstance(parent, dict) and part in parent:
+                parent = parent[part]
+            elif isinstance(parent, list) and isinstance(part, int) and 0 <= part < len(parent):
+                parent = parent[part]
+            else:
+                raise ValueError("GA mechanical repair path is not recoverable")
+        key = path[-1]
+        if not isinstance(parent, dict) or key not in parent:
+            raise ValueError("GA mechanical repair requires one existing container field")
+        value = parent[key]
+        if error["type"] == "list_type" and isinstance(value, dict):
+            parent[key] = [value]
+        elif error["type"] == "dict_type" and isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
+            parent[key] = value[0]
+        else:
+            raise ValueError("GA malformed container has no lossless representation")
+    return projected
+
+
+def require_repair_semantic_preservation(expected: dict[str, Any], actual: dict[str, Any]) -> None:
+    """Compare parsed content, not semantic equivalence or model assurances.
+
+    Object key order is immaterial. Values, explicit fields, array order and
+    cardinality remain exact, including information in optional fields.
+    """
+    def encode(value: dict[str, Any]) -> str:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+    if encode(expected) != encode(actual):
+        raise ValueError("GA repair semantic_preservation failed: authored content changed")

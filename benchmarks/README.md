@@ -470,6 +470,11 @@ python benchmarks/datasets/goal_association_daily_life/validate.py
 python -m pytest -q benchmarks/tests/test_goal_association_daily_life_dataset.py
 ```
 
+The repair-capture test uses an existing association object in place of its required
+singleton array. The production resolver permits at most one lossless container
+repair; unknown keys and changed semantic content reject. This Host contract check
+does not modify corpus inputs/reference meaning or establish live-model success.
+
 See the corpus
 [README](datasets/goal_association_daily_life/README.md) and
 [Issue #34](https://github.com/TimeTreker/chromie/issues/34) for its ownership,

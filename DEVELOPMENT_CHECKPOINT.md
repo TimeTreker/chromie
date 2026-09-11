@@ -1,36 +1,38 @@
 # Development Checkpoint
 
-## Current delivery boundary — Issue #40 GI speed rejection
+## Current delivery boundary — Issue #40 GA repair preservation
 
-Updated 2026-09-11. The owner approved rejecting invalid/unprovenanced GI speed
-instead of deleting it, and authorized commit/push with the prior #37–#39 changes.
-Primary/Deep GI now use the existing source/dimension validator directly. A failed
-primary result cannot trigger Deep or a repair; a failed Deep result is terminal.
-Absent speed and supported source/context-backed speed remain valid; Planner owns
-permitted execution defaults. No model/prompt/schema/provider policy was changed.
-GA repair/normalization, other GI normalizers, #41–#48 and full merge/split remain
-outside this approval. Existing numeric source extraction misses a number followed
-immediately by a period; this now rejects instead of silently dropping speed.
+Updated 2026-09-11. The owner approved freezing the complete first GA output,
+allowing at most one provably lossless structural repair, and deterministic
+comparison before acceptance. GA retains raw output before preprocessing;
+unknown fields, invalid optional meaning, malformed Goal references and conflicting
+segmentation decisions reject. Only existing object/singleton-array shape changes qualify after complete
+DTO/source/conservation preflight; changed semantics or over-budget input reject.
+Resource bindings may move only to an unambiguous active owner without data loss.
+No additional model invocation, architecture owner, service or switch was added.
 
-Delivery base: `main` at `a0c5d09fbb18fca8660aa43abb55bccca18924cc`, tracked
-against `origin/main`. Resume from the latest commit containing this checkpoint and
-HANDOFF; this text does not predict a commit hash or claim a completed push.
-Evidence: `.chromie/acceptance/issue40-gi-speed-rejection-20260911/`.
-`before.patch` exactly matches the retained #39 final patch. Three scripted baseline
-probes accepted deleted speed; the same inputs now reject. Focused GI: 83 tests,
-76 subtests passed, covering primary/Deep termination and valid/absent speed.
-Final canonical passed 2,415/692 tests/subtests, 140 benchmarks, 20 legacy; Level A 30/30.
-This is local contract/state evidence; no new model, voice, provider, or target
-qualification or deployment is claimed. Ignored evidence does not transfer with Git.
+Delivery base: `main` at `15f2a45c73a38e63a7274639d07b2ad544025e92`, tracking
+`origin/main`. Continue the owner's existing commit/push instruction. Resume from
+the latest commit containing this checkpoint and HANDOFF; do not predict its hash.
+Evidence: `.chromie/acceptance/issue40-ga-semantic-preservation-20260911/`.
+The original two-return probe accepted continue -> cancel after an extra-key error.
+Both identical probes now reject after one call because unknown-key deletion is
+not provably lossless. Separate shape-only contrasts permit one repair and reject
+changed relation, target, scope, values, Goal count/order and source references.
+Focused 167 tests/142 subtests; canonical 2,428/715, 140 benchmarks, 20 legacy
+passed. New preservation 13/23 and selected Level A 30/30 also passed.
+Rejected cancellation leaves real local Goal state unchanged. This is scripted
+contract/state evidence, not model, voice, provider or target qualification.
+Ignored evidence does not transfer with Git; exact workflow/commands are in HANDOFF.
 
-Prior #39 directly inherits GI WHAT; source-bound partial updates bind the actual
-Goal fingerprint, preserve untouched requirements, provenance/history, resources and
-Work/Evidence, and retain Planner Work authority. All 1,500 reference outputs were
-mechanically migrated with inputs/semantic expectations unchanged. Its canonical
-2,412/683 tests/subtests, 140 benchmarks, 20 legacy tests and Level A 21/21 passed.
-Evidence: `.chromie/acceptance/issue39-semantic-inheritance-20260911/`.
-Prior #38 corrected WHAT/Work and role Memory context in seven existing docs;
-its canonical 2,407/671/140/20 passed. #37 implementation/history remains below.
+Prior #37–#39 and GI speed rejection were delivered in the baseline commit.
+Its canonical 2,415 tests/692 subtests, 140 benchmarks, 20 legacy tests and
+Level A 30/30 passed; those results do not qualify this new GA change.
+Other GI normalizers, numeric source extraction beside a period, #41–#48, full
+merge/split, model optimization and deployment remain outside this approval.
+No corpus input or reference output was changed in this GA patch. The earlier
+1,500-reference representation migration belongs to #39, with meaning unchanged.
+Historical #37 implementation/evidence follows; use this top entry for current resume.
 
 ## Prior local implementation — Issue #37, 2026-09-11
 

@@ -1,10 +1,10 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-11
-**Current focus:** Issue #40 GI speed rejection; authorized Git delivery with #37–#39.
-Primary/Deep GI reject invalid speed rather than deleting it; no extra model call is added.
-Other #40 normalization/repair and #41–#48 remain pending separate decisions.
-Focused GI: 83/76 tests/subtests. Delivery canonical: 2,415/692, 140 benchmarks, 20 legacy; Level A 30/30 passed.
+**Current focus:** Issue #40 authorized GA structural-repair preservation.
+GA freezes primary claims, verifies exact preservation and rejects lossy preprocessing.
+Other GI normalization/numeric-source decisions and #41–#48 remain pending.
+GA focused 167/142 tests/subtests; canonical 2,428/715, 140 benchmarks, 20 legacy; Level A 30/30 passed.
 Numeric source extraction next to a period remains a known limitation; rejection preserves the failure.
 Prior #39 passed 2,412 tests/683 subtests, 140 benchmarks, 20 legacy tests and Level A 21/21.
 
@@ -20,7 +20,7 @@ was changed.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Independent Planner tasks, scoped Work, role Memory, source-bound Goal inheritance and GI speed rejection implemented. | GI focused 83 tests/76 subtests passed. Final delivery canonical: 2,415 tests, 692 subtests, 140 benchmarks and 20 legacy tests; policy, ownership, pinned static, configuration and docs passed. Level A 30/30. Prior results remain revision-scoped. | No model inference, live service, supervised voice or target-runtime qualification was performed for this patch. | Development only; default target-evidence closure remains open. |
+| Independent Planner tasks, scoped Work, role Memory, source-bound Goal inheritance, GI speed rejection and GA repair preservation implemented. | GA focused 167 tests/142 subtests passed; new preservation 13/23. Current canonical 2,428/715, 140 benchmarks, 20 legacy, policy, ownership, pinned static, configuration and docs passed. Level A 30/30. | No model inference, live service, supervised voice or target-runtime qualification was performed for this patch. | Development only; default target-evidence closure remains open. |
 
 The prior consolidation counts (2,392 tests / 671 subtests) describe the base
 revision only; historical evidence below is not qualification of this local patch.

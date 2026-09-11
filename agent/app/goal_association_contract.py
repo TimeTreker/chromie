@@ -150,8 +150,8 @@ class GoalAssociationModelRequirementChange(BaseModel):
 class GoalAssociationModelAssociation(BaseModel):
     """Minimal model-facing continuity decision for an existing goal."""
 
-    # Preserve the existing transport-noise policy; WHAT rewriting is never noise.
-    model_config = ConfigDict(extra="ignore")
+    # Unknown fields cannot be proven to be non-semantic transport noise.
+    model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="before")
     @classmethod
@@ -237,7 +237,7 @@ class GoalAssociationModelAssociation(BaseModel):
 class GoalAssociationModelBinding(BaseModel):
     """Model-facing semantic binding resolved before planning."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(min_length=1)
     entity_type: str = Field(min_length=1)
@@ -276,7 +276,7 @@ class GoalAssociationModelBinding(BaseModel):
 class GoalAssociationModelResolvedReference(BaseModel):
     """Model-facing explicit resolution of a reference in the current turn."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     surface_form: str = Field(min_length=1)
     entity_type: str = Field(min_length=1)
@@ -304,7 +304,7 @@ class GoalAssociationModelResolvedReference(BaseModel):
 class GoalAssociationModelReferentUpdate(BaseModel):
     """Model-facing scoped discourse mutation; identifiers remain Host-owned."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     operation: Literal["introduce", "correct", "focus", "background", "retire"]
     entity_type: str = ""
@@ -686,7 +686,7 @@ class GoalAssociationModelGoal(BaseModel):
         if isinstance(value, str):
             value = [value]
         if not isinstance(value, list):
-            return []
+            raise ValueError("Goal reference fields require an array or one explicit ID")
         return list(dict.fromkeys(
             normalized
             for item in value
@@ -740,14 +740,13 @@ class GoalAssociationModelGoal(BaseModel):
 class GoalSegmentationModelOutput(BaseModel):
     """Semantic goal segmentation used when no association target exists.
 
-    The discriminant is authoritative.  The Host may receive harmless content in
-    the inactive branch from a small structured-output model, but it never asks a
-    second model call to decide which mutually exclusive branch was intended.
+    The absent discriminant has one fixed default. An explicitly conflicting
+    value is rejected rather than overwritten by Host normalization.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    decision: GoalSegmentationDecision | None = None
+    decision: GoalSegmentationDecision = "create_goals"
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
@@ -769,16 +768,6 @@ class GoalSegmentationModelOutput(BaseModel):
             "decision and new_goals own the semantic result."
         ),
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def select_branch(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        decision = str(normalized.get("decision") or "").strip()
-        normalized["decision"] = "create_goals"
-        return normalized
 
     @field_validator("reason_summary", mode="before")
     @classmethod

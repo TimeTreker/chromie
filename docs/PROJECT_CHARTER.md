@@ -1037,6 +1037,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    An absent speed binding is valid when no speed was requested; Planner owns
    any permitted execution default under the Capability and safety contracts.
 
+   GA's one DTO repair must retain the complete primary parsed output before
+   preprocessing. Trusted code must first prove that only an unambiguous container
+   correction is needed and that the unchanged claims pass primary acceptance.
+   It then compares the repaired output with that lossless projection before
+   accepting it; a prompt instruction alone is not a preservation guarantee.
+   All authored fields, values, Goal/Responsibility references, requirement-change
+   scopes, array order and cardinality remain fixed. Unknown fields, incomplete or
+   conflicting meaning, and output that cannot be supplied losslessly within the
+   repair budget reject without another invocation. Preprocessing obeys the same
+   rule: it must not erase invalid optional meaning, overwrite a conflicting branch,
+   or discard bindings whose authoritative destination is unavailable.
+
    Goal Interpretation therefore carries its own Responsibility-coverage evidence
    in the primary WHAT result. Goal Association must conserve those accepted
    Responsibilities while owning only canonical Goal identity and continuity. A

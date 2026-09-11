@@ -216,6 +216,23 @@ rewriting previous model output; terminal Deep rejection fails closed or leads P
 to a genuine user-resolvable clarification. The Host validates and contains; it does
 not become a third semantic planner.
 
+GA retains the original parsed response before preprocessing. Only an existing
+object at a required array field, or a singleton object array at a required object
+field, may enter one structural regeneration. Host builds that lossless projection,
+validates its DTO and existing source/conservation contracts without committing
+state, and supplies the complete original plus mechanical errors to the repair call.
+Before acceptance, exact parsed-content comparison ignores object-key order only;
+explicit fields, values, references, requirement replacement indices, array order
+and cardinality must match. No changed meaning or third invocation is accepted.
+Unknown fields, missing meaning, null/scalar containers, hidden semantic failures,
+and over-budget repair input reject before regeneration. Invalid optional referent
+updates or quantities, malformed new-Goal reference containers and an explicitly
+conflicting segmentation decision also reject. Existing exact resource-binding
+relocation/duplicate-copy consolidation is retained only when the active owner is unambiguous and no authored value is
+discarded; malformed destinations and populated unknown-source branches reject.
+Failure returns no accepted Goal operation; Goal state, Planner and Runtime do not
+acquire authority from a rejected repair.
+
 A provisional conversational commitment is intentionally different from a rejected
 Fast result. It is a valid external Activity whose Responsibility remains open. Its one
 bounded continuation reasons forward from authoritative source state rather than editing
