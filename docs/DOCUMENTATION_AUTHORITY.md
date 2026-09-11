@@ -21,10 +21,10 @@ Status: current normative documentation-governance contract
 Lower-authority documents link to these owners instead of restating full current
 claims. Component documents own local implementation details only.
 
-The [Documentation Index](README.md) maintains a core reading path of no more
-than 15 documents. The complete reference catalog is not a required reading
-list. A specialized document needs a current component/operator audience or a
-concrete mechanically checked contract; being linked only from the index is not
+The [Documentation Index](README.md) maintains a focused core reading path.
+Its length is reported for review, not capped. The complete reference catalog is
+not a required reading list. A specialized document needs a current component/operator
+audience or a concrete mechanically checked contract; being linked only from the index is not
 permanent justification.
 
 ## Four-axis status vocabulary
@@ -53,7 +53,7 @@ authority.
 - required authority roles are present once;
 - paths are repository-local and exist;
 - historical narrative is removed from the working tree after consolidation;
-- concise owner documents remain within reviewed line limits;
+- owner-document paths and size-measurement baselines are valid;
 - every maintained Markdown file is indexed;
 - every specialized document is reachable from a current authority or component
   entry point, or is covered by a declared mechanical-contract checker;
@@ -63,6 +63,16 @@ The machine-readable `specialized_ownership` section distinguishes component
 entry points from mechanically checked package documentation. The documentation
 index is intentionally excluded as an ownership root, so an index-only document
 fails the gate.
+
+Owner-document line counts, the core reading-path length, total maintained
+Markdown files and root-level docs counts are informational in every delivery
+phase. `line_baselines` and `surface_baselines` record measured values at
+`size_baseline_revision`; the checker prints current values and signed deltas,
+including when ownership checks fail. These are review anchors, not ceilings or
+automatic permission to grow. Preserve the recorded revision and measurements;
+any later rebaselining needs a reviewed reason and before/after evidence, not a
+pass-condition workaround. The [engineering policy](REPOSITORY_ENGINEERING_POLICIES.md)
+owns this distinction; no temporary size exception remains.
 
 ## Addition and consolidation rule
 

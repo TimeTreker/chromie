@@ -49,30 +49,32 @@ or alter Soridormi safety.
 
 ## Mechanical structural baseline
 
-The executable baseline is owned by
-`config/runtime_structure_ratchets.json` and checked by:
+Blocking ownership rules and informational size baselines are owned by
+`config/runtime_structure_ratchets.json` and checked/reported by:
 
 ```bash
 python scripts/check_runtime_structure.py
 ```
 
-At this revision the checker reports:
+The reviewed measurements at `bd955740` are retained with their full revision in
+the config; each run reports current values and signed deltas:
 
-| Measure | Current ratchet |
+| Measure | Measured baseline |
 |---|---:|
-| `VoiceAssistant` methods | 105 |
+| `VoiceAssistant` methods | 104 |
 | properties | 1 |
-| `__init__` lines | 301 |
+| `__init__` lines | 304 |
 | initialized `self` attributes | 108 |
-| direct-LLM compatibility call sites | 0 |
 
-These values are a **non-growth ceiling**, not proof that structural
-simplification is complete. The composition root has already moved transport, input/session,
+These size values are informational in every delivery phase under approved #45;
+they do not prove that structural simplification is complete. Missing collaborators,
+returned lifecycle state, forbidden compatibility methods and any direct legacy
+Host model call remain blocking. The composition root has already moved transport, input/session,
 shutdown, observability, confirmation bookkeeping, and other mechanical lifecycle concerns to
-their existing owners. Historical ratchet transitions belong in Git history/CHANGELOG; this
-document records only the current maintained boundary. A ratchet increase requires an explicit
-reviewed before/after rationale in the same change; ordinary work must hold or lower every
-ceiling.
+their existing owners. Historical transitions belong in Git history/CHANGELOG.
+Review size deltas alongside ownership and readability; do not move code merely to
+reduce a count. [Repository Engineering Policies](REPOSITORY_ENGINEERING_POLICIES.md)
+owns the size-review and rebaselining rules.
 
 ## Remaining ownership seams
 
@@ -92,8 +94,8 @@ Further work is ordered by
 | shutdown lifecycle | top-level `shutdown_voice_assistant()` sequences mechanical teardown; task ownership remains in `InputTurnLifecycle`, playback teardown remains in Playback lifecycle/transport, session trace finalization remains in Session state, and process teardown never interprets or cancels Goals semantically |
 
 Each extraction must preserve ordering, cancellation, confirmation, and evidence
-semantics; add narrow regression tests; and lower or hold the mechanical
-ratchets. File size alone is not an acceptance criterion.
+semantics, add narrow regression tests, and preserve blocking ownership checks.
+Review the size deltas; file size alone is not an acceptance criterion.
 
 Broader decomposition starts only after the active current-revision evidence closure.
 Two narrow source slices are implemented. Pure Planner-reentry validation protects the

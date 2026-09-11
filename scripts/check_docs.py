@@ -770,16 +770,6 @@ def check_documentation_authority(errors: list[str]) -> None:
     else:
         if len(core_path) != len(set(core_path)):
             errors.append("core_reading_path contains duplicate documents")
-        ratchets = payload.get("surface_ratchets") or {}
-        try:
-            max_core = int(ratchets.get("max_core_reading_path", 15))
-        except (TypeError, ValueError):
-            errors.append("surface_ratchets.max_core_reading_path must be an integer")
-            max_core = 15
-        if len(core_path) > max_core:
-            errors.append(
-                f"core_reading_path has {len(core_path)} documents; maximum is {max_core}"
-            )
         index_text = DOC_INDEX.read_text(encoding="utf-8") if DOC_INDEX.is_file() else ""
         for raw_path in core_path:
             if not isinstance(raw_path, str) or not raw_path.strip():
@@ -804,45 +794,41 @@ def check_documentation_authority(errors: list[str]) -> None:
                     f"core reading document is not linked from docs/README.md: {raw_path}"
                 )
 
-    surface_ratchets = payload.get("surface_ratchets")
-    if not isinstance(surface_ratchets, dict):
-        errors.append("surface_ratchets must be an object")
+    print(f"Documentation size measurements (informational; baseline revision {payload.get('size_baseline_revision')}):")
+    surface_baselines = payload.get("surface_baselines")
+    if not isinstance(surface_baselines, dict):
+        errors.append("surface_baselines must be an object")
     else:
-        markdown_count = len(markdown_files())
-        docs_root_count = len(list((ROOT / "docs").glob("*.md")))
         for key, actual in (
-            ("max_markdown_files", markdown_count),
-            ("max_docs_root_markdown_files", docs_root_count),
+            ("core_reading_path", len(core_path) if isinstance(core_path, list) else 0),
+            ("markdown_files", len(markdown_files())),
+            ("docs_root_markdown_files", len(list((ROOT / "docs").glob("*.md")))),
         ):
-            try:
-                maximum = int(surface_ratchets[key])
-            except (KeyError, TypeError, ValueError):
-                errors.append(f"surface_ratchets.{key} must be an integer")
+            baseline = surface_baselines.get(key)
+            if type(baseline) is not int or baseline < 0:
+                errors.append(f"surface_baselines.{key} must be a non-negative integer")
                 continue
-            if actual > maximum:
-                errors.append(
-                    f"documentation surface grew: {key}={actual}, ratchet={maximum}"
-                )
+            print(f"  {key}={actual} baseline={baseline} delta={actual - baseline:+d}")
 
-    limits = payload.get("concise_line_limits")
-    if not isinstance(limits, dict):
-        errors.append("concise_line_limits must be an object")
+    line_baselines = payload.get("line_baselines")
+    if not isinstance(line_baselines, dict):
+        errors.append("line_baselines must be an object")
     else:
-        for raw_path, raw_limit in limits.items():
-            try:
-                limit = int(raw_limit)
-            except (TypeError, ValueError):
-                errors.append(f"invalid documentation line limit for {raw_path!r}")
+        for raw_path, baseline in line_baselines.items():
+            if type(baseline) is not int or baseline < 0:
+                errors.append(f"line_baselines.{raw_path} must be a non-negative integer")
                 continue
-            path = ROOT / str(raw_path)
+            path = (ROOT / str(raw_path)).resolve()
+            try:
+                path.relative_to(ROOT.resolve())
+            except ValueError:
+                errors.append(f"measured authority document escapes repository: {raw_path}")
+                continue
             if not path.is_file():
-                errors.append(f"concise authority document does not exist: {raw_path}")
+                errors.append(f"measured authority document does not exist: {raw_path}")
                 continue
             line_count = len(path.read_text(encoding="utf-8").splitlines())
-            if line_count > limit:
-                errors.append(
-                    f"{raw_path} has {line_count} lines, exceeding reviewed authority limit {limit}"
-                )
+            print(f"  {raw_path}={line_count} baseline={baseline} delta={line_count - baseline:+d}")
 
     authority_doc = ROOT / "docs" / "DOCUMENTATION_AUTHORITY.md"
     if not authority_doc.is_file():

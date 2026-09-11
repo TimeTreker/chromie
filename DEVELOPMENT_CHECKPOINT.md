@@ -1,39 +1,43 @@
 # Development Checkpoint
 
-## Current delivery boundary — Issue #43 online review requirement removed
+## Current delivery boundary — Issue #45 size measurements and ownership gates
 
-Updated 2026-09-11. The owner authorized #43 and instructed that solved Issues
-pushed to main be closed. The Goal-driven single-authority architecture remains
-binding. This documentation-only correction aligns SEMANTIC_AUTHORITY and the
-interaction latency rule with Charter principles 30–31: complete primary results,
-no second online completeness reviewer, source-based unresolved-only Deep
-reasoning, separately bounded structural repair and offline qualification.
-Mechanical checks do not prove arbitrary natural-language completeness.
-No runtime, prompt, Schema, model, configuration or corpus behavior changed.
+Updated 2026-09-11. After the retained audit, the owner explicitly approved making
+all ten Runtime/documentation size limits informational now, including before
+evidence closure. Ownership, safety, typing, tests and the current feature/evidence
+delivery constraint remain blocking. This replaces the prior phase ambiguity;
+no temporary size ceiling, phase switch, limit increase or exemption remains.
 
 Delivery base: main / origin/main at
-`9ce17956f6b1ec3efb01acd14b91e47571999e17`; initially clean and synchronized.
+`bd9557407504f4ce28e955df726f1a3dc6b04af7`; initially clean and synchronized.
 Resume from the latest main commit containing this checkpoint and HANDOFF.
-Evidence: `.chromie/acceptance/issue43-online-review-docs-20260911/`.
-The source authority audit passed. Existing focused tests passed 532 tests and
-332 subtests, including Fast/Deep call budgets, streaming, Host failure paths,
-GA/Goal continuity, Situation and customer Mind. Canonical passed 2,461 tests/729
-subtests, 140 benchmarks and 20 legacy Agent tests; policy/static/config/docs passed.
-The first gate stopped at a 261-line STATUS entry; it was condensed to the existing
-260-line limit without changing the gate. Both logs remain retained.
-No new behavior test or model trial is needed for these prose changes. The actual
-failure is retained conflicting documentation, not a newly reproduced robot episode.
-No deployment, model inference, voice, simulator or physical proof ran.
+Evidence: `.chromie/acceptance/issue45-count-gate-audit-20260911/`.
+The existing Runtime/docs checkers now print current sizes, revision-bound measured
+baselines and signed deltas. Runtime collaborator/lifecycle/legacy-model ownership
+and documentation authority/index/ownership still reject independently of size.
+AGENTS, engineering policy, documentation authority, ROADMAP and STATUS agree.
+No robot runtime, prompt, Schema, model, environment key or corpus changed.
 
-Prior #33 and #37–#39/#41–#42 are verified ancestors of main and are now closed
-under the owner's instruction. #43 closes after this verified main delivery.
-#40 remains partial; #24, #28, #32 and #35 retain acceptance or qualification gaps.
-#36 remains the open audit index.
-Remaining #40 work and #44–#48 require separate decisions; no new model iteration,
-transport amendment or deployment is authorized. The old 29–46 budget is exhausted.
-The prior #42 gate (2,461/729, 140 benchmarks, 20 legacy; Level A 30/30) is historical,
-with exact workflow and private evidence references in HANDOFF. Its private evidence
-folder is absent on this machine; Git does not transfer ignored artifacts.
+The pre-change audit retained two valid baselines, ten size-only rejections and
+seven ownership rejections across 19 temporary fixtures. A two-comment initializer
+change had the same AST but failed at 306 lines against 305; the preceding #43 gate
+had stopped at a 261-line STATUS against 260. The new executable regressions first
+failed on the unchanged checkers, then passed after the authorized policy change.
+Focused: 36 tests/30 subtests passed. Canonical: 2,465 tests/756 subtests,
+140 benchmarks and 20 legacy Agent tests passed; policy/static/config/docs passed.
+The focused lint finding in a new test's loop-variable binding was corrected;
+final checks and any limitations are recorded in HANDOFF. This tooling change
+makes no runtime-repair claim. No model, voice, deployment, simulator
+or physical proof ran; existing target/release qualification gaps remain open.
+
+#43 was delivered as bd955740 and is closed. #45 closes after this main delivery is
+pushed and verified. #36 remains the open audit index; the next suggested discussion
+is #44, followed by #46. Remaining #40 and #44/#46–#48 need separate decisions.
+#24, #28, #32 and #35 retain their acceptance or qualification gaps. The 29–46 model
+iteration budget is exhausted; this approval does not authorize optimization or
+transport/deployment changes. The prior #42 private evidence folder is absent on
+this machine; Git does not transfer ignored artifacts. See HANDOFF for historical
+workflow, failure and evidence records, including #43's complete local gate.
 
 ## Prior local implementation — Issue #37, 2026-09-11
 
@@ -109,8 +113,8 @@ The owner requested separate discussion and authorization for each audit finding
 [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) links #37 (this
 authorized local implementation) and #38 (completed documentation correction),
 #39 (semantic inheritance), #40 (GI speed and GA preservation), and #41 (speech
-authority). #43 is the current authorized correction; remaining #40 work and
-#44–#48 need separate authorization. Solved main-delivered Issues are closed under
+authority). #45 is the current authorized correction; remaining #40 work and
+#44/#46–#48 need separate authorization. Solved main-delivered Issues are closed under
 the owner's current instruction; historical acceptance wording below is superseded.
 
 1. Inspect `git status --short --branch`, this checkpoint, current Charter and

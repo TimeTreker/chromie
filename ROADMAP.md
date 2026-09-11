@@ -936,8 +936,9 @@ runtime path.
 
 **Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained-decoder schemas, including pass-specific Fast/Deep schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (Fast primary-result/reuse/fail-safe validation mechanics), `planner_deep_validation.py` (Deep mechanical-repair/safety/diagnostic validation mechanics), and `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only). The former model-assisted coverage/communication audit module and its dedicated truth-model configuration are removed under Charter principles 30–31. Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 5 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
 
-- Decompose the Orchestrator composition root without raising existing method,
-  property, initializer, exception-boundary, or direct-model-call ratchets.
+- Decompose the Orchestrator composition root when ownership or independently
+  testable boundaries improve. Review method/property/initializer size deltas;
+  preserve blocking ownership, exception-boundary and direct-model-call checks.
 - Remove import-time global logging configuration from library modules.
 - Keep configuration parsing inside typed settings owners.
 - Delete transient implementation plans once their durable contracts have moved
@@ -945,7 +946,8 @@ runtime path.
 
 Exit criteria:
 
-- structural ratchets decrease or remain unchanged;
+- size deltas and ownership rationale are reviewed; no size-only pass condition;
+- ownership, exception-boundary and direct-model-call checks remain effective;
 - no deleted document has an incoming link;
 - every specialized document has a component, operator, or mechanical owner.
 

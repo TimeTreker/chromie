@@ -3,10 +3,6 @@
   "voice_assistant": {
     "path": "orchestrator/orchestrator.py",
     "class_name": "VoiceAssistant",
-    "max_method_count": 105,
-    "max_property_count": 1,
-    "max_init_lines": 305,
-    "max_init_self_attributes": 110,
     "required_collaborators": [
       "input_turn_lifecycle",
       "playback_delivery"
@@ -49,6 +45,13 @@
       "_direct_llm_compatibility_allowed",
       "_launch_direct_llm_compatibility_or_fail_closed",
       "_legacy_agent_authority_context"
-    ]
-  }
+    ],
+    "size_baselines": {
+      "method_count": 104,
+      "property_count": 1,
+      "init_lines": 304,
+      "init_self_attributes": 108
+    }
+  },
+  "size_baseline_revision": "bd9557407504f4ce28e955df726f1a3dc6b04af7"
 }

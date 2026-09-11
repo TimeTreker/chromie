@@ -57,11 +57,6 @@
       "role": "notable_changes"
     }
   ],
-  "concise_line_limits": {
-    "CHANGELOG.md": 220,
-    "DEVELOPMENT_CHECKPOINT.md": 160,
-    "docs/STATUS.md": 260
-  },
   "core_reading_path": [
     "README.md",
     "docs/PROJECT_GUIDE.zh-CN.md",
@@ -81,11 +76,6 @@
   ],
   "historical_archives": [],
   "schema_version": "1.0",
-  "surface_ratchets": {
-    "max_core_reading_path": 15,
-    "max_docs_root_markdown_files": 59,
-    "max_markdown_files": 102
-  },
   "specialized_ownership": {
     "entrypoint_paths": [
       "AGENTS.md",
@@ -106,5 +96,16 @@
         "checker": "tests/test_agent_skill_progressive_disclosure.py"
       }
     ]
+  },
+  "size_baseline_revision": "bd9557407504f4ce28e955df726f1a3dc6b04af7",
+  "line_baselines": {
+    "CHANGELOG.md": 220,
+    "DEVELOPMENT_CHECKPOINT.md": 142,
+    "docs/STATUS.md": 260
+  },
+  "surface_baselines": {
+    "core_reading_path": 15,
+    "docs_root_markdown_files": 58,
+    "markdown_files": 102
   }
 }

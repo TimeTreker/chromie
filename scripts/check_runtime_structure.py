@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce monotonic VoiceAssistant ownership and compatibility ratchets."""
+"""Enforce VoiceAssistant ownership boundaries and report size for review."""
 
 from __future__ import annotations
 
@@ -81,15 +81,17 @@ def check() -> list[str]:
         "init_lines": int(init.end_lineno or init.lineno) - init.lineno + 1,
         "init_self_attributes": len(init_attributes),
     }
-    maximums = {
-        "method_count": int(rule["max_method_count"]),
-        "property_count": int(rule["max_property_count"]),
-        "init_lines": int(rule["max_init_lines"]),
-        "init_self_attributes": int(rule["max_init_self_attributes"]),
-    }
+    baselines = rule.get("size_baselines")
+    if not isinstance(baselines, dict):
+        errors.append("voice_assistant.size_baselines must be an object")
+        baselines = {}
+    print(f"Runtime size measurements (informational; baseline revision {config.get('size_baseline_revision')}):")
     for name, value in measurements.items():
-        if value > maximums[name]:
-            errors.append(f"{name} grew to {value}; ratchet maximum is {maximums[name]}")
+        baseline = baselines.get(name)
+        if type(baseline) is not int or baseline < 0:
+            errors.append(f"voice_assistant.size_baselines.{name} must be a non-negative integer")
+            continue
+        print(f"  {name}={value} baseline={baseline} delta={value - baseline:+d}")
 
     for collaborator in rule["required_collaborators"]:
         if collaborator not in init_attributes:
@@ -130,9 +132,7 @@ def check() -> list[str]:
     if errors:
         return errors
     print(
-        "Runtime structure ratchets passed: "
-        + " ".join(f"{key}={value}" for key, value in measurements.items())
-        + f" direct_llm_calls={len(direct_calls)}"
+        f"Runtime ownership checks passed: direct_llm_calls={len(direct_calls)}"
     )
     return []
 

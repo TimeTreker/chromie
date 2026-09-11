@@ -30,10 +30,13 @@ added, remove or merge an equivalent item in the same change or record the
 exception in the active Issue.
 
 After evidence closure, follow the semantic Issue order in
-`ROADMAP.md` and `docs/REPOSITORY_ENGINEERING_POLICIES.md`. Do not use file length,
-method count, or document count as mechanical gates; extract or consolidate only
-when ownership, independent testing, configuration authority, or failure
-semantics become clearer.
+`ROADMAP.md` and `docs/REPOSITORY_ENGINEERING_POLICIES.md`.
+In every phase, including before evidence closure, file length, method/property
+count, initializer size, and document/reading-path count are review measurements,
+not mechanical pass conditions. Ownership and safety checks remain blocking;
+extract or consolidate only when ownership, independent testing, configuration
+authority, or failure semantics become clearer. See the size-review policy in
+`docs/REPOSITORY_ENGINEERING_POLICIES.md`; this does not relax the delivery constraint.
 
 ## Working rules
 

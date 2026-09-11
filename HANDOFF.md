@@ -1,5 +1,106 @@
 # Chromie Latest Handoff
 
+## Issue #45 size measurements and blocking ownership, 2026-09-11
+
+The owner approved the concrete audited proposal: make the ten size ceilings
+informational now, preserve blocking ownership/safety/type/test gates and the
+current evidence/feature constraint. Normal main delivery and closure of solved
+main-delivered Issues remain authorized. #40 remainder and #44/#46–#48 require
+separate decisions; model optimization, Fast wire changes and deployment are excluded.
+All later entries are historical snapshots, including their older authorization state.
+
+Repository `/home/chromie/github/chromie`; main / origin/main initially clean and
+synchronized at `bd9557407504f4ce28e955df726f1a3dc6b04af7`. Resume from the latest main
+commit containing both handoff owners. Evidence root R:
+`.chromie/acceptance/issue45-count-gate-audit-20260911/`.
+`before.json`, `before/`, `issue-*-before.json`, `audit-summary.json`,
+`probe-results.json` and `authorization.json` retain baseline, audit and approval.
+
+### Actual reproduced workflow and earliest boundary
+
+The initiating episode was the #43 canonical gate stopping at STATUS=261 lines,
+then passing after condensation to 260. #45 reproduced each count-only rejection
+using the actual checkers over temporary copies; it did not execute robot code.
+The scripts/tests unconditionally enforced numeric ceilings, while governance
+qualified its no-count-gate rule by delivery phase and gave no temporary exit rule.
+This was a governance/pass-condition mismatch, not evidence of a model fault.
+The owner resolved the ambiguity explicitly before implementation.
+
+| Ordered boundary / owner | Actual material input and output | Expected/current result and handoff |
+| --- | --- | --- |
+| Source -> Runtime AST measurements | Two comments in copied VoiceAssistant initializer: identical AST, 306 lines versus old maximum 305. Other fixtures isolate 106 methods/2 properties/111 attributes. Measurement is correct; no runtime module executes. | Keep measured sizes. Compare against actual sizes at the named base revision, not old ceiling values. |
+| Runtime measurements -> checker decision | Each size-only fixture formerly returned an error and CLI failure with ownership otherwise intact. This is the first rejecting boundary. | Size and signed delta are informational; collaborator/lifecycle/forbidden-method/direct-LLM checks independently determine ownership errors. |
+| Docs/source registry -> docs checker | Blank-line fixtures exceeded each owner line ceiling; owned/indexed additions and a valid 16th core document exceeded surface ceilings. The prior real STATUS=261 episode stopped the canonical shell gate here. | Keep line/surface metrics and deltas; size alone produces no error. Required roles, local/existing paths, index and specialized ownership still block. |
+| Wrong ownership -> both checkers | Original audit: returned lifecycle state, absent collaborator, forbidden method/direct call, absent doc role/entrypoint and duplicate core path all rejected within ceilings. | New regressions reject these on both sides of size baselines; index-only/unindexed content also rejects. Reports remain visible on those failures. |
+| Checker result -> canonical runner | Nonzero checker exit stops run_tests.sh before later tests. The runner correctly propagates upstream failures; it was not the cause. | Same entrypoint/order and fail-closed propagation; only size-only rejection is removed. No entire checker, static scope, exception classification or safety test is bypassed. |
+| Agent/Host/Soridormi/live providers | Not invoked by this case; no admitted utterance, model output, audio event or body action exists. | No semantic or physical correctness claim from a repository-policy change. |
+
+Flow: source/registry -> mechanical measurements + ownership checks -> checker
+errors/exit status -> canonical runner -> delivery result. The fix changes the
+measurement-to-error decision in the two existing owners. No authority moves to
+another module, no file is split to satisfy a count, and no runtime policy changes.
+
+### Implemented scope and checks
+
+Runtime `size_baselines` and docs `line_baselines`/`surface_baselines` replace the
+old maximum fields. Both configs bind actual measurements to the delivery base via
+`size_baseline_revision`; these anchors are not auto-reset on growth. Reports show
+actual, baseline and signed delta. Malformed baselines still fail, and measured
+owner paths must remain local and present. Ownership config entries are unchanged.
+AGENTS, ROADMAP, both policy owners and the composition-root reference now state
+the every-phase rule; STATUS records
+only implementation/automatic verification, not target or release qualification.
+
+- `baseline-tests.log`: 32 tests/3 subtests passed before changes.
+- `probes.log`, `probe-results.json`: 19 cases; two valid baselines, ten size-only
+  rejections and seven ownership rejections. `probe_gates.py` retains exact inputs.
+- `regression-before.log`: new tests rejected the old behavior (29 failures,
+  including expected missing reports/new baseline validation; 14 tests passed).
+  One negative fixture initially used the wrong index-error wording; corrected to
+  the actual `does not index` contract. This is not a production defect.
+- `focused.log`: 36 tests/30 subtests passed after implementation.
+- `probes-after.log`, `probe-results-after.json`: the same 19 audit cases now
+  accept both baselines and all ten size-only changes, and reject all seven
+  ownership violations. Source-only measurement inputs are retained in
+  `probe_gates_after.py`; no production source or service was modified by probes.
+- Focused Ruff initially found B023 in the new test helper; binding the loop path
+  explicitly fixed it. `focused-ruff.log` passed; no ignore or scope change.
+- `canonical.log`: 2,465 tests/756 subtests, 140 benchmarks and 20 legacy Agent
+  tests passed; policy/static/config/docs passed. Two existing FastAPI deprecation warnings are not
+  new policy failures. Final docs/checkpoint/handoff validation is retained in
+  `docs-final.log` and `delivery-review.log`.
+
+Exact commands, from repository root with pinned requirements-test.txt dependencies
+(the local Python is `/home/chromie/miniconda3/bin/python`, 3.13.13):
+
+```bash
+python -m pytest -q tests/test_runtime_structure_ratchets.py tests/test_documentation_authority.py tests/test_repository_engineering_policies.py
+python -m ruff check scripts/check_runtime_structure.py scripts/check_docs.py tests/test_runtime_structure_ratchets.py tests/test_documentation_authority.py
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+git diff --check
+```
+
+No separate general-ability or model/live run is needed for a tooling-only pass
+condition; the canonical suite still runs the existing behavior tests. Runtime
+source and model/profile/corpus identities are unchanged. Soridormi is untouched;
+its preexisting `workspace/Open_Duck_Playground` dirt remains unrelated on
+`codex/turn-count` at `284273bc344cc94012347c75ab270a9f4ac8ffdb`. No deployed
+service, model residency, microphone, speaker, simulator or hardware state was
+revalidated. The earlier qualification failures and exhausted model budget remain.
+Maintained Markdown count is 102 before/after; environment-key and architectural-term
+counts are unchanged. Historical handoff consolidation remains a future opportunity;
+no current document, environment switch or compatibility path was added.
+
+After push, verify main's exact commit and close #45 as completed; update #36's
+current status while preserving its historical evidence. #44 is the next suggested
+discussion, then #46; neither proposal is authorized by this delivery. Remaining #40,
+#47/#48 and existing #24/#28/#32/#35 gaps stay open. Closing #45 does not promote
+runtime, voice, target or release evidence. Transfer ignored R artifacts separately;
+Git retains this workflow and the executable regressions, not private run files.
+
 ## Issue #43 primary-result authority documentation, 2026-09-11
 
 The owner authorized #43 and instructed that solved Issues pushed to main be closed.
