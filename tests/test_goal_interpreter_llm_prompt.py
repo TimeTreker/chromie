@@ -1359,6 +1359,64 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
 
 class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_primary_rejects_lossy_representation_repairs(self) -> None:
+        cases = [
+            ("missing confidence", {}, {"confidence": None}),
+            ("hidden effect", {"action": "blink as well"}, {}),
+            ("language deletion", {"recipient": "en-US"}, {}),
+            ("turn deletion", {"user_input": "Nod twice."}, {}),
+            ("fused count", {'count”: 2, // ignore rest': "three"}, {}),
+            ("renamed binding", [{"name": " count ", "value": 2}], {}),
+            ("dropped unresolved", {}, {"unresolved": [False]}),
+            ("unknown coordination", {}, {"coordination": [{"kind": "sequence", "refs": ["r1", "r2"], "unless": "cancelled"}]}),
+        ]
+        for label, bindings, overrides in cases:
+            with self.subTest(case=label):
+                text = "Nod twice."
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(
+                    outcome="nod", bindings=bindings, output_mode="speech"
+                )
+                raw.update(overrides)
+                if label == "missing confidence":
+                    del raw["confidence"]
+                if label == "unknown coordination":
+                    second = copy.deepcopy(raw["responsibilities"][0])
+                    second.update(local_ref="r2", outcome="blink")
+                    raw["responsibilities"][0]["source_evidence"] = {"source_start_token_ref": "t0", "source_end_token_ref": "t0"}
+                    second["source_evidence"] = {"source_start_token_ref": "t1", "source_end_token_ref": "t1"}
+                    raw["responsibilities"].append(second)
+                interpreter = self._interpreter()
+                interpreter._chat = mock.AsyncMock(
+                    return_value={"message": {"content": json.dumps(raw, ensure_ascii=False)}}
+                )
+                with self.assertRaises(InterpretationUnavailableError):
+                    await interpreter.interpret_goal(
+                        GoalInterpretationRequest(text=text, language="en-US")
+                    )
+                self.assertEqual(interpreter._chat.await_count, 1)
+
+    async def test_punctuated_decimal_speed_preserves_source_value(self) -> None:
+        for text in ("Nod at speed 0.35.", "Nod at speed 0.35!", "Nod at speed 0.35"):
+            with self.subTest(text=text):
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(
+                    outcome="nod", bindings={"speed": 0.35}, output_mode="body_action"
+                )
+                interpreter = self._interpreter()
+                interpreter._chat = mock.AsyncMock(
+                    return_value={"message": {"content": json.dumps(raw)}}
+                )
+                result = await interpreter.interpret_goal(GoalInterpretationRequest(text=text))
+                self.assertEqual(result.responsibilities[0].bindings, {"speed": 0.35})
+                self.assertEqual(interpreter._chat.await_count, 1)
+
+    def test_parser_rejects_discarded_or_duplicate_claims(self) -> None:
+        for raw in ('prefix {"confidence":1}', '{"confidence":1} suffix',
+                    '{"confidence":0,"confidence":1}', '{"confidence":NaN}'):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                _extract_json_object(raw)
+
     def _interpreter(self) -> OllamaGoalInterpreter:
         return OllamaGoalInterpreter(
             ollama_url="http://example.invalid", model="test-model", deep_model="deep-test-model", timeout_ms=800

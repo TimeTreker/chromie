@@ -73,7 +73,7 @@ manufacture, emergency controls, TTS realization, and provider-internal motion
 planning. A difficult case belonging to one of those owners must not be counted
 as Planner coverage.
 
-`streaming_advance` owns one two-frame HOW result over GI Responsibility refs
+`streaming_advance` owns one ordered JSON HOW result over GI Responsibility refs
 before GA joins. It cannot invent Goal IDs, satisfaction, Plan relation, or time
 conditions. `canonical_primary` owns the complete semantic Plan over GA-owned
 Goals. `canonical_reentry` sees only the admitted still-open Goal/Evidence scope

@@ -533,7 +533,7 @@ def fast_advance_layered_prompt(
         "source.bindings. General template: entity/item=R, recipient=P, location=L, "
         "distance=D becomes resource.description=R, recipient.description=P, and "
         "source.bindings containing location=L and distance=D. Compare every semantic "
-        "binding before closing terminal_plan; never collapse a numeric binding into "
+        "binding before closing terminal_result; never collapse a numeric binding into "
         "location prose.\n\n"
         if has_physical_resource_capability
         else ""
@@ -558,8 +558,8 @@ def fast_advance_layered_prompt(
     final_decision_checklist = (
         "FINAL DECISION CHECKLIST (apply after reading the schemas):\n"
         "1. Explicitly requested observable behavior is primary Goal Work. Put it in "
-        "terminal_plan.activities, never presentation_commit.auxiliary_activities or "
-        "terminal_plan.auxiliary_activities. Auxiliary social decoration is optional, "
+        "terminal_result.activities, never presentation_commit.auxiliary_activities or "
+        "terminal_result.auxiliary_activities. Auxiliary social decoration is optional, "
         "normally [], and must not use a Capability whose effect overlaps any "
         "Responsibility or terminal Capability Activity.\n"
         "2. Cover every authoritative Responsibility exactly once by one Capability, "
@@ -586,7 +586,7 @@ def fast_advance_layered_prompt(
         "other null required member. A silent commit has auxiliary_activities=[]; never "
         "invent speech only to anchor optional decoration. If the useful speech is an "
         "ordered terminal complete_response, keep the presentation silent and put any "
-        "independently justified decoration in terminal_plan.auxiliary_activities with "
+        "independently justified decoration in terminal_result.auxiliary_activities with "
         "that terminal Activity as its exact anchor.\n"
         if presentation_schema_json and terminal_schema_json
         else ""
@@ -601,8 +601,8 @@ def fast_advance_layered_prompt(
         "In this one streaming call, author presentation_commit.activity as useful "
         "immediate progress, a complete conversational response, or null for silence. "
         "Give it a short stable activity_id; any auxiliary anchor_id must match. Close "
-        "the frame, then continue the same decision in terminal_plan without repeating "
-        "or contradicting it. terminal_plan.activities may contain "
+        "the frame, then continue the same decision in terminal_result without repeating "
+        "or contradicting it. terminal_result.activities may contain "
         "still-needed Capability, complete_response, or genuine clarification Activities, "
         "but never another progress Activity. Emit only "
         "properties visible in the supplied payload schema for the selected object branch. "
@@ -610,12 +610,11 @@ def fast_advance_layered_prompt(
         "refs to it."
     )
     streaming_contract = (
-        "STREAMING PRESENTATION COMMIT CONTRACT: Return exactly two tagged frames "
-        "from this one invocation. The first frame is <presentation_commit> followed "
-        "by one JSON payload object and </presentation_commit>. The second frame is "
-        "<terminal_plan> followed by one JSON payload object and </terminal_plan>. "
-        "Do not wrap them in a top-level object. Keep this order so the first validated "
-        "frame may be realized before generation ends. "
+        "STREAMING PRESENTATION COMMIT CONTRACT: Return one JSON object from this "
+        "one invocation with exactly two ordered members: presentation_commit first, "
+        "terminal_result second. Each member contains one JSON payload object. "
+        "Keep this order so the first validated member may be realized before "
+        "generation ends. "
         "The presentation payload "
         "must contain both activity and auxiliary_activities. It may contain one "
         "complete_response only for ordinary speech already grounded by trusted context "
@@ -628,10 +627,10 @@ def fast_advance_layered_prompt(
         "authoritative Responsibility evidence. Preserve speaker and actor ownership "
         "and use the requested language naturally. presentation_commit auxiliary "
         "Activities may only be optional social decoration anchored to that exact "
-        "communicative Activity; a silent commit has none. terminal_plan is the "
+        "communicative Activity; a silent commit has none. terminal_result is the "
         "rest of the same HOW decision. It must not emit another progress Activity or "
         "repeat presentation decoration. It may author distinct optional decoration only "
-        "for an exact primary Activity in terminal_plan.activities. It must emit a "
+        "for an exact primary Activity in terminal_result.activities. It must emit a "
         "complete_response for still-needed "
         "ordinary speech that is ordered after or parallel with other terminal Work, and "
         "must not repeat a Responsibility already completed by the presentation. "
@@ -639,29 +638,30 @@ def fast_advance_layered_prompt(
         "model-visible activity_id, progress_kind when applicable, text, and "
         "source_responsibility_refs when the schema asks for them. Never put "
         "reason_summary, truth_stage, evidence_refs, role, timing, speech_act, or "
-        "semantic_provenance there. terminal_plan alone owns disposition, coverage, "
+        "semantic_provenance there. terminal_result alone owns disposition, coverage, "
         "covered_responsibility_refs, activities, auxiliary_activities, continuations, "
         "confidence, unresolved, and reason_summary. A terminal Capability Activity "
         "uses only role, capability_id, activity_id, args, timing, and "
         "source_responsibility_refs. Never use arguments, effects, resource_claims, "
         "or terminal-level decision fields inside an Activity. Every terminal Activity "
         "activity_id must differ from the committed presentation activity_id. "
-        "reason_summary exists only once, at terminal_plan.reason_summary. "
-        "No partial string, token, opening tag, or unclosed payload is a commitment; "
-        "only the complete validated first tagged frame is."
+        "reason_summary exists only once, at terminal_result.reason_summary. "
+        "Clarification-only terminal: disposition=clarify. "
+        "mixed also needs independent complete_response or Capability; progress does not count. "
+        "No partial string, token, or unclosed payload is a commitment; "
+        "only the complete validated presentation_commit member is."
     )
     wire_skeleton = (
-        "MECHANICAL TWO-FRAME SKELETON (replace values; do not omit keys):\n"
-        "<presentation_commit>\n"
+        "MECHANICAL ORDERED JSON SKELETON (replace values; do not omit keys):\n"
+        '{"presentation_commit":'
         '{"activity":null,"auxiliary_activities":[]}\n'
-        "</presentation_commit>\n"
-        "<terminal_plan>\n"
+        ',"terminal_result":'
         '{"disposition":"...","coverage":"...",'
         '"covered_responsibility_refs":[],"activities":[],'
         '"auxiliary_activities":[],"continuations":[],"confidence":0.0,'
         '"unresolved":[],"reason_summary":"..."}\n'
-        "</terminal_plan>\n"
-        f"terminal_plan.activities may contain at most {terminal_activity_limit} "
+        "}\n"
+        f"terminal_result.activities may contain at most {terminal_activity_limit} "
         "items for this request. Use only the minimum Work needed to satisfy the "
         "Responsibilities; social decoration belongs only in auxiliary_activities."
     )
@@ -736,18 +736,14 @@ def fast_advance_layered_prompt(
         "use only auxiliary_activity_id, anchor_kind, anchor_id, capability_id, args, "
         "execution_role, timing, social_function, and target; never activity_id or "
         "reason_summary. Preserve speaker/actor ownership: a human report about their own "
-        "state is not a robot action. Keep terminal_plan.reason_summary to one clause. "
+        "state is not a robot action. Keep terminal_result.reason_summary to one clause. "
         "It is prospective; never say speech or action completed. "
         "Escalate to deep_planner only when HOW exceeds the Fast budget, with no Capability "
         "Activities. Goal Association is concurrent, never a continuation.\n\n"
         + (
-            "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT:\n"
-            "<presentation_commit>\n"
-            "{one JSON object matching PRESENTATION PAYLOAD SCHEMA}\n"
-            "</presentation_commit>\n"
-            "<terminal_plan>\n"
-            "{one JSON object matching TERMINAL PLAN PAYLOAD SCHEMA}\n"
-            "</terminal_plan>\n\n"
+            "EXACT MODEL-VISIBLE ORDERED JSON WIRE FORMAT:\n"
+            '{"presentation_commit": {presentation payload}, '
+            '"terminal_result": {terminal payload}}\n\n'
             "PRESENTATION PAYLOAD SCHEMA:\n"
             + presentation_schema_json
             + "\n\nTERMINAL PLAN PAYLOAD SCHEMA:\n"
@@ -758,8 +754,8 @@ def fast_advance_layered_prompt(
         )
         + final_decision_checklist
         + "\nThis one call owns the complete decision; no later model audits or repairs it. "
-        "Return exactly the two fresh tagged frames above with no Markdown or extra "
-        "content. Stop immediately after </terminal_plan>."
+        "Return exactly the ordered JSON object above with no Markdown or extra "
+        "content. Stop immediately after its closing brace."
     )
     return LayeredPrompt.promote(
         role_memory_context(context, role="planner") + rendered,
@@ -829,10 +825,9 @@ def fast_advance_streaming_capability_prompt_projection(
 ) -> list[dict[str, Any]]:
     """Keep one exact argument contract beside each semantic catalog entry.
 
-    Tagged streaming does not use Ollama's JSON constrained decoder, so repeating
-    a full Activity union in the terminal payload schema only distracts the model.
-    The catalog carries each input schema once; strict runtime validation remains
-    unchanged after the tagged document is parsed.
+    The native streaming schema keeps a compact common Activity shape. The prompt
+    catalog carries each exact input schema once; strict runtime validation checks
+    arguments against that authoritative catalog after the JSON document is parsed.
     """
 
     semantic_projection = fast_advance_semantic_capability_projection(capabilities)
@@ -956,20 +951,19 @@ def fast_streaming_advance_system_prompt() -> str:
     return (
         PLANNER_COMMUNICATION_AUTHORITY_PROMPT +
         "You are Chromie's low-latency Fast Planner. Produce one complete semantic "
-        "result as exactly two tagged frames in one continuous output stream. Emit "
-        "<presentation_commit>...</presentation_commit> first and "
-        "<terminal_plan>...</terminal_plan> second. Each frame contains exactly one "
-        "JSON payload object matching its printed schema; the whole output is not a "
-        "top-level JSON document. presentation_commit owns the exact wording and "
+        "result as one JSON object in one continuous output stream. Emit exactly "
+        "two members in order: presentation_commit first, terminal_result second. "
+        "Each member is one object matching its printed schema. "
+        "presentation_commit owns the exact wording and "
         "optional social decoration that may be realized as soon as that complete "
-        "typed frame validates; terminal_plan continues the same decision and "
+        "typed frame validates; terminal_result continues the same decision and "
         "must not duplicate or contradict it. Accept Goal Interpretation's "
         "Responsibility evidence as authoritative contextual WHAT. Goal Association "
         "separately owns longitudinal association and Canonical Goal commits. Trusted "
         "Capability Runtime alone authorizes Work. Do not claim Work, fresh Evidence, "
         "or completion in the early presentation. Use no Markdown, code fence, "
-        "explanation, self-check, repeated frame, or extra text. Stop immediately "
-        "after </terminal_plan>."
+        "explanation, self-check, repeated member, or extra text. Stop immediately "
+        "after the outer closing brace."
     )
 
 

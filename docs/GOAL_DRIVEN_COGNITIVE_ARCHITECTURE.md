@@ -906,11 +906,11 @@ make GI the owner of why Planner asked or which source policy it chose. GA remai
 sole authority that commits that Goal version.
 
 The same immutable GI result starts Goal Association and one Fast Planner stream
-concurrently. The model emits one non-JSON wire document containing exactly two ordered
-tagged frames: `<presentation_commit>...</presentation_commit>` first and
-`<terminal_plan>...</terminal_plan>` second. Each frame contains one JSON payload object
-for strict DTO validation; there is no shared top-level JSON wrapper. The Agent exposes the
-first payload only after its closing tag is present and the complete payload is
+concurrently. The model emits one JSON document containing exactly two ordered
+members: `presentation_commit` first and `terminal_result` second,
+inside one outer object. Each member contains one payload object for strict DTO
+validation; only a complete validated member may escape the incremental parser. The Agent exposes the
+first payload only after that member is complete and its payload is
 schema-valid, then serializes it as a typed NDJSON `PresentationCommit`. That commit holds
 intentional silence or one exact immediately truthful Communicative Activity, plus
 optional auxiliary Activities anchored to the exact communication. It carries no Goal
@@ -3292,7 +3292,7 @@ second response owner. The maintained module I/O is:
 | Boundary | Authoritative input | Authoritative output | Forbidden authority |
 |---|---|---|---|
 | Fast Planner stream | immutable GI Responsibilities; applicable Goal/Work/Situation/Evidence projection; exact catalog/schema, presentation, style, target, and recent-interaction facts | at most one early `PresentationCommit`, followed by one complete Planner result from the same invocation | Goal identity, execution truth, provider mutation, or later rewriting of an accepted commit |
-| Agent stream decoder | ordered provider text deltas plus exact tagged-frame payload schemas and request identity | a complete schema-valid commit event and a complete schema-valid terminal result, or typed failure | semantic repair, text completion, frame reordering, trailing content, or calling another model |
+| Agent stream decoder | ordered provider text deltas plus the ordered JSON response Schema and request identity | a complete schema-valid commit event and a complete schema-valid terminal result, or typed failure | semantic repair, text completion, frame reordering, trailing content, or calling another model |
 | Host presentation commit | validated commit plus exact turn/Responsibility/claim/anchor/catalog/resource bindings | immutable commit receipt; primary presentation launch; optional post-primary auxiliary scheduling/suppression | choosing wording, changing truth stage, selecting/reselecting a gesture or target, or dispatching Goal-owned Work |
 | Terminal Plan join | complete Planner result plus GA-owned canonical Goal binding and accepted-commit receipt | validated canonical Plan, confirmation/dispatch/deep-escalation/silence/fail-closed outcome | contradiction, duplication, omission, or reinterpretation of the accepted commit |
 

@@ -216,21 +216,24 @@ def _without_goal_interpretation_authority(value: Any) -> Any:
 
 def _extract_json_object(text: str) -> dict[str, Any]:
     text = (text or "").strip()
-    if not text:
-        raise ValueError("empty model response")
     if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
-        text = re.sub(r"\s*```$", "", text)
-    try:
-        value = json.loads(text)
-        if isinstance(value, dict):
-            return value
-    except json.JSONDecodeError:
-        pass
-    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-    if not match:
-        raise ValueError("no JSON object in model response")
-    value = json.loads(match.group(0))
+        fence = re.fullmatch(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+        if fence is None:
+            raise ValueError("incomplete model JSON fence")
+        text = fence.group(1)
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate model JSON field: {key}")
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> Any:
+        raise ValueError(f"non-finite model JSON value: {value}")
+
+    value = json.loads(text, object_pairs_hook=unique_object, parse_constant=reject_constant)
     if not isinstance(value, dict):
         raise ValueError("model response JSON is not an object")
     return value
@@ -245,8 +248,8 @@ def _normalize_mechanical_goal_interpretation_dto(
     array of ``{name|key, value}`` entries. The representation is mechanically
     isomorphic only when every entry has one unique explicit key, so normalize
     exactly that form and leave every ambiguous/malformed variant for normal
-    contract rejection. A missing aggregate confidence is likewise derivable
-    without interpretation when every Responsibility already carries one.
+    contract rejection. Confidence remains model-authored and cannot be inferred
+    from per-Responsibility values when the aggregate claim is missing.
     """
 
     responsibilities = parsed.get("responsibilities")
@@ -273,53 +276,15 @@ def _normalize_mechanical_goal_interpretation_dto(
             ):
                 valid = False
                 break
-            name = " ".join(str(name_values[0] or "").strip().split())
-            if not name or name in normalized:
+            name = name_values[0]
+            if not isinstance(name, str) or not name or name != name.strip() or name in normalized:
                 valid = False
                 break
             normalized[name] = entry["value"]
         if valid:
             item["bindings"] = normalized
 
-    if "confidence" not in parsed:
-        confidence_values = [
-            item.get("confidence")
-            for item in responsibilities
-            if isinstance(item, dict)
-        ]
-        if confidence_values and all(
-            isinstance(value, (int, float)) and not isinstance(value, bool)
-            for value in confidence_values
-        ):
-            parsed["confidence"] = min(float(value) for value in confidence_values)
     return parsed
-
-
-def _strip_redundant_outcome_echo_bindings(parsed: dict[str, Any]) -> None:
-    """Remove fields that duplicate the Responsibility's authoritative outcome.
-
-    ``action``, ``activity``, ``effect``, and ``outcome`` are not material binding
-    dimensions. Keeping a second free-form copy lets a merged candidate's wording
-    contaminate freshly segmented siblings even though ``outcome`` already owns the
-    observable effect. Goal Association already excludes these names from canonical
-    bindings; normalize the same closed representation at the earlier owner.
-    """
-
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return
-    for item in responsibilities:
-        if not isinstance(item, dict):
-            continue
-        bindings = item.get("bindings")
-        if not isinstance(bindings, dict):
-            continue
-        for raw_name in list(bindings):
-            name = "_".join(
-                str(raw_name).strip().casefold().replace("-", "_").split()
-            )
-            if name in {"action", "activity", "effect", "outcome"}:
-                bindings.pop(raw_name, None)
 
 
 _HIDDEN_EFFECT_OR_HOW_BINDING_TOKENS = {
@@ -356,11 +321,11 @@ def _is_hidden_effect_or_how_binding_name(raw_name: Any) -> bool:
 def _reject_hidden_effect_or_how_bindings(parsed: dict[str, Any]) -> None:
     """Reject binding dimensions that conceal another effect or downstream HOW.
 
-    Exact ``action``/``effect`` echoes are removed by the normalization above.
-    Compound names such as ``concurrent_action`` can instead hide a missing
+    Even exact ``action``/``effect`` fields may carry distinct meaning.
+    Compound names such as ``concurrent_action`` can also hide a missing
     sibling Responsibility, while Capability/Skill/provider/execution names cross
     GI's WHAT-only authority.  This is a mechanical field-name contract, not a
-    phrase-to-intent rule; source-based deep GI gets the one allowed retry.
+    phrase-to-intent rule; invalid primary or Deep output is terminal.
     """
 
     responsibilities = parsed.get("responsibilities")
@@ -381,47 +346,6 @@ def _reject_hidden_effect_or_how_bindings(parsed: dict[str, Any]) -> None:
 
 _MALFORMED_BINDING_NAME = re.compile(r"[{}\[\]\"'“”‘’,:;/\\]")
 _MALFORMED_BINDING_VALUE = re.compile(r"[\"”]\s*[:：]|//|/\*")
-_CORRUPTED_COUNT_BINDING = re.compile(
-    r"^\s*count\s*[\"'“”‘’]*\s*[:：]\s*([+-]?\d+)(?:\D|$)",
-    re.IGNORECASE,
-)
-
-
-def _normalize_corrupted_count_binding_names(parsed: dict[str, Any]) -> None:
-    """Recover one mechanically fused canonical ``count`` key/value pair.
-
-    Some constrained decoders have returned a JSON object whose key contains the
-    intended scalar, for example ``count”: 2, // ...`` with a null object value.
-    This mechanical normalization does not infer a count from language or accept aliases: it only
-    separates the literal positive integer already embedded after the canonical
-    ``count:`` prefix. The existing source-number and typed-count validators then
-    prove that the recovered value is both requested and representable.
-    """
-
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return
-    for item in responsibilities:
-        if not isinstance(item, dict):
-            continue
-        bindings = item.get("bindings")
-        if not isinstance(bindings, dict) or "count" in bindings:
-            continue
-        recoverable: list[tuple[Any, int]] = []
-        for raw_name in bindings:
-            match = _CORRUPTED_COUNT_BINDING.match(str(raw_name or ""))
-            if match is None:
-                continue
-            value = int(match.group(1))
-            if value > 0:
-                recoverable.append((raw_name, value))
-        if len(recoverable) != 1:
-            continue
-        raw_name, value = recoverable[0]
-        bindings.pop(raw_name)
-        bindings["count"] = value
-
-
 def _reject_malformed_binding_names(parsed: dict[str, Any]) -> None:
     """Reject provider text that leaked JSON or commentary into a key.
 
@@ -482,7 +406,7 @@ def _reject_malformed_binding_values(parsed: dict[str, Any]) -> None:
                 )
 
 
-_EXPLICIT_NUMERIC_TOKEN = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])")
+_EXPLICIT_NUMERIC_TOKEN = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?!\w|\.\d)")
 
 
 def _decimal_values(value: Any) -> set[Decimal]:
@@ -1268,111 +1192,22 @@ def _normalized_turn_echo(value: str) -> str:
     )
 
 
-def _strip_language_envelope_bindings(
+def _reject_language_envelope_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
 ) -> None:
-    """Mechanically discard an exact request-language echo from GI bindings.
-
-    ``request.language`` is transport metadata, not WHAT evidence. Models may
-    nevertheless copy the exact tag (for example ``zh-CN``) into a generic
-    ``language`` binding on otherwise valid greetings and chat turns. That is
-    harmless envelope pollution, so remove only the exact copied scalar instead
-    of escalating or failing the whole interpretation.
-
-    This boundary deliberately does *not* infer or rewrite semantic language
-    facts: exact language-tag strings that occur literally in the user's turn are
-    retained, and all other binding values are untouched.
-    """
-
+    """Reject copied transport language without deleting authored binding claims."""
     language = " ".join(str(request.language or "").strip().casefold().split())
-    if not language:
+    if not language or language in (request.text or "").casefold():
         return
-    literal_turn = (request.text or "").casefold()
-    if language in literal_turn:
-        return
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list):
-        return
-    for item in responsibilities:
-        if not isinstance(item, dict):
-            continue
-        bindings = item.get("bindings")
-        if not isinstance(bindings, dict):
-            continue
-        for binding_name, value in list(bindings.items()):
-            if isinstance(value, str):
-                normalized = " ".join(value.strip().casefold().split())
-                if normalized == language:
-                    bindings.pop(binding_name, None)
-                continue
-            if not isinstance(value, list):
-                continue
-            filtered = [
-                scalar
-                for scalar in value
-                if not (
-                    isinstance(scalar, str)
-                    and " ".join(scalar.strip().casefold().split()) == language
+    for item in parsed.get("responsibilities", []):
+        for name, value in item.get("bindings", {}).items():
+            values = value if isinstance(value, list) else [value]
+            if any(isinstance(scalar, str) and " ".join(scalar.strip().casefold().split()) == language
+                   for scalar in values):
+                raise _GoalInterpretationSemanticStructureViolation(
+                    f"Goal Interpretation binding copied request-language metadata: {name}"
                 )
-            ]
-            if not filtered:
-                bindings.pop(binding_name, None)
-            elif len(filtered) != len(value):
-                bindings[binding_name] = filtered
-
-
-def _strip_redundant_conversational_turn_echo_bindings(
-    request: GoalInterpretationRequest,
-    parsed: dict[str, Any],
-) -> None:
-    """Discard a whole-turn echo only for one already-atomic speech Responsibility.
-
-    A model may redundantly preserve a short acknowledgement such as ``Yeah.`` in
-    ``bindings.user_input`` even though the same single conversational WHAT is
-    already carried by ``outcome``.  For one explicit ``output_mode=speech``
-    Responsibility, that exact whole-turn scalar is envelope redundancy rather
-    than hidden structure.
-
-    The rule is intentionally narrow. Embodied, information, stateful, media,
-    authored-vocal, or multi-Responsibility interpretations retain the fail-closed
-    whole-turn guard below because an opaque copied turn can conceal coordinated
-    independently satisfiable effects.
-    """
-
-    responsibilities = parsed.get("responsibilities")
-    if not isinstance(responsibilities, list) or len(responsibilities) != 1:
-        return
-    item = responsibilities[0]
-    if not isinstance(item, dict):
-        return
-    if str(item.get("output_mode") or "") != "speech":
-        return
-    bindings = item.get("bindings")
-    if not isinstance(bindings, dict):
-        return
-    turn_echo = _normalized_turn_echo(request.text or "")
-    if not turn_echo:
-        return
-    for binding_name, value in list(bindings.items()):
-        if isinstance(value, str):
-            if _normalized_turn_echo(value) == turn_echo:
-                bindings.pop(binding_name, None)
-            continue
-        if not isinstance(value, list):
-            continue
-        filtered = [
-            scalar
-            for scalar in value
-            if not (
-                isinstance(scalar, str)
-                and _normalized_turn_echo(scalar) == turn_echo
-            )
-        ]
-        if not filtered:
-            bindings.pop(binding_name, None)
-        elif len(filtered) != len(value):
-            bindings[binding_name] = filtered
 
 
 def _goal_ids_awaiting_user_clarification(context: dict[str, Any]) -> set[str]:
@@ -1454,8 +1289,7 @@ def _reject_transport_echo_bindings(
     a single ``relationship=clarify`` Responsibility targeting exactly one Goal
     whose bounded Context contains an unresolved ask-user information gap. A short
     elliptical answer can then legitimately be identical to one binding surface.
-    Exact request-language echoes are sanitized separately as mechanically
-    removable envelope noise.
+    Exact request-language echoes are rejected separately without deleting claims.
     """
 
     turn_echo = _normalized_turn_echo(request.text or "")
@@ -1659,11 +1493,17 @@ def _normalize_model_interpretation_projection(parsed: dict[str, Any]) -> None:
             raise _GoalInterpretationSemanticStructureViolation(
                 "Goal Interpretation coordination item must be one typed object"
             )
-        kind = str(group.get("kind") or "").strip()
-        refs = [str(item).strip() for item in group.get("refs") or []]
+        if set(group) != {"kind", "refs"} or not isinstance(group["refs"], list):
+            raise _GoalInterpretationSemanticStructureViolation(
+                "Goal Interpretation coordination must preserve exactly kind and refs"
+            )
+        kind = group["kind"]
+        refs = group["refs"]
         if (
-            kind not in {"parallel", "sequence"}
+            not isinstance(kind, str)
+            or kind not in {"parallel", "sequence"}
             or len(refs) < 2
+            or any(not isinstance(ref, str) or not ref or ref != ref.strip() for ref in refs)
             or len(set(refs)) != len(refs)
             or any(ref not in by_ref for ref in refs)
         ):
@@ -2920,6 +2760,21 @@ class OllamaGoalInterpreter:
         content: str,
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
+        proposals = parsed.get("responsibilities")
+        for item in proposals if isinstance(proposals, list) else []:
+            if not isinstance(item, dict):
+                continue  # The closed DTO rejects non-object entries below.
+            for name in ("local_ref", "outcome", "output_mode"):
+                if not isinstance(item.get(name), str) or not item[name].strip():
+                    raise ValueError(f"Goal Interpretation requires authored {name}")
+            confidence = item.get("confidence")
+            if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
+                raise ValueError("Goal Interpretation requires numeric Responsibility confidence")
+            refs = item.get("target_goal_ids", [])
+            if not isinstance(refs, list) or any(
+                not isinstance(ref, str) or not ref or ref != ref.strip() for ref in refs
+            ) or len(refs) != len(set(refs)):
+                raise ValueError("Goal Interpretation requires unique exact target Goal refs")
         _normalize_model_interpretation_projection(parsed)
         _normalize_mechanical_goal_interpretation_dto(parsed)
         # Planner/route fields are an authority violation rather than a generic
@@ -2938,11 +2793,8 @@ class OllamaGoalInterpreter:
         _reject_unprovenanced_duration_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
         _reject_unavailable_or_mismatched_prior_assistant_utterance(request, parsed)
-        _strip_language_envelope_bindings(request, parsed)
-        _strip_redundant_conversational_turn_echo_bindings(request, parsed)
-        _strip_redundant_outcome_echo_bindings(parsed)
+        _reject_language_envelope_bindings(request, parsed)
         _reject_hidden_effect_or_how_bindings(parsed)
-        _normalize_corrupted_count_binding_names(parsed)
         _reject_malformed_binding_names(parsed)
         _reject_malformed_binding_values(parsed)
         _reject_transport_echo_bindings(request, parsed)

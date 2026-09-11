@@ -60,7 +60,7 @@ class GoalInterpretationDecision(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=1.0, strict=True)
     responsibilities: list[CognitiveResponsibilityProposal] = Field(
         min_length=1,
         description=(
@@ -74,17 +74,13 @@ class GoalInterpretationDecision(BaseModel):
     @field_validator("unresolved", mode="before")
     @classmethod
     def normalize_unresolved(cls, value: Any) -> list[str]:
-        if value is None:
-            return []
         if isinstance(value, str):
             value = [value]
-        if not isinstance(value, list):
-            raise ValueError("unresolved must be an array")
-        return [
-            text
-            for item in value
-            if (text := " ".join(str(item or "").strip().split()))
-        ]
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) or not item.strip() for item in value
+        ):
+            raise ValueError("unresolved must contain only non-empty authored strings")
+        return value
 
     @model_validator(mode="after")
     def validate_local_refs(self) -> "GoalInterpretationDecision":

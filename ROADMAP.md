@@ -23,27 +23,26 @@ it does not reopen other audit findings or replace the remaining model/voice/tar
 qualification order. See [Status](docs/STATUS.md) and the current
 [checkpoint](DEVELOPMENT_CHECKPOINT.md) for evidence and resume scope.
 
-The owner requested independent discussion and authorization of the remaining
-top-level audit findings. [Audit index #36](https://github.com/TimeTreker/chromie/issues/36)
-maps the report to Issues #37–#48: #37 records the already-authorized local
-amendment. #38 completed the authorized WHAT/Work and role-context documentation
-correction. The owner now authorized #39: direct GI-to-Goal WHAT inheritance,
-source-bound partial revisions, and preserved history/Evidence. Full merge/split
-execution remains excluded. #40's GI speed rejection was delivered with #37–#39.
-The owner subsequently authorized GA repair preservation: freeze primary claims,
-validate a lossless structural projection, compare before acceptance, and reject
-lossy preprocessing. The owner also authorized #41: Planner owns speech necessity and
-repetition; Runtime enforces exact Activity identity and truthful playback completion.
-The owner authorized #42: ordinary Goal-bound and Goal-free communication belongs to
-Planner; independent Situation calls retain communication-only permissions and bounded
-depth. Other GI normalizers, numeric punctuation and #43–#48 remain pending.
-No model or deployment is qualified.
+The owner subsequently authorized completion of all remaining Issues and normal main
+delivery. [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) maps the
+review to #37–#48. Previously delivered #37–#39 and #41–#45 retain their accepted
+scope. The current delivery completes #40's remaining lossless-normalization and
+numeric-punctuation decisions, #46's Charter/interface separation, #47's scheduling
+support distinction, and #48's status reconciliation. These are source/audit closures.
+Full merge/split execution remains excluded; no model or deployment is qualified.
+
+Current evidence: the canonical source gate and all 204 frozen Fast Planner cases
+pass. The 40-case Deep cohort retains five failures involving staged-read satisfaction,
+cancellation scope projection and oracle/contract ambiguity. Resolve those #35
+boundaries before another Planner qualification claim. #24's local-model comparison
+and #32's native streaming/live qualification remain unsuccessful; continue from the
+exact failures in the checkpoint, without promoting a profile or widening features.
 
 ## Current execution order
 
 The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:
 
-1. **Retain a clean revision-bound full source qualification.** On a clean checkout with pinned test dependencies, run the documented repository policy, Ruff, Mypy, benchmark, documentation, and complete pytest main-tree gate. Record exact revision and collection/pass counts; do not treat the current audit worktree's focused/partition evidence as the final canonical gate.
+1. **Preserve revision-bound full source qualification.** The current source gate passes with pinned dependencies (2,480 tests/771 subtests,145 benchmarks,20 legacy tests). After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.
 2. **Freeze and qualify the complete model transaction on that exact source.** Re-run target-blind GI/GA/Fast/Deep cohorts with the production prompt projections, schemas/decoder transport, one-call topology, early commit guard, and failure-state reconciliation. A model or serving backend may be promoted only from revision-bound evidence.
 3. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
    and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
@@ -417,11 +416,13 @@ Implementation order:
    Planner contract; shared identity/repair validation preserves delivery truth. Concrete
    social adapters and model/target qualification are still open. Capability availability
    must not manufacture demand, and effectful autonomy remains separately governed.
-7. **Close the social feedback loop — source open.** Human reaction/turn-taking changes
-   Situation and may create another bounded opportunity for continue/stop/repair. Selective
-   Reflection may retain supported scoped experience, never permanent personality judgments
-   about another person or global social policy.
-8. **Add General Ability scenarios before wider autonomy.** Cover ordinary family life,
+11. **Qualify the implemented social feedback and bounded depth contracts.** PSM-6
+   feedback/repair and PSM-8 zero/one/two-call depth are implemented in the existing
+   Situation/Planner path and guarded by `test_social_feedback_loop.py` and
+   `test_situational_cognition.py`. The earlier source-open description is superseded.
+   Concrete perception/identity adapters, real-model social judgment and live
+   multi-person interaction remain unqualified; generic ingress is not recognition.
+12. **Extend General Ability evidence before wider autonomy.** Cover ordinary family life,
    meeting a new person, gradual familiarity, friend interaction, awkward/negative feedback,
    privacy boundaries, person-to-person versus Chromie-to-person relationships, doing
    nothing, continuing her own activity, and Capability temptation without need. Qualify
@@ -709,9 +710,9 @@ immutable GI result
   -> concurrently:
        Goal Association
        one Fast Planner stream
-          -> closed <presentation_commit> JSON payload
+          -> complete presentation_commit JSON member
           -> zero or one validated PresentationCommit
-          -> closed <terminal_plan> JSON payload
+          -> complete terminal_result JSON member and outer object
           -> complete typed Planner result
 
 accepted PresentationCommit
@@ -725,9 +726,9 @@ complete Planner result + applicable canonical Goal binding
 
 `PresentationCommit` is a typed serialization boundary inside the same Planner authority.
 It may carry one immediately truthful Communicative Main Activity or silence together with
-optional subordinate `auxiliary_activities[]`. The model emits those two payloads inside
-ordered closing tags, not inside one top-level JSON document. Runtime acts only after the
-whole owning frame is parsed and mechanically validated. Raw tokens, unclosed tags, and
+optional subordinate `auxiliary_activities[]`. The model emits those two payloads as
+ordered members of one JSON object. Runtime acts only after the
+whole owning member is parsed and mechanically validated. Raw tokens, incomplete members, and
 partial payloads never reach TTS or a
 Capability. Once accepted, wording, truth stage, anchor, and auxiliary proposal are
 immutable; the terminal result must reference the same commit and cannot regenerate,

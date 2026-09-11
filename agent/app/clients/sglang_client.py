@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, AsyncIterator
+from typing import Any, AsyncGenerator
 
 import httpx
 
@@ -257,7 +257,7 @@ class SGLangClient(OllamaClient):
         prompt_family: str | None = None,
         turn_id: str | None = None,
         attempt: int | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         request_options = self._effective_options(options)
         layered_prompt = prompt if isinstance(prompt, LayeredPrompt) else None
         rendered_prompt = layered_prompt.render() if layered_prompt else str(prompt)

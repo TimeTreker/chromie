@@ -10,7 +10,6 @@ import httpx
 from agent.app.clients.ollama_client import (
     LayeredPrompt,
     OllamaClient,
-    TaggedJSONResponseFormat,
     OllamaGenerationError,
 )
 from agent.app.inference_compute import CognitionComputeClass
@@ -71,7 +70,6 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_generate_stream_yields_ndjson_deltas_from_one_request(self) -> None:
         for response_format in (
             {"type": "object"}, "text",
-            TaggedJSONResponseFormat((("presentation_commit", {"type": "object"}),)),
         ):
             class StreamResponse:
                 status_code = 200
@@ -658,7 +656,7 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         with mock.patch(
             "agent.app.clients.ollama_client.httpx.AsyncClient",
             return_value=context,
-        ), self.assertLogs("chromie.agent.ollama", level="WARNING") as logs:
+        ), self.assertLogs("chromie.agent.ollama", level="INFO") as logs:
             result = await OllamaClient(
                 base_url="http://chromie-llm:11434",
                 model="qwen-test",
@@ -666,6 +664,10 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
             ).generate("hello", response_format=schema)
 
         self.assertEqual(result["activity"]["text"], "我去看看。")
+        evidence_line = next(line for line in logs.output if "llm_call_evidence " in line)
+        evidence = json.loads(evidence_line.split("llm_call_evidence ", 1)[1])
+        self.assertEqual(evidence["response"]["raw_model_output"], duplicated)
+        self.assertEqual(evidence["response"]["parsed_output"], result)
         self.assertTrue(
             any("ollama_non_thinking_boundary_recovered" in line for line in logs.output)
         )

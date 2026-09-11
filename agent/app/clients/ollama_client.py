@@ -8,7 +8,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Literal
+from typing import Any, AsyncGenerator, Literal
 
 
 from ..inference_compute import CognitionComputeClass, compute_class_for_purpose
@@ -46,21 +46,7 @@ except ImportError:  # pragma: no cover - repository development path
 
 logger = logging.getLogger("chromie.agent.ollama")
 
-@dataclass(frozen=True)
-class TaggedJSONResponseFormat:
-    """Ordered existing wire frames, with each frame's authoritative JSON schema."""
-
-    frames: tuple[tuple[str, dict[str, Any]], ...]
-
-    def __post_init__(self) -> None:
-        names = [name for name, _ in self.frames]
-        if not names or len(set(names)) != len(names) or any(
-            re.fullmatch(r"[a-z][a-z0-9_]*", name) is None for name in names
-        ):
-            raise ValueError("JSON response frame names must be unique wire identifiers")
-
-
-ResponseFormat = Literal["text", "json"] | dict[str, Any] | TaggedJSONResponseFormat
+ResponseFormat = Literal["text", "json"] | dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -458,7 +444,7 @@ class OllamaClient:
         prompt_family: str | None = None,
         turn_id: str | None = None,
         attempt: int | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         """Yield trusted Ollama response deltas from one inference invocation.
 
         This transport does not decide application-level commit boundaries. The
@@ -478,7 +464,7 @@ class OllamaClient:
         structured_output = response_format == "json" or isinstance(
             response_format, dict
         )
-        if not isinstance(response_format, (dict, TaggedJSONResponseFormat)) and response_format not in {
+        if not isinstance(response_format, dict) and response_format not in {
             "text",
             "json",
         }:
@@ -841,6 +827,7 @@ class OllamaClient:
         timeout = httpx.Timeout(self.timeout_ms / 1000.0)
         evidence_started = time.perf_counter()
         evidence_recorded = False
+        provider_data: dict[str, Any] | None = None
 
         def record_evidence(
             *,
@@ -861,7 +848,7 @@ class OllamaClient:
                 ),
                 transport="ollama.chat",
                 request=payload,
-                response=response_payload,
+                response=provider_data if provider_data is not None else response_payload,
                 status=status,
                 elapsed_ms=(time.perf_counter() - evidence_started) * 1000.0,
                 correlations=evidence_context,

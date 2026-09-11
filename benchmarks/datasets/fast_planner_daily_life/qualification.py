@@ -7,7 +7,7 @@ model, deployment, or behavior qualification evidence.
 
 Candidate calls are target-blind and one Codex invocation is used per scenario.
 Codex receives the exact rendered production system/user prompt and the exact
-dynamic canonical JSON Schema.  Streaming cases retain the production tagged
+dynamic canonical JSON Schema.  Streaming cases retain the production ordered JSON
 text transport.  This is same-model offline surrogate evidence: Codex is not
 the deployed Ollama transport and no release/deployment claim follows from it.
 """
@@ -61,6 +61,8 @@ CATALOG_ROOT = DATASET_ROOT / "catalogs"
 MANIFEST_PATH = DATASET_ROOT / "dataset.json"
 PRODUCTION_TRANSACTION_FILES = (
     ROOT / "agent" / "app" / "fast_planner.py",
+    ROOT / "agent" / "app" / "clients" / "ollama_client.py",
+    ROOT / "agent" / "app" / "clients" / "sglang_protocol.py",
     ROOT / "agent" / "app" / "capabilities" / "catalog.py",
     ROOT / "agent" / "app" / "planner_fallback.py",
     ROOT / "agent" / "app" / "planner_grounding.py",
@@ -355,7 +357,7 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
         "options": call.get("options") or {},
         "production_prompt_family": call.get("prompt_family") or "",
         "production_response_transport": (
-            "tagged_two_frame_text" if runtime_variant == "streaming_advance" else "structured_json"
+            "ordered_json_stream" if runtime_variant == "streaming_advance" else "structured_json"
         ),
         "prompt_identity": prompt_identity,
     }
@@ -851,7 +853,7 @@ def _candidate_prompt(
         "The model_output_text string must contain only the raw JSON object required "
         "by the dynamic production response Schema."
         if transport == "structured_json"
-        else "The model_output_text string must contain only the exact two tagged frames "
+        else "The model_output_text string must contain only the ordered JSON object with presentation_commit first and terminal_result second "
         "required by the Fast Planner system prompt."
     )
     return (

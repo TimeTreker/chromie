@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+from contextlib import aclosing
 import hashlib
 import json
 import logging
-from typing import Any, AsyncIterator
+from typing import Any, AsyncGenerator
 
 from pydantic import ValidationError
 
 from .capabilities.catalog import CapabilityCatalog
 from .clients.ollama_client import (
     OllamaClient,
-    TaggedJSONResponseFormat,
     OllamaGenerationError,
     llm_failure_metadata,
 )
@@ -109,10 +109,6 @@ from .planner_prompt import (
 
 logger = logging.getLogger("chromie.agent.fast_planner")
 
-PRESENTATION_COMMIT_OPEN = "<presentation_commit>"
-PRESENTATION_COMMIT_CLOSE = "</presentation_commit>"
-TERMINAL_PLAN_OPEN = "<terminal_plan>"
-TERMINAL_PLAN_CLOSE = "</terminal_plan>"
 
 
 
@@ -197,111 +193,79 @@ def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return value
 
 
-def _tagged_json_frame(
-    buffer: str,
-    *,
-    open_tag: str,
-    close_tag: str,
-    frame_name: str,
-    start: int = 0,
-    final: bool = False,
+def _stream_json_member(
+    buffer: str, *, prefix: str, name: str, start: int = 0, final: bool = False,
 ) -> tuple[dict[str, Any], int] | None:
-    """Parse one closed tagged JSON object without interpreting its semantics."""
+    """Read one ordered object member; incomplete values never escape."""
 
+    def reject_constant(value: str) -> Any:
+        raise PlannerDTOContractError(f"Fast Planner JSON contains nonfinite value: {value}")
+
+    decoder = json.JSONDecoder(
+        object_pairs_hook=_unique_json_object, parse_constant=reject_constant,
+    )
     index = start
     while index < len(buffer) and buffer[index].isspace():
         index += 1
-    available = buffer[index:]
-    if not available:
-        if final:
-            raise PlannerDTOContractError(
-                f"Fast Planner stream is missing <{frame_name}>"
-            )
-        return None
-    if not available.startswith(open_tag):
-        if not final and open_tag.startswith(available):
+    if index == len(buffer):
+        if not final:
             return None
-        raise PlannerDTOContractError(
-            f"Fast Planner stream must emit {open_tag} at this boundary"
-        )
-
-    payload_start = index + len(open_tag)
-    search_start = payload_start
-    saw_close = False
-    while True:
-        payload_end = buffer.find(close_tag, search_start)
-        if payload_end < 0:
-            break
-        saw_close = True
-        candidate = buffer[payload_start:payload_end].strip()
-        try:
-            value = json.loads(candidate, object_pairs_hook=_unique_json_object)
-        except json.JSONDecodeError:
-            # A literal closing tag may occur inside a JSON string. Keep looking
-            # for the real frame boundary instead of committing a partial value.
-            search_start = payload_end + 1
-            continue
-        if not isinstance(value, dict):
-            if final:
-                raise PlannerDTOContractError(
-                    f"Fast Planner {frame_name} payload must be a JSON object"
-                )
-            search_start = payload_end + 1
-            continue
-        return value, payload_end + len(close_tag)
-
-    if final:
-        detail = "contains invalid JSON" if saw_close else "is not closed"
-        raise PlannerDTOContractError(
-            f"Fast Planner {frame_name} frame {detail}"
-        )
-    return None
+        raise PlannerDTOContractError(f"Fast Planner stream is missing {name}")
+    if buffer[index] != prefix:
+        raise PlannerDTOContractError(f"Fast Planner stream requires {prefix!r} before {name}")
+    index += 1
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    try:
+        key, index = decoder.raw_decode(buffer, index)
+    except json.JSONDecodeError as exc:
+        if not final:
+            return None
+        raise PlannerDTOContractError(f"Fast Planner stream is missing key {name}") from exc
+    if key != name:
+        raise PlannerDTOContractError(f"Fast Planner stream requires {name} in this position")
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    if index == len(buffer) and not final:
+        return None
+    if index == len(buffer) or buffer[index] != ":":
+        raise PlannerDTOContractError(f"Fast Planner stream requires ':' after {name}")
+    index += 1
+    while index < len(buffer) and buffer[index].isspace():
+        index += 1
+    try:
+        value, end = decoder.raw_decode(buffer, index)
+    except json.JSONDecodeError as exc:
+        if not final:
+            return None
+        raise PlannerDTOContractError(f"Fast Planner {name} payload is incomplete or invalid") from exc
+    if not isinstance(value, dict):
+        raise PlannerDTOContractError(f"Fast Planner {name} payload must be a JSON object")
+    return value, end
 
 
 def first_presentation_frame(buffer: str) -> dict[str, Any] | None:
-    """Return the first closed presentation payload, or None while incomplete."""
+    """Return the complete first member, or None while it is incomplete."""
 
-    parsed = _tagged_json_frame(
-        buffer,
-        open_tag=PRESENTATION_COMMIT_OPEN,
-        close_tag=PRESENTATION_COMMIT_CLOSE,
-        frame_name="presentation_commit",
-    )
+    parsed = _stream_json_member(buffer, prefix="{", name="presentation_commit")
     return parsed[0] if parsed is not None else None
 
 
-def parse_fast_stream_document(
-    buffer: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Validate the exact two-frame wire document after provider completion."""
+def parse_fast_stream_document(buffer: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Require exactly two ordered JSON members and a complete outer object."""
 
-    presentation = _tagged_json_frame(
-        buffer,
-        open_tag=PRESENTATION_COMMIT_OPEN,
-        close_tag=PRESENTATION_COMMIT_CLOSE,
-        frame_name="presentation_commit",
-        final=True,
+    presentation = _stream_json_member(
+        buffer, prefix="{", name="presentation_commit", final=True,
     )
-    if presentation is None:  # defensive; final=True raises on incompleteness
-        raise PlannerDTOContractError(
-            "Fast Planner stream is missing <presentation_commit>"
-        )
-    terminal = _tagged_json_frame(
-        buffer,
-        open_tag=TERMINAL_PLAN_OPEN,
-        close_tag=TERMINAL_PLAN_CLOSE,
-        frame_name="terminal_plan",
-        start=presentation[1],
-        final=True,
+    if presentation is None:  # final=True raises instead of returning incomplete
+        raise PlannerDTOContractError("Fast Planner stream is missing presentation_commit")
+    terminal = _stream_json_member(
+        buffer, prefix=",", name="terminal_result", start=presentation[1], final=True,
     )
-    if terminal is None:  # defensive; final=True raises on incompleteness
-        raise PlannerDTOContractError(
-            "Fast Planner stream is missing <terminal_plan>"
-        )
-    if buffer[terminal[1] :].strip():
-        raise PlannerDTOContractError(
-            "Fast Planner stream added content after </terminal_plan>"
-        )
+    if terminal is None:
+        raise PlannerDTOContractError("Fast Planner stream is missing terminal_result")
+    if buffer[terminal[1]:].strip() != "}":
+        raise PlannerDTOContractError("Fast Planner stream requires only '}' after terminal_result")
     return presentation[0], terminal[0]
 
 
@@ -362,7 +326,7 @@ class FastPlannerResolver:
     async def stream_advance(
         self,
         request: CognitiveWorkRequest,
-    ) -> AsyncIterator[FastPlannerStreamFrame]:
+    ) -> AsyncGenerator[FastPlannerStreamFrame, None]:
         """Stream one Fast Planner result through an immutable typed commit."""
 
         responsibilities = [
@@ -432,76 +396,74 @@ class FastPlannerResolver:
             "num_predict": min(self.num_predict, 2048),
         }
         try:
-            async for delta in self.ollama.generate_stream(
+            async with aclosing(self.ollama.generate_stream(
                 prompt,
                 system=fast_streaming_advance_system_prompt(),
                 options=options,
-                response_format=TaggedJSONResponseFormat((
-                    ("presentation_commit", response_schema["properties"]["presentation_commit"]),
-                    ("terminal_plan", response_schema["properties"]["terminal_result"]),
-                )),
+                response_format=response_schema,
                 prompt_family="fast_planner.streaming_advance",
                 turn_id=request.sid,
                 attempt=1,
-            ):
-                raw_text += delta
-                if commit is not None:
-                    continue
-                raw_presentation = first_presentation_frame(raw_text)
-                if raw_presentation is None:
-                    continue
-                projected_presentation = project_presentation_schema_constants(
-                    raw_presentation,
-                    responsibility_refs=responsibility_refs,
-                )
-                presentation = (
-                    FastPlannerPresentationCommitModelOutput.model_validate(
-                        projected_presentation
+            )) as deltas:
+                async for delta in deltas:
+                    raw_text += delta
+                    if commit is not None:
+                        continue
+                    raw_presentation = first_presentation_frame(raw_text)
+                    if raw_presentation is None:
+                        continue
+                    projected_presentation = project_presentation_schema_constants(
+                        raw_presentation,
+                        responsibility_refs=responsibility_refs,
                     )
-                )
-                activity = presentation.activity
-                validate_presentation_commit_request_scope(
-                    activity,
-                    responsibilities=responsibilities,
-                    interpretation_unresolved=list(request.interpretation_unresolved),
-                )
-                if activity is not None:
-                    validate_communicative_activity_identity(
-                        activity_id=activity.activity_id, text=activity.text,
-                        interaction_context=request.context.get("interaction_context"),
-                    )
-                    refs = set(activity.source_responsibility_refs)
-                    if not refs or not refs.issubset(set(responsibility_refs)):
-                        raise PlannerDTOContractError(
-                            "PresentationCommit must cite supplied Responsibility refs"
+                    presentation = (
+                        FastPlannerPresentationCommitModelOutput.model_validate(
+                            projected_presentation
                         )
-                    if activity.role == "complete_response":
-                        modes_by_ref = {
-                            item.local_ref: item.output_mode
-                            for item in responsibilities
-                        }
-                        if any(modes_by_ref.get(ref) != "speech" for ref in refs):
+                    )
+                    activity = presentation.activity
+                    validate_presentation_commit_request_scope(
+                        activity,
+                        responsibilities=responsibilities,
+                        interpretation_unresolved=list(request.interpretation_unresolved),
+                    )
+                    if activity is not None:
+                        validate_communicative_activity_identity(
+                            activity_id=activity.activity_id, text=activity.text,
+                            interaction_context=request.context.get("interaction_context"),
+                        )
+                        refs = set(activity.source_responsibility_refs)
+                        if not refs or not refs.issubset(set(responsibility_refs)):
                             raise PlannerDTOContractError(
-                                "PresentationCommit completion is valid only for direct "
-                                "speech Responsibilities cited by that Activity"
+                                "PresentationCommit must cite supplied Responsibility refs"
                             )
-                commit = PresentationCommit(
-                    commit_id=commit_id,
-                    turn_id=turn_id,
-                    activity=activity,
-                    auxiliary_activities=presentation.auxiliary_activities,
-                    metadata={
-                        "semantic_authority": "fast_planner_model",
-                        "phase": "streaming_presentation_commit",
-                        "execution_authority": (
-                            "host_communicative_runtime"
-                            if activity is not None
-                            else "none"
-                        ),
-                        "semantic_result_call_count": 1,
-                    },
-                )
-                yield commit
+                        if activity.role == "complete_response":
+                            modes_by_ref = {
+                                item.local_ref: item.output_mode
+                                for item in responsibilities
+                            }
+                            if any(modes_by_ref.get(ref) != "speech" for ref in refs):
+                                raise PlannerDTOContractError(
+                                    "PresentationCommit completion is valid only for direct "
+                                    "speech Responsibilities cited by that Activity"
+                                )
+                    commit = PresentationCommit(
+                        commit_id=commit_id,
+                        turn_id=turn_id,
+                        activity=activity,
+                        auxiliary_activities=presentation.auxiliary_activities,
+                        metadata={
+                            "semantic_authority": "fast_planner_model",
+                            "phase": "streaming_presentation_commit",
+                            "execution_authority": (
+                                "host_communicative_runtime"
+                                if activity is not None
+                                else "none"
+                            ),
+                            "semantic_result_call_count": 1,
+                        },
+                    )
+                    yield commit
 
             if commit is None:
                 raise PlannerDTOContractError(

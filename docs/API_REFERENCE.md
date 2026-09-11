@@ -184,7 +184,7 @@ evidence and makes exactly one streaming model invocation. The response media ty
 `application/x-ndjson`. Its ordered typed frames are:
 
 1. exactly one `PresentationCommit` (`frame_type=presentation_commit`) after the complete
-   internal `<presentation_commit>...</presentation_commit>` payload has parsed and
+   internal `presentation_commit` JSON member has parsed and
    validated; it contains intentional silence or one
    exact immediately truthful `progress`/`complete_response` Communicative Activity and
    optional auxiliary Activities anchored to that exact Activity;
@@ -196,13 +196,26 @@ evidence and makes exactly one streaming model invocation. The response media ty
    after commit. A pre-commit failure is silent. A post-commit failure preserves only the
    already-launched truthful presentation and authorizes no Goal Work.
 
-The internal model stream is exactly two tagged frames, with the presentation payload
-first and the terminal Plan payload second; it is not one top-level JSON document. Raw
-provider tokens, unclosed tags, partial payloads, and partial DTOs never reach TTS or a Capability. The
+The internal model stream is one JSON object with exactly two ordered members:
+`presentation_commit` first, `terminal_result` second. Both providers receive the
+structured response Schema. The incremental parser validates the complete first
+member before exposing it; the terminal result also requires the closing outer brace.
+Raw provider tokens, incomplete members, and partial DTOs never reach TTS or a Capability. The
 terminal result cannot repeat, reword, translate, contradict, or omit the accepted
 communication or decoration. No retry/reviewer call repairs this streamed semantic result.
 Duplicate JSON object keys, including escaped and nested duplicates, are rejected
 before a typed frame is exposed; later values cannot replace earlier ownership.
+
+This section owns the current serialization mechanism under Charter principle 23.
+The #32 migration replaces the former tagged-text encoding with the existing
+two-member JSON contract and removes the tagged provider adapter. Future migrations
+must update producer, incremental parser, decoder contract, terminal consistency,
+consumer and retained qualification together, retiring the replaced path. Review
+must demonstrate one semantic invocation, zero or one accepted early commitment,
+immutable delivered content, one complete terminal result, no partial Work, and
+fail-closed cancellation/provider/parse behavior. A new encoding alone grants no
+new semantic decision, execution permission, model retry or release qualification.
+
 A clarification Communicative Act owns one
 or more typed Planner `InformationGap` records and no `response_text`. A semantic gap
 must cite one exact GI `unresolved` string; an execution-input gap must cite one exact

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
 from agent.app.clients.model_client_factory import build_model_client
-from agent.app.clients.ollama_client import OllamaClient, TaggedJSONResponseFormat
+from agent.app.clients.ollama_client import OllamaClient
 from agent.app.clients.sglang_client import SGLangClient, SGLangGenerationError
 from agent.app.clients.sglang_protocol import (
     build_sglang_chat_payload,
@@ -62,7 +62,7 @@ class SGLangProtocolTests(unittest.TestCase):
                     self.assertEqual(Draft202012Validator(wire).is_valid(value), expected)
                     self.assertEqual(Draft202012Validator(schema).is_valid(value), expected)
 
-    def test_tagged_wire_keeps_schema_authority_and_decoder_compatible_shapes(self) -> None:
+    def test_streaming_json_keeps_schema_authority_and_decoder_compatible_shapes(self) -> None:
         import copy
         from jsonschema import Draft202012Validator
 
@@ -76,19 +76,14 @@ class SGLangProtocolTests(unittest.TestCase):
             "allOf": [{"properties": {"text": {"minLength": 1}}}],
         }
         original = copy.deepcopy(schema)
-        declared = TaggedJSONResponseFormat((("presentation_commit", schema),
-                                              ("terminal_plan", schema)))
+        declared = {"title": "FastPlannerStreamingAdvanceOutput", **schema}
         payload = build_sglang_chat_payload(
             model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
             options={}, response_format=declared, stream=True, priority_step=100,
         )
-        elements = payload["response_format"]["format"]["elements"]
-        self.assertEqual(payload["response_format"]["type"], "structural_tag")
-        self.assertEqual([elements[i]["begin"] for i in (1, 3)],
-                         ["<presentation_commit>", "<terminal_plan>"])
-        wire_schema = elements[1]["content"]["elements"][1]["json_schema"]
-        self.assertEqual(wire_schema["x-guidance"], {"max_whitespace_cnt": 8})
-        self.assertEqual(elements[0]["pattern"], r"[ \t\r\n]{0,8}")
+        self.assertEqual(payload["response_format"]["type"], "json_schema")
+        wire_schema = payload["response_format"]["json_schema"]["schema"]
+        self.assertEqual(wire_schema["x-guidance"], {"whitespace_flexible": False})
         self.assertEqual(wire_schema["required"], ["text", "duration"])
         self.assertFalse(wire_schema["additionalProperties"])
         self.assertIn("anyOf", wire_schema)
@@ -99,11 +94,6 @@ class SGLangProtocolTests(unittest.TestCase):
         self.assertTrue(validator.is_valid({"text": "checking", "duration": 0.12}))
         self.assertFalse(validator.is_valid({"text": "checking?", "duration": 0.12}))
         self.assertFalse(validator.is_valid({"text": "checking", "duration": 0.9}))
-        with self.assertRaisesRegex(ValueError, "require streaming"):
-            build_sglang_chat_payload(
-                model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
-                options={}, response_format=declared, stream=False, priority_step=100,
-            )
 
     def test_compact_formatting_is_scoped_without_mutating_contract(self) -> None:
         for title in (

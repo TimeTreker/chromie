@@ -142,6 +142,25 @@ cancellable deployment.
 
 ## Hardware profile and startup
 
+Task concurrency and inference service guarantees are distinct (#47). Independent
+GA/Planner tasks are supported by Host scheduling even when a provider serializes
+their model calls. `CognitionComputeClass` expresses scheduling intent; its ordinal
+does not implement priority, preemption or a maximum queue wait.
+
+| Configuration | Actual support and qualification boundary |
+| --- | --- |
+| RTX 4090 Laptop / Ollama, one request slot | Logical GA/Planner concurrency; provider inference is serialized. No finite foreground queue-wait guarantee is established. Usable for development diagnostics; unqualified for the Charter's interactive responsiveness requirement. |
+| RTX 5090 / SGLang, configured scheduling and presentation lease | The adapter may use provider scheduling and the qualified speech lease. Source support alone does not establish a foreground-wait bound or the target latency budget; retain same-profile contention and real Agent/playback evidence before promotion. |
+| Other profiles/providers | Only capabilities actually verified on that exact configuration may be claimed. Missing scheduling telemetry or untested contention remains unknown. |
+
+Qualification records submission/admission, provider queue wait when observable,
+first valid model commitment, first TTS PCM and playback start separately, with
+source/model/engine/context/scheduler/workload/TTS identities. Client elapsed time
+is not measured queue wait; discarded audio is not physical playback. Keep failures
+and same-configuration contention controls. The existing 2s GI-handoff-to-commit and
+3s commit-to-playback warm targets remain unchanged. A timeout limits request
+lifetime, not foreground service delay. Development use does not qualify promotion.
+
 | Variable | Purpose |
 |---|---|
 | `CHROMIE_COMPOSE_OVERRIDE_FILES` | Comma-separated Compose override files. |
@@ -1097,24 +1116,17 @@ required projection has a 16000-character budget: overflow fails prompt construc
 explicitly, without truncating fields, omitting a Goal suffix or resolving conflicting
 versions in the Host. This replaces the former optional 600-character list budget.
 
-Fast Planner declares the existing ordered `presentation_commit` and `terminal_plan`
-wire frames with their original payload schemas to the model client. SGLang constrains
-those frames using its structural-tag decoder. The adapter exposes existing intersection
-shapes and omits string `pattern` and numeric `number` bounds from this decoder only:
-installed XGrammar 0.2.1 miscompiles JSON-string escaping and fractional bounds. Original
-schemas, parser, DTO and Host checks remain unchanged; full-schema qualification is
-separate and decoder validity alone does not establish semantic correctness. Ollama
-retains its existing unconstrained tagged text stream; no constrained-decoder claim is
-made for that provider. No new environment setting or extra model call is introduced.
-
-Tagged Fast requests bound each inter-token JSON whitespace region and each frame
-separator to eight characters. String contents are unaffected. The request carries
-`x-guidance.max_whitespace_cnt=8`; the pinned SGLang bridge converts only annotated
-structural JSON nodes to XGrammar's equivalent bounded-whitespace grammar. Unannotated
-requests keep their existing formatting. This prevents an observed whitespace loop
-after a closed JSON string from consuming the output budget; it does not repair
-semantic content or guarantee completion. Whitespace runs above eight characters
-outside strings are intentionally excluded from this decoder format.
+Fast Planner supplies one ordered JSON Schema with `presentation_commit` followed by
+`terminal_result`. Ollama receives that Schema through its native format field;
+SGLang receives its JSON-schema response format. The old tagged provider adapter is
+removed. The SGLang adapter exposes existing intersection shapes and preserves its
+decoder-only omissions of string `pattern` and numeric `number` bounds for the pinned
+XGrammar 0.2.1 limitations. Original Schema, DTO and Host checks retain these constraints.
+SGLang streaming requests now use `x-guidance.whitespace_flexible=false`, like existing
+Deep/GA requests; string contents are unaffected. No extra model call or environment
+setting is introduced. Native structured decoding does not prove semantic correctness,
+termination, or commit/terminal consistency. The current Ollama comparison remains
+unqualified, and this changed SGLang transport has no current target-hardware proof.
 
 Private model-call evidence preserves request/schema property order and records each
 SGLang stream once on completion or failure, including partial generated text,

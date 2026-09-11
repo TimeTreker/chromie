@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from agent.app.clients.ollama_client import TaggedJSONResponseFormat
-
 import json
 from typing import Any
 
@@ -9,7 +7,10 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.fast_planner import (
+    FastPlannerResolver, first_presentation_frame, parse_fast_stream_document,
+)
+from agent.app.planner_model_contract import PlannerDTOContractError
 from agent.app.planner_fast_validation import (
     AuthoritativeGroundingValidationError,
     validate_fast_advance_output,
@@ -124,15 +125,37 @@ def _valid_output() -> dict[str, Any]:
     }
 
 
-def _wire_output(output: dict[str, Any]) -> str:
-    return (
-        "<presentation_commit>"
-        + json.dumps(output["presentation_commit"], ensure_ascii=False)
-        + "</presentation_commit>"
-        + "<terminal_plan>"
-        + json.dumps(output["terminal_result"], ensure_ascii=False)
-        + "</terminal_plan>"
-    )
+def _wire_output(payload):
+    return json.dumps({
+        "presentation_commit": payload["presentation_commit"],
+        "terminal_result": payload["terminal_result"],
+    }, ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("consumer_closes", [False, True])
+async def test_provider_stream_closes_before_failure_or_consumer_return(consumer_closes):
+    class ClosingModel:
+        closed = False
+
+        async def generate_stream(self, *args, **kwargs):
+            try:
+                yield _wire_output(_valid_output()) if consumer_closes else "invalid"
+                pytest.fail("rejected or closed stream must not request another delta")
+            finally:
+                self.closed = True
+
+    model = ClosingModel()
+    stream = FastPlannerResolver(model, _Catalog()).stream_advance(_request())
+    first = await anext(stream)
+    if consumer_closes:
+        assert isinstance(first, PresentationCommit)
+        await stream.aclose()
+    else:
+        assert isinstance(first, FastPlannerStreamFailure)
+    assert model.closed
+    await stream.aclose()
+
 
 
 @pytest.mark.asyncio
@@ -592,7 +615,7 @@ def _structured_resource_output(*, recipient: str = "me") -> dict[str, Any]:
     }
 
 
-def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> None:
+def test_stream_prompt_teaches_exact_field_placement_and_json_stop() -> None:
     request, responsibility = _body_request()
     capability = _walk_capability()
     response_schema = fast_streaming_advance_response_schema(
@@ -623,7 +646,7 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
     assert streaming_projection[0]["args_schema"] == capability["input_schema"]
     assert "AUTHORITATIVE FAST DECISION TABLE" in prompt
     assert "single exact argument authority" in prompt
-    assert "reason_summary exists only once, at terminal_plan.reason_summary" in prompt
+    assert "reason_summary exists only once, at terminal_result.reason_summary" in prompt
     assert "Never use arguments, effects, resource_claims" in prompt
     assert "perform_action for an embodied, media, vocal, or state-changing effect" in prompt
     assert "FINAL DECISION CHECKLIST" in prompt
@@ -631,9 +654,9 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
     assert "never invent speech only to anchor optional decoration" in prompt
     assert "requested blink r1" in prompt
     assert "Stop immediately after" in prompt
-    assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in prompt
-    assert "<presentation_commit>" in prompt
-    assert "<terminal_plan>" in prompt
+    assert "EXACT MODEL-VISIBLE ORDERED JSON WIRE FORMAT" in prompt
+    assert '"presentation_commit":' in prompt
+    assert '"terminal_result":' in prompt
     assert (
         json.dumps(
             response_schema["properties"]["presentation_commit"],
@@ -642,8 +665,8 @@ def test_stream_prompt_teaches_exact_field_placement_and_two_frame_stop() -> Non
         )
         in prompt
     )
-    assert "top-level JSON document" in system
-    assert "repeated frame" in system
+    assert "one JSON object" in system
+    assert "repeated member" in system
 
 
 def test_stream_prompt_exposes_trusted_target_for_primary_capability_grounding() -> None:
@@ -962,18 +985,18 @@ def test_stream_schema_keeps_presentation_silent_when_terminal_escalates() -> No
 @pytest.mark.asyncio
 async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
     payload = _wire_output(_valid_output())
-    boundary = payload.index("</presentation_commit>") + len("</presentation_commit>")
+    boundary = payload.index(', "terminal_result":')
     model = _StreamingModel([payload[:boundary], payload[boundary:]])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
     frames = [frame async for frame in resolver.stream_advance(_request())]
 
     assert model.calls == 1
-    assert isinstance(model.last_kwargs["response_format"], TaggedJSONResponseFormat)
-    assert [name for name, _ in model.last_kwargs["response_format"].frames] == [
-        "presentation_commit", "terminal_plan",
+    assert isinstance(model.last_kwargs["response_format"], dict)
+    assert list(model.last_kwargs["response_format"]["properties"]) == [
+        "presentation_commit", "terminal_result",
     ]
-    assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in str(model.last_prompt)
+    assert "EXACT MODEL-VISIBLE ORDERED JSON WIRE FORMAT" in str(model.last_prompt)
     assert isinstance(frames[0], PresentationCommit)
     assert frames[0].activity is not None
     assert frames[0].activity.text == "你好呀！"
@@ -986,8 +1009,8 @@ async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
 @pytest.mark.asyncio
 async def test_failure_after_commit_preserves_commit_and_blocks_terminal_work() -> None:
     payload = _wire_output(_valid_output())
-    boundary = payload.index("</presentation_commit>") + len("</presentation_commit>")
-    model = _StreamingModel([payload[:boundary], "<terminal_plan>{"])
+    boundary = payload.index(', "terminal_result":')
+    model = _StreamingModel([payload[:boundary], ',"terminal_result":{'])
     resolver = FastPlannerResolver(model, _Catalog())  # type: ignore[arg-type]
 
     frames = [frame async for frame in resolver.stream_advance(_request())]
@@ -1273,11 +1296,7 @@ async def test_declared_structured_resource_realization_rejects_lost_gi_value() 
 
 @pytest.mark.asyncio
 async def test_terminal_before_commit_fails_silently() -> None:
-    payload = (
-        "<terminal_plan>"
-        + json.dumps(_valid_output()["terminal_result"], ensure_ascii=False)
-        + "</terminal_plan>"
-    )
+    payload = json.dumps({"terminal_result": _valid_output()["terminal_result"]})
     resolver = FastPlannerResolver(  # type: ignore[arg-type]
         _StreamingModel([payload]),
         _Catalog(),
@@ -1304,14 +1323,14 @@ async def test_content_after_terminal_frame_fails_after_preserving_commit() -> N
     assert isinstance(frames[0], PresentationCommit)
     assert isinstance(frames[1], FastPlannerStreamFailure)
     assert frames[1].failure_stage == "after_commit"
-    assert "after </terminal_plan>" in frames[1].reason
+    assert "after terminal_result" in frames[1].reason
 
 
 @pytest.mark.asyncio
 async def test_unclosed_presentation_frame_never_commits() -> None:
-    payload = "<presentation_commit>" + json.dumps(
+    payload = '{"presentation_commit":' + json.dumps(
         _valid_output()["presentation_commit"], ensure_ascii=False
-    )
+    )[:-1]
     resolver = FastPlannerResolver(  # type: ignore[arg-type]
         _StreamingModel([payload]),
         _Catalog(),
@@ -1349,7 +1368,7 @@ async def test_duplicate_json_members_fail_before_ambiguous_speech(
         first = target
     else:
         last = target
-    payload = "<presentation_commit>" + first + "</presentation_commit><terminal_plan>" + last + "</terminal_plan>"
+    payload = '{"presentation_commit":' + first + ',"terminal_result":' + last + "}"
     model = _StreamingModel(list(payload) if fragmented else [payload])
     frames = [frame async for frame in FastPlannerResolver(model, _Catalog()).stream_advance(_request())]
     assert not any(isinstance(frame, FastPlannerStreamTerminal) for frame in frames)
@@ -1363,20 +1382,10 @@ async def test_duplicate_json_members_fail_before_ambiguous_speech(
 @pytest.mark.asyncio
 async def test_duplicate_presentation_frame_is_rejected_after_first_commit() -> None:
     output = _valid_output()
-    presentation = (
-        "<presentation_commit>"
-        + json.dumps(output["presentation_commit"], ensure_ascii=False)
-        + "</presentation_commit>"
-    )
-    payload = (
-        presentation
-        + presentation
-        + (
-            "<terminal_plan>"
-            + json.dumps(output["terminal_result"], ensure_ascii=False)
-            + "</terminal_plan>"
-        )
-    )
+    presentation = json.dumps(output["presentation_commit"], ensure_ascii=False)
+    payload = ('{"presentation_commit":' + presentation
+               + ',"presentation_commit":' + presentation
+               + ',"terminal_result":' + json.dumps(output["terminal_result"]) + '}')
     resolver = FastPlannerResolver(  # type: ignore[arg-type]
         _StreamingModel([payload]),
         _Catalog(),
@@ -1387,7 +1396,7 @@ async def test_duplicate_presentation_frame_is_rejected_after_first_commit() -> 
     assert isinstance(frames[0], PresentationCommit)
     assert isinstance(frames[1], FastPlannerStreamFailure)
     assert frames[1].failure_stage == "after_commit"
-    assert "<terminal_plan>" in frames[1].reason
+    assert "terminal_result" in frames[1].reason
 
 
 def test_presentation_commit_cannot_contain_work_or_unanchored_decoration() -> None:
@@ -1558,3 +1567,29 @@ async def test_streaming_planner_shares_immutable_activity_history_boundary(same
     else:
         assert isinstance(frames[0], PresentationCommit)
         assert frames[0].activity.text == "你好呀！"
+
+
+@pytest.mark.parametrize("text", ['quoted } { and \" punctuation', '你好 </presentation_commit>'])
+def test_json_commit_waits_for_every_byte_of_its_member(text: str) -> None:
+    first = {"activity": {"text": text}, "auxiliary_activities": []}
+    prefix = '{"presentation_commit":' + json.dumps(first, ensure_ascii=False)
+    for end in range(len(prefix)):
+        assert first_presentation_frame(prefix[:end]) is None
+    assert first_presentation_frame(prefix) == first
+    document = prefix + ',"terminal_result":{}}'
+    assert parse_fast_stream_document(document) == (first, {})
+
+
+@pytest.mark.parametrize("suffix", [
+    ',"terminal_result":{}',  # missing outer close
+    ',"terminal_result":{},"extra":0}',
+    ',"terminal_result":{},"terminal_result":{}}',
+    ',"terminal_result":{}} {}',
+    ',"terminal_result":{"confidence":NaN}}',
+    ',"terminal_result":[]}',
+])
+def test_json_terminal_requires_one_complete_unambiguous_document(suffix: str) -> None:
+    prefix = '{"presentation_commit":{"activity":null,"auxiliary_activities":[]}'
+    assert first_presentation_frame(prefix) is not None
+    with pytest.raises(PlannerDTOContractError):
+        parse_fast_stream_document(prefix + suffix)

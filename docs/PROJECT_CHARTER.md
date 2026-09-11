@@ -35,6 +35,17 @@ it does not grant an implementer unilateral authority to rewrite that principle.
 The escalation is explicit, while the implementation remains governed by the
 last owner-approved canonical rule.
 
+Semantic ownership, immutable typed commitments, complete Plan validation,
+authorization, safety and Evidence are Charter invariants. Serialization and
+provider framing are replaceable mechanisms owned by the existing
+[API reference](API_REFERENCE.md) and component implementation.
+Under the owner-delegated #46 decision, changing a mechanism without changing
+those invariants requires a reviewed interface migration, decoder/parser and
+consumer compatibility evidence, failure/cancellation regressions, and renewed
+target qualification before promotion. It does not require another Charter
+amendment. A change to semantic authority or commitment/execution meaning still
+does. Moving ownership of format rules does not itself change the current wire.
+
 #### Architecture irreducibility review
 
 Before adding a new principle, authority, persistent state concept, module,
@@ -250,7 +261,8 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   distinct facts; only complete playback qualifies the whole utterance as delivered.
 - **INFERENCE-ATTENTION-001** — Chromie has one semantic mind and may run many
   peripheral/runtime processes concurrently, but central LLM inference is a limited compute
-  resource. Foreground cognition must never be trapped behind deliberative or background
+  resource. Qualified interactive deployments must prevent foreground cognition from
+  being trapped behind deliberative or background
   cognition merely because requests share one provider/GPU. A provider-neutral compute
   class may express only operational scheduling intent; it owns no Responsibility, Goal,
   Capability, Plan, wording, or truth. Logical GA/Fast concurrency remains valid while the
@@ -481,15 +493,15 @@ Read the diagram with these boundaries:
   or fresh Evidence is still needed from canonical Goal state, current Evidence, and
   available Capability truth.
 - The same immutable GI result starts Goal Association and one streaming Fast Planner
-  invocation concurrently. The first closed tagged frame of that single Planner result is
+  invocation concurrently. The first complete typed portion of that single Planner result is
   a typed `PresentationCommit`: intentional silence or one immediately truthful
   Communicative Activity, plus optional auxiliary social Activities anchored to that
   exact communication. The target communication role may be complete, prospective
   progress, clarification, or explicitly provisional; a provisional Activity is useful
   now but leaves the Responsibility open. Trusted code exposes the commit only after the
   complete frame payload is
-  parsed and validated; raw tokens, tags, and partial payloads never reach TTS or a
-  Capability. A second closed `terminal_plan` frame completes the same HOW decision,
+  parsed and validated; raw tokens and partial payloads never reach TTS or a
+  Capability. The complete terminal result finishes the same HOW decision,
   references the accepted commit,
   and cannot regenerate, contradict, duplicate, or silently omit it. A provisional commit
   may additionally retain one bounded deliberative continuation identity, but that
@@ -885,9 +897,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    obligation.**
    Once Goal Interpretation has emitted sufficient Responsibility evidence, Fast
    Planner starts one streamed HOW decision concurrently with Goal Association. Its first
-   complete typed tagged frame is the only early `PresentationCommit`; the same invocation
-   then emits its terminal Capability/input/clarification decision in a second tagged
-   frame. The two frames are not wrapped in one top-level JSON document. No separate response
+   complete typed commitment is the only early `PresentationCommit`; the same invocation
+   then emits its complete terminal Capability/input/clarification decision. The
+   [API reference](API_REFERENCE.md) owns exact framing, ordering and compatibility;
+   a representation change cannot bypass either validation boundary. No separate response
    module, model role, endpoint, or second wording owner exists.
    Whenever cognition
    has a new trustworthy, user-relevant semantic delta, the current speech-capable

@@ -3131,7 +3131,7 @@ def fast_streaming_advance_response_schema(
         else None
     )
     if isinstance(terminal_capability, dict):
-        # Tagged streaming is parsed as text and then checked by the full
+        # Native structured streaming is also checked by the full
         # Pydantic/catalog validators. Keep one common Activity shape here and
         # put every exact per-Capability args schema once in the prompt catalog;
         # repeating the whole Activity union made the semantic choice remote and
@@ -3188,6 +3188,7 @@ def fast_streaming_advance_response_schema(
         prefix="Terminal_",
     )
     streaming_schema = {
+        "title": "FastPlannerStreamingAdvanceOutput",
         "type": "object",
         "properties": {
             "presentation_commit": presentation,
@@ -3218,10 +3219,9 @@ def fast_streaming_advance_response_schema(
             },
         }
     )
-    return _ollama_streaming_schema(
-        streaming_schema,
-        retain_value_constraints=True,
-    )
+    compiled = _ollama_streaming_schema(streaming_schema, retain_value_constraints=True)
+    compiled["title"] = "FastPlannerStreamingAdvanceOutput"
+    return compiled
 
 
 def deep_plan_response_schema(

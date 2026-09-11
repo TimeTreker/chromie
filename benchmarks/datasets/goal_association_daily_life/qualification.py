@@ -557,6 +557,26 @@ async def _codex_call(
     return execution
 
 
+class _ProviderEvidenceCapture(logging.Handler):
+    """Retain exact production evidence for one correlated inference call."""
+
+    def __init__(self, case_ref: str, attempt: int) -> None:
+        super().__init__()
+        self.case_ref = case_ref
+        self.attempt = attempt
+        self.calls: list[dict[str, Any]] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        message = record.getMessage()
+        if not message.startswith("llm_call_evidence "):
+            return
+        value = json.loads(message.removeprefix("llm_call_evidence "))
+        correlations = value.get("correlations", {})
+        if (correlations.get("turn_id") == self.case_ref
+                and correlations.get("attempt") == self.attempt):
+            self.calls.append(value)
+
+
 async def _ollama_call(
     *,
     output_dir: Path,
@@ -583,6 +603,9 @@ async def _ollama_call(
     started = time.time()
     timed_out = False
     error: dict[str, Any] | None = None
+    evidence = _ProviderEvidenceCapture(case_ref, 1 if phase == "primary" else 2)
+    provider_logger = logging.getLogger("chromie.agent.ollama")
+    provider_logger.addHandler(evidence)
     try:
         value = await asyncio.wait_for(
             client.generate(
@@ -625,6 +648,9 @@ async def _ollama_call(
                 else {}
             ),
         }
+    finally:
+        provider_logger.removeHandler(evidence)
+        evidence.close()
     ended = time.time()
     log_path.write_text(
         json.dumps(
@@ -633,6 +659,8 @@ async def _ollama_call(
                 "model": client.model,
                 "production_options": production_options,
                 "error": error,
+                "output_representation": "production_client_parsed_object",
+                "provider_calls": evidence.calls,
             },
             ensure_ascii=False,
             indent=2,
@@ -843,7 +871,14 @@ async def run_batch(
                 flush=True,
             )
 
-    await asyncio.gather(*(tracked(item) for item in index))
+    provider_logger = logging.getLogger("chromie.agent.ollama")
+    previous_level = provider_logger.level
+    if provider == "ollama":
+        provider_logger.setLevel(logging.INFO)
+    try:
+        await asyncio.gather(*(tracked(item) for item in index))
+    finally:
+        provider_logger.setLevel(previous_level)
     source_after = production_source_identity()
     harness_after = harness_file_identity()
     provider_model_after: dict[str, Any] | None = None
@@ -1005,6 +1040,56 @@ async def _adjudicate_one(
     }
 
 
+def _provider_raw_verdict(
+    log_path: Path, schema: dict[str, Any], normalized_raw: str,
+) -> dict[str, Any]:
+    """Raw wire validity is distinct from replaying the client's parsed object."""
+    errors: list[str] = []
+
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError(f"duplicate JSON member: {key}")
+            value[key] = item
+        return value
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-finite JSON value: {value}")
+
+    try:
+        log = json.loads(log_path.read_text(encoding="utf-8"))
+        calls = log.get("provider_calls", [])
+        if len(calls) != 1:
+            raise ValueError(f"expected one correlated provider record, found {len(calls)}")
+        call = calls[0]
+        request = call["request"]
+        response = call["response"]
+        provider_response = response["provider_response"]
+        if call["status"] != "accepted" or call.get("error"):
+            errors.append("provider call was not accepted")
+        if request.get("think") is not False:
+            errors.append("missing explicit non-thinking request")
+        if request.get("format") != schema or request.get("model") != log["model"]:
+            errors.append("provider request model or Schema drift")
+        if (provider_response.get("done") is not True
+                or provider_response.get("done_reason") != "stop"):
+            errors.append("provider completion was not a normal stop")
+        for container in (provider_response, provider_response.get("message", {})):
+            if any(container.get(field) for field in ("thinking", "reasoning", "reasoning_content")):
+                errors.append("provider returned thinking content")
+        raw = json.loads(
+            response["raw_model_output"], object_pairs_hook=unique_object,
+            parse_constant=reject_constant,
+        )
+        errors.extend(error.message for error in Draft202012Validator(schema).iter_errors(raw))
+        if raw != json.loads(normalized_raw):
+            errors.append("raw provider object differs from client replay object")
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        errors.append(f"{type(exc).__name__}: {exc}")
+    return {"accepted": not errors, "errors": errors[:20]}
+
+
 async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
     output_dir = output_dir.resolve()
     identity = json.loads((output_dir / "batch-identity.json").read_text(encoding="utf-8"))
@@ -1038,6 +1123,21 @@ async def adjudicate_batch(output_dir: Path) -> dict[str, Any]:
         primary_raw = primary_path.read_text(encoding="utf-8") if primary_path.exists() else ""
         repair_raw = repair_path.read_text(encoding="utf-8") if repair_path.exists() else None
         result = await _adjudicate_one(case, primary_raw, repair_raw, schema)
+        if identity["inference"].get("provider") == "ollama":
+            raw_verdicts = []
+            for phase, raw in (("primary", primary_raw), ("repair", repair_raw)):
+                if raw is None:
+                    continue
+                log_path = output_dir / phase / "call-logs" / f"{item['case_ref']}.log"
+                raw_verdicts.append({
+                    "phase": phase, **_provider_raw_verdict(log_path, schema, raw),
+                })
+            result["normalized_client_hard_pass"] = result["hard_pass"]
+            result["provider_raw_schema"] = raw_verdicts
+            result["hard_pass"] = result["hard_pass"] and raw_verdicts[-1]["accepted"]
+            result["strict_pass"] = result["strict_pass"] and all(
+                verdict["accepted"] for verdict in raw_verdicts
+            )
         (adjudications_dir / f"{item['case_ref']}.json").write_text(
             json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",

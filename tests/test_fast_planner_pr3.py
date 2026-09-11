@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from agent.app.clients.ollama_client import TaggedJSONResponseFormat
-
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
@@ -74,17 +72,14 @@ def _streaming_document(response):
     payload = _streaming_payload(response)
     if not isinstance(payload, dict):
         return payload
-    return (
-        "<presentation_commit>"
-        + json.dumps(payload["presentation_commit"], ensure_ascii=False)
-        + "</presentation_commit>"
-        + "<terminal_plan>"
-        + json.dumps(payload["terminal_result"], ensure_ascii=False)
-        + "</terminal_plan>"
-    )
+    return json.dumps({
+        "presentation_commit": payload["presentation_commit"],
+        "terminal_result": payload["terminal_result"],
+    }, ensure_ascii=False)
 
 
-def _tagged_frame_schemas(prompt):
+
+def _stream_member_schemas(prompt):
     rendered = str(prompt)
     presentation_marker = "PRESENTATION PAYLOAD SCHEMA:\n"
     terminal_marker = "\n\nTERMINAL PLAN PAYLOAD SCHEMA:\n"
@@ -1758,7 +1753,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 self.assertEqual([item.role for item in advance.activities], ["clarification", "complete_response"])
                 self.assertEqual([item.text for item in advance.activities], [question, greeting])
                 self.assertEqual(len(model.prompts), 1)
-                terminal_schema = model.prompts[0][1]["response_format"].frames[1][1]
+                terminal_schema = model.prompts[0][1]["response_format"]["properties"]["terminal_result"]
                 Draft202012Validator(terminal_schema).validate(terminal)
                 for removed in (0, 1):
                     incomplete = copy.deepcopy(wire)
@@ -2391,8 +2386,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertEqual(advance.activities[0].role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
-        self.assertIsInstance(ollama.prompts[0][1]["response_format"], TaggedJSONResponseFormat)
-        presentation_schema, _ = _tagged_frame_schemas(ollama.prompts[0][0])
+        self.assertIsInstance(ollama.prompts[0][1]["response_format"], dict)
+        presentation_schema, _ = _stream_member_schemas(ollama.prompts[0][0])
         presentation_activity = presentation_schema["properties"]["activity"][
             "anyOf"
         ][0]
@@ -3982,8 +3977,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.activities[1].args["period"], "evening")
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
-        self.assertIsInstance(ollama.prompts[0][1]["response_format"], TaggedJSONResponseFormat)
-        presentation_schema, terminal_schema = _tagged_frame_schemas(
+        self.assertIsInstance(ollama.prompts[0][1]["response_format"], dict)
+        presentation_schema, terminal_schema = _stream_member_schemas(
             ollama.prompts[0][0]
         )
         presentation_activity = presentation_schema["properties"]["activity"][

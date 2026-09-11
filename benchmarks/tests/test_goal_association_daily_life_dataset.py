@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from benchmarks.datasets.goal_association_daily_life.qualification import (
     _adjudicate_one,
     _capture_repair_call,
     _ollama_call,
+    _provider_raw_verdict,
     _write_ordered_json,
     build_transaction,
 )
@@ -20,6 +24,7 @@ from benchmarks.datasets.goal_association_daily_life.validate import (
     validate_dataset,
 )
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_runtime.llm_diagnostics import log_llm_call_evidence
 
 
 def test_goal_association_daily_life_corpus_is_complete_and_mechanically_valid() -> None:
@@ -181,12 +186,23 @@ class _RecordingOllama:
 
     async def generate(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
         self.calls.append({"prompt": prompt, **kwargs})
+        for turn in ("unrelated-concurrent-turn", kwargs["turn_id"]):
+            log_llm_call_evidence(
+                logging.getLogger("chromie.agent.ollama"),
+                call_id="test-call-" + turn, purpose="goal_association",
+                stage=kwargs["prompt_family"], transport="ollama.chat",
+                request={"model": self.model, "think": False, "format": kwargs["response_format"]},
+                response={"message": {"content": json.dumps(self.output)}, "done": True, "done_reason": "stop"},
+                status="accepted", parsed_output=self.output,
+                correlations={"turn_id": turn, "attempt": kwargs["attempt"]},
+            )
         return self.output
 
 
 def test_goal_association_qualification_ollama_call_uses_production_contract(
-    tmp_path: Path,
+    tmp_path: Path, caplog,
 ) -> None:
+    caplog.set_level(logging.INFO, logger="chromie.agent.ollama")
     output = {"associations": [], "new_goals": []}
     client = _RecordingOllama(output)
     schema = {"type": "object"}
@@ -213,6 +229,9 @@ def test_goal_association_qualification_ollama_call_uses_production_contract(
 
     assert execution["exit_code"] == 0
     assert execution["provider"] == "ollama"
+    log_path = tmp_path / "primary" / "call-logs" / "case_test.log"
+    assert len(json.loads(log_path.read_text())["provider_calls"]) == 1
+    assert _provider_raw_verdict(log_path, schema, json.dumps(output))["accepted"]
     assert json.loads(
         (tmp_path / "primary" / "raw-outputs" / "case_test.txt").read_text(
             encoding="utf-8"
@@ -229,3 +248,30 @@ def test_goal_association_qualification_ollama_call_uses_production_contract(
             "attempt": 1,
         }
     ]
+
+
+@pytest.mark.parametrize("raw", [
+    '{"result":1,"result":1}', '{"result":NaN}',
+    'prefix {"result":1}', '{"result":"wrong type"}',
+])
+def test_goal_association_raw_wire_cannot_pass_from_normalized_object(tmp_path, caplog, raw):
+    caplog.set_level(logging.INFO, logger="chromie.agent.ollama")
+    schema = {"type": "object", "properties": {"result": {"type": "integer"}}}
+    asyncio.run(_ollama_call(
+        output_dir=tmp_path, case_ref="raw-case", phase="primary",
+        system_prompt="system", user_prompt="user", response_schema=schema,
+        production_options={}, client=_RecordingOllama({"result": 1}), timeout_s=10,
+    ))
+    path = tmp_path / "primary" / "call-logs" / "raw-case.log"
+    log = json.loads(path.read_text())
+    log["provider_calls"][0]["response"]["raw_model_output"] = raw
+    path.write_text(json.dumps(log))
+    assert not _provider_raw_verdict(path, schema, '{"result":1}')["accepted"]
+
+
+def test_goal_association_missing_provider_evidence_is_not_a_raw_pass(tmp_path):
+    path = tmp_path / "legacy.log"
+    path.write_text('{"model":"test"}')
+    verdict = _provider_raw_verdict(path, {}, '{}')
+    assert not verdict["accepted"]
+    assert "found 0" in verdict["errors"][0]

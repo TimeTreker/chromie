@@ -68,3 +68,12 @@ single production mechanical repair only when the resolver requests it, then che
 the accepted output through Schema, DTO, resolver/Host conservation, and the hidden
 Responsibility-map oracle. This is same-model, non-independent offline evidence; it
 does not qualify the deployed Ollama transport or production model profile.
+
+The `--provider ollama` variant uses the production client and frozen model digest
+and generation options. Its `raw-outputs` files contain the client's parsed object
+for Host replay; exact original provider text and request/response envelopes are
+retained separately in each `call-logs` record, correlated by turn and attempt.
+Adjudication reports raw JSON/Schema, completion, non-thinking and replay agreement
+separately from normalized Host acceptance. A strict pass requires both; missing
+historical provider records cannot establish raw validity. This direct provider
+evidence still bypasses Agent HTTP, microphone, playback and robot execution.

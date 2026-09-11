@@ -1,5 +1,77 @@
 # Development Checkpoint
 
+## Current delivery — remaining Issues, 2026-09-12
+
+The owner authorized project decisions, remaining-Issue implementation and qualification,
+normal commit/push, and closure of solved main-delivered Issues. Older approval/budget
+statements below are historical. Base: main/origin at
+`a4e7c3df5aa663b324a4a06ae13fbd37502ff67a`. Resume from the latest main commit containing
+this checkpoint and HANDOFF; no predicted delivery hash is recorded.
+
+Implemented: #40 rejects lossy GI preprocessing and preserves sentence-final decimal
+provenance; #28's current information-resource contract carries exact city/date/period
+through GA into Planner and keeps requested-provider evidence separate from speech;
+#46 separates stable semantic/safety invariants from API-owned serialization; #47
+records actual deployment scheduling limits; #48 reconciles source/status drift.
+Fast streaming now emits one native, ordered JSON object containing its early immutable
+presentation and complete terminal result. Rejected/cancelled streams close promptly.
+Provider diagnostics retain original responses; GA qualification distinguishes raw
+wire acceptance from parsed replay. A small Planner disposition clarification fixes
+the reproduced clarification-only/mixed error. No semantic authority, execution barrier,
+model profile, new runtime switch or physical permission changed.
+
+After the final cohorts, one stale internal docstring in planner_prompt.py was
+corrected. `delivery-comment-only-proof.json` proves identical non-docstring AST;
+all executable code and prompt literals are unchanged. Frozen/deployed byte hashes
+bind the pre-docstring source, with this explicit delivery-only textual difference.
+
+Evidence root: `.chromie/acceptance/open-issue-closure-20260911/`. Exact workflows,
+artifacts, source/runtime/model identities and next commands are in HANDOFF. Ignored
+private evidence must be transferred separately; Git alone does not retain it.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| GI/provenance, native streaming, provider lifecycle/evidence and documentation corrections implemented. | Final source gate: 2,480 tests/771 subtests,145 benchmarks,20 legacy tests; policies/static/config/docs pass. Level A30/30. Frozen Fast final204/204 Schema/Host and assisted semantic review. Deep final: 40/40 Schema,39/40 Host,35/40 frozen hard passes; five failures retained after full review. | Unqualified. All compared local model profiles retain hard semantic/contract failures. Final51-case preview stopped at GI:1 complete failure,1 partial startup,49 unrun. No current physical microphone, audible speaker or robot proof. | Development only; no target/profile/release promotion. |
+
+Fast baseline203/204 -> first JSON rerun204/204 -> final-source rerun204/204, all retained.
+Fast source corpus is204 cases (17 design capacities, bilingual,52 streaming/72 primary/
+80 re-entry). Deep corpus of 40 covers 10 capacities; these replace the older 600-case proposal
+under the maintained coverage-first method. Codex gpt-5.6-sol/high, one invocation per
+case, no runtime semantic reviewer or repair. Offline surrogate evidence is non-independent
+and bypasses deployed provider/Agent HTTP skill disclosure; it does not qualify local
+models or live robot behavior.
+
+The final laptop aggregate uses a rebuilt Agent matching all 113 evaluated source files
+before the documented docstring-only edit.
+SID 4800df1d / llmcall_goal_interpreter_4d9954acf7ff4523 merges the ordered walk0.2/10s,
+nod2 and left-turn request into one body Responsibility with a whole-turn subtype.
+GI correctly rejects; GA, Planner and requested provider dispatch do not run. One bundle
+at the hard stop: `/home/chromie/Downloads/chromie_debug_bundle_20260912_012522.tar.gz`.
+Text input, discarded audio and dry-run preview are not physical evidence.
+
+Model comparison results remain negative: GI44 strict dimension counts6/1/2 for qwen4b/
+e2b/e4b, and2/44 for the qwen9b extension; those counts include lexical/span-oracle
+limitations and are not semantic success rates. Confirmed independent-outcome omissions
+still reject all profiles. Final GA30 raw-aware strict result18/30 each. Native Fast8
+Host result2/8 each, with e4b additionally failing one accepted speech result semantically.
+Prefix/residency/contention evidence is retained; observed1 resident model and foreground
+first-token delay6.26–6.35s do not establish interactive responsiveness. Production model
+profile remains unchanged. Supervised target-evidence closure remains open.
+
+Complete main-delivered source/audit Issues may close after remote hash verification.
+#24, #32 and #35 must remain open while their qualification fails; do not check off
+those criteria to satisfy an Issue-count target. Next work starts with the reproduced
+Deep response-only cancellation projection and
+read-first satisfaction contract conflicts in #35, then the remaining GI/model transaction
+boundary. Preserve frozen contrasts and explicit oracle limitations; repeat both Planner
+cohorts, role/profile qualification and the aggregate live proof after the relevant repairs.
+Physical microphone/speaker/robot acceptance remains supervised. The current delivery
+constraint allows no unrelated feature expansion before those evidence prerequisites.
+
+## Historical checkpoints
+
+All following records describe prior revisions and prior authorization states.
+
 ## Current delivery boundary — Issue #44 validation claims and semantic evidence
 
 Updated 2026-09-11. The owner approved the retained #44 audit and proposed Charter

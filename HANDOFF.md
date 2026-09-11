@@ -1,5 +1,193 @@
 # Chromie Latest Handoff
 
+## Owner-authorized remaining-Issue delivery, 2026-09-12
+
+The owner authorized project decisions, completion of all remaining open Issues,
+normal commit/push and closure of solved Issues on main. This supersedes the older
+per-Issue approval and iteration-budget statements below; all older handoff entries
+remain historical. No model profile was promoted. Physical evidence remains supervised.
+
+Repository `/home/chromie/github/chromie`, branch main, delivery base
+`a4e7c3df5aa663b324a4a06ae13fbd37502ff67a`. Resume from the latest main commit
+containing this checkpoint and HANDOFF, rather than a predicted commit hash.
+After the final cohorts, one stale internal docstring in planner_prompt.py was
+corrected. `delivery-comment-only-proof.json` proves identical non-docstring AST;
+all executable code and prompt literals are unchanged. Frozen/deployed byte hashes
+bind the pre-docstring source, with this explicit delivery-only textual difference.
+
+Evidence root R: `.chromie/acceptance/open-issue-closure-20260911/` (private, ignored;
+Git does not transfer these artifacts). Python: `/home/chromie/miniconda3/bin/python`.
+
+### Implemented boundary corrections
+
+| Actual path and owner | Input/output defect and corrected handoff |
+| --- | --- |
+| Admitted source -> GI parser/normalizer -> DTO/Host | Scripted source-bound primary/Deep results carried hidden effect echoes, request-envelope bindings, fused count keys or missing authored confidence. Previous preprocessing deleted/inferred claims before validating. Current code preserves lossless object/array conversions, rejects lossy cases, rejects duplicate/extra JSON and nonfinite numbers, and retains exact authored references/values. No semantic repair model is added. Valid `0.35` followed by sentence punctuation now survives numeric provenance without accepting partial multi-dot numbers. |
+| GA resource classification -> canonical Goal -> Fast Planner | The historical #28 weather tuple is retired. Its current-contract counterpart supplies Chongqing/tomorrow/morning and information output mode. Real GA resolution preserves these values; real Fast resolution selects weather lookup with exact arguments after one scripted call per authority. Changing GA to speech fails closed before planning. Existing requested-work/fallback-speech provider-start tests retain distinct evidence. No live weather retrieval is claimed. |
+| GI Responsibility -> Fast model -> incremental parser -> immutable presentation -> terminal Host | Old tagged text bypassed Ollama's native structured decoder. The single primary response now has ordered presentation_commit and terminal_result JSON members under one native Schema. Only a complete validated first member can be committed; the existing complete-Plan, safe-read, canonical-binding and confirmation boundaries remain enforced. Duplicate/reordered/malformed/trailing output fails; no old production compatibility path remains. SGLang preserves existing decoder-only omissions while Host retains the original constraints; that transport has no new target-hardware proof. |
+| Rejected/abandoned Fast stream -> provider lifecycle | Native comparison exposed a rejected provider iterator closing during the next case, delaying release/evidence. Two regressions failed before the fix and pass after it. Explicit async closing releases the provider before returning failure or finishing consumer cancellation. Final native comparison retains exactly one correctly correlated record per case. |
+| Original provider response -> Ollama diagnostics -> GA qualification | Logs previously used recovered response data, while GA raw-outputs actually held parsed objects. Diagnostics now preserve the original response; the harness captures exact turn/attempt-correlated records, labels parsed replay separately, and checks original JSON/Schema, non-thinking, normal completion and replay agreement. Missing records, duplicate members, nonfinite values and malformed raw text cannot inherit a parsed-object pass. |
+| Frozen Planner -> semantic review | The baseline Chinese count clarification used mixed without an independent response or Capability. Its earliest wrong boundary was authored disposition, not Host validation. The small existing prompt clarification states that progress does not make clarification-only output mixed. No authority, Schema allowance or execution behavior was broadened. |
+| Charter/interface/config/status ownership | #46 keeps one semantic author, immutable commits, complete plans and execution safety in Charter; replaceable serialization is owned by API_REFERENCE. #47 separates task concurrency, inference scheduling, queue bounds and playback; laptop single-slot is development-only/unqualified. #48 corrects contradictory PSM-6/8 source status and retains concrete perception, target and release gaps. |
+
+Observed final live episode (one primary GI call):
+
+```text
+text admission: walk speed0.2/10s -> nod2 -> turn left
+  -> GI model: one merged Responsibility + whole-turn subtype (wrong)
+  -> GI semantic/provenance validator: rejects (correct containment)
+  -> Cognitive Core HTTP503 -> preview reports failure -> aggregate hard stop
+  -> GA / Fast / Deep / requested Work: not invoked
+```
+
+Separate native stream regression/probe path:
+
+```text
+frozen accepted GI Responsibility -> one Fast provider stream
+  -> complete typed first member -> Host validation -> immutable commit
+       -> optional TTS PCM generation (discarded, concurrent with remaining stream)
+  -> complete terminal -> Schema/DTO/Host -> accepted Plan or typed failure
+  -> rejected/abandoned iterator closes before return; no late cross-case cleanup
+```
+
+The native probe does not run GA or Runtime dispatch. It cannot stand in for the
+blocked aggregate episode; neither test proves audible delivery or executed Work.
+
+The source workflow preserves GI WHAT, GA continuity and Planner HOW ownership.
+ASR/physical devices were not invoked by the focused regressions. Scripted output
+proves local boundaries, not inference reliability. No new current document, runtime
+switch, service or architecture term was added: Markdown 102 -> 102; configuration
+keys 381, public booleans 1, aliases 0. Existing handoff history remains a consolidation
+opportunity, not a reason to delete retained evidence.
+
+### Verification and runtime evidence
+
+Final source checks: 2,480 tests / 771 subtests; 145 benchmark tests; 20 legacy Agent
+tests. Policies (15 rule families, zero exceptions), test ownership, pinned static
+analysis, configuration and documentation checks pass. Two existing FastAPI warnings
+remain. `final-canonical.log` retains the result. `closure-focused.log`: 97 tests /
+3 subtests. `weather-chain.log`: 5 tests. `stream-cleanup-red.log` -> green: 2 failures
+before -> 2 passes after. `level-a-final.log` / `level-a-final/`: 30/30 distinct cases
+across robust intent, uncertainty, grounding, multi-Goal and composable planning
+(overlapping class memberships must not be summed).
+
+Frozen Fast baseline `fast-offline/`: 203/204 mechanical and posthoc semantic passes.
+The complete pass-case baseline review happened during the next frozen run, after the
+initial single-failure diagnosis/wire edit; semantic-review.json records that procedural limit.
+First JSON rerun `fast-json/`: 204/204 mechanical and assisted semantic review passes.
+Final-source `fast-final/`: 204/204 Schema, Host and assisted semantic-review passes.
+Final-source `deep-final/`: 40/40 raw Schema, 39/40 Host, 35/40 frozen hard passes.
+All 40 outputs were reviewed; the five failures remain failures. `semantic-review.json`
+and `conditional-read-host-replay.json` retain diagnosis. #35 remains unqualified.
+These are gpt-5.6-sol/high one-call-per-case Codex surrogate results, non-independent;
+not native target-model, service, microphone, robot or release qualification.
+
+Model comparison under `model-comparison/`: qwen3.5:4b, gemma4:e2b and gemma4:e4b all
+remain unqualified. GI44 strict dimension counts 6/1/2 and calls59/44/45; qwen3.5:9b
+extension 2/44 with63 calls. These are not semantic success rates: lexical/span oracle
+limitations are explicitly retained, and every candidate still has confirmed effect
+omissions. See each GI semantic-review.json. Original Fast8 and Deep16 speech probes
+retain separate Schema/Host and semantic failures. Final GA30 raw-aware reruns have
+18 strict passes/12 failures per model; new creation, modification, clarification,
+replacement and mixed independent Goals still fail. Wire merge/split is representable,
+not implemented Runtime state mutation. Historical GA runs held parsed replay objects
+only; they cannot establish raw-provider validity.
+
+`json-stream-final/`: 24 exact native calls, one correlated record each; 2/8 terminal
+Host acceptances per model. Assisted semantic inspection accepts 2/2/1 primary results
+respectively; e4b's other accepted result promises an observation instead of providing
+one. Blink plans await future execution/result evidence. Native early commits and TTS
+PCM are measured, with playback_start=null throughout. e4b's accepted English greeting
+commits at 2067.8 ms, first PCM 4035.6 ms, terminal 3020.7 ms; this is one cold/warm sequence
+sample, not a percentile or end-to-end target pass. No physical speaker was used.
+
+`prefix-control/`: all three candidates tested cold/exact-repeat/changed-suffix/repeat,
+4 calls each. Endpoint cold/warm timings improve but do not measure streaming TTFT or
+prove cache hits/causal percentages. `residency-review.json`: 2,830 two-second samples,
+maximum 1 resident model; observed peak GPU 11875 MiB/minimum free 4072 MiB. Sampling began
+during the original qwen batch and can miss brief transitions. It does not qualify a
+combined role profile. `contention/`: same-source/config three trials; foreground
+first token 6256–6351 ms, TTS first PCM 1318–1339 ms. This misses the interactive target;
+queue wait, Planner commit and audible playback were not directly measured there.
+
+Aggregate final `iteration-04/`: all 113 discoverable Agent/shared deployment files
+matched the evaluated local source before the documented docstring-only edit. Directory cohort of 51 is incomplete after a hard GI integrity stop:
+1 complete failure, 1 partial startup, 49 unrun. SID 4800df1d, primary
+llmcall_goal_interpreter_4d9954acf7ff4523. The admitted walk0.2/10s -> nod2 -> left turn
+produces one merged body Responsibility and whole-turn subtype; the GI guard rejects
+with HTTP503. GA, Fast/Deep, requested provider dispatch are not invoked. Primary raw
+Schema acceptance is not semantic correctness. Exact reviewed call, local/deployed
+hashes, runtime identity and manual verdict are retained in that iteration.
+Exactly one debug bundle was collected at the stop:
+`/home/chromie/Downloads/chromie_debug_bundle_20260912_012522.tar.gz`.
+Iterations01/02/03 retain the same complete-failure/partial/unrun boundary on earlier
+source, each with one separately retained bundle; they are not final-source passes.
+
+Runtime: RTX 4090 Laptop 16376 MiB, driver 595.84, Ollama 0.33.2, one runner/one resident
+model, generated .env.runtime and compose.voice-mujoco override. LLM image
+sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2.
+Exact model digests, options, request envelopes and container identities are private
+artifacts. Agent rebuilt on current source; TTS generated/discarded audio. Headless
+MuJoCo/MCP were available, but the preview was dry_run=True with no robot Work.
+No physical microphone, audible playback, real robot or default target-evidence
+closure was obtained. Soridormi source is untouched at 284273bc on codex/turn-count;
+its existing Open_Duck_Playground dirt is unrelated. Residency monitoring stopped.
+
+### Deep qualification failures and next responsible boundary
+
+The immutable 40-case Deep run completed with source/harness stability and one invocation
+per case. No runtime, prompt, Schema or oracle was changed after seeing these failures:
+
+| Episode / owner | Actual input and output | Expected boundary / classification |
+| --- | --- | --- |
+| Conditional weather acquisition -> Deep -> Host | Canonical conditional reminder Goal, exact Hangzhou/date/morning bindings and available weather read. Deep emits only the correct `acquire_information` read, defers the conditional write, and honestly marks overall satisfaction partial at 0.6. Host returns `goal_satisfaction_below_threshold` against 0.75 and no Work. | The prompt permits read-first progress but its complete-plan satisfaction rule and Host threshold reject that legitimate stage. This is a stage-versus-Goal contract conflict; do not inflate the score or remove the threshold globally. Chinese counterpart passes with a different adequacy judgment. |
+| Cancelled reminder -> scoped Deep -> oracle | Host-bound cancellation Evidence says cancelled; the resolver projects response-only permission and an empty executable catalog. Both languages emit truthful cancellation wording, zero Work, unavailable disposition and an unmet original effect. Host accepts; the frozen oracle allows only respond. | Wording and non-execution are correct. The prompt calls canonical effect Goals direct speech while later requiring unavailable/refused for effects that cannot execute. Retain the oracle/contract ambiguity; do not relabel a failed frozen target as a pass. |
+| Released stale confirmation -> scoped Deep | Evidence says not_cancelled, with stale authorization released. The same response-only projection supplies an empty catalog. English asks fresh confirmation; Chinese asserts the reminder feature is unavailable. | Report the control result while preserving the open effect Goal. Current scope excludes execution; it does not establish global provider absence. Earliest defect is contradictory scope/capability prompt projection, followed by incorrect model interpretation. No reminder dispatch occurred. |
+
+Repair the existing Deep scope and staged-progress contracts before further prompt tuning,
+then freeze fresh packets and rerun the focused failure set followed by full Fast and Deep
+cohorts. Keep exact old inputs/oracles/results for comparison; any oracle amendment needs
+an explicit semantic justification and a new frozen identity. Issue #35 remains open with this failed qualification. #24 and #32 also remain
+open for the concrete local-model/live failures above. Source/audit closures #28, #40,
+#46–#48 and the completed audit index #36 can close after main delivery verification.
+
+### Resume and delivery commands
+
+Use fresh artifact directories: immutable batches must not overwrite prior results.
+Both maintained Planner harnesses freeze production prompts, Schema, scope and supplied
+Agent Skill context; they do not run the deployed Agent HTTP disclosure chain.
+
+```bash
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python -m benchmarks.datasets.fast_planner_daily_life.qualification prepare --label next-reviewed-revision --output-dir .chromie/benchmarks/fast-next
+python -m benchmarks.datasets.fast_planner_daily_life.qualification run --concurrency 4 --timeout-s 180 --output-dir .chromie/benchmarks/fast-next
+python -m benchmarks.datasets.fast_planner_daily_life.qualification adjudicate --output-dir .chromie/benchmarks/fast-next
+python -m benchmarks.datasets.fast_planner_daily_life.deep_qualification prepare --label next-reviewed-revision --output-dir .chromie/benchmarks/deep-next
+python -m benchmarks.datasets.fast_planner_daily_life.deep_qualification run --concurrency 4 --timeout-s 180 --output-dir .chromie/benchmarks/deep-next
+python -m benchmarks.datasets.fast_planner_daily_life.deep_qualification adjudicate --output-dir .chromie/benchmarks/deep-next
+```
+
+Review the whole Fast cohort before Deep inference; any Deep behavior change requires
+both cohorts rerun. The frozen design coverage is 204 Fast/40 Deep, replacing the older
+Issue's proposed 600-count quota under the maintained coverage-first method. Scenario
+inputs/oracles are unchanged and remain non-independent, training-ineligible assets.
+Retain source/model/provider identity before any future live iteration; run the complete
+directory-discovered cohort without edits/restarts between cases, stop on hard integrity
+failure and collect `./scripts/collect_debug_bundle.sh` exactly once at completion/stop.
+`iteration-04/cohort-command.json` retains the actual preview command and
+`contention-command.json` the exact contention workload. The private frozen live corpus,
+environment, helpers and model packets must be transferred with R before cross-machine
+replay; missing files are an evidence gap, not permission to substitute historical results.
+No new physical proof can be inferred from these commands. Current failures must be
+removed before a profile promotion and supervised microphone/speaker/target acceptance.
+
+## Historical handoffs
+
+All following records describe prior revisions and prior authorization states.
+
 ## Issue #44 validation claims and semantic evidence, 2026-09-11
 
 The owner explicitly approved the audited principle-30 clarification. Scope is
