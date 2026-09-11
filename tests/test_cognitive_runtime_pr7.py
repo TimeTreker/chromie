@@ -3542,6 +3542,25 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "planner_selected_silence",
         )
 
+    def test_mixed_speech_limitations_deliver_without_capability_work(self):
+        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests
+        from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
+
+        for disposition in ("clarify", "unavailable", "refused"):
+            with self.subTest(disposition=disposition):
+                _, raw = CanonicalDeepPlanContractTests.speech_outcomes(disposition, sibling=True)
+                plan = CanonicalPlan.model_validate(materialize_planner_output(
+                    PlannerModelOutput.model_validate(raw), planner_tier="deep",
+                    plan_id="mixed-speech", expected_goal_ids_for_turn=list(raw["goal_outcomes"]),
+                ))
+                response = asyncio.run(CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
+                    plan=plan, session_id="mixed-speech", language="en", context={},
+                ))
+                self.assertEqual(response.capabilities, [])
+                self.assertEqual([item.text for item in response.speech], [raw["response_text"]])
+                self.assertEqual(plan.goal_outcomes[1].disposition, "respond")
+                self.assertEqual(plan.waiting_goal_ids(), ["goal-speech"] if disposition == "clarify" else [])
+
     def test_confirmation_gated_execution_cannot_be_silent(self):
         plan = execute_plan()
         plan.response_text = None
@@ -3598,6 +3617,37 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response.metadata["operational_speech_authority"],
             "not_applicable",
         )
+
+    def test_deep_failure_producers_preserve_safe_silence_and_original_error(self):
+        from agent.app.planner_fallback import (
+            materialize_deep_clarify, materialize_deep_unavailable,
+        )
+        from tests.test_fast_planner_pr3 import _work_request
+
+        request = _work_request(sid="deep-failure", text="Bring that to me.")
+        feedback = [{"type": "parallel_resource_claim_conflict"}]
+        for producer in (materialize_deep_clarify, materialize_deep_unavailable):
+            for error in (None, ValueError("original invalid output")):
+                with self.subTest(producer=producer.__name__, error=error):
+                    plan = producer(
+                        "rejected-plan", request, "original_rejection",
+                        unresolved=["parallel_resource_claim_conflict"],
+                        error=error,
+                        metadata={"validation_feedback": feedback, "execution_allowed": True},
+                    )
+                    self.assertIs(plan.metadata["execution_allowed"], False)
+                    self.assertEqual(plan.metadata["reason"], "original_rejection")
+                    self.assertEqual(plan.metadata["validation_feedback"], feedback)
+                    if error is not None:
+                        self.assertEqual(plan.metadata["error"], str(error))
+                    response = asyncio.run(
+                        CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
+                            plan=plan, session_id=request.sid, language="en-US", context={},
+                        )
+                    )
+                    self.assertEqual(response.speech, [])
+                    self.assertEqual(response.capabilities, [])
+                    self.assertFalse(response.requires_confirmation)
 
     def test_unmarked_missing_planner_text_remains_a_contract_error(self):
         plan = CanonicalPlan(

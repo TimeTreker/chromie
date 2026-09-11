@@ -234,6 +234,33 @@ def expected_goal_ids(context: dict[str, Any] | None) -> list[str]:
     return ordered
 
 
+def fast_goal_continuity_projection(context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Preserve retained Goal meaning before concurrent association commits.
+
+    Snapshot diagnostics and task implementation identity are not planning inputs.
+    Keep complete semantic Goals, lifecycle state and gaps, including recent Goals;
+    do not choose between versions or reinterpret GI's explicit target IDs here.
+    """
+
+    snapshots: list[dict[str, Any]] = []
+    for source in ("active_goal_snapshots", "recent_goal_snapshots"):
+        raw = context.get(source) or []
+        if not isinstance(raw, list):
+            raise ValueError(f"{source} must be a list")
+        for item in raw:
+            if not isinstance(item, dict):
+                raise ValueError(f"{source} entries must be objects")
+            snapshots.append({
+                key: copy.deepcopy(item[key])
+                for key in (
+                    "goal_id", "goal_version", "responsibility_status", "work_status",
+                    "goal", "open_information_gaps", "last_user_update", "updated_ms",
+                )
+                if key in item
+            })
+    return snapshots
+
+
 def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Build a compact immutable grounding block for planner prompts.
 
@@ -699,6 +726,37 @@ def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any
         return SituationProjection.model_validate(raw).prompt_projection()
     except ValidationError:
         return {}
+
+
+
+def recent_dialogue_prompt_projection(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep exact prior surface dialogue and its provenance, without retired labels."""
+
+    records: list[dict[str, Any]] = []
+    for item in history[-6:]:
+        role = str(item.get("role") or "").strip().lower()
+        text = item.get("text")
+        if role not in {"user", "assistant"} or not isinstance(text, str) or not text.strip():
+            continue
+        metadata = item.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        if role == "user" and metadata.get("cognitive_gateway_admission") == "suppress":
+            continue
+        record: dict[str, Any] = {"role": role, "text": text}
+        for name in ("sid", "ts_ms", "conversation_id"):
+            if name in item:
+                record[name] = copy.deepcopy(item[name])
+        record["metadata"] = {
+            name: copy.deepcopy(metadata[name])
+            for name in (
+                "source", "turn_id", "fast_activity_id", "delivery_role", "speech_act",
+                "truth_stage", "evidence_bound", "phase", "source_goal_ids",
+                "source_responsibility_refs", "canonical_plan_id", "cognitive_gateway_admission",
+            )
+            if name in metadata
+        }
+        records.append(record)
+    return records
 
 
 def evidence_bound_dialogue(

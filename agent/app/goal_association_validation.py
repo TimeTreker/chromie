@@ -1113,6 +1113,20 @@ def non_verbatim_explicit_location_bindings(
     return rejected
 
 
+def is_mechanical_contract_failure(exc: ValidationError) -> bool:
+    """Only recognized shape errors may enter the one DTO regeneration.
+
+    Semantic validators also raise ValidationError. Missing meaning, invalid
+    values, and mixed failures must not authorize another semantic decision.
+    Unknown error types fail closed rather than expanding repair eligibility.
+    """
+    errors = exc.errors(include_url=False)
+    return bool(errors) and all(
+        error["type"] in {"extra_forbidden", "list_type", "dict_type"}
+        for error in errors
+    )
+
+
 def validation_error_json(exc: Exception) -> str:
     if isinstance(exc, ValidationError):
         payload: Any = exc.errors(include_url=False)

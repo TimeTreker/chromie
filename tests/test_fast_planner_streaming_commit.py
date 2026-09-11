@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app.clients.ollama_client import TaggedJSONResponseFormat
+
 import json
 from typing import Any
 
@@ -878,9 +880,15 @@ def test_stream_schema_exposes_only_reachable_phase_specific_branches() -> None:
     assert "reason_summary" not in json.dumps(presentation)
     assert "reason_summary" in terminal["properties"]
     assert len(terminal["allOf"]) == 2
-    execute_branch = terminal["allOf"][0]["then"]["properties"]
-    assert execute_branch["coverage"]["enum"] == ["complete"]
-    assert execute_branch["activities"]["minContains"] == 1
+    from jsonschema import Draft202012Validator
+
+    empty_execution = {
+        "disposition": "execute", "coverage": "complete",
+        "covered_responsibility_refs": [responsibility.local_ref],
+        "activities": [], "auxiliary_activities": [], "continuations": [],
+        "confidence": 1.0, "unresolved": [], "reason_summary": "No Work.",
+    }
+    assert not Draft202012Validator(terminal).is_valid(empty_execution)
     escalation_branch = terminal["allOf"][1]["then"]["properties"]
     assert escalation_branch["coverage"]["enum"] == ["partial", "uncertain"]
     assert escalation_branch["activities"]["maxItems"] == 0
@@ -961,7 +969,10 @@ async def test_commit_is_emitted_before_terminal_from_one_model_call() -> None:
     frames = [frame async for frame in resolver.stream_advance(_request())]
 
     assert model.calls == 1
-    assert model.last_kwargs["response_format"] == "text"
+    assert isinstance(model.last_kwargs["response_format"], TaggedJSONResponseFormat)
+    assert [name for name, _ in model.last_kwargs["response_format"].frames] == [
+        "presentation_commit", "terminal_plan",
+    ]
     assert "EXACT MODEL-VISIBLE TAGGED WIRE FORMAT" in str(model.last_prompt)
     assert isinstance(frames[0], PresentationCommit)
     assert frames[0].activity is not None
@@ -1315,6 +1326,41 @@ async def test_unclosed_presentation_frame_never_commits() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["presentation", "terminal"])
+@pytest.mark.parametrize("member", ["root", "text", "escaped_text"])
+@pytest.mark.parametrize("fragmented", [False, True])
+async def test_duplicate_json_members_fail_before_ambiguous_speech(
+    phase: str, member: str, fragmented: bool,
+) -> None:
+    output = _valid_output()
+    if phase == "terminal":
+        output["terminal_result"]["activities"] = [output["presentation_commit"]["activity"]]
+        output["presentation_commit"]["activity"] = None
+    first = json.dumps(output["presentation_commit"], ensure_ascii=False)
+    last = json.dumps(output["terminal_result"], ensure_ascii=False)
+    target = first if phase == "presentation" else last
+    if member == "root":
+        key, replacement = ("activity", "null") if phase == "presentation" else ("activities", "[]")
+        target = target.replace(f'"{key}":', f'"{key}":{replacement},"{key}":', 1)
+    else:
+        key = "text" if member == "text" else "\\u0074ext"
+        target = target.replace('"text":', f'"{key}":"Discarded wording.","text":', 1)
+    if phase == "presentation":
+        first = target
+    else:
+        last = target
+    payload = "<presentation_commit>" + first + "</presentation_commit><terminal_plan>" + last + "</terminal_plan>"
+    model = _StreamingModel(list(payload) if fragmented else [payload])
+    frames = [frame async for frame in FastPlannerResolver(model, _Catalog()).stream_advance(_request())]
+    assert not any(isinstance(frame, FastPlannerStreamTerminal) for frame in frames)
+    assert not any(isinstance(frame, PresentationCommit) and frame.activity is not None for frame in frames)
+    assert isinstance(frames[-1], FastPlannerStreamFailure)
+    assert "repeats key" in frames[-1].reason
+    assert frames[-1].failure_stage == ("before_commit" if phase == "presentation" else "after_commit")
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
 async def test_duplicate_presentation_frame_is_rejected_after_first_commit() -> None:
     output = _valid_output()
     presentation = (
@@ -1457,3 +1503,35 @@ async def test_runtime_keeps_committed_speech_but_never_dispatches_work_after_fa
     assert runtime.work_dispatch_count == 0
     assert resolution.metadata["failure_stage"] == "fast_planner_stream"
     assert resolution.metadata["presentation_commit"]["commit_id"] == commit.commit_id
+
+
+@pytest.mark.parametrize("recent", [False, True])
+def test_fast_continuity_preserves_large_goal_meaning_and_fails_on_overflow(recent: bool) -> None:
+    import copy
+
+    request, responsibility = _body_request()
+    goal = {
+        "goal_id": "goal_walk", "goal_version": 2,
+        "responsibility_status": "open", "work_status": "paused",
+        "goal": {"description": "walk forward for 10秒", "object": {
+            "bindings": {"direction": "前", "duration": "10秒"}},
+            "constraints": {"surface": "level"}},
+        "open_information_gaps": [{"gap_id": "where", "description": "destination"}],
+        "last_user_update": "向前走10秒", "metadata": {"diagnostic": "x" * 20000},
+    }
+    key = "recent_goal_snapshots" if recent else "active_goal_snapshots"
+    request.context[key] = [goal]
+    original = copy.deepcopy(request.context)
+    prompt = str(fast_advance_layered_prompt(
+        request, responsibilities=[responsibility], capabilities=[_walk_capability()],
+    ))
+    projected = json.JSONDecoder().raw_decode(
+        prompt.split("Active Goal continuity summary only:\n", 1)[1]
+    )[0]
+    assert projected == [{k: v for k, v in goal.items() if k != "metadata"}]
+    assert request.context == original
+    goal["goal"]["description"] = "x" * 17000
+    with pytest.raises(ValueError, match="Fast Planner Goal continuity exceeds"):
+        fast_advance_layered_prompt(
+            request, responsibilities=[responsibility], capabilities=[_walk_capability()],
+        )

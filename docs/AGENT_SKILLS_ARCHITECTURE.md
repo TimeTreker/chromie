@@ -40,6 +40,17 @@ The selection decoder requires the `selected_agent_skills` array for both
 selection rationales. A model cannot spend the output budget on prose and omit
 the authoritative selection payload.
 
+Selection makes at most one model invocation. The Host accepts its valid primary
+result or returns `model_contract_failed` with no selected Skill; semantic,
+identity, Goal, confidence and malformed-output failures never trigger model
+reselection. Provider failures retain `model_unavailable`. The owner authorized
+removal of the previous repair call on 2026-09-10 to enforce Charter principle 30.
+There is no model-based format regeneration: the old repair could not guarantee
+preservation of every authored semantic claim. Existing deterministic JSON parsing
+remains unchanged. The resolution's repair-history fields remain false, and a
+failed optional selection loads no projection; downstream Planner, permission and
+execution authority are unchanged.
+
 ## Purpose
 
 Chromie needs reusable task knowledge without creating a second planner, a

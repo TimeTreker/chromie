@@ -231,6 +231,11 @@ closed without a second same-authority call; only genuine
 unresolved outcome, scope, Goal-relationship, or referent meaning may delegate once
 to source-based Deep GI under the same WHAT-only contract.
 
+Location bindings may copy a contiguous surface from the accepted, bounded dialogue
+actually projected to GI. Raw history metadata, suppressed turns, and text outside
+that projected window are not dialogue provenance. This check validates the
+model-authored value; it does not resolve or rewrite a referent.
+
 Fast Planner is the first stage that compares understood Responsibility with concrete
 Plan, Agent-Skill, Capability, safety, and provider contracts. It therefore owns
 execution-input completeness and any planning `InformationGap`. It tries authoritative

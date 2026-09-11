@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import unittest
 from unittest import mock
@@ -9,12 +10,44 @@ import httpx
 from agent.app.clients.ollama_client import (
     LayeredPrompt,
     OllamaClient,
+    TaggedJSONResponseFormat,
     OllamaGenerationError,
 )
 from agent.app.inference_compute import CognitionComputeClass
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_records_only_its_own_completion_or_failure(self) -> None:
+        from agent.app.clients.ollama_client import _PREFIX_CACHE_TRACKER
+
+        for failure, expected in (
+            (None, "completed"),
+            (ValueError("current invocation failed"), "failed"),
+            (asyncio.CancelledError(), "cancelled"),
+        ):
+            with self.subTest(expected=expected):
+                client = OllamaClient("http://unused", "test-model")
+                generate = mock.AsyncMock(return_value={"ok": True}, side_effect=failure)
+                with mock.patch.object(client, "_generate", generate), mock.patch.object(
+                    _PREFIX_CACHE_TRACKER, "finish", wraps=_PREFIX_CACHE_TRACKER.finish
+                ) as finish:
+                    try:
+                        raise RuntimeError("already handled caller failure")
+                    except RuntimeError:
+                        if failure is None:
+                            self.assertEqual(await client.generate("prompt"), {"ok": True})
+                        else:
+                            with self.assertRaises(type(failure)) as caught:
+                                await client.generate("prompt")
+                            self.assertIs(caught.exception, failure)
+                generate.assert_awaited_once()
+                finish.assert_called_once()
+                self.assertEqual(finish.call_args.kwargs["status"], expected)
+                self.assertEqual(
+                    finish.call_args.kwargs.get("error_type"),
+                    type(failure).__name__ if failure is not None else None,
+                )
+
     def test_parse_json_accepts_one_complete_object_with_extra_closing_delimiter(self) -> None:
         client = OllamaClient(
             base_url="http://chromie-llm:11434",
@@ -36,74 +69,81 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
             client._parse_json('{"decision":"one"} {"decision":"two"}')
 
     async def test_generate_stream_yields_ndjson_deltas_from_one_request(self) -> None:
-        class StreamResponse:
-            status_code = 200
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc, tb):
-                del exc_type, exc, tb
-
-            async def aiter_lines(self):
-                yield json.dumps(
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "content": '{"presentation_commit":',
-                        },
-                        "done": False,
-                    }
-                )
-                yield json.dumps(
-                    {
-                        "message": {"role": "assistant", "content": "{}}"},
-                        "done": True,
-                        "done_reason": "stop",
-                        "prompt_eval_count": 4,
-                        "eval_count": 2,
-                    }
-                )
-
-        http_client = mock.Mock()
-        http_client.stream.return_value = StreamResponse()
-        client_context = mock.AsyncMock()
-        client_context.__aenter__.return_value = http_client
-
-        client = OllamaClient(
-            base_url="http://chromie-llm:11434",
-            model="test-model",
-            purpose="fast_planner",
-        )
-        with mock.patch(
-            "agent.app.clients.ollama_client.httpx.AsyncClient",
-            return_value=client_context,
+        for response_format in (
+            {"type": "object"}, "text",
+            TaggedJSONResponseFormat((("presentation_commit", {"type": "object"}),)),
         ):
-            deltas = [
-                delta
-                async for delta in client.generate_stream(
-                    "prompt",
-                    response_format={"type": "object"},
-                    prompt_family="fast_planner.streaming_advance",
-                    turn_id="turn-stream",
-                )
-            ]
+            class StreamResponse:
+                status_code = 200
 
-        self.assertEqual("".join(deltas), '{"presentation_commit":{}}')
-        payload = http_client.stream.call_args.kwargs["json"]
-        self.assertTrue(payload["stream"])
-        self.assertFalse(payload["think"])
-        self.assertNotIn("priority", payload)
-        self.assertEqual(client.compute_class, CognitionComputeClass.INTERACTIVE)
-        self.assertEqual(payload["format"], {"type": "object"})
-        self.assertEqual(
-            payload["messages"],
-            [{"role": "user", "content": "prompt"}],
-        )
-        self.assertEqual(
-            http_client.stream.call_args.args[:2],
-            ("POST", "http://chromie-llm:11434/api/chat"),
-        )
+                async def __aenter__(self):
+                    return self
+
+                async def __aexit__(self, exc_type, exc, tb):
+                    del exc_type, exc, tb
+
+                async def aiter_lines(self):
+                    yield json.dumps(
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": '{"presentation_commit":',
+                            },
+                            "done": False,
+                        }
+                    )
+                    yield json.dumps(
+                        {
+                            "message": {"role": "assistant", "content": "{}}"},
+                            "done": True,
+                            "done_reason": "stop",
+                            "prompt_eval_count": 4,
+                            "eval_count": 2,
+                        }
+                    )
+
+            http_client = mock.Mock()
+            http_client.stream.return_value = StreamResponse()
+            client_context = mock.AsyncMock()
+            client_context.__aenter__.return_value = http_client
+
+            client = OllamaClient(
+                base_url="http://chromie-llm:11434",
+                model="test-model",
+                purpose="fast_planner",
+            )
+            with mock.patch(
+                "agent.app.clients.ollama_client.httpx.AsyncClient",
+                return_value=client_context,
+            ):
+                deltas = [
+                    delta
+                    async for delta in client.generate_stream(
+                        "prompt",
+                        response_format=response_format,
+                        prompt_family="fast_planner.streaming_advance",
+                        turn_id="turn-stream",
+                    )
+                ]
+
+            self.assertEqual("".join(deltas), '{"presentation_commit":{}}')
+            payload = http_client.stream.call_args.kwargs["json"]
+            self.assertTrue(payload["stream"])
+            self.assertFalse(payload["think"])
+            self.assertNotIn("priority", payload)
+            self.assertEqual(client.compute_class, CognitionComputeClass.INTERACTIVE)
+            if isinstance(response_format, dict):
+                self.assertEqual(payload["format"], response_format)
+            else:
+                self.assertNotIn("format", payload)
+            self.assertEqual(
+                payload["messages"],
+                [{"role": "user", "content": "prompt"}],
+            )
+            self.assertEqual(
+                http_client.stream.call_args.args[:2],
+                ("POST", "http://chromie-llm:11434/api/chat"),
+            )
 
     async def test_generate_uses_chat_transport_and_reads_assistant_content(self) -> None:
         response = mock.Mock()

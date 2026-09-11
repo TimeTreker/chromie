@@ -1744,10 +1744,6 @@ class VoiceAssistant:
                 "verified_tool_memory_index", []
             ),
             "recent_tool_evidence": conversation.get("recent_tool_evidence", []),
-            "robot_state": {
-                "available": not self.action_dry_run,
-                "source": "host_orchestrator",
-            },
         }
 
     def _interaction_engagement_context(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -45,7 +46,7 @@ except ImportError:  # pragma: no cover - repository development path
     )
     from shared.chromie_runtime.log_colors import colorize_for_cli
 
-from ...prompt_projection import bounded_json
+from ...prompt_projection import bounded_json, required_json
 from .errors import InterpretationUnavailableError
 from .schema import (
     GoalInterpretationDecision,
@@ -57,6 +58,11 @@ logger = logging.getLogger("chromie.agent.goal_interpreter.llm")
 
 
 _CONTEXT_OMIT_KEYS = {
+    # Correlation labels belong to request/log joins, never human meaning.
+    "conversation_id",
+    "session_id",
+    "turn_id",
+    "sid",
     "candidate_capabilities",
     "common_ability_catalog",
     "common_ability_ids",
@@ -508,8 +514,8 @@ def _short_exact_surface_substrings(text: str) -> list[str]:
     """Enumerate exact source slices for a bounded decoder constraint.
 
     This does not identify an entity or choose its meaning. It only makes an
-    invalid translated location impossible to emit when a short fresh turn has
-    no bounded semantic-context location to preserve. Longer or continuity-rich
+    invalid translated binding impossible to emit when a short fresh turn has
+    no bounded semantic-context string to preserve. Longer or continuity-rich
     turns retain the normal validator and fail closed without growing an
     unbounded response schema.
     """
@@ -950,7 +956,16 @@ def _reject_unprovenanced_location_bindings(
     """
 
     current_turn = " ".join((request.text or "").strip().split()).casefold()
-    contextual_values = _semantic_context_string_values(request.context)
+    contextual_values = _semantic_context_string_values(
+        {key: value for key, value in request.context.items() if key != "history"}
+    )
+    # Dialogue provenance must match the accepted, bounded text shown to GI.
+    # Raw history also contains suppressed turns, metadata and truncated text;
+    # none of those are evidence for a model-authored location binding.
+    dialogue = json.loads(
+        _bounded_json_array(_compact_recent_dialogue(request.context), max_chars=1800)
+    )
+    dialogue_surfaces = [str(item["text"]).casefold() for item in dialogue]
     responsibilities = parsed.get("responsibilities")
     if not isinstance(responsibilities, list):
         return
@@ -1010,7 +1025,11 @@ def _reject_unprovenanced_location_bindings(
         if not location:
             continue
         folded = location.casefold()
-        if folded in current_turn or folded in contextual_values:
+        if (
+            folded in current_turn
+            or folded in contextual_values
+            or any(folded in surface for surface in dialogue_surfaces)
+        ):
             continue
         raise _GoalInterpretationLocationProvenanceViolation(
             "Goal Interpretation location binding has no authoritative surface "
@@ -1986,6 +2005,7 @@ def _goal_interpretation_identity_context(mind: Any) -> str:
                         "kind",
                         "age_description",
                         "family_role",
+                        "model_identity_boundary",
                     )
                     if raw_identity.get(key) not in (None, "", [], {})
                 }
@@ -1998,7 +2018,7 @@ def _goal_interpretation_identity_context(mind: Any) -> str:
                     identity[key] = speaker.get(key)
     profile = {"self_identity": identity or {"name": "Chromie"}}
     return (
-        f"{_bounded_json(profile, max_chars=420)}\n"
+        f"{required_json(profile, max_chars=1200, label='Goal Interpretation identity')}\n"
         "These semantic self facts may resolve identity or self-reference. "
         "Presentation style and internal profile identifiers are intentionally absent."
     )
@@ -2142,7 +2162,7 @@ class OllamaGoalInterpreter:
         allowed_goal_ids: tuple[str, ...] = (),
         prior_assistant_utterance: str | None = None,
         admitted_turn: str = "",
-        exact_location_surfaces: tuple[str, ...] = (),
+        exact_source_surfaces: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         schema = GoalInterpretationDecision.model_json_schema()
         schema["additionalProperties"] = False
@@ -2344,19 +2364,24 @@ class OllamaGoalInterpreter:
                         "code validates exact source/context provenance."
                     ),
                 }
-                if exact_location_surfaces:
+                if exact_source_surfaces:
                     binding_properties["location"] = {
                         "type": "string",
-                        "enum": list(exact_location_surfaces),
+                        "enum": list(exact_source_surfaces),
                         "description": (
                             "If present, copy one exact contiguous surface from the "
                             "authoritative current turn. This closed spelling constraint "
                             "does not decide whether any surface is a location."
                         ),
                     }
+                measurement_string: dict[str, Any] = (
+                    {"type": "string", "enum": list(exact_source_surfaces)}
+                    if exact_source_surfaces
+                    else {"$ref": "#/$defs/SourceBackedBindingString"}
+                )
                 binding_properties["duration"] = {
                     "anyOf": [
-                        {"$ref": "#/$defs/SourceBackedBindingString"},
+                        copy.deepcopy(measurement_string),
                         {"type": "number"},
                     ],
                     "description": (
@@ -2372,7 +2397,7 @@ class OllamaGoalInterpreter:
                 }
                 binding_properties["speed"] = {
                     "anyOf": [
-                        {"$ref": "#/$defs/SourceBackedBindingString"},
+                        copy.deepcopy(measurement_string),
                         {"type": "number"},
                     ],
                     "description": (
@@ -2735,6 +2760,14 @@ class OllamaGoalInterpreter:
             # Work/evidence readiness is deliberately absent: Planner derives it later
             # from canonical Goal state, trusted Evidence, and available Capabilities.
             responsibility["additionalProperties"] = False
+            if responsibility.get("allOf"):
+                # The pinned decoder otherwise hides sibling object fields behind
+                # the continuity intersection. Repeat only the existing shape;
+                # original cross-field conditions and Host checks stay authoritative.
+                responsibility["anyOf"] = [{
+                    key: copy.deepcopy(responsibility[key])
+                    for key in ("type", "properties", "required", "additionalProperties")
+                }]
         local_refs = [f"r{index}" for index in range(1, 13)]
         properties = schema.setdefault("properties", {})
         properties["coordination"] = {
@@ -2780,7 +2813,7 @@ class OllamaGoalInterpreter:
         self, request: GoalInterpretationRequest
     ) -> dict[str, Any]:
         prior = _most_recent_assistant_utterance(request.context)
-        exact_location_surfaces = (
+        exact_source_surfaces = (
             tuple(_short_exact_surface_substrings(request.text))
             if not _semantic_context_string_values(request.context)
             else ()
@@ -2808,7 +2841,7 @@ class OllamaGoalInterpreter:
                     prior["text"] if prior is not None else None
                 ),
                 admitted_turn=request.text,
-                exact_location_surfaces=exact_location_surfaces,
+                exact_source_surfaces=exact_source_surfaces,
             ),
         }
         if self.keep_alive:

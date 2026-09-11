@@ -612,10 +612,13 @@ class FastPlannerAdvance(BaseModel):
             raise ValueError("Fast Planner escalation requires Deep Planner continuation")
         if "deep_planner" in self.continuations and self.disposition != "escalate":
             raise ValueError("Deep Planner continuation requires disposition=escalate")
-        if self.disposition in {"execute", "mixed"} and not any(
-            item.role == "capability" for item in self.activities
-        ):
+        authored_activity_roles = {item.role for item in self.activities}
+        if self.disposition == "execute" and "capability" not in authored_activity_roles:
             raise ValueError("executable Fast Planner disposition requires a Capability Activity")
+        if self.disposition == "mixed" and "capability" not in authored_activity_roles and not {
+            "complete_response", "clarification"
+        }.issubset(authored_activity_roles):
+            raise ValueError("mixed Fast Planner requires Capability work or independent response and clarification")
         if self.disposition == "respond" and not any(
             item.role == "complete_response" for item in self.activities
         ):
@@ -908,6 +911,33 @@ class GoalSatisfactionAssessment(BaseModel):
         if self.status == "exact" and (self.unmet_goal_ids or self.unmet_requirements):
             raise ValueError("exact goal satisfaction cannot report unmet goals or requirements")
         return self
+
+
+def validate_goal_satisfaction_conservation(
+    outcomes: list[tuple[str, str, GoalSatisfactionAssessment | None]],
+    aggregate: GoalSatisfactionAssessment | None,
+) -> None:
+    """Reject contradictory accounting without changing a Planner judgment."""
+
+    unmet: set[str] = set()
+    for goal_id, disposition, satisfaction in outcomes:
+        if satisfaction is not None:
+            unmet.update(satisfaction.unmet_goal_ids)
+        if disposition not in {"clarify", "unavailable", "refused", "escalate"}:
+            continue
+        unmet.add(goal_id)
+        if satisfaction is not None and (
+            satisfaction.status == "exact"
+            or goal_id not in satisfaction.unmet_goal_ids
+            or goal_id in satisfaction.satisfied_goal_ids
+        ):
+            raise ValueError("noncompletion outcome must preserve its unmet Goal satisfaction")
+    if aggregate is not None and unmet and (
+        aggregate.status == "exact"
+        or not unmet.issubset(aggregate.unmet_goal_ids)
+        or unmet.intersection(aggregate.satisfied_goal_ids)
+    ):
+        raise ValueError("aggregate satisfaction must preserve every unmet Goal outcome")
 
 
 class PlannedGoalTimeCondition(BaseModel):
@@ -1253,7 +1283,19 @@ class CanonicalPlan(BaseModel):
         if self.disposition == "execute" and not self.steps:
             raise ValueError("execute disposition requires at least one step")
         if self.disposition == "mixed" and not self.steps:
-            raise ValueError("mixed disposition requires at least one executable step")
+            dispositions = {item.disposition for item in self.goal_outcomes}
+            if not (
+                "respond" in dispositions
+                and dispositions.intersection({"clarify", "unavailable", "refused"})
+                and dispositions <= {"respond", "clarify", "unavailable", "refused"}
+            ):
+                raise ValueError("mixed plan without steps requires response and limitation outcomes")
+            if (
+                self.metadata.get("user_confirmation_required")
+                or self.metadata.get("plan_relation", "exact") != "exact"
+                or self.time_conditions
+            ):
+                raise ValueError("mixed plan without steps cannot authorize or schedule Work")
         if self.disposition == "respond" and not (
             self.response_text
             or any(item.role == "complete_response" for item in self.communicative_acts)
@@ -1409,6 +1451,10 @@ class CanonicalPlan(BaseModel):
                 raise ValueError(
                     "top-level disposition must match the per-goal outcome dispositions"
                 )
+            validate_goal_satisfaction_conservation(
+                [(item.goal_id, item.disposition, item.satisfaction) for item in self.goal_outcomes],
+                self.goal_satisfaction,
+            )
             if self.planner_tier == "deep" and "escalate" in outcome_dispositions:
                 raise ValueError("deep plans cannot contain escalate goal outcomes")
             nonexecuting_time_goals = {
@@ -1484,8 +1530,8 @@ class CanonicalPlan(BaseModel):
 
         if self.disposition == "mixed":
             dispositions = {item.disposition for item in self.goal_outcomes}
-            if "execute" not in dispositions:
-                raise ValueError("mixed plans require at least one executable goal outcome")
+            if self.steps and "execute" not in dispositions:
+                raise ValueError("mixed plans with steps require an executable goal outcome")
             if self.planner_tier == "fast":
                 unsupported = dispositions - {"execute", "respond", "clarify"}
                 if unsupported:

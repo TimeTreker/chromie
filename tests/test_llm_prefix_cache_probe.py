@@ -5,12 +5,59 @@ import unittest
 from shared.chromie_runtime.llm_diagnostics import (
     PrefixCacheTracker,
     llm_call_evidence_payload,
+    log_llm_call_evidence,
 )
 
 
 class PrefixCacheTrackerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tracker = PrefixCacheTracker()
+
+    def test_exact_evidence_retains_schema_order_and_openai_partial_text(self) -> None:
+        import copy
+        import json
+        from unittest.mock import Mock
+
+        request = {"response_format": {"schema": {"properties": {
+            "z_first": {"type": "string"}, "a_last": {"type": "number"},
+        }}}}
+        original = copy.deepcopy(request)
+        logger = Mock()
+        record = log_llm_call_evidence(
+            logger, call_id="stream-failed", purpose="fast_planner", stage="stream",
+            transport="sglang.chat_stream", request=request,
+            response={"choices": [{"message": {"content": "<terminal_plan>{"},
+                                   "finish_reason": "length"}]},
+            status="failed", error={"failure_class": "output_truncated"},
+        )
+        self.assertEqual(request, original)
+        self.assertEqual(record["response"]["raw_model_output"], "<terminal_plan>{")
+        self.assertTrue(record["privacy"]["contains_raw_model_output"])
+        logged = json.loads(logger.info.call_args.args[2])
+        self.assertEqual(list(logged["request"]["response_format"]["schema"]["properties"]),
+                         ["z_first", "a_last"])
+        self.assertEqual(list(record["request"]["response_format"]["schema"]["properties"]),
+                         ["z_first", "a_last"])
+
+    def test_evidence_survives_container_log_frame_boundaries(self) -> None:
+        import json
+        from unittest.mock import Mock
+
+        logger = Mock()
+        record = log_llm_call_evidence(
+            logger, call_id="unicode-frames", purpose="fast_planner", stage="primary",
+            transport="sglang", request={"prompt": "中文🙂" * 10000},
+            response={"message": {"content": "你好🙂" * 10000}}, status="completed",
+        )
+        wire = logger.info.call_args.args[2].encode("utf-8")
+        # Reproduce a log collector decoding frames before joining the record.
+        for frame_size in (16384, 16383, 16385):
+            with self.subTest(frame_size=frame_size):
+                retained = "".join(
+                    wire[index:index + frame_size].decode("utf-8", errors="replace")
+                    for index in range(0, len(wire), frame_size)
+                )
+                self.assertEqual(json.loads(retained), record)
 
     def test_failed_attempt_remains_the_previous_call(self) -> None:
         first = self.tracker.begin(

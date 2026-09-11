@@ -20,6 +20,12 @@ This Issue does not convert every broad catch into an error log. It classifies
 why a boundary catches broadly and changes only handlers that were silent,
 ambiguous, or dependent on `assert` for a required invariant.
 
+Deep Planner failure materializers always set `execution_allowed=False` on empty
+rejected/unavailable Plans and retain the original error and validation feedback.
+The existing Runtime adapter recognizes this as silent non-executable containment;
+it must not invent response text or replace the original failure with a missing-text
+exception. This does not permit silent unmarked or confirmation-gated execution.
+
 ## Failure classification
 
 ### expected cleanup

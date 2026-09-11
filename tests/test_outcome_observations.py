@@ -51,6 +51,23 @@ class OutcomeObservationTests(unittest.TestCase):
             "cognitive_runtime": {},
         }
 
+    def test_turn_observation_retains_count_independently_of_duration(self) -> None:
+        summary = {
+            "interaction_response": {"capabilities": [{
+                "request_id": "turn", "capability_id": "soridormi.turn_in_place",
+                "args": {"count": 2, "duration_s": 1.0, "yaw_radps": -0.12},
+            }]},
+            "execution": {"results": [{"request_id": "turn", "status": "completed"}]},
+        }
+        observations = collect_observations(summary)
+        self.assertEqual(observations[0]["args"]["count"], 2)
+        self.assertEqual(validate_expected_observations(observations, [
+            {"type": "locomotion.turn", "args": {"count": 2, "duration_s": 1.0}},
+        ]), [])
+        self.assertTrue(validate_expected_observations(observations, [
+            {"type": "locomotion.turn", "args": {"count": 1}},
+        ]))
+
     def test_normalizes_capabilities_into_user_observable_events(self) -> None:
         observations = collect_observations(self._summary())
 

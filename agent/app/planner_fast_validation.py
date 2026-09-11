@@ -41,6 +41,7 @@ from .planner_context import planner_goal_execution_requirements
 from .planner_grounding import (
     _argument_realization_contract,
     _material_values_equal,
+    missing_argument_realizations,
     semantic_numeric_values,
 )
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
@@ -488,6 +489,18 @@ def validate_fast_advance_output(
             if source_ref in numeric_args_by_ref:
                 numeric_args_by_ref[source_ref].update(activity_numbers)
     for source_ref, source in by_ref.items():
+        if semantic_numeric_values(source.bindings.get("count")):
+            for activity in capability_activities:
+                if source_ref not in activity.source_responsibility_refs:
+                    continue
+                definition = allowed.get(activity.capability_id, {})
+                properties = (definition.get("input_schema") or {}).get("properties") or {}
+                if "count" not in properties:
+                    raise PlannerDTOContractError(
+                        "Fast Planner cannot validate repetition through an unrelated "
+                        "numeric argument: Capability has no count input; "
+                        f"source_ref={source_ref} capability_id={activity.capability_id}"
+                    )
         required_numbers = semantic_numeric_values(source.bindings)
         missing_numbers = sorted(required_numbers - numeric_args_by_ref.get(source_ref, set()))
         if missing_numbers and any(
@@ -514,16 +527,11 @@ def validate_fast_advance_output(
                 "disposition; missing=" + ",".join(sorted(missing_terminal_refs))
             )
     if clarification_activities:
-        expected_disposition = "mixed" if capability_activities else "clarify"
+        expected_disposition = "mixed" if capability_activities or complete_response_activities else "clarify"
         if output.disposition != expected_disposition:
             raise PlannerDTOContractError(
                 "clarification disposition must be clarify when it is the only "
-                "terminal work, or mixed when independent Capability work proceeds"
-            )
-        if complete_response_activities and not capability_activities:
-            raise PlannerDTOContractError(
-                "the current Fast contract cannot combine only response and "
-                "clarification outcomes without executable Work"
+                "terminal work, or mixed when independent Capability work or a complete response proceeds"
             )
     all_gap_ids = [
         gap.gap_id for activity in clarification_activities for gap in activity.information_gaps
@@ -632,6 +640,16 @@ def validate_fast_advance_output(
             )
         input_schema = definition.get("input_schema") or {}
         properties = input_schema.get("properties") or {}
+        for source_ref in activity.source_responsibility_refs:
+            missing = missing_argument_realizations(
+                definition, activity.args, list(by_ref[source_ref].bindings),
+            )
+            if missing:
+                raise AuthoritativeGroundingValidationError(
+                    "Fast Planner omitted declared argument realization: "
+                    f"{activity.capability_id}; source_ref={source_ref}; "
+                    + ",".join(missing)
+                )
         # Numeric conservation must retain field identity. An unrelated argument
         # (for example intensity=1.0) cannot witness a requested count=1.
         # Check each source independently, including optional/defaulted inputs.

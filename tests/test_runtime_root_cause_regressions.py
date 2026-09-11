@@ -596,7 +596,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             deep_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
                 "disposition"
             ]["enum"],
-            ["respond"],
+            ["respond", "clarify", "unavailable", "refused"],
         )
         self.assertEqual(
             deep_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
@@ -694,7 +694,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("mixed", tool_schema["properties"]["disposition"]["enum"])
         joke_outcome = tool_schema["properties"]["goal_outcomes"]["properties"]["goal-joke"]
-        self.assertEqual(joke_outcome["properties"]["disposition"]["enum"], ["respond"])
+        self.assertEqual(
+            joke_outcome["properties"]["disposition"]["enum"],
+            ["respond", "clarify", "unavailable", "refused"],
+        )
         self.assertNotIn("oneOf", joke_outcome)
         self.assertEqual(
             set(joke_outcome["required"]),

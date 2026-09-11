@@ -166,6 +166,75 @@ def _argument_realization_contract(
             return contract
     return None
 
+def missing_argument_realizations(
+    capability: dict[str, Any],
+    arguments: dict[str, Any],
+    entity_types: list[str],
+) -> list[str]:
+    """Check declared argument presence without interpreting source values.
+
+    Defaults may supply unspecified inputs, but cannot stand in for an explicit
+    semantic binding whose selected provider declares a realization contract.
+    Each applicable contract is checked, including multiple contracts per type.
+    """
+
+    contracts = (capability.get("hints") or {}).get("argument_realization")
+    if not isinstance(contracts, dict):
+        return []
+    bound_types = {_normalized_entity_type(value) for value in entity_types}
+    missing = []
+    for name, contract in contracts.items():
+        if not isinstance(contract, dict) or _normalized_entity_type(
+            contract.get("source_entity_type")
+        ) not in bound_types:
+            continue
+        declared = set(contract.get("arguments") or [])
+        minimum = max(1, int(contract.get("minimum_arguments") or 1))
+        if sum(argument in arguments for argument in declared) < minimum:
+            missing.append(str(name))
+    return missing
+
+
+def _is_count_binding(name: str, binding: dict[str, Any]) -> bool:
+    return name == "count" or _normalized_entity_type(binding.get("entity_type")) == "count"
+
+
+def _count_argument_names(
+    capability: dict[str, Any], binding_name: str = "count"
+) -> set[str]:
+    """Read repetition arguments only from provider names, types or mappings."""
+
+    properties = (capability.get("input_schema") or {}).get("properties") or {}
+    names = {
+        name for name, schema in properties.items()
+        if isinstance(schema, dict) and (
+            name in {"count", binding_name}
+            or _normalized_entity_type(schema.get("x-chromie-entity-type")) == "count"
+        )
+    }
+    contracts = (capability.get("hints") or {}).get("argument_realization") or {}
+    for contract in contracts.values():
+        if isinstance(contract, dict) and _normalized_entity_type(
+            contract.get("source_entity_type")
+        ) == "count":
+            names.update(name for name in contract.get("arguments") or [] if name in properties)
+    return names
+
+
+def _count_provenance_compatible(
+    capability: dict[str, Any], parameter: str, name: str, binding: dict[str, Any]
+) -> bool:
+    """Equal numbers cannot exchange count and another quantity's provenance.
+
+    This narrows the existing value comparison only for explicit repetition
+    identity. It does not infer mappings for other human-semantic quantities.
+    """
+
+    if _is_count_binding(name, binding):
+        return parameter == name or parameter in _count_argument_names(capability, name)
+    return parameter != "count" and parameter not in _count_argument_names(capability)
+
+
 def _argument_schema_accepts_canonical_binding(
     argument_schema: dict[str, Any],
     value: Any,

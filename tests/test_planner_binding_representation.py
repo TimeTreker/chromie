@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from jsonschema import Draft202012Validator
+
 from agent.app.planner_prompt import EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
 from agent.app.planner_model_contract import (
     PlannerDTOContractError,
@@ -12,6 +14,7 @@ from agent.app.planner_schema import (
     canonical_plan_response_schema,
 )
 from agent.app.planner_validation import (
+    normalize_common_planner_output,
     normalize_detached_parameter_resolutions,
     normalize_schema_default_parameter_provenance,
     qualify_capability_catalog_for_typed_binding_values,
@@ -1132,6 +1135,137 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 output,
                 authoritative_goals=[goal],
             )
+
+    def test_count_provenance_preserves_declared_argument_identity(self):
+        for binding_name in ("count", "repeats"):
+            for mapping in ("absent", "named", "typed", "declared"):
+                with self.subTest(binding=binding_name, mapping=mapping):
+                    goal = _weather_goal()
+                    goal["object"]["bindings"] = {
+                        binding_name: {"entity_type": "count", "value": 2}
+                    }
+                    output = _weather_output()
+                    step = output.steps[0]
+                    step.args = {"duration_s": 2.0}
+                    properties = {"duration_s": {"type": "number", "default": 2}}
+                    capability = {"capability_id": step.capability_id,
+                                  "input_schema": {"properties": properties}}
+                    parameter = "count" if mapping == "named" else "repetitions"
+                    if mapping != "absent":
+                        properties[parameter] = {"type": "integer", "default": 2}
+                        step.args[parameter] = 2
+                    if mapping == "typed":
+                        properties[parameter]["x-chromie-entity-type"] = "count"
+                    if mapping == "declared":
+                        capability["hints"] = {"argument_realization": {"repeat": {
+                            "source_entity_type": "count", "arguments": [parameter],
+                            "minimum_arguments": 1,
+                        }}}
+                    raw = output.model_dump(mode="json")
+                    normalized, _ = normalize_common_planner_output(
+                        raw, authoritative_goals=[goal], capability_payload=[capability]
+                    )
+                    self.assertEqual(normalized["steps"], raw["steps"])
+                    self.assertNotIn("duration_s", {
+                        item["parameter"] for item in normalized["parameter_resolutions"]
+                    })
+                    admitted = PlannerModelOutput.model_validate(normalized)
+                    if mapping == "absent":
+                        with self.assertRaisesRegex(ValueError, "no declared count input"):
+                            validate_goal_binding_argument_grounding(
+                                admitted, authoritative_goals=[goal], capabilities=[capability]
+                            )
+                    else:
+                        validate_goal_binding_argument_grounding(
+                            admitted, authoritative_goals=[goal], capabilities=[capability]
+                        )
+                        validate_explicit_numeric_parameter_grounding(
+                            admitted, authoritative_goals=[goal]
+                        )
+                        self.assertEqual(normalized["parameter_resolutions"][0]["parameter"], parameter)
+
+    def test_equal_count_and_duration_keep_independent_provenance(self):
+        goal = _weather_goal()
+        goal["object"]["bindings"] = {
+            "count": {"entity_type": "count", "value": 2},
+            "duration_s": {"entity_type": "duration", "value": 2.0},
+        }
+        output = _weather_output()
+        output.steps[0].args = {"count": 2, "duration_s": 2.0}
+        capability = {"capability_id": output.steps[0].capability_id,
+                      "input_schema": {"properties": {
+                          "count": {"type": "integer"}, "duration_s": {"type": "number"}
+                      }}}
+        normalized, _ = normalize_common_planner_output(
+            output.model_dump(mode="json"), authoritative_goals=[goal],
+            capability_payload=[capability],
+        )
+        self.assertEqual({item["parameter"] for item in normalized["parameter_resolutions"]},
+                         {"count", "duration_s"})
+        admitted = PlannerModelOutput.model_validate(normalized)
+        validate_goal_binding_argument_grounding(
+            admitted, authoritative_goals=[goal], capabilities=[capability]
+        )
+        validate_explicit_numeric_parameter_grounding(admitted, authoritative_goals=[goal])
+
+        # The same raw parameter claim is false when duration was never supplied.
+        del goal["object"]["bindings"]["duration_s"]
+        again, _ = normalize_common_planner_output(
+            normalized, authoritative_goals=[goal], capability_payload=[capability]
+        )
+        with self.assertRaisesRegex(ValueError, "provenance crosses count identity"):
+            validate_goal_binding_argument_grounding(
+                PlannerModelOutput.model_validate(again),
+                authoritative_goals=[goal], capabilities=[capability],
+            )
+
+    def test_structured_resource_count_is_not_execution_repetition(self):
+        goal = _information_weather_goal()
+        resource = goal["resource_responsibility"]["resource"]
+        resource["attributes"] = {"count": {"entity_type": "count", "value": 2}}
+        output = _weather_output()
+        output.steps[0].args = {"resource": resource}
+        capability = {"capability_id": output.steps[0].capability_id,
+                      "input_schema": {"properties": {"resource": {"type": "object"}}}}
+        validate_goal_binding_argument_grounding(
+            output, authoritative_goals=[goal], capabilities=[capability]
+        )
+        validate_explicit_numeric_parameter_grounding(output, authoritative_goals=[goal])
+
+    def test_count_decoder_restricts_ownership_without_removing_sibling_capability(self):
+        goal = _weather_goal()
+        goal["object"]["bindings"] = {"count": {"entity_type": "count", "value": 2}}
+        other = {"goal_id": "goal-other", "object": {"bindings": {}}}
+        capability = {"capability_id": "provider.action", "input_schema": {
+            "type": "object", "properties": {"duration_s": {"type": "number"}},
+            "additionalProperties": False,
+        }}
+        base = canonical_plan_response_schema(
+            planner_tier="fast", expected_goal_ids=[goal["goal_id"], other["goal_id"]],
+            allowed_capability_ids=[capability["capability_id"]],
+            capability_input_schemas={capability["capability_id"]: capability["input_schema"]},
+        )
+        schema = canonical_goal_binding_argument_response_schema(
+            base, authoritative_goals=[goal, other], capabilities=[capability]
+        )
+        Draft202012Validator.check_schema(schema)
+        branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
+        step = _weather_output().steps[0].model_dump(mode="json")
+        step.update(capability_id=capability["capability_id"], args={"duration_s": 2})
+        self.assertFalse(Draft202012Validator(branch).is_valid(step))
+        step["source_goal_ids"] = [other["goal_id"]]
+        Draft202012Validator(branch).validate(step)
+
+        single_base = canonical_plan_response_schema(
+            planner_tier="fast", expected_goal_ids=[goal["goal_id"]],
+            allowed_capability_ids=[capability["capability_id"]],
+            capability_input_schemas={capability["capability_id"]: capability["input_schema"]},
+        )
+        single = canonical_goal_binding_argument_response_schema(
+            single_base, authoritative_goals=[goal], capabilities=[capability]
+        )
+        Draft202012Validator.check_schema(single)
+        self.assertEqual(single["properties"]["steps"]["maxItems"], 0)
 
 
 if __name__ == "__main__":

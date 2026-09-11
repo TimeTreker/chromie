@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from types import SimpleNamespace
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
@@ -78,6 +79,25 @@ class _InteractionRuntime:
 
 
 class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
+    def test_execution_policy_is_not_observed_robot_availability(self):
+        for dry_run in (True, False):
+            with self.subTest(dry_run=dry_run):
+                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant.action_dry_run = dry_run
+                assistant.is_playing_audio = False
+                assistant.playback_generation = 0
+                assistant.conversation_state = SimpleNamespace(
+                    snapshot=lambda: {"history": [{"role": "user", "text": "hello"}]},
+                    active_goal_snapshots=lambda: [],
+                )
+                assistant.mind = SimpleNamespace(context=lambda: {})
+                assistant._interaction_engagement_context = lambda *a, **k: {}
+
+                context = assistant.build_context("availability-probe")
+                self.assertNotIn("robot_state", context)
+                self.assertEqual(context["history"], [{"role": "user", "text": "hello"}])
+                self.assertEqual(assistant.action_dry_run, dry_run)
+
     @staticmethod
     def _assistant(resolution: CognitiveRuntimeResolution):
         assistant = VoiceAssistant.__new__(VoiceAssistant)

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from .capabilities.catalog import CapabilityCatalog
 from .clients.ollama_client import (
     OllamaClient,
+    TaggedJSONResponseFormat,
     OllamaGenerationError,
     llm_failure_metadata,
 )
@@ -120,8 +121,8 @@ def validate_presentation_commit_request_scope(
 ) -> None:
     """Reject an early observable Activity that is invalid for this exact turn.
 
-    The streaming transport is free-form text, so the dynamic presentation Schema
-    is prompt guidance rather than a decoder-enforced boundary.  Re-run the small
+    The streaming transport may constrain framing and shape, but the Host remains
+    authoritative for observable effects. Re-run the small
     request-specific subset that can make an already validated DTO unsafe to yield
     before terminal-plan validation.
     """
@@ -182,6 +183,17 @@ def presentation_commit_id(request: CognitiveWorkRequest) -> str:
     return f"present_{digest}"
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject ambiguous member ownership before a parsed value can be exposed."""
+
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise PlannerDTOContractError(f"Fast Planner JSON object repeats key: {key}")
+        value[key] = item
+    return value
+
+
 def _tagged_json_frame(
     buffer: str,
     *,
@@ -220,7 +232,7 @@ def _tagged_json_frame(
         saw_close = True
         candidate = buffer[payload_start:payload_end].strip()
         try:
-            value = json.loads(candidate)
+            value = json.loads(candidate, object_pairs_hook=_unique_json_object)
         except json.JSONDecodeError:
             # A literal closing tag may occur inside a JSON string. Keep looking
             # for the real frame boundary instead of committing a partial value.
@@ -421,7 +433,10 @@ class FastPlannerResolver:
                 prompt,
                 system=fast_streaming_advance_system_prompt(),
                 options=options,
-                response_format="text",
+                response_format=TaggedJSONResponseFormat((
+                    ("presentation_commit", response_schema["properties"]["presentation_commit"]),
+                    ("terminal_plan", response_schema["properties"]["terminal_result"]),
+                )),
                 prompt_family="fast_planner.streaming_advance",
                 turn_id=request.sid,
                 attempt=1,
@@ -739,6 +754,7 @@ class FastPlannerResolver:
         response_schema = canonical_goal_binding_argument_response_schema(
             response_schema,
             authoritative_goals=authoritative_goals,
+            capabilities=capability_payload,
         )
         if reentry_goal_ids:
             evidence_wording_description = (

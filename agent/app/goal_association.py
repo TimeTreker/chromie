@@ -83,6 +83,7 @@ from .goal_association_schema import goal_association_response_schema
 from .goal_association_validation import (
     action_collection_bindings,
     binding_semantic_contract_conflicts,
+    is_mechanical_contract_failure,
     non_verbatim_explicit_location_bindings,
     normalize_optional_referent_updates,
     normalize_optional_resource_quantity,
@@ -281,6 +282,8 @@ class GoalAssociationResolver:
                 model_output = output_type.model_validate(initial_raw)
                 accepted_raw = initial_raw
             except ValidationError as initial_exc:
+                if not is_mechanical_contract_failure(initial_exc):
+                    raise
                 contract_repair_attempted = True
                 repaired = normalize_raw(
                     await invoke(

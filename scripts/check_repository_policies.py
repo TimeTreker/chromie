@@ -546,17 +546,27 @@ def audit_agent_skill_selection(root: Path) -> list[PolicyFinding]:
         return findings
 
     select_method = _find_method(service, "select")
-    if select_method is None or not any(
-        isinstance(node, ast.Call) and _call_qualname(node).endswith("client.generate")
-        for node in ast.walk(select_method or service)
-    ):
+    model_calls = [
+        node for node in ast.walk(service)
+        if isinstance(node, ast.Call)
+        and _call_qualname(node).endswith(("client.generate", "client.generate_stream"))
+    ]
+    primary_nodes = set(ast.walk(select_method)) if select_method is not None else set()
+    repeated_calls = any(
+        isinstance(node, (ast.For, ast.AsyncFor, ast.While, ast.ListComp,
+                          ast.SetComp, ast.DictComp, ast.GeneratorExp))
+        and any(call in set(ast.walk(node)) for call in model_calls)
+        for node in primary_nodes
+    )
+    if (len(model_calls) != 1 or not all(call in primary_nodes for call in model_calls)
+            or repeated_calls):
         findings.append(
             PolicyFinding(
                 rule_id=RULE_AGENT_SKILL_SELECTION,
                 path=_relative(path, root),
                 line=getattr(select_method or service, "lineno", 0) or 0,
                 symbol="AgentSkillSelectionService.select",
-                message="non-empty Agent Skill selection must remain model-authored through the configured client",
+                message="Agent Skill selection requires exactly one primary model call without a retry loop or second selection helper",
             )
         )
 

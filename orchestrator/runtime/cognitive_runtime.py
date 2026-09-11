@@ -1486,7 +1486,9 @@ class CanonicalPlanRuntimeAdapter:
                 "Planner-owned communicative response requires exact text"
             )
 
-        if plan.disposition == "clarify":
+        if plan.disposition == "clarify" or (
+            plan.disposition == "mixed" and not plan.steps and plan.waiting_goal_ids()
+        ):
             speech_act = "ask_clarification"
             commitment_state = "waiting_for_user"
             must_not_claim_completion = True
@@ -1494,7 +1496,7 @@ class CanonicalPlanRuntimeAdapter:
             speech_act = "ask_confirmation"
             commitment_state = "waiting_for_user"
             must_not_claim_completion = True
-        elif plan.disposition in {"execute", "mixed"}:
+        elif plan.disposition in {"execute", "mixed"} and plan.steps:
             speech_act = "inform"
             commitment_state = "evaluating"
             must_not_claim_completion = True
@@ -1524,7 +1526,7 @@ class CanonicalPlanRuntimeAdapter:
         )
         response_plan = (
             ResponsePlan(pre_action=stage)
-            if plan.disposition in {"execute", "mixed"}
+            if plan.disposition in {"execute", "mixed"} and plan.steps
             else ResponsePlan(final=stage)
         )
         fingerprint = canonical_plan_fingerprint(plan)

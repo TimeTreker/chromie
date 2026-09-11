@@ -4,6 +4,12 @@ import copy
 from typing import Any
 
 from ..inference_compute import CognitionComputeClass, compute_rank
+from .ollama_client import TaggedJSONResponseFormat
+
+try:
+    from chromie_contracts.json_schema import expose_intersection_shapes
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.json_schema import expose_intersection_shapes
 
 
 def sglang_priority(
@@ -41,7 +47,45 @@ def candidate_compatible_schema(
     return translated, removed
 
 
+def _tagged_response_format(response_format: TaggedJSONResponseFormat) -> dict[str, Any]:
+    def compatible(node: Any) -> None:
+        if isinstance(node, dict):
+            # XGrammar 0.2.1 emits raw regex characters inside JSON strings and
+            # miscompiles number bounds. Preserve the authoritative schemas in
+            # the caller; these are decoder-only omissions for the tagged wire.
+            if node.get("type") == "string":
+                node.pop("pattern", None)
+            if node.get("type") == "number":
+                for key in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"):
+                    node.pop(key, None)
+            for value in node.values():
+                compatible(value)
+        elif isinstance(node, list):
+            for value in node:
+                compatible(value)
+
+    whitespace = {"type": "regex", "pattern": r"[ \t\r\n]{0,8}"}
+    elements: list[dict[str, Any]] = [dict(whitespace)]
+    for name, original in response_format.frames:
+        schema = copy.deepcopy(original)
+        expose_intersection_shapes(schema)
+        compatible(schema)
+        schema["x-guidance"] = {"max_whitespace_cnt": 8}
+        elements.append({
+            "type": "tag", "begin": f"<{name}>",
+            "content": {"type": "sequence", "elements": [
+                dict(whitespace), {"type": "json_schema", "json_schema": schema},
+                dict(whitespace),
+            ]},
+            "end": f"</{name}>",
+        })
+        elements.append(dict(whitespace))
+    return {"type": "structural_tag", "format": {"type": "sequence", "elements": elements}}
+
+
 def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
+    if isinstance(response_format, TaggedJSONResponseFormat):
+        return _tagged_response_format(response_format)
     if response_format == "text":
         return None
     if response_format == "json":
@@ -49,10 +93,19 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
     if isinstance(response_format, dict):
         schema, _ = candidate_compatible_schema(response_format)
         if schema.get("title") in {
-            "GoalAssociationModelOutput", "GoalSegmentationModelOutput"
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
+        }:
+            # Native intersections can hide required object/array fields. Repeat
+            # their existing shape for decoding; original DTO/Host rules remain.
+            expose_intersection_shapes(schema)
+        if schema.get("title") in {
+            "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
+            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
         }:
             # Formatting belongs to this request, never to the shared model's
-            # global settings. Other roles retain their existing decoding.
+            # global settings. This also prevents the reproduced Deep/Skill JSON
+            # whitespace loop; strings retain their exact model-authored content.
             schema["x-guidance"] = {"whitespace_flexible": False}
         return {
             "type": "json_schema",
@@ -77,6 +130,8 @@ def build_sglang_chat_payload(
 ) -> dict[str, Any]:
     """Build the qualified SGLang OpenAI-compatible request without semantics."""
 
+    if isinstance(response_format, TaggedJSONResponseFormat) and not stream:
+        raise ValueError("Tagged JSON response frames require streaming")
     resolved_options = dict(options or {})
     payload: dict[str, Any] = {
         "model": model,

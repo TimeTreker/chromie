@@ -18,6 +18,12 @@ reflexes, attention review, bounded context assembly, and turn admission. The
 Goal-Driven Cognitive Core owns ordinary meaning, goal interpretation, task
 continuity proposals, capability intent, planning handoff, and response intent.
 
+Host context may report robot state only from observed provider/runtime facts.
+`VoiceAssistant.build_context` does not synthesize `robot_state.available` from
+`action_dry_run`: permission to execute and observed availability are different
+inputs. Without a provider observation, the base context omits that state claim;
+execution authorization and provider safety checks remain independently enforced.
+
 `POST /cognitive-gateway/attention-review` accepts only normalized turn identity,
 text, language, and bounded host engagement evidence. Suppression is limited to
 high-confidence inactive ambient speech. An internally contradictory
@@ -94,7 +100,9 @@ discovery: it filters by declared projection, validates explicit IDs, sorts and
 caps the candidate summaries, then lets the configured model author an explicit
 `no_skill` or ordered one/multi-Skill decision. The closed output is validated
 against the exact disclosed IDs, versions, projection, Goal IDs, confidence,
-and registry digest. One invalid result may receive one same-boundary repair;
+and registry digest. There is at most one primary model call and no model repair or
+reselection. Invalid output returns `model_contract_failed` with the original error;
+the existing repair-history flags are false. Deterministic JSON parsing is unchanged;
 model or contract failure returns an optional no-Skill resolution rather than
 fabricating method provenance. No `SKILL.md` or projection text is loaded, no
 Canonical Plan is changed, and no Capability is registered, authorized, or
@@ -159,6 +167,13 @@ for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
 Capability IDs, executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
 
+For short fresh turns of at most 40 normalized characters without retained semantic
+context strings, GI's dynamic Schema restricts location and duration/speed string
+values to untyped exact source substrings. It does not choose the dimension or
+meaning. Numeric measurement branches remain available; longer/context-backed
+turns keep the existing provenance validators. Source spelling alone does not
+establish complete units, correct typing or Responsibility coverage.
+
 Planning `InformationGap` creation/resolution, execution-input completeness, blocking
 status, source/default selection, and clarification selection belong to Fast Planner.
 GI carries only Responsibility meaning, Goal relation, and bounded unresolved meaning;
@@ -186,6 +201,8 @@ first and the terminal Plan payload second; it is not one top-level JSON documen
 provider tokens, unclosed tags, partial payloads, and partial DTOs never reach TTS or a Capability. The
 terminal result cannot repeat, reword, translate, contradict, or omit the accepted
 communication or decoration. No retry/reviewer call repairs this streamed semantic result.
+Duplicate JSON object keys, including escaped and nested duplicates, are rejected
+before a typed frame is exposed; later values cannot replace earlier ownership.
 A clarification Communicative Act owns one
 or more typed Planner `InformationGap` records and no `response_text`. A semantic gap
 must cite one exact GI `unresolved` string; an execution-input gap must cite one exact
@@ -260,7 +277,31 @@ provenance from the advisory Plan and append Deep Planner provenance. This field
 is included in Plan fingerprints and replay serialization but is ignored by
 Capability authorization and execution.
 
-`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association result, applicable Fast Planner continuation/escalation context, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. `vocal_output` Goals must use a response outcome containing the requested authored content and cannot own executable transport steps. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. A mechanically malformed planner DTO may be regenerated once in the same tier. Semantic grounding, responsibility coverage, capability applicability, confidence/satisfaction, and safety rejection are terminal in Deep and are not rewritten by another Deep model pass.
+Deep failure results contain no executable steps or invented response text and
+explicitly set `metadata.execution_allowed=False`; original rejection evidence is
+retained for the Runtime’s existing silent failure path. Fast repetition validation
+rejects a count-bound Capability without a count input: an unrelated duration or
+intensity value cannot witness repetition. Node-based repetition is not implied. The
+owner-authorized Soridormi `turn_in_place` catalog now supplies integer `count`
+(1-8, default 1), per-repetition `duration_s`, and a 20-second aggregate limit.
+The Planner authors count; Soridormi expands sequential segments under its existing
+safety lifecycle. Positive yaw means left, negative means right. Host validation
+still requires an explicit matching argument for a GI-bound count; unrelated
+numeric arguments remain invalid witnesses. Acceptance observations retain count
+alongside duration and yaw, without deriving it from node cardinality.
+
+`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association result, applicable Fast Planner continuation/escalation context, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. Ordinary speech Goals use `respond` only when their requested content can be supplied truthfully; they may instead clarify, report unavailable, or refuse. An independent completed speech Goal may coexist with such a limitation in a zero-step `mixed` Plan. Every unmet Goal must remain unmet in per-Goal and aggregate satisfaction; complete coverage is accounting, not fulfillment. Zero-step mixed speech grants no executable work, future readiness, or confirmation authority. Canonical and streamed Fast may combine an independent response with clarification without a Capability Activity; whole-scope Fast escalation remains atomic. Runtime preserves the question/waiting lifecycle or final limitation speech instead of labeling every mixed response pre-action. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. The current Deep implementation uses one primary model invocation and fails closed on invalid output. Semantic grounding, responsibility coverage, capability applicability, confidence/satisfaction, and safety rejection are not rewritten by another Deep model pass.
+
+Canonical Fast requires an empty `escalation_reason` on every non-escalating
+result; Schema and Host enforce the same field contract. Fast and Deep receive
+exact bounded GI unresolved evidence; canonical Fast also receives the requested
+response language. Deep receives first-class `CognitiveWorkRequest.history` through
+at most six retained user/assistant records with exact text and delivery-source
+metadata. Oversize history projection fails before inference at 6,000 characters;
+it is never silently shortened. Historical dialogue does not establish current
+world truth, and authored assistant text is not automatically audible-delivery
+Evidence. Native canonical speech schemas expose complete aggregate branches,
+while full Schema/DTO/Host validation remains required.
 
 `POST /situational-cognition` uses the configured Fast cognition model through a separate stateless invocation contract, not the Planner schema. The request is valid only for a Goal-free `situation_revision` opportunity whose Situation digest and trusted source refs exactly match the supplied `SituationProjection`. The model sees bounded Stable Mind, activated disclosure-safe Memory, current Situation including exact trusted audience when supplied, and delivered/pending interaction context; it owns semantic relevance and can choose `silence` or author one exact `greeting|acknowledge|inquire|inform|respond` utterance. Runtime binds opportunity/source/subject provenance, sets `truth_stage=context_grounded`, and materializes no Capability requests or Goal-completion authority. Normal admitted Goal-free Situation revisions enter one bounded Fast call rather than a Host social-salience rule table. `slow` Goal-free deliberation remains a separate future contract rather than borrowing Deep Planner. Concrete person/scene/social perception implementations are outside this endpoint and remain unqualified.
 
@@ -294,10 +335,28 @@ Live provider Capabilities may publish the same model-visible
 `metadata.argument_realization` contract when human semantic names differ from
 provider-local parameter names. The provider owns that mapping; Chromie validates
 that every declared target exists in the exact input schema and then projects it
-unchanged to Planner. For example, Soridormi declares human `speed -> vx_mps` and
-`duration -> duration_s` for `walk_velocity`, so an explicit numeric request must
+unchanged to Planner. A `walk_velocity` provider can declare human
+`speed -> vx_mps` and `duration -> duration_s`; applicability depends on the exact
+live catalog, not a historical declaration. An explicit numeric request must
 not be replaced by a provider default. The Host does not invent or repair the
-semantic transformation.
+semantic transformation. Both Fast advance and canonical Fast/Deep validation
+require `minimum_arguments` from every applicable realization contract whenever
+an owned Responsibility/Goal explicitly binds its `source_entity_type`, including
+optional and defaulted inputs. Other arguments and sibling Activities cannot
+witness that presence. The provider declares gaze `duration -> duration_s` as well;
+omitting it cannot silently select the four-second default. This is a presence
+check; interpretation and unit conversion remain Planner-owned.
+
+Canonical Fast/Deep also preserve repetition identity when projecting duplicate
+parameter provenance. A typed count may support only an exact declared argument
+name, a count-typed input, or a provider-declared count realization. Equal numeric
+values alone cannot make a count evidence for duration, yaw, or another quantity.
+The dynamic response schema excludes count-unrepresentable Goal ownership from
+that Capability's step branches while retaining compatible sibling Goals and
+nonexecution outcomes. Host validation rejects absent count applicability,
+omitted realization, and explicit provenance crossing count identity. It does
+not fill arguments or infer repetitions from the number of steps. Structured
+resource quantities retain their separate nested grounding contract.
 
 Terminal Capability results do not enter a separate interpretation endpoint. The
 Host validates and correlates the result, binds a `ToolResultEvidence` object to
@@ -347,8 +406,10 @@ mechanically conserves the authoritative GI Responsibilities and their integrate
 source/coverage evidence; it does not invoke a coverage reviewer, critic, fresh
 interpretation, or final semantic recheck. A semantic, grounding, or conservation
 rejection fails closed and cannot be repaired at the same authority. The current
-development implementation follows this primary-result contract; repository policy
-rejects restoration of the older certificate/reconsideration path. Live model quality
+repair gate accepts only extra-field and list/dictionary-shape errors. Missing
+semantic fields, invalid values, semantic validator failures, and mixed failures
+are terminal after the primary call; unknown validation error types fail closed.
+Repository policy rejects restoration of the older certificate/reconsideration path. Live model quality
 still requires current-revision qualification.
 
 `GoalAssociationResolution.resolution_status` is the terminal contract:
@@ -377,9 +438,17 @@ The host context now includes compact prompt-memory fields:
 `session_memory.memory_summary`, `session_memory.extracted_memory`, and
 top-level `extracted_memory`. These are process-local session/task memory
 summaries, not durable user-profile memory and not authorization for side
-effects. Fast Goal Interpretation prompts sanitize raw `history` and `conversation` fields
-from their bounded context payload and rely on these compact memory fields
-instead.
+effects. Goal Interpretation projects accepted dialogue and retained Goal semantics
+separately from ambient context. Root `conversation_id`, `session_id`, `turn_id`,
+and `sid` are excluded from its primary and Deep semantic prompts; they remain
+on the authoritative request for host correlation and logging. These bookkeeping
+labels cannot supply user meaning. Raw `history` and `conversation` containers
+remain excluded from the ambient context payload.
+The separate identity projection preserves the configured
+`identity.model_identity_boundary` alongside self-reference facts in both
+interpretation prompts. Its required JSON fails explicitly above 1,200 characters
+instead of dropping identity truth. Robotic embodiment does not establish any
+particular Capability's availability.
 Durable or session memory is not a Goal Interpretation route. Explicit memory
 changes flow through typed, consent-bound memory proposals and the existing
 Conversation State / memory capability boundary. The Host validates persistence

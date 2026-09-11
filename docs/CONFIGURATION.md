@@ -416,7 +416,7 @@ retained. See
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
 | `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
 | `AGENT_SKILL_SELECTION_MODEL` | Ollama model used by the responsible Agent-role selection boundary; default `qwen3:4b`. |
-| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for one Agent Skill selection or repair model call; default `10000`. Explicit qualification mode raises it to `120000`. |
+| `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for the single primary Agent Skill selection call; default `10000`. No model repair or reselection is performed. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
 | `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, and Deep Planner; default `1`. |
@@ -998,7 +998,10 @@ through its specialized model transport. Records correlate prompt-bearing reques
 schema/options, raw model output, parsed JSON when available, provider metadata, model,
 role/purpose, stage, call ID, and available trace/turn/session IDs. Provider `context` token
 vectors are omitted because they are not model-authored semantic output and can dwarf the
-useful record.
+useful record. The single-line log uses ASCII JSON escapes so container log framing
+cannot split a UTF-8 character; JSON decoding recovers the exact original Unicode
+request and response. Recompute the retained text references before attributing a
+logged difference to model inference. A digest mismatch is evidence corruption.
 
 These complete records are private diagnostic evidence and may contain family conversation
 or memory. `scripts/collect_debug_bundle.sh` extracts/deduplicates them as
@@ -1060,16 +1063,22 @@ unified Gemma constructor, preserving the existing GPU branch predicate. Remove 
 repair when a reviewed upstream image implements that constructor contract.
 The request-format candidate also makes the pinned XGrammar dispatcher honor
 `x-guidance.whitespace_flexible` per schema, retaining the complete schema as its
-cache key. The Agent adds `false` only to the two GA output-contract titles;
-GI, Planner and other requests retain their existing formatting. No global compact
+cache key. The Agent adds `false` to the two GA output-contract titles and the
+Deep Planner and Agent Skill Selection output-contract titles. Deep/Skill calls
+also reproduced outside-string whitespace loops that exhausted their output budgets.
+GI and other unannotated requests retain their existing formatting. No global compact
 flag or environment variable is added. This candidate requires the full qualification
 record in the checkpoint before promotion; the earlier global compact experiment
 was rejected for GI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
-The isolated GA schema candidate exposes existing object and array shape constraints
-through redundant alternatives for intersection-first decoders. Array item and length
-checks do not imply cross-item or cross-collection Responsibility conservation in the
-decoder; the original full Schema conditions and Host exact-once checks remain required.
+GA, canonical Fast Planner (single and multiple Goals), Deep Planner and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
+as redundant single alternatives beside intersections. This preserves the full Schema
+contract while making those shapes visible to the pinned decoder; cross-item identity
+conservation still requires the original Schema clauses and deterministic Host checks.
+GI likewise exposes its existing Responsibility object shape when supplied Goal context
+adds a continuity intersection. This preserves required source citations, relationship
+tokens and supplied Goal IDs in the decoder; it changes neither GI formatting nor the
+semantic contract. Conditional relationship checks remain independently enforced.
 The checkpoint must be cached in `hf_cache` before offline startup. Normal launch is
 `./scripts/start_chromie.sh --build`; `--no-orchestrator --keep-services` provides
 service-only startup with unplayed speech readiness probes. The launcher uses SGLang
@@ -1080,3 +1089,39 @@ This change adds one runtime Compose file and one reproducible image Dockerfile,
 and removes the obsolete candidate overlay. No new environment variable or semantic
 authority is introduced. The existing standalone SGLang qualification Compose remains
 available for explicitly isolated provider experiments.
+
+Fast Planner's pre-association Goal continuity context projects complete semantic Goals,
+lifecycle status, open information gaps and last-update text from active and recent
+snapshots. Snapshot diagnostics and task implementation identity are excluded. The
+required projection has a 16000-character budget: overflow fails prompt construction
+explicitly, without truncating fields, omitting a Goal suffix or resolving conflicting
+versions in the Host. This replaces the former optional 600-character list budget.
+
+Fast Planner declares the existing ordered `presentation_commit` and `terminal_plan`
+wire frames with their original payload schemas to the model client. SGLang constrains
+those frames using its structural-tag decoder. The adapter exposes existing intersection
+shapes and omits string `pattern` and numeric `number` bounds from this decoder only:
+installed XGrammar 0.2.1 miscompiles JSON-string escaping and fractional bounds. Original
+schemas, parser, DTO and Host checks remain unchanged; full-schema qualification is
+separate and decoder validity alone does not establish semantic correctness. Ollama
+retains its existing unconstrained tagged text stream; no constrained-decoder claim is
+made for that provider. No new environment setting or extra model call is introduced.
+
+Tagged Fast requests bound each inter-token JSON whitespace region and each frame
+separator to eight characters. String contents are unaffected. The request carries
+`x-guidance.max_whitespace_cnt=8`; the pinned SGLang bridge converts only annotated
+structural JSON nodes to XGrammar's equivalent bounded-whitespace grammar. Unannotated
+requests keep their existing formatting. This prevents an observed whitespace loop
+after a closed JSON string from consuming the output budget; it does not repair
+semantic content or guarantee completion. Whitespace runs above eight characters
+outside strings are intentionally excluded from this decoder format.
+
+Private model-call evidence preserves request/schema property order and records each
+SGLang stream once on completion or failure, including partial generated text,
+finish reason and failure classification. Existing canonical reference hashes stay
+unchanged; use the retained ordered request for decoder replay. Failed streams must
+remain in qualification denominators even when no complete JSON payload exists.
+Non-stream SGLang requests are likewise retained on timeout, cancellation, truncation,
+HTTP failure and parse failure. Available provider bodies are retained even when they
+are not JSON objects; missing responses are not fabricated. A successfully completed
+call does not inherit an unrelated exception already handled by its caller.

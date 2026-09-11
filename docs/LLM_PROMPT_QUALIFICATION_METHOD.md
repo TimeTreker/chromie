@@ -369,6 +369,25 @@ After the minimal change:
 If the focused rerun passes but the full cohort regresses, reject or revise the
 change. Do not declare the prompt qualified from the focused subset.
 
+### Scoped code acceptance and whole-runtime qualification
+
+A code-delivery decision must state its scope separately from model-role qualification
+or release readiness. With explicit owner approval, a reproduced mechanical repair may
+be accepted for its demonstrated mechanism while retaining unrelated or unresolved
+semantic failures. Record the focused proof, complete-cohort results, regression
+uncertainty, accepted scope and remaining deployment blockers in the checkpoint and
+handoff. This is scoped engineering acceptance, not satisfaction of the full-cohort
+nonregression rule above. Do not lower scene expectations, erase a regression, or
+convert this decision into a qualified role/profile or release claim.
+
+There is no universal passing-scene count for code acceptance. Qualification still uses
+the predeclared per-case requirements and hard gates. A model-inference limitation may
+justify stopping prompt iteration only after the exact prompt, context, Schema,
+provider and oracle are established sound. A safely contained limitation may remain
+outside a scoped delivery claim; attributing unsafe or untruthful behavior to the model
+does not waive the affected deployment gate. Owner acceptance of uncertainty must be
+recorded as uncertainty, not evidence of a model-only root cause.
+
 ### Phase 8 — stop deliberately
 
 Stop prompt iteration when all of these are true for the declared scope:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from agent.app.clients.ollama_client import TaggedJSONResponseFormat
+
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
@@ -9,6 +11,7 @@ import json
 import unittest
 
 from pydantic import ValidationError
+from jsonschema import Draft202012Validator
 
 from agent.app.fast_planner import FastPlannerResolver as ProductionFastPlannerResolver
 from agent.app import planner_fast_validation
@@ -1653,6 +1656,117 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 
 class FastPlannerResolverTests(unittest.TestCase):
+    def test_native_speech_schema_enforces_existing_cross_field_contract(self):
+        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests, FullCatalog
+
+        for multiple in (False, True):
+            with self.subTest(multiple=multiple):
+                run_request, raw = CanonicalDeepPlanContractTests.speech_outcomes("clarify", multiple)
+                model = FakeOllama(raw)
+                asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+                schema = model.prompts[0][1]["response_format"]
+                native_union = {"$defs": schema["$defs"], "anyOf": schema["anyOf"]}
+                for contract in (schema, native_union):
+                    validator = Draft202012Validator(contract)
+                    validator.validate(raw)
+                    for fault in ("aggregate", "escalation_reason", "local_escalation"):
+                        with self.subTest(fault=fault):
+                            invalid = copy.deepcopy(raw)
+                            if fault == "aggregate":
+                                invalid["disposition"] = "respond"
+                            elif fault == "escalation_reason":
+                                invalid["escalation_reason"] = "Unresolved content."
+                            else:
+                                invalid["goal_outcomes"]["goal-speech"]["disposition"] = "escalate"
+                            self.assertFalse(validator.is_valid(invalid))
+
+    def test_non_escalating_plan_rejects_escalation_reason(self):
+        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests, FullCatalog
+
+        for multiple in (False, True):
+            for reason in ("", "Missing referenced content.", " "):
+                with self.subTest(multiple=multiple, reason=reason):
+                    run_request, raw = CanonicalDeepPlanContractTests.speech_outcomes("clarify", multiple)
+                    raw["escalation_reason"] = reason
+                    model = FakeOllama(raw)
+                    plan = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+                    schema = model.prompts[0][1]["response_format"]
+                    self.assertEqual(Draft202012Validator(schema).is_valid(raw), not bool(reason))
+                    self.assertEqual(bool(plan.metadata.get("error")), bool(reason))
+                    self.assertEqual(len(model.prompts), 1)
+                    self.assertEqual(plan.steps, [])
+
+    def test_canonical_prompt_preserves_requested_language_for_each_goal_count(self):
+        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests, FullCatalog
+
+        for language in ("en", "zh-CN", "es"):
+            for multiple in (False, True):
+                with self.subTest(language=language, multiple=multiple):
+                    run_request, raw = CanonicalDeepPlanContractTests.speech_outcomes("clarify", multiple)
+                    run_request = run_request.model_copy(update={"language": language})
+                    model = FakeOllama(raw)
+                    asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+                    prompt = str(model.prompts[0][0])
+                    self.assertEqual(prompt.count(f"Required response language: {language}."), 1)
+                    self.assertEqual(len(model.prompts), 1)
+
+    def test_independent_response_survives_speech_clarification_without_work(self):
+        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests, FullCatalog
+
+        for language, question, greeting in (
+            ("en", "Which sentence do you mean?", "Goodnight."),
+            ("zh-CN", "你说的是哪句话？", "晚安。"),
+        ):
+            with self.subTest(language=language):
+                run_request, raw = CanonicalDeepPlanContractTests.speech_outcomes("clarify", True)
+                unresolved = "The referenced content is not identified."
+                run_request = run_request.model_copy(update={
+                    "language": language, "interpretation_unresolved": [unresolved],
+                    "responsibilities": [
+                        CognitiveResponsibilityProposal(local_ref="r1", outcome="say the referenced content", output_mode="speech", confidence=1.0),
+                        CognitiveResponsibilityProposal(local_ref="r2", outcome="say goodnight", output_mode="speech", confidence=1.0),
+                    ],
+                })
+                raw["response_text"] = question + " " + greeting
+                raw["goal_outcomes"]["goal-speech"]["response_text"] = question
+                raw["goal_outcomes"]["goal-goodnight"]["response_text"] = greeting
+                model = FakeOllama(raw)
+                plan = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+                Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+                self.assertNotIn("error", plan.metadata)
+                self.assertEqual(plan.disposition, "mixed")
+                self.assertEqual(plan.steps, [])
+                self.assertEqual(plan.response_text, question + " " + greeting)
+                self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, ["goal-speech"])
+                self.assertEqual(len(model.prompts), 1)
+
+                terminal = self._clarification_output(
+                    source_kind="unresolved_meaning", source_reference=unresolved,
+                    required_for=["content"], sources_considered=["authoritative_context"],
+                )
+                terminal.update(disposition="mixed", coverage="complete", covered_responsibility_refs=["r1", "r2"], auxiliary_activities=[])
+                terminal["activities"][0].update(text=question, source_responsibility_refs=["r1"])
+                terminal["activities"].append({
+                    "activity_id": "goodnight", "role": "complete_response", "text": greeting,
+                    "speech_act": "greeting", "timing": "sequential", "source_responsibility_refs": ["r2"],
+                })
+                wire = {"presentation_commit": {"activity": None, "auxiliary_activities": []}, "terminal_result": terminal}
+                model = FakeOllama(wire)
+                advance = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve_advance(run_request))
+                self.assertNotIn("error", advance.metadata)
+                self.assertEqual(advance.disposition, "mixed")
+                self.assertEqual([item.role for item in advance.activities], ["clarification", "complete_response"])
+                self.assertEqual([item.text for item in advance.activities], [question, greeting])
+                self.assertEqual(len(model.prompts), 1)
+                terminal_schema = model.prompts[0][1]["response_format"].frames[1][1]
+                Draft202012Validator(terminal_schema).validate(terminal)
+                for removed in (0, 1):
+                    incomplete = copy.deepcopy(wire)
+                    incomplete["terminal_result"]["activities"].pop(removed)
+                    self.assertFalse(Draft202012Validator(terminal_schema).is_valid(incomplete["terminal_result"]))
+                    rejected = asyncio.run(FastPlannerResolver(FakeOllama(incomplete), FullCatalog()).resolve_advance(run_request))
+                    self.assertIn("error", rejected.metadata)
+
     def test_capability_repair_feedback_keeps_distinct_argument_failures(self):
         error = planner_fast_validation.CapabilityArgumentValidationError(
             [
@@ -2039,6 +2153,158 @@ class FastPlannerResolverTests(unittest.TestCase):
                     self.assertIn("numeric Capability input contradicts GI binding", result.metadata["error"])
 
 
+    def test_repetition_cannot_be_witnessed_by_duration_without_count_input(self):
+        capability = {
+            "capability_id": "soridormi.turn_in_place",
+            "input_schema": {"type": "object", "additionalProperties": False,
+                "properties": {"duration_s": {"type": "number", "default": 2.0},
+                               "yaw_radps": {"type": "number", "default": 0.12}}},
+        }
+        for count in (1, 2):
+            for duration in (1.0, 2.0):
+                for yaw in (-0.12, 0.12):
+                    with self.subTest(count=count, duration=duration, yaw=yaw):
+                        request = _work_request(
+                            sid="turn-count", text="Turn in place.",
+                            responsibilities=[{"local_ref": "r1", "outcome": "turn in place",
+                                "output_mode": "body_action", "bindings": {"count": count},
+                                "confidence": 1.0}],
+                        )
+                        output = FastPlannerAdvanceModelOutput.model_validate({
+                            "disposition": "execute", "coverage": "complete",
+                            "covered_responsibility_refs": ["r1"],
+                            "activities": [{"role": "capability", "activity_id": "turn",
+                                "capability_id": capability["capability_id"],
+                                "args": {"duration_s": duration, "yaw_radps": yaw},
+                                "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                            "continuations": [], "confidence": 1.0, "unresolved": [],
+                            "reason_summary": "Turn as requested.",
+                        })
+                        with self.assertRaisesRegex(PlannerDTOContractError, "no count input"):
+                            planner_fast_validation.validate_fast_advance_output(
+                                output, request=request, responsibilities=list(request.responsibilities),
+                                capabilities=[capability],
+                            )
+
+    def test_turn_count_contract_preserves_named_binding(self):
+        capability = {
+            "capability_id": "soridormi.turn_in_place",
+            "input_schema": {"type": "object", "additionalProperties": False,
+                "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 8, "default": 1},
+                               "duration_s": {"type": "number", "default": 2.0},
+                               "yaw_radps": {"type": "number", "default": 0.12}}},
+        }
+        for count in (1, 2):
+            for actual_count in (None, 1, 2):
+                with self.subTest(count=count, actual_count=actual_count):
+                    request = _work_request(
+                        sid="turn-count-contract", text="Turn in place.",
+                        responsibilities=[{"local_ref": "r1", "outcome": "turn in place",
+                            "output_mode": "body_action", "bindings": {"count": count},
+                            "confidence": 1.0}],
+                    )
+                    args = {"duration_s": float(count), "yaw_radps": -0.12}
+                    if actual_count is not None:
+                        args["count"] = actual_count
+                    output = FastPlannerAdvanceModelOutput.model_validate({
+                        "disposition": "execute", "coverage": "complete",
+                        "covered_responsibility_refs": ["r1"],
+                        "activities": [{"role": "capability", "activity_id": "turn",
+                            "capability_id": capability["capability_id"], "args": args,
+                            "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                        "continuations": [], "confidence": 1.0, "unresolved": [],
+                        "reason_summary": "Turn as requested.",
+                    })
+                    def validate():
+                        return planner_fast_validation.validate_fast_advance_output(
+                            output, request=request, responsibilities=list(request.responsibilities),
+                            capabilities=[capability],
+                        )
+                    if actual_count == count:
+                        validate()
+                        self.assertEqual(output.activities[0].args, args)
+                    else:
+                        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "numeric Capability input contradicts GI binding"):
+                            validate()
+
+    def test_advance_declared_realization_cannot_fall_back_to_defaults(self):
+        capability = {
+            "capability_id": "provider.bounded_action",
+            "input_schema": {"type": "object", "additionalProperties": False,
+                "properties": {"hold_seconds": {"type": "number", "default": 4.0},
+                               "other_value": {"type": "number", "default": 2.0}}},
+            "hints": {"argument_realization": {"hold": {
+                "source_entity_type": "duration", "planner_owned": True,
+                "arguments": ["hold_seconds"], "minimum_arguments": 1,
+            }}},
+        }
+        for value, seconds in (("two seconds", 2.0), ("两秒", 2.0), ("one hundred and twenty milliseconds", 0.12)):
+            for args in ({}, {"other_value": seconds}, {"hold_seconds": seconds}):
+                with self.subTest(value=value, args=args):
+                    request = _work_request(
+                        sid="realization-coverage", text="Perform the bounded action.",
+                        responsibilities=[{"local_ref": "r1", "outcome": "bounded action",
+                            "output_mode": "body_action", "bindings": {"duration": value},
+                            "confidence": 1.0}],
+                    )
+                    output = FastPlannerAdvanceModelOutput.model_validate({
+                        "disposition": "execute", "coverage": "complete",
+                        "covered_responsibility_refs": ["r1"],
+                        "activities": [{"role": "capability", "activity_id": "action",
+                            "capability_id": capability["capability_id"], "args": args,
+                            "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                        "continuations": [], "confidence": 1.0, "unresolved": [],
+                        "reason_summary": "Perform the bounded action.",
+                    })
+                    before = output.model_dump()
+                    def validate():
+                        planner_fast_validation.validate_fast_advance_output(
+                            output, request=request, responsibilities=list(request.responsibilities),
+                            capabilities=[capability],
+                        )
+                    if "hold_seconds" in args:
+                        # Presence is mechanical; this check must not convert natural-language units.
+                        validate()
+                    else:
+                        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "omitted declared argument realization"):
+                            validate()
+                    self.assertEqual(output.model_dump(), before)
+
+    def test_canonical_declared_realization_requires_each_bound_contract(self):
+        capability = {
+            "capability_id": "provider.bounded_action",
+            "input_schema": {"type": "object", "properties": {
+                "start": {"type": "number", "default": 0},
+                "end": {"type": "number", "default": 4}}},
+            "hints": {"argument_realization": {"window": {
+                "source_entity_type": "interval", "planner_owned": True,
+                "arguments": ["start", "end"], "minimum_arguments": 2,
+            }}},
+        }
+        for bound in (False, True):
+            for args in ({}, {"start": 0}, {"start": 0, "end": 2}):
+                with self.subTest(bound=bound, args=args):
+                    raw = multi_goal_plan(
+                        disposition="execute", coverage="complete", goal_summary="Use the interval.",
+                        steps=[execute_step("action", capability["capability_id"], args,
+                                            ["goal-action"], "Use the interval.")],
+                        goal_outcomes={"goal-action": execute_outcome("goal-action", ["action"], "Covered.")},
+                        goal_satisfaction=exact_satisfaction(["goal-action"]),
+                    )
+                    output = PlannerModelOutput.model_validate(raw)
+                    goal = {"goal_id": "goal-action", "object": {"bindings": {
+                        "window": {"entity_type": "interval", "value": "the requested interval"}
+                    } if bound else {}}}
+                    before = output.model_dump()
+                    def validate():
+                        validate_goal_binding_argument_grounding(output, authoritative_goals=[goal], capabilities=[capability])
+                    if bound and len(args) < 2:
+                        with self.assertRaisesRegex(PlannerDTOContractError, "omitted declared argument realization"):
+                            validate()
+                    else:
+                        validate()
+                    self.assertEqual(output.model_dump(), before)
+
     @staticmethod
     def _clarification_output(
         *,
@@ -2125,7 +2391,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertEqual(advance.activities[0].role, "complete_response")
         self.assertIn("Responsibility evidence", ollama.prompts[0][0])
-        self.assertEqual(ollama.prompts[0][1]["response_format"], "text")
+        self.assertIsInstance(ollama.prompts[0][1]["response_format"], TaggedJSONResponseFormat)
         presentation_schema, _ = _tagged_frame_schemas(ollama.prompts[0][0])
         presentation_activity = presentation_schema["properties"]["activity"][
             "anyOf"
@@ -2852,16 +3118,13 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn('"reason_summary"', encoded_capability_schema)
         self.assertNotIn('"allOf"', encoded_capability_schema)
         self.assertIn('"args"', encoded_capability_schema)
-        self.assertTrue(
-            any(
-                item.get("then", {})
-                .get("properties", {})
-                .get("activities", {})
-                .get("minContains")
-                == 1
-                for item in schema["allOf"]
-            )
-        )
+        empty_execution = {
+            "disposition": "execute", "coverage": "complete",
+            "covered_responsibility_refs": ["weather"], "activities": [],
+            "auxiliary_activities": [], "continuations": [], "confidence": 1.0,
+            "unresolved": [], "reason_summary": "No Work was authored.",
+        }
+        self.assertFalse(Draft202012Validator(schema).is_valid(empty_execution))
 
     def test_fresh_evidence_missing_input_keeps_planner_resolution_branches(self):
         responsibility = CognitiveResponsibilityProposal.model_validate(
@@ -3719,7 +3982,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.activities[1].args["period"], "evening")
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertIn("Language hint: zh-CN", str(ollama.prompts[0][0]))
-        self.assertEqual(ollama.prompts[0][1]["response_format"], "text")
+        self.assertIsInstance(ollama.prompts[0][1]["response_format"], TaggedJSONResponseFormat)
         presentation_schema, terminal_schema = _tagged_frame_schemas(
             ollama.prompts[0][0]
         )
@@ -4814,7 +5077,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(resolved.disposition, "execute")
         self.assertEqual(len(ollama.prompts), 1)
         primary_prompt = str(ollama.prompts[0][0])
-        self.assertIn("every per-goal outcome", primary_prompt)
+        self.assertEqual({item.goal_id for item in resolved.goal_outcomes}, set(goal_ids))
         self.assertIn("no later model will audit or repair its semantics", primary_prompt)
 
     def test_parallel_plan_without_declared_provider_support_escalates(self):
