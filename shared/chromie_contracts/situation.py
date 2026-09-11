@@ -521,7 +521,7 @@ SituationalSpeechAct = Literal[
 
 
 class SituationalCommunicativeAct(BaseModel):
-    """One bounded goal-free communicative act authored by the same Cognitive Core.
+    """One bounded Goal-free Communicative Activity authored by Planner.
 
     The act is deliberately incapable of carrying Capability Work, Goal mutation, or
     effect authorization. Trusted Runtime binds Situation provenance around this exact
@@ -555,7 +555,7 @@ class SituationalCommunicativeAct(BaseModel):
 
 
 class SituationalCognitionRequest(BaseModel):
-    """One bounded Goal-free cognition invocation from trusted current Situation."""
+    """Planner communication-only request from trusted current Situation; no Goal/Work authority."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -675,7 +675,7 @@ class SituationalSelfMemoryCandidate(BaseModel):
 
 
 class SituationalCognitionResolution(BaseModel):
-    """Canonical result of one Goal-free situational cognition invocation."""
+    """Canonical result of Planner's restricted Situation invocation."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

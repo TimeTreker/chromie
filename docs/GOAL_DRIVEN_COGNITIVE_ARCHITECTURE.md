@@ -104,7 +104,7 @@ Planner fast pass        Goal Association
 speech + ordinary HOW     Goal continuity
       │                      │
       ├─ complex HOW ──> Deep Planner
-      ├─ provisional ──> bounded deliberative cognition
+      ├─ provisional ──> bounded Planner deliberation
       │                      │
       ▼                      ▼
 Plan / Activities       Canonical Goals
@@ -164,9 +164,9 @@ authority. The fast pass should produce a complete detailed Plan whenever HOW is
 sufficiently clear; the deep Planner pass is reserved for genuinely complex dependencies,
 alternatives, resource, or safety reasoning. Separately, a valid provisional conversational
 Activity may keep its Responsibility open and authorize one bounded communication-only
-deliberative continuation. That continuation does not become Deep Planner and does not gain
-Work authority; it returns through the same Core/Planner communication surface. The depth
-label never changes authority.
+Planner continuation. Its deeper invocation retains the communication-only contract and
+gains no Work authority; it uses the same Planner communication authority. The depth label
+never changes the input contract's permissions.
 
 A safe, side-effect-free read may begin before Goal Association finishes when the
 Capability contract explicitly permits it. Later Goal continuity, Runtime state, terminal
@@ -238,9 +238,10 @@ Work mutation, Evidence, or independent wording channel. It consumes the same
 Responsibility, Situation, Memory, Evidence, and Interaction Ledger projections as the
 Cognitive Core and returns through the same Planner-owned Communicative-Activity authority.
 Implementation should reuse common model-transaction, grounding, and validation mechanics
-rather than clone a parallel agent stack. A communication-only deliberative pass has no
-Capability/Work authority; if genuine HOW becomes necessary, normal Planner authority owns
-that HOW. In particular, **deeper cognition is not automatically Deep Planner**.
+rather than clone a parallel agent stack. A communication-only Planner pass has no
+Capability/Work authority. Capability planning
+requires independently admitted Responsibility/Goal inputs and normal authorization; a
+depth change cannot supply them. GI, GA and Reflection retain their own distinct authorities.
 
 A provisional claim is never permission to guess ahead of pending Work. If the truth of
 what Chromie would say materially depends on a Capability result or fresh Evidence that is
@@ -1647,7 +1648,8 @@ The synthesis above reduces to a small set of invariants:
 16. **Later cognition reconciles against what was actually delivered: unchanged meaning
     stays silent, additive meaning emits only the delta, and contradiction repairs forward.**
 17. **Deliberation is bounded work of the existing Core, not a persistent Belief Manager,
-    semantic reviewer, or ambient background loop; Deep Planner remains a HOW authority.**
+    semantic reviewer, or ambient background loop; Planner also owns ordinary communication
+    and deeper reasoning retains the invocation's exact Goal/Work permissions.**
 18. **Chromie is one persistent social Self; family/friend/stranger are relationships and
     Situation, not Persona modes.**
 19. **Identity, relationship, privacy, factual trust, and authorization remain distinct.**
@@ -1724,9 +1726,9 @@ flowchart TD
     GI --> GA["Goal Association<br/>canonical continuity when needed"]
     PLAN --> WORK["Communicative / Capability Activities"]
     PLAN --> PROV{"Provisional conversation?"}
-    PROV -->|"yes"| DELIB["Bounded deliberative cognition<br/>communication-only unless HOW emerges"]
+    PROV -->|"yes"| DELIB["Bounded Planner deliberation<br/>communication-only; no permission widening"]
     PROV -->|"no"| WORK
-    PLAN --> DEEP["Deep Planner pass<br/>only for complex HOW"]
+    PLAN --> DEEP["Deep Planner pass<br/>same authority and admitted scope"]
     DELIB --> RECON["Delivered-claim reconciliation<br/>silence / delta / repair"]
     DEEP --> WORK
     RECON --> WORK
@@ -1844,10 +1846,10 @@ trusted world/social transition
     -> Situation revision -> derived relational/situational salience
     -> CognitiveOpportunity (Goal-bound when continuing Responsibility,
                              Goal-free when only Situation itself is salient)
-    -> same Core cognition
+    -> Planner inside the same Core (communication-only for Goal-free input)
 
 same Core
-    -> silence / observe / speak / form Work when HOW is actually needed
+    -> silence / observe / speak / form Work only with admitted Goal/Work authority
     -> observe reaction/outcome
     -> Situation + Memory + optional bounded Reflection
 ```
@@ -1863,7 +1865,7 @@ The first relational-salience implementation remains reconstructable rather than
 new Mind object, but semantic salience is not implemented by Host rules. Runtime derives one
 semantic Situation signature for correlation, activates only disclosure-safe Memory for the
 exact Situation subjects and trusted audience, and projects delivery-qualified Interaction
-history. The same bounded situational-cognition model then decides whether the current change
+history. Planner's bounded Situation invocation then decides whether the current change
 matters, whether interruption is appropriate, and whether to remain silent or speak once.
 Relationship/shared experience, uncertainty, consequence, privacy, and prior delivery are
 semantic inputs to that judgment rather than string/event decision tables. There is no
@@ -1888,10 +1890,17 @@ The first production-neutral Goal-free source slice is implemented. Typed
 `SituationRevisionObservation`/`CognitiveOpportunity` may omit Goal IDs only with an exact
 Situation digest and trusted source provenance. The opportunity carries bounded source and
 subject refs, and replaying the same Situation digest creates no cognition. A stateless
-same-Core situational-cognition invocation can only remain silent or author one exact
-context-grounded low-commitment utterance; its schema contains no Capability Work, Goal
-mutation, confirmation, or effect authority, and `slow` Goal-free readiness currently fails
-quiet rather than entering Deep Planner. The first relational-Memory/privacy source slice is also implemented without a new social
+restricted Planner invocation can only remain silent or author one exact context-grounded
+low-commitment utterance, with existing private Memory proposals; its schema contains no
+Capability Work, Goal mutation, confirmation or effect authority. Fast may delegate an
+unresolved decision once with no Activity/Memory result; `slow` readiness enters Deep
+directly under the same restricted contract. Complete decisions receive no second model
+review, unavailable Deep fails quiet, and Deep cannot recurse. Every Planner scope shares
+ordinary communication authority and exact Activity/wording validation. Host checks all
+source/subject, identity, delivered-repair and Memory-candidate constraints before writing
+Memory or materializing speech. This Goal-free contract supplies no Responsibility and
+cannot use the separately approved GI-before-GA safe-read permission. The first
+relational-Memory/privacy source slice is also implemented without a new social
 owner. `MemoryEntry` carries bounded relation/subject/source-person/audience/disclosure
 provenance; exact Situation subject refs participate in deterministic activation; and
 privacy-aware entries are filtered before model projection. Unknown/private social Memory
@@ -1922,7 +1931,7 @@ Admitted User Turn + bounded Session Context
        |-> same Fast Planner -> remaining Activity Plan + input resolution
        |     |-> ready Capability and still-needed speaking Activities
        |     |-> user-resolvable clarification only when needed
-       |     `-> Deep Planner only when HOW is complex
+       |     `-> Deep Planner for unresolved planning within the admitted scope
        `-> Goal Association -> sole canonical Goal commit/version authority
   -> bind each Activity to the applicable per-Goal Runtime task-list views
   -> deterministic validation/authorization/resource scheduling
@@ -2535,7 +2544,12 @@ escalation. The implemented contract and qualification matrix are defined in
 
 ### 8.2 Deep Planner
 
-The Deep Planner receives:
+Deep denotes the depth of an independent Planner invocation. The existing restricted
+Situation schema supports Goal-free communication without acquiring Goal/Work permission;
+its one unresolved Fast delegation or direct slow invocation cannot review a completed
+decision or recurse. The following CanonicalPlan contract covers Goal-bound Work planning.
+
+For Goal-bound Work planning, Deep Planner receives:
 
 - the original user turn;
 - bounded projections of model-selected Agent Skills and their provenance;

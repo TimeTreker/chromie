@@ -16,6 +16,11 @@ from .cognitive_identity import (
     owner_approved_personality_context,
 )
 from .goal_progress_communication import goal_progress_communication_prompt
+try:
+    from chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT
+
 from .prompt_projection import bounded_json, required_json
 from .planner_context import (
     canonical_goal_grounding,
@@ -949,6 +954,7 @@ def fast_streaming_advance_system_prompt() -> str:
     """System authority for one Fast invocation with an early typed commit."""
 
     return (
+        PLANNER_COMMUNICATION_AUTHORITY_PROMPT +
         "You are Chromie's low-latency Fast Planner. Produce one complete semantic "
         "result as exactly two tagged frames in one continuous output stream. Emit "
         "<presentation_commit>...</presentation_commit> first and "
@@ -1010,6 +1016,7 @@ def fast_layered_prompt(
 
 def fast_system_prompt() -> str:
     return (
+        PLANNER_COMMUNICATION_AUTHORITY_PROMPT +
         "You are Chromie's Fast Planner. Plan only the final authoritative user turn and canonical goals at the end of the prompt. "
         "Author the semantic plan from the goals and executable catalog; never use phrase-to-action rules and never delegate semantic planning to the host. "
         "A verified-memory index is provenance only, never answer evidence. For a retained completed external-result Goal, a direct response may use only supplied delivered evidence-bound dialogue: preserve every measurement and condition exactly and omit unsupported embellishment. If that dialogue is absent, retrieve matching verified evidence, perform a fresh read, or escalate. "
@@ -1323,6 +1330,7 @@ def prompt_capability_contract(
 
 def deep_system_prompt() -> str:
     return (
+        PLANNER_COMMUNICATION_AUTHORITY_PROMPT +
         "You are Chromie's Deep Planner. Plan only the final authoritative user turn and canonical goals supplied at the end of the prompt. "
         "This is the only Deep Planner model call for the transaction; any invalid result fails closed. You never call or return to the Fast Planner. "
         "Capabilities are plan leaves, not planner ownership boundaries. This primary "

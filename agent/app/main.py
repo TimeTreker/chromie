@@ -73,7 +73,7 @@ except ImportError:  # pragma: no cover
     )
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
-from .situational_cognition import SituationalCognitionResolver
+from .situational_cognition import SituationalPlannerResolver
 from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
 try:
@@ -350,8 +350,8 @@ situational_deliberative_client = (
     if settings.use_llm and settings.deep_planner_enabled
     else None
 )
-situational_cognition_resolver = (
-    SituationalCognitionResolver(
+situational_planner_resolver = (
+    SituationalPlannerResolver(
         situational_cognition_client,
         deliberative_ollama=situational_deliberative_client,
         num_ctx=max(settings.fast_planner_num_ctx, settings.deep_planner_num_ctx),
@@ -610,12 +610,12 @@ async def resolve_deep_plan(request: CognitiveWorkRequest):
 
 @app.post("/situational-cognition")
 async def resolve_situational_cognition(request: SituationalCognitionRequest):
-    if situational_cognition_resolver is None:
+    if situational_planner_resolver is None:
         raise HTTPException(
             status_code=503,
             detail="Situational cognition is disabled with Fast cognition",
         )
-    return await situational_cognition_resolver.resolve(request)
+    return await situational_planner_resolver.resolve(request)
 
 
 @app.post("/reflection")

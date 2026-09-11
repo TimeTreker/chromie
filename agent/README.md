@@ -2,7 +2,7 @@
 
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
 separately testable Goal Interpretation, Goal Association, Planner fast/deep passes,
-Reflection, capability-catalog, and WorkDAG diagnostic
+restricted Goal-free Situation planning, Reflection, capability-catalog, and WorkDAG diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
 
@@ -12,7 +12,8 @@ The service is **not** a second orchestration runtime. The retired `AgentRuntime
 surfaces have been removed. One Planner authority owns Communicative Activities; its
 fast/deep passes receive bounded Responsibility/Goal/Work/Evidence state on initial and
 event-driven re-entry. Re-entry includes one immutable exact affected-Goal scope;
-unrelated siblings are not projected back into the Planner transaction. Planner owns
+unrelated sibling Work remains outside the Planner transaction; relevant sibling speech
+is read-only delivery context. Planner owns
 Capability/argument/step semantics, while the shared validation kernel projects only
 uniquely derivable duplicate parameter provenance. The Host Orchestrator owns turn coordination
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
@@ -21,6 +22,16 @@ provider behind the Capability boundary.
 GI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
 
 ## Authority boundary
+
+GI, GA, execution events and trusted Situation can trigger independent Planner tasks.
+Goal-free Situation supplies no Responsibility, Goal or Capability Work permission,
+including safe reads. `SituationalPlannerResolver` keeps the existing endpoint/DTO
+surface and configured Fast/Deep clients; it shares the ordinary communication
+contract and Activity identity checks with Goal-bound planning. Only an unresolved
+Fast decision with no Activity/Memory result may delegate once; direct Deep readiness
+has the same restricted scope. A complete decision has no second model reviewer.
+Runtime validates all returned provenance, identity, delivered repair references and
+Memory candidates before committing Memory or preserving exact speech for delivery.
 
 Primary and Deep GI reject a speed binding with invalid source or dimension
 provenance; Host does not delete the binding to accept the rest of the result.
@@ -59,7 +70,7 @@ Planner                  0..N Activity changes or none (Goal-bound)
 
 Goal-free trusted Situation
           ↓
-/situational-cognition   same Core; silence or one speech Activity; no Work
+/situational-cognition   Planner, communication-only; silence or one Activity; no Work
 ```
 
 Optional Social Attention decoration is emitted as `auxiliary_activities[]` in the
@@ -91,6 +102,7 @@ Important endpoints include:
 - `POST /fast-advance`
 - `POST /fast-plan`
 - `POST /deep-plan`
+- `POST /situational-cognition` (restricted Planner Situation contract)
 - Agent Skill selection/disclosure endpoints
 - WorkDAG validate/dry-run/guarded execution/trace diagnostics
 

@@ -12,6 +12,8 @@ from .cognitive_identity import (
 from .prompt_projection import bounded_json
 
 try:
+    from chromie_contracts.plan import validate_communicative_activity_identity
+    from chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT
     from chromie_contracts.situation import (
         SituationalCognitionDisposition,
         SituationalCognitionRequest,
@@ -21,6 +23,8 @@ try:
         SituationalSelfMemoryCandidate,
     )
 except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.plan import validate_communicative_activity_identity
+    from shared.chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT
     from shared.chromie_contracts.situation import (
         SituationalCognitionDisposition,
         SituationalCognitionRequest,
@@ -31,8 +35,8 @@ except ImportError:  # pragma: no cover - repository development path
     )
 
 
-class SituationalCognitionModelOutput(BaseModel):
-    """Model-facing Goal-free cognition result; Runtime binds all provenance."""
+class SituationalPlannerModelOutput(BaseModel):
+    """Planner output for the communication-only Situation scope; Runtime binds provenance."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -48,21 +52,22 @@ class SituationalCognitionModelOutput(BaseModel):
         return " ".join(str(value or "").strip().split())
 
     @model_validator(mode="after")
-    def validate_shape(self) -> "SituationalCognitionModelOutput":
+    def validate_shape(self) -> "SituationalPlannerModelOutput":
         if self.disposition in {"silence", "deliberate"} and self.activity is not None:
             raise ValueError(f"{self.disposition} output must not carry an activity")
         if self.disposition == "communicate" and self.activity is None:
             raise ValueError("communicate output requires an activity")
+        if self.disposition == "deliberate" and (self.memory_candidates or self.self_memory_candidates):
+            raise ValueError("deliberate output cannot contain an authored Memory result")
         return self
 
 
-class SituationalCognitionResolver:
-    """Stateless same-Core invocation for Goal-free current-Situation cognition.
+class SituationalPlannerResolver:
+    """Planner's stateless, communication-only Situation invocation.
 
-    This resolver owns no durable state, Goal, Work, authorization, or independent
-    conversation authority. It may author at most one exact low-commitment speech
-    Activity from the trusted Situation supplied by Runtime. Runtime binds provenance
-    and may suppress invalid or stale output but never rewrites the wording.
+    Fast and one unresolved-only Deep pass share the ordinary Planner speech
+    contract. This input supplies no Responsibility/Goal/Capability Work authority.
+    The existing endpoint and DTO names describe ingress, not a separate author.
     """
 
     def __init__(
@@ -142,7 +147,7 @@ class SituationalCognitionResolver:
         *,
         deliberative: bool,
         fast_reason: str = "",
-    ) -> SituationalCognitionModelOutput:
+    ) -> SituationalPlannerModelOutput:
         raw = await ollama.generate(
             self._prompt(request, deliberative=deliberative, fast_reason=fast_reason),
             system=self._system_prompt(deliberative=deliberative),
@@ -152,9 +157,9 @@ class SituationalCognitionResolver:
                 "num_ctx": self.num_ctx,
                 "num_predict": self.num_predict,
             },
-            response_format=SituationalCognitionModelOutput.model_json_schema(),
+            response_format=SituationalPlannerModelOutput.model_json_schema(),
         )
-        return SituationalCognitionModelOutput.model_validate(raw)
+        return SituationalPlannerModelOutput.model_validate(raw)
 
     @staticmethod
     def _resolution(
@@ -167,6 +172,12 @@ class SituationalCognitionResolver:
         reason_summary: str,
     ) -> SituationalCognitionResolution:
         opportunity = request.opportunity
+        if activity is not None:
+            validate_communicative_activity_identity(
+                activity_id=activity.activity_id, text=activity.text,
+                interaction_context=request.context.get("interaction_context"),
+                repair_of_activity_ids=activity.repair_of_activity_ids,
+            )
         return SituationalCognitionResolution(
             opportunity_id=opportunity.opportunity_id,
             situation_digest=request.situation.digest,
@@ -220,16 +231,17 @@ class SituationalCognitionResolver:
             f"{bounded_json(context.get('interaction_context') or {}, 5000)}\n\n"
             f"Language: {request.language}\n\n"
             + (f"Fast cognition escalation reason: {fast_reason}\n\n" if deliberative and fast_reason else "")
-            + ("This is already the deliberative pass: disposition must be silence or communicate; never deliberate again. " if deliberative else "If broader reasoning is genuinely needed before a safe/natural decision, disposition=deliberate with no activity. ")
-            + "If this interaction created a reusable shared experience, you may also propose a small private memory candidate grounded only in supplied Situation/source refs; record the episode, not a permanent relationship label. You may also retain one short-lived self_concern or interest when it is genuinely Chromie's own unfinished curiosity/interest; it is context only, never a Goal, action, timer, or permission. Return only the exact SituationalCognitionModelOutput JSON."
+            + ("This is already the deliberative pass: disposition must be silence or communicate; never deliberate again. " if deliberative else "If broader reasoning is needed before a decision, disposition=deliberate with no activity or memory candidates. ")
+            + "If this interaction created a reusable shared experience, you may also propose a small private memory candidate grounded only in supplied Situation/source refs; record the episode, not a permanent relationship label. You may also retain one short-lived self_concern or interest when it is genuinely Chromie's own unfinished curiosity/interest; it is context only, never a Goal, action, timer, or permission. Return only the exact SituationalPlannerModelOutput JSON."
         )
 
     @staticmethod
     def _system_prompt(*, deliberative: bool = False) -> str:
         return (
             ("You are the bounded deliberative pass of " if deliberative else "You are a bounded ")
-            + "situational cognition inside Chromie's one Cognitive Core. "
-            "You are not a Planner, assistant, social manager, or autonomous task creator. "
-            "You may choose silence or author one exact low-commitment social utterance from "
+            + "Planner inside Chromie's one Cognitive Core, under a communication-only Situation contract. "
+            "You have no Goal creation, Goal mutation, Capability Work or authorization permissions. "
+            + PLANNER_COMMUNICATION_AUTHORITY_PROMPT
+            + "You may choose silence or author one exact low-commitment social utterance from "
             "trusted current Situation. Preserve Chromie's Stable Mind and remain concise."
         )

@@ -6,6 +6,7 @@ import json
 import time
 from typing import Any, Iterable
 
+from shared.chromie_contracts.plan import validate_communicative_activity_identity
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
 from shared.chromie_contracts.social_world import (
@@ -657,7 +658,7 @@ async def resolve_goal_free_situation_response(
 
     This stateless helper coordinates the existing Memory, Interaction Ledger, Agent
     client, and playback-facing response contracts.  The only semantic author remains
-    the bounded situational-cognition invocation inside the same Cognitive Core.
+    the restricted Situation invocation of Planner inside the same Cognitive Core.
     """
 
     if observation.goal_ids or observation.projection.focus_goal_ids:
@@ -771,7 +772,7 @@ async def resolve_goal_free_situation_response(
         output_payload=resolution,
         errors=[],
         metadata={
-            "wording_owner": "cognitive_core",
+            "wording_owner": "planner",
             "authority_scope": "goal_free_situation",
         },
     )
@@ -779,9 +780,17 @@ async def resolve_goal_free_situation_response(
         resolution.opportunity_id != opportunity.opportunity_id
         or resolution.situation_digest != observation.projection.digest
         or set(resolution.source_refs) != set(observation.source_refs)
+        or set(resolution.subject_refs) != set(opportunity.subject_refs)
     ):
         raise ValueError(
             "situational cognition result changed trusted readiness provenance"
+        )
+    activity = resolution.activity
+    if activity is not None:
+        validate_communicative_activity_identity(
+            activity_id=activity.activity_id, text=activity.text,
+            interaction_context=context.get("interaction_context"),
+            repair_of_activity_ids=activity.repair_of_activity_ids,
         )
     situation_subjects = {item.subject_ref for item in observation.projection.interpretations}
     source_refs = set(observation.source_refs)
@@ -790,11 +799,6 @@ async def resolve_goal_free_situation_response(
             raise ValueError("situational memory candidate widened Situation subjects")
         if not set(candidate.source_refs).issubset(source_refs):
             raise ValueError("situational memory candidate widened trusted source provenance")
-    if resolution.memory_candidates:
-        host.conversation_state.record_cognitive_relational_experience(
-            list(resolution.memory_candidates),
-            sid=session_id,
-        )
     for candidate in resolution.self_memory_candidates:
         if not set(candidate.source_refs).issubset(source_refs):
             raise ValueError("self-context candidate widened trusted source provenance")
@@ -802,6 +806,11 @@ async def resolve_goal_free_situation_response(
         # the candidate must always include self:chromie by contract.
         if not set(candidate.subject_refs).issubset(situation_subjects | {"self:chromie"}):
             raise ValueError("self-context candidate widened Situation subjects")
+    if resolution.memory_candidates:
+        host.conversation_state.record_cognitive_relational_experience(
+            list(resolution.memory_candidates),
+            sid=session_id,
+        )
     if resolution.self_memory_candidates:
         host.conversation_state.record_cognitive_self_context(
             list(resolution.self_memory_candidates),
@@ -817,23 +826,6 @@ async def resolve_goal_free_situation_response(
     activity = resolution.activity
     if activity is None:
         raise ValueError("communicate situational cognition has no Activity")
-    if activity.repair_of_activity_ids:
-        interaction_context = context.get("interaction_context")
-        already_spoken = (
-            interaction_context.get("already_spoken")
-            if isinstance(interaction_context, dict)
-            else []
-        )
-        delivered_activity_ids = {
-            str(activity_id).strip()
-            for event in already_spoken or []
-            if isinstance(event, dict)
-            for activity_id in (event.get("metadata") or {}).get("communicative_activity_ids", [])
-            if str(activity_id).strip()
-        }
-        if not set(activity.repair_of_activity_ids).issubset(delivered_activity_ids):
-            raise ValueError("situational repair must reference actually delivered activities")
-
     response = InteractionResponse(
         speech=[
             InteractionSpeech(
@@ -845,7 +837,7 @@ async def resolve_goal_free_situation_response(
                 interruptible=True,
                 metadata={
                     "source": "situational_cognition",
-                    "wording_owner": "cognitive_core",
+                    "wording_owner": "planner",
                     "authority_scope": "goal_free_situation",
                     "truth_stage": "context_grounded",
                     "speech_act": activity.speech_act,

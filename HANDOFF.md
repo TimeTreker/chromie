@@ -1,5 +1,95 @@
 # Chromie Latest Handoff
 
+## Issue #42 one Planner communication authority, 2026-09-11
+
+The owner approved the discussed #42 direction: Planner owns ordinary communication
+with independent calls for different authoritative inputs. Goal-free Situation stays
+communication-only and cannot acquire Goal/Capability Work permission, including reads.
+Continue standing commit/push authorization. Other GI normalizers/numeric punctuation,
+remaining #40 work, #43–#48, model optimization, profiles and deployment are excluded.
+All entries after this section are historical snapshots.
+
+Repository `/home/chromie/github/chromie`, branch/upstream `main` / `origin/main`.
+Clean delivery base: `245eb540de2e9385c34f1a1b82ebb68a6e29e4c1`; initial remote matched.
+Resume at the latest commit containing this checkpoint/HANDOFF pair, not a predicted hash.
+Evidence root R: `.chromie/acceptance/issue42-planner-communication-20260911/`.
+Authorized canonical authority/contract correction; no prompt optimization iteration,
+model substitution, qualification corpus edit or real inference was performed.
+
+The initiating inconsistency was SPEECH-OWNER-001 versus a Situation system prompt
+that explicitly said it was not Planner while authoring speech. Calling both paths
+Cognitive Core did not give them one precise communication authority. The reproduced
+mechanical gaps below made that inconsistent contract consequential. No user/robot
+malfunction episode was supplied for #42; the following are local scripted boundary
+probes, not claims about a real conversation or model's naturalness.
+
+| Ordered boundary / owner | Material input and actual baseline output | Expected/current output and next handoff |
+| --- | --- | --- |
+| Trusted source -> Host Situation admission | Existing fixture `person:dad`, source `trusted-arrival-1`, exact Situation digest, no Goal IDs; unchanged-source/local and typed source binding remain existing contracts. No microphone, camera, GI or GA model is invoked. | Correct: bounded Situation opportunity and disclosure-safe Memory/Interaction context. A true Goal-free input supplies no Responsibility; prior GI-before-GA safe-read authority therefore does not apply. |
+| Context -> primary Situation model transaction | Existing resolver's system role explicitly disowned Planner while choosing silence or exact speech; it already used configured Fast and optional Deep clients. This was the earliest authority mismatch. | `SituationalPlannerResolver` and its replacing model DTO share the canonical Planner communication prompt with streaming Fast and canonical Fast/Deep. Existing endpoint/wire fields/configuration remain. A separate input contract does not become a new semantic owner. |
+| Scripted primary output -> Agent validation | `same-act` with earlier `Earlier words.` accepted new `Changed words.`; a `repair-new` citing pending/unheard `pending` also passed. Local pre-fix tests fail at these acceptance boundaries. | Shared mechanical identity/delivery checks reject before Agent resolution. Same identity with unchanged words and new identity with equal words remain valid; Runtime owns idempotent delivery. No text-equivalence or speech-necessity policy is added to Host. |
+| Unresolved Fast -> optional Deep | `deliberate` plus an authored shared-experience Memory candidate passed and the candidate disappeared on delegation. Deep then authored another result. | Reject this invalid aggregate before a second call. Valid unresolved Fast carries neither Activity nor Memory result; at most one Deep call receives the same original scope. Complete silence/speech calls Deep zero times; direct slow calls only Deep, unavailable Deep stays quiet and Deep cannot recurse. |
+| Agent response -> Host commit validation | A valid relational candidate plus an unheard repair, widened result subject, or widened self-Memory candidate entered Host. Baseline wrote relational Memory before rejecting the first/third; widened result subject passed. These are separate isolated replays, not real Memory writes. | Exact source/digest/opportunity/subject and all identity/repair/candidate checks precede either Memory writer. All three invalid outputs now reject with zero Memory writes and no speech response. Existing Memory owner/privacy/retention rules are unchanged. This guarantees validation order, not a new transactional storage layer. |
+| Accepted Activity -> existing Runtime delivery | Exact authored text is materialized with `wording_owner=planner`, immutable source and no Capability requests or Goal-completion authority. | Existing #41 execution/delivery owner handles scheduling and actual completion. Normal canonical Fast/Deep and streaming commits use the same identity check; both tiers reject changed words, preserve valid identity reuse and intentional new-identity repetition. No downstream model rewrites the Activity. |
+
+Local workflow: trusted observation -> bounded context -> one Fast Planner call ->
+complete silence/Activity OR one unresolved-only Deep Planner call -> Agent validation
+-> Host full-result validation -> existing Memory recording -> exact speech response
+-> existing delivery lifecycle. Direct slow skips Fast; local no-op skips models.
+Independent Goal-bound Planner calls remain separate; this does not merge GI-/GA-
+triggered planning tasks or grant Situation calls Goal/Work mutation rights.
+
+Observed evidence:
+
+- `before.json`, original system prompt and Issue snapshots retain the pre-change authority.
+- `baseline.log`: 270 tests/173 subtests passed; a preceding wrong filename produced
+  `baseline-command-error.log` with no tests, not a product failure.
+- `red-authority.log`: three new authority probes failed on the baseline before repair.
+- `baseline-situation.py` is the exact base Host source; `host-validation-replay.json`
+  records three baseline failures and three passing current Host contrasts with isolated
+  fake services/Memory writers. The shared tests retain the executable current assertions.
+- `focused-first.log`: 71 passed. `focused-second.log`: 84 passed/two failures from a
+  wrong new streaming-fixture method name, subsequently fixed. `focused-expanded.log`:
+  375 tests/184 subtests; final `focused-final.log`: **376 tests/190 subtests passed**.
+- `level-a.log`, `level-a/`: **30/30 distinct cases passed** across seven relevant ability
+  classes. Membership overlaps: intent 8/8, planning 4/4, continuity 4/4, recovery 4/4,
+  deterministic safety 3/3, multiple Goals 10/10, capability grounding 7/7.
+- `canonical.log`: **2,461 tests/729 subtests, 140 benchmark tests and 20 legacy Agent
+  tests passed**. Repository policy/ownership, pinned Ruff/MyPy, configuration, runtime
+  structure and docs passed. Final document-only updates are checked separately in
+  `docs-final.log`; tested source hashes remain unchanged.
+- `source-freeze.json`, `implementation.patch` bind the tested non-documentation patch:
+  SHA-256 `3874ae35b351d086ec07658eef58f71940e475f37f685998452941d94672c000`.
+  `authority-contract-projections.json` retains all five actual system prompt variants
+  and the Situation output Schema. These are contract artifacts, not qualified inference.
+
+Reproduce local verification from repository root:
+
+```bash
+python -m pytest -q tests/test_situational_cognition.py tests/test_semantic_authority.py tests/test_fast_planner_pr3.py tests/test_deep_planner_pr4.py tests/test_interaction_ledger.py tests/test_fast_planner_streaming_commit.py tests/test_social_feedback_loop.py tests/test_social_experience_memory.py tests/test_cognitive_runtime_pr7.py tests/test_planner_communication_pr6.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class robust_intent_understanding --ability-class planner_goal_semantic_quality --ability-class human_like_cognitive_continuity --ability-class continuous_cognition_recovery --ability-class deterministic_safety_controls --ability-class multi_goal_daily_life --ability-class stable_capability_grounding --evidence-dir .chromie/acceptance/issue42-planner-communication-20260911/level-a
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+git diff --check
+```
+
+The source/test gate and scripted model clients do not qualify actual model speech,
+latency, deployed services, microphones, audible playback, simulation or robot behavior.
+Two existing FastAPI startup warnings remain. Current target/default-evidence closure
+and release readiness remain open/development-only. #43's separate online-review wording
+conflict is deliberately outside this approved patch. No new current document, service,
+module, compatibility alias or configuration switch was added: maintained Markdown
+102 -> 102; configuration keys 381 -> 381, public booleans 1, aliases 0. Existing
+Charter, architecture, turn-loop, API, Agent README and status owners hold the change.
+
+After delivery, verify actual `HEAD`, upstream and clean worktree. Keep #42/#36 open
+for owner acceptance and discuss the next Issue separately. Further authorized source
+changes require fresh focused/canonical evidence; real model qualification requires its
+own fixed source/prompt/Schema/provider identity and frozen cohort. Ignored R artifacts
+need separate transfer; Git includes these commands and the complete workflow only.
+
 ## Issue #41 Planner speech authority and actual delivery, 2026-09-11
 
 The owner approved the discussed correction and asked to continue. Scope: remove

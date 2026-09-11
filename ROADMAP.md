@@ -34,7 +34,10 @@ The owner subsequently authorized GA repair preservation: freeze primary claims,
 validate a lossless structural projection, compare before acceptance, and reject
 lossy preprocessing. The owner also authorized #41: Planner owns speech necessity and
 repetition; Runtime enforces exact Activity identity and truthful playback completion.
-Other GI normalizers, numeric punctuation and #42–#48 remain pending. No model or deployment is qualified.
+The owner authorized #42: ordinary Goal-bound and Goal-free communication belongs to
+Planner; independent Situation calls retain communication-only permissions and bounded
+depth. Other GI normalizers, numeric punctuation and #43–#48 remain pending.
+No model or deployment is qualified.
 
 ## Current execution order
 
@@ -393,25 +396,25 @@ Implementation order:
 5. **Derive relational/situational salience — semantic owner corrected and source-implemented.** Goal-free
    Situation cognition no longer uses a deterministic Host decision table over event words,
    relationship labels, routine/busy/private categories, or consequence terms. Every changed
-   trusted Goal-free Situation enters one bounded Fast situational-cognition judgment after
+   trusted Goal-free Situation enters one bounded Fast Planner Situation judgment after
    disclosure-safe relational Memory and delivery-qualified Interaction projection; the same
-   Cognitive Core decides relevance, non-interruption, silence, and low-commitment speech. A
+   Planner inside the Cognitive Core decides relevance, non-interruption, silence, and low-commitment speech. A
    semantic Situation signature remains only transport-independent correlation/common-ground
    context and now includes exact trusted audience; Host keeps no persistent salience state or
    priority manager. Relationship Memory can inform semantic relevance but never privacy,
    trust, Goal, Work, or effect authority.
-6. **Close the social feedback loop — PSM-6 source contract implemented.** Trusted social feedback may reference the exact delivered Communicative Activity IDs it reacts to and enter the same Goal-free Situation/Core path. Source adapters report observable signals only; they do not label anger/approval/rejection or prescribe behavior. Situational cognition may remain silent, follow up, or author a `repair` act that must reference an actually delivered Activity. Runtime validates that reference mechanically and never decides whether repair is socially warranted.
+6. **Close the social feedback loop — PSM-6 source contract implemented.** Trusted social feedback may reference the exact delivered Communicative Activity IDs it reacts to and enter the same Goal-free Situation/Core path. Source adapters report observable signals only; they do not label anger/approval/rejection or prescribe behavior. Planner's Situation invocation may remain silent, follow up, or author a `repair` act that must reference an actually delivered Activity. Runtime validates that reference mechanically and never decides whether repair is socially warranted.
 7. **Form relationship experience without relationship rules — PSM-7 first source slice implemented.** Goal-free cognition may propose a bounded session-scoped `shared_experience` Memory candidate tied to exact current Situation subjects/source refs. Runtime rejects widened provenance and stores the candidate as private ephemeral Memory only. No interaction-count→friendship rule, relationship score, or model-granted public disclosure is created; future cognition interprets relationships from retained experiences.
-8. **Separate Goal-free deliberation from Planner — PSM-8 source implemented.** Fast situational cognition may request one bounded deliberative continuation. That continuation uses the configured quality/deep model but the same Goal-free output authority: silence, one low-commitment Communicative Activity, and private bounded experience proposals only. It cannot create Goal/Capability Work, reinterpret a user Responsibility, or recurse into another deliberative pass. Deep model selection therefore changes cognition depth, not authority.
+8. **Bound Goal-free Planner depth — PSM-8 source implemented; #42 authority corrected.** An unresolved Fast Situation decision may request one bounded Deep Planner invocation without an Activity or Memory result. That invocation uses the configured quality/deep model under the same restricted Planner authority: silence, one low-commitment Communicative Activity, and private bounded experience proposals only. It cannot create Goal/Capability Work, reinterpret a user Responsibility, or recurse into another deliberative pass. Direct slow readiness uses the same scope; complete decisions receive no second review and unavailable Deep remains quiet.
 9. **Retain short-lived self-directed concerns/interests — PSM-9 first source slice implemented.** The same Goal-free Core may propose bounded `self_concern|interest` session Memory with exact Situation source provenance and TTL. Runtime stores it as Chromie-owned `self_context`; it can re-enter later cognition but creates no Goal, timer, Work, Capability, authorization, or autonomous polling loop. Long-lived self-created intentions remain a separate future irreducibility question.
 10. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
-   Goal-free situational cognition is a stateless same-Core invocation with no Goal/Work
+   Goal-free Situation planning is a stateless Planner invocation with no Goal/Work
    fields. It may return `silence` or author exactly one context-grounded communicative act
    (`greeting|acknowledge|inquire|inform|respond`); Runtime binds Situation/opportunity
    provenance and the resulting `InteractionResponse` structurally contains no Capability
    Work or Goal-completion authority. Semantic relevance is decided in that same invocation,
-   not by a Host salience gate. `slow` Goal-free readiness remains an explicit future
-   deliberative contract rather than borrowing Deep Planner. Concrete
+   not by a Host salience gate. `slow` Goal-free readiness uses the same restricted Deep
+   Planner contract; shared identity/repair validation preserves delivery truth. Concrete
    social adapters and model/target qualification are still open. Capability availability
    must not manufacture demand, and effectful autonomy remains separately governed.
 7. **Close the social feedback loop — source open.** Human reaction/turn-taking changes

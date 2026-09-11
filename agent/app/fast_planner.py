@@ -83,6 +83,7 @@ try:
         FastPlannerStreamFrame,
         FastPlannerStreamTerminal,
         PresentationCommit,
+        validate_communicative_activity_identity,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -95,6 +96,7 @@ except ImportError:  # pragma: no cover
         FastPlannerStreamFrame,
         FastPlannerStreamTerminal,
         PresentationCommit,
+        validate_communicative_activity_identity,
     )
 
 from .planner_prompt import (
@@ -464,6 +466,10 @@ class FastPlannerResolver:
                     interpretation_unresolved=list(request.interpretation_unresolved),
                 )
                 if activity is not None:
+                    validate_communicative_activity_identity(
+                        activity_id=activity.activity_id, text=activity.text,
+                        interaction_context=request.context.get("interaction_context"),
+                    )
                     refs = set(activity.source_responsibility_refs)
                     if not refs or not refs.issubset(set(responsibility_refs)):
                         raise PlannerDTOContractError(

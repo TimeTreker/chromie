@@ -196,14 +196,16 @@ remaining uncertainty or consequence justifies broader reasoning. A numeric conf
 score is evidence, not the sole escalation switch. Harmless ordinary conversation
 should not pay a Deep-thinking tax merely because confidence is imperfectly calibrated.
 
-The word **deep** is owner-scoped. `Deep Planner` remains a deeper pass of the HOW
-planning authority and is justified by complex dependencies, alternatives, resources,
-or safety. A provider-free conversational Responsibility may instead request one bounded
-**deliberative cognition** continuation after a useful provisional response. That
-continuation is communication-only unless genuine HOW separately requires Planner Work;
-it is not a renamed Deep Planner, a reviewer of the Fast response, or a persistent
-belief owner. Shared model invocation, grounding, decoder, and validation mechanics are
-preferred over a parallel implementation stack.
+The word **deep** is owner-scoped. Deep GI, GA, Planner and Reflection keep their
+separate semantic responsibilities. Planner owns ordinary communication as well as
+Work planning, with permissions fixed by each invocation's input contract. Its restricted
+Situation pass may choose silence or one low-consequence utterance with no Goal/Work
+authority. Fast may delegate unresolved scope once before producing an Activity or
+Memory result; a completed decision receives no model review. A provider-free provisional
+Responsibility may retain the separately authorized bounded communication continuation;
+it preserves prior delivered speech and the explicitly unfinished scope. Depth alone
+never grants Capability Work. Shared Planner communication and validation contracts
+apply across these independent calls.
 
 The stage boundary remains exact. Fast Goal Interpretation may escalate once to Deep
 Goal Interpretation for genuine consequential ambiguity in the person's intended
@@ -584,7 +586,7 @@ trusted scene / person / interaction state materially changes
   -> source-specific adapter
   -> trusted Situation revision (+ exact audience when resolved)
   -> CognitiveOpportunity
-  -> same Core situational cognition decides relevance / silence / speech
+  -> Planner's restricted Situation invocation decides relevance / silence / speech
 ```
 
 The second path is not a hidden synthetic user message. It does not pass through GI unless
@@ -622,10 +624,14 @@ The first Goal-free source slice is now implemented. `SituationRevisionObservati
 source provenance remain bound; the opportunity also carries bounded subject/source refs.
 `orchestrator.runtime.situation.apply_goal_free_situation_opportunity(...)` admits that typed transition into
 the same Core without fabricating a UserTurn or GI/Goal state. A stateless
-`/situational-cognition` invocation has no Capability/Work contract and may return only
-`silence` or one low-commitment context-grounded Communicative Activity. `local` readiness
-stays local and `slow` Goal-free readiness currently fails quiet instead of borrowing Deep
-Planner. Source-specific scene/person/social adapters and target qualification remain open.
+`/situational-cognition` entrypoint runs Planner under its communication-only Situation
+contract. It may return `silence` or one low-commitment context-grounded Activity; Goal and
+Capability Work fields remain unavailable. `local` uses no model; `fast` may delegate once
+while unresolved; `slow` directly uses the configured Deep model under the same restricted
+contract. Unavailable Deep fails quiet, and Deep cannot recurse. Escalation contains neither
+an Activity nor Memory candidates. Complete results retain existing bounded Memory proposals;
+all source/subject, identity and delivered-repair checks precede any Memory write.
+Source-specific scene/person/social adapters and target qualification remain open.
 
 ## 4. Gateway-to-Core contract
 

@@ -61,6 +61,7 @@ from shared.chromie_contracts.plan import (
     RefusedGoalPlanOutcome,
     UnavailableGoalPlanOutcome,
     fast_planner_activity_request_id,
+    validate_communicative_activity_identity,
     canonical_plan_fingerprint,
 )
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
@@ -1255,6 +1256,12 @@ class CanonicalPlanRuntimeAdapter:
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse:
         """Mechanically realize exact Planner wording without another model owner."""
+
+        for activity in plan.communicative_acts:
+            validate_communicative_activity_identity(
+                activity_id=activity.activity_id, text=activity.text,
+                interaction_context=(context or {}).get("interaction_context"),
+            )
 
         delivered_by_fast_activity_id: dict[str, dict[str, Any]] = {}
         ambiguous_fast_activity_ids: set[str] = set()

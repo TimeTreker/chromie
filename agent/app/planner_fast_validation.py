@@ -23,6 +23,7 @@ try:
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
         FastPlannerProgressAct,
+        validate_communicative_activity_identity,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import (
@@ -34,6 +35,7 @@ except ImportError:  # pragma: no cover
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
         FastPlannerProgressAct,
+        validate_communicative_activity_identity,
     )
 
 from .capabilities.validator import validate_args_for_schema
@@ -361,6 +363,12 @@ def validate_fast_advance_output(
     responsibilities: list[CognitiveResponsibilityProposal],
     capabilities: list[dict[str, Any]],
 ) -> None:
+    for activity in output.activities:
+        if activity.role != "capability":
+            validate_communicative_activity_identity(
+                activity_id=activity.activity_id, text=activity.text,
+                interaction_context=request.context.get("interaction_context"),
+            )
     responsibility_refs = [item.local_ref for item in responsibilities]
     if set(output.covered_responsibility_refs) != set(responsibility_refs):
         raise PlannerDTOContractError(

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.app.situational_cognition import SituationalCognitionResolver
+from agent.app.situational_cognition import SituationalPlannerResolver
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy
 from orchestrator.runtime.situation import (
@@ -227,7 +227,7 @@ def test_situational_cognition_binds_model_wording_to_runtime_provenance() -> No
             "reason_summary": "A familiar important person just arrived home.",
         }
     )
-    resolver = SituationalCognitionResolver(ollama)
+    resolver = SituationalPlannerResolver(ollama)
 
     resolution = asyncio.run(resolver.resolve(request_for(observation)))
 
@@ -252,7 +252,7 @@ def test_slow_goal_free_readiness_fails_quiet_without_deep_planner() -> None:
         }
     )
     ollama = FakeOllama({})
-    resolver = SituationalCognitionResolver(ollama)
+    resolver = SituationalPlannerResolver(ollama)
 
     resolution = asyncio.run(resolver.resolve(request))
 
@@ -261,7 +261,7 @@ def test_slow_goal_free_readiness_fails_quiet_without_deep_planner() -> None:
     assert ollama.calls == 0
 
 
-def test_voice_assistant_goal_free_cognition_never_calls_planner_or_emits_work() -> None:
+def test_voice_assistant_uses_restricted_planner_without_goal_work_api() -> None:
     observation = goal_free_observation()
     opportunity = derive_situation_revision_opportunity(observation)
     assert opportunity is not None
@@ -297,11 +297,11 @@ def test_voice_assistant_goal_free_cognition_never_calls_planner_or_emits_work()
 
         async def resolve_fast_plan(self, *_args, **_kwargs):
             self.planner_calls += 1
-            raise AssertionError("Planner must not own Goal-free situational cognition")
+            raise AssertionError("Goal-bound Planner API requires Goal provenance")
 
         async def resolve_deep_plan(self, *_args, **_kwargs):
             self.planner_calls += 1
-            raise AssertionError("Deep Planner must not own Goal-free cognition")
+            raise AssertionError("Goal-bound Deep API requires Goal provenance")
 
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Agent()
@@ -604,7 +604,7 @@ async def test_fast_situational_cognition_can_escalate_to_same_scope_deliberatio
     observation = goal_free_observation()
     fast = FakeOllama({"disposition": "deliberate", "activity": None, "memory_candidates": [], "reason_summary": "Need broader context."})
     deep = FakeOllama({"disposition": "communicate", "activity": {"activity_id": "deep-social-1", "text": "你还好吗？", "speech_act": "inquire", "repair_of_activity_ids": []}, "memory_candidates": [], "reason_summary": "A small inquiry is appropriate."})
-    resolver = SituationalCognitionResolver(fast, deliberative_ollama=deep)
+    resolver = SituationalPlannerResolver(fast, deliberative_ollama=deep)
 
     result = await resolver.resolve(request_for(observation))
 
@@ -620,6 +620,140 @@ async def test_deliberative_situational_cognition_cannot_recurse() -> None:
     observation = goal_free_observation()
     fast = FakeOllama({"disposition": "deliberate", "activity": None, "memory_candidates": [], "reason_summary": "Need deeper reasoning."})
     deep = FakeOllama({"disposition": "deliberate", "activity": None, "memory_candidates": [], "reason_summary": "Again."})
-    resolver = SituationalCognitionResolver(fast, deliberative_ollama=deep)
+    resolver = SituationalPlannerResolver(fast, deliberative_ollama=deep)
     with pytest.raises(ValueError, match="cannot recurse"):
         await resolver.resolve(request_for(observation))
+
+
+@pytest.mark.asyncio
+async def test_goal_free_planner_rejects_rewording_an_existing_activity():
+    request = request_for(goal_free_observation())
+    request.context["interaction_context"] = {"already_spoken": [{
+        "text": "Earlier words.", "state": "playback_completed",
+        "metadata": {"communicative_activity_ids": ["same-act"]},
+    }]}
+    model = FakeOllama({"disposition": "communicate", "activity": {
+        "activity_id": "same-act", "text": "Changed words.", "speech_act": "inform",
+    }})
+    with pytest.raises(ValueError, match="wording"):
+        await SituationalPlannerResolver(model).resolve(request)
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_delegation_cannot_discard_an_authored_memory_result():
+    request = request_for(goal_free_observation())
+    fast = FakeOllama({"disposition": "deliberate", "activity": None,
+        "memory_candidates": [{"text": "A shared event.", "subject_refs": ["person:dad"],
+            "source_refs": request.opportunity.source_refs}]})
+    deep = FakeOllama({"disposition": "silence", "activity": None})
+    with pytest.raises(ValueError, match="deliberate"):
+        await SituationalPlannerResolver(fast, deliberative_ollama=deep).resolve(request)
+    assert fast.calls == 1
+    assert deep.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_goal_free_planner_rejects_repair_of_unheard_activity():
+    request = request_for(goal_free_observation())
+    request.context["interaction_context"] = {"pending_speech": [{
+        "text": "Unheard.", "metadata": {"communicative_activity_ids": ["pending"]},
+    }]}
+    model = FakeOllama({"disposition": "communicate", "activity": {
+        "activity_id": "repair-new", "text": "Correction.", "speech_act": "repair",
+        "repair_of_activity_ids": ["pending"],
+    }})
+    with pytest.raises(ValueError, match="delivered"):
+        await SituationalPlannerResolver(model).resolve(request)
+    assert model.calls == 1
+
+
+def test_every_planner_system_prompt_uses_one_communication_contract():
+    from agent.app.planner_prompt import fast_system_prompt, deep_system_prompt, fast_streaming_advance_system_prompt
+    from shared.chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT
+    for system in (fast_system_prompt(), deep_system_prompt(), fast_streaming_advance_system_prompt(),
+                   SituationalPlannerResolver._system_prompt(), SituationalPlannerResolver._system_prompt(deliberative=True)):
+        assert PLANNER_COMMUNICATION_AUTHORITY_PROMPT in system
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("disposition", ["silence", "communicate"])
+async def test_completed_goal_free_decision_does_not_call_a_second_model(disposition):
+    activity = {"activity_id": "new-act", "text": "Hello.", "speech_act": "greeting"} if disposition == "communicate" else None
+    fast = FakeOllama({"disposition": disposition, "activity": activity})
+    deep = FakeOllama({})
+    result = await SituationalPlannerResolver(fast, deliberative_ollama=deep).resolve(request_for(goal_free_observation()))
+    assert result.disposition == disposition
+    assert fast.calls == 1 and deep.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_direct_deep_goal_free_call_preserves_its_scope():
+    request = request_for(goal_free_observation())
+    request = request.model_copy(update={"opportunity": request.opportunity.model_copy(update={"recommended_cognition": "slow"})})
+    fast = FakeOllama({})
+    deep = FakeOllama({"disposition": "communicate", "activity": {
+        "activity_id": "deep-act", "text": "Hello.", "speech_act": "greeting"}})
+    result = await SituationalPlannerResolver(fast, deliberative_ollama=deep).resolve(request)
+    assert result.source_refs == request.opportunity.source_refs
+    assert result.subject_refs == request.opportunity.subject_refs
+    assert fast.calls == 0 and deep.calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("forbidden", ["goal_ids", "steps", "capabilities", "authorization"])
+async def test_goal_free_output_cannot_acquire_goal_or_work_authority(forbidden):
+    fast = FakeOllama({"disposition": "silence", forbidden: []})
+    deep = FakeOllama({"disposition": "silence"})
+    with pytest.raises(ValueError):
+        await SituationalPlannerResolver(fast, deliberative_ollama=deep).resolve(request_for(goal_free_observation()))
+    assert fast.calls == 1 and deep.calls == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("same_identity", [True, False])
+async def test_goal_free_planner_preserves_same_words_without_semantic_filtering(same_identity):
+    request = request_for(goal_free_observation())
+    request.context["interaction_context"] = {"already_spoken": [{
+        "text": "Hello.", "metadata": {"communicative_activity_ids": ["old-act"]},
+    }]}
+    model = FakeOllama({"disposition": "communicate", "activity": {
+        "activity_id": "old-act" if same_identity else "new-act", "text": "Hello.", "speech_act": "greeting"}})
+    result = await SituationalPlannerResolver(model).resolve(request)
+    assert result.activity.text == "Hello."
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["unheard_repair", "subject_widening", "self_memory_widening"])
+async def test_host_validates_complete_planner_result_before_any_memory_write(failure):
+    from unittest.mock import Mock
+    observation = goal_free_observation()
+    opportunity = derive_situation_revision_opportunity(observation)
+    activity = SituationalCommunicativeAct(activity_id="new", text="Hello.", speech_act="greeting")
+    if failure == "unheard_repair":
+        activity = SituationalCommunicativeAct(activity_id="repair", text="Correction.", speech_act="repair", repair_of_activity_ids=["unheard"])
+    resolution = SituationalCognitionResolution(
+        opportunity_id=opportunity.opportunity_id, situation_digest=observation.projection.digest,
+        source_refs=observation.source_refs,
+        subject_refs=["person:stranger"] if failure == "subject_widening" else opportunity.subject_refs,
+        disposition="communicate", activity=activity,
+        memory_candidates=[{"text": "Shared event.", "subject_refs": ["person:dad"], "source_refs": observation.source_refs}],
+        self_memory_candidates=[{"kind": "interest", "text": "An interest.", "subject_refs": ["self:chromie", "person:stranger"], "source_refs": observation.source_refs}] if failure == "self_memory_widening" else [],
+    )
+    async def resolve(*args, **kwargs):
+        return resolution
+    async def session():
+        return object()
+    state = SimpleNamespace(activated_memory_context=lambda **kwargs: {"summary": "", "entries": [], "selection": {}},
+        record_cognitive_relational_experience=Mock(), record_cognitive_self_context=Mock())
+    host = SimpleNamespace(build_context=lambda sid: {}, conversation_state=state,
+        cognitive_runtime=SimpleNamespace(interaction_ledger=None), session_log=lambda *args: None,
+        sessions=SimpleNamespace(current_sid=None), get_http_session=session,
+        agent_client=SimpleNamespace(resolve_situational_cognition=resolve),
+        cognitive_runtime_policy=CognitiveRuntimePolicy(fast_planner_timeout_ms=3000))
+    with pytest.raises(ValueError):
+        await resolve_goal_free_situation_response(host, observation=observation, opportunity=opportunity,
+            session_id="sid", language="en-US")
+    state.record_cognitive_relational_experience.assert_not_called()
+    state.record_cognitive_self_context.assert_not_called()

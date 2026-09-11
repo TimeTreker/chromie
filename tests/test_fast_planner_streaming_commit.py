@@ -1537,3 +1537,24 @@ def test_fast_continuity_preserves_large_goal_meaning_and_fails_on_overflow(rece
         fast_advance_layered_prompt(
             request, responsibilities=[responsibility], capabilities=[_walk_capability()],
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("same_identity", [True, False])
+async def test_streaming_planner_shares_immutable_activity_history_boundary(same_identity):
+    request = _request()
+    request.context["interaction_context"] = {"already_spoken": [{
+        "text": "Old words.", "metadata": {"communicative_activity_ids": ["reply-now"]},
+    }]}
+    output = _valid_output()
+    if not same_identity:
+        output["presentation_commit"]["activity"]["activity_id"] = "new-decision"
+    model = _StreamingModel([_wire_output(output)])
+    frames = [item async for item in FastPlannerResolver(model, _Catalog()).stream_advance(request)]
+    assert model.calls == 1
+    if same_identity:
+        assert not any(isinstance(frame, PresentationCommit) for frame in frames)
+        assert isinstance(frames[-1], FastPlannerStreamFailure)
+    else:
+        assert isinstance(frames[0], PresentationCommit)
+        assert frames[0].activity.text == "你好呀！"

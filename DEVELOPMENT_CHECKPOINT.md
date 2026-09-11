@@ -1,35 +1,35 @@
 # Development Checkpoint
 
-## Current delivery boundary — Issue #41 speech authority and delivery truth
+## Current delivery boundary — Issue #42 shared Planner communication authority
 
-Updated 2026-09-11. The owner authorized returning ordinary speech necessity,
-correction and repetition to Planner. Host no longer deletes valid speech by
-body-Work category, sibling speech, or equal text. Same-turn sibling speech is
-read-only Planner context; exact Goal/Work scope and execution guards remain.
-Runtime atomically reuses one Activity's delivery, rejects changed wording under
-that identity and retains separate scheduled/started/completed/interrupted facts.
-Every chunk must complete before whole speech becomes history or completes a Fast
-speech Goal. Start barriers remain separate; interrupted Activities do not replay
-automatically. Deferred playback retains original ownership and transport identity.
+Updated 2026-09-11. The owner approved Planner as the sole ordinary communication
+authority for Goal-bound and Goal-free inputs. Independent Situation Planner calls
+retain communication-only scope: no invented Responsibility/Goal, Capability Work
+or safe-read permission. Existing endpoint/DTO and configured Fast/Deep clients stay.
+Every Planner prompt shares the communication contract. Shared checks reject changed
+wording under an existing Activity identity and repair refs without actual delivery.
+A completed decision receives no second model review; unresolved Fast may delegate
+once without an Activity/Memory result. Direct Deep keeps the same restricted scope.
+Host validates the complete source/subject, identity, repair and Memory-candidate
+result before writing Memory. Existing #41 delivery truth remains authoritative.
 
-Delivery base: `main` at `4a1364028d6e59b09ac83ca470733f792a771f62`, tracking
-`origin/main`. Continue the standing commit/push authorization. Resume from the
-latest commit containing this checkpoint and HANDOFF; do not predict its hash.
-Evidence: `.chromie/acceptance/issue41-speech-authority-20260911/`.
-Focused 301 tests/44 subtests and Level A 30/30 passed. Final canonical passed
-2,442 tests/723 subtests, 140 benchmarks and 20 legacy Agent tests.
-The first full gate failed seven tests through stale start-as-delivered fixtures;
-its failed cohort and first Level A 28/30 remain retained, not promoted to passes.
-Real transport code was tested with mocked audio writes, including interruption,
-partial chunks, early receipts, retries, concurrent submissions and deferred output.
-No model inference, service deployment, physical voice or target proof was run.
+Delivery base: `main` at `245eb540de2e9385c34f1a1b82ebb68a6e29e4c1`, tracking
+`origin/main`. Continue standing commit/push authorization. Resume from the latest
+commit containing this checkpoint and HANDOFF; do not predict its hash.
+Evidence: `.chromie/acceptance/issue42-planner-communication-20260911/`.
+Focused 376 tests/190 subtests and Level A 30/30 passed. Final canonical passed
+2,461 tests/729 subtests, 140 benchmarks and 20 legacy Agent tests.
+Three Agent authority probes failed before the fix; three isolated Host replay
+contrasts failed on the delivery base and pass now. Two intermediate test failures
+were incorrect new fixture method names; both failed logs remain retained.
+No real model inference, service deployment, physical voice or target proof ran.
 Ignored artifacts need separate transfer; tracked commands/workflow are in HANDOFF.
 
-Prior #37–#40 changes are in the delivery base; their historical evidence remains
-below/in HANDOFF. Other GI normalizers, numeric source extraction beside a period,
-#42–#48, full merge/split, model optimization and deployment remain unapproved.
-No corpus inputs/reference outputs, provider profiles, config keys or runtime
-switches changed. Existing owners hold this amendment; no new architecture layer.
+Prior #37–#41 are in the delivery base; their evidence remains below/in HANDOFF.
+Other GI normalizers, numeric source extraction beside a period, #43–#48, full
+merge/split, model optimization and deployment remain outside the approved scope.
+No corpus inputs/reference outputs, provider profiles, config keys or switches changed.
+Existing owners hold this amendment; no new module, current document or service.
 Historical #37 implementation/evidence follows; use this top entry for current resume.
 
 ## Prior local implementation — Issue #37, 2026-09-11
@@ -106,7 +106,7 @@ The owner requested separate discussion and authorization for each audit finding
 [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) links #37 (this
 authorized local implementation) and #38 (completed documentation correction),
 #39 (semantic inheritance), #40 (GI speed and GA preservation), and #41 (speech
-authority). Remaining #40 work and #42–#48 need separate authorization.
+authority). Remaining #40 work and #43–#48 need separate authorization; #42 is recorded above.
 
 1. Inspect `git status --short --branch`, this checkpoint, current Charter and
    HANDOFF. Preserve any subsequent dirty work and existing evidence.

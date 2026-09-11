@@ -77,7 +77,7 @@ running.
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`; only one mechanical DTO regeneration is permitted. |
-| `POST` | `/situational-cognition` | Run one stateless Goal-free current-Situation cognition invocation after trusted Situation admission; semantic relevance/silence is decided in the same Cognitive Core call, not by Host social rules. The trusted request binds an exact Goal-free `CognitiveOpportunity` + `SituationProjection`, including semantic Situation signature; output is `silence` or one exact low-commitment Communicative Activity and contains no Goal/Capability Work authority. Fast cognition may request one bounded deliberative continuation on the quality/deep model under the same schema and authority; this is not Deep Planner. |
+| `POST` | `/situational-cognition` | Invoke Planner through a stateless, communication-only Goal-free Situation contract. Trusted opportunity/Situation provenance bounds silence or one exact low-commitment Activity plus existing private Memory candidates. No Goal or Capability Work permission is supplied. Fast may delegate unresolved meaning once to Deep with no authored Activity/Memory result; complete decisions receive no second review. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 
@@ -303,7 +303,26 @@ world truth, and authored assistant text is not automatically audible-delivery
 Evidence. Native canonical speech schemas expose complete aggregate branches,
 while full Schema/DTO/Host validation remains required.
 
-`POST /situational-cognition` uses the configured Fast cognition model through a separate stateless invocation contract, not the Planner schema. The request is valid only for a Goal-free `situation_revision` opportunity whose Situation digest and trusted source refs exactly match the supplied `SituationProjection`. The model sees bounded Stable Mind, activated disclosure-safe Memory, current Situation including exact trusted audience when supplied, and delivered/pending interaction context; it owns semantic relevance and can choose `silence` or author one exact `greeting|acknowledge|inquire|inform|respond` utterance. Runtime binds opportunity/source/subject provenance, sets `truth_stage=context_grounded`, and materializes no Capability requests or Goal-completion authority. Normal admitted Goal-free Situation revisions enter one bounded Fast call rather than a Host social-salience rule table. `slow` Goal-free deliberation remains a separate future contract rather than borrowing Deep Planner. Concrete person/scene/social perception implementations are outside this endpoint and remain unqualified.
+`POST /situational-cognition` is an independent Planner invocation under a restricted
+Situation contract. The existing HTTP path and DTO fields remain; it does not use the
+Goal-bound Plan schema or fabricate a Goal. The trusted request binds a Goal-free
+`situation_revision` opportunity to exact Situation digest, source refs and subjects.
+The model receives bounded Stable Mind, activated disclosure-safe Memory, trusted
+audience and actual delivered/pending Interaction context. Planner owns relevance,
+silence and exact `greeting|acknowledge|inquire|inform|respond|repair` wording.
+
+Normal admission uses the configured Fast model. Unresolved `deliberate` carries no
+Activity or Memory candidate and may enter exactly one configured Deep invocation;
+direct `slow` readiness uses the same Deep scope. Missing Deep fails quiet and Deep
+cannot recurse. Complete Fast decisions are never sent for another model review.
+All Planner variants share the ordinary communication authority contract and exact
+Activity identity/wording checks. A repair must cite an actually delivered Activity.
+Host validates complete response provenance, subjects, identity, repair references
+and all Memory candidates before any Memory write. Existing Memory privacy and
+retention rules still govern those candidates. Accepted speech retains exact text
+and `truth_stage=context_grounded` through the existing delivery runtime. No Goal
+creation/completion or Capability request is authorized, including safe reads.
+Concrete perception adapters and real model/interaction quality remain unqualified.
 
 `POST /reflection` reuses the configured Deep Planner model only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition. **Current endpoint semantics remain open-Responsibility-only:** applied actions require runtime-bound trusted evidence and a completed outcome is terminal to this API path. Reflection may propose future replan, clarification, a future user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, reopen the current turn, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary. The accepted architecture now specifies a later contract split in which terminal evidence may support bounded `experience`/`calibration` without reopening Responsibility; that design is not implemented by this endpoint yet.
 

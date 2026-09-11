@@ -22,7 +22,7 @@ The maintained authority boundary applies Charter requirements `SPEECH-OWNER-001
 ## Maintained invariant
 
 A turn carries one `context.semantic_authority` claim. The claim records an
-owner and one of three roles:
+owner and one of two roles:
 
 - `authoritative`: may resolve user goals and produce the semantic plan;
 - `observer`: may produce comparison evidence but cannot commit or execute.
@@ -89,12 +89,27 @@ author its exact next revision, merge coherent planned Work, or create a new Wor
 DAGEngine advances execution state and reports Evidence only; normal node completion may
 continue mechanically without a Planner turn, while material invalidation re-enters Planner.
 
+Planner also owns ordinary Goal-free communication. Trusted Situation may trigger an
+independent communication-only Planner task through the existing `/situational-cognition`
+entrypoint. Endpoint names and model depth do not create another author. The request has
+no Responsibility, Goal, Capability Work, or effect permissions; it may produce silence or
+one context-grounded Activity. This differs from GI-triggered planning before GA binding,
+which already has Responsibility provenance and its separately approved safe-read contract.
+Every Planner prompt receives the same ordinary communication authority contract. Shared
+mechanical checks preserve exact Activity identity/wording and delivered repair references;
+Runtime retains #41 delivery truth and never chooses semantic equivalence. An unresolved
+Fast Situation result may delegate once with no Activity or Memory result. Direct Deep
+readiness has the same restricted scope; unavailable Deep fails quiet and cannot recurse.
+No completed decision receives a second model review. All response source/subject and
+candidate checks precede Memory writes; existing Memory ownership/privacy remains unchanged.
+
 ## Entrypoint ownership
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
 | Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
+| Trusted Goal-free Situation | Goal-Driven Cognitive Core; Planner owns communication | authoritative, communication-only | Situation → independent bounded Fast/Deep Planner invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
 | Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner (including optional auxiliary activities), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 

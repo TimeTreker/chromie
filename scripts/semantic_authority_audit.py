@@ -37,6 +37,8 @@ def audit() -> dict[str, Any]:
             errors.append(f"non-canonical semantic owner: {row.get('owner')!r}")
         if row.get("role") not in {"authoritative", "observer"}:
             errors.append(f"invalid maintained semantic role: {row.get('role')!r}")
+        if row.get("communication_owner") != "planner":
+            errors.append(f"ordinary communication must remain Planner-owned: {row.get('entrypoint')!r}")
     apply = next((row for row in matrix if row.get("entrypoint", "").endswith("/apply")), {})
     if apply.get("fallback") != "fail_closed_without_legacy_reentry":
         errors.append("apply path must fail closed without legacy semantic re-entry")

@@ -167,16 +167,20 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   binding never authorizes an equivalent second utterance. Immediate satisfaction need
   not imply durable retention after the Goal is closed.
 - **SPEECH-OWNER-001** — Planner is the sole ordinary semantic owner of whether to
-  communicate, the Communicative Activity, its exact wording, truth stage, and Goal /
-  Responsibility provenance. Host, Runtime, TTS, and Provider may validate, schedule,
+  communicate, the Communicative Activity, its exact wording, truth stage, and source
+  provenance. GI, GA, Runtime/Evidence or trusted Situation may trigger independent
+  Planner tasks. A Goal-free Situation invocation is communication-only: it fabricates
+  no Responsibility/Goal and gains no Capability Work authority, including safe reads.
+  Host, Runtime, TTS, and Provider may validate, schedule,
   realize, retry delivery, or reject it but never independently rewrite its meaning.
 - **PLANNER-AUTHORITY-001** — There is one Planner authority. Fast and deep Planner are
   cognition passes/depths of that same HOW authority. Comparing, reusing, cancelling,
   replacing, or supplementing existing Work are Planner operations, not a mandatory
-  reconciliation stage or another semantic owner. This does **not** mean every deeper
-  non-HOW thought must be mislabeled Deep Planner: bounded conversational deliberation may
-  continue under the same Cognitive-Core semantic authority with no Capability/Work
-  mutation authority and no independent wording owner.
+  reconciliation stage or another semantic owner. Planner also owns ordinary outward
+  communication under a restricted Situation or conversational input contract. Deeper
+  Planner reasoning retains that exact scope and gains no Capability/Work permission.
+  GI, GA and Reflection keep their distinct semantic responsibilities; depth never
+  transfers ownership or reopens an already-complete decision.
 - **ASYNC-COGNITION-001** — Trusted asynchronous Runtime events report what happened;
   Host-bound Evidence records what is true; Responsibility/Goal records what is still
   owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
@@ -191,7 +195,8 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   source/Situation provenance and gains no Goal or Work authority from being salient. In
   all cases the callback says only that cognition may now be useful; it never selects a
   response or Work itself. Core cognition may produce zero, one, or many desired Activity
-  changes, and Planner owns HOW only when actual Work formation is needed. A deliberately
+  changes; Planner owns ordinary outward Activity selection and wording. The admitted
+  input contract determines whether Capability Work formation is available. A deliberately
   unfinished conversational commitment may also schedule exactly one bounded
   owner-preserving cognition continuation through the existing continuation/readiness
   machinery. No path may fabricate a UserTurn, Responsibility, Goal, Evidence, consent,
@@ -199,8 +204,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
 - **SITUATIONAL-INITIATIVE-001** — A meaningful trusted social/world Situation change may
   justify cognition even when nobody addressed Chromie and no Goal is open. Whether that
   change matters socially, whether another person should be interrupted, and whether any
-  outward response is worthwhile are ordinary semantic judgments owned by the same
-  Cognitive Core over Stable Mind, disclosure-safe Memory, relationships, Situation, and
+  outward response is worthwhile are ordinary semantic judgments owned by Planner
+  inside the same Cognitive Core over Stable Mind, disclosure-safe Memory, relationships,
+  Situation, and
   actual Interaction state. Host/Runtime must not implement those judgments with person,
   relationship, event-name, keyword, or priority rules. Runtime may only admit trusted
   source state, reject unchanged/stale provenance, enforce privacy/safety/authorization,
@@ -226,8 +232,8 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   request one bounded deliberative continuation. It is forbidden when the factual claim
   materially depends on pending Work or fresh Evidence that has not returned, and it can
   never lower a consequence-, authorization-, or claim-qualification requirement. Deep
-  Planner remains reserved for HOW; deeper conversation-only reasoning gains no Work
-  authority merely because it is deliberative.
+  Planner's conversation-only continuation gains no Work authority merely because it
+  uses deeper reasoning. An already-complete decision cannot be sent for model review.
 - **DELIVERED-CLAIM-001** — Actually delivered speech is immutable conversation evidence.
   On later cognition, the same ordinary speech semantic authority reconciles current
   meaning against delivered Communicative Activities: unchanged meaning normally produces silence
@@ -293,7 +299,7 @@ flowchart TD
     P0 --> ACT["Detailed Activities<br/>speech, body, information, tool, or other Capability Work"]
     P0 -. "complex HOW" .-> DP["Deep Planner<br/>same HOW authority"]
     DP --> ACT
-    P0 -. "provisional speech keeps Responsibility open" .-> DC["Bounded deliberative cognition<br/>communication-only authority scope"]
+    P0 -. "provisional speech keeps Responsibility open" .-> DC["Bounded Planner deliberation<br/>communication-only authority scope"]
     DC --> DCR["Delivered-claim reconciliation<br/>silence / delta / repair"]
     DCR --> ACT
     GA --> GOALS["Canonical Goals<br/>unfinished Responsibility only"]
@@ -1228,14 +1234,15 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Interpretation authority.
 
 35. **Response is a Planner-owned Main Activity, not a second semantic mind.**
-   Once authoritative Responsibility and bounded Goal/evidence state are available,
-   the Planner-owned communication surface chooses the still-needed user-facing delta
+   Once the invocation's authoritative inputs are available (Responsibility/Goal/Evidence
+   or exact trusted Situation without a Goal), Planner chooses the still-needed delta
    and authors one typed Communicative Activity containing both its semantic function
-   and exact natural wording. Ordinary Fast/Deep Planner does this while planning HOW;
-   a bounded conversation-only deliberative continuation may reuse the same speech
-   authority without acquiring Capability/Work authority or becoming another semantic
-   owner. Goal Interpretation owns neither. The Activity also carries timing,
-   Goal/Responsibility provenance, a truth stage, and exact Evidence references for facts
+   and exact natural wording. Fast/Deep are independent invocation depths of this same
+   Planner authority. A communication-only Situation/continuation contract provides
+   no Capability/Work or Goal mutation authority. It may deepen once only before its
+   decision is complete; escalation carries no Activity or authored Memory result. Goal
+   Interpretation owns neither. The Activity also carries timing, exact Goal/Responsibility
+   or trusted Situation provenance, a truth stage, and exact Evidence references for facts
    that depend on observed reality. There is no independent response-authoring or
    result-wording semantic owner between the Cognitive Core and Runtime.
    The Host validates these fields mechanically and rejects unsupported reality,

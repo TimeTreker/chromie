@@ -3542,6 +3542,37 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertTrue(response.capabilities[0].metadata["retryable_safe_read"])
         self.assertTrue(response.metadata["safe_read_parallel_execution"])
 
+    def test_canonical_planner_preserves_activity_identity_against_delivery_context(self):
+        for tier in ("fast", "deep"):
+            for activity_id, text in (("spoken-1", "Changed words."),
+                                      ("spoken-1", "Original words."),
+                                      ("new-2", "Original words.")):
+                with self.subTest(tier=tier, activity_id=activity_id, text=text):
+                    plan = CanonicalPlan(
+                        plan_id="speech-identity", planner_tier=tier,
+                        disposition="respond", coverage="complete", confidence=1.0,
+                        goal_ids=["goal-1"], response_text=text,
+                        communicative_acts=[{
+                            "activity_id": activity_id, "text": text,
+                            "role": "complete_response", "speech_act": "respond",
+                            "source_goal_ids": ["goal-1"], "truth_stage": "pre_evidence",
+                        }],
+                    )
+                    context = {"interaction_context": {"already_spoken": [{
+                        "text": "Original words.",
+                        "metadata": {"communicative_activity_ids": ["spoken-1"]},
+                    }]}}
+                    response_call = CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
+                        plan=plan, session_id="sid", language="en", context=context,
+                    )
+                    if activity_id == "spoken-1" and text == "Changed words.":
+                        with self.assertRaisesRegex(ValueError, "wording cannot change"):
+                            asyncio.run(response_call)
+                    else:
+                        response = asyncio.run(response_call)
+                        self.assertEqual([item.text for item in response.speech], [text])
+                        self.assertEqual(response.capabilities, [])
+
     def test_pure_effectful_execution_may_be_planner_selected_silence(self):
         plan = execute_plan()
         plan.response_text = None
