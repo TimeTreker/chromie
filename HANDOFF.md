@@ -1,5 +1,96 @@
 # Chromie Latest Handoff
 
+## Issue #43 primary-result authority documentation, 2026-09-11
+
+The owner authorized #43 and instructed that solved Issues pushed to main be closed.
+This supersedes older requests to keep completed source Issues open solely for an
+additional acceptance reply. Partial work and model/live qualification stay open.
+The scope is documentation consistency, existing verification, normal main delivery
+and Issue bookkeeping. Remaining #40 and #44–#48, model optimization, the separate
+Fast wire proposal and deployment remain outside this authorization.
+All entries after this section are historical delivery snapshots.
+
+Repository `/home/chromie/github/chromie`, branch/upstream main / origin/main.
+Delivery base `9ce17956f6b1ec3efb01acd14b91e47571999e17`; initially clean and synced.
+The local checkout was fast-forwarded from its older main before this patch.
+Resume at the latest main commit containing both handoff owners; do not predict it.
+Evidence root R: `.chromie/acceptance/issue43-online-review-docs-20260911/`.
+`before.json`, `before/` and `issue-*-before.json` retain the base and original prose.
+The prior #42 private evidence folder is not present on this machine. Historical
+counts come from its tracked record; the checks below are independently run here.
+
+### Observed contradiction and actual inspected workflow
+
+The originating case is a documentation audit, not a live utterance. The base
+SEMANTIC_AUTHORITY paragraph required an accept/reject model completeness audit for
+`entity_type=action_list`, then Deep after Fast review rejection. The interaction
+latency paragraph also named semantic-completeness review as an online gate.
+Charter principles 30–31 and the existing Planner code prohibit that second writer.
+The primary cause is stale contract documentation (`contract_or_schema` attribution);
+model-inference fault is not supported by this audit. No new runtime failure is claimed.
+
+| Boundary / owner | Actual inspected input and output | Expected contract / verdict |
+| --- | --- | --- |
+| Charter -> maintained authority prose | Primary semantic-result ownership and no same-authority review -> lower document requires action-list audit and review-triggered Deep. | Incorrect documentation. Remove that requirement; do not restore a model reviewer. |
+| Scripted Goal context -> Fast primary | Existing coordinated-action regression supplies goal-action with action_list plus a scripted Plan. Resolver accepts one primary result with one model invocation. | Correct invocation budget; this fixture does not prove the Plan understands every requested action. |
+| Scoped source/Goals -> Deep primary | Existing Deep regressions supply authoritative context and one scripted primary result; no Fast candidate is a review authority and no second coverage call runs. | Correct one-primary boundary in the covered fixtures. |
+| Fast contract failure -> Host | Existing Host regressions supply contract_failure; Host stops instead of calling Deep. Independent unresolved HOW uses the original scoped work request/context. | Correct technical-failure containment in those fixtures; no assertion that all semantic-classification paths are qualified. |
+| Primary output -> DTO/Host | Declared Goal refs, cardinality, provenance, capability/safety and state invariants are checked. | Mechanical acceptance is not arbitrary natural-language completeness; semantic performance needs separate qualification. |
+| Structural repair / offline adjudication | Current Fast/Deep have no same-tier regeneration. GA separately preflights and compares one lossless container repair. Offline reviewers judge retained results. | Neither mechanism grants an online Planner semantic rewrite or Runtime-state mutation. |
+
+The repair changes two existing documentation inputs to future implementers: the
+explicit action-list paragraph and the latency rule. It describes primary ownership,
+source-based unresolved-only Deep, role-specific structural repair and offline
+qualification separately. No prompt, source module, DTO, Schema, test, model profile,
+configuration switch, corpus input/reference, execution path or provider was edited.
+No GI/GA/Planner model service, ASR/TTS, Soridormi, microphone or physical robot was
+invoked for this diagnosis; verification uses the existing local scripted fixtures.
+No new behavior test was added for this reversible prose change. The original text
+is the reproduced failure; no fail-first runtime test is claimed.
+
+### Checks and delivery state
+
+- `authority-baseline.log`: semantic authority audit passed on the delivery base.
+- `focused.log`: 532 tests/332 subtests passed on unchanged runtime source, covering
+  Planner/Host authority plus GA, Goal/Situation and customer-Mind closure evidence.
+- `canonical-first.log`: stopped at docs/STATUS.md 261 lines versus the existing
+  260-line limit. Condensed the new status entry; no gate, test or runtime changed.
+- `canonical.log`: 2,461 tests/729 subtests, 140 benchmarks and 20 legacy Agent
+  tests passed, including repository policy/ownership, pinned Ruff/Mypy,
+  configuration, Runtime structure and documentation. Two existing FastAPI
+  startup-deprecation warnings remain. No final runtime/test failure remains.
+- `docs-reviewed.log` passed after a final authority-prose clarification. Final
+  delivery-document checks are retained separately in `docs-final.log`.
+- `review.json`, `closure-decisions.json`, `source-freeze.json` and
+  `documentation.patch` retain diagnosis, closure scope, unchanged runtime identity
+  and the final patch. No separate Level A or model cohort ran for a prose-only fix;
+  existing scripted behavior tests ran in the canonical suite.
+
+Exact commands from repository root with pinned requirements-test.txt dependencies:
+
+```bash
+python scripts/semantic_authority_audit.py
+python -m pytest -q tests/test_semantic_authority.py tests/test_fast_planner_pr3.py tests/test_deep_planner_pr4.py tests/test_fast_planner_streaming_commit.py tests/test_cognitive_runtime_pr7.py tests/test_goal_association_pr2.py tests/test_conversation_state.py tests/test_situational_cognition.py tests/test_mind_profile.py tests/test_configure_chromie_mind.py
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+git diff --check
+```
+
+Prior #33, #37–#39 and #41–#42 were verified in main and are now closed as completed;
+`closed-existing-issues.json` retains confirmed GitHub states. Their deliveries are
+respectively 1dde889f, 15f2a45c (37–39), 245eb540 and 9ce17956. #40 is partial.
+#24/#28/#32/#35 retain unmet acceptance/qualification requirements;
+#36 is the aggregate index. #43 closes only after this correction is pushed and the
+remote commit verified. Update #36 to reflect actual closures, preserving historical
+records and the outstanding #40/#44–#48 decisions. Closing a source Issue never
+promotes model quality, voice, simulator, physical or release evidence.
+Maintained Markdown count remains 102; no environment key or architectural term is
+added. The historical handoff remains a consolidation opportunity, outside this patch.
+No model/live/voice/target qualification or deployment was performed. Release remains
+development only. Ignored R artifacts need separate transfer; Git retains this workflow.
+
 ## Issue #42 one Planner communication authority, 2026-09-11
 
 The owner approved the discussed #42 direction: Planner owns ordinary communication

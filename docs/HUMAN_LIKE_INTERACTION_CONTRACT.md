@@ -693,10 +693,13 @@ playback evidence. Incremental audio playback can reduce TTS-to-first-audio
 latency, but it cannot make an unvalidated model fragment safe to speak.
 
 Latency work must not bypass schema validation, source-effect bounds,
-capability and resource validation, confirmation, semantic-completeness review,
-speech-claim validation, or evidence reconciliation. Optimize avoidable model
-generations, serial dependencies, and repair calls before weakening a validator
-that correctly rejected an invalid result.
+capability and resource validation, confirmation, primary-result coverage and
+provenance checks, speech-claim validation, or evidence reconciliation. These
+mechanical checks do not prove arbitrary semantic completeness and never require
+a second online model reviewer. Semantic quality is qualified separately through
+retained offline and target evidence. Optimize avoidable model generations and
+serial dependencies while preserving validators and the existing bounded
+delegation/structural-repair contracts.
 
 ## ASR uncertainty and ambiguity
 

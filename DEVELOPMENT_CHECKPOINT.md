@@ -1,36 +1,39 @@
 # Development Checkpoint
 
-## Current delivery boundary — Issue #42 shared Planner communication authority
+## Current delivery boundary — Issue #43 online review requirement removed
 
-Updated 2026-09-11. The owner approved Planner as the sole ordinary communication
-authority for Goal-bound and Goal-free inputs. Independent Situation Planner calls
-retain communication-only scope: no invented Responsibility/Goal, Capability Work
-or safe-read permission. Existing endpoint/DTO and configured Fast/Deep clients stay.
-Every Planner prompt shares the communication contract. Shared checks reject changed
-wording under an existing Activity identity and repair refs without actual delivery.
-A completed decision receives no second model review; unresolved Fast may delegate
-once without an Activity/Memory result. Direct Deep keeps the same restricted scope.
-Host validates the complete source/subject, identity, repair and Memory-candidate
-result before writing Memory. Existing #41 delivery truth remains authoritative.
+Updated 2026-09-11. The owner authorized #43 and instructed that solved Issues
+pushed to main be closed. The Goal-driven single-authority architecture remains
+binding. This documentation-only correction aligns SEMANTIC_AUTHORITY and the
+interaction latency rule with Charter principles 30–31: complete primary results,
+no second online completeness reviewer, source-based unresolved-only Deep
+reasoning, separately bounded structural repair and offline qualification.
+Mechanical checks do not prove arbitrary natural-language completeness.
+No runtime, prompt, Schema, model, configuration or corpus behavior changed.
 
-Delivery base: `main` at `245eb540de2e9385c34f1a1b82ebb68a6e29e4c1`, tracking
-`origin/main`. Continue standing commit/push authorization. Resume from the latest
-commit containing this checkpoint and HANDOFF; do not predict its hash.
-Evidence: `.chromie/acceptance/issue42-planner-communication-20260911/`.
-Focused 376 tests/190 subtests and Level A 30/30 passed. Final canonical passed
-2,461 tests/729 subtests, 140 benchmarks and 20 legacy Agent tests.
-Three Agent authority probes failed before the fix; three isolated Host replay
-contrasts failed on the delivery base and pass now. Two intermediate test failures
-were incorrect new fixture method names; both failed logs remain retained.
-No real model inference, service deployment, physical voice or target proof ran.
-Ignored artifacts need separate transfer; tracked commands/workflow are in HANDOFF.
+Delivery base: main / origin/main at
+`9ce17956f6b1ec3efb01acd14b91e47571999e17`; initially clean and synchronized.
+Resume from the latest main commit containing this checkpoint and HANDOFF.
+Evidence: `.chromie/acceptance/issue43-online-review-docs-20260911/`.
+The source authority audit passed. Existing focused tests passed 532 tests and
+332 subtests, including Fast/Deep call budgets, streaming, Host failure paths,
+GA/Goal continuity, Situation and customer Mind. Canonical passed 2,461 tests/729
+subtests, 140 benchmarks and 20 legacy Agent tests; policy/static/config/docs passed.
+The first gate stopped at a 261-line STATUS entry; it was condensed to the existing
+260-line limit without changing the gate. Both logs remain retained.
+No new behavior test or model trial is needed for these prose changes. The actual
+failure is retained conflicting documentation, not a newly reproduced robot episode.
+No deployment, model inference, voice, simulator or physical proof ran.
 
-Prior #37–#41 are in the delivery base; their evidence remains below/in HANDOFF.
-Other GI normalizers, numeric source extraction beside a period, #43–#48, full
-merge/split, model optimization and deployment remain outside the approved scope.
-No corpus inputs/reference outputs, provider profiles, config keys or switches changed.
-Existing owners hold this amendment; no new module, current document or service.
-Historical #37 implementation/evidence follows; use this top entry for current resume.
+Prior #33 and #37–#39/#41–#42 are verified ancestors of main and are now closed
+under the owner's instruction. #43 closes after this verified main delivery.
+#40 remains partial; #24, #28, #32 and #35 retain acceptance or qualification gaps.
+#36 remains the open audit index.
+Remaining #40 work and #44–#48 require separate decisions; no new model iteration,
+transport amendment or deployment is authorized. The old 29–46 budget is exhausted.
+The prior #42 gate (2,461/729, 140 benchmarks, 20 legacy; Level A 30/30) is historical,
+with exact workflow and private evidence references in HANDOFF. Its private evidence
+folder is absent on this machine; Git does not transfer ignored artifacts.
 
 ## Prior local implementation — Issue #37, 2026-09-11
 
@@ -106,7 +109,9 @@ The owner requested separate discussion and authorization for each audit finding
 [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) links #37 (this
 authorized local implementation) and #38 (completed documentation correction),
 #39 (semantic inheritance), #40 (GI speed and GA preservation), and #41 (speech
-authority). Remaining #40 work and #43–#48 need separate authorization; #42 is recorded above.
+authority). #43 is the current authorized correction; remaining #40 work and
+#44–#48 need separate authorization. Solved main-delivered Issues are closed under
+the owner's current instruction; historical acceptance wording below is superseded.
 
 1. Inspect `git status --short --branch`, this checkpoint, current Charter and
    HANDOFF. Preserve any subsequent dirty work and existing evidence.

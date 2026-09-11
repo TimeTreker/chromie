@@ -122,14 +122,33 @@ reason to author or play a second equivalent utterance. This changes latency,
 not semantic or effect authority. Capability-dependent factual answers still
 require matching trusted Evidence.
 
-When Goal Association explicitly binds one Goal with `entity_type=action_list`,
-Fast and Deep Planning require a bounded model-authored semantic completeness
-audit before accepting an effectful Plan. The audit can only accept or reject;
-it cannot add steps, choose a Capability, revise the Plan, or authorize
-execution. Fast rejection escalates to Deep Planning. Deep rejection or audit
-unavailability removes every executable step and returns clarification. This is
-a fail-closed validation of the current Planner's coverage claim, not another
-planning authority or a Host phrase-to-action rule.
+For Goal-bound planning, each Fast or Deep invocation authors its complete Plan,
+per-Goal outcomes and grounding/coverage evidence in its primary result. A Goal
+with `entity_type=action_list` does not introduce an exception
+to Charter principles 30–31. A second model call must not audit, accept/reject,
+complete, or repair that same semantic decision. Schema and Host checks enforce
+declared references, cardinality, provenance, Capability and execution invariants;
+passing them does not prove arbitrary natural-language semantic completeness.
+
+Before commitment, genuinely unresolved HOW may use the designated single
+source/context-based delegation to Deep Planner. Deep receives authoritative
+Responsibilities/Goals and current context, not a Fast candidate Plan to judge or
+rewrite. A technical/contract failure or a review verdict cannot authorize that
+delegation. Deep rejection is terminal for that attempt, and a completed decision
+cannot be reopened by another model review. New authoritative Goal, Work, Evidence
+or Situation state may independently trigger the existing scoped Planner path.
+
+Structural regeneration is separate from semantic reconsideration and is permitted
+only by the particular role's existing contract. Current Fast/Deep Planner do not
+invoke same-tier repair generations. GA's separately bounded container repair must
+preserve every primary claim through deterministic preflight and comparison; it
+does not authorize Planner review or semantic rewriting. See the
+[turn-loop depth and repair contract](COGNITIVE_TURN_LOOP.md#30-fastdeep-escalation-is-cognition-depth-not-repair).
+
+Offline semantic qualification may review retained primary results under the
+[frozen-cohort method](LLM_PROMPT_QUALIFICATION_METHOD.md). Its judgments remain
+evaluation evidence: they cannot replace candidate results, mutate Runtime state,
+or feed a repair back into the current online decision.
 
 `GET /semantic-authority` exposes the maintained machine-readable authority
 matrix from the Agent service.
@@ -187,5 +206,6 @@ Planner-selected Capability identity and semantic arguments remain Planner-autho
 Trusted Host/runtime validation may check the exact Capability against the live
 catalog and validate arguments against that Capability's schema, but it must not
 substitute a nearby Capability, translate one Capability's arguments into another
-schema, or clamp values as a semantic rewrite. Invalid output fails closed or
-returns to the owning Planner's bounded repair/escalation path.
+schema, or clamp values as a semantic rewrite. Invalid output fails closed;
+genuinely unresolved HOW may use only the source-based depth contract above,
+never a model review or repair of the rejected Plan.

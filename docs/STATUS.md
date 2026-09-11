@@ -1,12 +1,12 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-11
-**Current focus:** Issue #42 authorized shared Planner authority for Goal-bound and Goal-free communication.
-Independent Situation Planner calls retain communication-only permissions, exact provenance and bounded depth.
-Other GI normalization/numeric-source decisions and #43–#48 remain pending.
-Current focused 376/190; canonical 2,461/729, 140 benchmarks, 20 legacy; Level A 30/30 passed.
-Numeric source extraction next to a period remains a known limitation; rejection preserves the failure.
-Prior #41 passed 2,442 tests/723 subtests, 140 benchmarks, 20 legacy tests and Level A 30/30.
+**Current focus:** Issue #43 authorized documentation correction for the Goal-driven single-authority rule.
+SEMANTIC_AUTHORITY and the interaction latency contract now require complete primary results without online model review.
+Unresolved-only source-based Deep reasoning, bounded structural repair and offline qualification remain distinct.
+Authority audit and focused 532/332 passed; canonical passed 2,461 tests/729 subtests, 140 benchmarks and 20 legacy. Runtime, prompts, Schemas, profiles and corpora are unchanged.
+Solved main-delivered #33/#37–#39/#41–#42 are closed; #43 closes with this delivery. Remaining #40 and #44–#48 require separate decisions.
+Prior #42 canonical passed 2,461/729, 140 benchmarks, 20 legacy; Level A 30/30. No target qualification follows.
 
 **Prior authorized local implementation (#37):** independent Planner tasks, scoped Work
 changes, pre-GA safe reads and role Memory projections on local `main`. GI and GA remain
@@ -20,7 +20,7 @@ was changed.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Prior #37–#41 plus restricted Situation Planner, shared communication/identity contract, bounded unresolved delegation and complete validation before Memory writes implemented. | Focused 376 tests/190 subtests; canonical 2,461/729, 140 benchmarks, 20 legacy, policy/ownership, pinned static, configuration and docs passed; Level A 30/30. | No model inference, live service, supervised voice or target-runtime qualification was performed for this patch. | Development only; default target-evidence closure remains open. |
+| Prior #37–#42 implementation retained; #43 removes conflicting online-review instructions in existing authority documents. | Authority audit, focused 532 tests/332 subtests, canonical 2,461 tests/729 subtests, 140 benchmarks, 20 legacy and policy/static/config/docs passed. Initial STATUS line-limit failure was corrected; its log remains retained. | No model inference, live service, supervised voice or target-runtime qualification was performed for this documentation patch. | Development only; default target-evidence closure remains open. |
 
 The prior consolidation counts (2,392 tests / 671 subtests) describe the base
 revision only; historical evidence below is not qualification of this local patch.
