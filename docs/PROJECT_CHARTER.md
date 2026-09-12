@@ -546,6 +546,14 @@ Read the diagram with these boundaries:
   The owner authorized the future-readiness correction on 2026-09-12: a Goal
   with an explicit future `ready_at` may receive an acknowledgement and an exact
   Planner-authored time condition while its original effect remains unmet.
+  The owner authorized completion of the new-request path on 2026-09-13 (#60):
+  GI's one primary WHAT result may author the exact timezone-qualified `ready_at`
+  activation instant while preserving source temporal meaning. GA conserves it;
+  Planner owns the resulting HOW/time condition. The Gateway's immutable receipt
+  instant supplies elapsed-time context, never an assumed user-local timezone.
+  Missing clock/date/timezone meaning stays unresolved, with no invented activation.
+  Host validates typed timestamps and provenance; it neither interprets free-form
+  time nor supplies a second semantic normalization call.
   It owns no current executable Work. A time condition wakes cognition later;
   it never silently delays a step that the Plan lists now. Independent ready
   Goals and future monitoring of already-running Work retain their own contracts.

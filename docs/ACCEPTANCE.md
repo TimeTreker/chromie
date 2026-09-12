@@ -65,13 +65,15 @@ qualification. Real role clients use a strict local HTTP replay server; GI/GA/Pl
 validation, state and Capability Runtime run against controlled providers/audio.
 Initial admission and role scheduling remain explicit test-driver inputs. Each run
 retains source/corpus hashes and per-call requests/replies; mismatches fail closed.
-The delayed case starts from a declared prior scheduled Goal and does not prove
-new-request temporal interpretation ([#60](https://github.com/TimeTreker/chromie/issues/60)).
-These passes cannot close #24/#32 or replace native streaming, voice or robot evidence.
-The expanded cohort has 30 authored contrasts and 1,500 parameter/language variants;
-this count is not 1,500 independent model inferences or abilities. Report expected
-rejections/state outcomes separately from completed workflows, and retain the 50
-known #60 gaps as failed cases. Single-role substitution sends only the actual role
+Retained-timer cases start from prior Goals; new-request cases separately prove GI/GA
+admission of exact temporal WHAT, waiting across restart, no early work and one due wake.
+The simulator already returns the authored answer; the original #60 failure was the
+Schema/Host rejecting its readiness field. These passes cannot close #24/#32 or replace
+native streaming, voice or robot evidence. The expanded cohort has 60 authored contrasts
+and 6,000 parameter/language variants, not 6,000 independent inferences or abilities.
+Report contract rejection, safe nonexecution, state handling and completed workflows
+separately. An empty, absent or foreign single-Goal result map must fail Host admission.
+Single-role substitution sends only the actual role
 request to an explicitly selected candidate; an uncovered downstream packet is a
 coverage gap, not an automatic semantic failure. Model Schema errors take precedence.
 Fault-injection answers must never enter training; all current references remain

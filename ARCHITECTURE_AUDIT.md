@@ -1,14 +1,130 @@
 # Chromie project principles and implementation audit
 
-**Updated:** 2026-09-13. **Pre-delivery base:** `0457db8dfba677363bf99b7ab4f17027e70d4740`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
+**Updated:** 2026-09-13. **Pre-delivery base:** `6bf16ccfbe816c068e0b51048331cbec15938c4e`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
 
 **Audience:** project owner and maintainers reviewing or continuing the Issues. **Owner:** the project owner owns principle decisions; each linked Issue owns its acceptance. This report records evidence and decisions under the existing [Charter](docs/PROJECT_CHARTER.md), [Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 
 The owner explicitly authorized implementation, principle decisions, bounded maintenance, publication and closure of solved Issues in this session. The repairs preserve GI ownership of WHAT, GA ownership of Goal continuity, Planner ownership of HOW/speech, and Runtime ownership of execution and Evidence. Three decisions follow natural, grounded behavior: reporting a cancellation does not fulfill the original request; remembering a future intention is different from doing it now; optional learning follows the ready response. None needs another semantic reviewer or a phrase-based router.
 
-Earlier source repairs and deterministic verification are implemented; their revision-bound evidence is retained below. The latest owner-approved work expands offline architecture replay to 1,500 cases under #61 and repairs binding admission (#62) and multi-Goal context allocation (#63); the earlier prerequisite/count repair #59 remains delivered. New-request readiness remains #60; #24/#32 remain open. The preceding native GI investigation retained 226 executions/254 calls without a qualified repair. No new native model, aggregate live, streaming, audio or physical proof is claimed by the replay work.
+Earlier source repairs and native failures remain revision-bound evidence below. The latest owner-approved work expands offline architecture replay to 6,000 cases under #65, closes the new-request temporal contract (#60), and rejects omitted single-Goal Planner outcomes (#66). #24/#32 retain their separate native/target requirements. No new native model, aggregate live, streaming, audio or physical proof is claimed.
+
+## Broader workflow audit — #60/#65/#66
+
+The September 13 owner-authorized expansion is **6,000/6,000 expected outcomes**, not
+6,000 executed actions or independent model inferences. GPT-6 Astra authored 60
+contrast families, expanded over four actions, five values and five language forms.
+The strict full baseline retained 100 failures in the single-Goal Planner outcome
+map boundary (#66). The final unchanged-source full run passes: 1,400 complete
+workflows, 1,800 state/fault/permission outcomes, 2,580 contract rejections and 220
+safe nonexecuting responses. All source, corpus and raw packet identities are retained.
+
+The original 1,500-case result at `6bf16ccf` remains historical: 1,450 expected successes
+and 50 failed #60 contract-gap probes. Its clean source identity was checked against
+retained evidence before editing. Those #60 IDs are preserved in the new corpus and
+now run **new input → GI → GA → wait → restart → due wake → controlled execution**,
+without seeding a Goal. `new_readiness_gap` is a historical family identifier, not a
+remaining failure label. Separate prior-Goal timer cases remain as complementary tests.
+
+### Responsibility boundaries and fixes
+
+| Episode / owner | Authoritative input and actual output before repair | Expected output / first wrong boundary | Fix and downstream proof |
+| --- | --- | --- | --- |
+| #60 source → replayed GI primary | `Blink 1 times at 2099-09-04T19:00:00+08:00.`; the authored model reply **already includes** `ready_at` | The simulator can return the field; GI's closed Schema and Host vocabulary cannot admit it. This is a representability defect, not evidence of weak model inference | Owner-authorized Charter/architecture amendment: GI authors requested temporal WHAT in its primary result; no extra semantic call |
+| #60 Gateway context → GI prompt/Schema/Host | Trusted receipt instant was not projected as a usable normalization anchor; no admitted readiness key | Preserve a literal timezone-qualified timestamp, or a normalized instant plus exact source time/time_scope and trusted receipt clock | Schema/prompt expose `ready_at`; Host checks ISO shape, timezone and source/clock provenance. Gateway time anchors elapsed time and never invents the user's local timezone. Host does not parse natural-language time or judge normalization semantics |
+| #60 GI → GA → Goal | Prior failed probes never reached GA | Preserve exactly the accepted temporal binding and all other WHAT values under the new canonical Goal ID | Existing GA conservation carries `ready_at` unchanged. Tests assert no pre-seeded Goal and equality through both owners |
+| #60 Planner → state → due re-entry → Runtime | Existing retained-Goal timing path worked, but could not establish fresh GI admission | Register the exact due time, retain an open Goal, do no early Work, survive restart, wake the same scoped Goal once and execute the exact action | Absolute and relative episodes pass. At due−1 no provider call; at due one call; next drain no duplicate wake. New semantic cancellation survives restart and prevents wake |
+| #60 missing time meaning → primary/deeper GI → Planner | `tomorrow at seven` lacks timezone and AM/PM | Preserve uncertainty, invoke only the designated source-based deeper GI once, ask a genuine clarification and do no Work | Frozen primary/Deep uncertainty, GA, and Planner clarification complete with Goal open and no timer/provider call. Invalid date, naive timestamp, absent receipt and foreign source-time probes fail closed |
+| #66 GI → GA → Deep primary | Clear action/count becomes one canonical Goal; hostile reply returns an execute step and exact aggregate satisfaction but `goal_outcomes={}` | Raw dynamic Schema rejects the missing Goal key | Deliberate fault injection, never a training reference; valid upstream owners are unchanged |
+| #66 shared Planner Host → canonical adapter | Map equality was checked only for multiple Goals or escalation; empty/foreign single-Goal maps were admitted; absence was also exempt | **First wrong production boundary:** a supplied map must exactly cover authoritative Goal IDs regardless of cardinality | Require exact map coverage for every Goal count, including absence, in the existing shared validator. Fast/Deep empty, absent and foreign map tests change from failure to rejection; complete-map controls still pass. All 100 frozen omissions reject before adapter/Runtime; no second call or fallback map is authored |
+
+Broader validation also reproduced the absent-map variant: after the first repair,
+60 empty-map contrasts rejected but 40 deliberately omitted-map contrasts still
+passed Host admission. Their original raw packets and the failing run are retained
+in `missing-map-red/`. The final repair removes the supplied-field exception too;
+`missing-map-green/` rejects all 100. Twenty-eight reference DTOs in 27 older unit tests were
+updated to include their declared per-Goal result while preserving the same action,
+parameter, response, satisfaction claim and intended downstream assertion. Seven
+initial failures, sixteen further missing-map failures, and four broader-reference
+failures remain retained; no model
+mock automatically adds an outcome. The dedicated negative tests keep missing/empty/
+foreign maps malformed and verify both primary tiers reject them.
+
+The complete temporal path is `admitted source/receipt → GI WHAT → GA Goal → Planner
+waiting Plan → persisted Host condition → scoped due re-entry → Planner effect Plan
+→ controlled Capability Runtime → correlated outcome → satisfied Goal`. Semantic
+cancellation follows the same first three owners, removes the pending obligation and
+prevents the due re-entry. Operational stop cancels active work while preserving an
+unmet Goal. The fixture establishes receipt facts, initial role scheduling and, for
+one terminal-timer family, terminal state; it does not prove those facts' producers.
+
+### Coverage and reference review
+
+| Coverage | Concrete contrasts |
+| --- | --- |
+| Common execution and communication | Blink, walk, nod and head shake; Fast/Deep action plans; explicitly supplied speech content; mixed independent action/speech; exact quote delivery; two-Goal conservation |
+| Continuous interaction | Weather acquisition and rain/dry result re-entry; new and retained timers; relative/ambiguous times; restart, no-early-work and single wake; new/retained semantic cancellation; operational and late cancellation |
+| Primary authority and integrity | One designated deeper GI invocation with resolved/unresolved outcomes; sparse binding/source/Goal conservation; duplicate/missing/foreign source maps; forbidden HOW and undeclared keys; parameter, timing and satisfaction errors |
+| Execution boundaries | Failure/refusal/invalid output/cancelled/timed-out provider observations; absent provider; required/withheld trusted authorization; duplicate/stale/foreign outcomes; overlapping declared resources |
+
+Review did not accept every mechanical pass. Initial reference/harness failures are
+retained in `representatives-v1/` (337/420), `representatives-v2/` (212/240) and
+`representatives-v3/` (236/240). Corrections include dictionary-shaped Goal access,
+production speech-result correlation, proper supplied-proposition speech modality,
+confirmation wording in its allowed aggregate field, and 60 terminal dry-condition
+responses that retained blink-specific wording. These are reference/wiring corrections,
+not product defect claims or model improvements. Original answers/hashes remain in
+`reference-adjudication-notes.md`, `terminal-reference-review.json` and captures.
+
+The resource family originally stopped at a singleton parallel group or numeric
+provenance check. Its corrected 100 cases contain two independently sourced Goals,
+explicit parameter provenance, both parallel members and a controlled catalog that
+allows parallel work except for a shared resource. They now require the specific
+`parallel_resource_claim_conflict` diagnostic from Deep validation and no executable
+output. Declared fixture resource metadata also reaches Runtime definitions. The
+original shallow passes and two unsuccessful refinements remain retained. This tests
+catalog-driven conflict containment, not concurrent physical execution.
+
+`benchmarks/integration/workflow_scenarios/` contains 6,000 separate case JSONs and
+898 SHA-addressed packet parts; 382,137,005 bytes including its manifest. Original
+five prototype responses are unchanged; only their GI packets were explicitly
+refrozen for the authorized Schema/prompt amendment. Current model replies are
+references or labeled faults; none is runtime-generated from a verdict. The runner
+never imports the authoring module. Four isolated worker processes speed offline
+runs without sharing clock/UUID patches, state or providers; candidate mode requires
+one worker. Runtime/authoring source identities and primary prompt text are retained.
+
+All outputs remain training-ineligible and same-model/non-independent reviewed.
+3,600/1,200/1,200 splits keep each action/value's languages and contrast relatives
+together; they are parameter holdouts, not unseen-family generalization. Fixed peers
+support future one-role substitution, but an accepted novel output may reach an
+uncovered downstream packet and require a separately reviewed continuation. They do
+not establish native model ability or combined-model reliability. No LoRA job ran.
+
+This corpus excludes autonomous initial scheduling, Fast-to-Deep Planner delegation,
+native streaming, attention/reflection/skill selection, full Gateway/audio,
+wall-clock provider timeout expiry, confirmation dialogue interpretation, deployed
+service/registry compatibility, MuJoCo and physical robot evidence. Timeout cases inject
+terminal provider status. Nod/shake contracts are reduced qualification fixtures,
+using count 2–8 from the paired Soridormi manifest at `284273bc`; they are not its live
+registry. Known source speech is not external-information acquisition. #24/#32 remain
+open for their native/target evidence requirements.
+
+Final validation: 3,214 tests/804 subtests, 145 benchmarks, 20 legacy tests and
+pinned static/configuration/policy/ownership gates pass; Level A is 45/45 across
+15 classes. Two pre-existing FastAPI deprecation warnings remain.
+
+Evidence lives in `.chromie/acceptance/workflow-6000-20260913/`. The [checkpoint](DEVELOPMENT_CHECKPOINT.md)
+and [handoff](HANDOFF.md) own final canonical checks, archive hashes and resume commands.
+The owner authorized #60/#65/#66 closure after verified Git delivery. This change
+uses existing owners: no new current Markdown document, environment variable,
+model profile or architecture layer; 102 current documents / 15 core-path documents
+remain unchanged. The larger authoring/driver files are reviewed as test-owned
+assembly and execution boundaries, not an exception to safety/ownership checks.
 
 ## Expanded workflow audit — #61/#62/#63/#64
+
+This section records the preceding 1,500-case delivery at `6bf16ccf`; the current
+6,000-case result and subsequent repairs are described above.
 
 The owner approved 1,500 architecture/workflow/contract scenarios after the five-case
 prototype found a real defect. This is an explicitly authorized evidence expansion;

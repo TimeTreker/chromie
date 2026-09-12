@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from concurrent.futures import ProcessPoolExecutor
 import hashlib
 import json
 import logging
@@ -20,6 +21,7 @@ from benchmarks.integration.model_replay import ModelReplay, load_case  # noqa: 
 
 def source_identity():
     paths = [p for area in ('agent', 'orchestrator', 'shared') for p in (ROOT/area).rglob('*.py')]
+    paths += list((ROOT/'agent').rglob('*.txt'))
     paths += [ROOT/name for name in (
         'scripts/run_workflow_replay.py', 'benchmarks/integration/model_replay.py',
         'tests/workflow_replay_support.py', 'tests/capability_runtime_test_support.py',
@@ -28,9 +30,37 @@ def source_identity():
     return {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
+def run_one_case(job):
+    """Process-owned clock, replay service, providers, Goal store and evidence."""
+    path, evidence_dir, candidate = job
+    for name in list(logging.Logger.manager.loggerDict):
+        logging.getLogger(name).setLevel(logging.ERROR)
+    case = load_case(path)
+    replay = ModelReplay(case, candidate=candidate)
+    state = evidence_dir/path.stem
+    state.mkdir()
+    try:
+        result = asyncio.run(run_case(case, state, replay))
+    except Exception as exc:
+        result = {'case':case['id'], 'passed':False, 'error':f'{type(exc).__name__}: {exc}'}
+        failure_path = state/'failure.json'
+        if failure_path.exists():
+            failure = json.loads(failure_path.read_text())
+            result['boundary'] = failure.get('boundary')
+            result['verdict'] = failure.get('verdict', 'unexpected_failure')
+            result['contract_failure'] = failure.get('contract_failure')
+    result['external_candidate_calls'] = replay.candidate_calls
+    result.update(family=case.get('coverage_family',case['family']), split=case.get('split','prototype'))
+    result.setdefault('verdict', 'pass' if result['passed'] else 'unexpected_failure')
+    result['case_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+    (state/'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
+    return {k:v for k,v in result.items() if k not in {'events','model_records'}}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case-root', type=Path, default=ROOT/'benchmarks/integration/workflow_scenarios')
+    parser.add_argument('--workers', type=int, choices=(1,2,4,8), default=1, help='Independent offline episode processes; candidate mode requires 1')
     parser.add_argument('--family', action='append', help='Focused diagnostic family; omit for an aggregate')
     parser.add_argument('--evidence-dir', type=Path, required=True, help='New, unused output directory')
     parser.add_argument('--candidate-role', choices=('gi', 'ga', 'fast', 'deep'))
@@ -43,6 +73,8 @@ def main() -> int:
         parser.error('candidate role, URL and model must be supplied together')
     candidate = {'role':args.candidate_role, 'url':args.candidate_url, 'model':args.candidate_model,
                  'timeout':args.candidate_timeout} if all(selected) else None
+    if candidate and args.workers != 1:
+        parser.error('candidate inference uses one worker to preserve provider concurrency')
     if sys.flags.optimize:
         parser.error('run without -O: executable assertions are required')
     paths = sorted(args.case_root.glob('workflow-*.json'))
@@ -58,6 +90,7 @@ def main() -> int:
     source_files = source_identity()
     rows = []
     excluded = []
+    jobs = []
     for path in paths:
         case = load_case(path)
         if args.family and case.get('coverage_family',case['family']) not in args.family:
@@ -66,30 +99,21 @@ def main() -> int:
                           or not any(step.get('role',step['name'].split('-')[0]) == candidate['role'] for step in case['model_steps'])):
             excluded.append(case['id'])
             continue
-        replay = ModelReplay(case, candidate=candidate)
-        state = args.evidence_dir/path.stem
-        state.mkdir()
-        try:
-            result = asyncio.run(run_case(case, state, replay))
-        except Exception as exc:
-            result = {'case':case['id'], 'passed':False, 'error':f'{type(exc).__name__}: {exc}'}
-            failure_path = state/'failure.json'
-            if failure_path.exists():
-                failure = json.loads(failure_path.read_text())
-                result['boundary'] = failure.get('boundary')
-                result['verdict'] = failure.get('verdict', 'unexpected_failure')
-                result['contract_failure'] = failure.get('contract_failure')
-        result['external_candidate_calls'] = replay.candidate_calls
-        result.update(family=case.get('coverage_family',case['family']), split=case.get('split','prototype'))
-        result.setdefault('verdict', 'pass' if result['passed'] else 'unexpected_failure')
-        result['case_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
-        (state/'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n')
-        rows.append({k:v for k,v in result.items() if k not in {'events','model_records'}})
-        print(f"{case['id']}: {result['verdict']}", flush=True)
+        jobs.append((path,args.evidence_dir,candidate))
+    if args.workers == 1:
+        results = map(run_one_case,jobs)
+        for result in results:
+            rows.append(result)
+            print(f"{result['case']}: {result['verdict']}",flush=True)
+    else:
+        with ProcessPoolExecutor(max_workers=args.workers) as pool:
+            for result in pool.map(run_one_case,jobs):
+                rows.append(result)
+                print(f"{result['case']}: {result['verdict']}",flush=True)
     summary = {
         'evidence_level':'offline_architecture_replay', 'model_ability_evaluated':False,
         'physical_evidence':False, 'native_model_calls':None if candidate else 0,
-        'candidate':candidate, 'excluded_candidate_cases':excluded,
+        'workers':args.workers, 'candidate':candidate, 'excluded_candidate_cases':excluded,
         'external_candidate_calls':sum(row['external_candidate_calls'] for row in rows),
         'source_base':subprocess.check_output(['git','rev-parse','HEAD'], cwd=ROOT, text=True).strip(),
         'source_files':source_files, 'source_unchanged':source_identity() == source_files,

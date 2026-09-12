@@ -1693,7 +1693,13 @@ interpretation tuples and exact authority-owned source references, while source
 payloads remain outside Situation. Meaningful provider Runtime-state transitions
 are the first production trusted ingress and are explicitly not promoted to
 Evidence; broader scene/body/environment adapters remain source-specific future
-work. Structured future readiness is likewise Planner-owned HOW: a canonical Plan may
+work. The owner-approved #60 new-request contract separates requested temporal WHAT
+from its planned HOW. GI's primary result authors `ready_at` as an exact timezone-aware
+activation instant, retaining source time/time_scope when normalized. GA conserves it.
+The Gateway's immutable `received_at` may anchor elapsed time; it does not establish
+the user's local timezone. Without reliable clock/date/timezone meaning GI retains
+uncertainty; Host never parses human time or manufactures a missing instant.
+Structured time-condition registration remains Planner-owned HOW: a canonical Plan may
 carry bounded Goal/time conditions for executable Work, while ConversationState adds
 only Plan identity and immutable Responsibility provenance before durable registration.
 Host may wake a due condition mechanically but may not infer a deadline from Goal prose.

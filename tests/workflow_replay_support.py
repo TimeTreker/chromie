@@ -30,10 +30,11 @@ from benchmarks.integration.model_replay import ModelReplay, ReplayServer
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition, LocalSpeechCapabilityProvider, MockCapabilityProvider,
-    local_speech_definition,
+    local_speech_definition, RuntimeAuthorization,
 )
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
 from orchestrator.runtime.conversation_state import ConversationStateManager
+from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
 from orchestrator.runtime.situation import drain_due_time_conditions_once
 from shared.chromie_contracts import CognitiveWorkRequest
@@ -111,11 +112,13 @@ class Episode:
         definitions = [CapabilityDefinition(capability_id=c['capability_id'], provider_id='workflow-fixture',
             input_schema=c['input_schema'], output_schema=case['provider_schemas'][c['capability_id']],
             requires_confirmation=c.get('requires_confirmation', False),
-            metadata={'safety_class':c['safety_class'], 'effects':c['effects']}) for c in self.catalog]
+            can_run_parallel=c.get('can_run_parallel',False), exclusive_group=c.get('exclusive_group'),
+            metadata={'safety_class':c['safety_class'], 'effects':c['effects'], 'resource_claims':c.get('resource_claims',[])}) for c in self.catalog]
         definitions.append(local_speech_definition())
         self.runtime = FakeRuntime(definitions)
         self.provider = Provider(case)
-        self.runtime.runtime.register_provider(self.provider)
+        if case.get('probe') != 'runtime_disabled_provider':
+            self.runtime.runtime.register_provider(self.provider)
         self.runtime.runtime.register_provider(LocalSpeechCapabilityProvider(lambda _args: {'played': True, 'playback_started': True, 'voice_released': True}))
         self.adapter = CanonicalPlanRuntimeAdapter(self.runtime)
         self.manager = ConversationStateManager(base_conversation_id=case['id'], task_store_enabled=True, task_store_path=root/'state.json')
@@ -137,7 +140,7 @@ class Episode:
         if result.metadata.get('failure_class'):
             self.contract_failure = result.metadata
             raise AssertionError(f'{tier} contract failure: {result.metadata}')
-        self.events.append({'boundary':tier, 'disposition':result.disposition, 'goal_ids':result.goal_ids})
+        self.events.append({'boundary':tier, 'disposition':result.disposition, 'goal_ids':result.goal_ids, 'validation_feedback':result.metadata.get('validation_feedback',[])})
         return result
 
     def host(self, request):
@@ -181,21 +184,30 @@ class Episode:
         for index, goal_id in enumerate(self.goals[1:], 2):
             self.replay.bind(f'goal{index}', goal_id)
         self.events.append({'boundary':'ga', 'resolution':association.model_dump(mode='json')})
+        if self.case.get('expected_ready_at'):
+            assert not self.case.get('initial_goal_resolution'), 'New readiness must never be pre-seeded'
+            assert interpreted.responsibilities[0].bindings['ready_at'] == self.case['expected_ready_at']
+            actual = association.new_goals[0].object['bindings']['ready_at']
+            assert actual['value'] == self.case['expected_ready_at']
         request.context['goal_association_resolution'] = association.model_dump(mode='json')
         request.context['active_goal_snapshots'] = self.manager.active_goal_snapshots()
         self.request = request
         plan = await self.plan(request, self.case['initial_planner'])
+        self.boundary = 'adapter'
         response = await self.adapter.build_planner_owned_response(plan=plan, session_id=request.sid, language=request.language)
         response.metadata.update(turn_id=request.sid, goal_association=association.model_dump(mode='json'),
             goal_interpretation=interpreted.model_dump(mode='json'),
             user_turn_envelope={'turn_id':request.sid, 'original_input':{'text':request.text}, 'normalized_input':{'text':request.text, 'language':request.language}})
         self.manager.record_interaction_response(request.sid, response)
+        if self.case.get('expected_speech'):
+            assert self.case['expected_speech'] in [speech.text for speech in response.speech]
         return plan, response
 
     def record_result(self, plan, response, result, sid=None):
         bundle = ExecutionOutcomeReconciler().build(turn_id=response.metadata['turn_id'], interaction_id=response.interaction_id,
             plan=plan, requests=response.capabilities, results=result.results,
-            output_schemas={r.request_id:self.case['provider_schemas'][r.capability_id] for r in response.capabilities})
+            output_schemas={r.request_id:self.case['provider_schemas'][r.capability_id] for r in response.capabilities},
+            committed_auxiliary_result_capabilities=CognitiveTurnClosure._speech_result_bindings(response))
         self.manager.record_execution_outcome_bundle(bundle, sid=sid)
         self.manager.reconcile_execution_outcome_responsibilities(bundle, sid=sid)
         self.events.append({'boundary':'runtime_result', 'aggregate_status':bundle.aggregate_status, 'goal_status':self.goal_status()})
@@ -206,30 +218,14 @@ class Episode:
         result = await submit_and_wait_terminal(self.runtime.runtime, response)
         self.last_result = result
         assert result.status == 'completed', result
-        if response.capabilities:
-            return self.record_result(plan, response, result, sid)
+        bundle = self.record_result(plan,response,result,sid) if response.capabilities else None
         for speech in response.speech:
             self.manager.update_pending_task_status_for_request_id(request_id=speech.id, status='completed')
-        return None
+        return bundle
 
     async def probe(self, clock):
         """Exercise one declared hostile-input or state-transition boundary."""
         probe = self.case['probe']
-        if probe == 'new_readiness_gap':
-            self.boundary = 'gi'
-            accepted = False
-            try:
-                await self.gi.interpret_goal(GoalInterpretationRequest(**self.case['input']))
-                accepted = True
-            except Exception:
-                # The exact Schema gap is checked separately; a transport failure
-                # cannot masquerade as this documented representability result.
-                self.replay.assert_finished()
-            self.replay.assert_finished()
-            assert self.replay.records[0]['schema_errors']
-            result = self.probe_result('known_contract_gap', f'GI ready_at is Schema-invalid; Host accepted={accepted}')
-            result.update(passed=False, expected=True, known_issue=60)
-            return result
         expected_rejection = self.case.get('expected_rejection')
         if expected_rejection:
             try:
@@ -239,6 +235,8 @@ class Episode:
             except Exception as exc:
                 assert self.boundary == expected_rejection, (self.boundary, str(exc))
                 assert not self.provider.calls
+                if self.case.get('expected_rejection_detail'):
+                    assert self.case['expected_rejection_detail'] in str(exc), str(exc)
                 self.replay.assert_finished()
                 if hasattr(self, 'goals'):
                     assert all(self.goal_status(gid) == 'open' for gid in self.goals)
@@ -249,11 +247,41 @@ class Episode:
                     and not rejected_response.capabilities and rejected_plan.disposition in {'clarify','refuse'}):
                 self.replay.assert_finished()
                 assert all(self.goal_status(gid) == 'open' for gid in self.goals)
+                if self.case.get('expected_validation_feedback'):
+                    assert self.case['expected_validation_feedback'] in {item['type'] for item in rejected_plan.metadata.get('validation_feedback',[])}
                 return self.probe_result('expected_nonexecuting_rejection')
             raise AssertionError(f'{expected_rejection} accepted the forbidden reference')
 
         plan, response = await self.begin()
-        if probe.startswith('provider_'):
+        if probe == 'clarification':
+            assert plan.disposition == 'clarify' and plan.unresolved
+            assert not plan.steps and not plan.time_conditions and not response.capabilities
+            await self.execute(plan, response)
+            assert self.goal_status() == 'open' and not self.provider.calls
+        elif probe in {'runtime_disabled_provider','confirmation_denied','confirmation_granted'}:
+            self.boundary = 'runtime'
+            if probe == 'confirmation_granted':
+                authorization = RuntimeAuthorization(confirmed_request_ids={r.request_id for r in response.capabilities})
+                result = await submit_and_wait_terminal(self.runtime.runtime, response, authorization=authorization)
+                self.record_result(plan, response, result)
+                assert self.goal_status() == 'satisfied' and len(self.provider.calls) == 1
+            else:
+                try:
+                    await submit_and_wait_terminal(self.runtime.runtime, response)
+                except ValueError as exc:
+                    expected = 'requires confirmation' if probe == 'confirmation_denied' else 'no registered provider'
+                    assert expected in str(exc), str(exc)
+                else:
+                    raise AssertionError('Runtime dispatched without its provider or required authorization')
+                assert not self.provider.calls and self.goal_status() == 'open'
+        elif probe == 'cancel_after_completion':
+            await self.execute(plan,response)
+            receipt = await self.runtime.runtime.cancel_scope(CancellationDirective(source_turn_id='late-stop',
+                requested_scope='current_interaction',foreground_interaction_id=response.interaction_id))
+            self.manager.apply_reflex_cancellation_receipt(receipt, revoked_confirmation=None, sid=self.request.sid,user_text='Stop.')
+            assert self.goal_status() == 'satisfied' and len(self.provider.calls) == 1
+            self.events.append({'boundary':'late_cancellation','receipt':receipt.model_dump(mode='json')})
+        elif probe.startswith('provider_'):
             self.boundary = 'runtime'
             result = await submit_and_wait_terminal(self.runtime.runtime, response)
             bundle = self.record_result(plan, response, result)

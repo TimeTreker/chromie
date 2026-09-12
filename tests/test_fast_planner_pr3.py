@@ -1017,7 +1017,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-walk': respond_outcome('goal-walk', 'Done.', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-walk"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
@@ -1085,7 +1085,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '内乡今天有雷雨。', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
@@ -1121,7 +1121,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '现在有雷雨。', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
@@ -1166,7 +1166,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '今晚降雨概率最高约76%。', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
@@ -1220,7 +1220,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '今晚降雨概率最高约76%。', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
@@ -4200,7 +4200,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "goal_summary": "Walk forward for fifteen seconds.",
             "response_text": "I did it.",
             "steps": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-walk': respond_outcome('goal-walk', 'I did it.', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-walk"]),
             "escalation_reason": "",
             "unresolved": [],
@@ -4516,6 +4516,26 @@ class FastPlannerResolverTests(unittest.TestCase):
 
     def test_unrepaired_capability_args_are_not_marked_complete(self):
         invalid = {
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-walk"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.94,
@@ -4547,7 +4567,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
     def test_simple_blink_produces_complete_direct_plan(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"goal_outcomes": {'goal-blink': {'disposition': 'execute', 'coverage': 'complete', 'response_text': '', 'unresolved': [], 'step_ids': ['blink'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-blink'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.coverage, "complete")
@@ -4556,6 +4576,26 @@ class FastPlannerResolverTests(unittest.TestCase):
 
     def test_compatibility_chat_route_cannot_suppress_canonical_body_goal(self):
         raw = {
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-blink"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.96,
@@ -4931,6 +4971,26 @@ class FastPlannerResolverTests(unittest.TestCase):
 
     def test_coordinated_action_primary_plan_has_one_model_call_budget(self):
         raw = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 1.0,
@@ -6306,7 +6366,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(plan.steps), 1)
 
     def test_non_common_or_non_executable_skill_escalates(self):
-        raw = {"disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"timing":"sequential","source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'response_text': '', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"timing":"sequential","source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")

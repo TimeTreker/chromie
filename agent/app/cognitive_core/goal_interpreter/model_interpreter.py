@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import time
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -1764,6 +1765,43 @@ def _reject_unavailable_or_mismatched_prior_assistant_utterance(
                 )
 
 
+def _admitted_turn_clock(request: GoalInterpretationRequest) -> str | None:
+    """Project the trusted Gateway receipt instant, never a guessed local timezone."""
+    envelope = request.context.get("user_turn_envelope")
+    raw = envelope.get("received_at") if isinstance(envelope, dict) else None
+    if raw is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.isoformat() if parsed.tzinfo is not None else None
+
+
+def _reject_unprovenanced_readiness(request: GoalInterpretationRequest, parsed: dict[str, Any]) -> None:
+    """Check typed readiness/provenance; GI owns temporal interpretation itself."""
+    for item in parsed.get("responsibilities", []):
+        if not isinstance(item, dict) or not isinstance(item.get("bindings"), dict):
+            continue
+        bindings = item["bindings"]
+        if "ready_at" not in bindings:
+            continue
+        raw = bindings["ready_at"]
+        try:
+            instant = datetime.fromisoformat(raw.replace("Z", "+00:00")) if isinstance(raw, str) else None
+        except ValueError:
+            instant = None
+        if instant is None or instant.tzinfo is None or "T" not in raw:
+            raise _GoalInterpretationSemanticStructureViolation("ready_at requires a timezone-qualified ISO timestamp")
+        if raw in request.text:
+            continue  # Exact source timestamp, not a normalized or inferred instant.
+        scope = bindings.get("time_scope") or bindings.get("time")
+        if not isinstance(scope, str) or not scope.strip() or scope not in request.text or _admitted_turn_clock(request) is None:
+            raise _GoalInterpretationSemanticStructureViolation(
+                "normalized ready_at requires a cited source time/time_scope and the trusted Gateway receipt clock"
+            )
+
+
 def _goal_interpretation_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     prompt_context = _context_without_prompt_globals(context)
     memory = prompt_context.get("session_memory")
@@ -1915,12 +1953,22 @@ class OllamaGoalInterpreter:
             if prior_assistant_utterance is not None
             else ""
         )
+        clock = _admitted_turn_clock(request)
+        clock_context = (
+            "Trusted Gateway receipt instant (elapsed-time reference, never the user's local timezone): "
+            + clock + "\nFor a determinately scheduled effect, preserve source time/time_scope and author ready_at "
+            "in this primary result. Do not confuse an information query's time period, a duration, "
+            "a deadline or reminder provider due time with when this Goal's effect may start. "
+            "Missing calendar/timezone meaning remains unresolved; never guess a local zone.\n"
+            if clock is not None else ""
+        )
         return (
             "Current Turn:\n"
             "IMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; "
             "Goal Interpretation owns current-turn WHAT):\n"
             f"{json.dumps(_goal_interpretation_source_turn_provenance(request), ensure_ascii=False, separators=(',', ':'))}\n"
             f"language_hint={request.language or 'auto'}\n\n"
+            f"{clock_context}"
             "Authoritative source tokens (cite inclusive refs in each "
             "Responsibility.source_evidence):\n"
             f"{_bounded_json(_source_tokens(request.text), max_chars=5000)}\n\n"
@@ -2342,6 +2390,18 @@ class OllamaGoalInterpreter:
                         ),
                     }
                 bindings["properties"] = binding_properties
+                binding_properties["ready_at"] = {
+                    "type": "string", "format": "date-time",
+                    "description": (
+                        "Exact timezone-qualified ISO activation instant of this human-requested effect, "
+                        "authored by GI in the primary result and conserved by GA. This is WHAT timing, "
+                        "not a Plan, timer registration, execution permission, duration, query period or "
+                        "a reminder provider's due argument. Preserve the source time/time_scope when "
+                        "normalizing against the trusted Gateway receipt instant. Without that clock, "
+                        "emit only an exact timestamp literally present in the source. Ambiguous date or "
+                        "timezone remains unresolved with no invented ready_at."
+                    ),
+                }
                 if prior_assistant_utterance is not None:
                     binding_properties["prior_assistant_utterance"] = {
                         "const": prior_assistant_utterance,
@@ -2808,6 +2868,7 @@ class OllamaGoalInterpreter:
         _reject_untyped_coordination_bindings(parsed)
         _reject_dropped_explicit_numeric_bindings(request, parsed)
         _reject_noncanonical_count_bindings(parsed)
+        _reject_unprovenanced_readiness(request, parsed)
         prior = _most_recent_assistant_utterance(request.context)
         schema = response_schema or OllamaGoalInterpreter._goal_interpretation_response_schema(
             prior_assistant_utterance=prior["text"] if prior is not None else None,

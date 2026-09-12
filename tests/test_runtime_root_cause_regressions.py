@@ -894,6 +894,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 for index in range(step_count)
             ]
             raw = {
+                "goal_outcomes": {
+                    "goal-blink": {
+                        "disposition": "execute", "coverage": "complete",
+                        "step_ids": [f"step-{index}" for index in range(step_count)],
+                        "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-blink"]},
+                    }
+                },
                 "disposition": "execute",
                 "coverage": "complete",
                 "confidence": 1.0,

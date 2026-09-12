@@ -136,11 +136,19 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(tier, mut
     asyncio.run(check())
 
 
-def test_new_gi_ready_at_is_not_claimed_by_seeded_timer_case():
+def test_seeded_timer_does_not_authorize_unsourced_gi_ready_at():
     case = load('delayed')
     raw = copy.deepcopy(case['model_steps'][0]['response'])
     raw['responsibilities'][0]['binding_items']['ready_at'] = '2099-09-04T19:00:00+08:00'
-    assert not Draft202012Validator(case['model_steps'][0]['request']['format']).is_valid(raw)
+    assert Draft202012Validator(case['model_steps'][0]['request']['format']).is_valid(raw)
+    from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
+    from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+    raw['responsibilities'][0].pop('target_goal_ids')
+    raw['responsibilities'][0]['relationship'] = 'new'
+    with pytest.raises(ValueError,match='ready_at'):
+        OllamaGoalInterpreter._validate_interpretation_content(
+            GoalInterpretationRequest(**case['input']),json.dumps(raw),
+            response_schema=case['model_steps'][0]['request']['format'])
     assert case['initial_goal_resolution']['new_goals'][0]['object']['bindings']['ready_at']
 
 
@@ -158,12 +166,12 @@ def test_expanded_corpus_identity_coverage_and_split_integrity():
     from benchmarks.integration.workflow_corpus import FAMILIES
     manifest = json.loads((CORPUS/'manifest.json').read_text())
     paths = sorted(CORPUS.glob('workflow-*.json'))
-    assert len(paths) == manifest['count'] == 1500
+    assert len(paths) == manifest['count'] == 6000
     assert {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in paths} == manifest['case_sha256']
     assert {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (CORPUS/'artifacts').glob('*.json')} == manifest['artifact_sha256']
     assert manifest['unrendered_requests'] == []
     cases = [json.loads(p.read_text()) for p in paths]
-    assert Counter(c['coverage_family'] for c in cases) == {family:50 for family in FAMILIES}
+    assert Counter(c['coverage_family'] for c in cases) == {family:100 for family in FAMILIES}
     assert Counter(c['split'] for c in cases) == manifest['splits']
     splits = defaultdict(set)
     for case in cases:
@@ -173,7 +181,7 @@ def test_expanded_corpus_identity_coverage_and_split_integrity():
         for step in case['model_steps']:
             assert step['training_eligible'] is False
             assert 'request' in step and 'request_unavailable' not in step
-    assert len(splits) == 10 and all(len(values) == 1 for values in splits.values())
+    assert len(splits) == 20 and all(len(values) == 1 for values in splits.values())
     assert manifest['training_eligible'] is False
 
 
@@ -182,11 +190,7 @@ def test_expanded_family_regression(path, tmp_path):
     from benchmarks.integration.model_replay import load_case
     case = load_case(path)
     result = asyncio.run(run_case(case, tmp_path))
-    if case['coverage_family'] == 'new_readiness_gap':
-        assert result['verdict'] == 'known_contract_gap' and not result['passed']
-        assert result['known_issue'] == 60
-    else:
-        assert result['passed']
+    assert result['passed']
 
 
 def test_shared_packet_parts_are_hash_checked(tmp_path):
@@ -286,3 +290,20 @@ def test_candidate_http_failure_has_raw_evidence_and_no_reference_fallback():
     assert replay.records[0]['http_status'] == 409
     assert 'unexpected extra model call' in replay.records[0]['raw_transport_response']
     assert 'response' not in replay.records[0]
+
+
+@pytest.mark.parametrize('tier', ['fast','deep'])
+@pytest.mark.parametrize('shape', ['empty','missing','foreign','complete'])
+def test_supplied_single_goal_outcome_map_must_match_admitted_goal(tier, shape):
+    from agent.app.planner_validation import validate_planner_model_output
+    raw = copy.deepcopy(load()['model_steps'][2]['response'])
+    goal = '${goal}'
+    if shape == 'empty': raw['goal_outcomes'] = {}
+    if shape == 'missing': raw.pop('goal_outcomes')
+    if shape == 'foreign': raw['goal_outcomes'] = {'foreign':raw['goal_outcomes'][goal]}
+    if shape == 'complete':
+        result = validate_planner_model_output(raw, planner_tier=tier, expected_goal_ids_for_turn=[goal])
+        assert set(result.goal_outcomes) == {goal}
+    else:
+        with pytest.raises(ValueError,match='goal_outcomes keys must cover exactly'):
+            validate_planner_model_output(raw, planner_tier=tier, expected_goal_ids_for_turn=[goal])

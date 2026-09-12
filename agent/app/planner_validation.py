@@ -3254,11 +3254,7 @@ def validate_planner_model_output(
             "complete multi-goal planner output requires goal_outcomes keyed by "
             "every authoritative Goal Association ID"
         )
-    if (
-        goal_outcomes_were_supplied
-        and (len(expected_goal_id_set) > 1 or output.disposition == "escalate")
-        and outcome_goal_ids != expected_goal_id_set
-    ):
+    if outcome_goal_ids != expected_goal_id_set:
         raise ValueError(
             "goal_outcomes keys must cover exactly the authoritative Goal Association IDs"
         )

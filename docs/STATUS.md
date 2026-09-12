@@ -1,49 +1,54 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-13
-**Current focus:** owner-approved 1,500-case workflow audit (#61), with binding
-admission (#62), Deep multi-Goal context allocation (#63), and scenario modality
-assertion (#64) repaired. Pre-delivery base `0457db8d`; resume from the latest commit
-containing both handoffs. #24 native GI, #32 streaming/target and #60 new-request
-readiness remain open. No native inference or LoRA training occurred.
+**Current focus:** owner-approved 6,000-case offline workflow audit (#65), with the
+new-request temporal contract (#60) and single-Goal Planner outcome admission (#66)
+repaired. Pre-delivery base `6bf16ccf`; resume from the latest commit containing both
+handoffs. #24 native GI and #32 streaming/target remain separate open obligations.
+No native inference or LoRA training occurred.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| 30 authored contrast families / 1,500 frozen scenarios; real role clients and Runtime with fixed model replies; isolated candidate-role forwarding. Two production boundaries and one test oracle repaired in existing owners. | Final full replay: 1,450 expected successes, 0 unexpected failures, 50 known #60 gaps; aggregate remains failed/exit 1. Focused replay 66/66; 50/50 GI substitution cases use a second local fixture service. Level A 45/45 across 15 classes. Canonical 3,175 tests/798 subtests, 145 benchmarks and 20 legacy tests; pinned static/config/policy/ownership passed. | No deployed rebuild, native model, live aggregate, streaming, audio or physical run. Prior native investigation and failed live evidence remain unchanged. | Development only. #24/#32/#60 open. Neither references nor plumbing tests qualify a model, training dataset or target behavior. |
+| 60 authored families / 6,000 frozen scenarios; actual role clients, validators, state and Runtime; fixed model replies and controlled providers. GI authors requested temporal WHAT; every Planner Goal requires an explicit outcome. | Final immutable replay 6,000/6,000: 1,400 workflows, 1,800 state/fault/permission outcomes, 2,580 rejections and 220 safe nonexecuting responses. Level A 45/45 across 15 classes. Canonical 3,214 tests/804 subtests, 145 benchmarks and 20 legacy tests; pinned static/configuration/policy/ownership gates pass. | No deployment, native model, live aggregate, streaming, audio, MuJoCo or physical run. | Development only. #24/#32 open; no model, target or training-data promotion. |
 
-Baseline on production `0457db8d` had 1,328 expected successes, 122 unexpected
-failures and 50 known gaps. #62 removes 50 unknown-binding admissions. #63 removes
-72 premature Deep context rejections: 36 valid multi-Goal cases now complete, while
-36 omission cases reach the intended Host rejection. Full reruns retain all cases.
-#64 makes explicit expected output modality enforceable in the older scenario oracle.
-Eleven stale behavior references were corrected with their original source obligations
-and before/after identities retained; this is test evidence maintenance, not a native
-model result. The direct GI parser's Schema fallback now includes prior-speech context,
-preserving 34 existing legitimate reference cases.
+#60 was a contract representability gap: the simulator already returned the authored
+`ready_at`, but the GI Schema/Host rejected it. Primary GI now authors exact temporal
+WHAT and preserves source-time provenance; GA conserves it and Planner owns waiting.
+The trusted Gateway receipt anchors elapsed time, not user-local timezone. Missing
+calendar/timezone meaning stays unresolved. Tests start with a new request and prove
+waiting, restart, no early action, scoped single wake and exact controlled execution.
+Separate prior-Goal timers, semantic cancellation and terminal-before-due fixtures remain.
 
-GPT-6 Astra authored 30 contrasts and reference rules in this task. Deterministic
-parameter/language expansion is not 1,500 independent inferences. Review remains
-non-independent. Every output is training-ineligible; faults and unrepresentable
-results are separate from correct references. 900/300/300 splits hold out whole
-parameter contrast groups, not unseen semantic families. Candidate-role mode forwards
-only actual production requests; all other roles remain strict replay. Uncovered
-candidate continuations stop as coverage gaps rather than receiving substitute answers.
+#66's raw Schema rejected empty/absent/foreign single-Goal maps while Host validation
+allowed them. The shared validator now requires exact Goal key coverage for either
+tier before adaptation. The initial full strict baseline retained 100 empty-map
+failures; a later focused contrast retained 40 absent-map failures after the partial
+repair. Both variants pass the final rejection oracle. Original errors, reference
+corrections and qualification limits remain in the [audit](../ARCHITECTURE_AUDIT.md#broader-workflow-audit--606566).
 
-Initial admission/role scheduling, clock/UUIDs, providers and speech receipts remain
-controlled. Real GI/GA/Fast/Deep parsers, Schema/DTO/Host, state, Runtime and result/due
-re-entry are exercised. Gateway/streaming, autonomous escalation/scheduling,
-attention/reflection/skill selection, real services and embodied effects are untested
-by this corpus. Timer success explicitly starts from a prior Goal with `ready_at`;
-50 new-request probes preserve the GI-to-readiness gap #60.
+The current-task GPT-6 Astra references are 60 authored contrasts expanded across
+four actions, five values and five language forms, not 6,000 independent inferences.
+Review is non-independent and all outputs are training-ineligible. The 3,600/1,200/1,200
+splits keep action/value contrast groups together, not unseen semantic families.
+One-role candidate mode sends only actual requests; uncovered continuations stop for
+separate review. No automatic reference substitution or extra semantic reviewer.
 
-The [audit](../ARCHITECTURE_AUDIT.md#expanded-workflow-audit--61626364) owns workflow
-I/O, diagnoses and coverage limits; [benchmarks](../benchmarks/README.md#offline-workflow-replay)
-own commands. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md)
-retain final gates, identities, archive and resume instructions. No new current
-Markdown owner, environment variable, profile or architecture layer; counts 102/15
-remain unchanged. Previous native work (226 executions/254 calls, no qualified
-repair) and the last 51-case live result (1 GI failure, 1 startup interrupted,
-49 unrun) remain revision-limited evidence. Service health was not freshly checked.
+The driver supplies initial admission/scheduling, receipt/clock/UUID facts, controlled
+provider observations and local speech receipts. Coverage includes real GI depth,
+GA conservation, Fast/Deep transactions, conditional result re-entry, resource
+conflict rejection and Runtime authorization. It does not cover autonomous initial
+scheduling, Fast-to-Deep delegation, native streaming, attention/reflection/skill
+selection, full Gateway/audio, timeout expiry, confirmation dialogue interpretation,
+live registry/service compatibility or embodied execution. Timeout status and one
+terminal-Goal state are explicitly injected facts, not proofs of their producers.
+
+Use [benchmark commands](../benchmarks/README.md#offline-workflow-replay), the
+[checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) for final gates,
+identities, archive and resume instructions. No new current Markdown owner,
+environment variable, profile or architecture layer: 102 current / 15 core-path
+documents. Previous native GI work (226 executions/254 calls, no qualified repair)
+and the last 51-case live result (1 failure, 1 startup interrupted, 49 unrun) remain
+revision-limited evidence. Service health was not refreshed.
 
 ### Prior remaining-Issue delivery — 191083dc
 

@@ -19,7 +19,7 @@
     "independent_review": false,
     "model_ability_evaluated": false,
     "training_eligible": false,
-    "authoring_method": "GPT-6 Astra authored 30 contrasts; deterministic 2 actions × 5 values × 5 language forms expansion",
+    "authoring_method": "GPT-6 Astra authored 60 contrasts; deterministic 4 actions × 5 values × 5 language forms expansion",
     "independent_inference_per_case": false
   },
   "catalog": [
@@ -217,6 +217,102 @@
         "body.primary_motion"
       ],
       "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.nod_yes",
+      "agent_id": "capability_agent",
+      "description": "Perform the requested nod head gesture an exact number of times.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 8,
+            "x-chromie-entity-type": "count"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [
+        "physical_motion"
+      ],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "embodiment",
+        "face"
+      ],
+      "behavior_domains": [
+        "social_attention"
+      ],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.head_pose",
+      "resource_claims": [
+        "body.head_pose"
+      ],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.shake_no",
+      "agent_id": "capability_agent",
+      "description": "Perform the requested shake head gesture an exact number of times.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 8,
+            "x-chromie-entity-type": "count"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [
+        "physical_motion"
+      ],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "embodiment",
+        "face"
+      ],
+      "behavior_domains": [
+        "social_attention"
+      ],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.head_pose",
+      "resource_claims": [
+        "body.head_pose"
+      ],
+      "execution_constraints": {}
     }
   ],
   "provider_schemas": {
@@ -233,6 +329,30 @@
       "additionalProperties": false
     },
     "soridormi.blink_eyes": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "completed"
+      ],
+      "additionalProperties": false
+    },
+    "soridormi.nod_yes": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "completed"
+      ],
+      "additionalProperties": false
+    },
+    "soridormi.shake_no": {
       "type": "object",
       "properties": {
         "completed": {
@@ -262,6 +382,12 @@
       "rain_forecast": false
     },
     "soridormi.blink_eyes": {
+      "completed": true
+    },
+    "soridormi.nod_yes": {
+      "completed": true
+    },
+    "soridormi.shake_no": {
       "completed": true
     },
     "soridormi.walk_forward": {
@@ -307,7 +433,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "168c77460ba2ebe87d86ca4166fb491e589757afc300cd58c389bc3499d1773b"
+              "$artifact": "020a3cb7f55dc9e80bfc872bc79b57af3d7e8cd35a6f2b04f9214221b708f8fc"
             }
           },
           {
@@ -322,7 +448,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "ed909dfdf430b232a39464e2f51a01ff1715a32a2c6f70cb04ed6aa02c1926d2"
+          "$artifact": "b52d35314e385b8748fd7604445aaa579817e4843d786bf477dd8472426bdec0"
         }
       }
     }

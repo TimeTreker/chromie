@@ -605,7 +605,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "goal_summary": "Walk forward for fifteen seconds.",
             "response_text": "I did it.",
             "steps": [],
-            "goal_outcomes": {},
+            "goal_outcomes": {'goal-walk': {'disposition': 'respond', 'coverage': 'complete', 'response_text': 'I did it.', 'step_ids': [], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-walk'], 'unmet_goal_ids': [], 'unmet_requirements': [], 'rationale': 'Incorrectly declares the physical Goal complete.'}}},
             "goal_satisfaction": {
                 "score": 1.0,
                 "status": "exact",
@@ -1079,6 +1079,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_deep_primary_does_not_consume_fast_plan_validation_authority(self):
         adjusted = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 1.0,
@@ -1142,6 +1162,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_single_parallel_label_is_canonicalized_without_model_repair(self):
         parallel = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 1.0,
@@ -1333,6 +1373,27 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_full_catalog_exact_plan(self):
         raw = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk",
+                        "blink"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.91,
@@ -1365,6 +1426,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_coordinated_action_primary_plan_is_not_second_model_reviewed(self):
         partial = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 1.0,
@@ -1437,6 +1518,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         revised = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.93,
@@ -1460,6 +1561,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_explicit_numeric_goal_missing_provenance_is_normalized_without_replan(self):
         invalid = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.96,
@@ -1500,6 +1621,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_numeric_provenance_repair_cannot_rewrite_plan_semantics(self):
         invalid = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.96,
@@ -1536,6 +1677,27 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_unsafe_parallel_plan_fails_closed_without_deep_replan(self):
         parallel = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "walk",
+                        "blink"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.96,
@@ -2681,6 +2843,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_typed_material_alternative_is_host_materialized_for_confirmation(self):
         raw = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.96,
@@ -2930,6 +3112,26 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         revised = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "unresolved": [],
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": []
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.93,
@@ -3002,6 +3204,28 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
     def test_missing_essential_parameter_can_return_specific_clarification(self):
         raw = {
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "clarify",
+                    "coverage": "partial",
+                    "response_text": "你希望我往前走多久？",
+                    "unresolved": [
+                        "walking duration"
+                    ],
+                    "step_ids": [],
+                    "satisfaction": {
+                        "score": 0.0,
+                        "status": "unsatisfied",
+                        "satisfied_goal_ids": [],
+                        "unmet_goal_ids": [
+                            "goal-action"
+                        ],
+                        "unmet_requirements": [
+                            "walking duration"
+                        ]
+                    }
+                }
+            },
             "disposition": "clarify",
             "coverage": "partial",
             "confidence": 0.84,

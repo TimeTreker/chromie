@@ -1530,6 +1530,31 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.responsibilities[0].bindings, bindings)
                 self.assertEqual(interpreter._chat.await_count, 1)
 
+    async def test_primary_readiness_retains_typed_source_or_receipt_provenance(self) -> None:
+        literal = "2099-09-04T19:00:00+08:00"
+        clock = {"user_turn_envelope": {"received_at": "2026-09-04T00:00:00+00:00"}}
+        for text, bindings, context, valid in (
+            (f"Blink twice at {literal}.", {"count": 2, "ready_at": literal}, {}, True),
+            ("Blink twice in five minutes.", {"count": 2, "time_scope": "in five minutes", "ready_at": "2026-09-04T00:05:00+00:00"}, clock, True),
+            ("Blink twice in five minutes.", {"count": 2, "time_scope": "in five minutes", "ready_at": "2026-09-04T00:05:00+00:00"}, {}, False),
+            ("Blink twice in five minutes.", {"count": 2, "time_scope": "unstated time", "ready_at": "2026-09-04T00:05:00+00:00"}, clock, False),
+            ("Blink twice at 2099-09-04T19:00:00.", {"count": 2, "ready_at": "2099-09-04T19:00:00"}, {}, False),
+            ("Blink twice at 2099-02-30T19:00:00+08:00.", {"count": 2, "ready_at": "2099-02-30T19:00:00+08:00"}, {}, False),
+        ):
+            with self.subTest(text=text, bindings=bindings, valid=valid):
+                interpreter = self._interpreter()
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(outcome=text, bindings=bindings, output_mode="body_action")
+                interpreter._chat = mock.AsyncMock(return_value={"message": {"content": json.dumps(raw)}})
+                request = GoalInterpretationRequest(text=text, context=context)
+                if valid:
+                    result = await interpreter.interpret_goal(request)
+                    self.assertEqual(result.responsibilities[0].bindings, bindings)
+                else:
+                    with self.assertRaises(InterpretationUnavailableError):
+                        await interpreter.interpret_goal(request)
+                self.assertEqual(interpreter._chat.await_count, 1)
+
     async def test_missing_source_evidence_fails_closed_without_second_call(self) -> None:
         interpreter = self._interpreter()
         malformed = _valid_output()

@@ -177,23 +177,27 @@ Run the frozen architecture cohort without a model server or hardware:
 
 ```bash
 python scripts/run_workflow_replay.py \
-  --evidence-dir .chromie/acceptance/workflow-1500-new-run
+  --workers 4 --evidence-dir .chromie/acceptance/workflow-6000-new-run
 python -m pytest -q tests/test_workflow_replay.py
 ```
 
 Use an unused evidence directory and run without Python `-O`. The runner discovers
-`integration/workflow_scenarios/workflow-*.json`: 1,500 cases from 30 authored
-contrasts × 2 actions × 5 parameter values × 5 language forms. Original five
+`integration/workflow_scenarios/workflow-*.json`: 6,000 cases from 60 authored
+contrasts × 4 actions × 5 parameter values × 5 language forms. Original five
 prototype episodes remain in `integration/scenarios/`; select that directory with
 `--case-root` to rerun them. `--family` selects a diagnostic subset, never an aggregate.
-The full cohort intentionally returns exit 1 while its 50 #60 cases remain known
-contract gaps; inspect `summary.json` rather than treating that exit as an unknown
-regression or silently excluding the gaps.
+The full cohort requires every declared outcome and a stable source identity; any
+unexpected failure returns exit 1. `--workers 4` runs independent episodes in separate
+processes with isolated clocks, state and loopback services; the default is one.
+Candidate mode requires one worker to preserve the selected provider concurrency.
 
 Coverage includes Fast/Deep execution, conditional acquisition and both result
 branches, retained timers/restart, cancellation, provider failure/refusal/invalid
 output, duplicate/stale/foreign Evidence, source mapping, forbidden model output,
-parameter and Goal conservation, and new-request readiness representability.
+parameter and Goal conservation, new-request absolute/relative readiness, ambiguous
+time clarification, source-based deeper GI, supplied speech/mixed delivery, provider
+timeout/cancelled observations, confirmation authorization, late cancellation and
+declared resource conflicts.
 Production GI/GA/Fast/Deep clients call `/api/chat`; parsers, contract validation,
 Runtime, result re-entry and Goal bookkeeping remain real. The driver explicitly
 supplies initial admission and role scheduling, wall time/UUIDs, provider observations
@@ -210,19 +214,20 @@ benchmarks.integration.model_replay CASE.json --port 0 --bindings TRUSTED_BINDIN
 the normal runner binds committed Goal identities automatically.
 
 `integration/workflow_corpus.py` owns offline authoring/expansion only. GPT-6 Astra
-in this task authored the 30 contrasts and reference rules; deterministic expansion
-is not 1,500 independent model inferences. Review is non-independent. Persisted case
+in this task authored the 60 contrasts and reference rules; deterministic expansion
+is not 6,000 independent model inferences. Review is non-independent. Persisted case
 JSONs and SHA256-addressed shared packet parts are authoritative during execution;
 the runner never invokes the authoring module. Manifests bind case/part hashes.
 Updating a prompt/contract requires explicit request/reference review and a new
 freeze. Keep failed captures and preceding identities; never fit expected semantic
 answers to observed behavior. Runtime assertions remain separate from model answers.
-The #63 packet extension added only 72 previously unreachable Deep requests after
-repair; existing packets, semantic references and oracles were unchanged.
+The #60 contract amendment required explicitly refrozen GI packets, while the original
+five semantic replies stayed unchanged. The 6,000 expansion retains original captures,
+reference/wiring corrections and failing baselines; see the audit for each revision.
 
 All cases and outputs are `training_eligible=false`. Correct authored references,
-intentional `fault_injection` results and `desired_unrepresentable_result` probes are
-separate. The 900 train-candidate / 300 development / 300 held-out split keeps all
+intentional `fault_injection` results remain separate. The 3,600 train-candidate /
+1,200 development / 1,200 held-out split keeps all
 languages and positive/negative relatives of one action/value together. These are
 parameter holdouts within shared authored families, not unseen-family generalization
 or ready-made LoRA training data. Independent review and a richer hidden semantic
@@ -241,7 +246,7 @@ python scripts/run_workflow_replay.py --family normal_fast \
 Supported roles are `gi`, `ga`, `fast`, `deep`. Remove `--family` to discover all
 eligible cases for that role. This mode excludes intentional model-fault/gap replies
 and cases that never invoke the selected role; the summary records exclusions and
-actual external call counts. There are 750 reference-only cases before role filtering.
+actual external call counts. There are 3,200 reference-only cases before role filtering.
 Only the real role packet is forwarded, with its model identifier replaced; expected
 answers, rubrics and labels are never sent. Raw provider envelopes and termination are
 retained. Other roles keep strict request matching. A changed accepted candidate
@@ -251,11 +256,21 @@ this is neither a semantic failure nor a pass. A candidate Schema violation rema
 semantic critic or fallback inference is supplied. HTTP compatibility and local
 fixture-routing tests do not qualify a native model or produce LoRA training data.
 
-The timer cases seed an existing Goal with `ready_at`; new GI → readiness conversion
-remains [#60](https://github.com/TimeTreker/chromie/issues/60). Operational stop leaves
+Retained timer cases seed an existing Goal; the historical `new_readiness_gap` family
+now creates its Goal from a fresh GI/GA transaction, waits across restart and executes
+once when due. `relative_readiness` anchors five elapsed minutes to the trusted receipt
+instant. Ambiguous local time asks for missing details and emits no timer. These close
+the offline contract in [#60](https://github.com/TimeTreker/chromie/issues/60). Operational stop leaves
 the unmet Goal open; semantic cancellation closes the cancelled Goal and prevents
 later wake. See [acceptance scope](../docs/ACCEPTANCE.md) and the
 [audit](../ARCHITECTURE_AUDIT.md) for actual module I/O, defects and evidence limits.
+
+The resource-conflict family requires a specific shared-resource diagnostic for two
+Goals; an unrelated refusal does not pass it. Provider timeout cases inject terminal
+status and do not measure timeout expiry. Confirmation cases supply or withhold trusted
+Runtime authorization, not an interpreted confirmation dialogue. Nod/shake catalogs
+are reduced qualification fixtures, not live provider compatibility proof.
+
 
 `runners/` executes normalized scenarios through an explicit executor boundary.
 It does not import production services or infer expected behavior from user text.

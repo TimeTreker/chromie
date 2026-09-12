@@ -1,119 +1,97 @@
 # Chromie Latest Handoff
 
-## Current delivery — 1,500-case workflow audit, 2026-09-13
+## Current delivery — 6,000-case workflow audit, 2026-09-13
 
 Repository `/home/chromie/github/chromie`, branch `main`; pre-delivery base
-`0457db8dfba677363bf99b7ab4f17027e70d4740`. Python `/home/chromie/miniconda3/bin/python`.
+`6bf16ccfbe816c068e0b51048331cbec15938c4e`. Python `/home/chromie/miniconda3/bin/python`.
 Resume from the latest commit containing this file and [DEVELOPMENT_CHECKPOINT](DEVELOPMENT_CHECKPOINT.md).
-The owner authorized corpus expansion, bounded repairs, GitHub publication and solved
-Issue closure. #61–#64 close with this delivery; #24/#32/#60 remain open. Future LoRA
-was discussed, not started. No new semantic owner, model profile, environment variable
-or current document (102 Markdown / 15 core-path counts unchanged).
+The owner authorized expansion, bounded repairs, principle decisions, GitHub delivery
+and solved-Issue closure. #60/#65/#66 close with delivery; #24/#32 remain open.
+No native inference or LoRA training. No new current document, environment variable,
+model profile or architectural owner (102 Markdown / 15 core-path counts unchanged).
 
-## Implemented boundary and actual workflow
+## Actual workflow and changed boundaries
 
-The existing `benchmarks/integration/model_replay.py` serves exact frozen `/api/chat`
-responses to real GI/GA/Fast/Deep clients. Parsers/validators, canonical Goal state,
-Capability Runtime, result re-entry and due wake remain real. The driver supplies
-initial admission/role scheduling, controlled wall time/UUIDs, providers and successful
-local speech receipts. This is Level A architecture evidence, not a full Gateway,
-autonomous scheduler, native-stream, audio or robot pipeline.
+| Owner | Material input → output / previous defect | Final mechanism and observed result |
+| --- | --- | --- |
+| GI primary WHAT | New request with `2099-09-04T19:00:00+08:00`; simulator returned `ready_at`, but Schema/Host rejected it | Primary Schema/prompt admit requested temporal WHAT. ISO/timezone and source/receipt checks reject mechanical/provenance violations. Relative five minutes anchors to receipt `2026-09-04T00:00:00+00:00`; ambiguous calendar/timezone remains unresolved |
+| GA continuity | Admitted Responsibility → new canonical Goal | Existing conservation passes exact `ready_at` and action parameters. Test asserts no pre-seeded Goal and equality at both boundaries |
+| Planner / Host waiting | New Goal → waiting Plan → persisted condition → scoped due re-entry | No provider call before due; restart retains open Goal and exact due time; one due wake executes the requested parameter and closes only with controlled result evidence. Semantic cancellation prevents later wake |
+| Planner model validation | One Goal; execute reply with absent/empty/foreign outcome map previously passed via single-Goal exceptions | Exact map key coverage is now required for every count and both tiers before adaptation. Eight direct shape contrasts and all 100 omission cases pass; zero provider calls on rejection |
+| Replay/driver evidence | Earlier resource test stopped too early; mixed speech result correlation was incomplete | Real production auxiliary speech correlation and catalog resource metadata are retained. Two-Goal resource tests require `parallel_resource_claim_conflict`; a generic rejection cannot pass. Twenty-eight static DTO references in 27 older tests preserve their intended semantic assertions under the stronger contract |
 
-`benchmarks/integration/workflow_corpus.py` is authoring-only; the runtime runner
-never executes it. Current-task GPT-6 Astra authored 30 contrasts and response rules;
-2 actions × 5 values × 5 language forms produce 1,500 cases. Review is non-independent,
-not 1,500 independent inferences. The new frozen `workflow_scenarios/` holds 1,500 case
-JSONs, one manifest and 255 hash-addressed shared prompt/Schema parts (88,054,200 bytes).
-The original five `scenarios/` remain available. All responses are training-ineligible;
-intentional model faults and unrepresentable results are separately labeled. Whole
-parameter contrast groups stay in one 900/300/300 split; this is not unseen-family
-semantic qualification.
+The primary end-to-end path is fresh source/receipt → GI → GA → Planner → canonical
+adapter → state/Runtime → correlated outcome. Conditional weather completion and due
+wake use real Host re-entry methods and real role clients. One genuine GI uncertainty
+may invoke its designated deeper cognition once; no same-authority semantic repair
+or additional reviewer is added. Clock/UUIDs, initial admission and scheduling,
+provider results, successful speech receipts and one terminal-Goal fixture remain
+explicitly controlled. Runtime authorization is supplied/withheld by a trusted test
+fixture; this is not confirmation dialogue or physical proof. Full I/O and limitations
+are in the [audit](ARCHITECTURE_AUDIT.md#broader-workflow-audit--606566).
 
-#62: an intentionally unknown GI `binding_items` field failed the raw Schema but
-passed normalized Host admission. GI now checks authored wire/canonical key names
-against the actual primary/Deep request Schema. Existing relation-reference validation
-is preserved. Direct parser callers now include prior-speech context when constructing
-the fallback Schema; otherwise 34 legitimate prior-speech references were rejected by
-the first patch. There is no extra semantic call or new compatibility alias.
+`benchmarks/integration/workflow_corpus.py` is authoring-only. GPT-6 Astra authored
+60 contrasts; 4 actions × 5 values × 5 language forms produce 6,000 separate cases,
+not 6,000 independent inferences. All outputs are training-ineligible and review
+non-independent. 3,600/1,200/1,200 splits hold out action/value groups, not semantic
+families. Corpus: 6,000 JSONs, one manifest, 898 shared packet parts, 382,137,005 bytes.
+Original five semantic answers are unchanged; their GI requests were explicitly
+refrozen for #60. Independent worker processes accelerate offline episodes; candidate
+mode requires one worker and preserves actual requests, raw responses and uncovered
+branches without substitute answers.
 
-#63: two modest canonical Goal snapshots (3,431 characters in the retained English
-blink/walk probe) exceeded Deep's 3,200-character whole-list fragment limit before a
-model call. The existing allowance now scales with authoritative Goal count; complete
-association/snapshot JSON, all other fragment limits and whole-request preflight remain.
-After repair, valid two-Goal plans execute both effects sequentially; omission plans
-reach and fail the intended Host guard before any provider call. An explicit extension
-captured only 72 previously unrenderable Deep packets, proving every old packet and
-semantic answer/oracle unchanged. Original failed cases and manifest identities remain.
+## Observed checks and retained evidence
 
-#64: the older behavior scenario oracle ignored expected `output_mode`. Its focused
-baseline demonstrated body-action vs speech mismatches incorrectly passing. The
-existing evaluator now checks this field. Eleven older fixtures were migrated from
-undeclared binding aliases; the compound reference additionally corrects swapped
-modality/source spans and removes invented blink concurrency while retaining the
-explicit joke-while-walking relation. Source turns and requested obligations remain.
-These are oracle/reference defects, distinct from product/model behavior. Originals
-and exact before/after hashes are retained. The [audit](ARCHITECTURE_AUDIT.md#expanded-workflow-audit--61626364)
-provides the full coverage matrix, module I/O, first wrong boundaries and limits.
+R = `.chromie/acceptance/workflow-6000-20260913/` (ignored/private):
 
-The replay server can explicitly forward one GI/GA/Fast/Deep role to an Ollama-compatible
-candidate service; it sends only the actual role packet with the chosen model name.
-Other roles remain frozen. Raw candidate transport and termination survive unchanged;
-HTTP failure gets no reference fallback. An accepted variation without a frozen next
-packet stops as `uncovered_replay_branch`, not a semantic failure/pass. Candidate
-Schema violations take precedence. Model-fault/gap cases and cases without the role
-are excluded explicitly. Local fixture services prove all four routing paths, altered
-continuations and raw failure retention; the 50-case CLI proof used a second local
-fixture service, not a native model. No LoRA jobs, candidate training exports or native
-model-ability qualification are delivered.
+- `baseline-identity.json`: exact clean pre-change source matches the retained 1,500
+  result at `6bf16ccf`: 1,450 expected successes / 50 known #60 failures.
+- `authored-v1/` through `authored-v3/`, three representative captures and `capture-v3/`
+  retain reference/wiring failures and all original answers. `frozen-v4/` explicitly
+  corrects only 60 terminal dry-condition responses after review. Resource captures
+  retain the initial shallow pass, two failed refinements, and final specific conflict.
+- `baseline/summary.json`: immutable strict full run, 5,900 expected successes and
+  100 empty-map failures. First repair `issue66-focused/` rejects all 100. The later
+  absent-map contrast `missing-map-red/` retains 60 rejections / 40 unexpected failures;
+  `missing-map-green/` correctly rejects all 100 after the complete fix.
+- `final/` passes the preceding empty-map cohort; **`final-2/summary.json` is current**:
+  6,000/6,000, unchanged source, aggregate exit 0, no native calls. Counts: 1,400 complete
+  workflows; 1,800 state/fault/permission outcomes; 2,580 rejections; 220 safe nonexecuting
+  replies. Manifest SHA256 `1d9f5d3d35cf8b993ea2fe6703ac30adac2838514d8e7a27a9bd5431775a0773`.
+- `gi-focused-2.log`: 88 tests/101 subtests. `planner-broader-3.log`: 295 tests/173
+  subtests. `remaining-focused-2.log`: 36 tests/4 subtests. The broader final gate
+  includes all current replay/role checks and changed static references.
+- `canonical-3.log`: `./scripts/run_tests.sh` exit 0, **3,214 tests/804 subtests,
+  145 benchmark tests and 20 legacy tests**; pinned static/configuration/policy/
+  ownership checks pass. Two existing FastAPI deprecation warnings. Previous
+  `canonical-1.log` and `canonical-2.log` fail 7 and 4 old reference tests respectively;
+  intermediate focused failures and their corrections are retained, not called passes.
+- `level-a-2/`: 45/45 distinct cases across 15 classes. `validation-ledger.json` and
+  `delivery-source-identity.json` bind results; `source-snapshot/` retains 192 source/
+  authority files, including exact final production, replay and primary prompt hashes.
+- Reference review files retain all changed DTOs and original copies. Missing/empty/
+  foreign negative examples stay malformed, with explicit rejection assertions.
+  No runtime mock or normalizer automatically fills their missing outcomes.
 
-## Observed checks and evidence
+Archive: `/home/chromie/Downloads/chromie_workflow_6000_20260913.tar.gz` (1,855,642,868 bytes), SHA256
+`18295607616d0bef24c484726f4f0b75cf957ca9181e1384cf49f9de26f21e1a`; 79,430 indexed payload files verified.
+It includes all indexed private evidence, source snapshots, completed validation
+logs and the index. Post-archive documentation, commit/push and CI records are separate
+in R/Git and are not claimed inside the immutable archive.
 
-R = `.chromie/acceptance/workflow-1500-20260913/` (ignored/private):
-
-- `authored-v1/`: semantic responses/oracles frozen before the 1,500-case capture;
-  `capture-v1/` retains every case and actual available packet on production `0457db8d`.
-- `baseline/summary.json`: 1,328 expected successes, 122 unexpected failures, 50 known
-  #60 gaps. Manifest SHA256 `97c8d1ed36b51b64d5a6eb4dae9bd59ef4ae02a948e681884c87e68b277e9dbe`.
-- `after-gi/summary.json`: 1,378 expected successes, 72 failures, 50 gaps. No changes
-  between cohort cases. `after-deep/`, `final/`, `final-2/`: each 1,450 expected
-  successes, zero unexpected failures, 50 gaps. Final source identity unchanged
-  through the run; no native calls. Each aggregate intentionally exits 1 for #60.
-- Final successful outcomes: 350 completed workflows, 400 expected state/fault
-  outcomes, 675 explicit rejections, 25 nonexecuting clarify/refuse results. A safe
-  unknown-Capability clarification is correct containment, not a bug.
-- `packet-extension-2/`: successful 72-packet extension with original identities;
-  `legacy-reference-review.json` and `legacy-references/`: all 11 reference originals.
-- `candidate-focused-final.log`: 66/66; `candidate-cli/`: 50/50 normal Fast cases with
-  only GI forwarded, 50 external fixture calls. `candidate-provider.json` declares the
-  provider as local fixture/no inference. The summary's unknown native-call count must
-  not be relabeled as real native evidence. `oracle-fixed.log`: 10 tests/4 subtests.
-- `canonical-2.log`: `./scripts/run_tests.sh` exit 0, 3,175 tests/798 subtests,
-  145 benchmark tests, 20 legacy tests, pinned static/config/policy/ownership pass;
-  two existing FastAPI deprecation warnings. Production/replay source did not change
-  after this gate. Final documentation checks are retained separately.
-- `level-a-2/`: 45/45 cases across 15 classes after fixture vocabulary migration.
-  `level-a-final/` repeats after the oracle fix and also passes 45/45 across 15 classes.
-- Initial `canonical-1.log` failed 34 direct-parser benchmark references; initial
-  `level-a/` was 36/45 due to stale fixture keys. `general-ability/` is library-only
-  validation, not execution. `broader-2.log` retained three additional fixture/oracle
-  failures, now repaired. Preparation, editing and focused-test failed attempts
-  remain in their original logs; none is presented as a pass.
-
-Transfer archive: `/home/chromie/Downloads/chromie_workflow_1500_20260913.tar.gz`, 433,808,729 bytes,
-SHA256 `4bb09dafc01ba865da43ac811001c4cf620a54c09ebb314aa878a6b2d83c5430`; all 21,428 indexed payload files verified.
-It contains original and intermediate failures, final replay/source snapshots and
-completed validation logs. Post-archive documentation/publication checks are retained
-separately in R and Git; they are not claimed to be inside this immutable archive.
-Prior five-case archive remains `/home/chromie/Downloads/chromie_workflow_replay_20260913.tar.gz`
-(2,883,802 bytes; SHA256 `a31606849c791af7cf66ecc18c57a42984e6edc2e546d8ead8c9a52348cf3ba1`).
+Prior 1,500 archive `/home/chromie/Downloads/chromie_workflow_1500_20260913.tar.gz`:
+433,808,729 bytes, SHA256 `4bb09dafc01ba865da43ac811001c4cf620a54c09ebb314aa878a6b2d83c5430`,
+21,428 verified payloads. Prior five-case archive
+`/home/chromie/Downloads/chromie_workflow_replay_20260913.tar.gz`: 2,883,802 bytes,
+SHA256 `a31606849c791af7cf66ecc18c57a42984e6edc2e546d8ead8c9a52348cf3ba1`.
 
 ## Reproduce and resume
 
-Use the repository root, test requirements and a fresh evidence directory:
+From repository root, using fresh evidence directories:
 
 ```bash
 python -m pip install -r requirements-test.txt
-python scripts/run_workflow_replay.py --evidence-dir .chromie/acceptance/workflow-1500-new-run
+python scripts/run_workflow_replay.py --workers 4 --evidence-dir .chromie/acceptance/workflow-6000-new-run
 python -m pytest -q tests/test_workflow_replay.py
 python scripts/general_ability_acceptance.py --mode level-a --evidence-dir .chromie/acceptance/workflow-ability-new-run
 python scripts/check_repository_policies.py
@@ -122,16 +100,14 @@ python scripts/check_docs.py
 python scripts/check_test_ownership.py
 ```
 
-The full workflow command exits 1 while #60's 50 gaps remain; inspect `summary.json`.
-For the original five passing prototypes, add `--case-root
-benchmarks/integration/scenarios` to that command on one shell line. For candidate
-substitution, use the explicit role/URL/model instructions in
-[benchmarks](benchmarks/README.md#offline-workflow-replay). Never silently capture new
-packets, feed expected answers to a candidate, hide failed branches or promote faults
-into training data. Before LoRA, independently review references and freeze a hidden
-semantic-family cohort; then qualify isolated roles and the combined real-model system.
-Keep native #24, stream/target #32 and new-request readiness #60 open as described in
-the checkpoint. No new inference/training or deployed-service proof occurred here.
+The full cohort must exit 0 without exclusions. `--family` is focused diagnosis;
+`--case-root benchmarks/integration/scenarios` selects the original five episodes.
+Candidate substitution follows [benchmarks](benchmarks/README.md#offline-workflow-replay)
+with an explicit role/URL/model and one worker. Do not auto-capture changed packets,
+feed expected answers to a candidate, or treat a new continuation as model failure.
+Before LoRA, independently review positive references and hidden semantic families,
+then qualify isolated real roles and the combined real-model workflow. Keep #24/#32
+open; offline fixture success cannot replace their native/target evidence.
 
 ## Retained deployment context (historical, unrefreshed)
 

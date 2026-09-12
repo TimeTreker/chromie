@@ -35,15 +35,15 @@ architecture layer or product feature is promoted.
 
 ## Current execution order
 
-The owner's September 13 scope completed #59's prototype and expands it under #61
-into 1,500 offline architecture/workflow scenarios with isolated GI/GA/Fast/Deep
-candidate substitution. #62/#63 fix the reproduced binding-admission and multi-Goal
-projection boundaries; #64 fixes an ignored modality assertion in the older scenario
-oracle. The resulting 1,450 expected successes leave 50 known #60 readiness gaps;
-this is not a fully passing cohort or native model qualification. LoRA training is
-not started: references, faults, hidden semantic holdouts and actual candidate
-outputs need separate review. #60 requires the primary temporal contract; seeded
-scheduled-Goal success cannot close it. #24/#32 retain their live/target requirements.
+The owner's September 13 scope completed #59/#61's offline prototype and 1,500-case
+audit, then expanded to 6,000 cases under #65. #60 now connects primary GI temporal
+WHAT to GA conservation and Planner waiting/re-entry without a pre-seeded Goal. #66
+rejects empty, absent and foreign single-Goal outcome maps before canonical execution.
+The final replay requires all 6,000 declared outcomes, including genuine resource
+conflicts and expected nonexecution; exact counts and gates belong to Status/handoffs.
+These are architecture/workflow/contract tests, not native model qualification. LoRA
+training is not started: references, faults, hidden semantic holdouts and actual
+candidate outputs need separate review. #24/#32 retain their native/target requirements.
 
 Ordered offline Fast/Deep qualification and supported-version CI pass. GitHub
 #35 and #52–#58 are closed; follow the remaining #24/#32 native qualification line below.

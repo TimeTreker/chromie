@@ -140,6 +140,25 @@ class GoalSatisfactionContractTests(unittest.TestCase):
 class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
     def test_low_consequence_default_and_exact_satisfaction_are_retained(self):
         raw = {
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "unresolved": [],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact",
+                        "satisfied_goal_ids": [],
+                        "unmet_goal_ids": [],
+                        "unmet_requirements": [],
+                        "rationale": "The requested blink is fully covered."
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.92,
@@ -183,6 +202,25 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
 
     def test_material_missing_parameter_returns_specific_gap(self):
         raw = {
+            "goal_outcomes": {
+                "goal-walk": {
+                    "disposition": "clarify",
+                    "coverage": "partial",
+                    "response_text": "你希望我往前走多久？",
+                    "step_ids": [],
+                    "unresolved": [
+                        "walking duration"
+                    ],
+                    "satisfaction": {
+                        "score": 0.4,
+                        "status": "partial",
+                        "unmet_goal_ids": ["goal-walk"],
+                        "unmet_requirements": [
+                            "walking duration"
+                        ]
+                    }
+                }
+            },
             "disposition": "clarify",
             "coverage": "partial",
             "confidence": 0.9,
@@ -205,6 +243,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "goal_satisfaction": {
                 "score": 0.4,
                 "status": "partial",
+                "unmet_goal_ids": ["goal-walk"],
                 "unmet_requirements": ["walking duration"],
             },
         }
@@ -218,6 +257,24 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
 
     def test_complete_plan_below_satisfaction_threshold_fails_closed_without_replan(self):
         low = {
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "unresolved": [],
+                    "satisfaction": {
+                        "score": 0.8,
+                        "status": "substantial",
+                        "unmet_requirements": [
+                            "requested repeated blinking"
+                        ]
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.9,
@@ -238,6 +295,21 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         exact = {
+            "goal_outcomes": {
+                "goal-blink": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "response_text": "",
+                    "step_ids": [
+                        "blink"
+                    ],
+                    "unresolved": [],
+                    "satisfaction": {
+                        "score": 1.0,
+                        "status": "exact"
+                    }
+                }
+            },
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.92,
