@@ -1,74 +1,70 @@
 # Development Checkpoint
 
-## Current resume boundary — remaining-Issue repairs, 2026-09-12
+## Current resume boundary — native GI investigation, 2026-09-12
 
 Current focus: Goal-driven single-authority architecture and current-revision
 evidence closure. GI owns WHAT, GA continuity, Planner HOW/speech, Runtime execution.
+Only [#24](https://github.com/TimeTreker/chromie/issues/24) and
+[#32](https://github.com/TimeTreker/chromie/issues/32) remain open.
 
-Repository `main`; implementation base `c142f16c6993ed60a93e2155c93906930c2fa445`,
-delivered at `8aa3f499151e4d25e8aed3fec74dec486f12b9cd`. This documentation-only publication
-checkpoint starts from that delivered revision. Resume from the latest main commit
-containing this checkpoint and [HANDOFF](HANDOFF.md), not that older base. The owner
-explicitly authorized remaining-Issue repairs, principle decisions, bounded
-maintenance, normal publication and closure of solved Issues. This supersedes the
-preceding audit-only and maintenance-queue restrictions for this delivery.
+Repository `main`; investigation/fetched base
+`2b9910e7659b2bf3a0df9f7251db6dec62e7ec2f`. Production behavior remains the delivered
+`8aa3f499151e4d25e8aed3fec74dec486f12b9cd` implementation. This delivery updates existing
+evidence/report owners only. Resume from the latest main commit containing this
+checkpoint and [HANDOFF](HANDOFF.md), not an older base. The owner authorized repairs,
+principle decisions, normal publication and closure of solved Issues, then agreed to
+focus on the primary GI failure before streaming qualification. No new permission is
+needed to continue that scope; qualification is the blocker.
 
-The [audit report](ARCHITECTURE_AUDIT.md) records each issue, actual workflow,
-earliest wrong boundary, repair and evidence limit. #49–#51 remain delivered and
-closed. GitHub closure is verified for #35 and #52–#58. #35 closes at the offline Planner
-evidence ceiling; #24/#32 are the only open Issues. Implemented changes:
-
-- Cancellation reporting preserves the original unmet effect Goal, exact control
-  status and independent catalog truth. Both Planner tiers accept truthful zero-work
-  reporting; stale confirmation stays revoked and independent siblings stay intact.
-- The eligible result Planner runs before optional bounded Reflection. Real Host
-  requests include approved Mind; retired current-turn advisories cause no re-entry.
-- Future intentions wait with zero current Work and an exact time condition.
-  Persistent restart wakes the same open Goal through a matching trusted opportunity,
-  without inventing a fresh GA decision. The primary prompt carries the captured
-  Host clock fact when the time has arrived; it cannot wait for that same time again.
-- The existing strict typing gate covers the complete contract package. Lifecycle
-  review retains existing atomic state ownership and adds executable continuation,
-  serialization and duplicate-Evidence regressions. Historical evidence is labeled.
+The [audit report](ARCHITECTURE_AUDIT.md#native-goal-interpretation-boundary-investigation--24)
+records the actual module I/O, controls and claim limits. The retained compound request
+contains all three requested actions, but native GI still merges them or binds their
+parameters incorrectly. The original live whole-turn echo was rejected; fresh partial
+echoes pass the mechanical guard while remaining semantically wrong. No direct-role
+output entered GA, Planner or Runtime. No reliable repair qualified, and no production
+prompt, Schema, code, configuration or model profile was changed.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Repairs above; no new architecture layer, standing document, runtime flag or model profile. | Canonical: 3,105 tests/794 subtests, 145 benchmarks, 20 legacy; pinned static/config/policy/ownership pass. Future module: 50. Level A: 45 distinct cases/15 classes. Final Fast: 204/204 plus 16 cancellation and 6 persisted-due contrasts. Final Deep: 40/40 plus 16 cancellation, 6 waiting and 6 persisted-due contrasts. | Final deployed-source 51-case live-text cohort: 1 GI failure, 1 startup interrupted, 49 unrun. GA/Planner/Runtime not reached in failed case. Exactly one debug bundle; safe idle verified. Local Qwen9b budget experiment retains hard semantic failures. | Development only. #24/#32 remain open. No native streaming, current voice/default target profile, audible speaker, physical microphone, executed simulator capability or robot qualification. |
+| Prior cancellation/Reflection/future-wake/typing repairs unchanged. No new architecture, runtime flag, document owner or model profile. | Fresh canonical: 3,105 tests/794 subtests, 145 benchmarks, 20 legacy; pinned static/config/policy/ownership pass. Native GI diagnostic: five 44-case cohorts plus six cold cases, 226 executions/254 calls, every output reviewed; all candidates unqualified. | Last deployed-source live-text cohort remains 1 GI failure, 1 startup interrupted, 49 unrun of 51. No fresh aggregate, voice, TTS contention or robot proof in this investigation. | Development only. #24/#32 open. No native role/streaming/default target profile promotion. |
 
-[Supported Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596) passes on implementation
-commit `8aa3f499`: both jobs verify the same 3,105 tests/794 subtests, 145 benchmarks,
-20 legacy tests and strict typing across all 33 enforced files. This publication-only
-update changes no implementation, prompt, corpus, model or deployed runtime.
+The native packet is Qwen3.5:4b/Ollama 0.33.2, top-level `think:false`, 16,384 context,
+512 output tokens. Inherited presence penalty is 1.5. Added structural guidance,
+penalty zero, a plain-JSON decoder control, an installed Qwen3 Instruct comparison,
+and fresh loading each fail to qualify. All 254 replies complete normally; 210 pass
+the original full Schema, while all 44 plain-JSON replies fail it. Structural/Host
+acceptance is not semantic completeness. There is no model intelligence ceiling claim.
 
-Private evidence R: `.chromie/acceptance/remaining-issues-20260912/`. The handoff
-records exact archive/identity paths, failed attempts and resume commands. Offline
-fixed `gpt-5.6-sol/high` model evidence is post-hoc and non-independent; it does not
-qualify the deployed Qwen/Ollama provider. Original outputs and old failed oracles
-remain retained. Private #51 artifacts from the other machine remain absent here.
+Private evidence: `.chromie/acceptance/issue24-gi-boundary-20260912/`. Transfer archive:
+`/home/chromie/Downloads/chromie_issue24_gi_boundary_20260912.tar.gz`, 10,322,848 bytes,
+SHA256 `14e2b27523f92e4438a93f273f78cade42008a048530a414fd792945da7a4dc2`.
+The handoff records exact model identities, metadata corrections and replay boundaries.
+Original outputs/oracles are preserved; post-hoc semantic reviews are non-independent.
 
 Next work:
 
-1. Continue #24/#32 from the retained GI failure: compound walk/nod/turn collapses
-   into one responsibility and copies the whole turn into `subtype`. Host correctly
-   rejects before downstream admission. The 44-case output-budget contrast does not
-   resolve decomposition, binding, mode or truncation failures. Do not bypass GI or
-   infer a model intelligence ceiling from these results.
-2. For the next chosen transaction repair, freeze the complete contrast corpus and
-   exact production packets before inference. Distinguish prompt/context, Schema,
-   native provider and semantic failures; preserve one-call authority and exact
-   source identities. Source and offline success do not promote a native profile.
-3. Rebuild/verify the chosen revision and run one complete directory-discovered live
-   cohort without source edits or restarts between cases. At completion or hard
-   stop, collect exactly one bundle and review every case. Keep canonical gate →
-   narrow current-revision live voice → default target-evidence closure as the active
-   delivery line. Physical microphone/speaker proof remains supervised.
+1. Continue #24 at the primary GI transaction. Choose one new, predeclared hypothesis
+   about the primary context/representation or native provider. Preserve complete WHAT,
+   material bindings and source identity; do not add semantic phrase rules, a critic
+   or confidence-only escalation. The tested controls do not justify production edits.
+2. Retain the original 44 cases as regressions, freeze independent contrasts for the
+   chosen hypothesis and complete missing GI continuity/lifecycle coverage. Compare
+   raw Schema, DTO/Host and meaning separately. A focused success does not qualify the
+   role or combined model/TTS profile.
+3. After a qualified repair, verify/rebuild exact source and run the full discovered
+   live cohort once, with no edits/restarts between cases. Collect exactly one bundle
+   at completion/hard stop and review every case. Continue canonical local gate →
+   narrow current-revision supervised live voice → default target-evidence closure.
+   #32 additionally needs native accepted-commit/terminal/cancellation/timing evidence.
 
-Agent/TTS/LLM remain development services; ASR was absent. Owned simulator/MCP are
-stopped after safe-idle verification. Preserve Soridormi's pre-existing untracked
-submodule content. No follow-up is scheduled. Numeric size ceilings remain rejected;
-#57's no-extraction conclusion does not authorize unrelated refactoring.
+Agent/TTS/LLM remain healthy development services; original Qwen3.5:4b residency was
+restored. ASR absent; owned simulator/MCP remain stopped after the prior safe-idle
+check. No runtime restart or physical action occurred during this investigation.
+Preserve Soridormi's pre-existing untracked content. No follow-up is scheduled.
 
-The [preceding checkpoint](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/DEVELOPMENT_CHECKPOINT.md)
-and [handoff](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/HANDOFF.md)
-retain all earlier audit history, the external review, #49–#51 deliveries and exact
-historical evidence. Those revision-specific records are not current instructions.
+The [preceding checkpoint](https://github.com/TimeTreker/chromie/blob/2b9910e7659b2bf3a0df9f7251db6dec62e7ec2f/DEVELOPMENT_CHECKPOINT.md)
+and [handoff](https://github.com/TimeTreker/chromie/blob/2b9910e7659b2bf3a0df9f7251db6dec62e7ec2f/HANDOFF.md)
+retain #35/#49–#58 closure, prior 294-case offline Planner qualification, Level A
+45 cases/15 classes, CI, actual repaired workflows and live failure/archive identities.
+These prior results do not qualify the current native GI transaction. Private #51
+artifacts from the other machine remain absent here.

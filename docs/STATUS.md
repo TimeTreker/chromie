@@ -1,41 +1,51 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-12
-**Current focus:** owner-authorized remaining-Issue repairs from `c142f16c` are
-implemented and verified locally and in supported-version CI on `8aa3f499`.
-#35 and #52–#58 are verified closed with their acceptance evidence.
-#49–#51 remain delivered and closed. Remaining native model/streaming/voice/target
-qualification stays under #24/#32.
+**Current focus:** native Goal Interpretation qualification under #24, then #32's
+native streaming and target evidence. The focused investigation from `2b9910e7`
+qualifies no repair; production behavior remains `8aa3f499`. #35 and #49–#58 remain
+closed. #24/#32 are the only open Issues.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Truthful scoped cancellation; result planning before bounded Reflection; approved Mind and no current-turn advisory re-entry; zero-early-work waiting, persisted open-Goal wake and captured arrived-time fact; complete contract typing; lifecycle/documentation corrections. | Final canonical:3,105 tests/794 subtests,145 benchmarks,20 legacy; pinned static/config/policy/ownership pass. Future module: 50. Level A: 45 distinct cases/all 15 classes. Final Fast 204/Deep 40 plus 50 supplemental cases pass Schema/Host/frozen gates and post-hoc semantic review, in Fast-then-Deep order. | Final deployed-source 51-case live-text cohort: 1 GI failure, 1 startup interrupted, 49 unrun. All 113 Agent/shared files match; source/provider unchanged through cohort, one bundle, safe idle verified. Qwen9b output-budget contrast retains semantic/binding/truncation failures. | Development only. No target model profile, native streaming/voice, audible speaker, physical microphone, executed simulator capability or robot qualification. #24/#32 remain open. |
+| Prior scoped cancellation, Reflection ordering/Mind, zero-early-work future wake, typing and lifecycle repairs unchanged. This delivery changes evidence/report owners only. | Fresh canonical: 3,105 tests/794 subtests, 145 benchmarks, 20 legacy; pinned static/config/policy/ownership pass. Native GI investigation: 226 case executions/254 calls over 44 scenarios, all raw outputs reviewed; none of the tested transactions qualifies. | Last deployed-source 51-case live-text cohort remains 1 GI failure, 1 startup interrupted, 49 unrun. No fresh aggregate, native-stream timing, concurrent TTS, voice or physical proof in this investigation. | Development only. #24/#32 open; no production model/profile or target promotion. |
 
-Evidence: `.chromie/acceptance/remaining-issues-20260912/` (private, ignored).
-The [audit](../ARCHITECTURE_AUDIT.md) owns the actual workflows and principle decisions;
-the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own resume
-commands, exact source/runtime identities and transfer paths. Final cohort raw outputs
-and original failures are retained. Oracle amendments were separately justified and
-frozen before new inference; no historical failure was relabeled. Fixed
-`gpt-5.6-sol/high` offline qualification is post-hoc and non-independent, and does not
-qualify the deployed Qwen/Ollama provider. [Supported Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596) passes on implementation
-commit `8aa3f499`, including Mypy33 files and the complete gate in both jobs; #56
-links that result. This later publication-only documentation update changes no
-implementation, model, corpus or deployed runtime.
+The retained complete source request asks for ordered walk/nod/turn effects. Original
+live GI output hides the entire turn in one binding and is rejected before downstream
+admission. Fresh unchanged direct-role output hides only the later clauses and passes
+the mechanical guard while still omitting independent effects, count and sequence.
+This identifies a containment limit, not correct meaning. Direct experiments never
+invoke GA, Planner or Runtime, including for accepted but semantically wrong outputs.
 
-The current Qwen9b output-budget contrast preserves original packets except512→2,048
-output tokens:44 cases/63 calls,34 returned decisions,2 strict dimension passes, and a
-retained truncation plus decomposition/binding failures. All 44 outputs were reviewed;
-strict span/wording mismatches are distinguished from hard meaning failures. No
-production profile change was made. Agent/TTS/LLM remain development services; owned
-simulator/MCP stopped after safe-idle verification. Exact deployed source is recorded
-in HANDOFF and predates the final documentation commit, so it is not a clean-revision
-release claim. Physical microphone/speaker evidence remains supervised and absent.
+Five 44-case native cohorts test baseline, appended Schema structure, neutral presence
+penalty, plain-JSON decoder control, and installed Qwen3 Instruct; six representative
+cases additionally reload the model before each call. All 254 replies complete normally,
+with top-level `think:false` and no separate thinking field. The 210 non-JSON-control
+calls pass original Schema; all 44 plain-JSON outputs fail it. Missing/misbound effects,
+incorrect modes and provenance remain. Strict oracle counts are not semantic pass rates.
+No prompt/model/provider cause is uniquely established and no model ceiling is claimed.
 
-The [preceding audit delivery](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/HANDOFF.md)
-retains the friend's review and prior unchanged-source baselines. Private #51 artifacts
-from the other machine remain absent locally. Historical sections below retain their
-original revision limits; they are not current runtime instructions or new passes.
+Actual GI requests use Ollama 0.33.2/Qwen3.5:4b, 16,384 context and 512 output tokens;
+the environment's 32k label is not the actual request. Inherited presence penalty 1.5
+was verified and its neutral control did not repair the role. Original Qwen3.5:4b
+residency was restored; Agent/TTS/LLM remain healthy development services, ASR absent,
+owned simulator/MCP stopped. Physical microphone/speaker evidence remains supervised.
+
+New private evidence: `.chromie/acceptance/issue24-gi-boundary-20260912/`. The
+[audit](../ARCHITECTURE_AUDIT.md#native-goal-interpretation-boundary-investigation--24)
+owns exact controls, actual module I/O and conclusions; the
+[checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own the new archive,
+model/runtime identities, metadata corrections and resume commands. No code, prompt,
+Schema, runtime configuration or profile changed. Continue with one predeclared primary
+transaction hypothesis, complete frozen GI coverage, then whole-profile/live evidence.
+
+[Prior delivery evidence](https://github.com/TimeTreker/chromie/blob/2b9910e7659b2bf3a0df9f7251db6dec62e7ec2f/HANDOFF.md)
+retains the 294-case fixed `gpt-5.6-sol/high` offline Planner qualification, Level A 45/15,
+Qwen9b budget failure, last deployed-source failure and
+[Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596).
+Those are prior results, not new native GI/voice evidence. Private #51 artifacts from
+the other machine remain absent locally. Historical sections below retain their
+original revision limits and are not current instructions or new passes.
 
 ### Prior remaining-Issue delivery — 191083dc
 
