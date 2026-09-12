@@ -1,5 +1,118 @@
 # Chromie Latest Handoff
 
+## Audit publication delivery, 2026-09-12
+
+Current owner request: publish the full audit to the GitHub repository, create actionable
+Issues, and retain checkpoint/handoff. This delivery contains the report, navigation links
+and both handoff owners only. It does not implement the proposed repairs. Earlier broad
+implementation authorization records below are prior-session history; they do not turn this
+report-publication request into a new source or model-qualification run.
+
+Repository: `/home/chromie/github/chromie`; remote `https://github.com/TimeTreker/chromie.git`;
+branch main; audited/pre-delivery base `191083dc85ef8f9131eaadb2223660f58ad6f217`.
+The tracked tree and main/origin were clean and synchronized before publication. Resume
+from the latest main commit containing this checkpoint and HANDOFF; no future hash is
+predicted. Source links in the report are pinned to the audited base so later fixes cannot
+move their line evidence. The previous report is available at that base in Git history.
+
+### Published record and GitHub ownership
+
+`ARCHITECTURE_AUDIT.md` is the existing point-in-time report location, now containing the
+September 12 audit, seven new Issue links, the three existing qualification owners, exact
+boundary observations and closure criteria. README and documentation-index links identify
+the new review date. The report's appendix contains the original synthetic probe script and
+an explicitly abbreviated output excerpt; no private provider payloads are committed.
+Current Charter, Status, Roadmap and acceptance authority remain unchanged.
+
+| Finding / Issue | Earliest responsible boundary and retained observation | Next mechanism to prove |
+| --- | --- | --- |
+| A01 / #49 | Two valid definitions share a declared resource but have different groups. Same-Plan adapter rejects; separate Runtime interactions reach both mock providers simultaneously, peak 2. | Existing shared arbiter/registration must enforce resource sets across submissions without moving Soridormi safety ownership. |
+| A02 / #50 | Eight accepted retained Goals reach context; optional-budget prompt projection leaves only three meanings in both Fast/Deep prompts. No model invoked. | Required context stays lossless or rejects before inference/commit; output scope stays aligned. |
+| A03 / #51, under #35 | Retained Deep read-first weather result honestly scores partial 0.6; Host rejects against 0.75 and dispatches no Work. | Agree current-stage admissibility separately from whole-Goal completion, preserving conditional-effect barriers. |
+| A04 / #52, under #35 | Restricted cancellation reentry empties catalog and calls effect Goals speech responsibilities; retained bilingual outputs expose scope/availability/oracle conflict; no reminder runs. | Preserve Goal meaning and capability facts separately from invocation permission; retain and justify old/new oracle identities. |
+| A05 / #53 | Real aggregate Host closure waits for a blocked Reflection before result Planner despite ready terminal Evidence. | Eligible result planning proceeds independently under existing lifecycle/cancellation ownership. |
+| A06 / #54 | Real Reflection request omits configured Mind; its prompt renders null. Advisory reaches Planner request but neither prompt. | Complete the allowed existing context handoffs or remove unjustified advisory-driven reentry. |
+| A07 / #24/#32/#35 | Existing profile qualification fails; live 51 cohort stopped at GI with 1 complete failure, 1 partial, 49 unrun. | Repair proven boundaries, then qualify exact production transactions and one fixed live cohort/profile. |
+| A08 / #55 | Acceptance labels older voice revisions current; Capability README counts/registry status drift from source. | Update existing owners with revision-accurate claims; preserve historical evidence. |
+
+Every new Issue includes source links, initiating input, boundary verdict, impact, proposed
+repair and unchecked acceptance criteria. #51/#52 are verified GitHub sub-Issues of #35 and isolate repairs already diagnosed there;
+that parent still owns full Planner qualification. #55 is narrower residual drift, not a
+claim that closed #48's delivered source-status correction was undone. No new umbrella or
+implementation closure is created. The optional startup-speech exception remains a separate
+owner clarification in the report, not a confirmed defect or newly filed Issue.
+
+Recommended next selected Issue: #49, then #50, #51/#52, #53/#54, with #55 alongside the
+relevant delivery. Preserve the existing evidence-closure line in #24/#32/#35. This sequence
+must not be used to introduce unrelated architecture or weaken a binding principle.
+
+### Evidence and verification
+
+Local audit artifacts: `.chromie/acceptance/project-wide-audit-20260912/`.
+Publication logs and GitHub mappings: its `publication/` subdirectory. Older live/model
+artifacts: `.chromie/acceptance/open-issue-closure-20260911/`. These ignored directories do
+not transfer with Git. The original report, identity/digests, four probe outputs, combined
+outputs, replay script, canonical/authority/capability logs remain retained locally.
+
+Fresh audited-base checks: `./scripts/run_tests.sh` passed 2,480 tests/771 subtests,
+145 benchmarks and 20 legacy Agent tests; 15 policy families with zero exceptions, test
+ownership, pinned Ruff/Mypy, configuration and docs passed. Two existing FastAPI warnings
+remain. `python scripts/semantic_authority_audit.py` passed.
+`python -m tools.chromie_cli capability check` passed statically: 7 Agent records / 27 tools,
+no live provider probe. No new general-ability, model-inference, deployment, audio, simulator
+or physical run was performed. Historical Level A and frozen/live results below remain
+bound to their own source/runtime identities, not this publication.
+
+Publication replay: the Python block embedded in `ARCHITECTURE_AUDIT.md` matches the original
+probe script byte-for-byte apart from surrounding Markdown whitespace and reproduces all
+four findings. It exits successfully because it reports behavior, not because the defective
+contracts pass. The initial documentation precheck rejected two literal numbered synthetic
+step identifiers in the JSON appendix; the published excerpt explicitly omits only those
+identifiers. Original code/full outputs remain unchanged; no checker or exception changed.
+
+Publication rerun: `./scripts/run_tests.sh` exited 0. The result was 2,480 tests /
+771 subtests (44.82s), 145 benchmark tests (43.98s) and 20 legacy Agent tests; two existing
+FastAPI warnings remain. All included repository policy, test-ownership, pinned static,
+configuration and documentation checks passed. Retained log:
+`.chromie/acceptance/project-wide-audit-20260912/publication/canonical-gates.log`.
+Only this final evidence ledger and Issue relationship wording were completed afterward;
+final documentation, repository-policy, test-ownership and whitespace checks are repeated
+before delivery. GitHub readback verified all seven titles/bodies/open states and #51/#52's
+parent relationship. Source-link validation verified all 29 audited-revision links.
+
+The delivery adds no runtime code, test file, prompt, contract, profile, configuration key,
+service or term. Markdown 102 -> 102; docs-root Markdown 58 -> 58; core reading path 15 -> 15.
+The existing audit file is reused; its August 28 content stays in Git history. Older handoff
+narrative is a consolidation opportunity, not a mechanical size violation.
+
+### Cross-machine resume
+
+```bash
+git status --short --branch
+git pull --ff-only origin main
+gh issue view 49
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+```
+
+Use the test environment from CONTRIBUTING; this machine used
+`/home/chromie/miniconda3/bin/python`. Run the extraction/replay command in the report's
+reproduction appendix from the repository root. It requires no private artifacts, model,
+service or device. After a repair, reassess its output rather than treating today's observed
+defects as expected acceptance. Use the selected Issue's actual boundary regression and
+required general-ability/frozen cohorts for validation. Private live evidence must be
+transferred separately before its exact replay; if unavailable, record that gap. Any new
+revision-level live claim must use one complete directory-discovered cohort, one fixed
+revision/runtime identity and exactly one debug bundle at completion/hard stop. Physical
+microphone/speaker and robot evidence remain supervised; profile/release promotion is open.
+
+## Earlier delivery records
+
+The following entries retain previous implementation, runtime and qualification evidence;
+they are not fresh checks for the audit-publication delivery above.
+
 ## Owner-authorized remaining-Issue delivery, 2026-09-12
 
 The owner authorized project decisions, completion of all remaining open Issues,

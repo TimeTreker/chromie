@@ -1,6 +1,55 @@
 # Development Checkpoint
 
-## Current delivery — remaining Issues, 2026-09-12
+## Current delivery — audit publication and Issue breakdown, 2026-09-12
+
+The owner requested a full principles/design-versus-implementation audit, then explicitly
+requested GitHub Issues, the report in the repository, and handoff. This delivery publishes
+that review only. No runtime, prompt, contract, configuration, model profile or deployment
+is changed, and no finding is fixed or qualification promoted by publishing it.
+
+Base: clean main/origin at `191083dc85ef8f9131eaadb2223660f58ad6f217`.
+Resume from the latest main commit containing this checkpoint and HANDOFF. The exact
+source citations in [Architecture Audit](ARCHITECTURE_AUDIT.md) remain pinned to the audited
+base. The previous August 28 report is preserved in Git history. The existing report now
+contains the Issue mapping, boundary-by-boundary evidence, acceptance criteria and replayable
+synthetic probes; README/index links identify its date and non-authoritative status.
+
+New Issues: [#49](https://github.com/TimeTreker/chromie/issues/49) resource arbitration;
+[#50](https://github.com/TimeTreker/chromie/issues/50) lossless Planner inputs;
+[#51](https://github.com/TimeTreker/chromie/issues/51) staged progress;
+[#52](https://github.com/TimeTreker/chromie/issues/52) cancellation scope;
+[#53](https://github.com/TimeTreker/chromie/issues/53) Reflection scheduling;
+[#54](https://github.com/TimeTreker/chromie/issues/54) Reflection context;
+[#55](https://github.com/TimeTreker/chromie/issues/55) evidence/capability documentation.
+#51/#52 are bounded repairs under #35. A07 qualification stays in existing #24/#32/#35;
+none is closed or duplicated by a new umbrella Issue.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Audit/report/Issue delivery only; identified defects remain open. | Audited base passed 2,480 tests/771 subtests,145 benchmarks,20 legacy tests and policy/static/config/docs gates. All four synthetic probes reproduce the reported gaps; published probe code was replayed unchanged. Publication rerun passed the same complete local gate; no source behavior changed. | No new model, service, voice, simulator or hardware proof. Existing profile and live-cohort failures remain. | Development only; no promotion. |
+
+The active delivery line remains current-revision evidence closure in #24/#32/#35.
+Recommended repair order within that line: #49 (reproduced resource enforcement blocker),
+#50 (required meaning before inference), #51/#52 (existing #35 contract conflicts),
+then #53/#54; fold #55 into the relevant documentation delivery. This is a reviewable
+work order, not authorization to weaken Charter principles or add unrelated features.
+Start the next selected Issue by reproducing its earliest wrong boundary. Preserve frozen
+failures; required principle/contract decisions precede their implementation. After repairs,
+repeat the affected ability/cohort gates, the complete fixed-revision live cohort and the
+supervised target-evidence closure. Do not infer physical proof from synthetic probes.
+
+Private audit root: `.chromie/acceptance/project-wide-audit-20260912/`.
+The published appendix is sufficient to rerun the four synthetic probes; older live/model
+artifacts remain private and require separate transfer. HANDOFF retains exact commands,
+publication checks and evidence limitations. Markdown 102 -> 102, docs-root Markdown
+58 -> 58, core reading path 15 -> 15; no new standing document or runtime switch.
+
+## Earlier delivery records
+
+The following entries describe preceding deliveries and their evidence. The current
+publication scope and next review boundary are above.
+
+## Prior delivery — remaining Issues, 2026-09-12
 
 The owner authorized project decisions, remaining-Issue implementation and qualification,
 normal commit/push, and closure of solved main-delivered Issues. Older approval/budget

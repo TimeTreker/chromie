@@ -235,7 +235,7 @@ mechanical-contract owner.
 - [Coding Agent Guidance](../AGENTS.md)
 - [Semantic Transaction Qualification Skill](../.agents/skills/qualify-chromie-semantic-transaction/SKILL.md): executable entrypoint for frozen-transaction qualification and evidenced owner repair
 - [Chromie Delivery Handoff Skill](../.agents/skills/chromie-delivery-handoff/SKILL.md): Git delivery workflow for keeping the checkpoint and handoff truthful
-- [Architecture Audit](../ARCHITECTURE_AUDIT.md): external point-in-time review, 2026-08-28; not a maintained authority
+- [Architecture Audit](../ARCHITECTURE_AUDIT.md): point-in-time principles/implementation audit, 2026-09-12, with Issue breakdown and reproducible probes; not a maintained authority
 
 ## Update rules
 
