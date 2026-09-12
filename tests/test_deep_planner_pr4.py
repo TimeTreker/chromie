@@ -860,6 +860,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
             }
         )
 
+        with self.assertRaisesRegex(ValueError, "Deep Planner capability catalog exceeds"):
+            planner_prompt.deep_plan_prompt(
+                run_request.model_copy(update={"context": context}), capabilities,
+                response_schema={}, expected_goal_ids=["goal-action"],
+            )
+        capabilities = [*capabilities[:2], capabilities[-1]]
+
         prompt = planner_prompt.deep_plan_prompt(
             run_request.model_copy(update={"context": context}),
             capabilities,
@@ -871,7 +878,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "Executable capability catalog JSON:\n",
             1,
         )[1].split("Verified tool-memory index JSON", 1)[0]
-        self.assertNotIn("soridormi.walk_forward", catalog_section)
+        self.assertIn("soridormi.walk_forward", catalog_section)
+        self.assertLess(catalog_section.index("rare.capability_0"), catalog_section.index("soridormi.walk_forward"))
         self.assertNotIn("args has unknown fields", prompt)
         self.assertIn(
             "Response text is audible language, never a stage direction",

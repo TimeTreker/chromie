@@ -785,18 +785,18 @@ def evidence_bound_dialogue(
             != "evidence_bound_tool_result_interpretation"
         ):
             continue
-        text = " ".join(str(item.get("text") or "").strip().split())
-        if not text:
+        text = str(item.get("text") or "")
+        if not text.strip():
             continue
         out.append(
             {
-                "text": text[:1200],
+                "text": text,
                 "source_goal_ids": [
                     normalized
                     for value in metadata.get("source_goal_ids") or []
                     if (normalized := " ".join(str(value or "").strip().split()))
-                ][:8],
-                "canonical_plan_id": str(metadata.get("canonical_plan_id") or "")[:200],
+                ],
+                "canonical_plan_id": str(metadata.get("canonical_plan_id") or ""),
                 "source": "evidence_bound_tool_result_interpretation",
             }
         )

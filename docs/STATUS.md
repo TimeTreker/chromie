@@ -1,19 +1,19 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-12
-**Current focus:** Issue #49 shared Runtime resource arbitration from the September 12
-audit. The local repair acquires complete declared resource sets across independent
-Plans/interactions and compiled provider groups. Waiters hold no execution capacity;
-compiled work still waiting for resources cannot call provider cancellation. Existing semantic authority,
-provider safety ownership and model profiles remain unchanged.
+**Current focus:** Issue #50 required Planner-input projection from the September 12
+audit. #49 is pushed to main and closed at `c1585e78`. Required Fast/Deep inputs now
+preserve all admitted fields or reject before inference at unchanged budgets. Streaming
+rejection occurs before presentation; canonical failures preserve full Goal scope and
+cannot invoke a semantic repair. Existing authority, Schemas and profiles are unchanged.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| #49 implemented for authorized main delivery; no deployment. | Original shared-resource probe: peak 2 -> 1, both requests complete. Focused: 232 tests/40 subtests; Level A: 22/22 distinct cases. Canonical: 2,490 tests/794 subtests, 145 benchmarks, 20 legacy tests; policy/static/config/docs and ownership pass. | In-process fixtures only; no model, service, voice, simulator or physical proof for this patch. Prior failed qualification stays failed. | Development only; #24/#32/#35 remain open. |
+| #50 implemented for authorized main delivery; #49 delivered/closed. | Focused: 762 tests/190 subtests. Level A: 27/27 distinct cases. Full frozen prompt capture/dataset validation: Fast 204/204, Deep 40/40, with identical prompts/Schemas and unchanged corpora. Canonical: 2,956 tests/794 subtests, 145 benchmarks, 20 legacy tests; policy/static/config/docs/ownership pass. | No candidate inference, deployment, service, voice, simulator or physical proof. Prior failed qualification stays failed. | Development only; #24/#32/#35 remain open. |
 
-Evidence: `.chromie/acceptance/issue49-resource-arbitration-20260912/`. Exact source,
-workflow, failures and resume commands belong to the checkpoint and handoff. #50–#55
-remain separate audit work; this repair does not qualify the unchanged model transactions.
+Evidence: `.chromie/acceptance/issue50-planner-inputs-20260912/`. Exact workflow,
+source identity, failures and commands belong to checkpoint/handoff. #51–#55 remain
+separate audit work; dataset validation does not qualify model behavior.
 
 ### Prior remaining-Issue delivery — 191083dc
 

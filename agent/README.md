@@ -21,6 +21,16 @@ provider behind the Capability boundary.
 
 GI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
 
+Required Planner projections preserve complete admitted Goals, bindings, Work,
+Evidence, source Plans, delivery context and capability applicability contracts.
+Existing per-section character budgets reject oversized required inputs before
+inference instead of omitting fields or entries. Streaming applies the same rule
+before any presentation commit. Budget rejection retains the full Goal scope,
+records zero model attempts, and cannot trigger semantic Deep delegation or
+partial execution. Optional Situation relevance and auxiliary decoration remain
+separate background projections; their omission cannot establish Goal truth.
+The existing provider preflight still checks the complete request's model budget.
+
 ## Authority boundary
 
 GI, GA, execution events and trusted Situation can trigger independent Planner tasks.

@@ -4,6 +4,34 @@ import json
 from typing import Any
 
 
+class RequiredPromptProjectionError(ValueError):
+    """A required input cannot fit; no candidate decision may be attempted."""
+
+    def __init__(self, *, label: str, chars: int, max_chars: int) -> None:
+        super().__init__(
+            f"{label} exceeds required prompt projection budget: "
+            f"chars={chars} max_chars={max_chars}"
+        )
+        self.label = label
+        self.chars = chars
+        self.max_chars = max_chars
+
+    def metadata(self) -> dict[str, Any]:
+        return {
+            "failure_class": "required_context_over_budget",
+            "failure_domain": "prompt_projection",
+            "architecture_attribution": "prompt_projection",
+            "retryable": False,
+            "execution_allowed": False,
+            "attempt_count": 0,
+            "error_type": type(self).__name__,
+            "error": str(self),
+            "projection_label": self.label,
+            "projection_chars": self.chars,
+            "projection_max_chars": self.max_chars,
+        }
+
+
 def _encode(value: Any) -> str:
     return json.dumps(
         value,
@@ -41,9 +69,8 @@ def required_json(value: Any, max_chars: int, *, label: str) -> str:
     max_chars = max(4, int(max_chars))
     text = _encode(value)
     if len(text) > max_chars:
-        raise ValueError(
-            f"{label} exceeds required prompt projection budget: "
-            f"chars={len(text)} max_chars={max_chars}"
+        raise RequiredPromptProjectionError(
+            label=label, chars=len(text), max_chars=max_chars
         )
     return text
 

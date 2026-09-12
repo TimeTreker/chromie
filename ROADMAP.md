@@ -41,9 +41,9 @@ exact failures in the checkpoint, without promoting a profile or widening featur
 ## Current execution order
 
 The September 12 [audit](ARCHITECTURE_AUDIT.md) adds reproduced blockers within the
-existing evidence-closure line. #49's shared resource enforcement is implemented
-locally, with verification and delivery state in Status/checkpoint. Continue with
-#50 required Planner inputs, #51/#52 staged progress and cancellation scope under
+existing evidence-closure line. #49's shared resource enforcement is delivered and
+closed; #50's complete-or-reject Planner projection is implemented, with verification
+and delivery state in Status/checkpoint. Continue with #51/#52 staged progress and cancellation scope under
 #35, then #53/#54 Reflection scheduling/context. Fold #55's remaining documentation
 drift into the relevant delivery. Contract-meaning changes still require the Charter's
 owner decision. After these repairs, resume the fixed-transaction and full live-cohort

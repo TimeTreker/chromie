@@ -148,9 +148,9 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Contain inference/validation failures without authorizing unvalidated Work. Reject oversized required context before inference with zero attempts, exact Goal scope and an empty non-executable Plan; preserve projection diagnostics. Issue #50 regression: tests/test_planner_prompt_module.py.",
       "review_status": "reviewed",
-      "body_sha256": "696f270a1462d73d07ff891ee3f8aa5bef877c20b1c4bcb635926d8cf9ac899d",
+      "body_sha256": "3e17670d13483e5e4cdfd2c9c1f16c54e46444627e7372c4177c251e460c9bcc",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -176,9 +176,9 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
+      "contract": "Contain inference/validation failures without authorizing unvalidated Work. Map required-context overflow to contract_failure with zero attempts and exact Goal scope; Host must not invoke Deep to repair missing input. Issue #50 regression: tests/test_planner_prompt_module.py; Host containment: tests/test_cognitive_runtime_pr7.py.",
       "review_status": "reviewed",
-      "body_sha256": "013944657324859f33a2a1a407bd55e513b04967d46b66b97c4694a99a8bb90c",
+      "body_sha256": "c2ecf913157812c921bd18d517db5894978b8d77175e3cd6babcf5a2f1b7116a",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -204,9 +204,9 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
-      "contract": "Map single-invocation streaming failures into a typed pre-commit or post-commit failure frame without authorizing Goal Work.",
+      "contract": "Map single-invocation streaming failures into typed pre-commit or post-commit frames without authorizing Goal Work. Required-context overflow returns before_commit, no presentation ID and no model invocation; preserve projection diagnostics. Issue #50 regression: tests/test_planner_prompt_module.py.",
       "review_status": "reviewed",
-      "body_sha256": "d2ac238d9194a77e19a4d5caa59c604218cb9850d5665bdca95a7a587ede46ba",
+      "body_sha256": "0d1eebcb265e7b88ed76ccef8641f08328a38d8dc3c90a4c0438f891c5c9d88e",
       "failure_signals": [
         "diagnostic",
         "state_update"

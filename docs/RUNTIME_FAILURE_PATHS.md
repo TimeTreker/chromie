@@ -57,6 +57,18 @@ bounded `ValueError` on malformed input. Agent model paths now require their
 configured Ollama client through an explicit `RuntimeError` instead of a
 production `assert`.
 
+Planner required-context overflow is a projection admission failure. The existing
+`required_json` boundary raises `RequiredPromptProjectionError` with the section,
+actual character count and unchanged budget; no required payload is shortened.
+Fast/Deep resolvers retain `required_context_over_budget` in the
+`prompt_projection` failure domain, `attempt_count=0`, `retryable=False` and
+`execution_allowed=False`. Canonical Fast uses the existing `contract_failure`
+containment, so Host does not invoke Deep to repair an incomplete input. Deep
+uses its empty rejected-Plan materializer; it authors no clarification speech.
+Streaming renders inside its guarded boundary and returns a typed `before_commit`
+failure. These failures do not claim a truncated model response: no model was
+called, and no partial Plan, Goal outcome or presentation is committed.
+
 ### evidence failure
 
 A corrupt Runtime Trace checkpoint is archived under `corrupt/` and emits a

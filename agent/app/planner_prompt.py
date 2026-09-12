@@ -170,7 +170,7 @@ def auxiliary_social_planning_prompt_section(context: dict[str, Any]) -> str:
 def trusted_target_evidence_prompt_section(context: dict[str, Any]) -> str:
     """Expose one already-owned target reference for primary targeted Work.
 
-    The same bounded context may also qualify optional decoration, but target
+    The same evidence may also qualify optional decoration, but target
     Evidence is not auxiliary-only. Planner may copy an exact trusted reference
     into a provider-declared target argument; it may never infer a direction or
     synthesize a target when this projection is unavailable.
@@ -182,7 +182,7 @@ def trusted_target_evidence_prompt_section(context: dict[str, Any]) -> str:
         return "No trusted semantic target evidence is available.\n"
     return (
         "Trusted semantic target evidence JSON:\n"
-        f"{bounded_json(target_evidence, 1400)}\n"
+        f"{required_json(target_evidence, 1400, label='Planner target Evidence')}\n"
         "This evidence may ground a primary targeted Capability only when its exact "
         "semantic target matches the owning Responsibility and the Capability declares "
         "the corresponding argument_realization. Copy the supplied target_ref exactly. "
@@ -375,24 +375,24 @@ def fast_plan_prompt(
     if len(goal_context.expected_goal_ids) > 1:
         return (
             f"{response_language_contract}\n\n"
-            f"Goal association advisory JSON:\n{bounded_json(association, 3000)}\n\n"
+            f"Goal association advisory JSON:\n{required_json(association, 3000, label='Fast Planner Goal association')}\n\n"
             f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
             f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
             f"Owner-approved Stable Mind worldview/values JSON:\n{stable_mind_json}\n\n"
             f"{skill_section}"
-            f"Executable common capability catalog JSON:\n{bounded_json(capabilities, 9000)}\n\n"
-            f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
-            f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{bounded_json(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
-            f"Host-bound terminal Evidence JSON:\n{bounded_json(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
-            f"Authoritative source Plan JSON for exact re-entry correlation:\n{bounded_json(context.get('canonical_plan_resolution') or {}, 5000)}\n\n"
-            f"Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning):\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
-            f"Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence):\n{bounded_json(context.get('planner_reentry_expectations') or [], 3600)}\n\n"
-            f"Host-bound Goal cancellation Evidence JSON:\n{bounded_json(context.get('trusted_goal_cancellation_evidence') or [], 3200)}\n\n"
-            f"Active and recoverable task bindings JSON:\n{bounded_json(context.get('active_task_snapshots') or [], 5000)}\n\n"
-            f"Existing retained or provisional Runtime Activities JSON:\n{bounded_json(provisional_fast_activities or [], 3500)}\n\n"
+            f"Executable common capability catalog JSON:\n{required_json(capabilities, 9000, label='Fast Planner capability catalog')}\n\n"
+            f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{required_json(context.get('verified_tool_memory_index') or [], 5000, label='Planner verified memory bindings')}\n\n"
+            f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{required_json(evidence_bound_dialogue(context, fallback_history=request.history), 3600, label='Fast Planner delivered Evidence dialogue')}\n\n"
+            f"Host-bound terminal Evidence JSON:\n{required_json(context.get('trusted_terminal_evidence') or [], 6000, label='Planner terminal Evidence')}\n\n"
+            f"Authoritative source Plan JSON for exact re-entry correlation:\n{required_json(context.get('canonical_plan_resolution') or {}, 5000, label='Planner source Plan')}\n\n"
+            f"Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning):\n{required_json(context.get('trusted_execution_outcome') or {}, 5000, label='Planner execution outcome')}\n\n"
+            f"Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence):\n{required_json(context.get('planner_reentry_expectations') or [], 3600, label='Planner step expectations')}\n\n"
+            f"Host-bound Goal cancellation Evidence JSON:\n{required_json(context.get('trusted_goal_cancellation_evidence') or [], 3200, label='Planner cancellation Evidence')}\n\n"
+            f"Active and recoverable task bindings JSON:\n{required_json(context.get('active_task_snapshots') or [], 5000, label='Planner task bindings')}\n\n"
+            f"Existing retained or provisional Runtime Activities JSON:\n{required_json(provisional_fast_activities or [], 3500, label='Fast Planner retained Work')}\n\n"
             f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{bounded_json(situation_prompt_projection(context), 3600)}\n\n"
             f"{goal_progress_communication_prompt('Planner fast pass')}\n\n"
-            f"Goal-scoped Interaction Context JSON:\n{bounded_json(context.get('interaction_context') or {}, 7000)}\n\n"
+            f"Goal-scoped Interaction Context JSON:\n{required_json(context.get('interaction_context') or {}, 7000, label='Planner Interaction Context')}\n\n"
             "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
             "Author one fresh complete model-authored plan object from the authoritative goals and catalog. Do not classify text with lexical rules and do not expect the host to choose a capability, arguments, ordering, ownership, response, disposition, coverage, or satisfaction for you. "
             "Every top-level field and every nested field in FastPlannerMultiGoalPlanOutput is required. Use exact catalog capability IDs and schema-valid args. The verified tool-memory index contains no answer facts. When an exact fresh index entry matches every authoritative Goal binding, execute chromie.memory.retrieve_verified_tool_result with that evidence_id, original tool_id, and the same material arguments; never use a respond outcome directly from the index. If no exact fresh entry exists, execute the supplied fresh read capability. For a scheduled, running, or recoverable safe-read goal, reuse the bound capability and exact arguments and execute or retry it; never answer from another task's result. For an executable Goal, response_text is optional prospective conversational intent, not execution evidence. Use Interaction Context to leave it empty when an equivalent acknowledgement or commitment is already delivered or pending and nothing new needs saying. When there is a genuinely new acknowledgement, limitation, correction, confirmation need, or other conversational delta, author it naturally without predicting an external result or claiming execution/completion. A response_text never satisfies the executable Goal; post-execution factual claims require matching evidence. "
@@ -416,31 +416,31 @@ def fast_plan_prompt(
             "Use plan_relation=exact unless the plan materially changes the request; safe_adjustment or alternative requires user_confirmation_required=true and explanatory response_text. "
             "The host adds only plan_id, planner_tier, schema_version, and the authoritative top-level goal_ids after validating your output. It does not compile semantic decisions or generate step ownership. This primary result must contain complete per-Goal coverage, exact response truth, step ownership, satisfaction, and unresolved-work decisions; no later model will audit or repair its semantics. Return JSON only.\n\n"
             f"{immutable_source_turn_prompt(request)}\n\n"
-            f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
-            f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
+            f"FINAL CANONICAL GOALS JSON:\n{required_json(grounding, 4500, label='Fast Planner canonical Goals')}\n\n"
+            f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{required_json(context.get('trusted_execution_outcome') or {}, 5000, label='Planner execution outcome')}\n\n"
             f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
-            f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}"
+            f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{required_json([item['capability_id'] for item in capabilities], 2500, label='Fast Planner capability IDs')}"
         )
     return (
         f"{response_language_contract}\n\n"
-        f"Goal association advisory JSON:\n{bounded_json(association, 3000)}\n\n"
+        f"Goal association advisory JSON:\n{required_json(association, 3000, label='Fast Planner Goal association')}\n\n"
         f"Owner-approved Chromie identity JSON:\n{identity_json}\n\n"
         f"Owner-approved Personality Expression JSON:\n{personality_json}\n\n"
         f"Owner-approved Stable Mind worldview/values JSON:\n{stable_mind_json}\n\n"
         f"{skill_section}"
-        f"Executable common capability catalog JSON:\n{bounded_json(capabilities, 9000)}\n\n"
-        f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 5000)}\n\n"
-        f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{bounded_json(evidence_bound_dialogue(context, fallback_history=request.history), 3600)}\n\n"
-        f"Host-bound terminal Evidence JSON:\n{bounded_json(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
-        f"Authoritative source Plan JSON for exact re-entry correlation:\n{bounded_json(context.get('canonical_plan_resolution') or {}, 5000)}\n\n"
-        f"Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning):\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
-        f"Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence):\n{bounded_json(context.get('planner_reentry_expectations') or [], 3600)}\n\n"
-        f"Host-bound Goal cancellation Evidence JSON:\n{bounded_json(context.get('trusted_goal_cancellation_evidence') or [], 3200)}\n\n"
-        f"Active and recoverable task bindings JSON:\n{bounded_json(context.get('active_task_snapshots') or [], 5000)}\n\n"
-        f"Existing retained or provisional Runtime Activities JSON:\n{bounded_json(provisional_fast_activities or [], 3500)}\n\n"
+        f"Executable common capability catalog JSON:\n{required_json(capabilities, 9000, label='Fast Planner capability catalog')}\n\n"
+        f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{required_json(context.get('verified_tool_memory_index') or [], 5000, label='Planner verified memory bindings')}\n\n"
+        f"Delivered evidence-bound dialogue JSON (trusted spoken projection, not the full provider result):\n{required_json(evidence_bound_dialogue(context, fallback_history=request.history), 3600, label='Fast Planner delivered Evidence dialogue')}\n\n"
+        f"Host-bound terminal Evidence JSON:\n{required_json(context.get('trusted_terminal_evidence') or [], 6000, label='Planner terminal Evidence')}\n\n"
+        f"Authoritative source Plan JSON for exact re-entry correlation:\n{required_json(context.get('canonical_plan_resolution') or {}, 5000, label='Planner source Plan')}\n\n"
+        f"Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning):\n{required_json(context.get('trusted_execution_outcome') or {}, 5000, label='Planner execution outcome')}\n\n"
+        f"Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence):\n{required_json(context.get('planner_reentry_expectations') or [], 3600, label='Planner step expectations')}\n\n"
+        f"Host-bound Goal cancellation Evidence JSON:\n{required_json(context.get('trusted_goal_cancellation_evidence') or [], 3200, label='Planner cancellation Evidence')}\n\n"
+        f"Active and recoverable task bindings JSON:\n{required_json(context.get('active_task_snapshots') or [], 5000, label='Planner task bindings')}\n\n"
+        f"Existing retained or provisional Runtime Activities JSON:\n{required_json(provisional_fast_activities or [], 3500, label='Fast Planner retained Work')}\n\n"
         f"Bounded live Situation projection JSON (soft/revisable relevance only; referenced owners remain authoritative):\n{bounded_json(situation_prompt_projection(context), 3600)}\n\n"
         f"{goal_progress_communication_prompt('Planner fast pass')}\n\n"
-        f"Goal-scoped Interaction Context JSON:\n{bounded_json(context.get('interaction_context') or {}, 7000)}\n\n"
+        f"Goal-scoped Interaction Context JSON:\n{required_json(context.get('interaction_context') or {}, 7000, label='Planner Interaction Context')}\n\n"
         "Use Interaction Context to plan only the still-needed conversational and effectful delta. Preserve each typed event's owner and state: generated or scheduled speech is not proof the user heard it, committed work is not completion, and only execution_closure terminal events reference trusted Activity completion evidence. Do not treat missing or undelivered speech as fulfilled communication. Decide whether any new planner response_text materially helps the current human interaction, and prefer no extra speech when it would be filler or repetition. Do not repeat an already delivered or pending semantic act, or re-plan an already completed effect, unless the current meaning requires an explicit repeat, retry after failure, correction, changed state, new evidence, or clarification. It cannot override the authoritative current Goals or Canonical Plan contract. "
         "Author one fresh complete object from the authoritative turn, goals, and catalog. Do not patch, quote, splice, annotate, or embed JSON fragments inside rationale or response strings. "
         "Decide whether the executable common catalog completely covers every independent responsibility in the current user turn. A verified tool-memory index entry is only metadata that an exact prior result may be retrievable; it is never answer evidence. After Goal Association has fixed all material bindings, select chromie.memory.retrieve_verified_tool_result only when one index entry exactly matches the required tool_id and material arguments and is fresh enough for the user request. Otherwise select the fresh read capability. A status follow-up for a scheduled, running, or recoverable safe read must resume or retry the bound skill with its exact arguments when no matching completed memory entry exists. Never invent any external, private, or runtime result from model memory or index metadata. "
@@ -472,9 +472,9 @@ def fast_plan_prompt(
         "The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. "
         "This primary result must contain complete per-Goal coverage, exact response truth, step ownership, satisfaction, and unresolved-work decisions; no later model will audit or repair its semantics. Return JSON only. The final grounding below is authoritative and overrides previous output or advisory text.\n\n"
         f"{immutable_source_turn_prompt(request)}\n\n"
-        f"FINAL CANONICAL GOALS JSON:\n{bounded_json(grounding, 4500)}\n\n"
-        f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
-        f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 2500)}\n\n"
+        f"FINAL CANONICAL GOALS JSON:\n{required_json(grounding, 4500, label='Fast Planner canonical Goals')}\n\n"
+        f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{required_json(context.get('trusted_execution_outcome') or {}, 5000, label='Planner execution outcome')}\n\n"
+        f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{required_json([item['capability_id'] for item in capabilities], 2500, label='Fast Planner capability IDs')}\n\n"
         f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n"
         f"FINAL CONTROL-EVIDENCE WORDING CONTRACT:\n{control_evidence_contract or 'not_applicable'}"
     )
@@ -508,9 +508,10 @@ def fast_advance_layered_prompt(
         16000,
         label="Fast Planner Goal continuity",
     )
-    interaction_context = bounded_json(
+    interaction_context = required_json(
         context.get("interaction_context") or {},
         1200,
+        label="Fast streaming Planner Interaction Context",
     )
     capability_json = json.dumps(
         fast_advance_streaming_capability_prompt_projection(capabilities),
@@ -843,7 +844,7 @@ def fast_advance_streaming_capability_prompt_projection(
 def fast_advance_capability_prompt_projection(
     capabilities: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Keep every bounded catalog choice visible without slicing JSON mid-item."""
+    """Keep every admitted catalog choice and applicability constraint exact."""
 
     projected: list[dict[str, Any]] = []
     for capability in capabilities:
@@ -870,13 +871,13 @@ def fast_advance_capability_prompt_projection(
             ):
                 if key in raw_schema:
                     value = raw_schema[key]
-                    argument[key] = value[:12] if isinstance(value, list) else value
+                    argument[key] = value
             arguments.append(argument)
 
         hints = capability.get("hints") or {}
         semantic_scope = hints.get("semantic_scope") or {}
-        bounded_scope = {
-            key: value[:12] if isinstance(value, list) else value
+        projected_scope = {
+            key: value
             for key in (
                 "responsibility_type",
                 "resource_kinds",
@@ -889,15 +890,9 @@ def fast_advance_capability_prompt_projection(
             if (value := semantic_scope.get(key)) not in (None, "", [])
         }
         realization_contract = hints.get("argument_realization") or {}
-        bounded_realization_contract = {
+        projected_realization_contract = {
             str(name): {
-                key: (
-                    value[:12]
-                    if isinstance(value, list)
-                    else str(value)[:900]
-                    if key == "contract"
-                    else value
-                )
+                key: value
                 for key, value in dict(contract).items()
                 if key
                 in {
@@ -912,8 +907,8 @@ def fast_advance_capability_prompt_projection(
             if isinstance(contract, dict)
         }
         resource_contract = hints.get("resource_contract") or {}
-        bounded_resource_contract = {
-            key: value[:12] if isinstance(value, list) else value
+        projected_resource_contract = {
+            key: value
             for key in (
                 "provider_role",
                 "plan_requires",
@@ -925,21 +920,21 @@ def fast_advance_capability_prompt_projection(
         projected.append(
             {
                 "capability_id": str(capability.get("capability_id") or ""),
-                "description": str(capability.get("description") or "")[:360],
+                "description": str(capability.get("description") or ""),
                 "args_schema": arguments,
                 "requires_confirmation": bool(capability.get("requires_confirmation")),
                 "can_run_parallel": bool(capability.get("can_run_parallel")),
                 "parallel_metadata_declared": bool(capability.get("parallel_metadata_declared")),
-                "resource_claims": list(capability.get("resource_claims") or [])[:12],
-                "effects": list(capability.get("effects") or [])[:12],
+                "resource_claims": list(capability.get("resource_claims") or []),
+                "effects": list(capability.get("effects") or []),
                 "safety_class": str(capability.get("safety_class") or ""),
                 "side_effect_free": bool(capability.get("side_effect_free")),
-                "when_to_use": str(hints.get("when_to_use") or "")[:360],
-                "when_not_to_use": str(hints.get("when_not_to_use") or "")[:360],
+                "when_to_use": str(hints.get("when_to_use") or ""),
+                "when_not_to_use": str(hints.get("when_not_to_use") or ""),
                 "semantic_type": str(hints.get("semantic_type") or ""),
-                "semantic_scope": bounded_scope,
-                "argument_realization": bounded_realization_contract,
-                "resource_contract": bounded_resource_contract,
+                "semantic_scope": projected_scope,
+                "argument_realization": projected_realization_contract,
+                "resource_contract": projected_resource_contract,
             }
         )
     return projected
@@ -987,7 +982,7 @@ def fast_layered_prompt(
         + trusted_target_evidence_prompt_section(context)
         + auxiliary_social_planning_prompt_section(context)
         + "Executable common capability catalog JSON:\n"
-        + bounded_json(capabilities, 9000)
+        + required_json(capabilities, 9000, label='Fast Planner capability catalog')
         + "\n\n"
     )
     rendered = role_memory_context(context, role="planner") + fast_plan_prompt(
@@ -1117,8 +1112,8 @@ def deep_plan_prompt(
         )
     )
     return (
-        f"Goal association advisory JSON:\n{bounded_json(association, 3200)}\n\n"
-        f"Active goals JSON:\n{bounded_json(goals, 3200)}\n\n"
+        f"Goal association advisory JSON:\n{required_json(association, 3200, label='Deep Planner Goal association')}\n\n"
+        f"Active goals JSON:\n{required_json(goals, 3200, label='Deep Planner active Goals')}\n\n"
         f"Recent prior dialogue JSON:\n{required_json(recent_dialogue_prompt_projection(request.history), 6000, label='Deep Planner prior dialogue')}\n\n"
         "These are at most six retained prior records with exact text and speaker roles. "
         "Preserve their source and delivery metadata: an authored response is not proof "
@@ -1133,20 +1128,20 @@ def deep_plan_prompt(
         f"Owner-approved Stable Mind worldview/values JSON:\n{stable_mind_json}\n\n"
         f"{skill_section}"
         + (
-            f"Executable capability catalog JSON:\n{bounded_json(prompt_capabilities, 12000)}\n\n"
+            f"Executable capability catalog JSON:\n{required_json(prompt_capabilities, 12000, label='Deep Planner capability catalog')}\n\n"
             if include_capability_catalog
             else ""
         )
-        + f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{bounded_json(context.get('verified_tool_memory_index') or [], 6000)}\n\n"
-        f"Host-bound terminal Evidence JSON:\n{bounded_json(context.get('trusted_terminal_evidence') or [], 6000)}\n\n"
-        f"Authoritative source Plan JSON for exact re-entry correlation:\n{bounded_json(context.get('canonical_plan_resolution') or {}, 5000)}\n\n"
-        f"Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning):\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
-        f"Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence):\n{bounded_json(context.get('planner_reentry_expectations') or [], 3600)}\n\n"
-        f"Host-bound Goal cancellation Evidence JSON:\n{bounded_json(context.get('trusted_goal_cancellation_evidence') or [], 3200)}\n\n"
-        f"Active and recoverable task bindings JSON:\n{bounded_json(context.get('active_task_snapshots') or [], 6000)}\n\n"
-        f"Existing retained or provisional Runtime Activities JSON:\n{bounded_json(context.get('existing_work_activities') or [], 4000)}\n\n"
+        + f"Verified tool-memory index JSON (provenance and bound arguments only; no result contents):\n{required_json(context.get('verified_tool_memory_index') or [], 6000, label='Planner verified memory bindings')}\n\n"
+        f"Host-bound terminal Evidence JSON:\n{required_json(context.get('trusted_terminal_evidence') or [], 6000, label='Planner terminal Evidence')}\n\n"
+        f"Authoritative source Plan JSON for exact re-entry correlation:\n{required_json(context.get('canonical_plan_resolution') or {}, 5000, label='Planner source Plan')}\n\n"
+        f"Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning):\n{required_json(context.get('trusted_execution_outcome') or {}, 5000, label='Planner execution outcome')}\n\n"
+        f"Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence):\n{required_json(context.get('planner_reentry_expectations') or [], 3600, label='Planner step expectations')}\n\n"
+        f"Host-bound Goal cancellation Evidence JSON:\n{required_json(context.get('trusted_goal_cancellation_evidence') or [], 3200, label='Planner cancellation Evidence')}\n\n"
+        f"Active and recoverable task bindings JSON:\n{required_json(context.get('active_task_snapshots') or [], 6000, label='Planner task bindings')}\n\n"
+        f"Existing retained or provisional Runtime Activities JSON:\n{required_json(context.get('existing_work_activities') or [], 4000, label='Planner retained Work')}\n\n"
         f"{goal_progress_communication_prompt('Planner deep pass')}\n\n"
-        f"Goal-scoped Interaction Context JSON:\n{bounded_json(context.get('interaction_context') or {}, 8000)}\n\n"
+        f"Goal-scoped Interaction Context JSON:\n{required_json(context.get('interaction_context') or {}, 8000, label='Planner Interaction Context')}\n\n"
         "Use Interaction Context to reason from what Chromie actually delivered, what trusted evidence says completed or failed, what remains pending, and what is new; produce only the still-needed conversational and effectful delta. Preserve owner and event_type evidence strength: generated or scheduled speech is not proof the user heard it, a proposal or committed request is not completion, and execution completion must retain execution_closure evidence references. Missing or undelivered communication may still leave a meaningful conversational delta; decide that from the current Goal and Interaction Context rather than from an earlier stage's private preference. Add response_text only when it materially improves the current interaction; avoid filler and repetition. Repeat an act only when the current meaning justifies it, such as an explicit repeat, retry, correction, changed state, new evidence, or clarification. The current canonical Goals and validation feedback remain authoritative. "
         f"{result_evidence_contract}"
         "The active task bindings are historical Host/runtime context. Their "
@@ -1208,15 +1203,15 @@ def deep_plan_prompt(
         "The Ollama decoder enforces the exact flat DeepPlannerModelOutput JSON Schema supplied out-of-band. The host adds plan identity, planner tier, and the authoritative top-level canonical goal IDs; do not emit those envelope fields. Populate only fields allowed by the model schema and return JSON only. "
         "The following final grounding block is authoritative and must override unrelated content in previous model output or advisory context.\n\n"
         f"{immutable_source_turn_prompt(request)}\n\n"
-        f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{bounded_json(grounding, 5000)}\n\n"
-        f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{bounded_json(context.get('trusted_execution_outcome') or {}, 5000)}\n\n"
+        f"FINAL CANONICAL GOALS JSON (copy goal IDs exactly and satisfy these meanings only):\n{required_json(grounding, 5000, label='Deep Planner canonical Goals')}\n\n"
+        f"FINAL TRUSTED EXECUTION OUTCOME JSON:\n{required_json(context.get('trusted_execution_outcome') or {}, 5000, label='Planner execution outcome')}\n\n"
         f"FINAL RESULT-EVIDENCE WORDING CONTRACT:\n{result_evidence_contract or 'not_applicable'}\n\n"
         "FINAL PROVIDER-REQUIRED VOCAL GOALS WITH NO EXACT AVAILABLE "
         "VOCAL PROVIDER JSON (each must have a zero-step unavailable/refused "
         "outcome and truthful limitation wording; never promise, attempt, "
         "approximate, or substitute any vocal effect):\n"
-        f"{bounded_json(unavailable_provider_vocal_goal_ids, 2000)}\n\n"
-        f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{bounded_json([item['capability_id'] for item in capabilities], 4000)}"
+        f"{required_json(unavailable_provider_vocal_goal_ids, 2000, label='Deep Planner unavailable Goal IDs')}\n\n"
+        f"FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n{required_json([item['capability_id'] for item in capabilities], 4000, label='Deep Planner capability IDs')}"
     )
 
 
@@ -1243,7 +1238,7 @@ def deep_layered_prompt(
         + trusted_target_evidence_prompt_section(context)
         + auxiliary_social_planning_prompt_section(context)
         + "Executable capability catalog JSON:\n"
-        + bounded_json(prompt_capabilities, 12000)
+        + required_json(prompt_capabilities, 12000, label='Deep Planner capability catalog')
         + "\n\n"
     )
     rendered = role_memory_context(context, role="planner") + deep_plan_prompt(
@@ -1304,12 +1299,12 @@ def prompt_capability_contract(
         resource_contract = hints.get("resource_contract")
         if resource_contract:
             projected["resource_contract"] = resource_contract
-        when_to_use = str(hints.get("when_to_use") or "").strip()
+        when_to_use = str(hints.get("when_to_use") or "")
         if when_to_use and when_to_use != str(capability.get("description") or "").strip():
-            projected["when_to_use"] = when_to_use[:600]
-        when_not_to_use = str(hints.get("when_not_to_use") or "").strip()
+            projected["when_to_use"] = when_to_use
+        when_not_to_use = str(hints.get("when_not_to_use") or "")
         if when_not_to_use:
-            projected["when_not_to_use"] = when_not_to_use[:600]
+            projected["when_not_to_use"] = when_not_to_use
     constraints = capability.get("execution_constraints")
     if isinstance(constraints, dict):
         retained_constraints = {

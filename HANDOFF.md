@@ -1,6 +1,144 @@
 # Chromie Latest Handoff
 
-## Issue #49 resource-arbitration delivery, 2026-09-12
+## Issue #50 required-input delivery, 2026-09-12
+
+The owner requests commit/push and closure of each finished Issue after verified
+remote delivery. #49 is delivered and CLOSED at origin/main commit
+`c1585e78dc011aa81f9a3cc88f43126a839c3cc4`; this was the clean #50 base.
+Repository `/home/chromie/github/chromie`, branch `main`, Python
+`/home/chromie/miniconda3/bin/python`. Resume from the latest main commit containing
+both handoff owners. Verify the actual remote hash before closing #50. Earlier
+sections below retain historical authorization, evidence and commands.
+
+Evidence root R: `.chromie/acceptance/issue50-planner-inputs-20260912/`.
+R is ignored and needs separate transfer. The source regression is retained in
+`tests/test_planner_prompt_module.py`, the prior Deep catalog test is corrected in
+`tests/test_deep_planner_pr4.py`, and the originating probe is reproducible from the
+tracked architecture audit appendix. No standing document, environment variable,
+Runtime switch, module, compatibility path or semantic authority was added.
+Before/after counts for those new surfaces are unchanged. The typed exception and
+its diagnostic live in the existing projection owner; no separate budget manager.
+
+### Actual episode, authority and repaired workflow
+
+Mode: repair a reproduced context-projection invariant. Planner owns complete HOW
+and communicative content for the admitted WHAT; it cannot select a smaller Goal
+scope, re-author upstream meaning, authorize execution, or infer missing Evidence.
+The source defect is input loss, not an observed model reasoning or spoken failure.
+
+The original audit supplies eight typed retained speech Goals and eight continuation
+associations, asking to continue those requests. Each Goal contains distinct material
+qualifiers. `audit-request.json` retains the unchanged episode. Exact source turn,
+Goal IDs, object bindings, constraints and success criteria are input authority.
+
+| Ordered boundary / owner | Material input and baseline actual output | Expected/current output, handoff and verdict |
+| --- | --- | --- |
+| SemanticGoal + Goal Association | Eight valid retained Goals; eight continuation associations. | Correct unchanged WHAT/continuity authority; correlated by original turn and Goal IDs. |
+| planner_goal_context | Eight expected IDs and eight complete projected meanings. | Correct unchanged context scope; dynamic output Schema and Host still require these same IDs. |
+| planner_prompt -> bounded_json | Final canonical arrays silently retain only three Goals; five unique meaning markers disappear from both entire prompts. | Earliest wrong boundary repaired. Required serialization preserves a complete section or raises before a candidate call. Original Fast canonical block is 10,609 chars vs 4,500 limit; Deep first rejects active Goals at 12,161 vs 3,200. No budget or scope is raised/reduced. |
+| Catalog / delivered-Evidence projection | Inner slices can lose a late applicability rule, thirteenth resource/state item, final spoken qualifier, ninth Goal ID or long source Plan ID even before outer serialization. | Those admitted fields retain exact values. Required outer sections reject overflow; optional history-window selection remains at its existing owner. Regression checks actual decoded values/tails. |
+| Fast/Deep canonical resolver -> model | Original source allowed model invocation with incomplete required fields; originating audit itself did not invoke inference. | Production capture records zero calls for the oversized episode. Both fallback envelopes retain all eight IDs and uncertain coverage with empty speech, steps and outcomes. Metadata carries the projection section/count/limit and attempt_count=0. |
+| Streaming Fast -> presentation | Interaction Context was optionally truncated; existing required continuity rendering occurred outside the guarded stream boundary. | Full interaction/continuity rendering is guarded before generate_stream. Overflow returns one typed before_commit failure, with no presentation ID, commit or model call. |
+| Host / downstream containment | A generic ValueError would be classified as semantic escalation, incorrectly inviting Deep to interpret missing context. | Typed projection failure uses existing Fast contract_failure containment, which Host rejects without Deep. Deep uses existing silent non-executable rejected-Plan containment. Execution permissions and per-Goal truth do not change. |
+| Raw model -> Schema -> DTO/Host -> Runtime | No raw candidate, parser, normalizer or execution was exercised by the original probe. | Oversized inputs never reach these stages. Separate complete frozen capture checks existing prompt/Schema/input paths; no candidate-model correctness or live behavior is claimed. |
+
+```text
+admitted WHAT / exact re-entry scope -> shared Goal context -> full dynamic Schema
+                                        -> required prompt serialization
+within each limit -> layered primary request -> one model -> Schema/DTO/Host
+above any limit  -> typed projection failure (zero attempts)
+                   -> Fast contract_failure: stop before Deep
+                   -> Deep empty rejected Plan: no execution or invented speech
+streaming overflow -> before_commit failure: no early presentation or terminal result
+```
+
+Root cause: an optional-background truncator was reused for authoritative transaction
+inputs. Producing valid JSON did not preserve semantic completeness. Output Schema
+cardinality remained full, so downstream validation could not repair missing upstream
+meaning. Required serialization plus typed pre-inference containment repairs that
+boundary without another model call, phrase rules, scope reselection or an increased
+character cap. The original immutable source turn and model instructions are unchanged.
+Within/at/over-budget English/Chinese cases cover one/multiple Goals, both canonical
+branches, both layered depths, required re-entry fields, exact resource/applicability
+contracts, streaming continuity/delivery and rejection without partial completion.
+
+### Observed evidence and limits
+
+- `focused-red.log`: 90 failed, 155 passed, two temporary uninvoked-variant skips;
+  confirms omission and unintended model invocation before the source repair.
+- `focused-initial.log`: five failures after the first patch. Four new within-budget
+  fixtures actually exceeded Deep's independent active-Goal limit; their fixtures
+  now omit only absent/default DTO fields while preserving the eight meanings.
+  The fifth existing test explicitly expected the final capability to disappear
+  from a 31,312-character catalog. It now asserts rejection and complete original
+  ordering for an accepted smaller catalog, without Fast-feedback prioritization.
+- `focused-second.log`: six test-call keyword errors were corrected; one exact-value
+  assertion caught trailing-whitespace loss in applicability prose, now preserved.
+  No semantic oracle or frozen scenario was changed. Unsupported stream/Evidence
+  cross-product cells were removed instead of counted as skipped proof.
+- `focused-final.log`: 762 tests/190 subtests passed, covering prompt, resolver,
+  context, existing Host failure containment and Planner layer suites.
+- `baseline/` and `after/`: complete production request capture plus input DTO,
+  dataset coverage/provenance and dynamic Schema validation for Fast 204 and Deep 40. `corpus-comparison.json` proves
+  identical corpus digests, every rendered prompt and every dynamic Schema.
+  All 244 captures and dataset checks pass; no candidate inference or output
+  DTO/Host replay was run. Validation functions inspect scenario authority and
+  captured packets; they do not submit reference answers. Initial local reporting
+  called this reference replay; the retained summaries/helper now explicitly
+  correct that scope without changing packets, scenarios or measured results.
+  The initial baseline reporter expected a Deep runtime_variant field absent from
+  the capture packet; all 40 packets had been captured correctly. Its original
+  summary is retained as `summary-reporting-error.json`; corrected rows use the
+  original scenario field and retained packets, without rerunning or editing them.
+- `audit-result.json` / `.log`: unchanged original episode now rejects with zero calls,
+  full fallback scope and no execution; exact diagnostic measurements above.
+- `level-a/`, `level-a.log`: 27/27 distinct deterministic cases. Classes:
+  multi_goal_daily_life 10/10, stable_capability_grounding 7/7,
+  human_like_cognitive_continuity 4/4, composable_action_planning 5/5,
+  truthful_embodied_speech 6/6, workdag_multi_goal_revision_integrity 4/4;
+  class membership overlaps. Evidence ceiling is Level A.
+- `source-freeze.json` and `source.patch` bind the seven changed Python source/test
+  files to the base. `handler-review.json` binds the existing exception inventory:
+  131 -> 131 handlers, three updated reviews, zero new policy exceptions. The first
+  canonical run (`canonical-initial.log`) stopped at those three changed fingerprints;
+  each was re-audited for typed zero-attempt containment before updating its record.
+- `canonical.log`: 2,956 tests/794 subtests, 145 benchmarks and 20 legacy Agent tests
+  passed; all 15 policy families, ownership, pinned Ruff/Mypy, configuration,
+  structure and docs passed. Two existing FastAPI startup deprecation warnings remain.
+  Final documentation-only ledger edits receive separate docs/policy/ownership checks.
+- `projection-scenarios/`: 432 individually retained synthetic boundary input files
+  matching the tracked nine-field x four-variant x two-language x three-budget x
+  two-Goal-count regression matrix. `projection-scenarios.json` records its digest
+  and training_eligible=false; these are source transport fixtures, not model trials.
+
+No deployment or live target run is required to prove this pre-inference source
+boundary; none was performed. It is intentionally conservative: previously truncated
+oversized requests now fail explicitly, including catalogs and retained Evidence.
+Input-budget tuning or formally narrower transactions would be separate work with
+complete authority/evidence. Prior Deep candidate 35/40 hard passes and failing
+GI/native/live qualification remain failed and are not replaced by dataset validation.
+#24/#32/#35 and development-only release status remain open.
+
+### Replay and next steps
+
+```bash
+python -m pytest -q tests/test_planner_prompt_module.py tests/test_prompt_projection.py tests/test_fast_planner_pr3.py tests/test_deep_planner_pr4.py tests/test_cognition_prompt_projection.py tests/test_cognitive_runtime_pr7.py tests/test_planner_internal_layers.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class multi_goal_daily_life --ability-class stable_capability_grounding --ability-class human_like_cognitive_continuity --ability-class composable_action_planning --ability-class truthful_embodied_speech --ability-class workdag_multi_goal_revision_integrity --evidence-dir .chromie/acceptance/issue50-planner-inputs-20260912/replay-level-a
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+```
+
+For retained packet comparison, use R/cohort_projection.py with a fresh output label;
+do not overwrite the baseline/after folders. The helper uses the tracked qualification
+harnesses and frozen cases, captures calls and validates dataset inputs/Schemas without invoking a
+model or replaying candidate output. R/audit_projection.py replays the originating request through both resolvers.
+Verify normal remote main delivery, then close #50. Next is #51's read-first/staged
+progress conflict under #35; inspect and obtain the required owner contract decision
+before changing semantic meaning. #52 cancellation scope and #53–#55 remain separate.
+
+## Prior Issue #49 resource-arbitration delivery, 2026-09-12
 
 The owner authorized #49 and now instructs commit/push and closure of each completed
 Issue after remote-main verification, followed by #50 development.

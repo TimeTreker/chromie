@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
     from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
     from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-from .prompt_projection import bounded_json
+from .prompt_projection import RequiredPromptProjectionError, bounded_json
 from .planner_model_contract import (
     PlannerDTOContractError,
     ResourceResponsibilityCapabilityUnavailableError,
@@ -336,11 +336,16 @@ class DeepPlannerResolver:
                 authoritative_goals=authoritative_goals,
             )
         except Exception as exc:
-            failure = llm_failure_metadata(exc)
+            failure = (
+                exc.metadata()
+                if isinstance(exc, RequiredPromptProjectionError)
+                else llm_failure_metadata(exc)
+            )
             logger.warning(
-                "deep_planner_inference_failed sid=%s attempt=1 error_type=%s error=%s "
+                "deep_planner_inference_failed sid=%s attempt=%s error_type=%s error=%s "
                 "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
                 request.sid,
+                failure.get("attempt_count", 1),
                 type(exc).__name__,
                 exc,
                 failure["failure_class"],
@@ -348,6 +353,14 @@ class DeepPlannerResolver:
                 failure["architecture_attribution"],
                 failure["retryable"],
             )
+            if isinstance(exc, RequiredPromptProjectionError):
+                return materialize_deep_clarify(
+                    plan_id,
+                    request,
+                    "deep_planner_required_context_over_budget",
+                    attempts=0,
+                    metadata=failure,
+                )
             if isinstance(exc, ResourceResponsibilityCapabilityUnavailableError):
                 return materialize_deep_unavailable(
                     plan_id,

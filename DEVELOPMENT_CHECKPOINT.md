@@ -1,6 +1,45 @@
 # Development Checkpoint
 
-## Current delivery — Issue #49 resource arbitration, 2026-09-12
+## Current delivery — Issue #50 required Planner inputs, 2026-09-12
+
+The owner authorized committing/pushing each completed Issue and closing it after
+remote verification. #49 was delivered as `c1585e78dc011aa81f9a3cc88f43126a839c3cc4`,
+verified on origin/main and closed. That clean revision is the base for #50.
+Resume from the latest main commit containing this checkpoint/HANDOFF pair; do not
+predict its hash. #50 closes only after its actual remote delivery is verified.
+
+Required Fast/Deep prompt sections now preserve complete admitted Goal, binding,
+retained Work, Evidence, source Plan, execution truth, delivery and capability data
+or reject at their existing character limits. Inner clipping of delivered Evidence
+qualifiers/correlation and capability applicability/resource lists is removed.
+A typed projection failure records zero model attempts and no execution permission.
+Canonical Fast takes existing contract-failure containment without invoking Deep;
+Deep returns an empty rejected Plan; streaming returns a before-commit failure.
+No semantic authority, scope, output Schema, model/profile, budget or API changes.
+
+Evidence: `.chromie/acceptance/issue50-planner-inputs-20260912/` (ignored; transfer
+separately). The unchanged audit episode previously supplied eight Goals but exposed
+only three meanings. Both production resolvers now reject it before inference,
+retain all eight Goal IDs, and produce no speech, steps or completion outcomes.
+Focused: 762 tests/190 subtests passed. Relevant Level A: 27/27 distinct cases.
+Complete frozen prompt capture/dataset validation: Fast 204/204 and Deep 40/40; corpus,
+rendered prompts and dynamic Schemas are byte-identical before/after for every case.
+This proves projection, input DTO/provenance and dynamic Schema validity; it is
+not candidate inference or output DTO/Host replay.
+Current-source canonical passed 2,956 tests/794 subtests, 145 benchmarks and
+20 legacy Agent tests; policy/static/config/docs/ownership pass. Two existing FastAPI
+warnings remain. The first policy run required review of the three changed handlers;
+the existing records were updated with no new exception or handler. Source identity
+is retained in source-freeze.json; final documentation-only edits are checked separately.
+
+No service rebuild, deployment, live model, microphone/speaker, simulator or robot
+proof ran. #24/#32/#35 remain open with their existing failed qualification;
+read-first progress and cancellation issues remain #51/#52. Release readiness stays
+development-only. Next: verify #50 delivery/closure, then #51's staged-progress
+contract conflict under #35, preserving the owner decision boundary before changing
+semantic contract meaning. #53–#55 remain independently scoped audit work.
+
+## Prior delivery — Issue #49 resource arbitration, 2026-09-12
 
 The owner authorized #49 implementation, then instructed that each completed Issue
 be committed, pushed and closed after verified delivery. Continue next with #50.

@@ -14,7 +14,7 @@ from .clients.ollama_client import (
     OllamaGenerationError,
     llm_failure_metadata,
 )
-from .prompt_projection import bounded_json
+from .prompt_projection import RequiredPromptProjectionError, bounded_json
 from .planner_model_contract import (
     PlannerDTOContractError,
     ResourceResponsibilityCapabilityUnavailableError,
@@ -383,12 +383,6 @@ class FastPlannerResolver:
                 "type": "array",
                 "maxItems": 0,
             }
-        prompt = fast_advance_layered_prompt(
-            request,
-            responsibilities=responsibilities,
-            capabilities=capability_payload,
-            response_schema=response_schema,
-        )
         options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -396,6 +390,12 @@ class FastPlannerResolver:
             "num_predict": min(self.num_predict, 2048),
         }
         try:
+            prompt = fast_advance_layered_prompt(
+                request,
+                responsibilities=responsibilities,
+                capabilities=capability_payload,
+                response_schema=response_schema,
+            )
             async with aclosing(self.ollama.generate_stream(
                 prompt,
                 system=fast_streaming_advance_system_prompt(),
@@ -559,7 +559,9 @@ class FastPlannerResolver:
             )
         except Exception as exc:
             failure = (
-                llm_failure_metadata(exc)
+                exc.metadata()
+                if isinstance(exc, RequiredPromptProjectionError)
+                else llm_failure_metadata(exc)
                 if isinstance(exc, OllamaGenerationError)
                 else {
                     "failure_class": "fast_stream_contract_invalid",
@@ -905,12 +907,16 @@ class FastPlannerResolver:
                     },
                 )
         except Exception as exc:
-                failure = llm_failure_metadata(exc)
+                failure = (
+                    exc.metadata()
+                    if isinstance(exc, RequiredPromptProjectionError)
+                    else llm_failure_metadata(exc)
+                )
                 logger.warning(
                     "fast_planner_inference_failed sid=%s attempt=%s error_type=%s error=%s "
                     "failure_class=%s failure_domain=%s architecture_attribution=%s retryable=%s",
                     request.sid,
-                    1,
+                    failure.get("attempt_count", 1),
                     type(exc).__name__,
                     exc,
                     failure["failure_class"],
@@ -918,6 +924,14 @@ class FastPlannerResolver:
                     failure["architecture_attribution"],
                     failure["retryable"],
                 )
+                if isinstance(exc, RequiredPromptProjectionError):
+                    return materialize_fast_escalation(
+                        plan_id,
+                        request,
+                        "fast_planner_required_context_over_budget",
+                        path_classification="contract_failure",
+                        metadata=failure,
+                    )
                 if isinstance(
                     exc, ResourceResponsibilityCapabilityUnavailableError
                 ):
