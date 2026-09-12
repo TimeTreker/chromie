@@ -21,6 +21,15 @@ provider behind the Capability boundary.
 
 GI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
 
+Fast and Deep admit a complete, fully bound information-acquisition stage with an
+honest partial whole-Goal score and explicit per-Goal/aggregate deferred obligations.
+The acquisition result leaves the Goal open. Matching completed Evidence and source
+Plan identity permit a new Planner decision; effect confirmation and response-delivery
+barriers remain in Runtime. Failed or mismatched acquisition Evidence cannot establish
+either conditional branch. Canonical Fast must supply its exact confirmation question
+in top-level `response_text` whenever confirmation is required, including exact Plans;
+the Schema and Host reject an empty question before response adaptation. See the [interaction contract](../docs/HUMAN_LIKE_INTERACTION_CONTRACT.md).
+
 Required Planner projections preserve complete admitted Goals, bindings, Work,
 Evidence, source Plans, delivery context and capability applicability contracts.
 Existing per-section character budgets reject oversized required inputs before

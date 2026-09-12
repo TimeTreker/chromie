@@ -303,6 +303,19 @@ still requires an explicit matching argument for a GI-bound count; unrelated
 numeric arguments remain invalid witnesses. Acceptance observations retain count
 alongside duration and yaw, without deriving it from node cardinality.
 
+A fully specified acquisition stage may use complete coverage with partial whole-Goal
+satisfaction. Both assessments retain deferred requirements. `GoalExecutionOutcome`
+now carries `acquisition_step_ids` and `planned_satisfaction` copied from its source
+Plan. Its terminal `status` still describes Work; derived continuation requirements
+keep the Goal open. Re-entry must bind the source Plan ID/fingerprint, exact acquisition
+steps, and matching completed, schema-valid observations before the next conditional
+decision. A response settles the Goal only after delivered speech; a proposed effect
+still requires ordinary confirmation and terminal evidence. Canonical Fast requires
+nonempty top-level `response_text` containing the exact confirmation question whenever
+`user_confirmation_required=true`, including `plan_relation=exact`; the Host also
+rejects blank confirmation speech for any selected confirmation-gated Capability. Other Goal outcomes retain
+independent adequacy and completion checks.
+
 `POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association result, applicable Fast Planner continuation/escalation context, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. Ordinary speech Goals use `respond` only when their requested content can be supplied truthfully; they may instead clarify, report unavailable, or refuse. An independent completed speech Goal may coexist with such a limitation in a zero-step `mixed` Plan. Every unmet Goal must remain unmet in per-Goal and aggregate satisfaction; complete coverage is accounting, not fulfillment. Zero-step mixed speech grants no executable work, future readiness, or confirmation authority. Canonical and streamed Fast may combine an independent response with clarification without a Capability Activity; whole-scope Fast escalation remains atomic. Runtime preserves the question/waiting lifecycle or final limitation speech instead of labeling every mixed response pre-action. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. The current Deep implementation uses one primary model invocation and fails closed on invalid output. Semantic grounding, responsibility coverage, capability applicability, confidence/satisfaction, and safety rejection are not rewritten by another Deep model pass.
 
 Canonical Fast requires an empty `escalation_reason` on every non-escalating

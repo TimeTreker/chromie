@@ -1403,7 +1403,9 @@ def fast_multi_goal_response_schema(
         response_text_field = properties.get("response_text")
         if isinstance(response_text_field, dict):
             response_text_field["description"] = (
-                "Planner speech is empty for exact execution-only work. A "
+                "Planner speech is empty for exact execution-only work without "
+                "confirmation. When user_confirmation_required=true, author the "
+                "exact confirmation question here, including for an exact Plan. A "
                 "safe-adjusted or alternative Plan must explain its material "
                 "change here, and a mixed Plan may carry the direct-response "
                 "Goal delta."
@@ -1412,8 +1414,11 @@ def fast_multi_goal_response_schema(
             schema.setdefault("allOf", []).append(
                 {
                     "if": {
-                        "properties": {"plan_relation": {"const": "exact"}},
-                        "required": ["plan_relation"],
+                        "properties": {
+                            "plan_relation": {"const": "exact"},
+                            "user_confirmation_required": {"const": False},
+                        },
+                        "required": ["plan_relation", "user_confirmation_required"],
                     },
                     "then": {
                         "properties": {"response_text": {"maxLength": 0}},
@@ -1421,6 +1426,18 @@ def fast_multi_goal_response_schema(
                     },
                 }
             )
+    schema.setdefault("allOf", []).append(
+        {
+            "if": {
+                "properties": {"user_confirmation_required": {"const": True}},
+                "required": ["user_confirmation_required"],
+            },
+            "then": {
+                "properties": {"response_text": {"minLength": 1}},
+                "required": ["response_text"],
+            },
+        }
+    )
     bound_text(properties, "escalation_reason", 240)
     top_unresolved = properties.get("unresolved")
     if isinstance(top_unresolved, dict):
@@ -1890,7 +1907,9 @@ def fast_multi_goal_response_schema(
                                 "status": {
                                     "type": "string",
                                     "enum": (
-                                        ["exact", "substantial"]
+                                        ["exact", "substantial", "partial"]
+                                        if goal_disposition == "execute"
+                                        else ["exact", "substantial"]
                                         if terminal_outcome
                                         else nonexact_statuses
                                     ),
@@ -1925,7 +1944,9 @@ def fast_multi_goal_response_schema(
                             "status": {
                                 "type": "string",
                                 "enum": (
-                                    ["exact", "substantial"]
+                                    ["exact", "substantial", "partial"]
+                                    if terminal_assignment and execute_count
+                                    else ["exact", "substantial"]
                                     if terminal_assignment
                                     else nonexact_statuses
                                 ),
@@ -1972,7 +1993,7 @@ def fast_multi_goal_response_schema(
                             "disposition": {"enum": ["execute"]},
                             "steps": {"minItems": 1, "maxItems": 1},
                             "goal_satisfaction": {
-                                "properties": {"status": {"enum": ["exact", "substantial"]}}
+                                "properties": {"status": {"enum": ["exact", "substantial", "partial"]}}
                             },
                         },
                         "required": [

@@ -8,6 +8,7 @@ from typing import Any, Literal, TypeAlias
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .text import normalize_whitespace
+from .plan import GoalSatisfactionAssessment
 
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 
@@ -403,7 +404,20 @@ class GoalExecutionOutcome(BaseModel):
     completed_step_ids: list[str] = Field(default_factory=list)
     unresolved_step_ids: list[str] = Field(default_factory=list)
     reason_codes: list[str] = Field(default_factory=list)
+    acquisition_step_ids: list[str] = Field(default_factory=list)
+    planned_satisfaction: GoalSatisfactionAssessment | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def requires_planner_continuation(self) -> bool:
+        """Completed acquisition Work does not establish whole-Goal completion."""
+        return bool(
+            self.acquisition_step_ids
+            or (self.planned_satisfaction is not None and (
+                self.planned_satisfaction.unmet_requirements
+                or self.goal_id in self.planned_satisfaction.unmet_goal_ids
+            ))
+        )
 
     @field_validator("goal_id", mode="before")
     @classmethod
@@ -415,6 +429,7 @@ class GoalExecutionOutcome(BaseModel):
         "evidence_ids",
         "completed_step_ids",
         "unresolved_step_ids",
+        "acquisition_step_ids",
         "reason_codes",
         mode="before",
     )
@@ -430,6 +445,13 @@ class GoalExecutionOutcome(BaseModel):
     @model_validator(mode="after")
     def validate_step_partition(self) -> "GoalExecutionOutcome":
         steps = set(self.step_ids)
+        if not set(self.acquisition_step_ids).issubset(steps):
+            raise ValueError("acquisition step IDs must belong to step_ids")
+        if self.planned_satisfaction is not None and (
+            set(self.planned_satisfaction.satisfied_goal_ids)
+            | set(self.planned_satisfaction.unmet_goal_ids)
+        ) - {self.goal_id}:
+            raise ValueError("planned satisfaction must belong to this Goal")
         completed = set(self.completed_step_ids)
         unresolved = set(self.unresolved_step_ids)
         if not completed.issubset(steps) or not unresolved.issubset(steps):

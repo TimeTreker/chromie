@@ -1,6 +1,81 @@
 # Development Checkpoint
 
-## Current delivery — Issue #50 required Planner inputs, 2026-09-12
+## Issue #51 staged-progress delivery — 2026-09-12
+
+Owner-approved contract implemented on `main`, pre-delivery base/fetched origin
+`9be7b23fdfa3720278233eed74b63a1550a07940`. #49/#50 are delivered and closed.
+Resume at the latest main commit containing this checkpoint and HANDOFF, not a
+predicted hash. Commit/push and closure of finished Issues remain authorized; close
+#51 after verifying its remote delivery. #52 is separate and has not been started.
+
+Complete coverage now means accounting for all Goals/current Work. Canonical Fast
+and Deep admit a fully bound information-acquisition stage at honest partial
+whole-Goal satisfaction, preserving unmet obligations per Goal and aggregate. This
+is limited to declared information capabilities with valid inputs/expectations;
+independent siblings retain ordinary thresholds and a Goal cannot combine that
+acquisition with its deferred effect in the same Plan. Host does not inflate scores.
+
+Runtime copies source acquisition step IDs and planned satisfaction into immutable
+execution outcomes. Read completion keeps the Goal open. Exact source Plan identity,
+owned steps, qualified observation and matching selected Evidence permit a new
+Planner decision. Missing/failed/stale/mismatched evidence settles neither branch.
+Positive forecasts yield an ordinary confirmed effect; negative forecasts yield no
+write and an evidence-grounded response, closing only after delivered speech. Fast's
+exact-execution Schema also now requires the primary confirmation question when
+confirmation is needed; it previously forced silence and failed at response adaptation.
+No second semantic model, weather phrase rule, runtime switch, profile or new owner.
+
+Evidence R: `.chromie/acceptance/issue51-staged-progress-20260912/` (ignored; transfer
+separately). HANDOFF contains the actual workflow/module I/O and exact commands.
+
+- Reproduced EN/ZH partial-read rejection and four premature Goal closures at base.
+  Exact real baseline Deep raw EN score 0.5 and ZH 0.8 replay unchanged into the fix
+  and execute. Original historical five-failure raw files are absent locally;
+  their 35/40 result and tracked scenarios remain failed historical evidence.
+- Baseline: Fast 204 Schema/Host/frozen hard passes, but six confirmation adapter
+  failures; Deep 40 Schema/39 Host/36 frozen hard passes. First staged repair:
+  Fast 203 Schema/Host and 200 hard; Deep 40 Schema/Host and 37 hard; eight new
+  conditional continuations had correct branches but only six adapter passes.
+  All raw outputs reviewed; every failure and interrupted/preflight attempt retained.
+- `fast-final`: 203/204 Schema/Host, 199/204 frozen hard passes; four valid approved staged reads remain outside escalation-only regions, and one exact-confirmation reply has invalid JSON (typographic closing quote). No malformed output was repaired or retried. All 11 admitted confirmation proposals adapt successfully; five of the six formerly silent exact cases pass, the sixth fails parsing. `deep-final`: 40/40 Schema/Host, 36/40 frozen hard passes; two valid staged paths outside composite-only regions and two existing cancellation cases remain failed. Both retained conditional boundaries pass at honest EN 0.55 / ZH 0.5. Complete cohorts and all raw outputs reviewed; whole-role #35 remains unqualified.
+- `supplement-final`: 8/8 fresh Schema/Host/branch/adapter passes; 8/8 real Runtime replays with in-process providers and fake speech receipts. Every Goal stays open after acquisition; positive writes are confirmation-gated, negative branches make zero writes and close only after speech delivery. One Chinese confirmation has a temporal wording ambiguity retained for #35; correct `due_at` and branch behavior do not imply general wording qualification.
+- New staged/confirmation regression: 32 cases passed. Relevant Level A: 14/14
+  distinct cases. 2,988 tests/794 subtests, 145 benchmark tests and 20 legacy Agent tests passed; policy/static/config/docs/ownership pass (`canonical-delivery.log`). Two existing FastAPI warnings remain.
+
+Target evidence remains unqualified. Before implementation, rebuilt Agent at base;
+the full 51-case preview failed Soridormi preflight before cognition. One bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260912_103348.tar.gz`.
+The simulator later became available and safe idle. After final offline cohorts,
+rebuilt Agent with this patch and verified all 112 Agent/shared Python files match.
+The current full-preview attempt was blocked before all cases by another Orchestrator's
+exclusive Host lock. One bundle for that attempt:
+`/home/chromie/Downloads/chromie_debug_bundle_20260912_113523.tar.gz`.
+The running Host was not stopped and the lock was not bypassed in that attempt.
+After the owner closed processes, restarted current services and headless simulator;
+normal proxy clearing resolved TTS startup. R/live-retry reached cognition with all
+services healthy and Host idle. Of 51 cases, three completed preview cases passed
+mechanical and semantic review, one failed at primary GI overlapping source spans
+(`边走边唱歌。`, HTTP 503), one was interrupted by the hard-failure stop, and 46 were
+unrun. Twelve retained call records have matching original request/raw hashes;
+all output and case slots reviewed. Exactly one retry bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260912_114506.tar.gz`.
+Source/provider stayed unchanged. Final MCP was safe idle. Owned preview/simulator
+stopped; Host idle; Agent/ASR/TTS/LLM remain healthy. No microphone, audible speaker,
+simulator execution or robot proof. Reminder capability is a frozen fixture, not
+a new product capability. The incomplete live cohort does not qualify a target.
+#24/#32/#35 remain open and release readiness is development only. Bounded #51
+completion does not qualify the whole Planner or turn frozen-region failures into
+passes. Future #52 work must preserve these limits. Future live work starts from the
+retained GI diagnosis; restart simulator, recapture identity and use a new complete
+cohort directory. The former Host-lock blocker was resolved by the owner's shutdown.
+
+Next: verify delivery/closure, then await selection of the next Issue. For reproduction
+run `python -m pytest -q tests/test_planner_staged_progress.py` and the required
+repository policy/test/docs/ownership gates. Full frozen rerun commands and live
+blocker identities are in HANDOFF. Final source/corpus/packet hashes are retained;
+only final documentation ledgers change after the candidate freeze.
+
+## Prior delivery — Issue #50 required Planner inputs, 2026-09-12
 
 The owner authorized committing/pushing each completed Issue and closing it after
 remote verification. #49 was delivered as `c1585e78dc011aa81f9a3cc88f43126a839c3cc4`,

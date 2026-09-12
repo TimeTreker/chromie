@@ -14,6 +14,7 @@ from typing import Any
 
 
 try:
+    from chromie_contracts.core_interpretation import PlannerReentryScope
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         VOCAL_MODES,
@@ -25,6 +26,7 @@ try:
         PlanParameterResolution,
     )
 except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         VOCAL_MODES,
@@ -38,6 +40,8 @@ except ImportError:  # pragma: no cover
 
 from .planner_context import (
     _goal_output_mode,
+    acquisition_source_goal_ids,
+    completed_acquisition_goal_ids,
     evidence_bound_dialogue,
     goal_association_prompt_projection,
     goal_cancellation_evidence_reentry_goal_ids,
@@ -67,6 +71,69 @@ from .planner_model_contract import (
     ResourceResponsibilityCapabilityUnavailableError,
     ResourceResponsibilityRequiresCompositionError,
 )
+from .capabilities.validator import validate_args_for_schema
+
+
+def _capability_acquires_information(capability: dict[str, Any]) -> bool:
+    hints = capability.get("hints") or {}
+    resource = hints.get("resource_contract") or {}
+    effects = set(capability.get("effects") or [])
+    return bool(
+        not effects.intersection({"persistent_state", "state_change"})
+        and (
+            resource.get("provider_role") == "acquire_information"
+            or "perception" in effects
+            or capability.get("safety_class") in {"safe_read", "read_only", "external_read"}
+        )
+    )
+
+
+def information_acquisition_goal_ids(
+    plan: CanonicalPlan, capabilities: list[dict[str, Any]]
+) -> set[str]:
+    """Recognize complete current acquisition Work, preserving partial Goal truth.
+
+    This is a mechanical admission exception, not a new satisfaction judgment.
+    Planner must retain the deferred obligation in both assessments and select
+    only fully bound acquisition steps for that Goal. Other Goals keep their
+    ordinary adequacy threshold and Runtime keeps every execution prerequisite.
+    """
+    aggregate = plan.goal_satisfaction
+    if aggregate is None or aggregate.score <= 0 or not aggregate.unmet_requirements:
+        return set()
+    allowed = {item["capability_id"]: item for item in capabilities}
+    eligible: set[str] = set()
+    for outcome in plan.goal_outcomes:
+        satisfaction = outcome.satisfaction
+        if (
+            outcome.disposition != "execute"
+            or satisfaction is None
+            or satisfaction.score <= 0
+            or outcome.goal_id not in satisfaction.unmet_goal_ids
+            or outcome.goal_id in satisfaction.satisfied_goal_ids
+            or not satisfaction.unmet_requirements
+            or outcome.goal_id not in aggregate.unmet_goal_ids
+        ):
+            continue
+        steps = [step for step in plan.steps if outcome.goal_id in step.source_goal_ids]
+        if not steps:
+            continue
+        complete = True
+        for step in steps:
+            capability = allowed.get(step.capability_id) or {}
+            if (
+                step.step_purpose != "acquire_information"
+                or not step.expected_outcome
+                or not _capability_acquires_information(capability)
+                or not capability.get("available", True)
+                or not capability.get("interaction_executable", True)
+                or validate_args_for_schema(step.args, capability.get("input_schema") or {})
+            ):
+                complete = False
+                break
+        if complete:
+            eligible.add(outcome.goal_id)
+    return eligible
 
 _NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])")
 _LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
@@ -89,8 +156,23 @@ def validate_goal_responsibility_outcomes(
     *,
     authoritative_goals: list[dict[str, Any]],
     context: dict[str, Any] | None = None,
+    reentry_scope: PlannerReentryScope | None = None,
 ) -> None:
     """Keep planner outcomes aligned with typed Goal completion contracts."""
+
+    unproven_acquisition = acquisition_source_goal_ids(context) - completed_acquisition_goal_ids(
+        context, reentry_scope=reentry_scope
+    )
+    for goal_id in unproven_acquisition:
+        outcome = output.goal_outcomes.get(goal_id)
+        if outcome is not None and (
+            outcome.disposition == "respond"
+            or (outcome.disposition == "execute" and any(
+                step.step_purpose != "acquire_information"
+                for step in output.steps if goal_id in step.source_goal_ids
+            ))
+        ):
+            raise ValueError("acquisition continuation requires matching completed Evidence: " + goal_id)
 
     response_goal_ids = planner_response_goal_ids(authoritative_goals)
     provider_vocal_goal_ids = planner_provider_vocal_goal_ids(authoritative_goals)
@@ -352,7 +434,9 @@ def qualify_capability_catalog_for_output_modes(
                 qualified.append(capability)
             continue
         if is_information:
-            if has_information:
+            # Information may establish a prerequisite for a stateful Goal;
+            # Planner chooses relevance and defers the effect until Evidence.
+            if has_information or has_stateful:
                 qualified.append(capability)
             continue
         if is_stateful:
@@ -709,6 +793,12 @@ def validate_resource_responsibility_capability_grounding(
         for item in capabilities
         if isinstance(item, dict) and " ".join(str(item.get("capability_id") or "").strip().split())
     }
+
+    for step in output.steps:
+        if step.step_purpose == "acquire_information" and not _capability_acquires_information(
+            capability_by_id.get(step.capability_id) or {}
+        ):
+            raise ValueError("acquisition step requires a declared information Capability: " + step.step_id)
 
     def normalized_values(value: Any) -> set[str]:
         values = value if isinstance(value, list) else []

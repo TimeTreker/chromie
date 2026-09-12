@@ -385,6 +385,14 @@ class ExecutionOutcomeReconciler:
                     completed_step_ids=completed_step_ids,
                     unresolved_step_ids=unresolved_step_ids,
                     reason_codes=reason_codes,
+                    acquisition_step_ids=[
+                        step.step_id for step in goal_steps
+                        if step.step_purpose == "acquire_information"
+                    ],
+                    planned_satisfaction=next(
+                        (item.satisfaction for item in plan.goal_outcomes if item.goal_id == goal_id),
+                        plan.goal_satisfaction if len(plan.goal_ids) == 1 else None,
+                    ),
                     metadata={
                         "source": "deterministic_execution_reconciliation",
                     },
@@ -1369,6 +1377,12 @@ def planner_execution_outcome_truth(
             {
                 "goal_id": outcome.goal_id,
                 "status": outcome.status,
+                "acquisition_step_ids": list(outcome.acquisition_step_ids),
+                "planned_satisfaction": (
+                    outcome.planned_satisfaction.model_dump(mode="json")
+                    if outcome.planned_satisfaction else None
+                ),
+                "requires_planner_continuation": outcome.requires_planner_continuation,
                 "reason_codes": list(outcome.reason_codes),
                 "evidence_ids": list(outcome.evidence_ids),
                 "completion_qualification": (

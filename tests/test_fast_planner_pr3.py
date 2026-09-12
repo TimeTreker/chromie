@@ -5215,7 +5215,9 @@ class FastPlannerResolverTests(unittest.TestCase):
             list(schema["properties"]).index("goal_outcomes"),
             list(schema["properties"]).index("disposition"),
         )
-        aggregate_branches = schema["allOf"][0]["anyOf"]
+        aggregate_branches = next(
+            constraint["anyOf"] for constraint in schema["allOf"] if "anyOf" in constraint
+        )
         mixed_branches = [
             branch
             for branch in aggregate_branches

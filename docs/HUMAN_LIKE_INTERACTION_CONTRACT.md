@@ -988,6 +988,16 @@ from an observation that passes the committed/current schema and trust checks. S
 output remains failure evidence even if the provider process returned `completed`; user-facing
 speech must not promote it to success.
 
+For staged acquisition (#51), a fully specified, capability-grounded read may proceed
+with partial whole-Goal satisfaction while every deferred obligation remains explicit.
+Runtime copies the exact source Plan's acquisition step IDs and per-Goal satisfaction
+into immutable execution outcomes. A completed read leaves its Goal open and supplies
+matching, schema-valid Evidence to the next Planner invocation. Planner alone decides
+the condition; any effect keeps its normal confirmation and execution barriers. A
+negative condition can produce a no-effect final response, and only completed response
+delivery settles that Goal. Failed or unavailable observations establish no branch;
+independent sibling Goals retain their own evidence and completion status.
+
 The same state discipline applies before execution. If a newer accepted turn fails or terminates without a canonical Goal commit, its text remains
 recent dialogue evidence. A later follow-up should reason from that newer conversational subject rather than
 mechanically preferring an older canonical Goal. The failed turn does not receive an invented

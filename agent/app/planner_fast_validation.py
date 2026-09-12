@@ -48,6 +48,7 @@ from .planner_grounding import (
 )
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
 from .planner_validation import (
+    information_acquisition_goal_ids,
     parallel_activity_contract_errors,
     parallel_plan_contract_errors,
     planner_contract_diagnostics,
@@ -230,6 +231,12 @@ def qualify_fast_canonical_plan(
                 "actual_goal_ids": list(plan.goal_ids),
             },
         )
+    requires_confirmation = bool(plan.metadata.get("user_confirmation_required")) or any(
+        allowed.get(step.capability_id, {}).get("requires_confirmation", False)
+        for step in plan.steps
+    )
+    if requires_confirmation and not plan.response_text.strip():
+        return reject("confirmation_question_missing")
     _, requires_execution = planner_goal_execution_requirements(authoritative_goals)
     if evidence_reentry_goal_ids == set(expected_goal_ids_for_turn):
         requires_execution = False
@@ -281,6 +288,7 @@ def qualify_fast_canonical_plan(
     minimum_satisfaction = (
         0.75 if plan_relation in {"safe_adjustment", "alternative"} else 0.95
     )
+    acquisition_goals = information_acquisition_goal_ids(plan, capability_payload)
     achieving_dispositions = {"execute", "respond"}
     achieving_outcomes = [
         outcome
@@ -296,6 +304,7 @@ def qualify_fast_canonical_plan(
     if plan.goal_satisfaction is None or (
         top_level_requires_exact_satisfaction
         and plan.goal_satisfaction.score < minimum_satisfaction
+        and not acquisition_goals
     ):
         return reject(
             "goal_satisfaction_not_exact",
@@ -311,7 +320,8 @@ def qualify_fast_canonical_plan(
     incomplete_outcomes = [
         outcome.goal_id
         for outcome in achieving_outcomes
-        if outcome.satisfaction is None or outcome.satisfaction.score < minimum_satisfaction
+        if outcome.goal_id not in acquisition_goals
+        and (outcome.satisfaction is None or outcome.satisfaction.score < minimum_satisfaction)
     ]
     incomplete_outcomes.extend(
         outcome.goal_id

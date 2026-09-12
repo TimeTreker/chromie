@@ -19,6 +19,7 @@ try:
         PlannedGoalTimeCondition,
         PlanStepPurpose,
         PlanTiming,
+        validate_acquisition_stage_isolation,
         validate_goal_satisfaction_conservation,
     )
 except ImportError:  # pragma: no cover
@@ -35,6 +36,7 @@ except ImportError:  # pragma: no cover
         PlannedGoalTimeCondition,
         PlanStepPurpose,
         PlanTiming,
+        validate_acquisition_stage_isolation,
         validate_goal_satisfaction_conservation,
     )
 
@@ -90,7 +92,9 @@ class PlannerGoalSatisfaction(GoalSatisfactionAssessment):
         description=(
             "How fully the proposed plan would satisfy the canonical goals if "
             "its steps and responses complete successfully. This is not a "
-            "measurement of whether execution has already happened."
+            "measurement of whether execution has already happened. A complete current "
+            "acquisition stage may have partial whole-Goal adequacy; retain deferred "
+            "requirements in both per-Goal and aggregate satisfaction."
         ),
     )
     status: GoalSatisfactionStatus = Field(
@@ -369,6 +373,9 @@ class PlannerModelOutput(BaseModel):
             )
             if self.disposition != expected_disposition:
                 raise ValueError("top-level disposition must match per-goal outcome dispositions")
+            validate_acquisition_stage_isolation(
+                [(step.source_goal_ids, step.step_purpose) for step in self.steps]
+            )
             validate_goal_satisfaction_conservation(
                 [(goal_id, item.disposition, item.satisfaction) for goal_id, item in self.goal_outcomes.items()],
                 self.goal_satisfaction,

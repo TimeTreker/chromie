@@ -974,6 +974,14 @@ def validate_goal_satisfaction_conservation(
         raise ValueError("aggregate satisfaction must preserve every unmet Goal outcome")
 
 
+def validate_acquisition_stage_isolation(steps: list[tuple[list[str], str]]) -> None:
+    """One Goal's deferred effect waits for a new evidence-driven Plan."""
+    acquisition = {goal for goals, purpose in steps if purpose == "acquire_information" for goal in goals}
+    effects = {goal for goals, purpose in steps if purpose == "achieve_effect" for goal in goals}
+    if acquisition & effects:
+        raise ValueError("acquisition and deferred effect for the same Goal require separate Plans")
+
+
 class PlannedGoalTimeCondition(BaseModel):
     """Planner-authored semantic wake condition before Host provenance binding.
 
@@ -1496,6 +1504,9 @@ class CanonicalPlan(BaseModel):
                 raise ValueError(
                     "top-level disposition must match the per-goal outcome dispositions"
                 )
+            validate_acquisition_stage_isolation(
+                [(step.source_goal_ids, step.step_purpose) for step in self.steps]
+            )
             validate_goal_satisfaction_conservation(
                 [(item.goal_id, item.disposition, item.satisfaction) for item in self.goal_outcomes],
                 self.goal_satisfaction,

@@ -543,6 +543,17 @@ Read the diagram with these boundaries:
   Goal is accounted for, not that every Goal is satisfied. This owner-authorized
   contract preserves per-Goal unmet requirements, prohibits invented execution,
   and grants no confirmation, future Work, or completion Evidence from speech.
+  Owner-approved staged progress (2026-09-12, #51): complete current acquisition
+  Work may have honest partial whole-Goal satisfaction. Both per-Goal and aggregate
+  assessments retain deferred obligations; ordinary achieving siblings retain their
+  own admission requirements. A Goal's acquisition and deferred effect belong to
+  separate Plans. Completed acquisition establishes Work/Evidence, not Goal completion.
+  Exact source Plan and trusted observation re-enter the same Planner authority for
+  a new decision. Positive condition Evidence may authorize a proposed effect only
+  through ordinary confirmation and terminal execution; negative condition Evidence
+  may resolve the Goal through an actual delivered response without that effect.
+  Missing, failed, stale or mismatched Evidence establishes neither branch. No Host
+  predicate interpreter, extra semantic reviewer or score inflation is permitted.
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
   GA independently associates, creates, continues, corrects, merges, splits, or
   supersedes canonical Goals from the same GI result without waiting for or

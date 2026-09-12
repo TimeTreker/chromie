@@ -10,7 +10,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import CanonicalPlan
 
 from .capabilities.validator import validate_args_for_schema
-from .planner_validation import parallel_plan_contract_errors
+from .planner_validation import information_acquisition_goal_ids, parallel_plan_contract_errors
 
 
 def deep_plan_validation_errors(
@@ -24,6 +24,7 @@ def deep_plan_validation_errors(
     allows_evidence_response: bool = False,
 ) -> list[dict[str, Any]]:
     allowed = {item["capability_id"]: item for item in capabilities}
+    acquisition_goals = information_acquisition_goal_ids(plan, capabilities)
     errors: list[dict[str, Any]] = []
     if expected_goal_ids and set(plan.goal_ids) != set(expected_goal_ids):
         errors.append(
@@ -51,7 +52,7 @@ def deep_plan_validation_errors(
         elif (
             plan.disposition == "execute"
             or (plan.disposition == "respond" and not allows_evidence_response)
-        ) and plan.goal_satisfaction.score < min_goal_satisfaction:
+        ) and plan.goal_satisfaction.score < min_goal_satisfaction and not acquisition_goals:
             errors.append(
                 {
                     "type": "goal_satisfaction_below_threshold",
@@ -59,9 +60,11 @@ def deep_plan_validation_errors(
                     "required": min_goal_satisfaction,
                 }
             )
-    if plan.disposition == "mixed":
+    if plan.disposition == "mixed" or acquisition_goals:
         for outcome in plan.goal_outcomes:
             if outcome.disposition not in {"execute", "respond"}:
+                continue
+            if outcome.goal_id in acquisition_goals:
                 continue
             # The complete aggregate satisfaction object and exact keyed
             # outcome map already express prospective adequacy. Per-outcome
@@ -69,14 +72,15 @@ def deep_plan_validation_errors(
             # a second mandatory copy of the same judgment. Treat a supplied
             # low score as authoritative without failing solely on omission.
             if (
-                outcome.satisfaction is not None
-                and outcome.satisfaction.score < min_goal_satisfaction
+                (outcome.satisfaction is None and acquisition_goals)
+                or (outcome.satisfaction is not None
+                    and outcome.satisfaction.score < min_goal_satisfaction)
             ):
                 errors.append(
                     {
                         "type": "goal_outcome_satisfaction_below_threshold",
                         "goal_id": outcome.goal_id,
-                        "score": outcome.satisfaction.score,
+                        "score": outcome.satisfaction.score if outcome.satisfaction else None,
                         "required": min_goal_satisfaction,
                     }
                 )

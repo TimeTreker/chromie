@@ -1,6 +1,223 @@
 # Chromie Latest Handoff
 
-## Issue #50 required-input delivery, 2026-09-12
+## Issue #51 staged-progress delivery — 2026-09-12
+
+Repository `/home/chromie/github/chromie`, branch `main`, pre-delivery base/fetched
+origin `9be7b23fdfa3720278233eed74b63a1550a07940`. #49/#50 are delivered and closed.
+Resume from the latest main commit containing this HANDOFF/checkpoint pair; do not
+predict its hash. The owner approved the staged-progress contract and authorized
+commit/push/closure of finished Issues. Close #51 only after verifying remote delivery.
+#52 is the next separate audit item; it has not been started by this change.
+
+Evidence root R: `.chromie/acceptance/issue51-staged-progress-20260912/`, ignored and
+requiring separate transfer. The original private five-failure Deep outputs under
+`.chromie/acceptance/open-issue-closure-20260911/deep-final/` are unavailable locally.
+Their historical 35/40 result remains failed; tracked scenarios are unchanged. New
+reconstructions and fresh candidate outputs below do not replace that history.
+
+### Failure, approved contract and actual workflow
+
+The retained bilingual episode asks for Hangzhou's morning forecast and an umbrella
+reminder at 07:30 only if rain is forecast. Frozen bindings are location Hangzhou,
+date 2026-09-04, period morning, reminder due 2026-09-04T07:30:00+08:00 and text
+"bring an umbrella". These are historical scenario inputs, not a current forecast or
+live reminder schedule. GI/GA are retained authoritative fixtures, not invoked models.
+
+Initiating trigger: a conditional stateful Goal needs an information prerequisite.
+The Deep prompt permits the read, but admission demanded whole-Goal satisfaction.
+Scripted EN/ZH 0.6 partial results passed Schema/DTO and failed the 0.75 Host threshold;
+the same read at 0.75 admitted. Independently, explicit responsibility reconciliation
+closed the whole Goal after successful read Evidence despite its deferred reminder.
+A third contract barrier restricted acquisition re-entry to response-only outcomes.
+After those repairs, real candidate output exposed an existing confirmation conflict:
+Fast's exact-execution Schema forced empty speech even when the provider required
+confirmation, while its response adapter correctly required an exact question.
+The old Fast baseline had six such adapter failures; two fresh positive continuations
+reproduced the same failure. These are separate earliest boundaries, not bad weather
+arguments or reasons to inflate scores or add another semantic model call.
+
+Owner-approved meaning: complete coverage accounts for all Goals/current Work;
+fully bound acquisition can have honest partial whole-Goal satisfaction. Per-Goal
+and aggregate unmet obligations stay explicit. Acquisition completion is immutable
+Work/Evidence, leaving the Goal open. A new primary Planner invocation, with exact
+source Plan and qualified Evidence, decides the remaining branch. Runtime retains
+confirmation, execution, cancellation, safety and delivery authority.
+
+| Order / owner | Authoritative input and actual output after repair | Expected contract / verdict and next handoff |
+| --- | --- | --- |
+| Retained GI/GA fixture | One conditional stateful Goal with exact location/date/period/reminder bindings; declared read and confirmed write capabilities. | Correct WHAT input; no GI/GA model inference or production reminder feature added. |
+| Context/catalog + primary Fast/Deep | Complete Goal and capability contracts; primary authors one read with `step_purpose=acquire_information`, expected observation, exact arguments, partial satisfaction and deferred reminder. | Correct prospective current stage. Stateful Goals can see information prerequisites. Neither Host nor a reviewer chooses the semantic branch. |
+| Schema/DTO/Host | Exact ownership, complete argument schema, declared information capability and positive partial satisfaction; deferred requirements preserved per Goal and aggregate. | Admit the grounded read unchanged. Reject relabeled writes, missing inputs/expectations, premature read+effect for one Goal and erased obligations. Independent siblings retain ordinary adequacy checks. |
+| CapabilityRuntime + in-process provider | Exact admitted read request -> completed result containing `rain_forecast=true/false`; source Plan/request/step/Goal correlation retained. | Correct bounded provider evidence; no real weather service or physical execution claimed. |
+| ExecutionOutcomeReconciler | Exact source Plan -> outcome copies `acquisition_step_ids` and `planned_satisfaction`, alongside qualified observation and immutable completion. | Correct mechanical evidence ownership. Derived `requires_planner_continuation` is not model-written policy or a new runtime switch. |
+| ConversationStateManager | Exact recorded bundle fingerprint -> completed acquisition Work, responsibility still open. | Repairs premature Goal closure. Altered same-ID bundle rejects; cancelled/refused/superseded states remain terminal. |
+| Host Orchestrator re-entry + context guard | Source Plan ID/fingerprint, exact owned completed acquisition step IDs, selected Evidence refs, schema-validated observation and terminal data/hash/tool correlation. | Only qualified matching Evidence releases execute/respond continuation. Failed, missing, stale, mismatched or schema-invalid evidence establishes neither branch; existing freshness/replay checks remain. |
+| New primary Planner + confirmation adapter | Positive result -> exact reminder proposal with question; negative result -> grounded final response and no write. | Repairs response-only restriction and Fast's silent-confirmation contradiction. Fast Schema requires nonempty top-level question; Host rejects whitespace/missing questions, including a forged false flag on a gated capability. No generated Host question or second audit model. |
+| Runtime and responsibility closure | Positive: zero dispatch before confirmation, then one successful write. Negative: zero write, Goal stays open until fake delivered-speech receipt. | Exact completion/delivery can close the Goal; provider completion is not inferred from prospective speech. Verified in scripted regressions and fresh-candidate replay, subject to the evidence limits below. |
+
+```text
+conditional Goal -> primary acquisition Plan (honest partial satisfaction)
+  -> Host admission -> Runtime read -> immutable qualified Evidence / Goal open
+  -> exact source Plan + Evidence -> new primary Planner decision
+       positive -> exact confirmation question -> confirmed write -> completion -> Goal satisfied
+       negative -> no write -> grounded response -> delivered speech -> Goal satisfied
+       missing/failed/stale/mismatched Evidence -> neither branch established
+```
+
+Canonical Fast and Deep own this staged DTO contract. The streaming advance contract
+continues to require its existing direct-match-or-delegate behavior; it has not gained
+a second semantic authority or a Host-inferred staged plan. Whole streaming/Planner
+qualification remains #35. Cancellation/confirmation revision behavior remains #52.
+
+### Evidence ledger and claim limits
+
+All candidate runs use fixed `gpt-5.6-sol/high`, Codex CLI 0.153.4, one target-blind
+primary call per case, 600-second timeout, no retry or reviewer calls. Fast concurrency
+8, Deep 4, supplemental 2. Full raw outputs, exact prompts/Schemas, transport identity,
+source hashes and individual adjudication are retained. Reviews are non-independent
+post-hoc agent evaluation, never model output repair or Runtime authority.
+
+| Evidence | Observed result |
+| --- | --- |
+| Original scripted probes | `baseline-summary.json`: EN/ZH 0.6 reject vs 0.75 admission; four Schema passes. `reconciliation-summary.json`: all four rain/language reads prematurely close Goal. `reentry-baseline-summary.json`: positive effect cannot be represented at re-entry. |
+| Unchanged Fast baseline | `fast-before`: 204/204 Schema/Host/frozen hard passes, but six additional exact-confirmation adapter failures. All 204 raw results reviewed; this was not a complete transaction qualification. |
+| Unchanged Deep baseline | `deep-before`: 40 Schema, 39 Host, 36/40 frozen hard passes. Actual EN partial score 0.5 rejected by threshold; ZH 0.8 admitted. Three cancellation cases also fail their regions. All 40 reviewed. |
+| First staged repair | `fast-after`: 203 Schema/Host, 200/204 hard; three valid approved staged reads outside frozen escalation regions, one streaming clarification/mixed DTO error. Streaming packet is byte-identical to baseline. Six confirmation adapter failures remain. `deep-after`: 40 Schema/Host, 37/40 hard; one valid staged path outside composite-only region and two cancellation cases. Both conditional boundaries admit actual partial scores 0.5/0.55. |
+| First fresh continuation run | `supplement-after`: eight Schema/Host/correct branches, six full adapter passes. Both Fast positive branches omit required questions; adapter fails closed with zero dispatch. Exact Schema contradiction retained in `confirmation-question-schema-conflict.json`. |
+| Final full cohorts | `fast-final`: 203/204 Schema/Host, 199/204 frozen hard passes; four valid approved staged reads remain outside escalation-only regions, and one exact-confirmation reply has invalid JSON (typographic closing quote). No malformed output was repaired or retried. All 11 admitted confirmation proposals adapt successfully; five of the six formerly silent exact cases pass, the sixth fails parsing. `deep-final`: 40/40 Schema/Host, 36/40 frozen hard passes; two valid staged paths outside composite-only regions and two existing cancellation cases remain failed. Both retained conditional boundaries pass at honest EN 0.55 / ZH 0.5. Complete cohorts and all raw outputs reviewed; whole-role #35 remains unqualified. |
+| Final conditional continuations | `supplement-final`: 8/8 fresh Schema/Host/branch/adapter passes; 8/8 real Runtime replays with in-process providers and fake speech receipts. Every Goal stays open after acquisition; positive writes are confirmation-gated, negative branches make zero writes and close only after speech delivery. One Chinese confirmation has a temporal wording ambiguity retained for #35; correct `due_at` and branch behavior do not imply general wording qualification. |
+| Focused regression | New `tests/test_planner_staged_progress.py`: 32 parameterized cases pass. Earlier related focus passed 314 tests/193 subtests before the confirmation follow-up. Exact retained Deep EN 0.5 and ZH 0.8 raw outputs replay unchanged into the repair and execute (`unchanged-raw-after-replay.json`). |
+| General ability Level A | 14/14 distinct cases across continuous cognition recovery (4), evidence-bound closure (6), Planner Goal semantics (4), truthful embodied speech (6); memberships overlap. `level-a-final/`, `level-a-confirmation-final.log`. |
+| Final canonical gate | 2,988 tests/794 subtests, 145 benchmark tests and 20 legacy Agent tests passed; policy/static/config/docs/ownership pass (`canonical-delivery.log`). Two existing FastAPI warnings remain. |
+
+Initial failed local runs are retained: `canonical-first.log` had an outdated expected
+allowed-catalog list after exposing information prerequisites; `canonical-confirmation-final.log`
+had one positional Schema-test assumption (`allOf[0]`) after adding the confirmation
+constraint. The test now locates the aggregate constraint and preserves its assertions.
+`confirmation-focused.log` and `confirmation-schema-regression.log` retain focused proof.
+Earlier interrupted `fast-baseline`/`deep-baseline` are incomplete and unused. Two early
+first-after run/adjudication preflight attempts occurred before their prerequisites
+finished; they made no candidate calls or verdicts. An initial re-entry harness used
+`text` instead of provider argument `reminder_text`; invalid artifacts stay separately
+labelled. Supplemental Runtime replay initially supplied the model-projected GA object instead of
+the full original GA DTO, then omitted the original committed execution binding and
+used the re-entry session ID for source Evidence. Existing guards rejected each
+harness error. The corrected harness reconstructs the exact original response,
+verifies request/interaction identity, and records Evidence under its original turn;
+no source, candidate output or frozen scenario changed. All rejected harness logs
+are retained. None of these are silently counted as passes or overwritten.
+
+### Live deployment limit
+
+Before editing source, the available Agent service was found to differ from base in
+14/18 selected files. Rebuilt/restarted only `chromie-agent` at the unchanged base and
+captured runtime identity. The complete 51-case must-pass preview was invoked once;
+all cases failed preflight connection to Soridormi at localhost:8000 before cognition.
+No semantic or user outcome passed. One aggregate debug bundle was collected exactly
+once: `/home/chromie/Downloads/chromie_debug_bundle_20260912_103348.tar.gz`.
+R/live-before retains the command, service/source identity, failures and all-case review.
+A later read-only check found the simulator had become available: MCP status reports
+sim mode, safe_idle=true, no active task/emergency/fall, source revision
+`284273bc344cc94012347c75ab270a9f4ac8ffdb`. The `/health` URL returned 404 and is not
+an availability authority; R/live-target-final-status.json records the real MCP check.
+After both final offline cohorts completed, rebuilt/restarted only `chromie-agent`
+with this patch. All 112 Agent/shared Python files match the local source
+(R/live-final/agent-source-verification.json). Runtime identity digest:
+`21d5a028de029727237963d3188c582f317162d03e887c49024a14fe1e2be08b`.
+The current 51-case preview invocation then failed before any case or inference:
+another Orchestrator holds `/tmp/chromie-orchestrator.lock`. Existing Host ownership
+was preserved; no lock bypass or other Orchestrator shutdown occurred. One bundle
+for this invocation was collected exactly once:
+`/home/chromie/Downloads/chromie_debug_bundle_20260912_113523.tar.gz`.
+R/live-final retains the source patch, build/up logs, identity, invocation and blocked
+review; both repository/provider patches remained unchanged during the attempt.
+After the owner closed running processes and authorized continuation, started the
+current Agent/ASR/TTS and the existing headless Soridormi launcher (`--no-viewer`).
+TTS initially failed because inherited shell proxies pointed to container loopback;
+recreated ASR/TTS using the existing startup script's normal four-proxy-variable
+clearing. All four Chromie services became healthy; no generated runtime file,
+model, budget or profile changed. The exclusive Host idle check passed. A fresh
+identity binds the retry: `ee3e8df15ffb0f56dbb89747814ab7907d072357f68cd4166d85f1d06f4f94f8`.
+
+R/live-retry invoked the complete directory-discovered 51-case preview once, on
+unchanged repository/provider source. Four cases completed: three mechanical and
+reviewed preview passes, then `user_probe_walk_while_singing` failed at GI. The
+next case started before the hard-failure stop took effect: one interrupted case,
+46 unrun. This is an incomplete failed cohort, not 3/51 qualification. Exactly one
+bundle was collected at the stop:
+`/home/chromie/Downloads/chromie_debug_bundle_20260912_114506.tar.gz`.
+
+| Retry boundary / owner | Actual episode input -> output | Verdict / downstream |
+| --- | --- | --- |
+| Gateway/source tokenizer | `边走边唱歌。` -> immutable source and tokens t0..t5 | Correct input; separate walk and sing effects with parallel relation required. |
+| Primary GI model | r1 `singing while walking`, r2 `walking`; both cite t0..t5 and add whole-phrase `comparison` bindings | First wrong boundary: overlapping independent source spans and mixed predicate/binding semantics. |
+| GI semantic/source validator -> HTTP boundary | Reject overlapping r1:r2 spans -> `goal_interpreter_unavailable`, HTTP 503 | Correct fail-closed containment; transport record `accepted` does not mean semantic admission. |
+| GA / Planner / Runtime for failed turn | Not invoked after GI rejection | No Work or speech produced. #51 stage admission/reconciliation was not reached. |
+| Aggregate harness | Began case 5 before stop; SIGINT cancels its partial Fast stream | Interrupted evidence, no complete case verdict; no output repair or isolated retry. |
+
+All retained output was reviewed, including the three mechanical passes: ordered
+walk/nod/turn, parallel gaze/blink, and grounded high-level milk retrieval proposal.
+Twelve call records retain eleven complete outputs and one cancelled partial stream;
+all original request and raw-output digests match. The rejected GI record was split
+by an interleaved Uvicorn access log; `llm-calls-reconstructed.jsonl` joins the log
+fragments after removing that exact access-log text. `raw-integrity.json` verifies
+the original digests; the bundle is untouched and no model content was repaired.
+Case 5's GA result and complete Host/terminal result are unavailable in this retained
+bundle. R/live-retry/semantic-review.json judges all 51 case slots explicitly.
+
+Final MCP status was sim/safe_idle=true, no active task/emergency/fall. Stopped the
+owned preview and headless simulator through their normal signal cleanup; Host idle
+check passes. Agent, ASR, TTS and LLM remain running/healthy; simulator/MCP are stopped.
+`cleanup.json`, `provider-after.json`, source-stability proof, startup/proxy logs and
+all three attempts remain distinct. No microphone, audible speaker,
+simulator execution or robot proof is claimed. The conditional reminder exists in
+frozen capability fixtures, not the local production catalog. No reminder product
+feature, physical workflow or model-profile promotion was added to manufacture closure.
+
+Four-axis status: implemented bounded #51 contract; automated evidence as above;
+target validation blocked/unqualified; release readiness development only. #24/#32/#35
+remain open. Historical failures and final frozen-region failures remain failures.
+No new standing document, environment variable, architecture owner, model profile,
+semantic reviewer or runtime switch: Markdown 102 -> 102, configuration keys 381 -> 381.
+Two source-derived fields extend the existing execution-outcome owner so reconciliation
+can preserve information it previously dropped; no new compatibility layer.
+
+### Reproduction and delivery
+
+The retry removed the old Host-lock blocker and reached the upstream GI failure.
+Resume live qualification under #24/#32/#35 from that retained diagnosis. Start the
+existing Soridormi headless launcher again, check exclusive Host availability, then
+recapture identity and use R/live-retry/run-cohort.py as a command reference with a
+**new** evidence directory. Review the full cohort and collect one bundle at
+completion or a hard integrity stop. No automatic resumption is scheduled.
+
+
+`final-source-freeze.json` binds all tracked files plus the new regression before the
+final candidate calls; final documentation ledger edits are checked separately. Model
+transaction/corpus identities are retained per cohort. Use fresh output directories
+for future iterations; never overwrite this evidence.
+
+```bash
+python -m pytest -q tests/test_planner_staged_progress.py
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/check_test_ownership.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class continuous_cognition_recovery --ability-class evidence_bound_cognitive_turn_closure --ability-class planner_goal_semantic_quality --ability-class truthful_embodied_speech --evidence-dir .chromie/acceptance/issue51-repeat-level-a
+python -m benchmarks.datasets.fast_planner_daily_life.qualification prepare --output-dir .chromie/acceptance/issue51-repeat-fast --label issue51-repeat
+python -m benchmarks.datasets.fast_planner_daily_life.qualification run --output-dir .chromie/acceptance/issue51-repeat-fast --concurrency 8 --timeout-s 600
+python -m benchmarks.datasets.fast_planner_daily_life.qualification adjudicate --output-dir .chromie/acceptance/issue51-repeat-fast
+python -m benchmarks.datasets.fast_planner_daily_life.deep_qualification prepare --output-dir .chromie/acceptance/issue51-repeat-deep --label issue51-repeat
+python -m benchmarks.datasets.fast_planner_daily_life.deep_qualification run --output-dir .chromie/acceptance/issue51-repeat-deep --concurrency 4 --timeout-s 600
+python -m benchmarks.datasets.fast_planner_daily_life.deep_qualification adjudicate --output-dir .chromie/acceptance/issue51-repeat-deep
+```
+
+After reviewing/staging both delivery owners, commit and normal-push main under the
+standing authorization, verify remote hash and clean status, then close #51. Future
+work must start from these retained limits; do not treat #51 closure as #35 or target
+qualification. Read #52 only when the owner selects that separate next issue.
+
+## Prior Issue #50 required-input delivery, 2026-09-12
 
 The owner requests commit/push and closure of each finished Issue after verified
 remote delivery. #49 is delivered and CLOSED at origin/main commit

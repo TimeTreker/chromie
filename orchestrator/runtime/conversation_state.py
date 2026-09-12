@@ -4091,6 +4091,7 @@ class ConversationStateManager:
         canonical_plan_fingerprint: str = "",
         planner_reentry_responsibilities: list[dict[str, Any]] | None = None,
         planner_reentry_language: str = "",
+        planned_satisfaction: dict[str, Any] | None = None,
     ) -> None:
         """Track execution lifecycle for one semantic goal only.
 
@@ -4108,6 +4109,7 @@ class ConversationStateManager:
             "remaining_request_ids": list(request_ids),
             "request_statuses": {},
             "planning_result": planning_result,
+            "planned_satisfaction": planned_satisfaction,
             "confirmation_pending": confirmation_pending,
             "planned_capabilities": [dict(item) for item in planned_capabilities],
             "interaction_id": str(interaction_id or "").strip(),
@@ -4560,7 +4562,13 @@ class ConversationStateManager:
                     and str(item.get("capability_id") or "") == "chromie.speak"
                     for item in planned_capabilities
                 ) if isinstance(planned_capabilities, list) else False
-                if task_status == "done" and speaking_only:
+                planned_satisfaction = context["metadata"].get("planned_satisfaction") or {}
+                if (
+                    task_status == "done" and speaking_only
+                    and not planned_satisfaction.get("unmet_requirements")
+                    and goal_id not in (planned_satisfaction.get("unmet_goal_ids") or [])
+                    and self._goal_responsibility_status(context) not in {"cancelled", "refused", "superseded"}
+                ):
                     self._set_goal_responsibility_status(
                         context,
                         "satisfied",
@@ -4747,6 +4755,12 @@ class ConversationStateManager:
                     "evidence_ids": list(outcome.evidence_ids),
                     "completed_step_ids": list(outcome.completed_step_ids),
                     "unresolved_step_ids": list(outcome.unresolved_step_ids),
+                    "acquisition_step_ids": list(outcome.acquisition_step_ids),
+                    "planned_satisfaction": (
+                        outcome.planned_satisfaction.model_dump(mode="json")
+                        if outcome.planned_satisfaction else None
+                    ),
+                    "requires_planner_continuation": outcome.requires_planner_continuation,
                     "reason_codes": list(outcome.reason_codes),
                     "completion_qualification_required": qualification["required"],
                     "completion_qualification_established": qualification["established"],
@@ -4994,7 +5008,11 @@ class ConversationStateManager:
                     "responsibility reconciliation requires recorded execution evidence"
                 )
             recorded = evidence_summary.get("execution_outcome")
-            if not isinstance(recorded, dict) or recorded.get("outcome_id") != validated.outcome_id:
+            if (
+                not isinstance(recorded, dict)
+                or recorded.get("outcome_id") != validated.outcome_id
+                or recorded.get("outcome_fingerprint") != execution_outcome_fingerprint(validated)
+            ):
                 raise ValueError(
                     "responsibility reconciliation requires the exact recorded outcome"
                 )
@@ -5015,6 +5033,7 @@ class ConversationStateManager:
             )
             completion_established = bool(
                 outcome.status == "completed"
+                and not outcome.requires_planner_continuation
                 and (
                     not qualification["required"]
                     or qualification["established"]
@@ -5036,6 +5055,7 @@ class ConversationStateManager:
                 "responsibility_status": current,
                 "changed": current != previous,
                 "execution_status": outcome.status,
+                "requires_planner_continuation": outcome.requires_planner_continuation,
                 "completion_qualification_required": qualification["required"],
                 "completion_qualification_established": qualification["established"],
                 "completion_qualifications": qualification["qualifications"],
@@ -5972,6 +5992,7 @@ class ConversationStateManager:
                         )
                     ),
                     planner_reentry_language=planner_reentry_language,
+                    planned_satisfaction=outcome.get("satisfaction"),
                 )
 
         actions = data.get("actions", []) or data.get("capabilities", []) or []

@@ -1,19 +1,24 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-12
-**Current focus:** Issue #50 required Planner-input projection from the September 12
-audit. #49 is pushed to main and closed at `c1585e78`. Required Fast/Deep inputs now
-preserve all admitted fields or reject before inference at unchanged budgets. Streaming
-rejection occurs before presentation; canonical failures preserve full Goal scope and
-cannot invoke a semantic repair. Existing authority, Schemas and profiles are unchanged.
+**Current focus:** Issue #51 staged progress versus whole-Goal satisfaction, under
+its owner-approved contract. #49/#50 are delivered and closed. Canonical Fast/Deep
+admit grounded partial acquisition, retain deferred obligations through immutable
+Evidence, and reopen the exact source Goal for a new Planner decision. Confirmation
+and completion/delivery remain Runtime barriers. Fast's exact-confirmation question
+is now representable and required. No profile, semantic reviewer or runtime switch added.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| #50 implemented for authorized main delivery; #49 delivered/closed. | Focused: 762 tests/190 subtests. Level A: 27/27 distinct cases. Full frozen prompt capture/dataset validation: Fast 204/204, Deep 40/40, with identical prompts/Schemas and unchanged corpora. Canonical: 2,956 tests/794 subtests, 145 benchmarks, 20 legacy tests; policy/static/config/docs/ownership pass. | No candidate inference, deployment, service, voice, simulator or physical proof. Prior failed qualification stays failed. | Development only; #24/#32/#35 remain open. |
+| #51 implemented for authorized main delivery; #49/#50 delivered/closed. | New regression: 32 cases. Level A: 14/14 distinct cases. Canonical: 2,988 tests/794 subtests, 145 benchmarks, 20 legacy tests; policy/static/config/docs/ownership pass. Final fixed-candidate Fast: 203/204 Schema/Host, 199/204 frozen hard; Deep: 40/40 Schema/Host, 36/40 hard. Eight fresh conditional continuations pass Schema/Host/branch/adapter and mock Runtime replay. All results reviewed; frozen failures and wording caveats retained. | Agent rebuilt; 112 Agent/shared Python files match source. After owner shutdown resolved the Host lock, 51-case preview reached 3 reviewed passes, 1 GI source-span/HTTP 503 failure, 1 interrupted case, 46 unrun. Twelve retained call digests verified; cohort incomplete. Earlier connection/lock attempts retained separately. Final simulator safe idle, then stopped. No microphone, audible speaker, simulator execution or physical proof. | Development only; #24/#32/#35 remain open. Bounded #51 evidence does not qualify the whole Planner or promote a target. |
 
-Evidence: `.chromie/acceptance/issue50-planner-inputs-20260912/`. Exact workflow,
-source identity, failures and commands belong to checkpoint/handoff. #51–#55 remain
-separate audit work; dataset validation does not qualify model behavior.
+Evidence: `.chromie/acceptance/issue51-staged-progress-20260912/`. Exact workflow,
+source/runtime identities, failed baselines, final frozen-region distinctions and
+resume commands belong to checkpoint/handoff. #52–#55 remain separate audit work.
+The historical five Deep failures remain failed; their private original outputs are
+unavailable locally and are not replaced by the new cohorts. Relevant fixtures
+remain tracked unchanged. Earlier #50 projection delivery used byte-identical
+frozen prompt capture only; #51 includes new candidate inference and bounded replay.
 
 ### Prior remaining-Issue delivery — 191083dc
 

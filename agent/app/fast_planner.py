@@ -840,6 +840,7 @@ class FastPlannerResolver:
                     validated_model_output,
                     authoritative_goals=authoritative_goals,
                     context=request.context,
+                    reentry_scope=request.planner_reentry_scope,
                 )
                 validate_resource_responsibility_capability_grounding(
                     validated_model_output,

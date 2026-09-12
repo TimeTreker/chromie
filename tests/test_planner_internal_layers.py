@@ -154,7 +154,7 @@ def test_fast_qualification_required_capability_reaches_target_blind_transaction
 
     assert "chromie.reminder.create" in transaction_contract
     assert (
-        'FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n["chromie.reminder.create"]'
+        'FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n["chromie.reminder.create","chromie.weather.lookup"]'
         in (transaction["user_prompt"])
     )
 

@@ -10,6 +10,7 @@ from pydantic import ValidationError
 try:
     from chromie_contracts.core_interpretation import PlannerReentryScope
     from chromie_contracts.control import GoalCancellationEvidence
+    from chromie_contracts.execution_outcome import ExecutionOutcomeBundle
     from chromie_contracts.goal import GoalAssociationResolution
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
@@ -20,6 +21,7 @@ try:
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.control import GoalCancellationEvidence
+    from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
     from shared.chromie_contracts.goal import GoalAssociationResolution
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
@@ -565,6 +567,86 @@ def result_evidence_reentry_goal_ids(
     }
 
 
+def acquisition_source_goal_ids(context: dict[str, Any] | None) -> set[str]:
+    """Identify prior acquisition ownership without interpreting its result."""
+    current = context or {}
+    if not current.get("result_evidence_reentry"):
+        return set()
+    plan = current.get("canonical_plan_resolution") or {}
+    return {
+        goal_id for step in plan.get("steps") or []
+        if step.get("step_purpose") == "acquire_information"
+        for goal_id in step.get("source_goal_ids") or []
+    }
+
+
+def completed_acquisition_goal_ids(
+    context: dict[str, Any] | None,
+    *,
+    reentry_scope: PlannerReentryScope | None,
+) -> set[str]:
+    """Release only exact source acquisition Goals for the next Planner decision.
+
+    Status, source Plan, step ownership, and bounded observation must all agree.
+    This establishes availability of Evidence, never the meaning of a predicate.
+    The ordinary re-entry guard still checks live state and rejects replay.
+    """
+    current = context or {}
+    source_goals = acquisition_source_goal_ids(current)
+    if not source_goals or reentry_scope is None:
+        return set()
+    try:
+        bundle = ExecutionOutcomeBundle.model_validate(current.get("execution_outcome_bundle"))
+        terminal = {
+            item.evidence_id: item
+            for raw in current.get("trusted_terminal_evidence") or []
+            for item in [ToolResultEvidence.model_validate(raw)]
+        }
+    except (ValidationError, ValueError, TypeError):
+        return set()
+    plan = current.get("canonical_plan_resolution") or {}
+    if (
+        bundle.canonical_plan_id != reentry_scope.source_plan_id
+        or bundle.canonical_plan_fingerprint != reentry_scope.source_plan_fingerprint
+        or plan.get("plan_id") != bundle.canonical_plan_id
+    ):
+        return set()
+    refs = set(reentry_scope.evidence_refs)
+    completed: set[str] = set()
+    for outcome in bundle.goal_outcomes:
+        if outcome.goal_id not in source_goals or outcome.status != "completed":
+            continue
+        steps = [step for step in plan.get("steps") or []
+                 if outcome.goal_id in (step.get("source_goal_ids") or [])]
+        step_ids = {step.get("step_id") for step in steps}
+        if (
+            not step_ids or set(outcome.acquisition_step_ids) != step_ids
+            or set(outcome.step_ids) != step_ids
+            or any(step.get("step_purpose") != "acquire_information" for step in steps)
+        ):
+            continue
+        evidence = [item for item in bundle.evidence if item.evidence_id in outcome.evidence_ids]
+        if {item.step_id for item in evidence} != step_ids:
+            continue
+        if all(
+            item.status == "completed"
+            and item.evidence_id in refs
+            and item.evidence_id in terminal
+            and terminal[item.evidence_id].status == item.status
+            and terminal[item.evidence_id].tool_id == item.capability_id
+            and item.observation is not None
+            and item.observation.status == "available"
+            and item.observation.schema_validated
+            and terminal[item.evidence_id].data == item.observation.data
+            and terminal[item.evidence_id].output_sha256 == item.observation.output_sha256
+            and any(step.get("step_id") == item.step_id
+                    and step.get("capability_id") == item.capability_id for step in steps)
+            for item in evidence
+        ):
+            completed.add(outcome.goal_id)
+    return completed & set(reentry_scope.goal_ids)
+
+
 def goal_cancellation_evidence_reentry_goal_ids(
     context: dict[str, Any] | None,
 ) -> set[str]:
@@ -703,7 +785,10 @@ def planner_goal_context(
         )
         response_only = False
         requires_execution = bool(recoverable_goal_ids)
-        response_goal_ids = set(expected) - recoverable_goal_ids
+        response_goal_ids = (
+            set(expected) - recoverable_goal_ids
+            - completed_acquisition_goal_ids(current, reentry_scope=reentry_scope)
+        )
 
     return PlannerGoalContext(
         expected_goal_ids=expected,
