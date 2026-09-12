@@ -1,40 +1,49 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-13
-**Current focus:** owner-approved offline architecture/workflow replay under #59;
-then retained #24 native GI and #32 streaming/target blockers. New-request scheduling
-contract gap is tracked separately in #60. Pre-delivery base `6f726ce3`; resume from
-the latest commit containing both handoffs. #35/#49–#58 remain closed.
+**Current focus:** owner-approved 1,500-case workflow audit (#61), with binding
+admission (#62), Deep multi-Goal context allocation (#63), and scenario modality
+assertion (#64) repaired. Pre-delivery base `0457db8d`; resume from the latest commit
+containing both handoffs. #24 native GI, #32 streaming/target and #60 new-request
+readiness remain open. No native inference or LoRA training occurred.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Frozen local HTTP model replay plus prerequisite/count Schema/Host repair; five GI/GA/Fast/Deep workflow episodes. #59 closes on delivery; #60 new-request readiness remains open. | Canonical 3,131 tests/794 subtests, 145 benchmarks, 20 legacy; static/policy/config/ownership pass. Final fixture replay 5/5 with 18 local replies and focused 26/26. Level A 45/45 across 15 classes. | No native inference, deployed-source rebuild, live aggregate, streaming, audio or physical run. Last live cohort remains 1 GI failure, 1 startup interrupted, 49 unrun. | Development only. #24/#32/#60 open. No model/profile or target promotion. |
+| 30 authored contrast families / 1,500 frozen scenarios; real role clients and Runtime with fixed model replies; isolated candidate-role forwarding. Two production boundaries and one test oracle repaired in existing owners. | Final full replay: 1,450 expected successes, 0 unexpected failures, 50 known #60 gaps; aggregate remains failed/exit 1. Focused replay 66/66; 50/50 GI substitution cases use a second local fixture service. Level A 45/45 across 15 classes. Canonical 3,175 tests/798 subtests, 145 benchmarks and 20 legacy tests; pinned static/config/policy/ownership passed. | No deployed rebuild, native model, live aggregate, streaming, audio or physical run. Prior native investigation and failed live evidence remain unchanged. | Development only. #24/#32/#60 open. Neither references nor plumbing tests qualify a model, training dataset or target behavior. |
 
-GPT-6 Astra authored and reviewed the reference replies in one task; review is
-non-independent. These tests evaluate contracts and workflow, not LLM ability. Initial
-admission/role scheduling, clock/UUIDs, providers and speech receipts are explicit
-fixtures; real role clients, parsers, validators, state and Capability Runtime run.
-Changed request/Schema/options/order/Evidence is rejected instead of receiving an
-approximate canned answer. The conditional weather query exposed a count ownership
-bug: the prerequisite was required to perform the deferred blink count. Schema now
-admits declared acquisition candidates; Host uses the existing complete-acquisition
-scope while preserving eventual effect parameters and provenance. Deep retains
-composition ownership; no prompt/model/configuration or extra semantic call changed.
+Baseline on production `0457db8d` had 1,328 expected successes, 122 unexpected
+failures and 50 known gaps. #62 removes 50 unknown-binding admissions. #63 removes
+72 premature Deep context rejections: 36 valid multi-Goal cases now complete, while
+36 omission cases reach the intended Host rejection. Full reruns retain all cases.
+#64 makes explicit expected output modality enforceable in the older scenario oracle.
+Eleven stale behavior references were corrected with their original source obligations
+and before/after identities retained; this is test evidence maintenance, not a native
+model result. The direct GI parser's Schema fallback now includes prior-speech context,
+preserving 34 existing legitimate reference cases.
 
-The delayed episode explicitly starts from a prior scheduled Goal. GI cannot emit
-`ready_at` under its current Schema, while Planner consumes that typed Goal binding;
-new-request conversion remains #60, not a passing end-to-end claim. Execution cancel
-leaves the unmet Goal open. The [audit](../ARCHITECTURE_AUDIT.md#offline-workflow-replay--59)
-owns module I/O, root cause and limits; [benchmarks](../benchmarks/README.md#offline-workflow-replay)
-owns reproducible commands. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and
-[handoff](../HANDOFF.md) retain current hashes, archive and resume instructions.
+GPT-6 Astra authored 30 contrasts and reference rules in this task. Deterministic
+parameter/language expansion is not 1,500 independent inferences. Review remains
+non-independent. Every output is training-ineligible; faults and unrepresentable
+results are separate from correct references. 900/300/300 splits hold out whole
+parameter contrast groups, not unseen semantic families. Candidate-role mode forwards
+only actual production requests; all other roles remain strict replay. Uncovered
+candidate continuations stop as coverage gaps rather than receiving substitute answers.
 
-The previous native GI investigation remains unqualified: 226 executions/254 native
-calls across 44 scenarios; all tested controls retained meaning failures. Its evidence
-and model/runtime identities remain available in the
-[previous handoff](https://github.com/TimeTreker/chromie/blob/6f726ce32f2d69d6fd167ad600cfb7f9eb599536/HANDOFF.md).
-No new native service health or physical evidence was collected here. Historical
-sections below keep their original revision limits; they are not new passes.
+Initial admission/role scheduling, clock/UUIDs, providers and speech receipts remain
+controlled. Real GI/GA/Fast/Deep parsers, Schema/DTO/Host, state, Runtime and result/due
+re-entry are exercised. Gateway/streaming, autonomous escalation/scheduling,
+attention/reflection/skill selection, real services and embodied effects are untested
+by this corpus. Timer success explicitly starts from a prior Goal with `ready_at`;
+50 new-request probes preserve the GI-to-readiness gap #60.
+
+The [audit](../ARCHITECTURE_AUDIT.md#expanded-workflow-audit--61626364) owns workflow
+I/O, diagnoses and coverage limits; [benchmarks](../benchmarks/README.md#offline-workflow-replay)
+own commands. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md)
+retain final gates, identities, archive and resume instructions. No new current
+Markdown owner, environment variable, profile or architecture layer; counts 102/15
+remain unchanged. Previous native work (226 executions/254 calls, no qualified
+repair) and the last 51-case live result (1 GI failure, 1 startup interrupted,
+49 unrun) remain revision-limited evidence. Service health was not freshly checked.
 
 ### Prior remaining-Issue delivery — 191083dc
 

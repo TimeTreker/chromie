@@ -10,6 +10,9 @@ import copy
 import hashlib
 import json
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -21,20 +24,81 @@ def encoded(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
 
+def load_case(path: Path) -> dict[str, Any]:
+    """Resolve hash-checked frozen packet parts, never regenerate expectations."""
+    def expand(value: Any) -> Any:
+        if isinstance(value, dict) and set(value) == {"$artifact"}:
+            digest = value['$artifact']
+            if not isinstance(digest, str) or len(digest) != 64 or any(c not in '0123456789abcdef' for c in digest):
+                raise ReplayMismatch('invalid frozen artifact identity')
+            raw = (path.parent/'artifacts'/f'{digest}.json').read_bytes()
+            if hashlib.sha256(raw).hexdigest() != digest:
+                raise ReplayMismatch('frozen artifact hash mismatch')
+            return json.loads(raw)
+        if isinstance(value, dict):
+            return {key:expand(item) for key,item in value.items()}
+        if isinstance(value, list):
+            return [expand(item) for item in value]
+        return value
+    return expand(json.loads(path.read_text()))
+
+
 class ReplayMismatch(RuntimeError):
     pass
 
 
 class ModelReplay:
-    def __init__(self, case: dict[str, Any]):
+    def __init__(self, case: dict[str, Any], *, candidate: dict[str, Any] | None = None):
         self.case = copy.deepcopy(case)
         self.steps = self.case["model_steps"]
+        self.candidate = copy.deepcopy(candidate)
+        if candidate:
+            parsed = urllib.parse.urlsplit(candidate['url'])
+            if candidate['role'] not in {'gi', 'ga', 'fast', 'deep'} or not candidate['model']:
+                raise ValueError('select one supported candidate role and model')
+            if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+                raise ValueError('candidate URL must be an explicit HTTP(S) model service')
+            if not 0 < candidate.get('timeout', 60) <= 600:
+                raise ValueError('candidate timeout must be within (0, 600] seconds')
+            if any(step.get('fixture_kind', 'authored_reference') != 'authored_reference' for step in self.steps):
+                raise ValueError('candidate mode cannot substitute intentional model faults or contract-gap answers')
+        self.candidate_calls = 0
+        self.candidate_changed_result = False
         self.position = 0
         self.bindings: dict[str, str] = {}
         self.records: list[dict[str, Any]] = []
         self.mismatches: list[dict[str, Any]] = []
         self.errors: list[str] = []
         self.lock = threading.RLock()
+
+    def candidate_reply(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Send only the actual role packet, never the case, reference or rubric."""
+        if self.candidate is None:
+            raise ReplayMismatch('candidate service was not selected')
+        payload = copy.deepcopy(request)
+        payload['model'] = self.candidate['model']
+        self.candidate_calls += 1
+        submission = urllib.request.Request(
+            self.candidate['url'].rstrip('/') + '/api/chat', data=encoded(payload),
+            headers={'Content-Type': 'application/json'}, method='POST',
+        )
+        try:
+            with urllib.request.urlopen(submission, timeout=self.candidate.get('timeout', 60)) as response:
+                raw = response.read().decode()
+        except urllib.error.HTTPError as exc:
+            self.records.append({'source': 'candidate', 'submitted_request': self.normalize(payload),
+                                 'http_status': exc.code, 'raw_transport_response': exc.read().decode(errors='replace')})
+            raise ReplayMismatch(f'candidate returned HTTP {exc.code}') from exc
+        except (OSError, urllib.error.URLError) as exc:
+            self.records.append({'source': 'candidate', 'submitted_request': self.normalize(payload),
+                                 'transport_error': str(exc)})
+            raise ReplayMismatch(f'candidate transport failed: {exc}') from exc
+        self.records.append({'source': 'candidate', 'submitted_request': self.normalize(payload),
+                             'raw_transport_response': raw})
+        envelope = json.loads(raw)
+        if not isinstance(envelope, dict):
+            raise ReplayMismatch('candidate response envelope must be an object')
+        return envelope
 
     def bind(self, name: str, value: str) -> None:
         """Register a value from a trusted runtime result, never from a model request."""
@@ -78,20 +142,36 @@ class ModelReplay:
                 normalized = self.normalize(request)
                 if path != "/api/chat" or normalized != step["request"]:
                     self.mismatches.append({"step":step['name'], "path":path, "actual_request":normalized,
+                        "verdict": 'uncovered_replay_branch' if self.candidate_changed_result else 'request_mismatch',
                         "expected_request_sha256":hashlib.sha256(encoded(step['request'])).hexdigest()})
                     raise ReplayMismatch(f"request mismatch at {step['name']}")
-                raw = self.materialize(step["response"])
+                messages = '\n'.join(str(item.get('content','')) for item in normalized.get('messages',[]))
+                for required in step.get('required_prompt_fragments',[]):
+                    if required not in messages and json.dumps(required,ensure_ascii=False)[1:-1] not in messages:
+                        raise ReplayMismatch(f'authoritative input missing at {step["name"]}: {required}')
+                use_candidate = self.candidate and self.candidate['role'] == step.get('role', step['name'].split('-')[0])
+                if use_candidate:
+                    envelope = self.candidate_reply(request)
+                    try:
+                        raw = json.loads(envelope.get('message', {}).get('content', ''))
+                    except (ValueError, TypeError, AttributeError):
+                        raw = None  # Preserve the malformed envelope for the actual role parser.
+                    self.candidate_changed_result |= self.normalize(raw) != step['response']
+                    record = self.records[-1]
+                else:
+                    raw = self.materialize(step["response"])
+                    envelope = {"model": request["model"], "message": {"role": "assistant", "content": json.dumps(raw, ensure_ascii=False)},
+                                "done": True, "done_reason": "stop"}
+                    record = {'source': 'replay'}
+                    self.records.append(record)
                 schema_errors = [e.message for e in Draft202012Validator(request["format"]).iter_errors(raw)]
-                self.records.append({
+                record.update({
                     "step": step["name"], "request": normalized,
                     "request_sha256": hashlib.sha256(encoded(normalized)).hexdigest(),
                     "response": self.normalize(raw), "schema_errors": schema_errors,
                 })
                 self.position += 1
-                return {
-                    "model": request["model"], "message": {"role": "assistant", "content": json.dumps(raw, ensure_ascii=False)},
-                    "done": True, "done_reason": "stop",
-                }
+                return envelope
             except (ReplayMismatch, KeyError, TypeError, ValueError) as exc:
                 self.errors.append(str(exc))
                 raise ReplayMismatch(str(exc)) from exc
@@ -132,7 +212,7 @@ class ReplayServer:
                 self.wfile.write(body)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread = threading.Thread(target=lambda: self.server.serve_forever(poll_interval=0.01), daemon=True)
         self.url = f"http://127.0.0.1:{self.server.server_port}"
 
     def __enter__(self) -> "ReplayServer":
@@ -151,7 +231,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--bindings", type=Path, help="Explicit trusted runtime identity map, when required")
     args = parser.parse_args()
-    replay = ModelReplay(json.loads(args.case.read_text()))
+    replay = ModelReplay(load_case(args.case))
     if args.bindings:
         for name, value in json.loads(args.bindings.read_text()).items():
             replay.bind(name, value)

@@ -30,7 +30,7 @@
                   "outcome": "告知用户北京今天的天气",
                   "bindings": {
                     "location": "北京",
-                    "date": "today"
+                    "time_scope": "today"
                   },
                   "confidence": 0.96,
                   "relationship": "new",
@@ -58,7 +58,7 @@
             "outcome": "告知用户北京今天的天气",
             "bindings": {
               "location": "北京",
-              "date": "today"
+              "time_scope": "today"
             },
             "confidence": 0.96,
             "output_mode": "information"
@@ -81,8 +81,7 @@
                   "local_ref": "r1",
                   "outcome": "点头一次",
                   "bindings": {
-                    "count": 1,
-                    "order": "first"
+                    "count": 1
                   },
                   "confidence": 0.98,
                   "relationship": "new",
@@ -98,7 +97,7 @@
                   "outcome": "眨眼两次",
                   "bindings": {
                     "count": 2,
-                    "order": "then"
+                    "after": "r1"
                   },
                   "confidence": 0.98,
                   "relationship": "new",
@@ -125,8 +124,7 @@
             "local_ref": "r1",
             "outcome": "点头一次",
             "bindings": {
-              "count": 1,
-              "order": "first"
+              "count": 1
             },
             "confidence": 0.98,
             "output_mode": "body_action"
@@ -136,7 +134,7 @@
             "outcome": "眨眼两次",
             "bindings": {
               "count": 2,
-              "order": "then"
+              "after": "r1"
             },
             "confidence": 0.98,
             "output_mode": "body_action"

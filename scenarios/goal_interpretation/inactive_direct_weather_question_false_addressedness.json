@@ -46,8 +46,8 @@
               "outcome": "告知用户北京今天是否下雨",
               "bindings": {
                 "location": "北京",
-                "date": "today",
-                "question": "rain"
+                "time_scope": "today",
+                "proposition": "rain"
               },
               "confidence": 0.95,
               "relationship": "new",
@@ -77,8 +77,8 @@
         "outcome": "告知用户北京今天是否下雨",
         "bindings": {
           "location": "北京",
-          "date": "today",
-          "question": "rain"
+          "time_scope": "today",
+          "proposition": "rain"
         },
         "confidence": 0.95,
         "relationship": "new",

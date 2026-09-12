@@ -27,8 +27,8 @@
               "outcome": "walk forward quickly for 15 seconds",
               "bindings": {
                 "direction": "forward",
-                "duration_s": 15,
-                "speed": "quickly"
+                "speed": "quickly",
+                "duration": "15 seconds"
               },
               "confidence": 0.97,
               "relationship": "new",
@@ -58,8 +58,8 @@
         "outcome": "walk forward quickly for 15 seconds",
         "bindings": {
           "direction": "forward",
-          "duration_s": 15,
-          "speed": "quickly"
+          "speed": "quickly",
+          "duration": "15 seconds"
         },
         "confidence": 0.97,
         "relationship": "new",

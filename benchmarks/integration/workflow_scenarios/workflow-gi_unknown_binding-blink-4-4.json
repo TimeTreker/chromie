@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "id": "workflow-gi_unknown_binding-blink-4-4",
+  "family": "normal",
+  "input": {
+    "sid": "workflow-gi_unknown_binding-blink-4-4",
+    "text": "请 blink 10 times。",
+    "language": "auto"
+  },
+  "initial_goal_resolution": null,
+  "initial_planner": "fast",
+  "scope": "Already-admitted role transaction; controlled providers/audio.",
+  "provenance": {
+    "author_model": "gpt-6-astra",
+    "reasoning_effort": "xhigh",
+    "author_kind": "current Codex task reference authoring",
+    "model_identity_evidence": "latest task turn_context model gpt-6-astra",
+    "task_id": "01a09282-0644-7461-96dc-1c6fe658ca9c",
+    "independent_review": false,
+    "model_ability_evaluated": false,
+    "training_eligible": false,
+    "authoring_method": "GPT-6 Astra authored 30 contrasts; deterministic 2 actions × 5 values × 5 language forms expansion",
+    "independent_inference_per_case": false
+  },
+  "catalog": [
+    {
+      "capability_id": "chromie.weather.lookup",
+      "agent_id": "chromie.weather",
+      "description": "Retrieve current or short-range weather for one location.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "x-chromie-entity-type": "location"
+          },
+          "date": {
+            "type": "string",
+            "default": "today"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "day",
+              "morning",
+              "afternoon",
+              "night"
+            ],
+            "default": "day",
+            "x-chromie-entity-type": "day_part"
+          }
+        },
+        "required": [
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [],
+      "safety_class": "safe_read",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "information",
+        "weather"
+      ],
+      "behavior_domains": [
+        "weather"
+      ],
+      "hints": {
+        "side_effect_free": true,
+        "semantic_scope": {
+          "responsibility_type": "acquire_and_deliver_resource",
+          "resource_kinds": [
+            "information"
+          ],
+          "delivery_modes": [
+            "spoken_explanation",
+            "structured_result"
+          ],
+          "acquisition": "structured_weather_retrieval",
+          "provider_result": "evidence_material",
+          "domain": "weather_forecast",
+          "supported_temporal_scopes": [
+            "current",
+            "today",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "tomorrow",
+            "near_term_forecast"
+          ],
+          "unsupported_temporal_scopes": [
+            "annual",
+            "seasonal",
+            "historical",
+            "climate_normals"
+          ],
+          "scope_mismatch_policy": "clarify_or_unavailable_never_narrow"
+        },
+        "resource_contract": {
+          "provider_role": "acquire_information",
+          "plan_requires": [],
+          "plan_provides": [
+            "resource_acquired"
+          ],
+          "completion_evidence": "trusted_tool_result",
+          "final_delivery_owner": "planner_communicative_activity"
+        }
+      },
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": null,
+      "resource_claims": [],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.blink_eyes",
+      "agent_id": "capability_agent",
+      "description": "Blink the robot's eyes an exact number of times.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "x-chromie-entity-type": "count"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [
+        "physical_motion"
+      ],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "embodiment",
+        "face"
+      ],
+      "behavior_domains": [
+        "social_attention"
+      ],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.face",
+      "resource_claims": [
+        "body.face"
+      ],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.walk_forward",
+      "agent_id": "capability_agent",
+      "description": "Walk forward for an exact duration in seconds.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "duration_s": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 30.0,
+            "x-chromie-entity-type": "duration_seconds"
+          }
+        },
+        "required": [
+          "duration_s"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [
+        "physical_motion"
+      ],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "embodiment",
+        "locomotion"
+      ],
+      "behavior_domains": [
+        "locomotion"
+      ],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": false,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.primary_motion",
+      "resource_claims": [
+        "body.primary_motion"
+      ],
+      "execution_constraints": {}
+    }
+  ],
+  "provider_schemas": {
+    "chromie.weather.lookup": {
+      "type": "object",
+      "properties": {
+        "rain_forecast": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rain_forecast"
+      ],
+      "additionalProperties": false
+    },
+    "soridormi.blink_eyes": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "completed"
+      ],
+      "additionalProperties": false
+    },
+    "soridormi.walk_forward": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "completed"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "provider_outputs": {
+    "chromie.weather.lookup": {
+      "rain_forecast": false
+    },
+    "soridormi.blink_eyes": {
+      "completed": true
+    },
+    "soridormi.walk_forward": {
+      "completed": true
+    }
+  },
+  "model_steps": [
+    {
+      "name": "gi",
+      "response": {
+        "confidence": 1.0,
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "请 blink 10 times",
+            "output_mode": "body_action",
+            "confidence": 1.0,
+            "source_evidence": {
+              "source_start_token_ref": "t0",
+              "source_end_token_ref": "t4"
+            },
+            "binding_items": {
+              "count": 10,
+              "invented_owner_field": "unsupported"
+            }
+          }
+        ],
+        "unresolved": [],
+        "coordination": []
+      },
+      "role": "gi",
+      "required_prompt_fragments": [
+        "请 blink 10 times。"
+      ],
+      "fixture_kind": "fault_injection",
+      "training_eligible": false,
+      "request": {
+        "model": "fixture-gi",
+        "stream": false,
+        "think": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": {
+              "$artifact": "168c77460ba2ebe87d86ca4166fb491e589757afc300cd58c389bc3499d1773b"
+            }
+          },
+          {
+            "role": "user",
+            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; Goal Interpretation owns current-turn WHAT):\n{\"original_text\":\"请 blink 10 times。\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=auto\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":1,\"ref\":\"t0\",\"start\":0,\"surface\":\"请\"},{\"end\":7,\"ref\":\"t1\",\"start\":2,\"surface\":\"blink\"},{\"end\":10,\"ref\":\"t2\",\"start\":8,\"surface\":\"10\"},{\"end\":16,\"ref\":\"t3\",\"start\":11,\"surface\":\"times\"},{\"end\":17,\"ref\":\"t4\",\"start\":16,\"surface\":\"。\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nSemantic Continuity Context:\nBounded session/world context JSON:{}\nInteraction context JSON:{}\nRecent accepted dialogue JSON:[]\nRetained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:[]\nActive Task/Activity progress with identity and pending clarification JSON:[]\n\nApply the system WHAT-only contract to this authoritative turn and bounded semantic Context. Return one complete schema-valid JSON decision only."
+          }
+        ],
+        "options": {
+          "temperature": 0,
+          "top_p": 0.9,
+          "num_ctx": 131072,
+          "num_predict": 2048
+        },
+        "format": {
+          "$artifact": "546314bf064d568f9c5550a0615aa509b313fd1676a8f76c72e8422490d2fc0e"
+        }
+      }
+    }
+  ],
+  "expected_provider_calls": [
+    {
+      "capability": "soridormi.blink_eyes",
+      "args": {
+        "count": 10
+      }
+    }
+  ],
+  "expected_goal_status": "satisfied",
+  "coverage_family": "gi_unknown_binding",
+  "contrast_set": "blink-4",
+  "split": "held_out",
+  "training_eligible": false,
+  "reference_review": "Astra-authored parameterized reference; non-independent review",
+  "expected_verdict": "expected_rejection",
+  "parameters": {
+    "action": "blink",
+    "value": 10,
+    "form": 4
+  },
+  "semantic_dimensions": [
+    "source ownership",
+    "parameter conservation",
+    "stage/Goal separation",
+    "terminal evidence"
+  ],
+  "forbidden_outcomes": [
+    "unbound or early effect",
+    "wrong parameter",
+    "unsupported completion"
+  ],
+  "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
+  "probe": "gi_unknown_binding",
+  "expected_rejection": "gi"
+}

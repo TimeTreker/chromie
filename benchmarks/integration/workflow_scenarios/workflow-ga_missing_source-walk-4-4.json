@@ -1,0 +1,427 @@
+{
+  "schema_version": 1,
+  "id": "workflow-ga_missing_source-walk-4-4",
+  "family": "normal",
+  "input": {
+    "sid": "workflow-ga_missing_source-walk-4-4",
+    "text": "请 walk forward for 30 seconds。",
+    "language": "auto"
+  },
+  "initial_goal_resolution": null,
+  "initial_planner": "fast",
+  "scope": "Already-admitted role transaction; controlled providers/audio.",
+  "provenance": {
+    "author_model": "gpt-6-astra",
+    "reasoning_effort": "xhigh",
+    "author_kind": "current Codex task reference authoring",
+    "model_identity_evidence": "latest task turn_context model gpt-6-astra",
+    "task_id": "01a09282-0644-7461-96dc-1c6fe658ca9c",
+    "independent_review": false,
+    "model_ability_evaluated": false,
+    "training_eligible": false,
+    "authoring_method": "GPT-6 Astra authored 30 contrasts; deterministic 2 actions × 5 values × 5 language forms expansion",
+    "independent_inference_per_case": false
+  },
+  "catalog": [
+    {
+      "capability_id": "chromie.weather.lookup",
+      "agent_id": "chromie.weather",
+      "description": "Retrieve current or short-range weather for one location.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "minLength": 1,
+            "x-chromie-entity-type": "location"
+          },
+          "date": {
+            "type": "string",
+            "default": "today"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "day",
+              "morning",
+              "afternoon",
+              "night"
+            ],
+            "default": "day",
+            "x-chromie-entity-type": "day_part"
+          }
+        },
+        "required": [
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [],
+      "safety_class": "safe_read",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "information",
+        "weather"
+      ],
+      "behavior_domains": [
+        "weather"
+      ],
+      "hints": {
+        "side_effect_free": true,
+        "semantic_scope": {
+          "responsibility_type": "acquire_and_deliver_resource",
+          "resource_kinds": [
+            "information"
+          ],
+          "delivery_modes": [
+            "spoken_explanation",
+            "structured_result"
+          ],
+          "acquisition": "structured_weather_retrieval",
+          "provider_result": "evidence_material",
+          "domain": "weather_forecast",
+          "supported_temporal_scopes": [
+            "current",
+            "today",
+            "morning",
+            "afternoon",
+            "evening",
+            "night",
+            "tomorrow",
+            "near_term_forecast"
+          ],
+          "unsupported_temporal_scopes": [
+            "annual",
+            "seasonal",
+            "historical",
+            "climate_normals"
+          ],
+          "scope_mismatch_policy": "clarify_or_unavailable_never_narrow"
+        },
+        "resource_contract": {
+          "provider_role": "acquire_information",
+          "plan_requires": [],
+          "plan_provides": [
+            "resource_acquired"
+          ],
+          "completion_evidence": "trusted_tool_result",
+          "final_delivery_owner": "planner_communicative_activity"
+        }
+      },
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": null,
+      "resource_claims": [],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.blink_eyes",
+      "agent_id": "capability_agent",
+      "description": "Blink the robot's eyes an exact number of times.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "x-chromie-entity-type": "count"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [
+        "physical_motion"
+      ],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "embodiment",
+        "face"
+      ],
+      "behavior_domains": [
+        "social_attention"
+      ],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": true,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.face",
+      "resource_claims": [
+        "body.face"
+      ],
+      "execution_constraints": {}
+    },
+    {
+      "capability_id": "soridormi.walk_forward",
+      "agent_id": "capability_agent",
+      "description": "Walk forward for an exact duration in seconds.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "duration_s": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 30.0,
+            "x-chromie-entity-type": "duration_seconds"
+          }
+        },
+        "required": [
+          "duration_s"
+        ],
+        "additionalProperties": false
+      },
+      "effects": [
+        "physical_motion"
+      ],
+      "safety_class": "safe_motion",
+      "requires_confirmation": false,
+      "available": true,
+      "source": "qualification_fixture",
+      "invocation_kind": "mcp_tool",
+      "interaction_executable": true,
+      "prompt_tier": "common",
+      "prompt_tier_locked": true,
+      "prompt_tier_source": "qualification_fixture",
+      "tags": [
+        "embodiment",
+        "locomotion"
+      ],
+      "behavior_domains": [
+        "locomotion"
+      ],
+      "hints": {},
+      "metadata": {},
+      "can_run_parallel": false,
+      "parallel_metadata_declared": true,
+      "exclusive_group": "body.primary_motion",
+      "resource_claims": [
+        "body.primary_motion"
+      ],
+      "execution_constraints": {}
+    }
+  ],
+  "provider_schemas": {
+    "chromie.weather.lookup": {
+      "type": "object",
+      "properties": {
+        "rain_forecast": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rain_forecast"
+      ],
+      "additionalProperties": false
+    },
+    "soridormi.blink_eyes": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "completed"
+      ],
+      "additionalProperties": false
+    },
+    "soridormi.walk_forward": {
+      "type": "object",
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "completed"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "provider_outputs": {
+    "chromie.weather.lookup": {
+      "rain_forecast": false
+    },
+    "soridormi.blink_eyes": {
+      "completed": true
+    },
+    "soridormi.walk_forward": {
+      "completed": true
+    }
+  },
+  "model_steps": [
+    {
+      "name": "gi",
+      "response": {
+        "confidence": 1.0,
+        "responsibilities": [
+          {
+            "local_ref": "r1",
+            "outcome": "请 walk forward for 30 seconds",
+            "output_mode": "body_action",
+            "confidence": 1.0,
+            "source_evidence": {
+              "source_start_token_ref": "t0",
+              "source_end_token_ref": "t6"
+            },
+            "binding_items": {
+              "duration": "30 seconds",
+              "direction": "forward"
+            }
+          }
+        ],
+        "unresolved": [],
+        "coordination": []
+      },
+      "role": "gi",
+      "required_prompt_fragments": [
+        "请 walk forward for 30 seconds。"
+      ],
+      "fixture_kind": "authored_reference",
+      "training_eligible": false,
+      "request": {
+        "model": "fixture-gi",
+        "stream": false,
+        "think": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": {
+              "$artifact": "168c77460ba2ebe87d86ca4166fb491e589757afc300cd58c389bc3499d1773b"
+            }
+          },
+          {
+            "role": "user",
+            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; Goal Interpretation owns current-turn WHAT):\n{\"original_text\":\"请 walk forward for 30 seconds。\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=auto\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":1,\"ref\":\"t0\",\"start\":0,\"surface\":\"请\"},{\"end\":6,\"ref\":\"t1\",\"start\":2,\"surface\":\"walk\"},{\"end\":14,\"ref\":\"t2\",\"start\":7,\"surface\":\"forward\"},{\"end\":18,\"ref\":\"t3\",\"start\":15,\"surface\":\"for\"},{\"end\":21,\"ref\":\"t4\",\"start\":19,\"surface\":\"30\"},{\"end\":29,\"ref\":\"t5\",\"start\":22,\"surface\":\"seconds\"},{\"end\":30,\"ref\":\"t6\",\"start\":29,\"surface\":\"。\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nSemantic Continuity Context:\nBounded session/world context JSON:{}\nInteraction context JSON:{}\nRecent accepted dialogue JSON:[]\nRetained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:[]\nActive Task/Activity progress with identity and pending clarification JSON:[]\n\nApply the system WHAT-only contract to this authoritative turn and bounded semantic Context. Return one complete schema-valid JSON decision only."
+          }
+        ],
+        "options": {
+          "temperature": 0,
+          "top_p": 0.9,
+          "num_ctx": 131072,
+          "num_predict": 2048
+        },
+        "format": {
+          "$artifact": "df09ae2e21a319c65b3e5216c3b9508dc869e5e825eb4053108abf06733c4805"
+        }
+      }
+    },
+    {
+      "name": "ga",
+      "response": {
+        "decision": "create_goals",
+        "new_goals": [
+          {
+            "source_responsibility_refs": [],
+            "output_mode": "body_action",
+            "media_operation": "none",
+            "bindings": [
+              {
+                "name": "duration",
+                "entity_type": "duration",
+                "value": "30 seconds",
+                "confidence": 1.0
+              },
+              {
+                "name": "direction",
+                "entity_type": "direction",
+                "value": "forward",
+                "confidence": 1.0
+              }
+            ],
+            "related_goal_ids": [],
+            "supersedes_goal_ids": [],
+            "resource_kind": "none",
+            "resource_responsibility": null
+          }
+        ],
+        "referent_updates": [],
+        "resolved_references": [],
+        "confidence": 1.0,
+        "reason_summary": "Preserve the accepted requested body effect."
+      },
+      "role": "ga",
+      "fixture_kind": "fault_injection",
+      "training_eligible": false,
+      "request": {
+        "model": "fixture-ga",
+        "messages": [
+          {
+            "role": "system",
+            "content": {
+              "$artifact": "23eddaa2c17ad6a88d1b11e9149aee6a7c174552da4f585a7f7af690bffc8998"
+            }
+          },
+          {
+            "role": "user",
+            "content": "Owner-approved Chromie identity JSON:\nnull\n\nPreserve the human-facing WHAT category from Goal Interpretation exactly. Goal Association may refine semantic bindings, resource structure, references, and canonical continuity, but it does not decide whether a Capability, provider, execution lane, fresh Evidence, or Work is required. Use information when the person wants Chromie to determine or provide information, whether that information is already available to reasoning/context or must later be acquired. Use stateful_effect only for a durable or future state change outside embodiment, such as recording, scheduling, changing a setting, or sending later. Locomotion, posture, gaze, gesture, physical manipulation, carrying, and handover use body_action even when they change location or another lasting physical state; lifecycle control of media uses media_playback; authored vocal performances use their exact vocal mode. Ordinary directly authored conversation uses speech. Capability and provider applicability are Planner concerns and must not be encoded into Goal output_mode or metadata. A negative instruction that limits another outcome is a constraint, not a separate Goal. A manner, mood, persona, or social-presentation directive attached to another effect is expression framing, not an extra spoken Goal. Coordination grammar still requires one Goal per independently satisfiable observable outcome. Never invent an audible modality from style wording alone.\n\nThere are no active or retained recent Goals. Association is impossible; create new Goals only. Goal Association receives provider-neutral Responsibility evidence, not a route, Capability, plan, or response draft. The authoritative user turn and the supplied GI Responsibilities are the only sources of owed human outcomes. Fast Planner Activity is HOW authored concurrently and must never become, justify, or be copied into a Goal. Responsibility conservation is strict: create exactly one Goal for each independently satisfiable Responsibility, copy its local_ref into source_responsibility_refs, and neither merge independent effects nor add acknowledgement, progress, delivery, personality, or implementation Goals. A manner, prohibition, timing, or social-presentation modifier stays on the outcome it constrains. A greeting attached to substantive work is framing; a standalone social act is one speech Goal. Information acquisition and a requested interpretation of that same evidence are one Goal. Acquisition, carrying, return, and handoff are stages of one requested physical delivery, not sibling Goals.\n\nPreserve the supplied Responsibility WHAT output_mode exactly in the canonical Goal. information keeps one information resource_responsibility when grounded information acquisition is the human outcome; stateful_effect keeps ordinary typed bindings and no information resource. This semantic preservation never selects a Capability, provider, executable operation, or Plan. Preserve every supplied material binding verbatim, including counts, durations, speeds, directions, targets, severity, thresholds, negation, comparison, and scope. For a non-resource Goal, put these in top-level typed bindings; the action remains in GI outcome. Do not emit a Goal description: Host inherits it and success_criteria from GI. Do not claim completion or choose a Capability. \n\nUse resource_responsibility only when obtaining and making a resource available to a recipient is the human outcome. A physical_object is a distinct concrete object independent of Chromie's body and requires acquisition plus physical_handover. Locomotion, gaze, blinking, gesture, turning, posture, and other self-motion are non-resource body_action Goals; never describe Chromie's body, position, displacement, or motion as an object to acquire or hand over. A physical resource keeps top-level bindings empty; its identity/quantity belong to description/quantity and its supplied location, distance, direction, and route belong in source.acquisition_bindings. Preserve separately supplied GI bindings separately, but never decompose one GI-owned composite binding: retain its complete source value in one typed acquisition binding. Supplied spatial grounding requires source.status=known; source.status=unknown is allowed only when none was supplied.\n\nAn information resource uses output_mode=information and one exact information_domain: local_clock, weather_forecast, external_grounded_information, direct_environment_perception, or private_runtime_information. Its query_scope is the sole owner of location, time, aspects, comparisons, and thresholds: a resolved place is a query_scope binding named location, with time and requested result aspects as separate bindings. Current nearby people/objects/events require direct_environment_perception, not weather. A public source uses source.status=provider_resolved; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for an explicitly named source. Never invent location, timezone, source, provider, device, coordinates, or another query fact. Preserve source-grounded temporal wording as human semantic scope in query_scope. A compound natural expression stays intact instead of being decomposed into Capability date, period, or clock-range arguments. A duration remains duration. Never narrow broader temporal scope.\n\nResolve a pronoun, demonstrative, ellipsis, correction, or task mention only from explicit current meaning, a supplied scoped discourse referent, a candidate binding, or accepted dialogue, in that order. There are no candidate Goals in this request. If evidence does not select one meaning, keep the narrowest source-grounded provisional Goal and do not invent the referent; Fast Planner owns any clarification. resolved_references may copy only a supplied referent_id. Ordinary explicit mentions are bindings, not resolved references. referent_updates require supplied provenance; never invent IDs. Tool results and runtime diagnostics are not semantic authority.\n\nThe Host owns IDs, versions, lifecycle, source text, persistence, plans, and canonical construction. Emit none of those fields. Return only the exact GoalSegmentationModelOutput JSON Schema: decision=create_goals, new_goals, referent_updates, resolved_references, confidence, and compact reason_summary. Goal Association never executes, commits, asks a question, creates a planning InformationGap, or pretends work is complete.\n\nResponsibility evidence JSON:\n[{\"bindings\":{\"direction\":\"forward\",\"duration\":\"30 seconds\"},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"请 walk forward for 30 seconds\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t6\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]}]\n\nGI unresolved-meaning evidence JSON:\n[]\n\nScoped discourse referents JSON:\n[]\n\nRecent accepted conversation JSON (reference evidence only):\n[]\n\nLanguage hint: auto\nIMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"请 walk forward for 30 seconds。\",\"authority\":\"normalized_transport_fallback\"}"
+          }
+        ],
+        "stream": false,
+        "think": false,
+        "options": {
+          "temperature": 0,
+          "top_p": 0.9,
+          "num_ctx": 131072,
+          "num_predict": 2048
+        },
+        "format": {
+          "$artifact": "a9f1b97566b53c336fe2506ef094d6850902ceb6d0975e62ebd2e45485b1c780"
+        }
+      }
+    }
+  ],
+  "expected_provider_calls": [
+    {
+      "capability": "soridormi.walk_forward",
+      "args": {
+        "duration_s": 30
+      }
+    }
+  ],
+  "expected_goal_status": "satisfied",
+  "coverage_family": "ga_missing_source",
+  "contrast_set": "walk-4",
+  "split": "held_out",
+  "training_eligible": false,
+  "reference_review": "Astra-authored parameterized reference; non-independent review",
+  "expected_verdict": "expected_rejection",
+  "parameters": {
+    "action": "walk",
+    "value": 30,
+    "form": 4
+  },
+  "semantic_dimensions": [
+    "source ownership",
+    "parameter conservation",
+    "stage/Goal separation",
+    "terminal evidence"
+  ],
+  "forbidden_outcomes": [
+    "unbound or early effect",
+    "wrong parameter",
+    "unsupported completion"
+  ],
+  "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
+  "probe": "ga_missing_source",
+  "expected_rejection": "ga"
+}

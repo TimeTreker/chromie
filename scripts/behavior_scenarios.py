@@ -1008,6 +1008,7 @@ def _evaluate_goal_interpretation_expectations(
                 for field in (
                     "local_ref",
                     "outcome",
+                    "output_mode",
                     "relationship",
                     "target_goal_ids",
                     "resolved_gap_ids",

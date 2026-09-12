@@ -28,8 +28,7 @@
               "local_ref": "r1",
               "outcome": "点头一次",
               "bindings": {
-                "count": 1,
-                "order": "first"
+                "count": 1
               },
               "confidence": 0.98,
               "relationship": "new",
@@ -45,7 +44,7 @@
               "outcome": "眨眼两次",
               "bindings": {
                 "count": 2,
-                "order": "then"
+                "after": "r1"
               },
               "confidence": 0.98,
               "relationship": "new",
@@ -74,8 +73,7 @@
         "local_ref": "r1",
         "outcome": "点头一次",
         "bindings": {
-          "count": 1,
-          "order": "first"
+          "count": 1
         },
         "confidence": 0.98,
         "relationship": "new",
@@ -87,7 +85,7 @@
         "outcome": "眨眼两次",
         "bindings": {
           "count": 2,
-          "order": "then"
+          "after": "r1"
         },
         "confidence": 0.98,
         "relationship": "new",

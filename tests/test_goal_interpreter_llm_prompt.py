@@ -1422,6 +1422,30 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             ollama_url="http://example.invalid", model="test-model", deep_model="deep-test-model", timeout_ms=800
         )
 
+    async def test_unknown_binding_names_rejected_by_both_role_hosts(self) -> None:
+        text = "Nod twice."
+        for stage in ("primary", "deep"):
+            for field in ("bindings", "binding_items"):
+                with self.subTest(stage=stage, field=field):
+                    primary = _valid_output(text, unresolved=["uncertain"])
+                    primary["responsibilities"][0].update(
+                        outcome=text, bindings={"count": 2}, output_mode="body_action"
+                    )
+                    invalid = copy.deepcopy(primary)
+                    invalid["unresolved"] = []
+                    item = invalid["responsibilities"][0]
+                    item.pop("bindings")
+                    item[field] = {"count": 2, "invented_owner_field": "unsupported"}
+                    invalid["coordination"] = []
+                    outputs = [primary, invalid] if stage == "deep" else [invalid]
+                    interpreter = self._interpreter()
+                    interpreter._chat = mock.AsyncMock(side_effect=[
+                        {"message": {"content": json.dumps(raw)}} for raw in outputs
+                    ])
+                    with self.assertRaisesRegex(InterpretationUnavailableError, "SemanticStructureViolation"):
+                        await interpreter.interpret_goal(GoalInterpretationRequest(text=text))
+                    self.assertEqual(interpreter._chat.await_count, len(outputs))
+
     async def test_resolved_primary_result_uses_one_model_call(self) -> None:
         interpreter = self._interpreter()
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]

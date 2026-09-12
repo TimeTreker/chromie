@@ -68,6 +68,18 @@ retains source/corpus hashes and per-call requests/replies; mismatches fail clos
 The delayed case starts from a declared prior scheduled Goal and does not prove
 new-request temporal interpretation ([#60](https://github.com/TimeTreker/chromie/issues/60)).
 These passes cannot close #24/#32 or replace native streaming, voice or robot evidence.
+The expanded cohort has 30 authored contrasts and 1,500 parameter/language variants;
+this count is not 1,500 independent model inferences or abilities. Report expected
+rejections/state outcomes separately from completed workflows, and retain the 50
+known #60 gaps as failed cases. Single-role substitution sends only the actual role
+request to an explicitly selected candidate; an uncovered downstream packet is a
+coverage gap, not an automatic semantic failure. Model Schema errors take precedence.
+Fault-injection answers must never enter training; all current references remain
+ineligible pending independent review. Parameter-group split separation does not
+establish unseen-family generalization. A native candidate's Schema/DTO/Host acceptance
+still needs separate semantic adjudication and eventual combined-model integration.
+The behavior scenario oracle also checks declared Responsibility `output_mode` (#64);
+reference source-span entailment is not mechanically established by that check.
 
 | Level | Environment | What it proves |
 |---|---|---|

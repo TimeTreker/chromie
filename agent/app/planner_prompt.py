@@ -1140,6 +1140,9 @@ def deep_plan_prompt(
     grounding = list(goal_context.authoritative_goals)
     response_only = goal_context.response_only
     requires_execution = goal_context.requires_execution
+    # Association and snapshots grow with the admitted Goal scope. Keep the
+    # existing per-Goal allowance; whole-request preflight still bounds inference.
+    goal_projection_budget = 3200 * max(1, len(grounding))
     result_evidence_contract = (
         "This is a trusted terminal-Evidence Planner re-entry, not a new user turn. "
         "Only the typed re-entry Goal scope and FINAL CANONICAL GOALS are current "
@@ -1202,8 +1205,8 @@ def deep_plan_prompt(
         )
     )
     return (
-        f"Goal association advisory JSON:\n{required_json(association, 3200, label='Deep Planner Goal association')}\n\n"
-        f"Active goals JSON:\n{required_json(goals, 3200, label='Deep Planner active Goals')}\n\n"
+        f"Goal association advisory JSON:\n{required_json(association, goal_projection_budget, label='Deep Planner Goal association')}\n\n"
+        f"Active goals JSON:\n{required_json(goals, goal_projection_budget, label='Deep Planner active Goals')}\n\n"
         f"Recent prior dialogue JSON:\n{required_json(recent_dialogue_prompt_projection(request.history), 6000, label='Deep Planner prior dialogue')}\n\n"
         "These are at most six retained prior records with exact text and speaker roles. "
         "Preserve their source and delivery metadata: an authored response is not proof "

@@ -1323,6 +1323,12 @@ def _reject_transport_echo_bindings(
                 )
 
 
+_GI_SIBLING_RELATION_NAMES = frozenset({"after", "before", "follows", "parallel_with", "precedes"})
+_GI_SIMULTANEOUS_RELATION_NAMES = frozenset({
+    "alongside", "concurrent_with", "parallel_with", "simultaneity", "simultaneous_with", "with",
+})
+
+
 def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
     """Require coordination edges to reference sibling Responsibilities.
 
@@ -1348,21 +1354,8 @@ def _reject_untyped_coordination_bindings(parsed: dict[str, Any]) -> None:
         "simultaneously",
         "together",
     }
-    sibling_relation_names = {
-        "after",
-        "before",
-        "follows",
-        "parallel_with",
-        "precedes",
-    }
-    simultaneous_relation_names = {
-        "alongside",
-        "concurrent_with",
-        "parallel_with",
-        "simultaneity",
-        "simultaneous_with",
-        "with",
-    }
+    sibling_relation_names = _GI_SIBLING_RELATION_NAMES
+    simultaneous_relation_names = _GI_SIMULTANEOUS_RELATION_NAMES
     for responsibility_index, item in enumerate(responsibilities):
         if not isinstance(item, dict):
             continue
@@ -2758,9 +2751,23 @@ class OllamaGoalInterpreter:
     def _validate_interpretation_content(
         request: GoalInterpretationRequest,
         content: str,
+        *,
+        response_schema: dict[str, Any] | None = None,
     ) -> GoalInterpretationDecision:
         parsed = _extract_json_object(content)
         proposals = parsed.get("responsibilities")
+        # Inspect model-authored keys before lowering typed coordination into
+        # canonical after/parallel_with bindings. The latter are Host-derived.
+        authored_wire_binding_names = {
+            name
+            for item in proposals if isinstance(item, dict)
+            for name in (item["binding_items"] if isinstance(item.get("binding_items"), dict) else {})
+        } if isinstance(proposals, list) else set()
+        authored_canonical_binding_names = {
+            name
+            for item in proposals if isinstance(item, dict)
+            for name in (item["bindings"] if isinstance(item.get("bindings"), dict) else {})
+        } if isinstance(proposals, list) else set()
         for item in proposals if isinstance(proposals, list) else []:
             if not isinstance(item, dict):
                 continue  # The closed DTO rejects non-object entries below.
@@ -2801,6 +2808,19 @@ class OllamaGoalInterpreter:
         _reject_untyped_coordination_bindings(parsed)
         _reject_dropped_explicit_numeric_bindings(request, parsed)
         _reject_noncanonical_count_bindings(parsed)
+        prior = _most_recent_assistant_utterance(request.context)
+        schema = response_schema or OllamaGoalInterpreter._goal_interpretation_response_schema(
+            prior_assistant_utterance=prior["text"] if prior is not None else None,
+        )
+        declared = schema["$defs"]["CognitiveResponsibilityProposal"]["properties"]["binding_items"]["properties"]
+        unknown = (authored_wire_binding_names - set(declared)) | (
+            authored_canonical_binding_names - set(declared)
+            - _GI_SIBLING_RELATION_NAMES - _GI_SIMULTANEOUS_RELATION_NAMES
+        )
+        if unknown:
+            raise _GoalInterpretationSemanticStructureViolation(
+                f"Goal Interpretation contains undeclared semantic binding names: {sorted(unknown)}"
+            )
         return GoalInterpretationDecision.model_validate(parsed)
 
     async def _accept_or_deepen_interpretation(
@@ -2816,14 +2836,16 @@ class OllamaGoalInterpreter:
             "material_unresolved_responsibility_meaning",
         )
         try:
+            payload = self.build_deep_interpretation_payload(request)
             data = await self._chat_logged(
-                self.build_deep_interpretation_payload(request),
+                payload,
                 stage="goal_interpretation_deep",
                 request=request,
             )
             decision = self._validate_interpretation_content(
                 request,
                 str(data.get("message", {}).get("content") or ""),
+                response_schema=payload["format"],
             )
             return decision
         except Exception as exc:
@@ -2836,8 +2858,9 @@ class OllamaGoalInterpreter:
         self, request: GoalInterpretationRequest
     ) -> GoalInterpretationDecision:
         try:
+            payload = self.build_interpretation_payload(request)
             data = await self._chat_logged(
-                self.build_interpretation_payload(request),
+                payload,
                 stage="goal_interpretation",
                 request=request,
             )
@@ -2848,7 +2871,7 @@ class OllamaGoalInterpreter:
 
         content = str(data.get("message", {}).get("content") or "")
         try:
-            decision = self._validate_interpretation_content(request, content)
+            decision = self._validate_interpretation_content(request, content, response_schema=payload["format"])
             return await self._accept_or_deepen_interpretation(request, decision)
         except _GoalInterpretationSemanticStructureViolation as exc:
             logger.warning(

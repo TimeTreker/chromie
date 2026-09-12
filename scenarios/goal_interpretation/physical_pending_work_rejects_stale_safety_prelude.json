@@ -27,7 +27,7 @@
               "outcome": "向前走十五秒",
               "bindings": {
                 "direction": "forward",
-                "duration_s": 15
+                "duration": "十五秒"
               },
               "confidence": 0.96,
               "relationship": "new",
@@ -57,7 +57,7 @@
         "outcome": "向前走十五秒",
         "bindings": {
           "direction": "forward",
-          "duration_s": 15
+          "duration": "十五秒"
         },
         "confidence": 0.96,
         "relationship": "new",

@@ -173,48 +173,89 @@ authoritative source dataset.
 
 ### Offline workflow replay
 
-Run the small frozen architecture cohort without a model server or hardware:
+Run the frozen architecture cohort without a model server or hardware:
 
 ```bash
 python scripts/run_workflow_replay.py \
-  --evidence-dir .chromie/acceptance/workflow-replay-new-run
+  --evidence-dir .chromie/acceptance/workflow-1500-new-run
 python -m pytest -q tests/test_workflow_replay.py
 ```
 
-The evidence directory must be unused. Do not use Python `-O`, which disables test
-assertions. The runner discovers `integration/scenarios/workflow-*.json` and creates
-fresh persisted state per case. Five cases cover normal execution, both forecast
-branches, a prior scheduled Goal across restart/due wake, and in-flight cancellation.
-Production GI/GA/Fast/Deep clients call an ephemeral loopback HTTP service through
-`/api/chat`; parsers, contract validation, Runtime, result re-entry and Goal bookkeeping
-remain real. The driver explicitly supplies initial admission and role scheduling,
-wall time/UUIDs, provider observations and successful local speech receipts. It does
-not test Gateway/audio admission, native inference, streaming or physical execution.
+Use an unused evidence directory and run without Python `-O`. The runner discovers
+`integration/workflow_scenarios/workflow-*.json`: 1,500 cases from 30 authored
+contrasts × 2 actions × 5 parameter values × 5 language forms. Original five
+prototype episodes remain in `integration/scenarios/`; select that directory with
+`--case-root` to rerun them. `--family` selects a diagnostic subset, never an aggregate.
+The full cohort intentionally returns exit 1 while its 50 #60 cases remain known
+contract gaps; inspect `summary.json` rather than treating that exit as an unknown
+regression or silently excluding the gaps.
 
-`integration/model_replay.py` returns only the next frozen reply after exact matching
+Coverage includes Fast/Deep execution, conditional acquisition and both result
+branches, retained timers/restart, cancellation, provider failure/refusal/invalid
+output, duplicate/stale/foreign Evidence, source mapping, forbidden model output,
+parameter and Goal conservation, and new-request readiness representability.
+Production GI/GA/Fast/Deep clients call `/api/chat`; parsers, contract validation,
+Runtime, result re-entry and Goal bookkeeping remain real. The driver explicitly
+supplies initial admission and role scheduling, wall time/UUIDs, provider observations
+and local speech receipts. It does not test Gateway/audio admission, native inference,
+streaming, deployment integration or physical execution. Terminal-timer coverage uses
+an explicit terminal-state fixture; it does not prove the producer of that state.
+
+`integration/model_replay.py` returns the next frozen reply only after exact matching
 of messages, context, Schema, model identity and options. Explicit trusted runtime
-Goal IDs may be bound to fixture placeholders; no keyword routing, semantic matching,
-online fallback or automatic recording exists. Unknown, changed, reordered, extra
-and unused calls fail; failed requests and stage evidence are retained. A standalone
-service is available with `python -m benchmarks.integration.model_replay CASE.json
---port 0 --bindings TRUSTED_BINDINGS.json`; a fresh episode needs its real committed
-Goal identity registered by the harness. The normal runner handles this automatically.
+Goal IDs may bind fixture placeholders. Unknown, changed, reordered, extra and unused
+calls fail; no semantic matching, implicit online fallback or automatic recording
+exists. A standalone service is available with `python -m
+benchmarks.integration.model_replay CASE.json --port 0 --bindings TRUSTED_BINDINGS.json`;
+the normal runner binds committed Goal identities automatically.
 
-The current references were authored and reviewed in one GPT-6 Astra Codex task.
-Review is non-independent; they are expected test outputs, not model-quality truth.
-`manifest.json` records the reviewed corpus hashes. Updating prompts or contracts
-requires intentional reference/request review and a new freeze; a mismatch must never
-silently teach the replay a new answer. Review raw replies separately from normalized
-DTOs and keep failures from preparation. Expand scenario families only after checking
-what real boundaries their assertions exercise. Runtime state/call assertions are
-separate from stored model answers.
+`integration/workflow_corpus.py` owns offline authoring/expansion only. GPT-6 Astra
+in this task authored the 30 contrasts and reference rules; deterministic expansion
+is not 1,500 independent model inferences. Review is non-independent. Persisted case
+JSONs and SHA256-addressed shared packet parts are authoritative during execution;
+the runner never invokes the authoring module. Manifests bind case/part hashes.
+Updating a prompt/contract requires explicit request/reference review and a new
+freeze. Keep failed captures and preceding identities; never fit expected semantic
+answers to observed behavior. Runtime assertions remain separate from model answers.
+The #63 packet extension added only 72 previously unreachable Deep requests after
+repair; existing packets, semantic references and oracles were unchanged.
 
-The timer case explicitly seeds an existing Goal with `ready_at`; new GI → readiness
-conversion remains [#60](https://github.com/TimeTreker/chromie/issues/60). Operational
-stop cancels execution while leaving the original unmet Goal open. See
-[acceptance scope](../docs/ACCEPTANCE.md) and the
-[audit](../ARCHITECTURE_AUDIT.md#offline-workflow-replay--59) for the reproduced
-prerequisite/count defect, corrective boundary and evidence limits.
+All cases and outputs are `training_eligible=false`. Correct authored references,
+intentional `fault_injection` results and `desired_unrepresentable_result` probes are
+separate. The 900 train-candidate / 300 development / 300 held-out split keeps all
+languages and positive/negative relatives of one action/value together. These are
+parameter holdouts within shared authored families, not unseen-family generalization
+or ready-made LoRA training data. Independent review and a richer hidden semantic
+cohort are required before promoting training/evaluation data.
+
+To exercise one candidate role while keeping other roles frozen, explicitly select
+an Ollama-compatible endpoint and model (this command performs candidate inference):
+
+```bash
+python scripts/run_workflow_replay.py --family normal_fast \
+  --candidate-role gi --candidate-url http://127.0.0.1:11434 \
+  --candidate-model YOUR_MODEL --candidate-timeout 60 \
+  --evidence-dir .chromie/acceptance/workflow-candidate-new-run
+```
+
+Supported roles are `gi`, `ga`, `fast`, `deep`. Remove `--family` to discover all
+eligible cases for that role. This mode excludes intentional model-fault/gap replies
+and cases that never invoke the selected role; the summary records exclusions and
+actual external call counts. There are 750 reference-only cases before role filtering.
+Only the real role packet is forwarded, with its model identifier replaced; expected
+answers, rubrics and labels are never sent. Raw provider envelopes and termination are
+retained. Other roles keep strict request matching. A changed accepted candidate
+result may stop at `uncovered_replay_branch`, requiring a reviewed alternate branch;
+this is neither a semantic failure nor a pass. A candidate Schema violation remains
+`candidate_contract_failure`. No automatic branch authoring, substitute answer,
+semantic critic or fallback inference is supplied. HTTP compatibility and local
+fixture-routing tests do not qualify a native model or produce LoRA training data.
+
+The timer cases seed an existing Goal with `ready_at`; new GI → readiness conversion
+remains [#60](https://github.com/TimeTreker/chromie/issues/60). Operational stop leaves
+the unmet Goal open; semantic cancellation closes the cancelled Goal and prevents
+later wake. See [acceptance scope](../docs/ACCEPTANCE.md) and the
+[audit](../ARCHITECTURE_AUDIT.md) for actual module I/O, defects and evidence limits.
 
 `runners/` executes normalized scenarios through an explicit executor boundary.
 It does not import production services or infer expected behavior from user text.

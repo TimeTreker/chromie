@@ -1,12 +1,142 @@
 # Chromie project principles and implementation audit
 
-**Updated:** 2026-09-13. **Pre-delivery base:** `6f726ce32f2d69d6fd167ad600cfb7f9eb599536`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
+**Updated:** 2026-09-13. **Pre-delivery base:** `0457db8dfba677363bf99b7ab4f17027e70d4740`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
 
 **Audience:** project owner and maintainers reviewing or continuing the Issues. **Owner:** the project owner owns principle decisions; each linked Issue owns its acceptance. This report records evidence and decisions under the existing [Charter](docs/PROJECT_CHARTER.md), [Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 
 The owner explicitly authorized implementation, principle decisions, bounded maintenance, publication and closure of solved Issues in this session. The repairs preserve GI ownership of WHAT, GA ownership of Goal continuity, Planner ownership of HOW/speech, and Runtime ownership of execution and Evidence. Three decisions follow natural, grounded behavior: reporting a cancellation does not fulfill the original request; remembering a future intention is different from doing it now; optional learning follows the ready response. None needs another semantic reviewer or a phrase-based router.
 
-Earlier source repairs and deterministic verification are implemented; their revision-bound evidence is retained below. The latest owner-approved work adds offline architecture replay and repairs the prerequisite/count contract under #59. New-request readiness remains #60; #24/#32 remain open. The preceding native GI investigation retained 226 executions/254 calls without a qualified repair. No new native model, aggregate live, streaming, audio or physical proof is claimed by the replay work.
+Earlier source repairs and deterministic verification are implemented; their revision-bound evidence is retained below. The latest owner-approved work expands offline architecture replay to 1,500 cases under #61 and repairs binding admission (#62) and multi-Goal context allocation (#63); the earlier prerequisite/count repair #59 remains delivered. New-request readiness remains #60; #24/#32 remain open. The preceding native GI investigation retained 226 executions/254 calls without a qualified repair. No new native model, aggregate live, streaming, audio or physical proof is claimed by the replay work.
+
+## Expanded workflow audit — #61/#62/#63/#64
+
+The owner approved 1,500 architecture/workflow/contract scenarios after the five-case
+prototype found a real defect. This is an explicitly authorized evidence expansion;
+it does not replace the native #24, streaming/target #32 or temporal-contract #60
+work. GPT-6 Astra authored 30 contrast families and their reference rules in this task,
+then deterministic expansion produced 2 actions × 5 values × 5 language forms per
+family. These are 1,500 executable cases, not 1,500 independent inferences or ability
+classes. Reference review is non-independent and every output is ineligible for
+training. Synthetic scenario text, exact request packets, reference responses and
+independent Runtime/state assertions are tracked in the existing benchmark owner.
+
+| Coverage group | Families | Cases / checked boundary |
+| --- | --- | --- |
+| Ordinary execution | normal_fast, normal_deep, multi_goal | 150; real primary role clients, Goal coverage, exact arguments and sequential effects |
+| Conditional progress | conditional_rain, conditional_dry | 100; acquisition leaves Goal open, correlated result re-entry selects the frozen continuation |
+| Retention/cancellation | retained_timer, cancellation, cancel_timer, terminal_timer | 200; persist/restart, once-only wake, cancellation and no later Work; terminal_timer seeds a trusted terminal state |
+| Provider and Evidence faults | provider_failed, provider_refused, provider_invalid_output, duplicate_outcome, stale_outcome, foreign_goal_outcome | 300; fail-closed output/identity handling, no false closure or duplicate execution |
+| GI/GA admission | ga_missing_source, ga_foreign_source, ga_duplicate_mapping, gi_forbidden_how, gi_duplicate_ref, gi_bad_source, gi_unknown_binding | 350; source conservation and authority/field boundaries |
+| Planner rejection | plan_wrong_parameter, plan_missing_parameter, plan_foreign_goal, plan_unknown_capability, acquisition_false_completion, multi_goal_omission, early_work | 350; argument, scope, acquisition and readiness constraints |
+| Unrepresentable new readiness | new_readiness_gap | 50; #60 remains a gap and never counts as passed |
+
+Language surfaces: 600 English, 600 Chinese and 300 mixed. Blink counts are 1/2/3/5/10;
+walk durations are 0.1/1/2/15/30 seconds. All language and positive/negative relatives
+for one action/value stay in one split: 900 train-candidate, 300 development and
+300 held-out. This holds out parameters inside shared families, not unseen semantic
+families. It cannot independently establish model generalization or training quality.
+
+The semantic/oracle cohort was frozen before the complete baseline. Invalid model
+outputs are labeled `fault_injection`, separate from authored references; the #60
+requested result is `desired_unrepresentable_result`. Initial capture observes actual
+requests while supplying predetermined answers; subsequent execution is strict replay,
+never capture or semantic inference. Hash-checked shared prompt/Schema parts reduce
+repetition. The persisted corpus adds 1,500 cases, one manifest and 255 shared parts
+(88,054,200 bytes); the original five cases remain reproducible. No new document,
+environment variable, model profile or production architecture layer was added.
+Current Markdown/core-reading-path counts remain 102/15. Future corpus growth should
+reuse these shared packet parts and existing documentation owners.
+
+| Frozen aggregate | Expected successes | Unexpected failures | Known #60 gaps | Interpretation |
+| --- | ---: | ---: | ---: | --- |
+| Original production `0457db8d` | 1,328 | 122 | 50 | Baseline fails; two earliest-boundary clusters |
+| GI binding-vocabulary repair | 1,378 | 72 | 50 | All 50 unknown-binding probes now reject |
+| Deep allocation repair | 1,450 | 0 | 50 | 36 valid multi-Goal cases proceed; 36 omission probes reach the intended rejection boundary |
+
+Final expected successes comprise 350 completed workflows, 400 expected state/fault
+outcomes, 675 explicit rejections and 25 nonexecuting clarify/refuse responses. The
+whole 1,500-case cohort remains failed/exit 1 because the 50 known gaps remain. A
+safe nonexecuting unknown-Capability response is correct containment, not a product
+bug. No hard failure is averaged away.
+
+### Actual defects and module I/O
+
+| Episode / owner | Authoritative input → actual output before repair | Expected output, correlation and first wrong boundary | Repair / downstream proof |
+| --- | --- | --- | --- |
+| #62 test admission → GI primary HTTP | `Blink 1 times.` and exact source span; frozen primary result carries `count:1` plus `invented_owner_field` in `binding_items` | Raw dynamic Schema rejects the invented key; model output is intentional fault injection | Reference stays invalid; it is never training truth |
+| #62 GI normalization → DTO/Host | Sparse bindings become canonical `bindings`; the open canonical dictionary admits the invented name | **First wrong production boundary:** semantic key admission must agree with the primary role vocabulary | Validate authored wire/canonical names against that request's Schema before returning. Existing canonical relation refs retain their existing validation. Unknown names fail closed after one call |
+| #62 GI → GA/Planner/Runtime | Before repair the test detects acceptance and stops at GI; downstream owners are not invoked in this probe | Do not infer any downstream execution from this fixture | After repair the same one-call probe rejects, no committed Goal/provider Work. Focused tests cover primary and designated Deep GI; the 1,500 cohort itself does not cover Deep GI |
+| #63 GI → GA | `Blink 1 times. Walk forward for 0.1 seconds.` → two separate sourced responsibilities → two canonical Goals | Both boundaries correct; committed Goal IDs bind `${goal}` and `${goal2}` | Same input, outputs, source spans and Goal meanings retained |
+| #63 GA/state → Deep prompt projection | Two snapshots total 3,431 characters; a 3,200-character list-wide limit returns `required_context_over_budget`, attempt_count 0 | **First wrong boundary:** a single-Goal fragment allowance prevents a modest admitted multi-Goal request before inference | Association/snapshot allowance scales with authoritative Goal count (6,400 for two). Complete JSON is retained; other fragment and whole-request limits remain enforced |
+| #63 Deep primary → Host → Runtime | No Deep call or Work before repair on 72 cases | Valid two-Goal Plan must execute both effects; omission must fail before any provider call | After repair, full Plan executes exact blink/walk sequentially and satisfies both Goals. Omission fixture now reaches Host and is rejected. All 50 cases in each family produce their expected result |
+| #60 new turn → GI → GA/Planner | Desired primary `ready_at` is outside current GI Schema; Planner consumes that exact typed Goal binding | Contract has no admitted producer-to-consumer path; **known gap**, not repaired here | 50 probes remain failed. GA/Planner/Runtime are not invoked in these probes. Separate retained-timer cases seed the prior Goal explicitly |
+
+The #63 fix made 72 previously unrendered Deep packets available. An explicit second
+packet freeze added only these missing packets: every existing packet, authored reply
+and oracle was compared unchanged. Original manifest/hash and failed cases remain
+retained; neither failures nor expected answers were rewritten to manufacture a pass.
+No prompt wording, semantic authority or additional semantic call changed.
+
+Broader regression found one implementation omission in the initial #62 patch:
+direct parser validation built a context-free Schema and incorrectly rejected 34
+legitimate prior-assistant-utterance references. The fallback now includes the same
+accepted prior-speech fact used by the production Schema builder. Existing provenance
+validation still rejects absent or changed speech. The production primary/Deep paths
+already supply their actual request Schema. Eleven older behavior fixtures used
+undeclared aliases (`date`, `question`, `aspects`, `duration_s`, `duration_text`,
+`topic`, `order`, `concurrency`). Their reference/expected DTOs now express the same time, requested
+property, duration, referent and ordering through declared bindings or validated
+Responsibility relations. Source turns and intended success criteria remain; only their test representations
+are corrected, with no new production aliases or safety behavior. Original files and exact before/after hashes
+remain in `legacy-references/` and `legacy-reference-review.json`. These fixture
+migrations are distinct from production defect discoveries. Initial editing/test
+failures remain retained and are superseded only by successful reruns.
+
+The same review reproduced [#64](https://github.com/TimeTreker/chromie/issues/64):
+`_evaluate_goal_interpretation_expectations` compared declared outcome text and
+bindings but ignored explicit `output_mode`. A body-action result against an expected
+speech modality produced no oracle error. The focused baseline test failed before
+the checker changed. The existing oracle now compares modality; the focused suite
+passes 10 tests/4 subtests. In the compound fixture, walk/blink/joke now have correct
+body/body/speech expectations, predicate-aligned source spans and only the explicitly
+requested joke-while-walking relation. The old fixture had swapped modalities/spans
+and invented blink concurrency. This corrects test evidence, not production semantics;
+GA/Planner/Runtime are not invoked by this direct oracle test. Semantic span entailment
+still requires reference review; adding a modality assertion does not automate it.
+
+### Single-role substitution and remaining limits
+
+The existing replay service can explicitly forward one selected GI/GA/Fast/Deep role
+to an Ollama-compatible candidate endpoint. It forwards only the actual production
+request, replacing the model identifier; no reference, case rubric or evaluator
+output enters inference. Other roles require exact frozen requests. Raw candidate
+transport responses, termination and Schema observations are retained without a
+replacement answer or online critic. Intentional model-fault and unrepresentable
+reference cases are excluded from this mode, as are cases not invoking the selected
+role. There are 750 reference-only candidates before that role filter.
+
+An accepted candidate variation can change the next role's packet. Such a mismatch
+stops as `uncovered_replay_branch`; it is neither a semantic failure nor a pass.
+A raw candidate Schema violation takes precedence as `candidate_contract_failure`.
+Broader semantic judgment and valid alternative continuations require a separately
+reviewed branch/corpus. Local fixture services verify isolated routing for all four
+roles, altered-trajectory containment, incomplete termination preservation and HTTP
+failure without fallback. A 50-case GI substitution CLI run passed with 50 calls to
+a second local fixture server, not native inference. This is plumbing proof only.
+
+LoRA training was not started. Before using these artifacts for training, review
+reference correctness independently, exclude fault injections, construct hidden
+semantic-family holdouts, match each role's actual prompt/Schema/transport, and judge
+candidate outputs at Schema/DTO/Host plus semantic boundaries. After isolated-role
+qualification, test the combined real-model system; frozen peers cannot prove its
+joint behavior. GI uncertainty/Deep cognition, autonomous role scheduling, Fast-to-Deep
+escalation, native streaming, attention/reflection/skill selection, Gateway/audio,
+real services, resource contention and physical effects are outside this corpus's
+coverage. Two positive primary planner families do not prove escalation behavior.
+
+The [benchmark instructions](benchmarks/README.md#offline-workflow-replay) own commands;
+[Status](docs/STATUS.md), [checkpoint](DEVELOPMENT_CHECKPOINT.md) and [handoff](HANDOFF.md)
+own final gates, revision binding, retained archives and ordered remaining work.
 
 ## Offline workflow replay — #59
 
@@ -127,6 +257,10 @@ Evidence: `.chromie/acceptance/issue24-gi-boundary-20260912/`, including frozen 
 
 | Finding | Implemented resolution | Qualification boundary |
 | --- | --- | --- |
+| [#61](https://github.com/TimeTreker/chromie/issues/61) | 1,500 frozen cases, full baseline/reruns, isolated candidate-role forwarding and reproducible report. | Closes on delivery; 50 #60 gaps remain failed, no native qualification or training. |
+| [#62](https://github.com/TimeTreker/chromie/issues/62) | Enforce GI binding vocabulary, retaining contextual prior-speech and typed relation validation. | 50 original failed probes now reject; primary/Deep and broader reference regressions pass. |
+| [#63](https://github.com/TimeTreker/chromie/issues/63) | Allocate complete Deep association/snapshot input for admitted Goal cardinality. | 72 premature failures removed; valid effects complete and omissions fail at Host. |
+| [#64](https://github.com/TimeTreker/chromie/issues/64) | Compare declared output modality in the existing behavior oracle; correct the faulty compound reference. | Baseline fails, focused/canonical checks pass; no native semantic claim. |
 | <a id="a01"></a>A01 — [#49](https://github.com/TimeTreker/chromie/issues/49) | Previously delivered at `c1585e78`: atomic complete-resource acquisition. | Closed; preserve cancellation while waiting and cross-interaction exclusion. |
 | <a id="a02"></a>A02 — [#50](https://github.com/TimeTreker/chromie/issues/50) | Previously delivered at `9be7b23f`: complete required Planner context or rejection before inference. | Closed; complete retained Goal meaning remains required. |
 | <a id="a03"></a>A03 — [#51](https://github.com/TimeTreker/chromie/issues/51) | Previously delivered at `f5522f87`: complete acquisition stage with honest unmet downstream obligations. | Closed; this delivery strengthens serialization and duplicate-response regressions. |

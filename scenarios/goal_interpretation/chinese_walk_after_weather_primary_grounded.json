@@ -28,8 +28,8 @@
               "outcome": "快速向前移动十来秒",
               "bindings": {
                 "direction": "forward",
-                "duration_text": "十来秒",
-                "speed": "速度点"
+                "speed": "速度点",
+                "duration": "十来秒"
               },
               "confidence": 0.97,
               "relationship": "new",
@@ -59,8 +59,8 @@
         "outcome": "快速向前移动十来秒",
         "bindings": {
           "direction": "forward",
-          "duration_text": "十来秒",
-          "speed": "速度点"
+          "speed": "速度点",
+          "duration": "十来秒"
         },
         "confidence": 0.97,
         "relationship": "new",

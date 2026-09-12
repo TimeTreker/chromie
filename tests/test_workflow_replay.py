@@ -149,3 +149,140 @@ def test_reference_corpus_matches_reviewed_freeze():
     actual = {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in CASES.glob('workflow-*.json')}
     assert actual == manifest['case_sha256']
     assert manifest['model_ability_evaluated'] is False
+
+CORPUS = CASES.parent/'workflow_scenarios'
+
+
+def test_expanded_corpus_identity_coverage_and_split_integrity():
+    from collections import Counter, defaultdict
+    from benchmarks.integration.workflow_corpus import FAMILIES
+    manifest = json.loads((CORPUS/'manifest.json').read_text())
+    paths = sorted(CORPUS.glob('workflow-*.json'))
+    assert len(paths) == manifest['count'] == 1500
+    assert {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in paths} == manifest['case_sha256']
+    assert {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (CORPUS/'artifacts').glob('*.json')} == manifest['artifact_sha256']
+    assert manifest['unrendered_requests'] == []
+    cases = [json.loads(p.read_text()) for p in paths]
+    assert Counter(c['coverage_family'] for c in cases) == {family:50 for family in FAMILIES}
+    assert Counter(c['split'] for c in cases) == manifest['splits']
+    splits = defaultdict(set)
+    for case in cases:
+        splits[case['contrast_set']].add(case['split'])
+        assert case['provenance']['training_eligible'] is False
+        assert case['provenance']['independent_inference_per_case'] is False
+        for step in case['model_steps']:
+            assert step['training_eligible'] is False
+            assert 'request' in step and 'request_unavailable' not in step
+    assert len(splits) == 10 and all(len(values) == 1 for values in splits.values())
+    assert manifest['training_eligible'] is False
+
+
+@pytest.mark.parametrize('path', sorted(CORPUS.glob('workflow-*-blink-0-0.json')), ids=lambda p:p.stem)
+def test_expanded_family_regression(path, tmp_path):
+    from benchmarks.integration.model_replay import load_case
+    case = load_case(path)
+    result = asyncio.run(run_case(case, tmp_path))
+    if case['coverage_family'] == 'new_readiness_gap':
+        assert result['verdict'] == 'known_contract_gap' and not result['passed']
+        assert result['known_issue'] == 60
+    else:
+        assert result['passed']
+
+
+def test_shared_packet_parts_are_hash_checked(tmp_path):
+    from benchmarks.integration.model_replay import load_case
+    value = b'{"frozen":"packet"}'
+    digest = hashlib.sha256(value).hexdigest()
+    (tmp_path/'artifacts').mkdir()
+    part = tmp_path/'artifacts'/f'{digest}.json'
+    part.write_bytes(value)
+    case = tmp_path/'case.json'
+    case.write_text(json.dumps({'request':{'$artifact':digest}}))
+    assert load_case(case) == {'request':{'frozen':'packet'}}
+    part.write_text('{"frozen":"changed"}')
+    with pytest.raises(ReplayMismatch, match='hash mismatch'):
+        load_case(case)
+    part.unlink()
+    with pytest.raises(FileNotFoundError):
+        load_case(case)
+
+
+@pytest.mark.parametrize('role', ['gi', 'ga', 'fast', 'deep'])
+def test_only_selected_role_receives_actual_answer_blind_packet(role, tmp_path):
+    from benchmarks.integration.model_replay import load_case
+    family = 'normal_deep' if role == 'deep' else 'normal_fast'
+    case = load_case(CORPUS/f'workflow-{family}-blink-0-0.json')
+    case['private_adjudication'] = 'REFERENCE_AND_RUBRIC_MUST_NOT_ENTER_INFERENCE'
+    step = copy.deepcopy(next(s for s in case['model_steps'] if s['role'] == role))
+    step['request']['model'] = 'candidate-local'
+    candidate = ModelReplay({'model_steps':[step]})
+    with ReplayServer(candidate) as server:
+        replay = ModelReplay(case, candidate={'role':role,'url':server.url,'model':'candidate-local'})
+        candidate.bindings = replay.bindings
+        result = asyncio.run(run_case(case, tmp_path, replay))
+    candidate.assert_finished()
+    assert result['passed'] and replay.candidate_calls == 1
+    assert [r['step'] for r in replay.records if r['source'] == 'candidate'] == [step['name']]
+    assert len([r for r in replay.records if r['source'] == 'replay']) == len(case['model_steps']) - 1
+    assert candidate.records[0]['request'] == step['request']
+    assert case['private_adjudication'] not in json.dumps(candidate.records[0]['request'])
+    assert replay.records[case['model_steps'].index(next(s for s in case['model_steps'] if s['role'] == role))]['raw_transport_response']
+
+
+def test_valid_candidate_variation_stops_at_uncovered_downstream_branch(tmp_path):
+    from benchmarks.integration.model_replay import load_case
+    case = load_case(CORPUS/'workflow-normal_fast-blink-0-0.json')
+    step = copy.deepcopy(case['model_steps'][0])
+    step['request']['model'] = 'candidate-local'
+    step['response']['responsibilities'][0]['confidence'] = 0.75
+    candidate = ModelReplay({'model_steps':[step]})
+    with ReplayServer(candidate) as server:
+        replay = ModelReplay(case, candidate={'role':'gi','url':server.url,'model':'candidate-local'})
+        with pytest.raises(Exception):
+            asyncio.run(run_case(case, tmp_path, replay))
+    failure = json.loads((tmp_path/'failure.json').read_text())
+    assert failure['verdict'] == 'uncovered_replay_branch'
+    assert replay.position == replay.candidate_calls == 1
+    assert replay.records[0]['response']['responsibilities'][0]['confidence'] == 0.75
+    assert replay.records[0]['schema_errors'] == []
+    assert failure['provider_calls'] == []
+    with pytest.raises(ReplayMismatch):
+        replay.assert_finished()
+
+
+def test_candidate_mode_rejects_fault_injection_references():
+    from benchmarks.integration.model_replay import load_case
+    case = load_case(CORPUS/'workflow-gi_unknown_binding-blink-0-0.json')
+    with pytest.raises(ValueError, match='intentional model faults'):
+        ModelReplay(case, candidate={'role':'gi','url':'http://127.0.0.1:1','model':'unused'})
+
+
+def test_candidate_transport_preserves_incomplete_provider_envelope():
+    case = load()
+    step = copy.deepcopy(case['model_steps'][0])
+    step['request']['model'] = 'candidate-local'
+    candidate = ModelReplay({'model_steps':[step]})
+    original_reply = candidate.reply
+    def incomplete(path, request):
+        envelope = original_reply(path, request)
+        envelope.update(done=False, done_reason='length')
+        return envelope
+    candidate.reply = incomplete
+    with ReplayServer(candidate) as server:
+        replay = ModelReplay(case, candidate={'role':'gi','url':server.url,'model':'candidate-local'})
+        actual = replay.reply('/api/chat', case['model_steps'][0]['request'])
+    assert actual['done'] is False and actual['done_reason'] == 'length'
+    assert json.loads(replay.records[0]['raw_transport_response']) == actual
+
+
+def test_candidate_http_failure_has_raw_evidence_and_no_reference_fallback():
+    case = load()
+    candidate = ModelReplay({'model_steps':[]})
+    with ReplayServer(candidate) as server:
+        replay = ModelReplay(case, candidate={'role':'gi','url':server.url,'model':'candidate-local'})
+        with pytest.raises(ReplayMismatch, match='HTTP 409'):
+            replay.reply('/api/chat', case['model_steps'][0]['request'])
+    assert replay.position == 0 and replay.candidate_calls == 1
+    assert replay.records[0]['http_status'] == 409
+    assert 'unexpected extra model call' in replay.records[0]['raw_transport_response']
+    assert 'response' not in replay.records[0]

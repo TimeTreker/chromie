@@ -30,7 +30,7 @@
                   "outcome": "provide today's Beijing weather",
                   "bindings": {
                     "location": "Beijing",
-                    "date": "today"
+                    "time_scope": "today"
                   },
                   "confidence": 0.96,
                   "relationship": "new",
@@ -58,7 +58,7 @@
             "outcome": "provide today's Beijing weather",
             "bindings": {
               "location": "Beijing",
-              "date": "today"
+              "time_scope": "today"
             },
             "confidence": 0.96,
             "output_mode": "information"
@@ -82,8 +82,8 @@
                   "outcome": "walk forward quickly for 15 seconds",
                   "bindings": {
                     "direction": "forward",
-                    "duration_s": 15,
-                    "speed": "quickly"
+                    "speed": "quickly",
+                    "duration": "15 seconds"
                   },
                   "confidence": 0.97,
                   "relationship": "new",
@@ -111,8 +111,8 @@
             "outcome": "walk forward quickly for 15 seconds",
             "bindings": {
               "direction": "forward",
-              "duration_s": 15,
-              "speed": "quickly"
+              "speed": "quickly",
+              "duration": "15 seconds"
             },
             "confidence": 0.97,
             "output_mode": "body_action"
@@ -139,8 +139,8 @@
                   "outcome": "walk forward quickly for 15 seconds",
                   "bindings": {
                     "direction": "forward",
-                    "duration_s": 15,
-                    "speed": "quickly"
+                    "speed": "quickly",
+                    "duration": "15 seconds"
                   },
                   "confidence": 0.97,
                   "relationship": "new",
@@ -168,8 +168,8 @@
             "outcome": "walk forward quickly for 15 seconds",
             "bindings": {
               "direction": "forward",
-              "duration_s": 15,
-              "speed": "quickly"
+              "speed": "quickly",
+              "duration": "15 seconds"
             },
             "confidence": 0.97,
             "output_mode": "body_action"

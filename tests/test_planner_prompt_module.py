@@ -285,3 +285,18 @@ def test_delivered_evidence_keeps_late_qualifier_and_all_goal_bindings():
     assert projected["text"] == text
     assert projected["source_goal_ids"] == goal_ids
     assert projected["canonical_plan_id"] == plan_id
+
+
+@pytest.mark.parametrize("count", [1, 2])
+def test_deep_goal_snapshots_allocate_capacity_for_each_admitted_goal(count):
+    request = _retained_request(count=count, detail="Keep this source qualification. " * 17)
+    snapshots = request.context["active_goal_snapshots"]
+    prompt = _render_required(request, "deep_plan_prompt")
+    actual, _ = json.JSONDecoder().raw_decode(prompt.split("Active goals JSON:\n")[1])
+    assert actual == snapshots
+    if count > 1:
+        assert len(json.dumps(snapshots)) > 3200
+    # An oversized single Goal cannot borrow an unlimited fragment budget.
+    oversized = _retained_request(count=1, detail="qualification " * 500)
+    with pytest.raises(ValueError, match="required prompt projection budget"):
+        _render_required(oversized, "deep_plan_prompt")

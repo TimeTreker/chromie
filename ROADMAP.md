@@ -35,13 +35,15 @@ architecture layer or product feature is promoted.
 
 ## Current execution order
 
-The owner's September 13 scope adds #59's small offline workflow replay before
-further native qualification. It covers GI/GA/Fast/Deep contract continuity with
-reviewed fixed replies and controlled providers; it does not evaluate model ability.
-The reproduced prerequisite/count validation defect is repaired in the existing
-owners. #60 separately retains the new-request GI → `ready_at` contract gap; the
-seeded scheduled-Goal case cannot close it. Neither replay success nor #59 closure
-closes #24/#32 or changes their live/target evidence requirements.
+The owner's September 13 scope completed #59's prototype and expands it under #61
+into 1,500 offline architecture/workflow scenarios with isolated GI/GA/Fast/Deep
+candidate substitution. #62/#63 fix the reproduced binding-admission and multi-Goal
+projection boundaries; #64 fixes an ignored modality assertion in the older scenario
+oracle. The resulting 1,450 expected successes leave 50 known #60 readiness gaps;
+this is not a fully passing cohort or native model qualification. LoRA training is
+not started: references, faults, hidden semantic holdouts and actual candidate
+outputs need separate review. #60 requires the primary temporal contract; seeded
+scheduled-Goal success cannot close it. #24/#32 retain their live/target requirements.
 
 Ordered offline Fast/Deep qualification and supported-version CI pass. GitHub
 #35 and #52–#58 are closed; follow the remaining #24/#32 native qualification line below.

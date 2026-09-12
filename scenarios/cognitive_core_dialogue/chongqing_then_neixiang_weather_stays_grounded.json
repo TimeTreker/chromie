@@ -31,12 +31,8 @@
                   "outcome": "告知用户重庆今天的天气、冷热和降雨情况",
                   "bindings": {
                     "location": "重庆",
-                    "date": "today",
-                    "aspects": [
-                      "weather",
-                      "temperature",
-                      "rain"
-                    ]
+                    "time_scope": "today",
+                    "attribute": "weather, temperature, rain"
                   },
                   "confidence": 0.96,
                   "relationship": "new",
@@ -64,12 +60,8 @@
             "outcome": "告知用户重庆今天的天气、冷热和降雨情况",
             "bindings": {
               "location": "重庆",
-              "date": "today",
-              "aspects": [
-                "weather",
-                "temperature",
-                "rain"
-              ]
+              "time_scope": "today",
+              "attribute": "weather, temperature, rain"
             },
             "confidence": 0.96,
             "output_mode": "information"
@@ -93,8 +85,8 @@
                   "outcome": "告知用户河南省内乡县现在是否下雨",
                   "bindings": {
                     "location": "河南省内乡县",
-                    "date": "today",
-                    "question": "rain"
+                    "time_scope": "today",
+                    "proposition": "rain"
                   },
                   "confidence": 0.97,
                   "relationship": "new",
@@ -122,8 +114,8 @@
             "outcome": "告知用户河南省内乡县现在是否下雨",
             "bindings": {
               "location": "河南省内乡县",
-              "date": "today",
-              "question": "rain"
+              "time_scope": "today",
+              "proposition": "rain"
             },
             "confidence": 0.97,
             "output_mode": "information"

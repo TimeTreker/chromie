@@ -27,7 +27,7 @@
               "outcome": "walk forward for 20 seconds",
               "bindings": {
                 "direction": "forward",
-                "duration_s": 20
+                "duration": "20 seconds"
               },
               "confidence": 0.72,
               "relationship": "new",
@@ -40,14 +40,14 @@
             },
             {
               "local_ref": "r2",
-              "outcome": "say something humorous while walking",
+              "outcome": "blink six times",
               "bindings": {
-                "concurrency": "while walking"
+                "count": 6
               },
-              "confidence": 0.31,
+              "confidence": 0.7,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "speech",
+              "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t7",
                 "source_end_token_ref": "t9"
@@ -55,15 +55,14 @@
             },
             {
               "local_ref": "r3",
-              "outcome": "blink six times while walking",
+              "outcome": "say something humorous while walking",
               "bindings": {
-                "concurrency": "while walking",
-                "count": 6
+                "parallel_with": "r1"
               },
-              "confidence": 0.7,
+              "confidence": 0.31,
               "relationship": "new",
               "target_goal_ids": [],
-              "output_mode": "body_action",
+              "output_mode": "speech",
               "source_evidence": {
                 "source_start_token_ref": "t12",
                 "source_end_token_ref": "t17"
@@ -88,35 +87,46 @@
         "outcome": "walk forward for 20 seconds",
         "bindings": {
           "direction": "forward",
-          "duration_s": 20
+          "duration": "20 seconds"
         },
         "confidence": 0.72,
         "relationship": "new",
         "target_goal_ids": [],
-        "output_mode": "speech"
+        "output_mode": "body_action",
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t5"
+        }
       },
       {
         "local_ref": "r2",
-        "outcome": "say something humorous while walking",
+        "outcome": "blink six times",
         "bindings": {
-          "concurrency": "while walking"
-        },
-        "confidence": 0.31,
-        "relationship": "new",
-        "target_goal_ids": [],
-        "output_mode": "body_action"
-      },
-      {
-        "local_ref": "r3",
-        "outcome": "blink six times while walking",
-        "bindings": {
-          "concurrency": "while walking",
           "count": 6
         },
         "confidence": 0.7,
         "relationship": "new",
         "target_goal_ids": [],
-        "output_mode": "body_action"
+        "output_mode": "body_action",
+        "source_evidence": {
+          "source_start_token_ref": "t7",
+          "source_end_token_ref": "t9"
+        }
+      },
+      {
+        "local_ref": "r3",
+        "outcome": "say something humorous while walking",
+        "bindings": {
+          "parallel_with": "r1"
+        },
+        "confidence": 0.31,
+        "relationship": "new",
+        "target_goal_ids": [],
+        "output_mode": "speech",
+        "source_evidence": {
+          "source_start_token_ref": "t12",
+          "source_end_token_ref": "t17"
+        }
       }
     ]
   }

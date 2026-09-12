@@ -27,7 +27,7 @@
               "local_ref": "r1",
               "outcome": "understand and respond to what the user means about their headset",
               "bindings": {
-                "topic": "headset"
+                "entity": "headset"
               },
               "relationship": "new",
               "target_goal_ids": [],
@@ -54,7 +54,7 @@
               "local_ref": "r1",
               "outcome": "understand and respond to what the user means about their headset",
               "bindings": {
-                "topic": "headset"
+                "entity": "headset"
               },
               "relationship": "new",
               "target_goal_ids": [],
@@ -89,7 +89,7 @@
         "local_ref": "r1",
         "outcome": "understand and respond to what the user means about their headset",
         "bindings": {
-          "topic": "headset"
+          "entity": "headset"
         },
         "relationship": "new",
         "target_goal_ids": [],

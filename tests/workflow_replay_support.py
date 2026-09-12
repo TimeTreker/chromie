@@ -43,6 +43,10 @@ from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_cognitive_runtime_pr7 import FakeRuntime
 
 
+class UnexpectedAdmission(AssertionError):
+    """The tested owner accepted an intentionally forbidden primary result."""
+
+
 @contextmanager
 def controlled_runtime():
     """Fix only wall time/UUID sources, preserving real async cancellation/scheduling."""
@@ -84,18 +88,21 @@ class Provider(MockCapabilityProvider):
                 raise
         output = self.case['provider_outputs'][request.capability_id]
         return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
-            provider_id=self.provider_id, status='completed', output=copy.deepcopy(output))
+            provider_id=self.provider_id, status=self.case.get('provider_status','completed'), output=copy.deepcopy(output))
 
 
 class Episode:
     def __init__(self, case, replay, url, root):
         self.case, self.replay, self.root = case, replay, root
         self.events = []
+        self.boundary = 'initialization'
+        self.contract_failure = None
         self.catalog = case['catalog']
-        self.gi = OllamaGoalInterpreter(ollama_url=url, model='fixture-gi', deep_model='fixture-gi-deep', timeout_ms=5000, num_ctx=131072, num_predict=2048)
+        self.model_timeout_ms = timeout_ms = int((replay.candidate.get('timeout', 60) + 1) * 1000) if replay.candidate else 5000
+        self.gi = OllamaGoalInterpreter(ollama_url=url, model='fixture-gi', deep_model='fixture-gi-deep', timeout_ms=timeout_ms, num_ctx=131072, num_predict=2048)
         settings = AgentServiceSettings(ollama_num_ctx=131072, ollama_num_predict=2048)
         def model(role):
-            return OllamaClient(base_url=url, model='fixture-'+role, purpose=role, timeout_ms=5000, service_settings=settings)
+            return OllamaClient(base_url=url, model='fixture-'+role, purpose=role, timeout_ms=timeout_ms, service_settings=settings)
         self.ga = GoalAssociationResolver(model('ga'), num_ctx=131072, num_predict=2048)
         self.planners = {
             'fast': FastPlannerResolver(model('fast'), StaticCatalog(self.catalog), num_ctx=131072, num_predict=2048),
@@ -113,8 +120,8 @@ class Episode:
         self.adapter = CanonicalPlanRuntimeAdapter(self.runtime)
         self.manager = ConversationStateManager(base_conversation_id=case['id'], task_store_enabled=True, task_store_path=root/'state.json')
 
-    def goal_status(self):
-        return self.manager._goal_responsibility_status(self.manager._task_context_by_goal_id(self.goal))
+    def goal_status(self, goal_id=None):
+        return self.manager._goal_responsibility_status(self.manager._task_context_by_goal_id(goal_id or self.goal))
 
     async def resolve_fast_plan(self, _session, *, request, timeout_ms):
         self.last_request = request
@@ -125,8 +132,10 @@ class Episode:
         return await self.plan(request, 'deep')
 
     async def plan(self, request, tier):
+        self.boundary = tier
         result = await self.planners[tier].resolve(request)
         if result.metadata.get('failure_class'):
+            self.contract_failure = result.metadata
             raise AssertionError(f'{tier} contract failure: {result.metadata}')
         self.events.append({'boundary':tier, 'disposition':result.disposition, 'goal_ids':result.goal_ids})
         return result
@@ -135,7 +144,7 @@ class Episode:
         host = VoiceAssistant.__new__(VoiceAssistant)
         host.agent_client = self
         host.conversation_state = self.manager
-        host.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=5000, deep_planner_timeout_ms=5000)
+        host.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=self.model_timeout_ms, deep_planner_timeout_ms=self.model_timeout_ms)
         host.cognitive_runtime = GoalDrivenRuntimeCoordinator(agent_client=self, adapter=self.adapter, policy=CognitiveRuntimePolicy(mode='apply'))
         host.session_log = lambda *a, **kw: self.events.append({'host_log': str(a), 'fields': str(kw)})
         host.build_context = lambda _sid: copy.deepcopy(request.context)
@@ -152,16 +161,25 @@ class Episode:
             self.manager.apply_goal_association_resolution(self.case['initial_goal_resolution'], sid=inp['sid'], user_text='Prior scheduled request', atomic=True)
             context['active_goal_snapshots'] = self.manager.active_goal_snapshots()
         gi_request = GoalInterpretationRequest(sid=inp['sid'], text=inp['text'], language=inp['language'], context=context)
+        self.boundary = 'gi'
         interpreted = await self.gi.interpret_goal(gi_request)
         self.events.append({'boundary':'gi', 'responsibilities':interpreted.model_dump(mode='json')})
+        if self.case.get('expected_rejection') == 'gi':
+            raise UnexpectedAdmission('GI accepted a result forbidden by its primary contract')
         request = CognitiveWorkRequest(sid=inp['sid'], text=inp['text'], language=inp['language'], context=context,
             responsibilities=interpreted.responsibilities, interpretation_confidence=interpreted.confidence,
             interpretation_unresolved=interpreted.unresolved)
+        self.boundary = 'ga'
         association = await self.ga.resolve(request)
         assert association.resolution_status == 'resolved', association.metadata
+        if self.case.get('expected_rejection') == 'ga':
+            raise UnexpectedAdmission('GA accepted a result forbidden by its primary contract')
         self.manager.apply_goal_association_resolution(association, sid=request.sid, user_text=request.text, atomic=True)
         self.goal = association.new_goals[0].goal_id if association.new_goals else association.associations[0].target_goal_ids[0]
+        self.goals = [goal.goal_id for goal in association.new_goals] or [self.goal]
         self.replay.bind('goal', self.goal)
+        for index, goal_id in enumerate(self.goals[1:], 2):
+            self.replay.bind(f'goal{index}', goal_id)
         self.events.append({'boundary':'ga', 'resolution':association.model_dump(mode='json')})
         request.context['goal_association_resolution'] = association.model_dump(mode='json')
         request.context['active_goal_snapshots'] = self.manager.active_goal_snapshots()
@@ -184,13 +202,120 @@ class Episode:
         return bundle
 
     async def execute(self, plan, response, sid=None):
+        self.boundary = 'runtime'
         result = await submit_and_wait_terminal(self.runtime.runtime, response)
+        self.last_result = result
         assert result.status == 'completed', result
         if response.capabilities:
             return self.record_result(plan, response, result, sid)
         for speech in response.speech:
             self.manager.update_pending_task_status_for_request_id(request_id=speech.id, status='completed')
         return None
+
+    async def probe(self, clock):
+        """Exercise one declared hostile-input or state-transition boundary."""
+        probe = self.case['probe']
+        if probe == 'new_readiness_gap':
+            self.boundary = 'gi'
+            accepted = False
+            try:
+                await self.gi.interpret_goal(GoalInterpretationRequest(**self.case['input']))
+                accepted = True
+            except Exception:
+                # The exact Schema gap is checked separately; a transport failure
+                # cannot masquerade as this documented representability result.
+                self.replay.assert_finished()
+            self.replay.assert_finished()
+            assert self.replay.records[0]['schema_errors']
+            result = self.probe_result('known_contract_gap', f'GI ready_at is Schema-invalid; Host accepted={accepted}')
+            result.update(passed=False, expected=True, known_issue=60)
+            return result
+        expected_rejection = self.case.get('expected_rejection')
+        if expected_rejection:
+            try:
+                rejected_plan, rejected_response = await self.begin()
+            except UnexpectedAdmission:
+                raise
+            except Exception as exc:
+                assert self.boundary == expected_rejection, (self.boundary, str(exc))
+                assert not self.provider.calls
+                self.replay.assert_finished()
+                if hasattr(self, 'goals'):
+                    assert all(self.goal_status(gid) == 'open' for gid in self.goals)
+                elif not self.case.get('initial_goal_resolution'):
+                    assert not self.manager.active_goal_snapshots()
+                return self.probe_result('expected_rejection', str(exc))
+            if (self.case.get('allow_nonexecuting_rejection') and not rejected_plan.steps
+                    and not rejected_response.capabilities and rejected_plan.disposition in {'clarify','refuse'}):
+                self.replay.assert_finished()
+                assert all(self.goal_status(gid) == 'open' for gid in self.goals)
+                return self.probe_result('expected_nonexecuting_rejection')
+            raise AssertionError(f'{expected_rejection} accepted the forbidden reference')
+
+        plan, response = await self.begin()
+        if probe.startswith('provider_'):
+            self.boundary = 'runtime'
+            result = await submit_and_wait_terminal(self.runtime.runtime, response)
+            bundle = self.record_result(plan, response, result)
+            assert self.goal_status() == 'open', (result, bundle)
+            assert len(self.provider.calls) == 1
+        elif probe in {'duplicate_outcome','stale_outcome','foreign_goal_outcome'}:
+            bundle = await self.execute(plan, response)
+            before = copy.deepcopy(self.manager._task_context_by_goal_id(self.goal))
+            if probe == 'duplicate_outcome':
+                self.manager.record_execution_outcome_bundle(bundle, sid=None)
+                self.manager.reconcile_execution_outcome_responsibilities(bundle, sid=None)
+                assert self.manager._task_context_by_goal_id(self.goal) == before
+            else:
+                altered = bundle.model_dump(mode='json')
+                if probe == 'stale_outcome':
+                    altered['canonical_plan_id'] = 'plan_stale'
+                else:
+                    altered = json.loads(json.dumps(altered).replace(self.goal, 'foreign_goal'))
+                try:
+                    self.manager.record_execution_outcome_bundle(altered, sid=None)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError('unbound execution evidence accepted')
+                assert self.manager._task_context_by_goal_id(self.goal) == before
+            assert len(self.provider.calls) == 1 and self.goal_status() == 'satisfied'
+        elif probe in {'cancel_timer','terminal_timer'}:
+            assert plan.time_conditions and not response.capabilities
+            await self.execute(plan, response)
+            if probe == 'cancel_timer':
+                inp = self.case['followup']
+                context = {'active_goal_snapshots':self.manager.active_goal_snapshots()}
+                interpretation = await self.gi.interpret_goal(GoalInterpretationRequest(**inp, context=context))
+                request = CognitiveWorkRequest(**inp, context=context, responsibilities=interpretation.responsibilities,
+                    interpretation_confidence=interpretation.confidence, interpretation_unresolved=interpretation.unresolved)
+                association = await self.ga.resolve(request)
+                assert association.resolution_status == 'resolved', association
+                self.manager.apply_goal_cancellation_resolution(association, receipts=[], confirmation_transition=None,
+                    sid=request.sid, user_text=request.text)
+                assert self.goal_status() == 'cancelled'
+            else:
+                # Explicit trusted terminal-state fixture; does not prove the
+                # separate semantic completion path that established that state.
+                self.manager._set_goal_responsibility_status(
+                    self.manager._task_context_by_goal_id(self.goal), 'satisfied', source='trusted_test_fixture')
+            assert self.manager.persist_task_contexts()
+            self.manager = ConversationStateManager(base_conversation_id=self.case['id'], task_store_enabled=True,
+                task_store_path=self.root/'state.json')
+            assert self.manager.due_time_condition_opportunities(now_ms=plan.time_conditions[0].due_at_ms) == []
+            assert not self.provider.calls
+        else:
+            raise AssertionError(f'unimplemented workflow probe: {probe}')
+        self.replay.assert_finished()
+        assert all(not row['schema_errors'] for row in self.replay.records)
+        return self.probe_result('observed_expected_state')
+
+    def probe_result(self, verdict, detail=''):
+        return {'case':self.case['id'], 'passed':True, 'verdict':verdict, 'detail':detail,
+            'evidence_level':'offline_architecture_replay', 'model_ability_evaluated':False,
+            'events':self.replay.normalize(self.events), 'model_calls':len(self.replay.records),
+            'model_records':self.replay.records,
+            'provider_calls':[{'capability':c.capability_id,'args':c.args} for c in self.provider.calls]}
 
     async def run(self, clock):
         plan, response = await self.begin()
@@ -249,6 +374,7 @@ class Episode:
                 self.manager.record_interaction_response(self.request.sid, next_response)
                 await self.execute(next_plan, next_response)
             assert self.goal_status() == 'satisfied', self.goal_status()
+            assert all(self.goal_status(gid) == 'satisfied' for gid in self.goals)
         calls = [{'capability':c.capability_id, 'args':c.args} for c in self.provider.calls]
         assert calls == self.case['expected_provider_calls'], calls
         assert self.goal_status() == self.case['expected_goal_status']
@@ -264,10 +390,14 @@ async def run_case(case, root: Path, replay=None):
     with ReplayServer(replay) as server, controlled_runtime() as clock:
         episode = Episode(case, replay, server.url, root)
         try:
-            return await episode.run(clock)
+            return await (episode.probe(clock) if case.get('probe') else episode.run(clock))
         except Exception as exc:
             (root/'failure.json').write_text(json.dumps({
                 'error': f'{type(exc).__name__}: {exc}',
+                'verdict': ('candidate_contract_failure' if any(r.get('source') == 'candidate' and r.get('schema_errors') for r in replay.records)
+                            else 'uncovered_replay_branch' if any(m.get('verdict') == 'uncovered_replay_branch' for m in replay.mismatches)
+                            else 'unexpected_failure'),
+                'boundary':episode.boundary, 'contract_failure':episode.contract_failure,
                 'events': replay.normalize(episode.events), 'model_records': replay.records,
                 'mismatches': replay.mismatches, 'errors': replay.errors,
                 'provider_calls': [{'capability':c.capability_id, 'args':c.args} for c in episode.provider.calls],

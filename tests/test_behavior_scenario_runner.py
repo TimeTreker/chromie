@@ -130,7 +130,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         )
         self.assertEqual(
             turns[2]["interpretation"]["responsibilities"][0]["bindings"],
-            {"direction": "forward", "duration_s": 15, "speed": "quickly"},
+            {"direction": "forward", "duration": "15 seconds", "speed": "quickly"},
         )
         self.assertIn(
             "What is the weather in Beijing today?",
@@ -199,3 +199,17 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_goal_interpretation_oracle_checks_requested_output_mode():
+    import copy
+    from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationDecision
+    from scripts.behavior_scenarios import _evaluate_goal_interpretation_expectations
+    scenario, = load_scenarios(only={'goal_interpretation/chinese_nod_blink_primary_grounded'})
+    decision = GoalInterpretationDecision.model_validate(scenario.stub['llm_script'][0]['decision'])
+    expected = copy.deepcopy(scenario.expect)
+    expected['responsibilities'][0]['output_mode'] = 'speech'
+    errors = _evaluate_goal_interpretation_expectations(
+        scenario, decision=decision, llm_calls=1, llm_stages=['goal_interpretation'], expect=expected,
+    )
+    assert any('responsibilities[0].output_mode' in error for error in errors)
