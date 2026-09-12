@@ -198,9 +198,9 @@
     "claim_boundary": "assistant-authored candidate oracle; same-model review required",
     "reference_region": {
       "accepted_dispositions": [
-        "execute"
+        "respond"
       ],
-      "expected_confirmation_required": null,
+      "expected_confirmation_required": false,
       "expected_goal_ids": [
         "goal-fpdl_v2_temporal_readiness_planning_36_supported_zh-1"
       ],
@@ -213,18 +213,24 @@
         "不得在缺少所需可信证据时声称已经执行、送达、授权或掌握外部事实。"
       ],
       "forbidden_reuse_activity_ids": [],
-      "required_capability_ids": [
-        "chromie.weather.lookup"
-      ],
+      "required_capability_ids": [],
       "required_evidence_refs": [],
       "required_reuse_activity_ids": [],
       "required_time_conditions": true,
-      "response_required": null,
+      "response_required": true,
       "semantic_facts": [
-        "已知的未来就绪时间必须进入绑定 Goal 的 time condition；Planner 不能假装天气查询已经发生。"
+        "Acknowledge the still-unmet future intention with an exact Goal-bound time condition and zero current Work.",
+        "The timer wakes cognition later; it never delays an executable step listed now. No early weather lookup, invented observation or effect-completion claim."
       ],
-      "semantic_review_required": true
+      "semantic_review_required": true,
+      "allowed_capability_sets": [
+        []
+      ],
+      "waiting_time_conditions": {
+        "goal-fpdl_v2_temporal_readiness_planning_36_supported_zh-1": 4092202800000
+      }
     },
-    "schema_expectation": "accept"
+    "schema_expectation": "accept",
+    "oracle_revision": "issue58-future-readiness-20260912"
   }
 }

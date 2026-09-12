@@ -47,8 +47,10 @@ The maintained Mypy version is pinned in `requirements-test.txt`. The gate runs:
 python scripts/run_mypy.py
 ```
 
-`config/mypy_scope.txt` currently contains five files and is a monotonic
-ratchet over selected clean contracts and tooling boundaries. `mypy.ini` requires complete function
+`config/mypy_scope.txt` includes the complete `shared/chromie_contracts/` package
+and the existing three development scripts. The runner expands the package on
+every invocation, so new Python modules enter automatically. This is a monotonic
+ratchet over owned contracts and tooling boundaries. `mypy.ini` requires complete function
 annotations, checks untyped bodies, forbids implicit optional values, and reports
 unsafe `Any` returns and stale ignores. It does not skip imports or enable a
 whole-tree error suppression.
@@ -63,29 +65,23 @@ valid ratchet expansion. The scope is therefore restored to the last verified
 contract rather than suppressing those errors or falsely treating them as new
 vocal-Issue regressions.
 
-After the existing gate is clean, the queued expansion replaces file-by-file
-contract entries with all 30 current Python files under
-`shared/chromie_contracts/`, then adds independently owned Orchestrator runtime
-packages after their decomposition boundaries stabilize. A directory/package
-entry must include future files automatically.
+The 2026-09-12 owner-authorized continuation activates the complete contract
+package after the fresh 30-module diagnostic passed. The scope contains 33 current
+Python files: 30 contracts and three tools. No module, import or diagnostic is
+ignored to obtain this expansion. Further Orchestrator expansion remains queued
+until independently owned runtime boundaries are ready.
 
 A checked path may leave the ratchet only through a separate reviewed
 architecture change. New modules should enter once their real optionality,
 containers, callables, and async return types are clean; broad `Any` conversion
 is not an accepted migration strategy.
 
-A fresh diagnostic at `f5522f87` on 2026-09-12 passes all 30 contract-package files
-with the current strict configuration. This does not expand the enforced five-file
-scope or prove semantic correctness. [Issue #56](https://github.com/TimeTreker/chromie/issues/56)
-tracks activating the complete package through the existing gate.
-
-## Accepted expansion order
-
-After current-revision target evidence closes and the relevant boundaries are
-stable, expand Mypy through complete ownership scopes: first
-`shared/chromie_contracts/`, then coherent slices of `orchestrator/runtime/`. Do
-not add isolated showcase files merely to increase a count, and do not use broad
-`Any`, import skipping, global ignores, or scope removal to manufacture a pass.
+[Issue #56](https://github.com/TimeTreker/chromie/issues/56) retains the expansion
+and supported Python-environment evidence. The owner explicitly authorized this
+bounded maintenance work during the remaining-Issue continuation; it does not
+establish or replace current target qualification. Future expansion uses coherent
+ownership scopes, without broad `Any`, import skipping, global ignores or checked
+path removal.
 
 ## Source qualification reporting
 

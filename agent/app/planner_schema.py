@@ -409,6 +409,66 @@ def canonical_goal_binding_argument_response_schema(
     return schema if constrained else base_schema
 
 
+def scoped_reporting_response_schema(
+    schema: dict[str, Any], *, goal_ids: set[str], expected_goal_ids: list[str],
+    future_goal_times: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    """Bound control/waiting reports separately from effect fulfillment and Work."""
+    if not goal_ids:
+        return schema
+    result = copy.deepcopy(schema)
+    future_goal_times = future_goal_times or {}
+    for variant in [result, *result.get("anyOf", [])]:
+        properties = variant["properties"]
+        if goal_ids == set(expected_goal_ids):
+            for name in ("steps", "auxiliary_activities", "time_conditions", "cancel_activity_ids"):
+                if name in properties:
+                    properties[name]["maxItems"] = 0
+            properties["user_confirmation_required"]["enum"] = [False]
+        if future_goal_times:
+            conditions = properties["time_conditions"]
+            conditions.pop("maxItems", None)
+            conditions["minItems"] = len(future_goal_times)
+            conditions.setdefault("allOf", []).extend({"contains": {
+                "type": "object", "properties": {"goal_id": {"const": goal_id},
+                    "due_at_ms": {"const": due_ms}}, "required": ["goal_id", "due_at_ms"],
+            }} for goal_id, due_ms in future_goal_times.items())
+            if goal_ids == set(expected_goal_ids):
+                conditions["maxItems"] = len(future_goal_times)
+                properties["disposition"]["enum"] = ["respond"]
+        outcomes = properties["goal_outcomes"]["properties"]
+        assessments = [(properties["goal_satisfaction"], goal_ids)]
+        for goal_id in goal_ids:
+            fields = outcomes[goal_id]["properties"]
+            fields["step_ids"]["maxItems"] = 0
+            if goal_id in future_goal_times:
+                fields["disposition"]["enum"] = ["respond"]
+            assessments.append((fields["satisfaction"], {goal_id}))
+        for assessment, unmet_ids in assessments:
+            bands = assessment.get("anyOf", [assessment])
+            bands = [band for band in bands
+                     if band.get("properties", {}).get("status", {}).get("enum") != ["exact"]]
+            if "anyOf" in assessment:
+                assessment["anyOf"] = bands
+            for band in bands:
+                fields = band["properties"]
+                fields["score"]["exclusiveMaximum"] = 0.95
+                fields["status"]["enum"] = [
+                    value for value in fields["status"]["enum"] if value != "exact"
+                ]
+                fields["unmet_requirements"]["minItems"] = 1
+                fields["unmet_goal_ids"].setdefault("allOf", []).extend(
+                    {"contains": {"const": goal_id}} for goal_id in sorted(unmet_ids)
+                )
+                fields["satisfied_goal_ids"]["items"]["enum"] = [
+                    goal_id for goal_id in expected_goal_ids if goal_id not in unmet_ids
+                ]
+                if not fields["satisfied_goal_ids"]["items"]["enum"]:
+                    fields["satisfied_goal_ids"]["maxItems"] = 0
+                    fields["satisfied_goal_ids"]["items"].pop("enum")
+    return result
+
+
 def canonical_plan_response_schema(
     *,
     planner_tier: PlannerTier,
@@ -419,6 +479,7 @@ def canonical_plan_response_schema(
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
+    nonfulfilling_response_goal_ids: list[str] | None = None,
     provider_vocal_goal_ids: list[str] | None = None,
     provider_media_goal_operations: dict[str, str] | None = None,
     unavailable_information_goal_ids: list[str] | None = None,
@@ -449,6 +510,7 @@ def canonical_plan_response_schema(
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=response_goal_ids,
+            nonfulfilling_response_goal_ids=nonfulfilling_response_goal_ids,
             confirmation_required_capability_ids=(confirmation_required_capability_ids),
         )
         schema["title"] = "FastPlannerModelOutput"
@@ -1323,6 +1385,7 @@ def fast_multi_goal_response_schema(
     response_only: bool = False,
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
+    nonfulfilling_response_goal_ids: list[str] | None = None,
     effectful_goal_ids: list[str] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
@@ -1379,6 +1442,7 @@ def fast_multi_goal_response_schema(
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
+    cancellation_goal_set = set(nonfulfilling_response_goal_ids or []).intersection(allowed_goals)
     effectful_goal_set = set(effectful_goal_ids or []).intersection(allowed_goals)
 
     def bound_text(
@@ -1907,7 +1971,9 @@ def fast_multi_goal_response_schema(
                                 "status": {
                                     "type": "string",
                                     "enum": (
-                                        ["exact", "substantial", "partial"]
+                                        nonexact_statuses
+                                        if goal_id in cancellation_goal_set
+                                        else ["exact", "substantial", "partial"]
                                         if goal_disposition == "execute"
                                         else ["exact", "substantial"]
                                         if terminal_outcome
@@ -1944,7 +2010,9 @@ def fast_multi_goal_response_schema(
                             "status": {
                                 "type": "string",
                                 "enum": (
-                                    ["exact", "substantial", "partial"]
+                                    nonexact_statuses
+                                    if cancellation_goal_set
+                                    else ["exact", "substantial", "partial"]
                                     if terminal_assignment and execute_count
                                     else ["exact", "substantial"]
                                     if terminal_assignment

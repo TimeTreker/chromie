@@ -198,9 +198,9 @@
     "claim_boundary": "assistant-authored candidate oracle; same-model review required",
     "reference_region": {
       "accepted_dispositions": [
-        "execute"
+        "respond"
       ],
-      "expected_confirmation_required": null,
+      "expected_confirmation_required": false,
       "expected_goal_ids": [
         "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1"
       ],
@@ -213,18 +213,24 @@
         "Do not claim execution, delivery, authorization, or external facts without the required trusted evidence."
       ],
       "forbidden_reuse_activity_ids": [],
-      "required_capability_ids": [
-        "chromie.weather.lookup"
-      ],
+      "required_capability_ids": [],
       "required_evidence_refs": [],
       "required_reuse_activity_ids": [],
       "required_time_conditions": true,
-      "response_required": null,
+      "response_required": true,
       "semantic_facts": [
-        "Known future readiness belongs in a Goal-bound time condition; Planner must not pretend the weather read already happened."
+        "Acknowledge the still-unmet future intention with an exact Goal-bound time condition and zero current Work.",
+        "The timer wakes cognition later; it never delays an executable step listed now. No early weather lookup, invented observation or effect-completion claim."
       ],
-      "semantic_review_required": true
+      "semantic_review_required": true,
+      "allowed_capability_sets": [
+        []
+      ],
+      "waiting_time_conditions": {
+        "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1": 4092202800000
+      }
     },
-    "schema_expectation": "accept"
+    "schema_expectation": "accept",
+    "oracle_revision": "issue58-future-readiness-20260912"
   }
 }

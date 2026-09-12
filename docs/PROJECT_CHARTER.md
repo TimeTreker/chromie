@@ -543,6 +543,20 @@ Read the diagram with these boundaries:
   Goal is accounted for, not that every Goal is satisfied. This owner-authorized
   contract preserves per-Goal unmet requirements, prohibits invented execution,
   and grants no confirmation, future Work, or completion Evidence from speech.
+  The owner authorized the future-readiness correction on 2026-09-12: a Goal
+  with an explicit future `ready_at` may receive an acknowledgement and an exact
+  Planner-authored time condition while its original effect remains unmet.
+  It owns no current executable Work. A time condition wakes cognition later;
+  it never silently delays a step that the Plan lists now. Independent ready
+  Goals and future monitoring of already-running Work retain their own contracts.
+  After restart, an exact trusted wake scope may project its existing open Goal
+  snapshots without a fresh Goal Association result. The Host does not invent a
+  new association to wake cognition; missing, conflicting, or terminal snapshots
+  fail closed before inference.
+  The primary Planner request also carries the Host's captured comparison of each
+  typed readiness instant with the current clock. Once that instant has arrived,
+  the original future-tense wording does not authorize waiting for the same time
+  again. Readiness grants neither execution permission nor completion Evidence.
   Owner-approved staged progress (2026-09-12, #51): complete current acquisition
   Work may have honest partial whole-Goal satisfaction. Both per-Goal and aggregate
   assessments retain deferred obligations; ordinary achieving siblings retain their
@@ -1357,7 +1371,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    decoder contract, and final Goal-set validator use exactly that affected Goal set;
    unrelated or already-closed sibling Goals may remain in durable history but cannot
    silently re-enter this planning transaction. A mismatch between the typed scope,
-   Goal Association, Evidence/cancellation binding, or source Plan fails closed.
+   Goal Association (or the exact persisted open Goal for a trusted state wake),
+   Evidence/cancellation binding, or source Plan fails closed.
    Planner alone decides whether the human-relevant next Main Activity is
    an answer, follow-up Work, revision, clarification, waiting, silence, or no new
    Activity; complex HOW may use the Planner deep pass. Neither Host nor a separate Tool Result Interpreter may
@@ -1369,6 +1384,19 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    may occur once without reconsidering meaning; it preserves the initial semantic
    disposition and may make schema defaults explicit so Runtime never guesses omitted
    scope. Consequential evidence/provenance failure remains fail-closed.
+
+   Cancellation reporting permission is distinct from both original Goal meaning
+   and current provider availability. A trusted control re-entry may report the
+   cancelled, not-cancelled, uncertain, or released-confirmation state without
+   executing, rescheduling, or authorizing that Goal. Its `respond` result can
+   completely account for the control report while the original effect remains
+   unmet in per-Goal and aggregate satisfaction. A released confirmation does not
+   cancel its Goal or authorize a replacement Plan. Catalog availability remains
+   visible as read-only truth even when this invocation has no executable scope;
+   independent Goals retain their ordinary fulfillment and authorization checks.
+   This clarification follows the owner's 2026-09-12 authorization to resolve
+   conflicts by natural, grounded behavior: knowing what happened, what remains
+   wanted, and what can be done are separate facts.
 
 39. **Reflection learns forward; it does not rewrite history.** Trusted observations,
    delivered speech, commitments, execution attempts, and outcomes remain historical

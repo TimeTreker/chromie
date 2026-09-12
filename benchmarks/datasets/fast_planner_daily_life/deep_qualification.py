@@ -36,6 +36,7 @@ from .qualification import (  # noqa: E402
     _json_bytes,
     _sha256,
     _target_checks,
+    staged_reference_errors,
     materialize_catalog,
 )
 
@@ -595,6 +596,7 @@ async def adjudicate_one(
         confirmation_required=plan.metadata.get("user_confirmation_required") if plan else None,
         time_condition_count=len(plan.time_conditions) if plan else 0,
     )
+    target_errors.extend(staged_reference_errors(expected, plan))
     for purpose in expected.get("required_step_purposes", []):
         if purpose not in purposes:
             target_errors.append(f"missing required step_purpose: {purpose}")

@@ -295,7 +295,7 @@ class PlannerModelOutput(BaseModel):
                     and dispositions <= {"respond", "clarify", "unavailable", "refused"}
                 ):
                     raise ValueError("mixed output without steps requires response and limitation outcomes")
-                if self.user_confirmation_required or self.plan_relation != "exact" or self.time_conditions:
+                if self.user_confirmation_required or self.plan_relation != "exact":
                     raise ValueError("mixed output without steps cannot authorize or schedule Work")
         if self.disposition == "respond" and not self.response_text.strip():
             raise ValueError("respond planner output requires response_text")
@@ -343,9 +343,9 @@ class PlannerModelOutput(BaseModel):
             "mixed",
         }:
             raise ValueError("planner-requested confirmation is valid only for executable plans")
-        if self.time_conditions and self.disposition not in {"execute", "mixed"}:
+        if self.time_conditions and self.disposition not in {"execute", "mixed", "respond"}:
             raise ValueError(
-                "time conditions require executable Work that leaves a Goal live until future readiness"
+                "time conditions require live Work or an unmet future Goal acknowledgement"
             )
         if self.goal_outcomes:
             outcome_goal_ids = set(self.goal_outcomes)
@@ -360,11 +360,11 @@ class PlannerModelOutput(BaseModel):
             nonexecuting_time_goals = {
                 item.goal_id
                 for item in self.time_conditions
-                if self.goal_outcomes[item.goal_id].disposition != "execute"
+                if self.goal_outcomes[item.goal_id].disposition not in {"execute", "respond"}
             }
             if nonexecuting_time_goals:
                 raise ValueError(
-                    "time conditions may only bind execute goal outcomes: "
+                    "time conditions may only bind execute or waiting respond goal outcomes: "
                     + ",".join(sorted(nonexecuting_time_goals))
                 )
             outcome_dispositions = {item.disposition for item in self.goal_outcomes.values()}

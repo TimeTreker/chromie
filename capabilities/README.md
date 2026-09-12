@@ -13,8 +13,8 @@ Planner-authored WorkDAG validation and deterministic DAGEngine execution.
 
 [`soridormi.json`](soridormi.json) is generated from Soridormi's authoritative
 capability export and then materialized with Chromie's MCP Streamable HTTP
-transport placeholder. The checked-in snapshot contains six agent records and
-twenty tool records. Its `metadata.upstream_commit` records generation provenance
+transport placeholder. The manifest owns the current Agent/tool records; the
+static capability audit below derives their counts from that file. Its `metadata.upstream_commit` records generation provenance
 for evidence checks; it is not a compatibility pin for normal paired Chromie/Soridormi development.
 
 Do not hand-edit exported tools, schemas, or safety policy. Refresh the source
@@ -88,8 +88,8 @@ before Goal Interpretation and downstream planning can reliably ground natural l
 
 ## Selective ecosystem alignment
 
-Chromie now has an accepted architecture direction for a separate
-owner-approved **Agent Skill** library; see
+Chromie implements a separate owner-approved **Agent Skill** library with
+read-only discovery and disclosure; see
 [`docs/AGENT_SKILLS_ARCHITECTURE.md`](../docs/AGENT_SKILLS_ARCHITECTURE.md).
 Agent Skills may use prose-oriented formats such as `SKILL.md`, but they are
 passive LLM task methods stored outside this executable capability directory.
@@ -102,14 +102,14 @@ execution-authoritative path. Live Chromie contracts use canonical
 `CapabilityRequest`, `CapabilityResult`, and `capability_id`; retired executable
 `Skill*` names and `skill_id` aliases are not compatibility surfaces. Provider-local
 Soridormi wire `skill_id` is translated by its adapter. Do not add a second execution
-registry, script entrypoint, automatic provider-registration hook, or install mechanism. The planned Agent Skill
+registry, script entrypoint, automatic provider-registration hook, or install mechanism. The implemented Agent Skill
 registry is a read-only cognitive-content index with no execution authority.
 
 ## Prompt-tier preset
 
 [`prompt_tiers.json`](prompt_tiers.json) is the owner-editable initial
-common/rare prompt-tier preset. This is where daily/common skills belong; do
-not add a Python skill list for that purpose. The Agent loads it with
+common/rare prompt-tier preset. This is where daily/common Capabilities belong; do
+not add a Python Capability list for that purpose. The Agent loads it with
 `AGENT_CAPABILITY_PROMPT_TIER_PRESET`, and Docker Compose defaults that path to
 `/app/capabilities/prompt_tiers.json`.
 
@@ -168,7 +168,7 @@ Chromie currently has two related but distinct capability views:
 1. The Agent capability registry is a startup-loaded, static manifest view used
    to validate Planner-authored WorkDAG nodes, enforce DAGEngine execution policy, and
    invoke qualified provider operations. The registry does not plan DAG topology.
-2. The Orchestrator Skill Registry is a runtime catalog of trusted named skills
+2. The Host `CapabilityRegistry` is a runtime catalog of trusted named Capabilities
    used by `InteractionResponse` and the host Trusted Capability Runtime.
 
 They share the principle that the model selects validated named capabilities,

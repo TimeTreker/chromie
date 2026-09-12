@@ -34,17 +34,19 @@ class MypyGateTests(unittest.TestCase):
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
         return path
 
-    def test_scope_matches_last_verified_clean_baseline(self) -> None:
-        entries = run_mypy.load_scope(ROOT / "config" / "mypy_scope.txt")
+    def test_scope_covers_entire_contract_package_and_gate_tools(self) -> None:
+        entries = set(run_mypy.load_scope(ROOT / "config" / "mypy_scope.txt"))
+        package_files = {
+            path.relative_to(ROOT).as_posix()
+            for path in (ROOT / "shared" / "chromie_contracts").rglob("*.py")
+        }
         self.assertEqual(
             entries,
-            (
+            package_files | {
                 "scripts/check_local_runtime_exposure.py",
                 "scripts/run_mypy.py",
                 "scripts/run_ruff.py",
-                "shared/chromie_contracts/errors.py",
-                "shared/chromie_contracts/semantic_authority.py",
-            ),
+            },
         )
 
     def test_scope_accepts_python_package_and_rejects_escape(self) -> None:

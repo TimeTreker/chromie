@@ -196,6 +196,7 @@ def qualify_fast_canonical_plan(
     expected_goal_ids_for_turn: list[str],
     authoritative_goals: list[dict[str, Any]],
     evidence_reentry_goal_ids: set[str],
+    nonfulfilling_response_goal_ids: set[str] | None = None,
 ) -> FastPlanQualification:
     allowed = {item["capability_id"]: item for item in capability_payload}
     contract_schema = (
@@ -237,7 +238,10 @@ def qualify_fast_canonical_plan(
     )
     if requires_confirmation and not plan.response_text.strip():
         return reject("confirmation_question_missing")
-    _, requires_execution = planner_goal_execution_requirements(authoritative_goals)
+    _, requires_execution = planner_goal_execution_requirements([
+        goal for goal in authoritative_goals
+        if goal.get("goal_id") not in (nonfulfilling_response_goal_ids or set())
+    ])
     if evidence_reentry_goal_ids == set(expected_goal_ids_for_turn):
         requires_execution = False
     if (
@@ -289,6 +293,11 @@ def qualify_fast_canonical_plan(
         0.75 if plan_relation in {"safe_adjustment", "alternative"} else 0.95
     )
     acquisition_goals = information_acquisition_goal_ids(plan, capability_payload)
+    control_response_goals = {
+        outcome.goal_id for outcome in plan.goal_outcomes
+        if outcome.disposition == "respond"
+        and outcome.goal_id in (nonfulfilling_response_goal_ids or set())
+    }
     achieving_dispositions = {"execute", "respond"}
     achieving_outcomes = [
         outcome
@@ -305,6 +314,7 @@ def qualify_fast_canonical_plan(
         top_level_requires_exact_satisfaction
         and plan.goal_satisfaction.score < minimum_satisfaction
         and not acquisition_goals
+        and not control_response_goals
     ):
         return reject(
             "goal_satisfaction_not_exact",
@@ -321,6 +331,7 @@ def qualify_fast_canonical_plan(
         outcome.goal_id
         for outcome in achieving_outcomes
         if outcome.goal_id not in acquisition_goals
+        and outcome.goal_id not in control_response_goals
         and (outcome.satisfaction is None or outcome.satisfaction.score < minimum_satisfaction)
     ]
     incomplete_outcomes.extend(

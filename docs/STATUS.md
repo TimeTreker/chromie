@@ -1,30 +1,39 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-12
-**Current focus:** audit continuation at `f5522f87` after verified delivery/closure
-of #49–#51. #52 cancellation reporting is freshly diagnosed, not repaired.
-#53/#54 Reflection defects remain reproduced. #55 remains open; current handoff
-records are consolidated into their owners with immutable links to history.
-#56/#57 track typing and a justified lifecycle seam at the existing maintenance priority.
+**Current focus:** owner-authorized remaining-Issue repairs from `c142f16c` are
+implemented and locally qualified. #35 and #52–#58 have delivered acceptance evidence
+subject to publication checks; #56 additionally requires supported-version CI.
+#49–#51 remain delivered and closed. Remaining native model/streaming/voice/target
+qualification stays under #24/#32.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Delivered #51 staged-progress contract unchanged; #49/#50 closed. This delivery changes audit/status/handoff documents only. | Fresh canonical: 2,988 tests/794 subtests, 145 benchmarks, 20 legacy; policy/static/config/docs/ownership pass. #51 regression: 32 pass. All 30 contract modules pass strict Mypy diagnostically; enforced gate remains five files. | Fresh fixed-Codex Fast: 204/204 Schema/Host, 201/204 frozen hard; Deep: 40/40 Schema/Host, 36/40 hard. Reviewed semantic output projections retain failures and unresolved interpretations. Rebuilt Agent source matches 112 files; 51-case live preview stops at GI: 1 failed, 1 interrupted, 49 unrun. | Development only. #24/#32/#35 and current voice/default target closure remain open. No microphone, audible speaker, simulator-execution or robot proof. |
+| Truthful scoped cancellation; result planning before bounded Reflection; approved Mind and no current-turn advisory re-entry; zero-early-work waiting, persisted open-Goal wake and captured arrived-time fact; complete contract typing; lifecycle/documentation corrections. | Final canonical:3,105 tests/794 subtests,145 benchmarks,20 legacy; pinned static/config/policy/ownership pass. Future module: 50. Level A: 45 distinct cases/all 15 classes. Final Fast 204/Deep 40 plus 50 supplemental cases pass Schema/Host/frozen gates and post-hoc semantic review, in Fast-then-Deep order. | Final deployed-source 51-case live-text cohort: 1 GI failure, 1 startup interrupted, 49 unrun. All 113 Agent/shared files match; source/provider unchanged through cohort, one bundle, safe idle verified. Qwen9b output-budget contrast retains semantic/binding/truncation failures. | Development only. No target model profile, native streaming/voice, audible speaker, physical microphone, executed simulator capability or robot qualification. #24/#32 remain open. |
 
-Evidence: `.chromie/acceptance/issue52-cancellation-scope-20260912/` (ignored).
-The [audit](../ARCHITECTURE_AUDIT.md) distinguishes failed frozen regions from valid
-#51 staged reads and current cancellation/semantic failures. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
-and [handoff](../HANDOFF.md) own current commands, source/call identities, one retained
-live bundle and transfer limits. No output, oracle, model, profile or principle was
-changed to manufacture a pass. Agent/TTS/LLM remain healthy development services;
-ASR was not running in this text-preview audit. Owned simulator/MCP are stopped,
-last checked safe idle. Current source evidence does not promote those services.
+Evidence: `.chromie/acceptance/remaining-issues-20260912/` (private, ignored).
+The [audit](../ARCHITECTURE_AUDIT.md) owns the actual workflows and principle decisions;
+the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own resume
+commands, exact source/runtime identities and transfer paths. Final cohort raw outputs
+and original failures are retained. Oracle amendments were separately justified and
+frozen before new inference; no historical failure was relabeled. Fixed
+`gpt-5.6-sol/high` offline qualification is post-hoc and non-independent, and does not
+qualify the deployed Qwen/Ollama provider. Supported Python3.11/3.12 CI must be linked
+on #56 before closure; local Python3.13 checks do not establish those results.
 
-The [preceding #51 delivery record](https://github.com/TimeTreker/chromie/blob/f5522f874671ff1b8bd42553a22793eaad0b1f51/HANDOFF.md)
-retains its 32 regressions, 14 Level A cases, eight conditional continuations,
-failed full-role regions and incomplete live retry. Its private artifacts from the
-other machine are absent here. Historical sections below retain their original
-revision limits; they are not current deployment instructions or new passing evidence.
+The current Qwen9b output-budget contrast preserves original packets except512→2,048
+output tokens:44 cases/63 calls,34 returned decisions,2 strict dimension passes, and a
+retained truncation plus decomposition/binding failures. All 44 outputs were reviewed;
+strict span/wording mismatches are distinguished from hard meaning failures. No
+production profile change was made. Agent/TTS/LLM remain development services; owned
+simulator/MCP stopped after safe-idle verification. Exact deployed source is recorded
+in HANDOFF and predates the final documentation commit, so it is not a clean-revision
+release claim. Physical microphone/speaker evidence remains supervised and absent.
+
+The [preceding audit delivery](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/HANDOFF.md)
+retains the friend's review and prior unchanged-source baselines. Private #51 artifacts
+from the other machine remain absent locally. Historical sections below retain their
+original revision limits; they are not current runtime instructions or new passes.
 
 ### Prior remaining-Issue delivery — 191083dc
 
@@ -42,7 +51,7 @@ concurrency limits and PSM-6/8 source status are reconciled.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| GI/provenance, native Fast streaming, provider lifecycle/evidence and #46–#48 documentation corrections implemented. Earlier independent Planner tasks, scoped Work and Memory projections remain. | Final source gate: 2,480 tests/771 subtests,145 benchmarks,20 legacy tests; policy/static/config/docs and ownership pass. Level A:30/30 distinct cases. Frozen Fast:204/204 Schema/Host and assisted semantic review. Deep:40/40 Schema,39/40 Host,35/40 frozen hard passes; all five failures retained after review. | Unqualified. Three local profiles and a fourth GI-only candidate retain semantic failures. Final rebuilt-Agent 51-case preview stops at GI integrity:1 complete failure,1 partial startup,49 unrun. Native Fast has2/8 Host acceptances per local model. No current physical microphone, audible speaker or robot proof. | Development only; no model profile or target/release promotion. |
+| GI/provenance, native Fast streaming, provider lifecycle/evidence and #46–#48 documentation corrections implemented. Earlier independent Planner tasks, scoped Work and Memory projections remain. | Final source gate: 2,480 tests/771 subtests,145 benchmarks,20 legacy tests; policy/static/config/docs and ownership pass. Level A:30/30 distinct cases. Frozen Fast: 204/204 Schema/Host and assisted semantic review. Deep: 40/40 Schema,39/40 Host,35/40 frozen hard passes; all five failures retained after review. | Unqualified. Three local profiles and a fourth GI-only candidate retain semantic failures. Final rebuilt-Agent 51-case preview stops at GI integrity:1 complete failure, 1 partial startup,49 unrun. Native Fast has2/8 Host acceptances per local model. No current physical microphone, audible speaker or robot proof. | Development only; no model profile or target/release promotion. |
 
 Fast/Deep offline results use gpt-5.6-sol/high as a Codex surrogate, one invocation per
 case, and non-independent assisted review. Deep exposes a read-first satisfaction

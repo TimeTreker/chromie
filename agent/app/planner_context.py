@@ -2,32 +2,34 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 from typing import Any
 
 from pydantic import ValidationError
+from .planner_grounding import _goal_binding_map
 
 try:
     from chromie_contracts.core_interpretation import PlannerReentryScope
     from chromie_contracts.control import GoalCancellationEvidence
     from chromie_contracts.execution_outcome import ExecutionOutcomeBundle
-    from chromie_contracts.goal import GoalAssociationResolution
+    from chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         reject_forbidden_low_level_fields,
     )
-    from chromie_contracts.situation import SituationProjection
+    from chromie_contracts.situation import CognitiveOpportunity, SituationProjection
     from chromie_contracts.tool_result import ToolResultEvidence
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.control import GoalCancellationEvidence
     from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
-    from shared.chromie_contracts.goal import GoalAssociationResolution
+    from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         reject_forbidden_low_level_fields,
     )
-    from shared.chromie_contracts.situation import SituationProjection
+    from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
     from shared.chromie_contracts.tool_result import ToolResultEvidence
 
 
@@ -264,7 +266,11 @@ def fast_goal_continuity_projection(context: dict[str, Any]) -> list[dict[str, A
     return snapshots
 
 
-def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, Any]]:
+def canonical_goal_grounding(
+    context: dict[str, Any] | None,
+    *,
+    retained_goal_ids: tuple[str, ...] = (),
+) -> list[dict[str, Any]]:
     """Build a compact immutable grounding block for planner prompts.
 
     Goal Association owns which goals exist. Planners receive only those IDs and
@@ -335,6 +341,10 @@ def canonical_goal_grounding(context: dict[str, Any] | None) -> list[dict[str, A
                     "metadata": item.get("metadata") or {},
                 }
             )
+    for goal_id in retained_goal_ids:
+        if goal_id not in seen:
+            result.append(active_by_id[goal_id])
+            seen.add(goal_id)
     return result
 
 
@@ -704,6 +714,34 @@ class PlannerGoalContext:
     response_goal_ids: tuple[str, ...]
     response_only: bool
     requires_execution: bool
+    future_goal_times: tuple[tuple[str, int], ...] = ()
+
+
+def goal_readiness_times(goals: list[dict[str, Any]] | tuple[dict[str, Any], ...]) -> dict[str, int]:
+    """Read exact typed readiness instants without interpreting time semantics.
+
+    This does not interpret deadlines, prose, or provider due-time arguments.
+    A timer for monitoring already-running Work has no such readiness binding.
+    """
+    result: dict[str, int] = {}
+    for goal in goals:
+        binding = _goal_binding_map(goal).get("ready_at")
+        if not binding:
+            continue
+        value = binding.get("value")
+        if not isinstance(value, str):
+            raise ValueError("ready_at must be an explicit timezone-qualified timestamp")
+        ready = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if ready.tzinfo is None:
+            raise ValueError("ready_at requires an explicit timezone")
+        due_ms = int(ready.timestamp() * 1000)
+        result[str(goal["goal_id"])] = due_ms
+    return result
+
+
+def future_goal_readiness_times(goals: list[dict[str, Any]] | tuple[dict[str, Any], ...]) -> dict[str, int]:
+    now_ms = datetime.now(timezone.utc).timestamp() * 1000
+    return {goal_id: due_ms for goal_id, due_ms in goal_readiness_times(goals).items() if due_ms > now_ms}
 
 
 def planner_goal_context(
@@ -722,6 +760,36 @@ def planner_goal_context(
     current = context if isinstance(context, dict) else {}
     full_expected = tuple(expected_goal_ids(current))
     full_goals = canonical_goal_grounding(current)
+    if reentry_scope is not None and current.get("goal_association_resolution") is None:
+        # A trusted state wake continues already-owned Goals. It is not a new
+        # user turn or a fresh GA decision, including after task-store restore.
+        opportunity = CognitiveOpportunity.model_validate(current.get("cognitive_opportunity"))
+        if (
+            not reentry_scope.opportunity_id
+            or opportunity.opportunity_id != reentry_scope.opportunity_id
+            or set(opportunity.goal_ids) != set(reentry_scope.goal_ids)
+        ):
+            raise ValueError("Retained Goal re-entry requires an exact trusted opportunity")
+        retained: dict[str, dict[str, Any]] = {}
+        for item in current.get("active_goal_snapshots") or []:
+            if not isinstance(item, dict) or item.get("goal_id") not in reentry_scope.goal_ids:
+                continue
+            snapshot = ActiveGoalSnapshot.model_validate(item)
+            if (
+                snapshot.goal_id in retained
+                or snapshot.goal.goal_id != snapshot.goal_id
+                or snapshot.responsibility_status != "open"
+                or snapshot.goal.responsibility_status != "open"
+            ):
+                raise ValueError("Retained Goal re-entry requires one current open snapshot per Goal")
+            retained[snapshot.goal_id] = item
+        if set(retained) != set(reentry_scope.goal_ids):
+            raise ValueError("Retained Goal re-entry lacks an exact current Goal snapshot")
+        full_expected = reentry_scope.goal_ids
+        full_goals = canonical_goal_grounding(
+            {**current, "active_goal_snapshots": list(retained.values()), "recent_goal_snapshots": []},
+            retained_goal_ids=full_expected,
+        )
     cancellation_goal_ids = frozenset(goal_cancellation_evidence_reentry_goal_ids(current))
     result_goal_ids = frozenset(result_evidence_reentry_goal_ids(current))
     if reentry_scope is not None:
@@ -767,15 +835,16 @@ def planner_goal_context(
         expected = full_expected
         goals = full_goals
     response_only, requires_execution = planner_goal_execution_requirements(goals)
+    future_times = future_goal_readiness_times(goals)
+    for goal_id in cancellation_goal_ids:
+        future_times.pop(goal_id, None)
     response_goal_ids = set(planner_response_goal_ids(goals)) | set(cancellation_goal_ids)
+    response_goal_ids.update(future_times)
 
     if cancellation_goal_ids:
-        stateful_goal_ids = {
-            str(goal.get("goal_id") or "").strip()
-            for goal in goals
-            if isinstance(goal, dict) and _goal_output_mode(goal) == "stateful_effect"
-        }
-        requires_execution = bool(stateful_goal_ids - set(cancellation_goal_ids))
+        _, requires_execution = planner_goal_execution_requirements([
+            goal for goal in goals if goal.get("goal_id") not in cancellation_goal_ids
+        ])
         if set(cancellation_goal_ids) == set(expected):
             response_only = True
 
@@ -790,6 +859,15 @@ def planner_goal_context(
             - completed_acquisition_goal_ids(current, reentry_scope=reentry_scope)
         )
 
+    if future_times:
+        # Preserve catalog availability; only the explicitly future Goal's Work
+        # is withheld. Ready independent siblings retain their normal contract.
+        _, requires_execution = planner_goal_execution_requirements([
+            goal for goal in goals
+            if goal.get("goal_id") not in set(future_times) | cancellation_goal_ids
+        ])
+        response_goal_ids.update(future_times)
+
     return PlannerGoalContext(
         expected_goal_ids=expected,
         authoritative_goals=tuple(goals),
@@ -798,6 +876,7 @@ def planner_goal_context(
         response_goal_ids=tuple(sorted(response_goal_ids)),
         response_only=response_only,
         requires_execution=requires_execution,
+        future_goal_times=tuple(sorted(future_times.items())),
     )
 
 
@@ -943,6 +1022,19 @@ def deep_capability_payload(item: Any) -> dict[str, Any]:
         "execution_constraints": item.execution_constraints,
         "hints": dict(item.hints),
     }
+
+
+def cancellation_capability_facts(entries: list[Any]) -> list[dict[str, Any]]:
+    """Catalog truth for control reporting, without granting executable scope."""
+    return [
+        {
+            "capability_id": item.capability_id,
+            "description": item.description,
+            "available": item.available,
+            "interaction_executable": item.interaction_executable,
+        }
+        for item in entries
+    ]
 
 
 def auxiliary_social_capability_payloads(entries: list[Any]) -> list[dict[str, Any]]:

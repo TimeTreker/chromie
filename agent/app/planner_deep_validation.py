@@ -22,6 +22,7 @@ def deep_plan_validation_errors(
     requires_execution: bool,
     min_goal_satisfaction: float,
     allows_evidence_response: bool = False,
+    nonfulfilling_response_goal_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     allowed = {item["capability_id"]: item for item in capabilities}
     acquisition_goals = information_acquisition_goal_ids(plan, capabilities)
@@ -65,6 +66,9 @@ def deep_plan_validation_errors(
             if outcome.disposition not in {"execute", "respond"}:
                 continue
             if outcome.goal_id in acquisition_goals:
+                continue
+            if (outcome.disposition == "respond"
+                    and outcome.goal_id in (nonfulfilling_response_goal_ids or set())):
                 continue
             # The complete aggregate satisfaction object and exact keyed
             # outcome map already express prospective adequacy. Per-outcome

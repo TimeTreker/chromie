@@ -745,3 +745,55 @@ def test_fast_exact_confirmation_requires_primary_question(language, reentry):
             assert qualified.reason == "confirmation_question_missing"
 
     asyncio.run(run())
+
+
+def test_derived_continuation_survives_serialization_and_both_host_projections():
+    async def run():
+        from orchestrator.runtime.outcome_reconciliation import planner_execution_outcome_truth
+        from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
+
+        _, _, plan, _, _, _, _, manager, bundle = await begin_episode('en', False)
+        wire = json.loads(bundle.model_dump_json())
+        assert 'requires_planner_continuation' not in wire['goal_outcomes'][0]
+        restored = ExecutionOutcomeBundle.model_validate(wire)
+        outcome = restored.goal_outcomes[0]
+        assert outcome.acquisition_step_ids and outcome.requires_planner_continuation
+        projection = planner_execution_outcome_truth(restored)
+        assert projection['goal_outcomes'][0]['requires_planner_continuation'] is True
+        goal = manager._task_context_by_goal_id(plan.goal_ids[0])
+        assert goal['evidence_summary']['execution_outcome']['requires_planner_continuation'] is True
+        assert manager._goal_responsibility_status(goal) == 'open'
+        # The sender cannot override a source-derived property on the wire.
+        wire['goal_outcomes'][0]['requires_planner_continuation'] = False
+        with pytest.raises(ValidationError, match='extra_forbidden'):
+            ExecutionOutcomeBundle.model_validate(wire)
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('handled_key', [
+    'incremental_result_delivery_evidence_ids', 'incremental_planner_reentry_evidence_ids',
+])
+def test_legacy_reflection_advice_cannot_reconsume_handled_result(handled_key):
+    async def run():
+        request, catalog, plan, _, _, adapter, response, _, bundle = await begin_episode('en', False)
+        response.metadata[handled_key] = [item.evidence_id for item in bundle.evidence]
+        response.metadata['reflection_advisories'] = [{'action': 'replan'}]
+        result, invoked_request = await reenter(request, catalog, plan, adapter, response, bundle,
+                                               next_reply(request, False))
+        assert result is None and invoked_request is None
+    asyncio.run(run())
+
+
+def test_frozen_prerequisite_reference_does_not_accept_effect_completion_from_a_read():
+    from benchmarks.datasets.fast_planner_daily_life.qualification import staged_reference_errors
+    async def run():
+        request,catalog=scenario('en')
+        plan=await resolve(request,catalog,read_reply(request))
+        reference={'staged_acquisition_capability_ids':['chromie.weather.lookup']}
+        assert staged_reference_errors(reference,plan)==[]
+        false_completion=plan.model_copy(deep=True)
+        false_completion.goal_satisfaction.score=1.0
+        false_completion.goal_satisfaction.unmet_goal_ids=[]
+        assert staged_reference_errors(reference,false_completion)
+    asyncio.run(run())

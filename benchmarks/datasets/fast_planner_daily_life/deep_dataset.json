@@ -57,6 +57,12 @@
   },
   "asset_contract": {
     "discovery_glob": "deep_scenarios/<split>/<category>/*.json",
-    "scenario_tree_sha256": "a0c79e38cf4055b7021a4dcc1cbd0a2caec915872174d41e9c2bf153a4a7406a"
+    "scenario_tree_sha256": "f9825aa1d7e1235ced93a1ef7b41c21f551cab15eb9178ac0b770cbc1119f87b"
+  },
+  "oracle_revision": {
+    "id": "issue51-staged-acquisition-20260912",
+    "authority": "Delivered Issue 51 / Charter complete acquisition stage, owner-authorized Issue 35 continuation",
+    "input_changes": false,
+    "historical_outputs_reclassified": false
   }
 }

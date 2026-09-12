@@ -754,12 +754,18 @@
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 204,
     "contrast_set_size": 4,
-    "scenario_tree_sha256": "2650948b9027071c948bb75481d203104923b4aff2bfc33750288d350679c2d8"
+    "scenario_tree_sha256": "e8556125778edddab9053738383d7153ed63e9e9e01b5b881e3fbbf7171799a6"
   },
   "split_policy": {
     "unit": "contrast_set",
     "cross_split_contrast_sets_allowed": false,
     "frozen_test_mutation": "owner review required",
     "train_candidate_note": "Training remains prohibited until independent semantic review promotes individual cases."
+  },
+  "oracle_revision": {
+    "id": "issue51-stage-and-issue58-readiness-20260912",
+    "authority": "Delivered Issue 51 plus owner-authorized Issue 58 correction of reproduced early dispatch",
+    "input_changes": false,
+    "historical_outputs_reclassified": false
   }
 }

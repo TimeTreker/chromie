@@ -45,6 +45,8 @@ from .planner_context import (
     evidence_bound_dialogue,
     goal_association_prompt_projection,
     goal_cancellation_evidence_reentry_goal_ids,
+    future_goal_readiness_times,
+    goal_readiness_times,
     planner_effectful_goal_ids,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
@@ -157,8 +159,62 @@ def validate_goal_responsibility_outcomes(
     authoritative_goals: list[dict[str, Any]],
     context: dict[str, Any] | None = None,
     reentry_scope: PlannerReentryScope | None = None,
+    future_goal_times: dict[str, int] | None = None,
 ) -> None:
     """Keep planner outcomes aligned with typed Goal completion contracts."""
+
+    cancellation_goals = goal_cancellation_evidence_reentry_goal_ids(context).intersection(
+        str(goal.get("goal_id") or "") for goal in authoritative_goals
+    )
+    # Use the same clock snapshot that shaped this invocation's prompt/Schema;
+    # crossing the due instant during inference must not reinterpret its result.
+    future_times = dict(future_goal_times) if future_goal_times is not None else future_goal_readiness_times(authoritative_goals)
+    readiness_times = goal_readiness_times(authoritative_goals)
+    for goal_id in cancellation_goals:
+        future_times.pop(goal_id, None)
+    for goal_id, due_ms in future_times.items():
+        outcome = output.goal_outcomes.get(goal_id)
+        if outcome is None or outcome.disposition != "respond" or outcome.step_ids or any(
+            goal_id in step.source_goal_ids for step in output.steps
+        ):
+            raise ValueError("future Goal cannot dispatch Work before ready_at: " + goal_id)
+        matches = [condition for condition in output.time_conditions if condition.goal_id == goal_id]
+        if len(matches) != 1 or matches[0].due_at_ms != due_ms:
+            raise ValueError("future Goal requires its exact readiness condition: " + goal_id)
+        for assessment in (outcome.satisfaction, output.goal_satisfaction):
+            if (assessment is None or goal_id not in assessment.unmet_goal_ids
+                    or goal_id in assessment.satisfied_goal_ids
+                    or not assessment.unmet_requirements or assessment.score >= 0.95):
+                raise ValueError("waiting acknowledgement cannot fulfill future Goal: " + goal_id)
+    for condition in output.time_conditions:
+        outcome = output.goal_outcomes.get(condition.goal_id)
+        if outcome is not None and outcome.disposition == "respond" and (
+            condition.goal_id not in future_times
+            or readiness_times.get(condition.goal_id) != condition.due_at_ms
+        ):
+            raise ValueError("scheduled response requires an exact typed ready_at binding")
+    if future_times and set(future_times) == {str(goal.get("goal_id") or "") for goal in authoritative_goals}:
+        if output.steps or output.auxiliary_activities or output.cancel_activity_ids or output.user_confirmation_required:
+            raise ValueError("waiting acknowledgement cannot authorize or mutate current Work")
+    if cancellation_goals:
+        # Reporting a control transition neither performs the original effect nor
+        # issues another authorization. Validate scope; never rewrite the result.
+        for goal_id in cancellation_goals:
+            outcome = output.goal_outcomes.get(goal_id)
+            if outcome is None or outcome.step_ids or any(
+                goal_id in step.source_goal_ids for step in output.steps
+            ):
+                raise ValueError("cancellation reporting cannot own executable Work: " + goal_id)
+            for assessment in (outcome.satisfaction, output.goal_satisfaction):
+                if (assessment is None or goal_id not in assessment.unmet_goal_ids
+                        or goal_id in assessment.satisfied_goal_ids
+                        or not assessment.unmet_requirements or assessment.score >= 0.95):
+                    raise ValueError("cancellation reporting cannot fulfill original Goal: " + goal_id)
+        if any(condition.goal_id in cancellation_goals for condition in output.time_conditions):
+            raise ValueError("cancellation reporting cannot schedule original Goal")
+        if cancellation_goals == {str(goal.get("goal_id") or "") for goal in authoritative_goals}:
+            if output.steps or output.auxiliary_activities or output.cancel_activity_ids or output.user_confirmation_required:
+                raise ValueError("cancellation reporting cannot authorize or mutate Work")
 
     unproven_acquisition = acquisition_source_goal_ids(context) - completed_acquisition_goal_ids(
         context, reentry_scope=reentry_scope
@@ -175,8 +231,12 @@ def validate_goal_responsibility_outcomes(
             raise ValueError("acquisition continuation requires matching completed Evidence: " + goal_id)
 
     response_goal_ids = planner_response_goal_ids(authoritative_goals)
-    provider_vocal_goal_ids = planner_provider_vocal_goal_ids(authoritative_goals)
-    provider_media_goal_operations = planner_provider_media_goal_operations(authoritative_goals)
+    provider_vocal_goal_ids = planner_provider_vocal_goal_ids(authoritative_goals) - cancellation_goals - set(future_times)
+    provider_media_goal_operations = {
+        goal_id: operation for goal_id, operation in
+        planner_provider_media_goal_operations(authoritative_goals).items()
+        if goal_id not in cancellation_goals and goal_id not in future_times
+    }
     speaking_goal_ids = response_goal_ids | provider_vocal_goal_ids
     stateful_goal_ids = {
         goal_id
@@ -316,7 +376,7 @@ def validate_goal_responsibility_outcomes(
             and not output.goal_outcomes
             and output.disposition == "respond"
         )
-        if responds_without_capability and goal_id not in evidence_goal_ids:
+        if responds_without_capability and goal_id not in evidence_goal_ids and goal_id not in future_times:
             raise ValueError(
                 "stateful_effect goal cannot use disposition=respond without "
                 "execution or delivered evidence-bound dialogue: " + goal_id
@@ -338,7 +398,7 @@ def validate_goal_responsibility_outcomes(
             continue
         if disposition in terminal_block_dispositions:
             continue
-        if disposition == "respond" and goal_id in evidence_goal_ids:
+        if disposition == "respond" and (goal_id in evidence_goal_ids or goal_id in future_times):
             continue
         raise ValueError(
             "unresolved effectful goal requires an executable step or explicit "
@@ -1770,6 +1830,12 @@ def validate_external_response_evidence_boundary(
     unsupported = responding_goal_ids & unresolved_external_goal_ids
     unsupported -= result_evidence_reentry_goal_ids(context)
     unsupported -= goal_cancellation_evidence_reentry_goal_ids(context)
+    # validate_goal_responsibility_outcomes has already required an exact typed
+    # wake condition, zero Work, and honest unmet satisfaction for these Goals.
+    readiness_times = goal_readiness_times(authoritative_goals) if output.time_conditions else {}
+    waiting_goal_ids = {condition.goal_id for condition in output.time_conditions
+                       if readiness_times.get(condition.goal_id) == condition.due_at_ms}
+    unsupported -= waiting_goal_ids
     unsupported -= dialogue_goal_ids
     if unsupported:
         raise ValueError(
@@ -1791,6 +1857,7 @@ def validate_external_response_evidence_boundary(
     index_only_goal_ids = responding_goal_ids & verified_goal_ids - dialogue_goal_ids
     index_only_goal_ids -= result_evidence_reentry_goal_ids(context)
     index_only_goal_ids -= goal_cancellation_evidence_reentry_goal_ids(context)
+    index_only_goal_ids -= waiting_goal_ids
     if index_only_goal_ids:
         raise ValueError(
             "external_read_response_requires_evidence_bound_dialogue_or_retrieval: "

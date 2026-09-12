@@ -23,35 +23,37 @@ it does not reopen other audit findings or replace the remaining model/voice/tar
 qualification order. See [Status](docs/STATUS.md) and the current
 [checkpoint](DEVELOPMENT_CHECKPOINT.md) for evidence and resume scope.
 
-The owner subsequently authorized completion of all remaining Issues and normal main
-delivery. [Audit index #36](https://github.com/TimeTreker/chromie/issues/36) maps the
-review to #37–#48. Previously delivered #37–#39 and #41–#45 retain their accepted
-scope. The current delivery completes #40's remaining lossless-normalization and
-numeric-punctuation decisions, #46's Charter/interface separation, #47's scheduling
-support distinction, and #48's status reconciliation. These are source/audit closures.
-Full merge/split execution remains excluded; no model or deployment is qualified.
-
-Current evidence: the canonical source gate and all 204 frozen Fast Planner cases
-pass. The 40-case Deep cohort retains five failures involving staged-read satisfaction,
-cancellation scope projection and oracle/contract ambiguity. Resolve those #35
-boundaries before another Planner qualification claim. #24's local-model comparison
-and #32's native streaming/live qualification remain unsuccessful; continue from the
-exact failures in the checkpoint, without promoting a profile or widening features.
+The owner authorized completion of the remaining Issues and normal main delivery.
+[Audit index #36](https://github.com/TimeTreker/chromie/issues/36) and the
+[September 12 audit](ARCHITECTURE_AUDIT.md) preserve the prior deliveries and current
+repair evidence. #49–#51 are delivered and closed. The current delivery implements
+#52 cancellation reporting, #53/#54 Reflection scheduling/context, #55 evidence
+labels, #56 complete contract typing, #57 lifecycle regressions, and newly reproduced
+#58 future-readiness/persisted-wake handoff. The owner authorized the corresponding
+Charter decisions and bounded maintenance in this session. No new model profile,
+architecture layer or product feature is promoted.
 
 ## Current execution order
 
-The September 12 [audit](ARCHITECTURE_AUDIT.md) adds reproduced blockers within the
-existing evidence-closure line. #49's shared resource enforcement is delivered and
-closed; #50's complete-or-reject Planner projection is implemented, with verification
-and delivery state in Status/checkpoint. Continue with #51/#52 staged progress and cancellation scope under
-#35, then #53/#54 Reflection scheduling/context. Fold #55's remaining documentation
-drift into the relevant delivery. Contract-meaning changes still require the Charter's
-owner decision. After these repairs, resume the fixed-transaction and full live-cohort
-qualification below; no source fix promotes a model or substitutes for target evidence.
+Ordered offline Fast/Deep qualification of the repairs above passes. Complete
+publication verification, then follow the remaining native qualification line below.
+Exact current results belong in [Status](docs/STATUS.md) and the
+[checkpoint](DEVELOPMENT_CHECKPOINT.md). Retain all original failures and separately
+frozen staged/readiness oracle amendments. The coverage-designed 204 Fast/40 Deep
+corpora plus boundary contrasts replace #35's earlier numeric-size proposal; a
+surrogate pass is not a native provider or target claim.
+
+Then continue #24/#32 from the actual primary GI failure before GA/Planner/Runtime.
+The latest aggregate live cohort is incomplete and failed; the Qwen9b output-budget
+contrast also retains semantic/binding/truncation failures. Do not bypass GI to reach
+downstream tests or promote a profile from isolated role results. Keep canonical
+source gate → narrow current-revision live voice → default target-evidence closure
+as the active delivery line. Numeric class/document sizes remain review measurements,
+and #57's reasoned no-extraction result does not authorize unrelated refactoring.
 
 The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:
 
-1. **Preserve revision-bound full source qualification.** The current source gate passes with pinned dependencies (2,480 tests/771 subtests,145 benchmarks,20 legacy tests). After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.
+1. **Preserve revision-bound full source qualification.** The latest observed source gate is recorded in Status/checkpoint; avoid duplicating revision-specific counts here. After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.
 2. **Freeze and qualify the complete model transaction on that exact source.** Re-run target-blind GI/GA/Fast/Deep cohorts with the production prompt projections, schemas/decoder transport, one-call topology, early commit guard, and failure-state reconciliation. A model or serving backend may be promoted only from revision-bound evidence.
 3. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
    and retain bilingual/provider/simulator/live evidence for Planner-owned speech,

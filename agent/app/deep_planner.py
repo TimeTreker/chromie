@@ -30,6 +30,7 @@ from .planner_model_contract import (
     stable_plan_id,
 )
 from .planner_schema import (
+    scoped_reporting_response_schema,
     work_change_response_schema,
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
@@ -38,6 +39,7 @@ from .planner_schema import (
 from .planner_context import (
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
+    cancellation_capability_facts,
     deep_capability_payload,
     planner_goal_context,
     planner_provider_media_goal_operations,
@@ -143,9 +145,15 @@ class DeepPlannerResolver:
         )
         expected_goal_ids_for_turn = list(goal_context.expected_goal_ids)
         authoritative_goals = list(goal_context.authoritative_goals)
+        future_goal_times = dict(goal_context.future_goal_times)
+        reporting_goal_ids = set(goal_context.cancellation_reentry_goal_ids) | set(future_goal_times)
         response_only = goal_context.response_only
         requires_execution = goal_context.requires_execution
         capabilities = await self.catalog.prompt_entries(scope="all", refresh=False)
+        context["planner_cancellation_capability_facts"] = (
+            cancellation_capability_facts(capabilities)
+            if goal_context.cancellation_reentry_goal_ids else []
+        )
         auxiliary_social_capabilities = auxiliary_social_capability_payloads(capabilities)
         context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(
             context,
@@ -184,6 +192,8 @@ class DeepPlannerResolver:
             payload,
             authoritative_goals=authoritative_goals,
         )
+        unavailable_information_goal_ids -= reporting_goal_ids
+        unavailable_resource_goal_ids -= reporting_goal_ids
         if context.get("verified_tool_memory_index"):
             unavailable_resource_goal_ids -= set(unavailable_information_goal_ids)
             # A fresh exact memory entry may satisfy a typed information Goal via
@@ -210,9 +220,14 @@ class DeepPlannerResolver:
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=list(goal_context.response_goal_ids),
-            provider_vocal_goal_ids=sorted(planner_provider_vocal_goal_ids(authoritative_goals)),
+            provider_vocal_goal_ids=sorted(
+                planner_provider_vocal_goal_ids(authoritative_goals)
+                - reporting_goal_ids
+            ),
             provider_media_goal_operations=(
-                planner_provider_media_goal_operations(authoritative_goals)
+                {goal_id: operation for goal_id, operation in
+                 planner_provider_media_goal_operations(authoritative_goals).items()
+                 if goal_id not in reporting_goal_ids}
             ),
             unavailable_information_goal_ids=sorted(unavailable_information_goal_ids),
             unavailable_resource_goal_ids=sorted(unavailable_resource_goal_ids),
@@ -235,6 +250,11 @@ class DeepPlannerResolver:
             capabilities=payload,
         )
         response_schema = work_change_response_schema(response_schema, context=context)
+        response_schema = scoped_reporting_response_schema(
+            response_schema, goal_ids=reporting_goal_ids,
+            expected_goal_ids=expected_goal_ids_for_turn,
+            future_goal_times=future_goal_times,
+        )
         generation_options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -251,6 +271,7 @@ class DeepPlannerResolver:
                     response_schema=response_schema,
                     expected_goal_ids=expected_goal_ids_for_turn,
                     minimum_goal_satisfaction=self.min_goal_satisfaction,
+                    goal_context=goal_context,
                 ),
                 system=deep_system_prompt(),
                 options=generation_options,
@@ -312,6 +333,7 @@ class DeepPlannerResolver:
                 authoritative_goals=authoritative_goals,
                 context=request.context,
                 reentry_scope=request.planner_reentry_scope,
+                future_goal_times=future_goal_times,
             )
             validate_resource_responsibility_capability_grounding(
                 validated_model_output,
@@ -409,8 +431,9 @@ class DeepPlannerResolver:
             requires_execution=requires_execution,
             min_goal_satisfaction=self.min_goal_satisfaction,
             allows_evidence_response=bool(
-                context.get("result_evidence_reentry") or context.get("goal_cancellation_reentry")
+                goal_context.result_reentry_goal_ids or reporting_goal_ids
             ),
+            nonfulfilling_response_goal_ids=reporting_goal_ids,
         )
         if errors:
             return materialize_deep_clarify(

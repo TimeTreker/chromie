@@ -79,6 +79,19 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
         self.assertEqual(transition["released_confirmation_goal_ids"], ["goal-b"])
         self.assertIsNone(transition["replacement"])
         self.assertNotIn("replacement_confirmation_prompt", transition)
+        # The builder proposes the transition; the token owner applies it after
+        # Goal reconciliation, as dispatch_named_goal_cancellation does.
+        dialogue.replace(expected_confirmation_id=transition["old_confirmation_id"], pending=replacement)
+        stale = dialogue.resolve("confirm", expected_confirmation_id=pending.confirmation_id)
+        self.assertEqual(stale.decision, "not_confirmation")
+        self.assertIsNone(stale.response)
+        # A revoked token cannot consume a later, independently authorized proposal.
+        fresh = dialogue.begin(response, confirmed_request_ids={"request-b"},
+            origin_session_id="sid", conversation_id="conversation")
+        self.assertEqual(dialogue.resolve("confirm", expected_confirmation_id=pending.confirmation_id).decision,
+            "not_confirmation")
+        self.assertEqual(dialogue.resolve("confirm", expected_confirmation_id=fresh.confirmation_id).decision,
+            "approved")
 
     def test_cancellation_reentry_delegates_to_existing_planner_state_entry(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

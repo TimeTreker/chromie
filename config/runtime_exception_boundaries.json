@@ -461,19 +461,6 @@
       "ordinal": 6,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the trusted execution outcome and open Responsibility when optional selective Reflection state application fails; retain a diagnostic and do not invent memory, completion, or effect authority.",
-      "review_status": "reviewed",
-      "body_sha256": "103ff539ff211f0b20423fad0deb41dc90f8cc999cba0a8d4ef59c2276737d22",
-      "failure_signals": [
-        "diagnostic"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 7,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
       "contract": "Fail closed when Fast-Planner Evidence re-entry and its mechanical outcome projection cannot produce a valid response; retain the trusted outcome and diagnostic without inventing speech, completion, or effect authority.",
       "review_status": "reviewed",
       "body_sha256": "12d339e6d275fa28ab09496d168f755a1d3316f2a1ff603d32ec7ea858a86d1c",
@@ -1773,6 +1760,33 @@
       "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._schedule_outcome_reflection",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Reject optional Reflection context admission with a visible diagnostic; preserve foreground result planning and trusted Goal/Evidence facts, with no background invocation or invented adaptation.",
+      "review_status": "reviewed",
+      "body_sha256": "41a0b68c7f7bbccefca47a0931b946176336a5ab4e6a8eefc60977d28273315f",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._schedule_outcome_reflection.learn_forward",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Bound optional background Reflection by its deadline; log provider, expiry or state-admission failure without speech, Work, Goal completion or a second Planner review. Task cancellation propagates to the existing Host cleanup owner.",
+      "review_status": "reviewed",
+      "body_sha256": "b69dafef72ebcb308fb501ebe2a873c3dc3f4f725dfefd26ebe931775dac1c15",
+      "failure_signals": [
+        "diagnostic"
       ]
     }
   ],

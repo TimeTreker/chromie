@@ -533,18 +533,28 @@
         "Do not claim execution, delivery, authorization, or fresh evidence without trusted proof."
       ],
       "forbidden_reuse_activity_ids": [],
-      "required_capability_ids": [
-        "chromie.weather.reminder_if_rain"
-      ],
+      "required_capability_ids": [],
       "required_evidence_refs": [],
       "required_reuse_activity_ids": [],
       "required_step_purposes": [],
       "required_time_conditions": false,
       "response_required": null,
       "semantic_facts": [
-        "Deep Planner must satisfy fast_escalation_without_candidate_leakage at the declared supported boundary without changing Goal WHAT."
+        "The delivered Issue 51 contract permits a complete prerequisite acquisition stage. That stage must use exact acquire_information Work, keep the conditional effect unmet in per-Goal and aggregate satisfaction, and wait for trusted Evidence before deciding or authorizing the effect. A complete exact composite remains valid when advertised. Fast may instead escalate the entire unresolved scope with zero Work."
+      ],
+      "allowed_capability_sets": [
+        [
+          "chromie.weather.reminder_if_rain"
+        ],
+        [
+          "chromie.weather.lookup"
+        ]
+      ],
+      "staged_acquisition_capability_ids": [
+        "chromie.weather.lookup"
       ]
     },
-    "schema_expectation": "accept"
+    "schema_expectation": "accept",
+    "oracle_revision": "issue51-staged-acquisition-20260912"
   }
 }

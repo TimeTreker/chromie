@@ -1058,6 +1058,9 @@ def _target_checks(
     errors: list[str] = []
     if disposition not in expectation["accepted_dispositions"]:
         errors.append(f"disposition={disposition!r} outside accepted region")
+    allowed_sets = expectation.get("allowed_capability_sets")
+    if allowed_sets is not None and set(capability_ids) not in [set(items) for items in allowed_sets]:
+        errors.append("capability set outside the declared complete/staged reference region")
     missing_capabilities = set(expectation["required_capability_ids"]) - set(capability_ids)
     if missing_capabilities:
         errors.append("missing required capabilities: " + ",".join(sorted(missing_capabilities)))
@@ -1096,6 +1099,51 @@ def _target_checks(
         )
     if expectation.get("required_time_conditions") and time_condition_count < 1:
         errors.append("missing required Goal-bound time condition")
+    return errors
+
+
+def staged_reference_errors(expectation: dict[str, Any], plan: Any) -> list[str]:
+    """A permitted prerequisite stage must retain every downstream obligation."""
+    stage_capabilities = set(expectation.get("staged_acquisition_capability_ids") or [])
+    errors = waiting_reference_errors(expectation, plan)
+    if plan is None or not stage_capabilities:
+        return errors
+    for step in plan.steps:
+        if step.capability_id not in stage_capabilities:
+            continue
+        if step.step_purpose != "acquire_information":
+            errors.append("prerequisite reference requires acquire_information purpose")
+        for gid in step.source_goal_ids:
+            outcome = next((item for item in plan.goal_outcomes if item.goal_id == gid), None)
+            for assessment in (plan.goal_satisfaction, outcome.satisfaction if outcome else None):
+                if (assessment is None or gid not in assessment.unmet_goal_ids
+                        or not assessment.unmet_requirements or assessment.score >= 0.95):
+                    errors.append("prerequisite reference lost an unmet effect obligation")
+    return errors
+
+
+def waiting_reference_errors(expectation: dict[str, Any], plan: Any) -> list[str]:
+    """The waiting reference forbids current Work and effect-completion claims."""
+    expected = expectation.get("waiting_time_conditions")
+    if not isinstance(expected, dict) or not expected:
+        return []
+    if plan is None:
+        return ["waiting reference has no admitted Plan"]
+    errors = []
+    actual = sorted((item.goal_id, item.due_at_ms) for item in plan.time_conditions)
+    if actual != sorted(expected.items()):
+        errors.append("waiting reference requires exact Goal/time conditions")
+    if plan.steps or plan.auxiliary_activities or plan.cancel_activity_ids or plan.metadata.get("user_confirmation_required"):
+        errors.append("waiting reference forbids current Work or confirmation")
+    for gid in expected:
+        outcome = next((item for item in plan.goal_outcomes if item.goal_id == gid), None)
+        if outcome is None or outcome.disposition != "respond":
+            errors.append("waiting reference requires a scoped acknowledgement")
+        for assessment in (plan.goal_satisfaction, outcome.satisfaction if outcome else None):
+            if (assessment is None or gid not in assessment.unmet_goal_ids
+                    or gid in assessment.satisfied_goal_ids or not assessment.unmet_requirements
+                    or assessment.score >= 0.95):
+                errors.append("waiting reference lost the unmet future obligation")
     return errors
 
 
@@ -1275,6 +1323,7 @@ async def _adjudicate_one(
         confirmation_required=confirmation_required,
         time_condition_count=time_condition_count,
     )
+    target_errors.extend(staged_reference_errors(expectation, plan))
     disallowed_normalizations = [
         item for item in normalized_fields if item != "parameter_provenance_normalization"
     ]

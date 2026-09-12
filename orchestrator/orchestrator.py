@@ -4227,6 +4227,77 @@ class VoiceAssistant:
         )
         return len(delivered_speech)
 
+    def _schedule_outcome_reflection(
+        self, *, response: InteractionResponse, plan: CanonicalPlan, bundle: Any,
+        opportunities: list[Any], session_id: str | None, generation: int,
+    ) -> None:
+        """Learn from recorded outcomes under the existing detached-task lifecycle.
+
+        Optional learning has one in-flight slot and one bounded deadline. It
+        cannot hold foreground result planning or request another review of it.
+        """
+        reflection_call = getattr(getattr(self, "agent_client", None), "resolve_reflection", None)
+        if not opportunities or not callable(reflection_call):
+            return
+        tasks = getattr(self, "active_cognitive_runtime_tasks", None)
+        if not isinstance(tasks, dict):
+            tasks = {}
+            self.active_cognitive_runtime_tasks = tasks
+        if any(not task.done() and task.get_name().startswith("outcome-reflection:") for task in tasks):
+            self.session_log(session_id, "selective_reflection_skipped: reason=background_slot_busy")
+            return
+        try:
+            mind = self.mind.context()
+            reflection_context = {
+                "mind": {key: mind[key] for key in (
+                    "owner_approved", "profile_id", "version", "worldview", "household_values", "core_principles"
+                ) if key in mind},
+                "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
+                "recent_goal_snapshots": self.conversation_state.recent_goal_snapshots(),
+                "execution_outcome_bundle": bundle.model_dump(mode="json", exclude_none=True),
+                "canonical_plan": plan.model_dump(mode="json", exclude_none=True),
+            }
+            for source, target in (("goal_association", "goal_association_resolution"), ("situation", "situation")):
+                projection = response.metadata.get(source)
+                if isinstance(projection, dict):
+                    reflection_context[target] = dict(projection)
+            requests = [ReflectionRequest(
+                sid=session_id, text=execution_outcome_user_text(response, plan),
+                language=str(response.metadata.get("language") or "en-US"),
+                opportunity=opportunity,
+                context={**reflection_context, "cognitive_opportunity": opportunity.prompt_projection()},
+                history=self.conversation_state.get_history(),
+            ) for opportunity in opportunities]
+        except Exception as exc:
+            self.session_log(session_id, "selective_reflection_context_rejected: error=%s", exc)
+            return
+
+        async def learn_forward() -> None:
+            timeout_ms = self.cognitive_runtime_policy.deep_planner_timeout_ms
+            try:
+                async with asyncio.timeout(timeout_ms / 1000):
+                    session = await self.get_http_session()
+                    for request in requests:
+                        result = await reflection_call(session, request=request, timeout_ms=timeout_ms)
+                        if generation != self.playback_generation:
+                            self.session_log(session_id, "selective_reflection_suppressed: reason=stale_generation")
+                            return
+                        state_results = self.conversation_state.apply_reflection_resolution(result, sid=session_id)
+                        response.metadata.setdefault("reflection_resolutions", []).append(result.prompt_projection())
+                        response.metadata.setdefault("reflection_state_results", []).extend(state_results)
+                        # Only the state owner's bounded Memory proposals can affect
+                        # future cognition. Advisory actions never bypass handled-
+                        # Evidence suppression or trigger a second Planner result.
+                        self.session_log(session_id, "selective_reflection_recorded: opportunity=%s", request.opportunity.opportunity_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self.session_log(session_id, "selective_reflection_unavailable: error_type=%s error=%s", type(exc).__name__, exc)
+
+        task = asyncio.create_task(learn_forward(), name=f"outcome-reflection:{response.interaction_id}")
+        tasks[task] = response.interaction_id
+        task.add_done_callback(self._cognitive_runtime_task_done)
+
     async def _close_cognitive_execution(
         self,
         *,
@@ -4399,95 +4470,6 @@ class VoiceAssistant:
             for item in cognitive_opportunities
             if item.recommended_cognition == "slow"
         ]
-        reflection_resolutions: list[dict[str, Any]] = []
-        reflection_state_results: list[dict[str, Any]] = []
-        reflection_call = getattr(
-            getattr(self, "agent_client", None),
-            "resolve_reflection",
-            None,
-        )
-        if slow_opportunities and callable(reflection_call):
-            reflection_context = {
-                "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
-                "recent_goal_snapshots": self.conversation_state.recent_goal_snapshots(),
-            }
-            association_projection = response.metadata.get("goal_association")
-            if isinstance(association_projection, dict):
-                reflection_context["goal_association_resolution"] = dict(
-                    association_projection
-                )
-            situation_projection = response.metadata.get("situation")
-            if isinstance(situation_projection, dict):
-                reflection_context["situation"] = dict(situation_projection)
-            reflection_context["execution_outcome_bundle"] = bundle.model_dump(
-                mode="json", exclude_none=True
-            )
-            reflection_context["canonical_plan"] = plan.model_dump(
-                mode="json", exclude_none=True
-            )
-            reflection_session = await self.get_http_session()
-            reflection_calls = []
-            for opportunity in slow_opportunities:
-                context = {
-                    **reflection_context,
-                    "cognitive_opportunity": opportunity.prompt_projection(),
-                }
-                reflection_calls.append(
-                    reflection_call(
-                        reflection_session,
-                        request=ReflectionRequest(
-                            sid=session_id,
-                            text=execution_outcome_user_text(response, plan),
-                            language=str(response.metadata.get("language") or "en-US"),
-                            opportunity=opportunity,
-                            context=context,
-                            history=self.conversation_state.get_history(),
-                        ),
-                        timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
-                    )
-                )
-            reflected = await asyncio.gather(
-                *reflection_calls,
-                return_exceptions=True,
-            )
-            for opportunity, item in zip(
-                slow_opportunities, reflected, strict=True
-            ):
-                if isinstance(item, BaseException):
-                    self.session_log(
-                        session_id,
-                        "selective_reflection_unavailable: opportunity=%s error_type=%s error=%s",
-                        opportunity.opportunity_id,
-                        type(item).__name__,
-                        item,
-                    )
-                    continue
-                reflection_resolutions.append(item.prompt_projection())
-                try:
-                    reflection_state_results.extend(
-                        self.conversation_state.apply_reflection_resolution(
-                            item,
-                            sid=session_id,
-                        )
-                    )
-                except Exception as exc:
-                    self.session_log(
-                        session_id,
-                        "selective_reflection_state_rejected: opportunity=%s error_type=%s error=%s",
-                        opportunity.opportunity_id,
-                        type(exc).__name__,
-                        exc,
-                    )
-            response.metadata["reflection_resolutions"] = reflection_resolutions
-            response.metadata["reflection_state_results"] = reflection_state_results
-
-        reflection_planner_advisories = [
-            dict(item["planner_advisory"])
-            for item in reflection_state_results
-            if isinstance(item, dict) and isinstance(item.get("planner_advisory"), dict)
-        ]
-        if reflection_planner_advisories:
-            response.metadata["reflection_planner_advisories"] = reflection_planner_advisories
 
         self.session_log(
             session_id,
@@ -4570,7 +4552,6 @@ class VoiceAssistant:
             bundle.aggregate_status == "completed"
             and completed_evidence_ids
             and completed_evidence_ids.issubset(delivered_incremental_evidence)
-            and not reflection_planner_advisories
         ):
             self.session_log(
                 session_id,
@@ -4592,7 +4573,6 @@ class VoiceAssistant:
             and terminal_evidence_ids.issubset(
                 planner_handled_incremental_evidence
             )
-            and not reflection_planner_advisories
         ):
             self.session_log(
                 session_id,
@@ -4616,8 +4596,12 @@ class VoiceAssistant:
                 bundle=bundle,
                 plan=plan,
                 session_id=session_id,
-                reflection_advisories=reflection_planner_advisories,
             )
+            self._schedule_outcome_reflection(
+                response=response, plan=plan, bundle=bundle, opportunities=slow_opportunities,
+                session_id=session_id, generation=generation,
+            )
+
             if final_response is None:
                 self.session_log(
                     session_id,
@@ -5941,7 +5925,6 @@ class VoiceAssistant:
         bundle: Any,
         plan: Any,
         session_id: str | None,
-        reflection_advisories: list[dict[str, Any]] | None = None,
     ) -> InteractionResponse | None:
         """Reactivate Fast Planner from bounded terminal Evidence.
 
@@ -5964,13 +5947,6 @@ class VoiceAssistant:
             or "en-US"
         )
 
-        bounded_reflection_advisories = [
-            dict(item)
-            for item in (reflection_advisories or [])
-            if isinstance(item, dict)
-        ]
-        reflection_reentry = bool(bounded_reflection_advisories)
-
         delivered_incremental_evidence = {
             str(item).strip()
             for item in metadata.get(
@@ -5990,9 +5966,9 @@ class VoiceAssistant:
         evidence: list[ToolResultEvidence] = []
         selected_execution_evidence: list[ExecutionEvidence] = []
         for item in bundle.evidence:
-            if not reflection_reentry and item.evidence_id in delivered_incremental_evidence:
+            if item.evidence_id in delivered_incremental_evidence:
                 continue
-            if not reflection_reentry and item.evidence_id in planner_handled_incremental_evidence:
+            if item.evidence_id in planner_handled_incremental_evidence:
                 continue
             observation = item.observation
             observation_data = (
@@ -6104,7 +6080,6 @@ class VoiceAssistant:
                         "evidence_refs": evidence_refs,
                         "planner_authority": "planner",
                     },
-                    "reflection_advisories": bounded_reflection_advisories,
                     **extra_context,
                 },
                 fast_workflow_stage="fast_planner_evidence_reentry",

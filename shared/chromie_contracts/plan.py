@@ -1346,7 +1346,6 @@ class CanonicalPlan(BaseModel):
             if (
                 self.metadata.get("user_confirmation_required")
                 or self.metadata.get("plan_relation", "exact") != "exact"
-                or self.time_conditions
             ):
                 raise ValueError("mixed plan without steps cannot authorize or schedule Work")
         if self.disposition == "respond" and not (
@@ -1384,8 +1383,19 @@ class CanonicalPlan(BaseModel):
                 "time conditions reference unknown Goal IDs: "
                 + ",".join(sorted(unknown_time_goals))
             )
-        if self.time_conditions and self.disposition not in {"execute", "mixed"}:
-            raise ValueError("time conditions require executable Work with future Goal readiness")
+        if self.time_conditions and self.disposition not in {"execute", "mixed", "respond"}:
+            raise ValueError("time conditions require live Work or an unmet future Goal acknowledgement")
+        timed_goals = {item.goal_id for item in self.time_conditions}
+        for outcome in self.goal_outcomes:
+            if outcome.goal_id in timed_goals and outcome.disposition == "respond":
+                assessment = outcome.satisfaction
+                if (assessment is None or assessment.score >= 0.95
+                        or outcome.goal_id not in assessment.unmet_goal_ids
+                        or outcome.goal_id in assessment.satisfied_goal_ids
+                        or not assessment.unmet_requirements):
+                    raise ValueError("a waiting response cannot fulfill its future Goal")
+        if self.disposition == "respond" and timed_goals - {item.goal_id for item in self.goal_outcomes}:
+            raise ValueError("waiting response requires explicit per-Goal outcomes")
         communicative_act_ids = [item.activity_id for item in self.communicative_acts]
         if len(communicative_act_ids) != len(set(communicative_act_ids)):
             raise ValueError("Canonical Plan Communicative Act IDs must be unique")
@@ -1516,11 +1526,11 @@ class CanonicalPlan(BaseModel):
             nonexecuting_time_goals = {
                 item.goal_id
                 for item in self.time_conditions
-                if outcome_by_goal[item.goal_id].disposition != "execute"
+                if outcome_by_goal[item.goal_id].disposition not in {"execute", "respond"}
             }
             if nonexecuting_time_goals:
                 raise ValueError(
-                    "time conditions may only bind execute goal outcomes: "
+                    "time conditions may only bind execute or waiting respond goal outcomes: "
                     + ",".join(sorted(nonexecuting_time_goals))
                 )
 

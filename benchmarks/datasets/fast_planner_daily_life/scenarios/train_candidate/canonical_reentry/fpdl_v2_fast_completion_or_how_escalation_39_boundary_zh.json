@@ -181,6 +181,7 @@
     "claim_boundary": "assistant-authored candidate oracle; same-model review required",
     "reference_region": {
       "accepted_dispositions": [
+        "execute",
         "escalate"
       ],
       "expected_confirmation_required": null,
@@ -193,7 +194,6 @@
       ],
       "forbidden_capability_ids": [
         "chromie.reminder.create",
-        "chromie.weather.lookup",
         "soridormi.blink_eyes",
         "soridormi.look_at_person",
         "soridormi.walk_forward"
@@ -208,10 +208,20 @@
       "required_time_conditions": false,
       "response_required": null,
       "semantic_facts": [
-        "条件式多阶段 HOW 需要更广规划；Fast 必须完整升级范围，不能泄漏部分天气或提醒 Work。"
+        "The delivered Issue 51 contract permits a complete prerequisite acquisition stage. That stage must use exact acquire_information Work, keep the conditional effect unmet in per-Goal and aggregate satisfaction, and wait for trusted Evidence before deciding or authorizing the effect. A complete exact composite remains valid when advertised. Fast may instead escalate the entire unresolved scope with zero Work."
       ],
-      "semantic_review_required": true
+      "semantic_review_required": true,
+      "allowed_capability_sets": [
+        [],
+        [
+          "chromie.weather.lookup"
+        ]
+      ],
+      "staged_acquisition_capability_ids": [
+        "chromie.weather.lookup"
+      ]
     },
-    "schema_expectation": "accept"
+    "schema_expectation": "accept",
+    "oracle_revision": "issue51-staged-acquisition-20260912"
   }
 }

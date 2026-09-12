@@ -5221,7 +5221,7 @@ class ConversationStateManager:
 
             result: dict[str, Any] = {
                 "goal_id": goal_id,
-                "applied": bool(advisory_actions or applied_actions),
+                "applied": bool(applied_actions),
                 "actions": list(reflected.actions),
                 "planner_advisory_actions": advisory_actions,
                 "applied_actions": applied_actions,
@@ -5229,7 +5229,7 @@ class ConversationStateManager:
                 "memory_promoted": promoted,
                 "repeated_pattern": repeated_pattern,
                 "responsibility_status": responsibility_status,
-                "future_adaptation": bool(advisory_actions or applied_actions),
+                "future_adaptation": bool(applied_actions),
                 "terminal_history_learning": bool(
                     not responsibility_open and promoted
                 ),

@@ -122,8 +122,28 @@ evidence identifies it as the earliest defective owner. Host rewriting,
 same-tier semantic repair/review, validator weakening, and example-answer
 libraries are forbidden.
 
+The `issue51-staged-acquisition-20260912` oracle revision changes only the target
+regions of four Fast conditional cases and two Deep component/composite cases.
+The source turns, Goal bindings and catalogs are unchanged. Delivered #51 allows
+complete prerequisite acquisition with honest unmet downstream obligations; the
+older escalate-only/composite-only targets excluded that legitimate behavior.
+The revised checks require an explicitly allowed Capability set and acquisition
+purpose, with the original effect unmet at both satisfaction levels. Historical
+failures and their original oracle identities remain retained in the audit
+artifacts and Git history; they are not relabeled as new passes. New inference
+must freeze the updated manifest and case digests before execution.
+
 Codex CLI qualification is an offline same-model surrogate, not the deployed
 Ollama/vLLM transport and not an independent semantic reviewer. Local artifacts
 under `.chromie/benchmarks/` do not transfer with Git. No scenario may enter
 QLoRA/SFT until an independent reviewer accepts its semantic target and the
 owner explicitly changes `training_eligible`.
+
+The `issue51-stage-and-issue58-readiness-20260912` Fast oracle additionally corrects
+the six bilingual future-readiness targets. Exact Runtime replay showed that the
+previous required lookup dispatched immediately despite a future time condition.
+The corrected region requires `respond`, an exact Goal/time condition, no current
+Work or confirmation, and honest unmet Goal satisfaction. Inputs remain unchanged;
+the old mechanical passes remain failed temporal behavior in the retained review.
+The existing Deep corpus is supplemented by the same six immutable future inputs
+under its own production transaction during Issue #58 qualification.

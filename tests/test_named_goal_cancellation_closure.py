@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from types import SimpleNamespace
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.confirmation import ConfirmationDialogue
@@ -205,22 +206,15 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
             response=response,
             confirmed_request_ids={"request-a", "request-b"},
         )
-        _, transition = __import__(
-            "orchestrator.runtime.named_goal_cancellation",
-            fromlist=["_build_confirmation_remainder"],
-        )._build_confirmation_remainder(
-            confirmation_dialogue=dialogue, target_goal_ids={"goal-a"}
-        )
-        association = _cancel_resolution(["goal-a"]).goal_association
-        assert association is not None and transition is not None
-
-        manager.apply_goal_cancellation_resolution(
-            association,
-            receipts=[],
-            confirmation_transition=transition,
-            sid="sid-cancel",
-            user_text="Cancel the nod.",
-        )
+        _, metadata = asyncio.run(dispatch_named_goal_cancellation(
+            conversation_state=manager, interaction_runtime=SimpleNamespace(cancel_scope=None),
+            confirmation_dialogue=dialogue, resolution=_cancel_resolution(["goal-a"]),
+            session_id="sid-cancel", user_text="Cancel the nod.", language="en-US",
+        ))
+        self.assertTrue(metadata["confirmation_transition"]["revoked_entire_confirmation"])
+        self.assertIsNone(dialogue.pending)
+        self.assertEqual(dialogue.resolve("confirm", expected_confirmation_id=pending.confirmation_id).decision,
+            "not_confirmation")
 
         target = manager._task_context_by_goal_id("goal-a")
         sibling = manager._task_context_by_goal_id("goal-b")

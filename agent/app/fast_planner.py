@@ -24,6 +24,7 @@ from .planner_model_contract import (
     stable_plan_id,
 )
 from .planner_schema import (
+    scoped_reporting_response_schema,
     work_change_response_schema,
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
@@ -34,6 +35,7 @@ from .planner_schema import (
 from .planner_context import (
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
+    cancellation_capability_facts,
     fast_capability_payload,
     planner_effectful_goal_ids,
     planner_goal_context,
@@ -641,10 +643,16 @@ class FastPlannerResolver:
         )
         reentry_goal_ids = set(goal_context.result_reentry_goal_ids)
         response_goal_ids = list(goal_context.response_goal_ids)
+        future_goal_times = dict(goal_context.future_goal_times)
+        reporting_goal_ids = cancellation_reentry_goal_ids | set(future_goal_times)
         response_only = goal_context.response_only
         requires_execution = goal_context.requires_execution
         capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
         auxiliary_catalog = await self.catalog.prompt_entries(scope="all", refresh=False)
+        context["planner_cancellation_capability_facts"] = (
+            cancellation_capability_facts(auxiliary_catalog)
+            if cancellation_reentry_goal_ids else []
+        )
         auxiliary_social_capabilities = auxiliary_social_capability_payloads(
             auxiliary_catalog
         )
@@ -689,8 +697,9 @@ class FastPlannerResolver:
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
+                nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
                 effectful_goal_ids=list(
-                    planner_effectful_goal_ids(authoritative_goals)
+                    planner_effectful_goal_ids(authoritative_goals) - reporting_goal_ids
                 ),
                 confirmation_required_capability_ids=[
                     item["capability_id"]
@@ -711,6 +720,7 @@ class FastPlannerResolver:
                 response_only=response_only,
                 requires_execution=requires_execution,
                 response_goal_ids=response_goal_ids,
+                nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
                 confirmation_required_capability_ids=[
                     item["capability_id"]
                     for item in capability_payload
@@ -728,6 +738,11 @@ class FastPlannerResolver:
             capabilities=capability_payload,
         )
         response_schema = work_change_response_schema(response_schema, context=context)
+        response_schema = scoped_reporting_response_schema(
+            response_schema, goal_ids=reporting_goal_ids,
+            expected_goal_ids=expected_goal_ids_for_turn,
+            future_goal_times=future_goal_times,
+        )
         if reentry_goal_ids:
             evidence_wording_description = (
                 "Exact natural answer grounded only in trusted terminal Evidence for "
@@ -773,6 +788,7 @@ class FastPlannerResolver:
                         request,
                         capability_payload,
                         response_schema=response_schema,
+                        goal_context=goal_context,
                     ),
                     system=fast_system_prompt(),
                     options=options,
@@ -841,6 +857,7 @@ class FastPlannerResolver:
                     authoritative_goals=authoritative_goals,
                     context=request.context,
                     reentry_scope=request.planner_reentry_scope,
+                    future_goal_times=future_goal_times,
                 )
                 validate_resource_responsibility_capability_grounding(
                     validated_model_output,
@@ -1013,8 +1030,9 @@ class FastPlannerResolver:
                 expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                 authoritative_goals=authoritative_goals,
                 evidence_reentry_goal_ids=(
-                    reentry_goal_ids | cancellation_reentry_goal_ids
+                    reentry_goal_ids | reporting_goal_ids
                 ),
+                nonfulfilling_response_goal_ids=reporting_goal_ids,
             )
         if not qualification.accepted:
             return materialize_fast_escalation(

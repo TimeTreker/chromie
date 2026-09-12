@@ -544,6 +544,17 @@ central model compute as a limited attentional resource: foreground interactive 
 must strongly outrank deliberative/background cognition without becoming a second semantic
 brain.
 
+Aggregate execution closure gives ready trusted Evidence to its result Planner
+before starting optional Reflection. Reflection uses one bounded background slot
+under the existing Host shutdown lifecycle and the existing Deep-call deadline.
+Blocked learning cannot delay that response; expiry, cancellation and stale
+generation discard its result. It receives the approved Stable Mind projection.
+Recorded replan/clarification/correction suggestions do not bypass handled-Evidence
+suppression or trigger another review of that result. Only accepted, evidence-bound
+Memory proposals adapt future context; neither advice nor learning reopens a
+terminal Goal. This scheduling rule does not establish provider-level preemption
+for a new turn arriving while an inference is already running.
+
 The inference scheduler may use provider-neutral compute classes, provider priority,
 chunked prefill, batching, preemption, cache reuse, resource reservation, or separate
 instances. Those are operational controls only. They may not inspect the utterance to
