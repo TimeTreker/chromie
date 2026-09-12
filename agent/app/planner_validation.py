@@ -1302,6 +1302,7 @@ def validate_goal_binding_argument_grounding(
     *,
     authoritative_goals: list[dict[str, Any]],
     capabilities: list[dict[str, Any]] | None = None,
+    acquisition_goal_ids: set[str] | None = None,
 ) -> None:
     """Keep executable arguments aligned with Goal Association bindings.
 
@@ -1382,9 +1383,14 @@ def validate_goal_binding_argument_grounding(
         if capabilities is not None:
             # Structured resource arguments retain their own nested grounding;
             # an item quantity in that DTO is not an execution repetition.
+            # Complete prerequisite acquisition may defer an effect's repetition.
+            # Callers derive this scope from the validated whole Plan and catalog,
+            # never from the model's step_purpose label alone.
             count_bindings = [
                 (name, binding)
-                for goal_id in claimed_goal_ids if goal_id not in resource_goal_ids
+                for goal_id in claimed_goal_ids
+                if goal_id not in resource_goal_ids
+                and goal_id not in (acquisition_goal_ids or set())
                 for name, binding in bindings_by_goal[goal_id].items()
             ]
             for name, binding in count_bindings:
@@ -1869,6 +1875,7 @@ def validate_explicit_numeric_parameter_grounding(
     output: PlannerModelOutput,
     *,
     authoritative_goals: list[dict[str, Any]],
+    acquisition_goal_ids: set[str] | None = None,
 ) -> None:
     """Verify numeric user-supplied arguments against typed Goal bindings.
 
@@ -2022,7 +2029,18 @@ def validate_explicit_numeric_parameter_grounding(
     if not executable_goal_ids:
         executable_goal_ids = {goal_id for step in output.steps for goal_id in step.source_goal_ids}
     missing_numeric_grounding: list[tuple[str, Decimal]] = []
+    deferred_effect_goals = {
+        str(goal.get("goal_id") or "") for goal in authoritative_goals
+        if str(goal.get("goal_id") or "") in (acquisition_goal_ids or set())
+        and (goal.get("metadata") or {}).get("output_mode") in {
+            "body_action", "stateful_effect", "singing", "media_playback"
+        }
+    }
     for goal_id in sorted(executable_goal_ids):
+        if goal_id in deferred_effect_goals:
+            # Supplied arguments/provenance were checked above. Only the demand
+            # to execute every deferred effect parameter *now* is inapplicable.
+            continue
         for literal in sorted(goal_numeric_values.get(goal_id, set())):
             if not any(
                 literal == value and goal_id in resolution.source_goal_ids

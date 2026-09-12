@@ -562,6 +562,10 @@ Read the diagram with these boundaries:
   assessments retain deferred obligations; ordinary achieving siblings retain their
   own admission requirements. A Goal's acquisition and deferred effect belong to
   separate Plans. Completed acquisition establishes Work/Evidence, not Goal completion.
+  Schema must retain declared acquisition candidates even when they cannot realize
+  the deferred effect's repetition. Count/numeric admission checks may defer that
+  effect obligation only for a complete, grounded acquisition stage with both
+  assessments retaining unmet Work; the actual effect still realizes its exact count.
   Exact source Plan and trusted observation re-enter the same Planner authority for
   a new decision. Positive condition Evidence may authorize a proposed effect only
   through ordinary confirmation and terminal execution; negative condition Evidence

@@ -41,6 +41,7 @@ from .planner_context import (
     planner_goal_context,
 )
 from .planner_validation import (
+    information_acquisition_goal_ids,
     normalize_common_planner_output,
     qualify_planner_capability_payload,
     validate_explicit_numeric_parameter_grounding,
@@ -869,6 +870,7 @@ class FastPlannerResolver:
                         validated_model_output,
                         authoritative_goals=authoritative_goals,
                         capabilities=capability_payload,
+                        acquisition_goal_ids=information_acquisition_goal_ids(plan, capability_payload),
                     )
                 except PlannerDTOContractError:
                     raise
@@ -878,6 +880,7 @@ class FastPlannerResolver:
                     validate_explicit_numeric_parameter_grounding(
                         validated_model_output,
                         authoritative_goals=authoritative_goals,
+                        acquisition_goal_ids=information_acquisition_goal_ids(plan, capability_payload),
                     )
                 except PlannerDTOContractError:
                     raise

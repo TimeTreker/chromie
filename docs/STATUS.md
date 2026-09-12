@@ -1,51 +1,40 @@
 # Chromie Current Status
 
-**Updated:** 2026-09-12
-**Current focus:** native Goal Interpretation qualification under #24, then #32's
-native streaming and target evidence. The focused investigation from `2b9910e7`
-qualifies no repair; production behavior remains `8aa3f499`. #35 and #49–#58 remain
-closed. #24/#32 are the only open Issues.
+**Updated:** 2026-09-13
+**Current focus:** owner-approved offline architecture/workflow replay under #59;
+then retained #24 native GI and #32 streaming/target blockers. New-request scheduling
+contract gap is tracked separately in #60. Pre-delivery base `6f726ce3`; resume from
+the latest commit containing both handoffs. #35/#49–#58 remain closed.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| Prior scoped cancellation, Reflection ordering/Mind, zero-early-work future wake, typing and lifecycle repairs unchanged. This delivery changes evidence/report owners only. | Fresh canonical: 3,105 tests/794 subtests, 145 benchmarks, 20 legacy; pinned static/config/policy/ownership pass. Native GI investigation: 226 case executions/254 calls over 44 scenarios, all raw outputs reviewed; none of the tested transactions qualifies. | Last deployed-source 51-case live-text cohort remains 1 GI failure, 1 startup interrupted, 49 unrun. No fresh aggregate, native-stream timing, concurrent TTS, voice or physical proof in this investigation. | Development only. #24/#32 open; no production model/profile or target promotion. |
+| Frozen local HTTP model replay plus prerequisite/count Schema/Host repair; five GI/GA/Fast/Deep workflow episodes. #59 closes on delivery; #60 new-request readiness remains open. | Canonical 3,131 tests/794 subtests, 145 benchmarks, 20 legacy; static/policy/config/ownership pass. Final fixture replay 5/5 with 18 local replies and focused 26/26. Level A 45/45 across 15 classes. | No native inference, deployed-source rebuild, live aggregate, streaming, audio or physical run. Last live cohort remains 1 GI failure, 1 startup interrupted, 49 unrun. | Development only. #24/#32/#60 open. No model/profile or target promotion. |
 
-The retained complete source request asks for ordered walk/nod/turn effects. Original
-live GI output hides the entire turn in one binding and is rejected before downstream
-admission. Fresh unchanged direct-role output hides only the later clauses and passes
-the mechanical guard while still omitting independent effects, count and sequence.
-This identifies a containment limit, not correct meaning. Direct experiments never
-invoke GA, Planner or Runtime, including for accepted but semantically wrong outputs.
+GPT-6 Astra authored and reviewed the reference replies in one task; review is
+non-independent. These tests evaluate contracts and workflow, not LLM ability. Initial
+admission/role scheduling, clock/UUIDs, providers and speech receipts are explicit
+fixtures; real role clients, parsers, validators, state and Capability Runtime run.
+Changed request/Schema/options/order/Evidence is rejected instead of receiving an
+approximate canned answer. The conditional weather query exposed a count ownership
+bug: the prerequisite was required to perform the deferred blink count. Schema now
+admits declared acquisition candidates; Host uses the existing complete-acquisition
+scope while preserving eventual effect parameters and provenance. Deep retains
+composition ownership; no prompt/model/configuration or extra semantic call changed.
 
-Five 44-case native cohorts test baseline, appended Schema structure, neutral presence
-penalty, plain-JSON decoder control, and installed Qwen3 Instruct; six representative
-cases additionally reload the model before each call. All 254 replies complete normally,
-with top-level `think:false` and no separate thinking field. The 210 non-JSON-control
-calls pass original Schema; all 44 plain-JSON outputs fail it. Missing/misbound effects,
-incorrect modes and provenance remain. Strict oracle counts are not semantic pass rates.
-No prompt/model/provider cause is uniquely established and no model ceiling is claimed.
+The delayed episode explicitly starts from a prior scheduled Goal. GI cannot emit
+`ready_at` under its current Schema, while Planner consumes that typed Goal binding;
+new-request conversion remains #60, not a passing end-to-end claim. Execution cancel
+leaves the unmet Goal open. The [audit](../ARCHITECTURE_AUDIT.md#offline-workflow-replay--59)
+owns module I/O, root cause and limits; [benchmarks](../benchmarks/README.md#offline-workflow-replay)
+owns reproducible commands. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and
+[handoff](../HANDOFF.md) retain current hashes, archive and resume instructions.
 
-Actual GI requests use Ollama 0.33.2/Qwen3.5:4b, 16,384 context and 512 output tokens;
-the environment's 32k label is not the actual request. Inherited presence penalty 1.5
-was verified and its neutral control did not repair the role. Original Qwen3.5:4b
-residency was restored; Agent/TTS/LLM remain healthy development services, ASR absent,
-owned simulator/MCP stopped. Physical microphone/speaker evidence remains supervised.
-
-New private evidence: `.chromie/acceptance/issue24-gi-boundary-20260912/`. The
-[audit](../ARCHITECTURE_AUDIT.md#native-goal-interpretation-boundary-investigation--24)
-owns exact controls, actual module I/O and conclusions; the
-[checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own the new archive,
-model/runtime identities, metadata corrections and resume commands. No code, prompt,
-Schema, runtime configuration or profile changed. Continue with one predeclared primary
-transaction hypothesis, complete frozen GI coverage, then whole-profile/live evidence.
-
-[Prior delivery evidence](https://github.com/TimeTreker/chromie/blob/2b9910e7659b2bf3a0df9f7251db6dec62e7ec2f/HANDOFF.md)
-retains the 294-case fixed `gpt-5.6-sol/high` offline Planner qualification, Level A 45/15,
-Qwen9b budget failure, last deployed-source failure and
-[Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596).
-Those are prior results, not new native GI/voice evidence. Private #51 artifacts from
-the other machine remain absent locally. Historical sections below retain their
-original revision limits and are not current instructions or new passes.
+The previous native GI investigation remains unqualified: 226 executions/254 native
+calls across 44 scenarios; all tested controls retained meaning failures. Its evidence
+and model/runtime identities remain available in the
+[previous handoff](https://github.com/TimeTreker/chromie/blob/6f726ce32f2d69d6fd167ad600cfb7f9eb599536/HANDOFF.md).
+No new native service health or physical evidence was collected here. Historical
+sections below keep their original revision limits; they are not new passes.
 
 ### Prior remaining-Issue delivery — 191083dc
 

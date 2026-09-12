@@ -171,6 +171,51 @@ authoritative source dataset.
 
 ## Module and integration runners
 
+### Offline workflow replay
+
+Run the small frozen architecture cohort without a model server or hardware:
+
+```bash
+python scripts/run_workflow_replay.py \
+  --evidence-dir .chromie/acceptance/workflow-replay-new-run
+python -m pytest -q tests/test_workflow_replay.py
+```
+
+The evidence directory must be unused. Do not use Python `-O`, which disables test
+assertions. The runner discovers `integration/scenarios/workflow-*.json` and creates
+fresh persisted state per case. Five cases cover normal execution, both forecast
+branches, a prior scheduled Goal across restart/due wake, and in-flight cancellation.
+Production GI/GA/Fast/Deep clients call an ephemeral loopback HTTP service through
+`/api/chat`; parsers, contract validation, Runtime, result re-entry and Goal bookkeeping
+remain real. The driver explicitly supplies initial admission and role scheduling,
+wall time/UUIDs, provider observations and successful local speech receipts. It does
+not test Gateway/audio admission, native inference, streaming or physical execution.
+
+`integration/model_replay.py` returns only the next frozen reply after exact matching
+of messages, context, Schema, model identity and options. Explicit trusted runtime
+Goal IDs may be bound to fixture placeholders; no keyword routing, semantic matching,
+online fallback or automatic recording exists. Unknown, changed, reordered, extra
+and unused calls fail; failed requests and stage evidence are retained. A standalone
+service is available with `python -m benchmarks.integration.model_replay CASE.json
+--port 0 --bindings TRUSTED_BINDINGS.json`; a fresh episode needs its real committed
+Goal identity registered by the harness. The normal runner handles this automatically.
+
+The current references were authored and reviewed in one GPT-6 Astra Codex task.
+Review is non-independent; they are expected test outputs, not model-quality truth.
+`manifest.json` records the reviewed corpus hashes. Updating prompts or contracts
+requires intentional reference/request review and a new freeze; a mismatch must never
+silently teach the replay a new answer. Review raw replies separately from normalized
+DTOs and keep failures from preparation. Expand scenario families only after checking
+what real boundaries their assertions exercise. Runtime state/call assertions are
+separate from stored model answers.
+
+The timer case explicitly seeds an existing Goal with `ready_at`; new GI → readiness
+conversion remains [#60](https://github.com/TimeTreker/chromie/issues/60). Operational
+stop cancels execution while leaving the original unmet Goal open. See
+[acceptance scope](../docs/ACCEPTANCE.md) and the
+[audit](../ARCHITECTURE_AUDIT.md#offline-workflow-replay--59) for the reproduced
+prerequisite/count defect, corrective boundary and evidence limits.
+
 `runners/` executes normalized scenarios through an explicit executor boundary.
 It does not import production services or infer expected behavior from user text.
 Two modes are available:

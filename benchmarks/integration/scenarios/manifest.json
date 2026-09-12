@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "frozen_on": "2026-09-13",
+  "author_model": "gpt-6-astra",
+  "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
+  "independent_review": false,
+  "model_ability_evaluated": false,
+  "case_sha256": {
+    "workflow-cancellation.json": "5feb7647941eb8d661cb5ed16187e692b6343c946d924ab26fddab93c57d9ee5",
+    "workflow-conditional-dry.json": "6407e1601595010cce2549f5f16182fb199a6bbdfcac68e154318fcd20a1bc28",
+    "workflow-conditional-rain.json": "1bfebbdaed427666fe0c5eee39953e2561969c6bfb29107164c41cdd327b91fe",
+    "workflow-delayed.json": "2065b372d128d4655e98c0831ed988340f048608a2aa4c13473fdf4f4e3cfb86",
+    "workflow-normal.json": "4aeca8093ac9d1c3aef2b6dc68df309f687d931250ac06022258c07de63828db"
+  },
+  "freeze_revision": 3,
+  "freeze_note": "Final reference review corrected conditional GI source span to t0\u2013t7, covering the full condition and location. Unique deterministic UUID prefixes retained. Preparation evidence is separate."
+}

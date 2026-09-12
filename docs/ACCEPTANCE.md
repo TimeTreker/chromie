@@ -58,6 +58,17 @@ levels; they introduce no new evidence ladder or online model invocation.
 
 ## Evidence levels
 
+The frozen [workflow replay](../benchmarks/README.md#offline-workflow-replay)
+is Level A architecture/contract evidence only. GPT-6 Astra-authored reference
+replies are reviewed test fixtures, not independent ground truth or sampled model
+qualification. Real role clients use a strict local HTTP replay server; GI/GA/Planner
+validation, state and Capability Runtime run against controlled providers/audio.
+Initial admission and role scheduling remain explicit test-driver inputs. Each run
+retains source/corpus hashes and per-call requests/replies; mismatches fail closed.
+The delayed case starts from a declared prior scheduled Goal and does not prove
+new-request temporal interpretation ([#60](https://github.com/TimeTreker/chromie/issues/60)).
+These passes cannot close #24/#32 or replace native streaming, voice or robot evidence.
+
 | Level | Environment | What it proves |
 |---|---|---|
 | A | GPU-free automated tests | Contracts, policy, scheduling, fallback, and deterministic behavior. |

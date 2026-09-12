@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover
     )
 
 from .prompt_projection import bounded_json
+from .planner_validation import _capability_acquires_information
 from .planner_grounding import (
     _argument_schema_accepts_canonical_binding,
     _count_argument_names,
@@ -315,6 +316,7 @@ def canonical_goal_binding_argument_response_schema(
         unsupported_goal_ids = {
             str(goal.get("goal_id") or "") for goal in authoritative_goals
             if not isinstance(goal.get("resource_responsibility"), dict)
+            and not _capability_acquires_information(capability)
             and any(
                 _is_count_binding(name, binding)
                 and not _count_argument_names(capability, name)

@@ -46,6 +46,7 @@ from .planner_context import (
     planner_provider_vocal_goal_ids,
 )
 from .planner_validation import (
+    information_acquisition_goal_ids,
     explicit_numeric_goal_values,
     information_goal_ids_without_declared_provider,
     normalize_common_planner_output,
@@ -344,10 +345,12 @@ class DeepPlannerResolver:
                 validated_model_output,
                 authoritative_goals=authoritative_goals,
                 capabilities=payload,
+                acquisition_goal_ids=information_acquisition_goal_ids(plan, payload),
             )
             validate_explicit_numeric_parameter_grounding(
                 validated_model_output,
                 authoritative_goals=authoritative_goals,
+                acquisition_goal_ids=information_acquisition_goal_ids(plan, payload),
             )
             validate_user_supplied_parameter_provenance(
                 validated_model_output,

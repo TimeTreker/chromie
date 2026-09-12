@@ -1,12 +1,78 @@
 # Chromie project principles and implementation audit
 
-**Updated:** 2026-09-12. **Investigation base:** `2b9910e7659b2bf3a0df9f7251db6dec62e7ec2f`, `main`; production behavior remains the `8aa3f499` implementation. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
+**Updated:** 2026-09-13. **Pre-delivery base:** `6f726ce32f2d69d6fd167ad600cfb7f9eb599536`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
 
 **Audience:** project owner and maintainers reviewing or continuing the Issues. **Owner:** the project owner owns principle decisions; each linked Issue owns its acceptance. This report records evidence and decisions under the existing [Charter](docs/PROJECT_CHARTER.md), [Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 
 The owner explicitly authorized implementation, principle decisions, bounded maintenance, publication and closure of solved Issues in this session. The repairs preserve GI ownership of WHAT, GA ownership of Goal continuity, Planner ownership of HOW/speech, and Runtime ownership of execution and Evidence. Three decisions follow natural, grounded behavior: reporting a cancellation does not fulfill the original request; remembering a future intention is different from doing it now; optional learning follows the ready response. None needs another semantic reviewer or a phrase-based router.
 
-Earlier source repairs and deterministic verification are implemented. Ordered final Fast and Deep offline qualification passed: 244 core cases plus 50 supplemental cases. Implementation is published at `8aa3f499`; [Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596) passes the full gate on that commit. #35 and #52–#58 are closed; only #24/#32 remain open. The new focused GI investigation below retains 226 case executions and 254 native calls without finding a qualified repair. No production prompt, Schema, code, configuration or model profile changed. The last aggregate live check still fails at primary Goal Interpretation before Planner or execution; no new aggregate or physical evidence is claimed.
+Earlier source repairs and deterministic verification are implemented; their revision-bound evidence is retained below. The latest owner-approved work adds offline architecture replay and repairs the prerequisite/count contract under #59. New-request readiness remains #60; #24/#32 remain open. The preceding native GI investigation retained 226 executions/254 calls without a qualified repair. No new native model, aggregate live, streaming, audio or physical proof is claimed by the replay work.
+
+## Offline workflow replay — #59
+
+The owner explicitly requested architecture/workflow/contract tests excluding model
+ability. Five cases use GPT-6 Astra-authored reference replies, reviewed in the same
+task, through a strict loopback model HTTP service. They exercise GI → GA → Fast or
+Deep → real Schema/DTO/Host → state/Capability Runtime, plus result/due re-entry.
+Initial admission and role scheduling are explicit driver inputs. Providers, speech
+receipts, wall time and UUIDs are controlled. No native inference or keyword-based
+semantic simulator runs. References and whole request packets are frozen separately
+from executable expectations; unchanged requests are required to receive a reply.
+
+The initiating probe is “Blink twice if rain is forecast in Hangzhou.” Its authoritative
+Goal has body-action mode, count 2 and location Hangzhou. Deep's correct current Work
+is a weather query, with both satisfaction assessments retaining the deferred blink.
+The first incorrect contract boundary was the dynamic Schema: its generic count
+filter removed the weather candidate because it has no repetition argument. The
+scripted reply was independently Schema-invalid; when supplied to the actual parser,
+the Host count guard rejected it too. Removing only that guard exposed the generic
+numeric guard's same demand. This is one stage-vs-effect obligation ownership defect,
+not evidence of bad model reasoning. Runtime never ran the rejected initial Plan.
+
+| Actual episode boundary / owner | Authoritative input → observed output before fix | Expected output / correlation / verdict |
+| --- | --- | --- |
+| Test admission → GI WHAT | Exact synthetic turn/source tokens; reference emits one conditional body effect, count 2, Hangzhou | Complete WHAT, no Capability/HOW. Final reviewed source span t0–t7 includes condition/place. Correct fixture; initial short span was a reference defect corrected before final freeze. |
+| GI → GA continuity | Accepted responsibility r1 → one new Goal carrying count/location | Exactly-once mapping and same meaning; real committed Goal ID binds the replay placeholder. Correct. |
+| Catalog/Goal → Deep dynamic Schema | Weather is declared safe_read; blink accepts count; generic count filter excludes weather for this Goal | Retain a representable prerequisite query. Earliest incorrect contract. |
+| Primary reply → parser/DTO/Host | Weather lookup `{location: Hangzhou}`, acquire_information, partial 0.5, both unmet obligations → count rejection, then numeric rejection when isolated | Accept complete acquisition Work while keeping Goal open. Original containment prevents execution but rejects valid progress. |
+| Accepted Plan → Runtime/provider, after fix | Same query is admitted; controlled forecast returns rain true/false with request/Goal/Plan provenance | Exactly one weather call, no blink before Evidence. Real result reconciliation retains open Goal. Correct. |
+| Terminal Evidence → actual Host re-entry → Fast | Trusted forecast and exact source Plan → blink count 2 when true; delivered no-effect response when false | Same Goal/scope; wrong forecast content fails frozen request matching. Correct; semantic choice itself is supplied by the reference. |
+| Runtime execution/speech receipt → state | True branch executes exactly two blinks; false branch has no blink and a controlled delivered response | Goal satisfied only after terminal execution/delivery. Correct within controlled-provider Level A scope. |
+
+Fix: the Schema retains declared information-acquisition candidates. Host reuses the
+existing whole-Plan acquisition validator (available executable information provider,
+valid arguments, expected outcome and both unmet assessments) to scope the deferred
+effect count/numeric exception. Supplied argument/provenance checks still run; the
+actual blink still requires count 2. Merely labeling a state-changing action as an
+acquisition or claiming completion cannot obtain the exception. Fast's direct catalog
+remains bounded; cross-domain composition stays with Deep. No prompt, model profile,
+extra semantic call, runtime flag or semantic authority is added. The existing #51
+Charter rule is clarified rather than replaced.
+
+Coverage is five episodes/18 local model-shaped HTTP calls: normal, conditional true,
+conditional false, retained scheduled Goal across restart/due/once-only wake, and
+in-flight cancellation. Cancellation stops current execution and leaves its unmet
+Goal open. The delayed case starts from an explicitly seeded prior Goal: GI's current
+Schema rejects `ready_at`, while Planner consumes that exact typed binding. This is
+the separately open [#60](https://github.com/TimeTreker/chromie/issues/60) new-request
+contract gap; a successful seeded timer is not new-request scheduling evidence.
+
+Verification: canonical gate passed 3,131 tests/794 subtests, 145 benchmarks and 20
+legacy tests, with pinned static/policy/config/ownership checks. Level A remains
+45/45 cases across 15 classes. The 26 added tests exercise frozen HTTP episodes,
+request/order/Schema/options mismatch, unused/extra/unbound replies, wrong terminal
+Evidence, rejected missing/wrong action count, acquisition counterexamples and the
+documented readiness gap. Final reference-span correction is rerun in the focused
+suite and full replay. No model-ability or live qualification follows from these results.
+Preparation failures and harness/oracle corrections are retained separately from
+production defects; async due wake has no session ID, which the driver now preserves.
+
+Commands and fixture ownership are in [benchmarks](benchmarks/README.md#offline-workflow-replay).
+Private evidence is `.chromie/acceptance/workflow-replay-20260913/`; tracked raw packets,
+responses and corpus hashes are in `benchmarks/integration/scenarios/`. Current source
+and corpus hashes, per-call observations, state snapshots and failures accompany each
+run. #59 may close on delivery; #24, #32 and #60 remain open. New current Markdown
+owners: 0 (102 → 102); core reading path: 15 → 15; no environment-variable growth.
 
 ## Native Goal Interpretation boundary investigation — #24
 

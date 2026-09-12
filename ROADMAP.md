@@ -35,6 +35,14 @@ architecture layer or product feature is promoted.
 
 ## Current execution order
 
+The owner's September 13 scope adds #59's small offline workflow replay before
+further native qualification. It covers GI/GA/Fast/Deep contract continuity with
+reviewed fixed replies and controlled providers; it does not evaluate model ability.
+The reproduced prerequisite/count validation defect is repaired in the existing
+owners. #60 separately retains the new-request GI → `ready_at` contract gap; the
+seeded scheduled-Goal case cannot close it. Neither replay success nor #59 closure
+closes #24/#32 or changes their live/target evidence requirements.
+
 Ordered offline Fast/Deep qualification and supported-version CI pass. GitHub
 #35 and #52–#58 are closed; follow the remaining #24/#32 native qualification line below.
 Exact current results belong in [Status](docs/STATUS.md) and the
