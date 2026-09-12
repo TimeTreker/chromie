@@ -2,8 +2,8 @@
 
 **Updated:** 2026-09-12
 **Current focus:** owner-authorized remaining-Issue repairs from `c142f16c` are
-implemented and locally qualified. #35 and #52–#58 have delivered acceptance evidence
-subject to publication checks; #56 additionally requires supported-version CI.
+implemented and verified locally and in supported-version CI on `8aa3f499`.
+#35 and #52–#58 are verified closed with their acceptance evidence.
 #49–#51 remain delivered and closed. Remaining native model/streaming/voice/target
 qualification stays under #24/#32.
 
@@ -18,8 +18,10 @@ commands, exact source/runtime identities and transfer paths. Final cohort raw o
 and original failures are retained. Oracle amendments were separately justified and
 frozen before new inference; no historical failure was relabeled. Fixed
 `gpt-5.6-sol/high` offline qualification is post-hoc and non-independent, and does not
-qualify the deployed Qwen/Ollama provider. Supported Python3.11/3.12 CI must be linked
-on #56 before closure; local Python3.13 checks do not establish those results.
+qualify the deployed Qwen/Ollama provider. [Supported Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596) passes on implementation
+commit `8aa3f499`, including Mypy33 files and the complete gate in both jobs; #56
+links that result. This later publication-only documentation update changes no
+implementation, model, corpus or deployed runtime.
 
 The current Qwen9b output-budget contrast preserves original packets except512→2,048
 output tokens:44 cases/63 calls,34 returned decisions,2 strict dimension passes, and a

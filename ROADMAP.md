@@ -35,8 +35,8 @@ architecture layer or product feature is promoted.
 
 ## Current execution order
 
-Ordered offline Fast/Deep qualification of the repairs above passes. Complete
-publication verification, then follow the remaining native qualification line below.
+Ordered offline Fast/Deep qualification and supported-version CI pass. GitHub
+#35 and #52–#58 are closed; follow the remaining #24/#32 native qualification line below.
 Exact current results belong in [Status](docs/STATUS.md) and the
 [checkpoint](DEVELOPMENT_CHECKPOINT.md). Retain all original failures and separately
 frozen staged/readiness oracle amendments. The coverage-designed 204 Fast/40 Deep

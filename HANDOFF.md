@@ -3,12 +3,15 @@
 ## Current delivery — remaining-Issue repairs, 2026-09-12
 
 Repository `/home/chromie/github/chromie`, branch `main`, pre-delivery base/fetched
-origin `c142f16c6993ed60a93e2155c93906930c2fa445`. Python:
+origin `8aa3f499151e4d25e8aed3fec74dec486f12b9cd` for this documentation-only publication
+update. Implementation was delivered at that commit from base `c142f16c`; all runtime,
+prompt, corpus and evidence identities below remain bound to that implementation. Python:
 `/home/chromie/miniconda3/bin/python`. Resume from the latest main commit containing
 this file and [DEVELOPMENT_CHECKPOINT](DEVELOPMENT_CHECKPOINT.md). The owner authorized
 implementation, principle decisions, bounded maintenance, normal commit/push and
 closure of solved Issues. The [audit report](ARCHITECTURE_AUDIT.md) owns the issue map
-and actual module I/O; #24/#32 remain failed qualification, not permission blockers.
+and actual module I/O. Verified closed Issues: #35 and #52–#58. Only #24/#32 remain
+open for failed qualification; they are not permission blockers.
 
 ## Implemented workflow and authority
 
@@ -43,7 +46,7 @@ live identities require the separate archive. Public tests/corpora are tracked.
 | Final Fast | `fast-full-5/`:204 one-call cases, all Schema/Host/frozen hard/semantic pass. One allowed parameter-provenance normalization, no disallowed semantic normalization. `control-fast-final_ready/`:16/16; `retained-fast-3/`:6/6 due-wake cases. |
 | Final Deep | `deep-full-2/`:40/40 Schema/Host/frozen hard/semantic pass; `control-deep-final_ready/`:16/16; `deep-future-2/`:6/6; `retained-deep-3/`:6/6. |
 | Model → Runtime proof | `future-readiness-after.json`:six waiting outputs, zero early dispatch, open Goal after speech, one wake. `retained-fast-runtime-replay.json` and `retained-deep-runtime-replay.json`:six final due model Plans per tier dispatch one exact lookup through actual adapter/Runtime with fake providers. Real bilingual restart tests separately prove source Plan/Responsibility continuity and one-shot behavior. |
-| Documentation / delivery | Final local docs/policy/ownership pass. CI has not yet run on this uncommitted tree at handoff preparation; #56 closure must link successful Python 3.11/3.12 checks for the published commit. Local Python 3.13 is not CI evidence. |
+| Documentation / delivery | Final local docs/policy/ownership pass. [Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596) passes on implementation commit `8aa3f499`: each job reports 3,105 tests/794 subtests,145 benchmarks,20 legacy and Mypy33 files. #56 is closed with that link. |
 
 Final offline candidate: `gpt-5.6-sol/high`, one target-blind primary invocation per
 case, 600-second deadline, no retries/repair. Full Fast concurrency 12, Deep 6;
@@ -128,6 +131,16 @@ healthy development services. Soridormi:`/home/chromie/github/soridormi`,branch
 `codex/turn-count`,revision`284273bc`; preserve pre-existing untracked
 `workspace/Open_Duck_Playground`. No microphone, audible speaker, executed simulator
 capability or physical robot proof. Native stream/voice/default target closure open.
+
+## Verified publication state
+
+Implementation commit: `8aa3f499151e4d25e8aed3fec74dec486f12b9cd` on `origin/main`.
+GitHub #35 and #52–#58 are closed with individual workflow, acceptance and evidence
+comments. #35's body explicitly preserves the original600-case proposal as history
+and records the accepted coverage-based replacement; it does not claim600 cases ran.
+Only #24/#32 remain open, each with fresh native failure reports and next steps.
+This subsequent documentation-only commit records the observed publication/CI result
+and preserves both handoff owners; it makes no newer live-runtime claim.
 
 ## Transfer and next commands
 

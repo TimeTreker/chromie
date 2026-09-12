@@ -5,8 +5,9 @@
 Current focus: Goal-driven single-authority architecture and current-revision
 evidence closure. GI owns WHAT, GA continuity, Planner HOW/speech, Runtime execution.
 
-Repository `main`; pre-delivery base/fetched origin:
-`c142f16c6993ed60a93e2155c93906930c2fa445`. Resume from the latest main commit
+Repository `main`; implementation base `c142f16c6993ed60a93e2155c93906930c2fa445`,
+delivered at `8aa3f499151e4d25e8aed3fec74dec486f12b9cd`. This documentation-only publication
+checkpoint starts from that delivered revision. Resume from the latest main commit
 containing this checkpoint and [HANDOFF](HANDOFF.md), not that older base. The owner
 explicitly authorized remaining-Issue repairs, principle decisions, bounded
 maintenance, normal publication and closure of solved Issues. This supersedes the
@@ -14,7 +15,8 @@ preceding audit-only and maintenance-queue restrictions for this delivery.
 
 The [audit report](ARCHITECTURE_AUDIT.md) records each issue, actual workflow,
 earliest wrong boundary, repair and evidence limit. #49–#51 remain delivered and
-closed. This delivery implements #52–#57 and newly discovered #58; #35 closes at the offline Planner evidence ceiling after publication verification:
+closed. GitHub closure is verified for #35 and #52–#58. #35 closes at the offline Planner
+evidence ceiling; #24/#32 are the only open Issues. Implemented changes:
 
 - Cancellation reporting preserves the original unmet effect Goal, exact control
   status and independent catalog truth. Both Planner tiers accept truthful zero-work
@@ -32,6 +34,11 @@ closed. This delivery implements #52–#57 and newly discovered #58; #35 closes 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
 | Repairs above; no new architecture layer, standing document, runtime flag or model profile. | Canonical: 3,105 tests/794 subtests, 145 benchmarks, 20 legacy; pinned static/config/policy/ownership pass. Future module: 50. Level A: 45 distinct cases/15 classes. Final Fast: 204/204 plus 16 cancellation and 6 persisted-due contrasts. Final Deep: 40/40 plus 16 cancellation, 6 waiting and 6 persisted-due contrasts. | Final deployed-source 51-case live-text cohort: 1 GI failure, 1 startup interrupted, 49 unrun. GA/Planner/Runtime not reached in failed case. Exactly one debug bundle; safe idle verified. Local Qwen9b budget experiment retains hard semantic failures. | Development only. #24/#32 remain open. No native streaming, current voice/default target profile, audible speaker, physical microphone, executed simulator capability or robot qualification. |
+
+[Supported Python 3.11/3.12 CI](https://github.com/TimeTreker/chromie/actions/runs/34691856596) passes on implementation
+commit `8aa3f499`: both jobs verify the same 3,105 tests/794 subtests, 145 benchmarks,
+20 legacy tests and strict typing across all 33 enforced files. This publication-only
+update changes no implementation, prompt, corpus, model or deployed runtime.
 
 Private evidence R: `.chromie/acceptance/remaining-issues-20260912/`. The handoff
 records exact archive/identity paths, failed attempts and resume commands. Offline
