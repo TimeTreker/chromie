@@ -44,10 +44,30 @@ The runtime package provides the shared asyncio `ResourceArbiter` used by:
 - Agent WorkDAG execution;
 - host Trusted Capability Runtime scheduling.
 
-It enforces bounded concurrency and named exclusive groups within one Python
-process. Each process has its own arbiter. It is not a distributed lock and
-cannot coordinate Agent and Orchestrator processes by itself. Cross-process
-robot exclusivity remains Soridormi's responsibility.
+It acquires capacity and the complete set of named exclusive resources atomically.
+An `exclusive_group` and every `resource_claims` entry use the same exact-name lock
+domain within one arbiter, across Plans, interactions and providers. Empty claims
+add no resource restriction; duplicate names name one resource. Waiting work holds
+neither capacity nor a partial set, so disjoint work can proceed. Cancellation and
+exceptions release the acquired set; queued non-parallel work retains precedence.
+
+Runtime takes claims from trusted Capability definitions, never request metadata.
+Resource declarations must be lists of non-empty strings without surrounding whitespace;
+malformed declarations reject rather than losing a claim. Names are opaque and
+case-sensitive: Runtime adds no provider prefix and infers no aliases. Provider
+adapters retain their declared names; independently owned resources need distinct
+names, while providers sharing a resource must declare the same name.
+
+A compiled provider group acquires the union of its members' resources and exclusive
+groups plus its existing provider compilation group. It holds one capacity slot for
+that provider invocation; the provider still owns internal compilation and safety.
+Cancellation or timeout while waiting for arbitration releases only the Runtime waiter and
+does not call provider cancellation. Active provider cancellation retains its existing
+contract. Scheduler counts distinguish admitted work from all waiting work.
+
+Each process has its own arbiter. It is not a distributed lock and cannot coordinate
+Agent and Orchestrator processes by itself. Cross-process robot exclusivity remains
+Soridormi's responsibility.
 
 ## Development install
 

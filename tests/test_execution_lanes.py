@@ -448,6 +448,202 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(response.capabilities), 1)
         self.assertEqual(response.capabilities[0].capability_id, "soridormi.walk_forward")
 
+    async def test_separate_canonical_plans_share_runtime_resource_exclusion(self) -> None:
+        active = peak = 0
+
+        class Provider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):
+                nonlocal active, peak
+                active += 1
+                peak = max(peak, active)
+                try:
+                    await asyncio.sleep(0.01)
+                    return CapabilityResult(
+                        request_id=request.request_id, capability_id=request.capability_id,
+                        provider_id=self.provider_id, status="completed", output={"completed": True},
+                    )
+                finally:
+                    active -= 1
+
+        definitions = [
+            _definition(f"test.output.{index}", group=f"group.{index}", resources=["shared"])
+            for index in range(2)
+        ]
+        registry = CapabilityRegistry()
+        for definition in definitions:
+            registry.register(definition)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime.register_provider(Provider("body"))
+        adapter = CanonicalPlanRuntimeAdapter(_InteractionRuntimeView(definitions))
+        responses = []
+        for index, definition in enumerate(definitions):
+            plan = CanonicalPlan(
+                plan_id=f"plan-{index}", planner_tier="deep", disposition="execute",
+                coverage="complete", confidence=1.0, goal_ids=[f"goal-{index}"],
+                steps=[{
+                    "step_id": "output", "capability_id": definition.capability_id,
+                    "args": {}, "source_goal_ids": [f"goal-{index}"],
+                }],
+            )
+            projection = PlannerResponseProjection(
+                projection_id=f"projection-{index}", canonical_plan_id=plan.plan_id,
+                canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+                canonical_plan=plan, response_plan=ResponsePlan(),
+            )
+            responses.append(await adapter.build_response(
+                plan=plan, planner_response=projection, session_id=f"session-{index}",
+                language="en-US", context={},
+            ))
+        async with asyncio.timeout(1):
+            results = await asyncio.gather(*(
+                submit_and_wait_terminal(runtime, response) for response in responses
+            ))
+        self.assertEqual([result.status for result in results], ["completed", "completed"])
+        self.assertEqual(peak, 1)
+        self.assertEqual(
+            {result.results[0].metadata["canonical_plan_id"] for result in results},
+            {"plan-0", "plan-1"},
+        )
+
+    async def test_compiled_group_reserves_member_resources_and_groups(self) -> None:
+        # A different provider removes the compiled-provider lock as an accidental guard.
+        for conflict, other_compiled in (
+            ("resource", False), ("group", False), ("disjoint", False),
+            ("serial", False), ("resource", True), ("disjoint", True),
+        ):
+            with self.subTest(conflict=conflict, other_compiled=other_compiled):
+                active = peak = 0
+                running: set[str] = set()
+                overlaps: list[set[str]] = []
+
+                class Provider(_GroupedBodyProvider):
+                    async def execute_group(self, items):
+                        nonlocal active, peak
+                        active += 1
+                        peak = max(peak, active)
+                        identity = items[0][0].capability_id
+                        running.add(identity)
+                        overlaps.append(set(running))
+                        try:
+                            await asyncio.sleep(0.01)
+                            return await super().execute_group(items)
+                        finally:
+                            running.remove(identity)
+                            active -= 1
+
+                    async def execute(self, request, definition, context):
+                        return (await self.execute_group([(request, definition, context)]))[0]
+
+                definitions = [
+                    _definition("soridormi.first", group="first", resources=["a", "b"]),
+                    _definition("soridormi.second", group="second", resources=["c"]),
+                    _definition(
+                        "soridormi.other" if other_compiled else "test.other", provider_id="other",
+                        group="second" if conflict == "group" else "other",
+                        resources=["c"] if conflict == "resource" else ["d"],
+                    ),
+                ]
+                if other_compiled:
+                    definitions.append(_definition(
+                        "soridormi.other_second", provider_id="other", group="other-second", resources=["e"],
+                    ))
+                if conflict == "serial":
+                    definitions[0].can_run_parallel = False
+                registry = CapabilityRegistry()
+                for definition in definitions:
+                    registry.register(definition)
+                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                body, other = Provider(), Provider()
+                other.provider_id = "other"
+                runtime.register_provider(body)
+                runtime.register_provider(other)
+                responses = [InteractionResponse(
+                    interaction_id="compiled", capabilities=[{
+                        "request_id": str(index), "capability_id": definition.capability_id,
+                        "timing": "parallel",
+                    } for index, definition in enumerate(definitions[:2])],
+                ), InteractionResponse(
+                    interaction_id="single", capabilities=[{
+                        "request_id": f"other-{index}", "capability_id": definition.capability_id,
+                        "timing": "parallel",
+                    } for index, definition in enumerate(definitions[2:])],
+                )]
+                async with asyncio.timeout(1):
+                    results = await asyncio.gather(*(
+                        submit_and_wait_terminal(runtime, response) for response in responses
+                    ))
+                self.assertEqual([result.status for result in results], ["completed", "completed"])
+                if conflict == "serial":
+                    self.assertEqual(body.group_calls, [["0"], ["1"]])
+                    self.assertTrue(all(len(state) == 1 for state in overlaps if "soridormi.first" in state))
+                else:
+                    self.assertEqual(body.group_calls, [["0", "1"]])
+                    self.assertEqual(peak, 2 if conflict == "disjoint" else 1)
+                self.assertEqual(other.group_calls, [["other-0", "other-1"]] if other_compiled else [["other-0"]])
+
+    async def test_waiting_compiled_group_does_not_cancel_running_provider(self) -> None:
+        for terminate in ("cancel", "timeout"):
+            with self.subTest(terminate=terminate):
+                started, release = asyncio.Event(), asyncio.Event()
+                cancellations: list[str] = []
+
+                class Provider(_GroupedBodyProvider):
+                    async def execute_group(self, items):
+                        if items[0][2].interaction_id == "holder":
+                            started.set()
+                            await release.wait()
+                        return await super().execute_group(items)
+
+                    async def cancel(self, request, definition, context):
+                        cancellations.append(context.interaction_id)
+                        await super().cancel(request, definition, context)
+
+                registry = CapabilityRegistry()
+                for index in range(2):
+                    registry.register(_definition(
+                        f"soridormi.member{index}", group=f"group{index}", resources=[f"resource{index}"],
+                    ))
+                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                provider = Provider()
+                runtime.register_provider(provider)
+
+                async def submit(name, timeout_ms):
+                    return await submit_and_wait_terminal(runtime, InteractionResponse(
+                        interaction_id=name, capabilities=[{
+                            "request_id": f"{name}-{index}", "capability_id": f"soridormi.member{index}",
+                            "timing": "parallel", "timeout_ms": timeout_ms,
+                        } for index in range(2)],
+                    ))
+
+                holder = asyncio.create_task(submit("holder", 2000))
+                waiter = None
+                try:
+                    await asyncio.wait_for(started.wait(), 1)
+                    waiter = asyncio.create_task(submit("waiter", 100 if terminate == "timeout" else 2000))
+                    async with asyncio.timeout(1):
+                        # The baseline arbiter counts a group-lock waiter as active.
+                        while runtime.scheduler_status().active_count + runtime.scheduler_status().waiting_count < 2:
+                            await asyncio.sleep(0)
+                        if terminate == "cancel":
+                            await runtime.cancel_interaction("waiter")
+                        result = await waiter
+                    self.assertEqual(result.status, "cancelled" if terminate == "cancel" else "failed")
+                    self.assertEqual(
+                        [item.status for item in result.results],
+                        ["cancelled" if terminate == "cancel" else "timed_out"] * 2,
+                    )
+                    self.assertEqual(cancellations, [])
+                    self.assertEqual(provider.group_calls, [])
+                finally:
+                    release.set()
+                    result = await asyncio.wait_for(holder, 1)
+                    if waiter is not None:
+                        waiter.cancel()
+                        await asyncio.gather(waiter, return_exceptions=True)
+                self.assertEqual(result.status, "completed")
+                self.assertEqual(provider.group_calls, [["holder-0", "holder-1"]])
+                self.assertEqual(runtime.scheduler_status().active_count, 0)
+
     async def test_parallel_runtime_rejects_two_personal_voice_owners(self) -> None:
         declaration = VocalProviderDeclaration(
             provider_id="fake.vocal.parallel-conflict",

@@ -1,7 +1,23 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-12
-**Current focus:** deliver the owner-authorized remaining-Issue fixes, and retain
+**Current focus:** Issue #49 shared Runtime resource arbitration from the September 12
+audit. The local repair acquires complete declared resource sets across independent
+Plans/interactions and compiled provider groups. Waiters hold no execution capacity;
+compiled work still waiting for resources cannot call provider cancellation. Existing semantic authority,
+provider safety ownership and model profiles remain unchanged.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| #49 implemented for authorized main delivery; no deployment. | Original shared-resource probe: peak 2 -> 1, both requests complete. Focused: 232 tests/40 subtests; Level A: 22/22 distinct cases. Canonical: 2,490 tests/794 subtests, 145 benchmarks, 20 legacy tests; policy/static/config/docs and ownership pass. | In-process fixtures only; no model, service, voice, simulator or physical proof for this patch. Prior failed qualification stays failed. | Development only; #24/#32/#35 remain open. |
+
+Evidence: `.chromie/acceptance/issue49-resource-arbitration-20260912/`. Exact source,
+workflow, failures and resume commands belong to the checkpoint and handoff. #50–#55
+remain separate audit work; this repair does not qualify the unchanged model transactions.
+
+### Prior remaining-Issue delivery — 191083dc
+
+The preceding delivery completed the owner-authorized remaining-Issue fixes and retained
 failed qualification under #24, #32 and #35. The owner authorized project decisions,
 implementation, normal commit/push and closure of solved main-delivered Issues.
 Older per-iteration approval and budget statements below are historical.

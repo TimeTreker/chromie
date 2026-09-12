@@ -395,6 +395,10 @@ Capabilities answer **what can be done**; execution resources answer **what can
 coexist**. The Cognitive Core plans with both truths, and the Trusted Capability
 Runtime mechanically contains a bad parallel plan. This rule reuses the existing
 `ResourceArbiter`; it does not create a second Resource Manager.
+Independent submissions acquire the complete declared resource set at that same
+boundary. Compiled provider groups reserve every member's claims and exclusive groups,
+so compilation cannot bypass another interaction's claim. Exact names, waiting and
+cancellation are defined by the [shared arbiter contract](../shared/README.md#chromie_runtime).
 
 `chromie.voice` is not the Goal-level acquire/deliver `Resource` responsibility,
 and it is not identical to the physical speaker. Existing-media playback is realized

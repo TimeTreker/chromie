@@ -40,6 +40,15 @@ exact failures in the checkpoint, without promoting a profile or widening featur
 
 ## Current execution order
 
+The September 12 [audit](ARCHITECTURE_AUDIT.md) adds reproduced blockers within the
+existing evidence-closure line. #49's shared resource enforcement is implemented
+locally, with verification and delivery state in Status/checkpoint. Continue with
+#50 required Planner inputs, #51/#52 staged progress and cancellation scope under
+#35, then #53/#54 Reflection scheduling/context. Fold #55's remaining documentation
+drift into the relevant delivery. Contract-meaning changes still require the Charter's
+owner decision. After these repairs, resume the fixed-transaction and full live-cohort
+qualification below; no source fix promotes a model or substitutes for target evidence.
+
 The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:
 
 1. **Preserve revision-bound full source qualification.** The current source gate passes with pinned dependencies (2,480 tests/771 subtests,145 benchmarks,20 legacy tests). After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.

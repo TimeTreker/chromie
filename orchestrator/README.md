@@ -309,7 +309,10 @@ barge-in may silence current audio without cancelling the underlying work.
 
 The Interaction Coordinator validates the response and submits speech and capability
 requests to the Trusted Capability Runtime. Scheduling is bounded by
-`ORCH_CAPABILITY_MAX_CONCURRENCY` and provider/exclusive-group policy.
+`ORCH_CAPABILITY_MAX_CONCURRENCY` and the complete trusted resource/exclusive-group
+declaration across interactions. Resource waiters consume no execution capacity.
+See the [shared arbiter contract](../shared/README.md#chromie_runtime) for exact-name
+ownership and compiled-group acquisition.
 
 Cancellation:
 

@@ -1,6 +1,112 @@
 # Chromie Latest Handoff
 
-## Audit publication delivery, 2026-09-12
+## Issue #49 resource-arbitration delivery, 2026-09-12
+
+The owner authorized #49 and now instructs commit/push and closure of each completed
+Issue after remote-main verification, followed by #50 development.
+Repository `/home/chromie/github/chromie`, branch `main`, clean base/fetched upstream
+`3e1c50414b6709a2b7222269cadce203e5e6661a`. Resume from the latest main commit containing
+this checkpoint/HANDOFF pair. Delivery is a normal main push; verify the actual remote
+hash before closing #49. No model run or service deployment is included.
+Earlier delivery/authorization entries below describe their own sessions.
+
+Evidence root R: `.chromie/acceptance/issue49-resource-arbitration-20260912/`.
+Python `/home/chromie/miniconda3/bin/python`. R is ignored and needs separate transfer;
+the original probe is reproducible from the tracked audit appendix and the new
+regressions are in the existing Runtime/arbiter/execution-lane test files.
+
+### Actual episode and repaired boundaries
+
+This is a synthetic Runtime episode, not a reported physical collision. Two accepted
+definitions `audit.output.0/1` share `audit.shared.output` but have distinct groups.
+The admission trigger is concurrent independent submissions. GI, GA, Planner inference,
+audio, real providers and physical devices are not invoked. Separate canonical Plan
+tests additionally exercise the real Plan adapter with scripted accepted Plans.
+
+| Ordered/concurrent boundary and owner | Material input -> baseline output | Expected/current output and correlation |
+| --- | --- | --- |
+| Trusted CapabilityDefinition/Registry | Valid resource lists and different groups retained. Malformed null/string/object/non-string/empty/whitespace declarations were also accepted. | Valid declarations retain exact names; malformed resource declarations reject during definition validation. Request metadata cannot override trusted claims. |
+| CanonicalPlanRuntimeAdapter | Both steps inside one parallel Plan -> `runtime_parallel_resource_conflict`. Two separate Plans each validate. | Correct unchanged local check. Independent Plans retain distinct Plan/Goal and interaction/request bindings; shared acquisition is still required. |
+| CapabilityRuntime -> shared ResourceArbiter | Separate `audit-0/1`, `req-0/1` calls acquire only different groups; metadata claims are omitted. Peak provider concurrency is 2. | Earliest missing guarantee repaired: capacity plus the entire definition resource set and group acquire atomically. Peak is 1 and both requests complete. No semantic decision changes. |
+| Compiled provider batch -> arbiter | One provider compilation lock loses members' resource/group conflicts with other submissions. | One atomic union contains every member resource/group and the existing compilation group. Provider receives the original group once and retains internal decomposition/safety ownership. Different-provider compiled groups also share declared conflicts. |
+| Resource waiter -> scheduler | A group waiter was counted active and held a capacity slot. | All resource/capacity waiters count as waiting and hold no partial set or capacity. Disjoint work can run. Reverse-order and duplicate sets cannot deadlock; non-parallel precedence remains. |
+| Waiting compiled group -> cancel/timeout | Before provider start, both paths called provider cancellation. Scripted provider records `waiter`; a provider-global cancel could affect other work, but no real side effect was exercised. | Both paths skip provider cancellation until actual provider start. Member results retain cancelled/timed_out truth; aggregate timeout remains failed. The holder completes, and subsequent work can acquire released resources. |
+| Provider -> Runtime evidence | Two mock provider calls complete despite invalid overlap. Existing within-Plan tests and the 83-test baseline pass. | Completed evidence still binds to exact requests/Plans. Mock concurrency and event ordering prove the repaired Host boundary, not physical exclusion across processes. |
+
+```text
+accepted Plan A -> request A -> claim {group A, shared resource} -> provider A
+accepted Plan B -> request B -> wait for complete set (no slot/partial holds)
+provider A returns -> release complete set -> provider B -> bound terminal evidence
+disjoint request C -----------------------> may run beside A
+compiled batch -> union of member claims/groups + provider compilation group
+waiting batch cancel/timeout -> remove waiter, no provider cancel
+```
+
+Root cause: code enforcement omitted declared resources at shared acquisition;
+within-Plan checks cannot protect independent submissions. The compiled waiting-cancel
+path was a related lifecycle defect revealed while protecting that shared boundary.
+The repair refines existing owners, removes per-group lock/semaphore bookkeeping,
+and uses one condition to acquire the complete set and capacity together. Names are
+opaque, exact and process-wide; provider adapters own naming, Runtime infers no
+provider prefix/aliases. Existing `chromie.voice` and compiled-provider locks remain.
+No Charter/semantic amendment, new authority or parallel resource manager is needed.
+
+### Evidence ledger and commands
+
+- `before.json`: clean base/Python identity. `audit-probes.py` is the published appendix
+  code unchanged. `baseline-probes.json` retains peak 2; `repaired-probes.json` retains
+  peak 1, with both requests completed and other audit findings unchanged.
+- `baseline-tests.log`: 83 tests passed before edits.
+- `red-resources.log`: reproduced resource overlap and malformed declarations; new
+  direct-arbiter tests also fail because the old API lacks resource-set acquisition.
+- `red-groups.log`: separate Plan and compiled conflict failures. Two fixture assumptions
+  were incorrect: aggregate timeout is failed (member timed_out), and serial-only members
+  bypass compilation. `red-group-cancel.log` reruns the corrected timeout expectation and
+  reproduces two unwanted pre-start provider cancellations on the baseline.
+- `focused-first.log`: 98 passed/one subtest failed because the new serial fixture wrongly
+  prohibited overlap after the serial-only member finished. The corrected assertion checks
+  overlap only while that member is active. `focused-second.log`: 98 tests/21 subtests passed.
+- `focused-expanded.log`: invocation error from a nonexistent test filename, no tests ran.
+  `focused-expanded-corrected.log`: 232 tests/40 subtests passed, including same/different
+  provider resource sets, separate Plans, compiled groups, queued cancellation/timeout,
+  active arbiter cancellation/exception, personal voice and Soridormi compilation.
+- `level-a.log`, `level-a/`: 22/22 distinct cases passed. Overlapping class counts:
+  composable planning 5/5, deterministic safety 3/3, multi-Goal 10/10, truthful speech
+  6/6, WorkDAG revision integrity 4/4. These are Level A fixture evidence only.
+- `canonical.log`: full current-patch gate exited 0; 2,490 tests/794 subtests (57.40s),
+  145 benchmark tests (46.13s), 20 legacy Agent tests. All policy, ownership, pinned
+  Ruff/Mypy, configuration, runtime structure and documentation checks pass. Two existing
+  FastAPI startup-deprecation warnings remain. No final local gate failure remains.
+- `source-freeze.json` retains SHA-256 for both changed source files and all three
+  changed test files; hashes remain unchanged through the canonical gate. The tested
+  non-documentation diff is retained as `implementation.patch`. Final documentation-only
+  ledger edits are checked separately in `docs-final.log`, with complete patch/source
+  integrity recorded in `final-verification.json`.
+
+```bash
+python -m pytest -q tests/test_resource_arbiter.py tests/test_capability_runtime.py tests/test_execution_lanes.py tests/test_soridormi_activity_compilation.py tests/test_cognitive_runtime_pr7.py tests/test_work_dag_execution_state.py tests/test_work_dag_revision.py tests/test_vocal_provider_contract.py tests/test_vocal_issue_closure.py tests/test_media_provider_contract.py
+python scripts/general_ability_acceptance.py --mode level-a --ability-class composable_action_planning --ability-class deterministic_safety_controls --ability-class multi_goal_daily_life --ability-class truthful_embodied_speech --ability-class workdag_multi_goal_revision_integrity --evidence-dir .chromie/acceptance/issue49-resource-arbitration-20260912/level-a
+python scripts/check_repository_policies.py
+python scripts/check_test_ownership.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+git diff --check
+```
+
+Scope/claims: #49 local implementation only; no real inference, HTTP/service deployment,
+microphone, speaker, simulator or physical test. No model-facing contract/prompt/profile
+or corpus changes. #50–#55 remain open work, and #24/#32/#35's failed qualification
+remains failed. Markdown 102 -> 102; docs-root Markdown 58 -> 58; configuration keys,
+runtime switches and compatibility aliases are unchanged. The only documentation drift
+folded into this repair is CONFIGURATION's obsolete universal Soridormi motion-group claim.
+Delivery-only documentation updates follow the passing source gate; source/test hashes
+are rechecked against `source-freeze.json` and documentation is checked again before
+commit. `final-verification.json` describes the pre-delivery patch, when it was still
+uncommitted. Preserve that record; retain actual commit/remote identity separately.
+Next: verify this main delivery, close #49, then #50. Every completed Issue's authorized
+Git delivery must include both updated handoff owners and retain ignored R separately.
+
+## Prior audit publication delivery, 2026-09-12
 
 Current owner request: publish the full audit to the GitHub repository, create actionable
 Issues, and retain checkpoint/handoff. This delivery contains the report, navigation links

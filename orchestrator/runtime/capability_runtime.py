@@ -156,6 +156,17 @@ class CapabilityDefinition(CapabilityIdentityModel):
     def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
 
+    @field_validator("metadata")
+    @classmethod
+    def validate_resource_claims(cls, value: dict[str, Any]) -> dict[str, Any]:
+        claims = value.get("resource_claims", [])
+        if not isinstance(claims, list) or any(
+            not isinstance(name, str) or not name or name != name.strip()
+            for name in claims
+        ):
+            raise ValueError("resource_claims must be a list of non-empty exact resource names")
+        return value
+
     @model_validator(mode="after")
     def default_owner_reviewed_completion_policy(self) -> "CapabilityDefinition":
         if self.completion_evidence_policy is None and self.output_schema:
@@ -2285,6 +2296,15 @@ class CapabilityRuntime:
             async with self._resource_arbiter.claim(
                 can_run_parallel=True,
                 exclusive_group=f"{provider_id}.compiled_body_activity",
+                resource_claims={
+                    resource
+                    for _, definition in items
+                    for resource in (
+                        *definition.metadata.get("resource_claims", []),
+                        definition.exclusive_group,
+                    )
+                    if resource
+                },
             ):
                 async with self._active_lock:
                     for trace, context in zip(traces, contexts, strict=True):
@@ -2362,11 +2382,15 @@ class CapabilityRuntime:
                     ),
                 )
         except TimeoutError:
-            cancel_error = await self._cancel_provider(
-                provider,
-                items[0][0],
-                items[0][1],
-                contexts[0],
+            cancel_error = (
+                await self._cancel_provider(
+                    provider,
+                    items[0][0],
+                    items[0][1],
+                    contexts[0],
+                )
+                if contexts[0].provider_started
+                else None
             )
             results = self._group_terminal_results(
                 items,
@@ -2378,13 +2402,17 @@ class CapabilityRuntime:
                 ),
             )
         except asyncio.CancelledError:
-            cancel_error = await asyncio.shield(
-                self._cancel_provider(
-                    provider,
-                    items[0][0],
-                    items[0][1],
-                    contexts[0],
+            cancel_error = (
+                await asyncio.shield(
+                    self._cancel_provider(
+                        provider,
+                        items[0][0],
+                        items[0][1],
+                        contexts[0],
+                    )
                 )
+                if contexts[0].provider_started
+                else None
             )
             results = self._group_terminal_results(
                 items,
@@ -2641,6 +2669,7 @@ class CapabilityRuntime:
             async with self._resource_arbiter.claim(
                 can_run_parallel=definition.can_run_parallel,
                 exclusive_group=definition.exclusive_group,
+                resource_claims=definition.metadata.get("resource_claims", []),
             ):
                 async with self._active_lock:
                     context.provider_started = True

@@ -1115,6 +1115,140 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(peak, 1)
 
+    async def test_declared_resources_span_independent_interactions_and_providers(self) -> None:
+        contrasts = [
+            (["shared"], ["shared"], "left", "right", 1),
+            (["a", "shared"], ["shared", "b", "shared"], None, None, 1),
+            (["a"], ["b"], "same-group", "same-group", 1),
+            (["a"], ["b"], "left", "right", 2),
+            (["one.output"], ["two.output"], None, None, 2),
+            (["chromie.voice"], [], None, "chromie.voice", 1),
+        ]
+        for left, right, left_group, right_group, expected in contrasts:
+            with self.subTest(left=left, right=right, groups=(left_group, right_group)):
+                active = peak = 0
+
+                class Provider(MockCapabilityProvider):
+                    async def execute(self, request, definition, context):
+                        nonlocal active, peak
+                        active += 1
+                        peak = max(active, peak)
+                        try:
+                            await asyncio.sleep(0.01)
+                            return await super().execute(request, definition, context)
+                        finally:
+                            active -= 1
+
+                registry = CapabilityRegistry()
+                definitions = [
+                    CapabilityDefinition(
+                        capability_id=f"test.resource.{index}",
+                        provider_id=f"provider.{index}",
+                        exclusive_group=group,
+                        metadata={"resource_claims": resources},
+                    )
+                    for index, (resources, group) in enumerate(
+                        ((left, left_group), (right, right_group))
+                    )
+                ]
+                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                for definition in definitions:
+                    registry.register(definition)
+                    runtime.register_provider(Provider(definition.provider_id))
+                async with asyncio.timeout(1):
+                    results = await asyncio.gather(*(
+                        submit_and_wait_terminal(runtime, InteractionResponse(
+                            interaction_id=f"interaction-{index}",
+                            capabilities=[{
+                                "request_id": "same-request",
+                                "capability_id": definition.capability_id,
+                                # Requests cannot override trusted definition claims.
+                                "metadata": {"resource_claims": [f"unrelated-{index}"]},
+                            }],
+                        ))
+                        for index, definition in enumerate(definitions)
+                    ))
+                self.assertEqual([result.status for result in results], ["completed"] * 2)
+                self.assertEqual(peak, expected)
+                self.assertEqual(runtime.scheduler_status().active_count, 0)
+
+    async def test_resource_waiter_cancel_or_timeout_never_starts_provider(self) -> None:
+        for terminate in ("cancel", "timeout"):
+            with self.subTest(terminate=terminate):
+                started = asyncio.Event()
+                release = asyncio.Event()
+                calls: list[str] = []
+                cancellations: list[str] = []
+
+                class Provider(MockCapabilityProvider):
+                    async def execute(self, request, definition, context):
+                        calls.append(context.interaction_id)
+                        if context.interaction_id == "holder":
+                            started.set()
+                            await release.wait()
+                        return await super().execute(request, definition, context)
+
+                    async def cancel(self, request, definition, context):
+                        cancellations.append(context.interaction_id)
+                        await super().cancel(request, definition, context)
+
+                registry = CapabilityRegistry()
+                for index, resources in enumerate((["shared"], ["spare", "shared"], ["spare"])):
+                    registry.register(CapabilityDefinition(
+                        capability_id=f"test.resource.{index}", provider_id="mock.resource",
+                        metadata={"resource_claims": resources},
+                    ))
+                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                runtime.register_provider(Provider("mock.resource"))
+
+                async def submit(name: str, index: int, timeout_ms: int = 2000):
+                    return await submit_and_wait_terminal(runtime, InteractionResponse(
+                        interaction_id=name, capabilities=[{
+                            "request_id": name, "capability_id": f"test.resource.{index}",
+                            "timeout_ms": timeout_ms,
+                        }],
+                    ))
+
+                holder = asyncio.create_task(submit("holder", 0))
+                waiter = None
+                try:
+                    await asyncio.wait_for(started.wait(), 1)
+                    waiter = asyncio.create_task(submit("waiter", 1, 150 if terminate == "timeout" else 2000))
+                    async with asyncio.timeout(1):
+                        while runtime.scheduler_status().waiting_count != 1:
+                            if waiter.done():
+                                self.fail(f"waiting work escaped resource exclusion: {calls}")
+                            await asyncio.sleep(0)
+                        disjoint = await submit("disjoint", 2)
+                        self.assertEqual(disjoint.status, "completed")
+                        self.assertNotIn("waiter", calls)
+                        if terminate == "cancel":
+                            await runtime.cancel_interaction("waiter")
+                        result = await waiter
+                    self.assertEqual(result.status, "cancelled" if terminate == "cancel" else "failed")
+                    self.assertEqual(result.results[0].status, "cancelled" if terminate == "cancel" else "timed_out")
+                    self.assertNotIn("waiter", calls)
+                    self.assertNotIn("waiter", cancellations)
+                    self.assertEqual(runtime.scheduler_status().waiting_count, 0)
+                finally:
+                    release.set()
+                    await asyncio.wait_for(holder, 1)
+                    if waiter is not None:
+                        waiter.cancel()
+                        await asyncio.gather(waiter, return_exceptions=True)
+                retry = await asyncio.wait_for(submit("retry", 1), 1)
+                self.assertEqual(retry.status, "completed")
+                self.assertEqual(runtime.scheduler_status().active_count, 0)
+
+    def test_malformed_declared_resources_reject_at_definition_boundary(self) -> None:
+        for claims in (None, "shared", {"shared": True}, [None], [42], [""], [" shared "]):
+            with self.subTest(claims=claims):
+                with self.assertRaisesRegex(ValueError, "resource_claims"):
+                    CapabilityDefinition(
+                        capability_id="test.invalid_resources", provider_id="mock.resource",
+                        metadata={"resource_claims": claims},
+                    )
+
     def test_cancellation_receipt_exposes_only_qualified_request_identity(self) -> None:
         fields = set(CancellationDispatchReceipt.model_fields)
         self.assertTrue(

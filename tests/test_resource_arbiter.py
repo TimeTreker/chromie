@@ -94,6 +94,109 @@ class ResourceArbiterTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(order, ["first", "serial", "late"])
 
+    async def test_resource_set_waiter_holds_neither_capacity_nor_partial_resources(self) -> None:
+        arbiter = ResourceArbiter(2)
+        release = asyncio.Event()
+        entered = asyncio.Event()
+
+        async def blocked() -> None:
+            async with arbiter.claim(resource_claims=["free", "busy", "free"]):
+                entered.set()
+                await release.wait()
+
+        async with arbiter.claim(resource_claims=["busy"]):
+            waiter = asyncio.create_task(blocked())
+            try:
+                async with asyncio.timeout(1):
+                    while arbiter.snapshot().waiting_count != 1:
+                        await asyncio.sleep(0)
+                    async with arbiter.claim(resource_claims=["free"]):
+                        self.assertFalse(entered.is_set())
+                        self.assertEqual(arbiter.active_count, 2)
+                waiter.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await waiter
+                self.assertEqual(arbiter.snapshot().waiting_count, 0)
+                self.assertEqual(arbiter.active_count, 1)
+            finally:
+                release.set()
+                waiter.cancel()
+                await asyncio.gather(waiter, return_exceptions=True)
+        async with arbiter.claim(resource_claims=["busy", "free"]):
+            self.assertEqual(arbiter.active_count, 1)
+        self.assertEqual(arbiter.active_count, 0)
+
+    async def test_overlapping_sets_in_reverse_order_are_deadlock_free(self) -> None:
+        arbiter = ResourceArbiter(3)
+        active = 0
+        peak = 0
+
+        async def run(resources: list[str]) -> None:
+            nonlocal active, peak
+            async with arbiter.claim(resource_claims=resources):
+                active += 1
+                peak = max(peak, active)
+                await asyncio.sleep(0)
+                active -= 1
+
+        async with asyncio.timeout(1):
+            await asyncio.gather(
+                run(["a", "b"]), run(["b", "a"]), run(["b", "c"])
+            )
+        self.assertEqual(peak, 1)
+        self.assertEqual(arbiter.snapshot().waiting_count, 0)
+
+    async def test_cancelling_serial_waiter_unblocks_disjoint_parallel_work(self) -> None:
+        arbiter = ResourceArbiter(3)
+
+        async def serial() -> None:
+            async with arbiter.claim(can_run_parallel=False):
+                self.fail("serial work must not start beside an active claim")
+
+        async with arbiter.claim(resource_claims=["a"]):
+            waiter = asyncio.create_task(serial())
+            try:
+                async with asyncio.timeout(1):
+                    while arbiter.snapshot().serial_waiters != 1:
+                        await asyncio.sleep(0)
+                waiter.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await waiter
+                async with asyncio.timeout(1):
+                    async with arbiter.claim(resource_claims=["b"]):
+                        self.assertEqual(arbiter.active_count, 2)
+            finally:
+                waiter.cancel()
+                await asyncio.gather(waiter, return_exceptions=True)
+        self.assertEqual(arbiter.snapshot().serial_waiters, 0)
+
+    async def test_active_cancellation_and_exception_release_every_resource(self) -> None:
+        arbiter = ResourceArbiter(1)
+        started = asyncio.Event()
+
+        async def run() -> None:
+            async with arbiter.claim(resource_claims=["a", "b"]):
+                started.set()
+                await asyncio.Event().wait()
+
+        task = asyncio.create_task(run())
+        try:
+            await asyncio.wait_for(started.wait(), 1)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            with self.assertRaisesRegex(ValueError, "provider failure"):
+                async with asyncio.timeout(1):
+                    async with arbiter.claim(resource_claims=["b", "a"]):
+                        raise ValueError("provider failure")
+            async with asyncio.timeout(1):
+                async with arbiter.claim(resource_claims=["a", "b"]):
+                    self.assertEqual(arbiter.active_count, 1)
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        self.assertEqual(arbiter.active_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

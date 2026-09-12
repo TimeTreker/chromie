@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator
@@ -22,14 +23,12 @@ class ResourceArbiter:
         if max_concurrency < 1:
             raise ValueError("max_concurrency must be at least 1")
         self.max_concurrency = max_concurrency
-        self._capacity = asyncio.Semaphore(max_concurrency)
         self._condition = asyncio.Condition()
         self._active = 0
         self._waiting = 0
         self._serial_active = False
         self._serial_waiters = 0
-        self._group_locks: dict[str, asyncio.Lock] = {}
-        self._group_lock_guard = asyncio.Lock()
+        self._active_resources: set[str] = set()
 
     @property
     def active_count(self) -> int:
@@ -50,56 +49,50 @@ class ResourceArbiter:
         *,
         can_run_parallel: bool = True,
         exclusive_group: str | None = None,
+        resource_claims: Iterable[str] = (),
     ) -> AsyncIterator[None]:
-        self._waiting += 1
+        # Exact names share one process-local lock domain. Claim the whole set
+        # atomically with capacity, so a waiter holds neither a partial resource
+        # set nor a slot that disjoint work could use.
+        if isinstance(resource_claims, (str, bytes)):
+            raise ValueError("resource_claims must be a collection of resource names")
+        resources = frozenset(resource_claims)
+        if any(not isinstance(name, str) or not name or name != name.strip() for name in resources):
+            raise ValueError("resource_claims must contain non-empty exact resource names")
+        if exclusive_group:
+            resources = resources.union((exclusive_group,))
+        await self._admit(can_run_parallel=can_run_parallel, resources=resources)
         try:
-            await self._capacity.acquire()
-        finally:
-            self._waiting -= 1
-        admitted = False
-        group_lock: asyncio.Lock | None = None
-        group_acquired = False
-        try:
-            await self._admit(can_run_parallel=can_run_parallel)
-            admitted = True
-            if exclusive_group:
-                group_lock = await self._get_group_lock(exclusive_group)
-                await group_lock.acquire()
-                group_acquired = True
             yield
         finally:
-            if group_acquired and group_lock is not None:
-                group_lock.release()
-            if admitted:
-                await self._release(can_run_parallel=can_run_parallel)
-            self._capacity.release()
+            await self._release(can_run_parallel=can_run_parallel, resources=resources)
 
-    async def _admit(self, *, can_run_parallel: bool) -> None:
+    async def _admit(self, *, can_run_parallel: bool, resources: frozenset[str]) -> None:
         async with self._condition:
-            if can_run_parallel:
-                await self._condition.wait_for(
-                    lambda: not self._serial_active and self._serial_waiters == 0
-                )
-                self._active += 1
-                return
-            self._serial_waiters += 1
+            self._waiting += 1
+            if not can_run_parallel:
+                self._serial_waiters += 1
             try:
                 await self._condition.wait_for(
-                    lambda: not self._serial_active and self._active == 0
+                    lambda: not self._serial_active
+                    and self._active < self.max_concurrency
+                    and resources.isdisjoint(self._active_resources)
+                    and (self._serial_waiters == 0 if can_run_parallel else self._active == 0)
                 )
-                self._serial_active = True
-                self._active = 1
+                self._active += 1
+                self._active_resources.update(resources)
+                if not can_run_parallel:
+                    self._serial_active = True
             finally:
-                self._serial_waiters -= 1
+                self._waiting -= 1
+                if not can_run_parallel:
+                    self._serial_waiters -= 1
                 self._condition.notify_all()
 
-    async def _release(self, *, can_run_parallel: bool) -> None:
+    async def _release(self, *, can_run_parallel: bool, resources: frozenset[str]) -> None:
         async with self._condition:
             self._active -= 1
+            self._active_resources.difference_update(resources)
             if not can_run_parallel:
                 self._serial_active = False
             self._condition.notify_all()
-
-    async def _get_group_lock(self, group: str) -> asyncio.Lock:
-        async with self._group_lock_guard:
-            return self._group_locks.setdefault(group, asyncio.Lock())

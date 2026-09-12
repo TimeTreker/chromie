@@ -625,9 +625,11 @@ See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AN
 | `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
 | `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
 
-Trusted Capability Runtime uses a process-local scheduler. Imported Soridormi named
-capabilities share the exclusive group `soridormi.robot_motion`; Soridormi remains
-responsible for cross-process resource safety.
+Trusted Capability Runtime uses a process-local scheduler. It enforces imported
+Soridormi resource names and exclusive groups across submissions; the provider's
+declared body contract determines those names rather than one universal motion
+group. See the [shared arbiter contract](../shared/README.md#chromie_runtime).
+Soridormi remains responsible for cross-process resource safety.
 
 ## ASR
 

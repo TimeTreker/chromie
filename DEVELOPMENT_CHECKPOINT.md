@@ -1,6 +1,45 @@
 # Development Checkpoint
 
-## Current delivery — audit publication and Issue breakdown, 2026-09-12
+## Current delivery — Issue #49 resource arbitration, 2026-09-12
+
+The owner authorized #49 implementation, then instructed that each completed Issue
+be committed, pushed and closed after verified delivery. Continue next with #50.
+Base: `main` at `3e1c50414b6709a2b7222269cadce203e5e6661a`, initially clean and
+synchronized with fetched `origin/main`. Resume from the latest main commit containing
+this checkpoint/HANDOFF pair; do not predict its hash. Close #49 only after the remote
+commit is verified. This delivery does not deploy services or implement #50–#55.
+
+The existing ResourceArbiter now acquires capacity and complete named resource sets
+atomically. Runtime supplies trusted definition claims for individual work and the
+union of member claims/groups for compiled work. Exact names share one process-local
+lock domain across providers; there is no inferred prefix or alias. Malformed resource
+declarations reject. Waiters hold no partial resources or capacity. A compiled group
+cancelled or timed out while waiting no longer calls the provider's cancellation API.
+Soridormi retains provider-local and cross-process physical safety authority.
+
+Evidence: `.chromie/acceptance/issue49-resource-arbitration-20260912/` (ignored; transfer
+separately). The unchanged published probe changes shared-resource peak 2 -> 1 while
+both requests complete; the other three audit probes retain their existing defects.
+Baseline focused: 83 passed. Expanded focused: 232 tests/40 subtests passed. Relevant
+Level A: 22/22 distinct cases. Current-patch canonical passed 2,490 tests/794 subtests,
+145 benchmarks and 20 legacy Agent tests; policy/static/config/docs/ownership pass.
+Two existing FastAPI startup warnings remain. Source hashes match `source-freeze.json`;
+final documentation-only ledger changes are checked separately. Initial red runs and
+test-fixture corrections are retained and explained in HANDOFF.
+
+No prompt, model-facing Schema/DTO, provider profile, service, new Runtime owner,
+configuration key, compatibility alias or standing document was added. Existing shared,
+Orchestrator, execution-lane and configuration owners hold the scheduling clarification.
+No real model, live service, microphone, audible speaker, simulator or robot proof ran.
+#24/#32/#35 qualification and release readiness remain open/development-only.
+
+Next: verify the main delivery and close #49, then reproduce #50's required
+Planner-input projection boundary. Each completed Issue's authorized Git delivery
+must include both checkpoint/handoff owners with observed results;
+#51/#52's contract decisions and #53–#55 remain separately scoped work. Preserve the
+frozen failures and repeat affected qualification before a revision-level target claim.
+
+## Prior delivery — audit publication and Issue breakdown, 2026-09-12
 
 The owner requested a full principles/design-versus-implementation audit, then explicitly
 requested GitHub Issues, the report in the repository, and handoff. This delivery publishes
