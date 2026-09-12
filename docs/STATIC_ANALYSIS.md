@@ -47,13 +47,13 @@ The maintained Mypy version is pinned in `requirements-test.txt`. The gate runs:
 python scripts/run_mypy.py
 ```
 
-`config/mypy_scope.txt` currently contains four files and is a monotonic
+`config/mypy_scope.txt` currently contains five files and is a monotonic
 ratchet over selected clean contracts and tooling boundaries. `mypy.ini` requires complete function
 annotations, checks untyped bodies, forbids implicit optional values, and reports
 unsafe `Any` returns and stale ignores. It does not skip imports or enable a
 whole-tree error suppression.
 
-The current baseline contains four files. The mechanism is implemented and the
+The original July baseline contained four files. The mechanism was implemented and the
 pinned Mypy 2.3.0 command passes that scope on the 2026-07-31 maintained tree
 without ignores, but four files are not meaningful package coverage. An August
 2 package/file expansion was committed from an environment that did not contain
@@ -64,7 +64,7 @@ contract rather than suppressing those errors or falsely treating them as new
 vocal-Issue regressions.
 
 After the existing gate is clean, the queued expansion replaces file-by-file
-contract entries with all 23 current Python files under
+contract entries with all 30 current Python files under
 `shared/chromie_contracts/`, then adds independently owned Orchestrator runtime
 packages after their decomposition boundaries stabilize. A directory/package
 entry must include future files automatically.
@@ -73,6 +73,11 @@ A checked path may leave the ratchet only through a separate reviewed
 architecture change. New modules should enter once their real optionality,
 containers, callables, and async return types are clean; broad `Any` conversion
 is not an accepted migration strategy.
+
+A fresh diagnostic at `f5522f87` on 2026-09-12 passes all 30 contract-package files
+with the current strict configuration. This does not expand the enforced five-file
+scope or prove semantic correctness. [Issue #56](https://github.com/TimeTreker/chromie/issues/56)
+tracks activating the complete package through the existing gate.
 
 ## Accepted expansion order
 

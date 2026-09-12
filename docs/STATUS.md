@@ -1,24 +1,30 @@
 # Chromie Current Status
 
 **Updated:** 2026-09-12
-**Current focus:** Issue #51 staged progress versus whole-Goal satisfaction, under
-its owner-approved contract. #49/#50 are delivered and closed. Canonical Fast/Deep
-admit grounded partial acquisition, retain deferred obligations through immutable
-Evidence, and reopen the exact source Goal for a new Planner decision. Confirmation
-and completion/delivery remain Runtime barriers. Fast's exact-confirmation question
-is now representable and required. No profile, semantic reviewer or runtime switch added.
+**Current focus:** audit continuation at `f5522f87` after verified delivery/closure
+of #49–#51. #52 cancellation reporting is freshly diagnosed, not repaired.
+#53/#54 Reflection defects remain reproduced. #55 remains open; current handoff
+records are consolidated into their owners with immutable links to history.
+#56/#57 track typing and a justified lifecycle seam at the existing maintenance priority.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| #51 implemented for authorized main delivery; #49/#50 delivered/closed. | New regression: 32 cases. Level A: 14/14 distinct cases. Canonical: 2,988 tests/794 subtests, 145 benchmarks, 20 legacy tests; policy/static/config/docs/ownership pass. Final fixed-candidate Fast: 203/204 Schema/Host, 199/204 frozen hard; Deep: 40/40 Schema/Host, 36/40 hard. Eight fresh conditional continuations pass Schema/Host/branch/adapter and mock Runtime replay. All results reviewed; frozen failures and wording caveats retained. | Agent rebuilt; 112 Agent/shared Python files match source. After owner shutdown resolved the Host lock, 51-case preview reached 3 reviewed passes, 1 GI source-span/HTTP 503 failure, 1 interrupted case, 46 unrun. Twelve retained call digests verified; cohort incomplete. Earlier connection/lock attempts retained separately. Final simulator safe idle, then stopped. No microphone, audible speaker, simulator execution or physical proof. | Development only; #24/#32/#35 remain open. Bounded #51 evidence does not qualify the whole Planner or promote a target. |
+| Delivered #51 staged-progress contract unchanged; #49/#50 closed. This delivery changes audit/status/handoff documents only. | Fresh canonical: 2,988 tests/794 subtests, 145 benchmarks, 20 legacy; policy/static/config/docs/ownership pass. #51 regression: 32 pass. All 30 contract modules pass strict Mypy diagnostically; enforced gate remains five files. | Fresh fixed-Codex Fast: 204/204 Schema/Host, 201/204 frozen hard; Deep: 40/40 Schema/Host, 36/40 hard. Reviewed semantic output projections retain failures and unresolved interpretations. Rebuilt Agent source matches 112 files; 51-case live preview stops at GI: 1 failed, 1 interrupted, 49 unrun. | Development only. #24/#32/#35 and current voice/default target closure remain open. No microphone, audible speaker, simulator-execution or robot proof. |
 
-Evidence: `.chromie/acceptance/issue51-staged-progress-20260912/`. Exact workflow,
-source/runtime identities, failed baselines, final frozen-region distinctions and
-resume commands belong to checkpoint/handoff. #52–#55 remain separate audit work.
-The historical five Deep failures remain failed; their private original outputs are
-unavailable locally and are not replaced by the new cohorts. Relevant fixtures
-remain tracked unchanged. Earlier #50 projection delivery used byte-identical
-frozen prompt capture only; #51 includes new candidate inference and bounded replay.
+Evidence: `.chromie/acceptance/issue52-cancellation-scope-20260912/` (ignored).
+The [audit](../ARCHITECTURE_AUDIT.md) distinguishes failed frozen regions from valid
+#51 staged reads and current cancellation/semantic failures. The [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+and [handoff](../HANDOFF.md) own current commands, source/call identities, one retained
+live bundle and transfer limits. No output, oracle, model, profile or principle was
+changed to manufacture a pass. Agent/TTS/LLM remain healthy development services;
+ASR was not running in this text-preview audit. Owned simulator/MCP are stopped,
+last checked safe idle. Current source evidence does not promote those services.
+
+The [preceding #51 delivery record](https://github.com/TimeTreker/chromie/blob/f5522f874671ff1b8bd42553a22793eaad0b1f51/HANDOFF.md)
+retains its 32 regressions, 14 Level A cases, eight conditional continuations,
+failed full-role regions and incomplete live retry. Its private artifacts from the
+other machine are absent here. Historical sections below retain their original
+revision limits; they are not current deployment instructions or new passing evidence.
 
 ### Prior remaining-Issue delivery — 191083dc
 
@@ -49,7 +55,7 @@ profile defaults remain unchanged. #24 and #32 still require successful role/pro
 stream integrity, responsiveness and live evidence.
 
 Evidence is private under `.chromie/acceptance/open-issue-closure-20260911/`.
-The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own exact
+The [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](https://github.com/TimeTreker/chromie/blob/f5522f874671ff1b8bd42553a22793eaad0b1f51/HANDOFF.md) own exact
 workflow diagnoses, identities, artifact paths and resume commands. Source/audit Issues
 #28, #40, #46–#48 and index #36 may close after remote main verification; #24, #32 and
 #35 remain open. Historical counts below describe their own revisions only.
@@ -70,11 +76,11 @@ open after the38 experiment was unselected. Rejected41's failed local gate is re
 final source did not weaken its test. All 88final GI packets match32 byte for byte, so
 repeat differences cannot be credited to unchanged GI code. The
 [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the current resume boundary; the
-[handoff](../HANDOFF.md) owns all 18 iterations, workflows, actual evidence, commands
+[handoff](https://github.com/TimeTreker/chromie/blob/f5522f874671ff1b8bd42553a22793eaad0b1f51/HANDOFF.md) owns all 18 iterations, workflows, actual evidence, commands
 and identities. Text-preview failure containment is not robot qualification.
 
 Previous RTX 5090 evidence (2026-09-10; different model/provider and local tree): Goal-driven single-authority architecture, Issue #35, fixed RTX 5090 / Gemma4-12B. Explicit provider argument realizations now enforce minimum argument presence in Fast advance and canonical Fast/Deep validation; gaze duration is declared instead of silently using its default. Canonical Fast single/multiple-Goal decoder schemas now expose existing intersection shapes, closing a native decoder omission. Two focused MuJoCo episodes complete exact gaze2/blink2 and gaze3 with valid primary Fast result DTOs and zero Deep calls. Canonical gates pass2331 tests /437 subtests,140 benchmarks,20 legacy tests; Soridormi789 passed /2 skipped. Final stable51-case preview:27 mechanical /19 reviewed acceptable,154 call digests intact. GI/GA/Planner semantic defects, headless speech and supervised target-evidence gaps remain; no model-only or main-promotion claim. Checkpoint/handoff own exact workflows, paired commits and evidence.
-Earlier different-model comparison: three canary trials showed lower SGLang foreground latency, but model/precision/topology differed. The 51-case preview produced zero reviewer-qualified complete transactions on either deployment. The sole SGLang mechanical pass dropped GA bindings and admitted unresolved GI actor meaning downstream; preview prevented dispatch. See the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) for retained evidence. Error containment is not successful behavior.
+Earlier different-model comparison: three canary trials showed lower SGLang foreground latency, but model/precision/topology differed. The 51-case preview produced zero reviewer-qualified complete transactions on either deployment. The sole SGLang mechanical pass dropped GA bindings and admitted unresolved GI actor meaning downstream; preview prevented dispatch. See the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](https://github.com/TimeTreker/chromie/blob/f5522f874671ff1b8bd42553a22793eaad0b1f51/HANDOFF.md) for retained evidence. Error containment is not successful behavior.
 ## 2026-09-06 transaction-fidelity source closure
 The archive audit did not reopen the authority architecture; it found six implementation mismatches at the existing GA/Fast/Runtime boundaries. The current worktree closes them as follows:
 - **A01 / source-closed — GA semantic repair:** the live GA normalization chain no longer deletes ungrounded resource-query locations or reclassifies model-authored semantic binding types before acceptance. Semantic/grounding conflicts remain visible to fail-closed validation; repository policy guards reject reconnecting those repair calls to the live transaction.
@@ -201,7 +207,7 @@ concurrent long decoding delayed TTS, and the subsequent alternate-model screens
 promoted no candidate. Simplified RTX5090 prompts and assistant-reference tests
 also did not qualify the production transaction. Exact historical counts,
 identities, artifacts and prompt hashes now live in the handoff's
-[historical provider diagnostics](../HANDOFF.md#historical-provider-diagnostics-consolidated-from-status-2026-09-11).
+[historical provider diagnostics](https://github.com/TimeTreker/chromie/blob/f5522f874671ff1b8bd42553a22793eaad0b1f51/HANDOFF.md#L4000).
 They are not current-source or current-model claims.
 
 An assistant-reference audit applied that prompt and each exact decoder schema to all 16 primary GI manifest cases without an external model/provider call. All 16 passed schema, Host validation, and six semantic dimensions. This proves only strong-reference prompt clarity, not deployed-model qualification: any candidate result measures the combined model + prompt + schema + decoder transaction and cannot alone prove the prompt correct or defective. Runtime contracts remain unchanged; no model was promoted.
