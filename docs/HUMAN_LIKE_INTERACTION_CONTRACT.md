@@ -223,6 +223,10 @@ Goal identity and continuity, and the Host derives execution projections only af
 validation. A measured binding with an explicit unit preserves the exact contiguous
 number-and-unit source/context surface; downstream planning may normalize execution
 quantities without rewriting GI's human-semantic value.
+The Host rejects duration/distance string bindings without a current-turn or
+semantic-continuity source value, including values copied from static prompt
+examples or operational metadata. This is mechanical containment, not validation
+of GI's number-word normalization or complete understanding of the request.
 Trusted code checks only closed references, source membership and ordering,
 non-overlap, explicit-value provenance, and DTO shape. It does not use
 conjunction/action phrase rules, a second model auditor, or source resegmentation to

@@ -23,7 +23,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
     _reject_planner_shaped_goal_interpretation,
     _reject_unavailable_or_mismatched_prior_assistant_utterance,
     _reject_unprovenanced_location_bindings,
-    _reject_unprovenanced_duration_bindings,
+    _reject_unprovenanced_measurement_bindings,
     _reject_unprovenanced_speed_bindings,
     _source_tokens,
     _without_goal_interpretation_authority,
@@ -401,7 +401,7 @@ class GoalInterpreterContractTests(unittest.TestCase):
 
     def test_duration_requires_source_provenance(self) -> None:
         with self.assertRaisesRegex(ValueError, "no authoritative surface provenance"):
-            _reject_unprovenanced_duration_bindings(
+            _reject_unprovenanced_measurement_bindings(
                 GoalInterpretationRequest(text="move briefly"),
                 {
                     "responsibilities": [
@@ -411,10 +411,50 @@ class GoalInterpreterContractTests(unittest.TestCase):
             )
 
     def test_duration_accepts_gi_owned_number_word_normalization(self) -> None:
-        _reject_unprovenanced_duration_bindings(
+        _reject_unprovenanced_measurement_bindings(
             GoalInterpretationRequest(text="持续三秒", language="zh-CN"),
             {"responsibilities": [{"bindings": {"duration": 3}}]},
         )
+
+    def test_distance_preserves_current_and_continuity_source_values(self) -> None:
+        cases = (
+            ("Walk forward five meters.", {}, "five meters"),
+            ("往前走五米。", {}, "五米"),
+            ("A box is 50 meters away. Bring it to me.", {}, "50 meters"),
+            ("Walk that far.", {"discourse_referents": [{"distance": "five meters"}]}, "five meters"),
+            ("Walk five meters.", {}, 5),
+        )
+        for text, context, distance in cases:
+            with self.subTest(text=text, distance=distance):
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(
+                    outcome="move forward", bindings={"distance": distance}, output_mode="body_action"
+                )
+                result = OllamaGoalInterpreter._validate_interpretation_content(
+                    GoalInterpretationRequest(text=text, context=context), json.dumps(raw)
+                )
+                self.assertEqual(result.responsibilities[0].bindings, {"distance": distance})
+
+    def test_distance_rejects_invented_translated_or_nested_values(self) -> None:
+        cases = (
+            ("Walk forward.", {}, "twenty meters"),
+            ("往前走五米。", {}, "five meters"),
+            ("Walk forward.", {"robot_state": {"distance": "twenty meters"}}, "twenty meters"),
+            ("Walk forward.", {"mind": {"example": "twenty meters"}}, "twenty meters"),
+            ("Walk five meters.", {}, {"value": 5, "unit": "meters"}),
+            ("Walk five meters.", {}, ["five meters"]),
+            ("Walk five meters.", {}, True),
+        )
+        for text, context, distance in cases:
+            with self.subTest(text=text, distance=distance):
+                raw = _valid_output(text)
+                raw["responsibilities"][0].update(
+                    outcome="move forward", bindings={"distance": distance}, output_mode="body_action"
+                )
+                with self.assertRaisesRegex(ValueError, "distance binding"):
+                    OllamaGoalInterpreter._validate_interpretation_content(
+                        GoalInterpretationRequest(text=text, context=context), json.dumps(raw)
+                    )
 
     def test_spatial_surface_cannot_be_retyped_as_speed(self) -> None:
         with self.assertRaisesRegex(ValueError, "Direction/location is never speed"):
@@ -1359,6 +1399,34 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
 
 class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_prompt_example_distance_fails_closed_at_primary_and_deep(self) -> None:
+        # Retained native #67 reply: source has no parcel, direction or distance.
+        text = "把那个拿给我。"
+        invalid = {
+            "confidence": 0.5,
+            "responsibilities": [{
+                "local_ref": "r1",
+                "source_evidence": {"source_start_token_ref": "t0", "source_end_token_ref": "t6"},
+                "outcome": "bring the thing to me", "output_mode": "body_action", "confidence": 0.5,
+                "binding_items": {"direction": "behind you", "distance": "twenty meters", "entity": "A parcel", "recipient": "me"},
+            }],
+            "unresolved": [], "coordination": [],
+        }
+        primary = _valid_output(text, unresolved=["which object is indicated"])
+        primary["responsibilities"][0].update(
+            outcome="bring that to me", bindings={"entity": "那个", "recipient": "我"}, output_mode="body_action"
+        )
+        for stage in ("primary", "deep"):
+            with self.subTest(stage=stage):
+                outputs = [primary, invalid] if stage == "deep" else [invalid]
+                interpreter = self._interpreter()
+                interpreter._chat = mock.AsyncMock(side_effect=[
+                    {"message": {"content": json.dumps(raw)}} for raw in outputs
+                ])
+                with self.assertRaisesRegex(InterpretationUnavailableError, "MeasurementProvenanceViolation"):
+                    await interpreter.interpret_goal(GoalInterpretationRequest(text=text, language="zh-CN"))
+                self.assertEqual(interpreter._chat.await_count, len(outputs))
+
     async def test_primary_rejects_lossy_representation_repairs(self) -> None:
         cases = [
             ("missing confidence", {}, {"confidence": None}),

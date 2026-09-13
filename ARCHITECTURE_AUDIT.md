@@ -1,12 +1,114 @@
 # Chromie project principles and implementation audit
 
-**Updated:** 2026-09-13. **Pre-delivery base:** `6bf16ccfbe816c068e0b51048331cbec15938c4e`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
+**Updated:** 2026-09-14. **Pre-delivery base:** `d7c7f27767d8e137edbf2aa165a11b81d6282527`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
 
 **Audience:** project owner and maintainers reviewing or continuing the Issues. **Owner:** the project owner owns principle decisions; each linked Issue owns its acceptance. This report records evidence and decisions under the existing [Charter](docs/PROJECT_CHARTER.md), [Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
 
 The owner explicitly authorized implementation, principle decisions, bounded maintenance, publication and closure of solved Issues in this session. The repairs preserve GI ownership of WHAT, GA ownership of Goal continuity, Planner ownership of HOW/speech, and Runtime ownership of execution and Evidence. Three decisions follow natural, grounded behavior: reporting a cancellation does not fulfill the original request; remembering a future intention is different from doing it now; optional learning follows the ready response. None needs another semantic reviewer or a phrase-based router.
 
-Earlier source repairs and native failures remain revision-bound evidence below. The latest owner-approved work expands offline architecture replay to 6,000 cases under #65, closes the new-request temporal contract (#60), and rejects omitted single-Goal Planner outcomes (#66). #24/#32 retain their separate native/target requirements. No new native model, aggregate live, streaming, audio or physical proof is claimed.
+Earlier source repairs and native failures remain revision-bound evidence below. The September 14 continuation investigates native GI without promoting a model or changing semantic authority, and repairs a reproduced distance-provenance gap (#67). #24/#32 retain their separate native/target requirements.
+
+## Native GI continuation and distance containment — #24/#32/#67
+
+The existing qwen3.5:4b candidate was held fixed on Ollama 0.33.2, context 16,384,
+512 output tokens, `think:false`. The unchanged 44-case diagnostic cohort has
+frozen references, exact request packets and source/model identities. Expected
+answers were never supplied to inference. One primary owns complete WHAT; only
+accepted genuine unresolved meaning may invoke its designated source-based deeper
+GI once. No critic or repair invocation was introduced.
+
+| Native diagnostic before repair | Calls / normal stops / Schema and Host accepts | Complete primary-transaction review |
+| --- | --- | --- |
+| Unchanged production baseline | 71 / 71 / 71 | 3 pass, 2 meaning-correct but provenance extent unqualified, 39 fail |
+| Source-first ordering experiment | 87 / 87 / 87 | 44 fail; also moved confidence, so not a clean single-variable control |
+| Source-only ordering experiment | 84 / 84 / 84 | 1 pass, 43 fail; only source_evidence property position moved |
+
+All 242 calls used `think:false` and returned no separate thinking content; this
+does not prove that every model role meets #24's resource/non-thinking contract.
+Every raw primary and deeper result was reviewed. The two ordering candidates are
+rejected: compound decomposition improves in one case, but invalid unitless numeric
+representation persists and previously good simple requests regress into false
+uncertainty. No production prompt or Schema ordering changes are adopted. A valid
+JSON/Host result is not proof of complete or correct meaning. Remaining native
+failures include lost independent effects, wrong information/speech mode, borrowed
+identity/operational values, and planning-input uncertainty incorrectly owned by GI.
+These experiments do not establish a model-only root cause or a full GI-role score.
+
+### Reproduced case and earliest enforceable defect
+
+| Owner / correlation | Authoritative input → actual output | Expected result / verdict |
+| --- | --- | --- |
+| Admitted GI request | `context-ambiguous_deictic_object`: `把那个拿给我。`; context `{}` | Correct input; object is unresolved and no distance is supplied |
+| Prompt/Schema projection | Current tokens plus static worked example; distance scalar shape | Example remains instructional, not factual source; representable exact positive references pass Schema/Host |
+| Native primary WHAT | Body responsibility with `distance="twenty meters"`, `direction="behind you"`, `entity="A parcel"`, `recipient="me"`; unresolved empty | Incorrect inference: the first three values occur in the prompt example, not admitted text/context |
+| Parser/DTO/Host admission | Original raw reply accepted despite unsupported distance | Incorrect containment: duration/speed/location had provenance checks, distance had none |
+| Deeper GI / GA / Planner / Runtime | Not invoked in this direct-role case | No downstream or physical outcome demonstrated |
+
+The initiating failure is model-authored meaning. The bounded production repair
+extends the existing duration scalar validator to distance, rejecting unsupported
+strings and non-scalar values before admission. It does not remove invented values,
+guess the referent, repair meaning or delegate an invalid result. Primary rejection
+uses one call; rejection after genuine unresolved primary uses two total calls and
+stops. Numeric number-word normalization remains GI-owned; this patch does not
+certify numerical semantics or every entity/direction binding.
+
+The original failure is retained unchanged. Revalidating all 242 original raw
+replies through the patched ordinary Host rejects exactly six previously accepted
+distance violations: the copied example once and translated measured surfaces five
+times. The other 236 admission outcomes are unchanged. Nine focused negative
+subcases fail before repair and pass after; valid English/Chinese, cross-clause,
+continuity and numeric-normalization controls retain their exact values. Focused
+GI suite: 91 tests / 115 subtests pass. Broader and live delivery evidence is recorded
+in the current checkpoint/handoff; it must not be inferred from these focused tests.
+
+The patched production-order native rerun completes all 44 cases / 71 calls with
+unchanged source/model identity. All parsed raw replies equal the reviewed original
+baseline replies. The unsupported translated-distance primary now rejects; 43 final
+decisions remain. This proves containment, not improved model understanding. The
+full local gate passes 3,217 tests / 818 subtests, 145 benchmarks and 20 legacy tests;
+Level A passes 45/45 and the unchanged 6,000-case corpus passes every expected outcome.
+
+### Rebuilt deployment and stopped aggregate
+
+Seven stale deployed files exactly matched known historical revisions; they had no
+container-only changes. Agent was rebuilt and all 113 Agent/shared source files
+matched local source. The old acceptance environment's qualification budgets did
+not match the currently generated interactive profile. Identity capture correctly
+rejected that mixture before any case. A new diagnostic text environment uses the
+current profile budgets through their existing synchronizer, with stdin/discard
+transport. Runtime identity is diagnostic-only because the patch was uncommitted:
+`b078a0b56709653f160d5c6bb805281cb4cac59a4ab0cddd11db17ea76d9c190`.
+
+One directory-discovered 51-case must-pass invocation used real Agent/LLM/TTS and
+headless Soridormi/MuJoCo with execution enabled, no microphone/ASR or audible output.
+It is **incomplete: two complete failures, one interrupted case, 48 unrun**. The
+older evidence watcher's stop set missed `model_contract`; reviewer inspection
+stopped the process on the first retained numeric-provenance failure after the next
+case had completed and a third had started. Exactly one debug bundle was collected.
+The original runner is frozen; its next-run copy now includes that hard-failure
+domain. Neither case is averaged into a pass. Both source trees were unchanged
+through the invocation. No same-stage retry or Deep Planner repair was attempted.
+
+| Actual episode / owner | Input → output and handoff | Verdict / downstream result |
+| --- | --- | --- |
+| Compound `cbe8a87b`: primary GI | Walk at 0.2 for 10 seconds, then nod twice, then turn left → one fused Responsibility plus false `actor` uncertainty | First wrong boundary: native primary completeness/uncertainty; current Host admits |
+| Compound: source-based deeper GI → GA | Three distinct effects/order; speed string `0.2 speed` → three canonical Goals with exact source bindings | Decomposition improves downstream but primary remains unqualified; noncanonical unitless speed survives; GA conserves values |
+| Compound: native Fast stream → Host | Empty presentation commit; terminal claims complete coverage but walking `vx_mps=0.02` instead of explicit 0.2 | Native value violation; existing numeric conservation correctly rejects before Capability execution |
+| Gaze/blink `8a11295e`: primary GI → GA | Look at me three seconds while blinking twice → one fused gaze Responsibility, blink hidden in time_scope → one Goal | First wrong boundary: missing independent blink Responsibility; no deeper GI invoked |
+| Gaze/blink: native Fast stream → Host | Gaze Capability plus blink as social decoration; auxiliary anchor_kind=communicative_act points to Capability Activity | Invalid anchor rejected; independently requested blink was also downgraded semantically; no body execution |
+| Milk `5b7a0a66`: interrupted Host request / late Agent GI | Retained primary/deeper replies put `ahead of you about 50 meters` entirely in direction and invent then clear actor uncertainty | Partial only; typed distance omission remains a GI defect. No completed Host outcome or downstream GA/Planner invocation observed |
+| Runtime / Soridormi | Applied body Activities absent; error speech uses discard transport. Post-stop status: sim, safe_idle=true, active_task=null, active_lanes={}, fallen=false, emergency_stop=false | Safe containment observed in simulator. Owned simulator/MCP stopped; no physical evidence |
+
+Nine completed native Agent calls are retained, including two late GI replies after
+client cancellation. Transport status `accepted` does not mean semantic acceptance.
+The online failures remain #24/#32 evidence, outside #67's bounded string-provenance
+repair. No model profile, streaming target or training-data promotion is justified.
+
+Private evidence root: `.chromie/acceptance/issue24-source-order-20260914/`.
+`comparison.json`, three `semantic-review.json` files, original `corpus/` and all
+request/raw-response packets preserve rejected experiments; `distance-red.log`,
+`distance-green.log`, and `retained-host-before-after.json` preserve the regression.
+No new document, environment variable, profile, runtime switch or semantic owner.
 
 ## Broader workflow audit — #60/#65/#66
 

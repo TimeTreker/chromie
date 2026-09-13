@@ -1,79 +1,82 @@
 # Development Checkpoint
 
-## Current resume boundary — 6,000-case workflow audit, 2026-09-13
+## Current resume boundary — native continuation and #67, 2026-09-14
 
 Current focus: Goal-driven single-authority architecture and current-revision
 evidence closure. Repository `main`; pre-delivery base
-`6bf16ccfbe816c068e0b51048331cbec15938c4e`. Resume from the latest main commit containing
-this checkpoint and [HANDOFF](HANDOFF.md). The owner authorized 6,000 broader offline
-scenarios, bounded fixes, principle decisions, GitHub delivery and solved-Issue closure.
-No additional permission is needed for that existing scope. These tests exclude model
-ability; LoRA was discussed but no training/native inference occurred. Physical
-microphone/speaker/robot evidence remains supervised.
+`d7c7f27767d8e137edbf2aa165a11b81d6282527`.
+Resume from the latest main commit containing this checkpoint and [HANDOFF](HANDOFF.md).
+The owner authorized continued unfinished work, bounded fixes, project decisions,
+GitHub reports/Issue closure, commit and push. No additional permission is needed
+for that existing scope. Physical microphone/speaker/robot evidence remains supervised.
 
-#60/#65/#66 close with this verified delivery; #24/#32 remain open. GI owns WHAT,
-GA continuity, Planner HOW/speech and Runtime execution/Evidence. #60 admits
-primary GI-authored timezone-aware `ready_at`, conserving it through GA to Planner
-waiting and due re-entry. The simulator already returned this value; the old GI
-Schema/Host rejected it. Gateway receipt supplies elapsed-time origin, never the
-user's local timezone. #66 requires exact per-Goal outcome coverage at either
-Planner tier, rejecting absent, empty and foreign maps before canonical adaptation.
-The [audit](ARCHITECTURE_AUDIT.md#broader-workflow-audit--606566) owns detailed module
-I/O, root causes, reference corrections and evidence limits. No second semantic
-call, semantic Host parser, new runtime flag, model profile or architecture layer.
-102 current Markdown / 15 core-path documents remain unchanged.
+#67 closes with this delivery: GI Host now applies the existing duration scalar
+provenance boundary to distance. Unsupported strings, nested values, arrays and
+booleans reject before downstream admission. It neither invents replacement values
+nor invokes another model. GI still owns complete WHAT, GA continuity, Planner
+HOW/speech and Runtime execution. No production prompt/Schema order change, new
+runtime switch, profile, document or semantic authority. Document counts stay
+102 current Markdown / 15 core-path. The [audit](ARCHITECTURE_AUDIT.md#native-gi-continuation-and-distance-containment--243267)
+owns actual per-module I/O, triggering failure, containment mechanism and limits.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| 60 authored families / 6,000 frozen cases; strict model replay and isolated candidate-role forwarding; temporal and Planner map boundaries repaired. | Final full replay 6,000/6,000: 1,400 workflows, 1,800 state/fault/permission outcomes, 2,580 contract rejections, 220 safe nonexecuting replies. Canonical 3,214 tests/804 subtests, 145 benchmarks, 20 legacy; pinned gates pass. Level A 45/45 across 15 classes. | No native model, deployment, full Gateway, autonomous initial scheduling, native streaming, audio, MuJoCo or physical evidence added. | Development only. #24/#32 open; no model/target/training promotion. |
+| #67 rejects distance copied from a prompt example absent from admitted text/context; duration behavior preserved. | 91 focused GI tests / 115 subtests. Canonical 3,217 tests / 818 subtests, 145 benchmarks, 20 legacy; pinned checks pass. Level A 45/45; unchanged 6,000 replay passes. | Four 44-case native GI cohorts / 313 calls remain semantically unqualified. Rebuilt Agent matches all 113 source files. One 51-case native text/MuJoCo aggregate stopped: 2 failures, 1 interrupted, 48 unrun. | Development only. #24/#32 remain open. No model/streaming target/LoRA or physical promotion. |
 
-The exact-tree 1,500 baseline at `6bf16ccf` retained 50 #60 gaps. Those case IDs now
-run fresh input → GI → GA → waiting → restart → due wake → controlled execution,
-without a pre-seeded Goal. Separate retained timers still test existing Goals.
-The first strict 6,000 baseline retained 100 missing-outcome failures. After the
-first fix, 40 newly contrasted absent maps still failed; the final fix rejects both
-forms. Original and partial-repair failures remain. Twenty-eight reference DTOs in
-27 older unit tests were corrected without changing their target semantic assertions.
-Resource-conflict tests now require the specific resource diagnostic rather than an
-unrelated singleton-group/parameter rejection. These are evidence corrections, not
-model improvements or changes to expected positive behavior.
+Three pre-fix native cohorts used unchanged qwen3.5:4b on Ollama 0.33.2,
+`think:false`: baseline 71 calls, source-first 87, source-only 84. Complete transaction
+review: baseline 3 pass / 2 meaning-correct with provenance extent unqualified / 39
+fail; candidates 0 and 1 passes. Both order candidates are rejected; neither is
+adopted. All 242 original replies passed old Schema/Host. The patch rejects exactly
+six unsupported distance strings while the other 236 admission results remain.
+The final production-order cohort has the same 71 parsed raw replies as baseline;
+one invalid distance now rejects, 43 final decisions remain. Mechanical containment
+is proven; general meaning and numeric normalization are not certified.
 
-Astra authored the contrast families and responses; deterministic 4-action × 5-value
-× 5-language-form expansion is not 6,000 independent inferences. Review remains
-non-independent and every output training-ineligible. The 3,600/1,200/1,200 splits
-separate action/value groups, not hidden semantic families. Current corpus contains
-6,000 case JSONs, a manifest and 898 shared packet parts (382,137,005 bytes). Original
-five semantic replies remain, with reviewed GI packet changes for #60. The runner
-uses isolated processes for offline speed; candidate mode requires one worker and
-never receives expected answers. A changed accepted candidate output can stop at an
-uncovered continuation; it is not automatically bad semantics or a pass.
+The native live aggregate uses current generated **interactive** budgets and
+stdin/discard transport with execution enabled only against headless MuJoCo. The
+first old qualification-env/current-profile identity capture correctly failed;
+a fresh diagnostic transport snapshot uses the existing budget synchronizer.
+Runtime identity `b078a0b56709653f160d5c6bb805281cb4cac59a4ab0cddd11db17ea76d9c190`
+is dirty-source diagnostic evidence, not clean-revision target qualification.
+Both source trees stayed unchanged throughout the cohort.
 
-Evidence root `.chromie/acceptance/workflow-6000-20260913/`:
-`baseline/`, `final/`, `final-2/`, `missing-map-red/`, `missing-map-green/`, all authored
-and capture revisions, `canonical-1.log`/`canonical-2.log` failures, passing
-`canonical-3.log`, `level-a-2/`, reference reviews and `source-snapshot/`.
-The final manifest SHA256 is
+The first primary GI fused walk/nod/turn and invented actor uncertainty; deeper GI
+split them, but Fast changed 0.2 to 0.02 and Host rejected numeric provenance. The
+second primary GI fused gaze/blink; Fast emitted an invalid auxiliary anchor and
+Host rejected it. The third case was interrupted; two late GI replies were retained.
+Nine native Agent calls were reviewed. The old private watcher missed model_contract;
+reviewer stopped it, retained one bundle and corrected only the next-run watcher.
+Post-stop simulator status: safe_idle=true, active_task=null, active_lanes={},
+fallen=false, emergency_stop=false. Owned simulator/MCP were stopped. Agent/TTS/LLM
+remain healthy; ASR absent. No audible output or physical action was tested.
+
+Evidence: `.chromie/acceptance/issue24-source-order-20260914/`, including all frozen
+packets/raw replies/reviews, red/green regression, full gates, 6,000 replay,
+iteration-01 identity/source hashes/native calls, the single live-stop bundle and
+post-stop status. Transfer archive: `/home/chromie/Downloads/chromie_issue67_native_continuation_20260914.tar.gz` (265,500,309 bytes), SHA256 `22eab7ac1445fbb9f0df183586a9df82d77f0f7ca852f4139e8b74237b027f53`; 11,249 indexed members verified.
+Previous immutable 6,000 evidence remains in
+`/home/chromie/Downloads/chromie_workflow_6000_20260913.tar.gz`; SHA256
+`18295607616d0bef24c484726f4f0b75cf957ca9181e1384cf49f9de26f21e1a`.
+Its corpus manifest remains
 `1d9f5d3d35cf8b993ea2fe6703ac30adac2838514d8e7a27a9bd5431775a0773`.
-Transfer archive: `/home/chromie/Downloads/chromie_workflow_6000_20260913.tar.gz` (1,855,642,868 bytes), SHA256
-`18295607616d0bef24c484726f4f0b75cf957ca9181e1384cf49f9de26f21e1a`; 79,430 indexed payload files verified.
-Post-archive documentation/publication/CI checks are retained separately in Git and
-this evidence root. The preceding 1,500 archive remains unchanged, as recorded in
-HANDOFF and the preceding delivery.
+All authored simulator references are training-ineligible and not independently
+reviewed; 60 families expanded to 6,000 cases are not 6,000 independent inferences.
 
 Next work:
 
-1. Keep #24 native GI and #32 stream/target evidence open. Prior native GI remains
-   226 executions/254 calls with no qualified repair. Use the frozen transaction
-   method and one primary hypothesis; no critic, phrase router or replay promotion.
-2. Before LoRA, independently review positive references, exclude injected faults,
-   build hidden semantic-family holdouts, then qualify isolated actual roles and
-   the combined real-model workflow. This delivery tests engineering contracts only.
-3. Before any live claim, verify/rebuild deployed source and bind one runtime
-   identity; run the complete discovered cohort unchanged, collect one bundle at
-   completion/hard stop, and judge every case. Preserve canonical gate → supervised
-   narrow voice → default target-evidence closure order.
+1. Keep #24 native semantic/model-role qualification and #32 stream/target evidence
+   open. Use the frozen full-transaction method; do not repeat rejected ordering
+   controls or treat deeper repair of false uncertainty as primary correctness.
+2. Diagnose the first native boundary for complete atomic meaning, exact typed
+   parameters and correct uncertainty; do not weaken conservation/anchor checks,
+   add a phrase router, or add a same-authority critic/repair invocation.
+3. For new live evidence, regenerate/verify matching current budgets, rebuild and
+   verify source, bind one identity and run the full discovered cohort unchanged.
+   Stop on hard model_contract/provenance/integrity faults; one bundle; review all
+   retained cases. Follow canonical gate → supervised narrow voice → default target
+   evidence closure before release claims. HANDOFF owns exact commands.
+4. Before LoRA, independently review positive references, exclude injected faults,
+   add hidden semantic-family holdouts and qualify isolated then combined real roles.
 
-Last service state is unrefreshed: development Agent/TTS/LLM, absent ASR, owned
-simulator/MCP stopped after prior safe idle. Preserve Soridormi's untracked content.
-No follow-up is scheduled. Exact historical runtime identities and cross-machine
-commands remain in HANDOFF.
+No follow-up is scheduled. Preserve Soridormi's untracked upstream workspace.

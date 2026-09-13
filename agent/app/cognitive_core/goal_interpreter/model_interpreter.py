@@ -193,10 +193,10 @@ class _GoalInterpretationSpeedProvenanceViolation(
     """A speed field was invented or conflicts with another typed dimension."""
 
 
-class _GoalInterpretationDurationProvenanceViolation(
+class _GoalInterpretationMeasurementProvenanceViolation(
     _GoalInterpretationSemanticStructureViolation
 ):
-    """A duration field was invented or lost its source/context scalar."""
+    """A duration or distance lost its source/context scalar."""
 
 
 def _without_goal_interpretation_authority(value: Any) -> Any:
@@ -1084,13 +1084,13 @@ def _reject_unprovenanced_speed_bindings(
             )
 
 
-def _reject_unprovenanced_duration_bindings(
+def _reject_unprovenanced_measurement_bindings(
     request: GoalInterpretationRequest,
     parsed: dict[str, Any],
 ) -> None:
-    """Require duration to remain one typed scalar with safe string provenance.
+    """Require duration/distance scalars to preserve their string provenance.
 
-    Numeric duration is GI-owned semantic normalization: number words in the
+    Numeric measurements are GI-owned semantic normalization: number words in the
     admitted language may legitimately become a JSON number.  The cited source
     span carries its provenance, while the explicit-Arabic-number guard below
     separately prevents literal numeric values from being dropped or rewritten.
@@ -1105,31 +1105,34 @@ def _reject_unprovenanced_duration_bindings(
         return
     for index, item in enumerate(responsibilities):
         bindings = item.get("bindings") if isinstance(item, dict) else None
-        if not isinstance(bindings, dict) or "duration" not in bindings:
+        if not isinstance(bindings, dict):
             continue
-        duration = bindings.get("duration")
-        if isinstance(duration, bool) or not isinstance(
-            duration, (str, int, float, Decimal)
-        ):
-            raise _GoalInterpretationDurationProvenanceViolation(
-                "Goal Interpretation duration binding must remain one scalar "
-                "source value, never a nested provider-shaped object: "
-                f"responsibilities[{index}].bindings.duration={duration!r}."
-            )
-        if isinstance(duration, str):
-            normalized = " ".join(duration.strip().split()).casefold()
-            if normalized and (
-                normalized in current_turn or normalized in contextual_values
-            ):
+        for dimension in ("duration", "distance"):
+            if dimension not in bindings:
                 continue
-        else:
-            continue
-        raise _GoalInterpretationDurationProvenanceViolation(
-            "Goal Interpretation duration binding has no authoritative surface "
-            "provenance: "
-            f"responsibilities[{index}].bindings.duration={duration!r}. "
-            "Duration must preserve one explicitly supplied elapsed-time scalar."
-        )
+            value = bindings[dimension]
+            if isinstance(value, bool) or not isinstance(
+                value, (str, int, float, Decimal)
+            ):
+                raise _GoalInterpretationMeasurementProvenanceViolation(
+                    f"Goal Interpretation {dimension} binding must remain one scalar "
+                    "source value, never a nested provider-shaped object: "
+                    f"responsibilities[{index}].bindings.{dimension}={value!r}."
+                )
+            if isinstance(value, str):
+                normalized = " ".join(value.strip().split()).casefold()
+                if normalized and (
+                    normalized in current_turn or normalized in contextual_values
+                ):
+                    continue
+            else:
+                continue
+            raise _GoalInterpretationMeasurementProvenanceViolation(
+                f"Goal Interpretation {dimension} binding has no authoritative surface "
+                "provenance: "
+                f"responsibilities[{index}].bindings.{dimension}={value!r}. "
+                "Measurements must preserve one explicitly supplied source/context scalar."
+            )
 
 
 def _reject_runtime_identity_bindings(
@@ -2857,7 +2860,7 @@ class OllamaGoalInterpreter:
         _reject_continuity_completion_contract_mismatch(request, parsed)
         _reject_unprovenanced_location_bindings(request, parsed)
         _reject_unprovenanced_speed_bindings(request, parsed)
-        _reject_unprovenanced_duration_bindings(request, parsed)
+        _reject_unprovenanced_measurement_bindings(request, parsed)
         _reject_runtime_identity_bindings(request, parsed)
         _reject_unavailable_or_mismatched_prior_assistant_utterance(request, parsed)
         _reject_language_envelope_bindings(request, parsed)

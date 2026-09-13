@@ -1,15 +1,26 @@
 # Chromie Current Status
 
-**Updated:** 2026-09-13
-**Current focus:** owner-approved 6,000-case offline workflow audit (#65), with the
-new-request temporal contract (#60) and single-Goal Planner outcome admission (#66)
-repaired. Pre-delivery base `6bf16ccf`; resume from the latest commit containing both
-handoffs. #24 native GI and #32 streaming/target remain separate open obligations.
-No native inference or LoRA training occurred.
+**Updated:** 2026-09-14
+**Current focus:** native #24/#32 qualification and bounded #67 distance containment.
+Pre-delivery base `d7c7f277`; resume from the latest commit containing both handoffs.
+The owner authorized continued fixes, reports, commit/push and solved-Issue closure.
+#67 closes with delivery; #24/#32 remain open. No LoRA training or profile promotion.
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |
-| 60 authored families / 6,000 frozen scenarios; actual role clients, validators, state and Runtime; fixed model replies and controlled providers. GI authors requested temporal WHAT; every Planner Goal requires an explicit outcome. | Final immutable replay 6,000/6,000: 1,400 workflows, 1,800 state/fault/permission outcomes, 2,580 rejections and 220 safe nonexecuting responses. Level A 45/45 across 15 classes. Canonical 3,214 tests/804 subtests, 145 benchmarks and 20 legacy tests; pinned static/configuration/policy/ownership gates pass. | No deployment, native model, live aggregate, streaming, audio, MuJoCo or physical run. | Development only. #24/#32 open; no model, target or training-data promotion. |
+| Existing GI duration scalar guard now covers distance; invented/source-translated strings and non-scalars reject. Production prompts/Schema unchanged. | Canonical 3,217 tests / 818 subtests, 145 benchmarks, 20 legacy pass. GI focused 91 / 115. Level A 45/45. Full unchanged 6,000 replay passes: 1,400 workflows, 1,800 state/fault/permission outcomes, 2,580 rejections, 220 safe nonexecuting replies. | Four 44-case native GI cohorts / 313 calls remain unqualified. Rebuilt Agent matches 113 source files. Current-profile text/MuJoCo aggregate incomplete: 2 failures, 1 interrupted, 48 unrun. Safe idle observed; owned simulator/MCP stopped. | Development only. #24/#32 open; no native model, streaming target, training-data or physical promotion. |
+
+The native ordering experiments are rejected. The patched production-order rerun
+returns the same 71 raw JSON replies as baseline; the unsupported distance now
+rejects. Mechanical containment does not certify correct meaning. Revalidating all
+242 original baseline/experimental replies rejects exactly six distance violations
+and leaves the other 236 admission results unchanged. Full workflow/module I/O and
+remaining live failures are in the [audit](../ARCHITECTURE_AUDIT.md#native-gi-continuation-and-distance-containment--243267).
+The live identity is explicitly dirty-source diagnostic evidence. Source/profile
+identity, matching current interactive budgets, raw late replies after cancellation,
+one stop bundle and no-physical-evidence limits are retained in the handoffs.
+
+### Prior 6,000-case workflow audit — d7c7f277
 
 #60 was a contract representability gap: the simulator already returned the authored
 `ready_at`, but the GI Schema/Host rejected it. Primary GI now authors exact temporal
@@ -47,8 +58,8 @@ Use [benchmark commands](../benchmarks/README.md#offline-workflow-replay), the
 identities, archive and resume instructions. No new current Markdown owner,
 environment variable, profile or architecture layer: 102 current / 15 core-path
 documents. Previous native GI work (226 executions/254 calls, no qualified repair)
-and the last 51-case live result (1 failure, 1 startup interrupted, 49 unrun) remain
-revision-limited evidence. Service health was not refreshed.
+and the preceding 51-case live result (1 failure, 1 startup interrupted, 49 unrun)
+remain historical evidence; the current continuation is described above.
 
 ### Prior remaining-Issue delivery — 191083dc
 
