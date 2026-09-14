@@ -178,8 +178,9 @@ class OllamaGenerationError(RuntimeError):
 def llm_failure_metadata(exc: Exception) -> dict[str, Any]:
     """Return stable failure-domain facts without assigning root cause."""
 
-    if isinstance(exc, OllamaGenerationError):
-        return exc.metadata()
+    metadata = getattr(exc, "metadata", None)
+    if callable(metadata):
+        return dict(metadata())
     if isinstance(exc, httpx.TimeoutException):
         return {
             "failure_class": "timeout",

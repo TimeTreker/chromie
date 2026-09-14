@@ -241,6 +241,93 @@ def request(text="往前走15秒，然后眨眼。", *, goal_ids=None) -> Cognit
 
 
 class CanonicalDeepPlanContractTests(unittest.TestCase):
+    def test_single_goal_aggregate_cannot_be_mixed_in_either_decoder(self):
+        for tier in ("fast", "deep"):
+            for response_only, requires_execution in ((False, False), (True, False), (False, True)):
+                for response_goals in ([], ["goal-action"]):
+                    schema = planner_schema.canonical_plan_response_schema(
+                        planner_tier=tier, expected_goal_ids=["goal-action"],
+                        allowed_capability_ids=["soridormi.walk_forward"],
+                        response_only=response_only, requires_execution=requires_execution,
+                        response_goal_ids=response_goals,
+                    )
+                    with self.subTest(tier=tier, response_only=response_only,
+                                      requires_execution=requires_execution, response_goals=response_goals):
+                        disposition = Draft202012Validator(schema["properties"]["disposition"])
+                        self.assertFalse(disposition.is_valid("mixed"))
+                        self.assertTrue(disposition.is_valid("clarify"))
+            schema = planner_schema.canonical_plan_response_schema(
+                planner_tier=tier, expected_goal_ids=["goal-action", "goal-answer"],
+                allowed_capability_ids=["soridormi.walk_forward"], response_goal_ids=["goal-answer"],
+            )
+            self.assertTrue(Draft202012Validator(schema["properties"]["disposition"]).is_valid("mixed"))
+
+    def test_parameter_resolution_schema_matches_dto_invariant(self):
+        from shared.chromie_contracts.plan import PlanParameterResolution
+        from pydantic import ValidationError
+
+        schemas = {"dto": PlanParameterResolution.model_json_schema()}
+        for tier in ("fast", "deep"):
+            full = planner_schema.canonical_plan_response_schema(
+                planner_tier=tier, expected_goal_ids=["goal-action"],
+                allowed_capability_ids=["soridormi.walk_forward"],
+            )
+            schemas[tier] = {"$ref": "#/$defs/PlanParameterResolution", "$defs": full["$defs"]}
+        for strategy in ("user_supplied", "schema_default", "safe_default", "observed_context",
+                         "trusted_service", "semantic_realization", "ask_user", "unresolvable"):
+            for value in (None, 0, "exact-value"):
+                for blocking in (False, True):
+                    row = {"step_id": "planned-work", "parameter": "speed_mps", "strategy": strategy,
+                           "value": value, "blocking": blocking, "confidence": 1,
+                           "rationale": "source evidence", "source_goal_ids": ["goal-action"]}
+                    try:
+                        PlanParameterResolution.model_validate(row)
+                        expected = True
+                    except ValidationError:
+                        expected = False
+                    for tier, schema in schemas.items():
+                        with self.subTest(tier=tier, strategy=strategy, value=value, blocking=blocking):
+                            self.assertEqual(Draft202012Validator(schema).is_valid(row), expected)
+        # Native decoder alternatives must each retain the complete object
+        # contract, rather than depending on a sibling properties/required block.
+        for tier, schema in schemas.items():
+            definition = schema if tier == "dto" else schema["$defs"]["PlanParameterResolution"]
+            for branch in definition.get("anyOf", []):
+                branch_schema = {**branch, "$defs": schema.get("$defs", {})}
+                for partial in ({"strategy": "user_supplied", "value": "unknown"},
+                                {"strategy": "ask_user", "blocking": True}):
+                    with self.subTest(tier=tier, incomplete_decoder_branch=partial):
+                        self.assertFalse(Draft202012Validator(branch_schema).is_valid(partial))
+        for strategy in ("ask_user", "unresolvable"):
+            row = {"step_id": "clarification_needed", "parameter": "speed_unit", "strategy": strategy}
+            with self.subTest(strategy=strategy, missing_blocking=True):
+                self.assertFalse(Draft202012Validator(schemas["deep"]).is_valid(row))
+
+    def test_blocking_clarifications_require_goal_ownership_in_decoder_branches(self):
+        for tier in ("fast", "deep"):
+            for goals in (["goal-action"], ["goal-action", "goal-other"]):
+                schema = planner_schema.canonical_plan_response_schema(
+                    planner_tier=tier, expected_goal_ids=goals,
+                    allowed_capability_ids=["soridormi.walk_forward"],
+                )
+                definition = schema["$defs"]["PlanParameterResolution"]
+                for strategy in ("ask_user", "unresolvable"):
+                    row = {"step_id": "none", "parameter": "speed", "strategy": strategy,
+                           "blocking": True, "value": None, "confidence": 0.5,
+                           "rationale": "The speed unit requires clarification."}
+                    for ownership in (None, [], ["foreign"], goals[:1], goals):
+                        value = dict(row)
+                        if ownership is not None:
+                            value["source_goal_ids"] = ownership
+                        expected = ownership is not None and bool(ownership) and ownership != ["foreign"]
+                        for contract in (definition, *definition["anyOf"]):
+                            # Resolved-value alternatives deliberately reject this unresolved row.
+                            if strategy not in contract.get("properties", {}).get("strategy", {}).get("enum", []):
+                                continue
+                            with self.subTest(tier=tier, goals=goals, strategy=strategy,
+                                              ownership=ownership, branch=contract is not definition):
+                                self.assertEqual(Draft202012Validator(contract).is_valid(value), expected)
+
     def test_deep_packet_preserves_prior_speaker_text_and_delivery_source(self):
         for text in ("The code word is amber.", "这次的口令是琥珀。"):
             for role in ("assistant", "user"):
@@ -829,12 +916,25 @@ class DeepPlannerResolverTests(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "Deep Planner capability catalog exceeds"):
-            planner_prompt.deep_plan_prompt(
-                run_request.model_copy(update={"context": context}), capabilities,
-                response_schema={}, expected_goal_ids=["goal-action"],
-            )
-        capabilities = [*capabilities[:2], capabilities[-1]]
+        layered = planner_prompt.deep_layered_prompt(
+            run_request.model_copy(update={"context": context}), capabilities,
+            response_schema={}, expected_goal_ids=["goal-action"],
+        )
+        self.assertEqual(layered.render().count("Executable capability catalog JSON:"), 1)
+        self.assertIn("rare.capability_39", layered.render())
+        # The complete request budget belongs to the transport, including system
+        # text, output reservation and safety margin; no catalog prefix is valid.
+        from unittest.mock import patch
+        from agent.app.clients.ollama_client import OllamaClient
+        with patch("agent.app.clients.ollama_client.httpx.AsyncClient") as http:
+            with self.assertRaises(OllamaGenerationError) as rejected:
+                asyncio.run(OllamaClient(
+                    base_url="http://unused.invalid", model="fixed-test-model",
+                    purpose="deep_planner",
+                ).generate(layered, system=planner_prompt.deep_system_prompt(),
+                           options={"num_ctx": 4096, "num_predict": 1024}))
+        self.assertEqual(rejected.exception.failure_class, "prompt_budget_exceeded")
+        http.assert_not_called()
 
         prompt = planner_prompt.deep_plan_prompt(
             run_request.model_copy(update={"context": context}),

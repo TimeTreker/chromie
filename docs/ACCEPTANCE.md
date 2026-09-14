@@ -547,10 +547,15 @@ controls promotion order, while each file declares `difficulty=easy|medium|hard`
 Scenario-local `require_safe_idle=true` makes an executed final safe-idle state
 a non-overridable mechanical assertion; preview output cannot satisfy it.
 Use `--stage must_pass` for the cheapest broad-change gate. In a full run the
-runner always executes every selected case in the current stage and reports all
-of its failures. Only after that stage is complete does a hard deterministic
-failure in `must_pass` prevent `core` and `challenge` from starting; one failed
-case never aborts the remainder of its own stage.
+runner collects ordinary scenario mismatches through the current stage before
+gating later stages. Structured Runtime/model-contract and LLM-integrity failures,
+observed Goal omission/provenance rejection, unsafe status, missing post-run status
+in execution mode, and harness exceptions instead stop before the next case in
+any stage. The aggregate and reviewer packet retain the exact `integrity_stop`,
+planned/executed counts and unrun cases. `cohort_complete=false` means selected
+coverage is incomplete; `qualification_complete` additionally requires all hard
+gates and semantic review. Neither an early stop nor an unreviewed passing subset
+qualifies the revision.
 
 A passing `--mode level-a` run is still Level A deterministic evidence only. It
 does not prove live services, microphone/speaker behavior, simulator execution,
@@ -591,6 +596,16 @@ Goal Interpretation, Agent, and Soridormi status/preflight boundary but does not
 motion; live text execution can support a Level C simulator claim only when the
 summary shows successful Trusted Capability Runtime execution and safe idle. Neither mode is
 microphone, speaker, or physical hardware evidence.
+In either mode, the text checker must reject a missing Soridormi manifest,
+an unsupervised non-simulator provider, or a non-idle/unsafe initial status before
+creating a session or admitting a turn. Retain health, initial status and a failed
+summary with `harness_failure.failure_domain=preflight`; cognition, execution and
+post-run status remain absent. After an admitted non-preview turn, handled Runtime
+or validation failure still receives the final provider-status probe. Its result
+or probe error is retained without dispatching rejected Work; preview remains
+nonexecuting and does not claim final execution state. The cohort runner treats that rejection as an
+integrity stop, preserving unrun coverage. A later dispatch guard is insufficient
+because Core realization and deterministic reflexes precede that guard.
 `--soridormi-repo` records a declared paired checkout for diagnostic
 provenance; it does not prove which source revision is executing behind the MCP
 endpoint.
@@ -630,11 +645,12 @@ summary and semantic-review bundle; then group failures by the earliest shared
 boundary. Use
 `--only-case` only after that diagnosis to validate one proposed fix, followed
 by the affected ability class and the complete directory-discovered cohort on the changed
-revision. Within `must_pass`, a hard safety, provenance, service-integrity, or
-safe-idle failure is retained and reported alongside the remaining must-pass
-cases, then blocks both later stages. An infrastructure failure that makes
-further cases impossible still leaves the cohort incomplete and cannot support
-a passing claim. See [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
+revision. Hard integrity or unsafe/unverified execution state stops collection
+at the case boundary, including within `must_pass`; unrun cases remain explicit
+and cannot support a passing claim. Collect the one correlated bundle after
+normal runner exit, without an external polling watcher terminating it before
+the aggregate and reviewer artifacts are written. See
+[Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
 
 Warm interaction cases retain two non-overlapping intervals: the accepted SC
 stage start to its complete decision (`max_warm_sc_decision_ms`), then that

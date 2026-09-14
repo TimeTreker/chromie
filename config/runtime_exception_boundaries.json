@@ -582,13 +582,13 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._planner_state_reentry_response",
+      "symbol": "VoiceAssistant._planner_state_reentry_response.resolve_reentry_plan",
       "ordinal": 1,
       "classification": "narrow_reraise",
       "owner": "orchestrator",
-      "contract": "Retain Planner state re-entry failure evidence, then re-raise so the caller fails closed without Host-authored semantic wording.",
+      "contract": "Retain Fast/Deep Planner re-entry call and returned technical/scope failures before adaptation, then re-raise so the caller fails closed without technical Deep delegation or Host-authored semantic wording.",
       "review_status": "reviewed",
-      "body_sha256": "1f743fa38cf04e565fb92542dd6b6aa97ca64e193a0cbaacfa3e815f38c73e3d",
+      "body_sha256": "351f65274987dd94bc4cea476b58a73ffe923d415a5e39802b2ceebe55ef5cf6",
       "failure_signals": [
         "bare_reraise"
       ]

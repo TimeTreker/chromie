@@ -1783,7 +1783,150 @@
                 "strategy"
               ],
               "title": "PlanParameterResolution",
-              "type": "object"
+              "type": "object",
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "step_id": {
+                      "minLength": 1,
+                      "title": "Step Id",
+                      "type": "string"
+                    },
+                    "parameter": {
+                      "description": "Exact argument key from the referenced plan step's args object. Do not prefix it with a step ID or capability ID.",
+                      "minLength": 1,
+                      "title": "Parameter",
+                      "type": "string"
+                    },
+                    "strategy": {
+                      "enum": [
+                        "ask_user",
+                        "unresolvable"
+                      ],
+                      "title": "Strategy",
+                      "type": "string"
+                    },
+                    "value": {
+                      "title": "Value",
+                      "type": "null"
+                    },
+                    "confidence": {
+                      "default": 0.0,
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "blocking": {
+                      "title": "Blocking",
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "rationale": {
+                      "default": "",
+                      "title": "Rationale",
+                      "type": "string",
+                      "maxLength": 240
+                    },
+                    "source_goal_ids": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${goal}"
+                        ]
+                      },
+                      "title": "Source Goal Ids",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "step_id",
+                    "parameter",
+                    "strategy",
+                    "blocking",
+                    "source_goal_ids"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "step_id": {
+                      "minLength": 1,
+                      "title": "Step Id",
+                      "type": "string"
+                    },
+                    "parameter": {
+                      "description": "Exact argument key from the referenced plan step's args object. Do not prefix it with a step ID or capability ID.",
+                      "minLength": 1,
+                      "title": "Parameter",
+                      "type": "string"
+                    },
+                    "strategy": {
+                      "enum": [
+                        "user_supplied",
+                        "schema_default",
+                        "safe_default",
+                        "observed_context",
+                        "trusted_service",
+                        "semantic_realization"
+                      ],
+                      "title": "Strategy",
+                      "type": "string"
+                    },
+                    "value": {
+                      "title": "Value",
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "confidence": {
+                      "default": 0.0,
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "blocking": {
+                      "default": false,
+                      "title": "Blocking",
+                      "type": "boolean"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "title": "Rationale",
+                      "type": "string",
+                      "maxLength": 240
+                    },
+                    "source_goal_ids": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${goal}"
+                        ]
+                      },
+                      "title": "Source Goal Ids",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "step_id",
+                    "parameter",
+                    "strategy",
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
             },
             "PlannerGoalSatisfaction": {
               "additionalProperties": false,
@@ -3536,7 +3679,6 @@
               "enum": [
                 "respond",
                 "execute",
-                "mixed",
                 "clarify",
                 "unavailable",
                 "refused"
@@ -3917,7 +4059,157 @@
                 "source_goal_ids"
               ],
               "title": "PlanParameterResolution",
-              "type": "object"
+              "type": "object",
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "step_id": {
+                      "minLength": 1,
+                      "title": "Step Id",
+                      "type": "string"
+                    },
+                    "parameter": {
+                      "description": "Copy exactly one argument key from the referenced step's args object, such as speed_mps or duration_s. Do not prefix it with a step ID or capability ID.",
+                      "minLength": 1,
+                      "title": "Parameter",
+                      "type": "string"
+                    },
+                    "strategy": {
+                      "enum": [
+                        "ask_user",
+                        "unresolvable"
+                      ],
+                      "title": "Strategy",
+                      "type": "string"
+                    },
+                    "value": {
+                      "title": "Value",
+                      "type": "null"
+                    },
+                    "confidence": {
+                      "default": 0.0,
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "blocking": {
+                      "title": "Blocking",
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "rationale": {
+                      "default": "",
+                      "title": "Rationale",
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "source_goal_ids": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${goal}"
+                        ]
+                      },
+                      "title": "Source Goal Ids",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "step_id",
+                    "parameter",
+                    "strategy",
+                    "value",
+                    "confidence",
+                    "blocking",
+                    "rationale",
+                    "source_goal_ids"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "step_id": {
+                      "minLength": 1,
+                      "title": "Step Id",
+                      "type": "string"
+                    },
+                    "parameter": {
+                      "description": "Copy exactly one argument key from the referenced step's args object, such as speed_mps or duration_s. Do not prefix it with a step ID or capability ID.",
+                      "minLength": 1,
+                      "title": "Parameter",
+                      "type": "string"
+                    },
+                    "strategy": {
+                      "enum": [
+                        "user_supplied",
+                        "schema_default",
+                        "safe_default",
+                        "observed_context",
+                        "trusted_service",
+                        "semantic_realization"
+                      ],
+                      "title": "Strategy",
+                      "type": "string"
+                    },
+                    "value": {
+                      "title": "Value",
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "object",
+                        "array"
+                      ]
+                    },
+                    "confidence": {
+                      "default": 0.0,
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "blocking": {
+                      "default": false,
+                      "title": "Blocking",
+                      "type": "boolean"
+                    },
+                    "rationale": {
+                      "default": "",
+                      "title": "Rationale",
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "source_goal_ids": {
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "${goal}"
+                        ]
+                      },
+                      "title": "Source Goal Ids",
+                      "type": "array",
+                      "uniqueItems": true,
+                      "minItems": 1
+                    }
+                  },
+                  "required": [
+                    "step_id",
+                    "parameter",
+                    "strategy",
+                    "value",
+                    "confidence",
+                    "blocking",
+                    "rationale",
+                    "source_goal_ids"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
             },
             "PlannerGoalSatisfaction": {
               "additionalProperties": false,
@@ -5036,7 +5328,6 @@
               "enum": [
                 "respond",
                 "execute",
-                "mixed",
                 "clarify",
                 "escalate"
               ],

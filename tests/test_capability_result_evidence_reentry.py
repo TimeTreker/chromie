@@ -7,6 +7,9 @@ import asyncio
 import hashlib
 import unittest
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.planner_reentry import incremental_execution_outcome_truth
@@ -60,6 +63,74 @@ async def _social_result(request, plan):
             "source_goal_ids": plan.goal_ids, "evidence_refs": request.evidence_refs,
             "addressed_need_ids": [need.need_id for need in request.communication_needs]}],
     )
+
+
+@pytest.mark.parametrize("tier", ["fast", "deep"])
+@pytest.mark.parametrize("failure_kind", ["returned", "raised", "goal_scope"])
+def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind):
+    from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
+
+    goal_id = "goal-weather"
+    semantic_escalation = CanonicalPlan(
+        plan_id="needs-depth", planner_tier="fast", disposition="escalate",
+        coverage="uncertain", confidence=0.0, goal_ids=[goal_id],
+        escalation_reason="source_evidence_requires_deeper_cognition",
+        metadata={"path_classification": "semantic_escalation"},
+    )
+    failure = semantic_escalation.model_copy(update={
+        "planner_tier": tier,
+        "disposition": "escalate" if tier == "fast" else "clarify",
+        "metadata": {"path_classification": "contract_failure",
+                     "failure_class": "required_context_over_budget" if tier == "fast" else "prompt_budget_exceeded",
+                     "failure_domain": "prompt_projection" if tier == "fast" else "llm_budget",
+                     "retryable": False, "execution_allowed": False},
+    })
+    if failure_kind == "goal_scope":
+        failure = semantic_escalation.model_copy(update={"goal_ids": ["foreign-goal"]})
+    client = SimpleNamespace(resolve_fast_plan=AsyncMock(return_value=semantic_escalation),
+                             resolve_deep_plan=AsyncMock(return_value=failure))
+    selected = getattr(client, f"resolve_{tier}_plan")
+    selected.return_value = failure
+    if failure_kind == "raised":
+        selected.side_effect = TimeoutError("transport deadline")
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.agent_client = client
+    assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(mode="apply")
+    adapter = CanonicalPlanRuntimeAdapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True}))
+    adapter.build_planner_owned_response = AsyncMock()
+    assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
+        agent_client=client, adapter=adapter, policy=assistant.cognitive_runtime_policy,
+    )
+    assistant.sessions = SimpleNamespace(record_cognitive_stage=Mock())
+    assistant.session_log = Mock()
+    assistant.build_context = lambda _sid: {"history": []}
+    assistant.get_http_session = AsyncMock(return_value=object())
+    source = InteractionResponse(interaction_id="weather", metadata={
+        "goal_interpretation": {"responsibilities": [{"local_ref": "r-weather",
+            "outcome": "Check the weather.", "output_mode": "information", "confidence": 1.0}]},
+        "goal_association": {"associations": [], "new_goals": [{"goal_id": goal_id,
+            "source_responsibility_refs": ["r-weather"], "source_text": "Check the weather."}]},
+    })
+    expected_error = {"returned": CognitiveStageFailure, "raised": TimeoutError, "goal_scope": ValueError}[failure_kind]
+    with pytest.raises(expected_error):
+        asyncio.run(_planner_evidence_reentry(
+            assistant, source_response=source, canonical_plan=semantic_escalation,
+            user_request="Check the weather.", language="en-US", goal_ids=[goal_id],
+            evidence=[ToolResultEvidence(evidence_id="weather-result", tool_id="chromie.weather.lookup",
+                                        status="completed", data={}, output_sha256=canonical_value_sha256({}))],
+            session_id="session", phase="post_execution",
+        ))
+    assert client.resolve_fast_plan.await_count == 1
+    assert client.resolve_deep_plan.await_count == (tier == "deep")
+    adapter.build_planner_owned_response.assert_not_awaited()
+    stages = [call.kwargs for call in assistant.sessions.record_cognitive_stage.call_args_list]
+    assert stages[-1]["status"] == "failed"
+    assert stages[-1]["stage"] == ("fast_planner_evidence_reentry" if tier == "fast" else "planner_deep_pass_evidence_reentry")
+    assert stages[-1]["errors"]
+    assert stages[0]["metadata"]["planner_pass"] == "fast"
+    assert "wording_owner" not in stages[0]["metadata"]
+    if tier == "deep":
+        assert stages[0]["status"] == "resolved"  # Genuine source-based depth remains allowed.
 
 
 async def _planner_evidence_reentry(

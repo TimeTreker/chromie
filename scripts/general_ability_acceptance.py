@@ -30,6 +30,7 @@ from scripts.interaction_text_mujoco_check import (  # noqa: E402
     parse_expected_arg,
     run_check,
     run_check_sequence,
+    safe_idle_errors,
 )
 from scripts.outcome_observations import (  # noqa: E402
     collect_llm_integrity_violations,
@@ -360,6 +361,12 @@ def _provenance_attachment_rejected(cognitive: dict[str, Any]) -> bool:
     return False
 
 
+def _failed_workflow_stage(summary: dict[str, Any]) -> dict[str, Any] | None:
+    session = summary.get("session_state") or {}
+    return next((item for item in session.get("cognitive_workflow_stages") or []
+                 if isinstance(item, dict) and item.get("status") in {"error", "failed"}), None)
+
+
 def _structured_case_metrics(
     case: TextScenarioCase,
     summary: dict[str, Any],
@@ -435,6 +442,12 @@ def _structured_case_metrics(
         runtime_metadata.get("failure_class") or ""
     ).strip()
     runtime_integrity_failed = runtime_status in {"error", "failed"}
+    failed_stage = _failed_workflow_stage(summary)
+    if not runtime_integrity_failed and failed_stage is not None:
+        runtime_integrity_failed = True
+        runtime_status = "failed"
+        runtime_failure_stage = str(failed_stage.get("stage") or "")
+        runtime_failure_class = "workflow_stage_failed"
     return {
         "new_goal_count": len(new_goals),
         "required_new_goal_count": case.min_new_goal_count,
@@ -1629,6 +1642,12 @@ def _write_reviewer_packet(
         },
         "passed": int(run_summary.get("passed") or 0),
         "failed": int(run_summary.get("failed") or 0),
+        "cohort_complete": run_summary.get("cohort_complete"),
+        "qualification_complete": run_summary.get("qualification_complete"),
+        "planned_case_count": run_summary.get("planned_case_count"),
+        "case_count": run_summary.get("case_count"),
+        "skipped_cases": list(run_summary.get("skipped_cases") or []),
+        "integrity_stop": run_summary.get("integrity_stop"),
         "errors": list(run_summary.get("errors") or []),
         "cases": case_summaries,
         "claim_limits": {
@@ -2131,6 +2150,7 @@ async def _run_live_case(
         "text": [turn.text for turn in case.turns],
         "evidence_dir": str(case_dir),
         "conversation_id": conversation_id,
+        "cohort_complete": len(raw_results) == len(case.turns),
         "errors": episode_errors,
         "turns": turn_results,
         "diagnostic_evaluation": _episode_diagnostic_evaluation(
@@ -2250,10 +2270,68 @@ def _semantic_review_bundle(
                     "semantic_review_status"
                 ),
                 "stage_results": run_summary.get("stage_results") or [],
+                "cohort_complete": run_summary.get("cohort_complete"),
+                "planned_case_count": run_summary.get("planned_case_count"),
+                "skipped_cases": run_summary.get("skipped_cases") or [],
+                "integrity_stop": run_summary.get("integrity_stop"),
             },
             "results": suite_results,
         },
     )
+
+
+def _live_integrity_stop(
+    result: dict[str, Any], *, execute: bool,
+) -> dict[str, Any] | None:
+    """Stop collection on trusted hard evidence, never on semantic wording."""
+
+    for turn in result.get("turns") or []:
+        stop = _live_integrity_stop(turn, execute=execute)
+        if stop is not None:
+            return stop
+    if result.get("turns"):
+        return None
+    cognitive = result.get("cognitive_runtime") or {}
+    metadata = cognitive.get("metadata") or {}
+    failed_stage = _failed_workflow_stage(result)
+    failure: dict[str, Any] | None = None
+    if result.get("harness_failure"):
+        failure = dict(result["harness_failure"])
+    elif metadata.get("failure_domain") or cognitive.get("status") in {"error", "failed"}:
+        failure = {
+            "failure_domain": metadata.get("failure_domain") or "cognitive_runtime",
+            "failure_class": metadata.get("failure_class") or cognitive.get("status"),
+            "failure_stage": metadata.get("failure_stage"),
+        }
+    elif failed_stage is not None:
+        failure = {"failure_domain": "cognitive_runtime", "failure_class": "workflow_stage_failed",
+                   "failure_stage": failed_stage.get("stage")}
+    elif collect_llm_integrity_violations(result):
+        failure = {"failure_domain": "llm_integrity", "failure_class": "retained_llm_integrity_violation"}
+    else:
+        metrics = (result.get("diagnostic_evaluation") or {}).get("metrics") or {}
+        if metrics.get("provenance_attachment_rejected"):
+            failure = {"failure_domain": "provenance", "failure_class": "provenance_attachment_rejected"}
+        elif metrics.get("goal_omission_rate", 0) > 0:
+            failure = {"failure_domain": "model_contract", "failure_class": "goal_omission"}
+        else:
+            for key in ("status_before", "status_after"):
+                status = result.get(key)
+                if isinstance(status, dict) and safe_idle_errors(status):
+                    failure = {"failure_domain": "safe_idle", "failure_class": "unsafe_or_incomplete_status", "failure_stage": key}
+                    break
+                if key == "status_after" and execute and not isinstance(status, dict):
+                    failure = {"failure_domain": "safe_idle", "failure_class": "post_run_status_unavailable", "failure_stage": key}
+                    break
+    if failure is None:
+        return None
+    return {
+        **failure,
+        "turn_id": metadata.get("turn_id") or result.get("turn_id"),
+        "scenario_turn_id": result.get("turn_id"),
+        "sid": result.get("sid"),
+        "evidence_dir": result.get("evidence_dir"),
+    }
 
 
 async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
@@ -2284,6 +2362,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     stage_results: list[dict[str, Any]] = []
     skipped_cases: list[dict[str, str]] = []
     stopped_after_stage: str | None = None
+    integrity_stop: dict[str, Any] | None = None
     refs_by_stage: dict[str, list[tuple[AbilityClass, LiveCaseRef]]] = {}
     for ability, ref in selected_refs:
         refs_by_stage.setdefault(ref.stage, []).append((ability, ref))
@@ -2324,6 +2403,10 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                     ),
                     "evidence_dir": str(case_dir),
                     "errors": [error],
+                    "harness_failure": {
+                        "failure_domain": "harness",
+                        "failure_class": exc.__class__.__name__,
+                    },
                     "diagnostic_evaluation": {
                         "passed": False,
                         "overall_score": 0,
@@ -2345,17 +2428,43 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
             result["review_rubric"] = dict(ref.review_rubric)
             result["scenario_provenance"] = dict(ref.provenance)
             result["root_cause_boundaries"] = list(ability.root_cause_boundaries)
+            stop = _live_integrity_stop(result, execute=args.execute)
+            if stop is not None:
+                integrity_stop = {**stop, "case_id": case.case_id, "stage": ref.stage}
+                result["integrity_stop"] = integrity_stop
+                result["ok"] = False
+                result.setdefault("errors", []).append(
+                    "cohort stopped on hard integrity failure: "
+                    f"{stop['failure_domain']}:{stop['failure_class']}"
+                )
+                if isinstance(result.get("user_outcome"), dict):
+                    result["user_outcome"]["ok"] = False
+                if isinstance(result.get("diagnostic_evaluation"), dict):
+                    result["diagnostic_evaluation"]["passed"] = False
+                    result["diagnostic_evaluation"]["hard_gate_failures"] = list(result["errors"])
             if not args.no_write:
                 _write_json(case_dir / "summary.json", result)
             case_results.append(result)
             stage_case_results.append(result)
+            if integrity_stop is not None:
+                for pending_ability, pending_ref in stage_refs[len(stage_case_results):]:
+                    skipped_cases.append({
+                        "case_id": pending_ref.case.case_id,
+                        "ability_class": pending_ability.ability_id,
+                        "stage": pending_ref.stage,
+                        "reason": f"blocked_by_integrity_failure_in_{case.case_id}",
+                    })
+                break
 
         hard_failed = sum(1 for item in stage_case_results if not item.get("ok"))
         stage_results.append(
             {
                 "id": stage.stage_id,
                 "title": stage.title,
-                "status": "hard_fail" if hard_failed else "hard_pass",
+                "status": (
+                    "incomplete" if len(stage_case_results) < len(stage_refs)
+                    else "hard_fail" if hard_failed else "hard_pass"
+                ),
                 "case_count": len(stage_case_results),
                 "passed": len(stage_case_results) - hard_failed,
                 "hard_failed": hard_failed,
@@ -2365,7 +2474,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                 ),
             }
         )
-        if hard_failed and stage.stop_later_stages_on_hard_failure:
+        if integrity_stop is not None or (hard_failed and stage.stop_later_stages_on_hard_failure):
             stopped_after_stage = stage.stage_id
             later_stage_ids = {
                 item.stage_id for item in library.stages if item.order > stage.order
@@ -2446,12 +2555,17 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         in {"semantic_review", "hybrid"}
     )
     deterministic_ok = not errors
+    cohort_complete = not skipped_cases and all(
+        item.get("cohort_complete", True) for item in case_results
+    )
     summary = {
         "ok": deterministic_ok,
         "deterministic_ok": deterministic_ok,
+        "cohort_complete": cohort_complete,
+        "integrity_stop": integrity_stop,
         "qualification_complete": deterministic_ok
         and semantic_review_pending == 0
-        and not skipped_cases,
+        and cohort_complete,
         "semantic_review_status": (
             "pending" if semantic_review_pending else "not_required"
         ),
@@ -2469,7 +2583,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "execute": args.execute,
         "speaker": args.speaker,
         "errors": errors,
-        "stage_policy": "finish_current_stage_then_gate_later_stages",
+        "stage_policy": "stop_on_integrity_failure_otherwise_finish_stage_then_gate",
         "selected_stages": list(args.stage),
         "stage_results": stage_results,
         "stopped_after_stage": stopped_after_stage,
@@ -2604,7 +2718,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help=(
             "Run one live-text stage. Repeatable. By default stages run in contract "
-            "order; each stage finishes before its gate can block later stages."
+            "order; integrity failures stop immediately, otherwise each stage "
+            "finishes before its gate can block later stages."
         ),
     )
     parser.add_argument(

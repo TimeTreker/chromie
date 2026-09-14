@@ -1,5 +1,11 @@
 # Chromie Current Status
 
+## SC integration — 2026-09-15
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Newest upstream SC/Work separation, priority scheduling and execution lanes preserved. Local catalog, Schema/DTO, failure containment/evidence and paired resource mappings integrated; fetch-before-development guidance added. | Canonical 3,382 tests / 1,139 subtests, 145 benchmarks and 20 legacy pass. Full 6,000 SC-aware replay and Level A 45/45 pass. Provider 798 / two skips, body 165, task 147 plus governance/compile/manifest pass. | Previous Qwen/native evidence is pre-SC, not current-revision proof. Local service images are not rebuilt by committing source; no new native SC or physical claim. | Development only; fine-tuning readiness false. Reference review, hidden-family evaluation and #24/#32 target closure remain open. |
+
 ## Frozen model comparison — 2026-09-14
 
 | Implementation | Automated verification | Target validation | Release readiness |

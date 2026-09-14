@@ -65,11 +65,25 @@ Fast/Deep resolvers retain `required_context_over_budget` in the
 `execution_allowed=False`. Canonical Fast uses the existing `contract_failure`
 containment, so Host does not invoke Deep to repair an incomplete input. Deep
 uses its empty rejected-Plan materializer; it authors no clarification speech.
+The same containment applies to result, provider, time and Situation re-entry:
+returned technical failures and thrown call errors are retained as failed workflow
+stages before adaptation or commitment. A Fast technical failure cannot invoke
+Deep. Genuine semantic escalation still receives its one designated depth pass.
+Acceptance inspects these retained failed stages even when the initial turn's
+detached dispatch was already applied; it stops the cohort and marks coverage
+incomplete. Redacted error prose is not interpreted as semantic evidence.
 Streaming renders inside its guarded boundary and returns a typed `before_commit`
 failure. These failures do not claim a truncated model response: no model was
 called, and no partial Plan, Goal outcome or presentation is committed.
 
 ### evidence failure
+
+`PlannerDTOContractError` preserves the existing `structured_output_validation` /
+`model_contract` classification through Fast/Deep fallback materialization using
+the runtime's typed exception metadata protocol. It remains non-retryable at that
+boundary, with `architecture_attribution=not_evaluated`: locating a rejected DTO
+does not identify whether its cause is Schema, context or model inference. Unknown
+exceptions retain their unclassified failure rather than being relabeled by text.
 
 A corrupt Runtime Trace checkpoint is archived under `corrupt/` and emits a
 warning with the source, destination, error type, and bounded message. Episode

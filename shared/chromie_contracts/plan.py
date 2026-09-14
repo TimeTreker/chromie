@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from typing import Annotated, Any, Literal, Union, cast
@@ -797,8 +798,38 @@ def _normalize_ids(value: Any) -> list[str]:
     return out
 
 
+def _parameter_resolution_json_schema(schema: dict[str, Any]) -> None:
+    """Render complete decoder branches for the existing resolution invariant."""
+    branches = []
+    for unresolved in (True, False):
+        properties = copy.deepcopy(schema["properties"])
+        properties["strategy"]["enum"] = (
+            ["ask_user", "unresolvable"] if unresolved else [
+                "user_supplied", "schema_default", "safe_default", "observed_context",
+                "trusted_service", "semantic_realization",
+            ]
+        )
+        properties["value"].pop("default", None)
+        properties["value"]["type"] = (
+            "null" if unresolved else ["string", "number", "boolean", "object", "array"]
+        )
+        if unresolved:
+            properties["blocking"].pop("default", None)
+            properties["blocking"]["const"] = True
+        branches.append({
+            "type": "object", "properties": properties,
+            "required": list(dict.fromkeys([
+                *schema.get("required", []), "blocking" if unresolved else "value",
+            ])),
+            "additionalProperties": False,
+        })
+    # Some constrained decoders select anyOf without intersecting outer object
+    # properties. Each alternative must independently preserve the full DTO.
+    schema["anyOf"] = branches
+
+
 class PlanParameterResolution(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_parameter_resolution_json_schema)
 
     step_id: str = Field(min_length=1)
     parameter: str = Field(

@@ -1,5 +1,65 @@
 # Development Checkpoint
 
+## Integration delivery — 2026-09-15
+
+Owner authorization: integrate the newest remote SC design, resolve conflicts,
+rerun validation, commit and push both repositories. Chromie was fast-forwarded
+from `d5a7985e` to `2e18f86a` on `main`; Soridormi from `284273b` to `0af3d09`
+on `codex/turn-count`. The paired provider integration is now committed and
+pushed as `fa6331f1344ce26154b197ca7d7c49badea292ad`. Resume at the latest
+Chromie delivery commit containing both handoffs. Original local changes remain
+in recovery stashes; do not reapply them over this integration. Both repositories now require fetching/checking upstream
+before development and again before push, preserving dirty work during integration.
+
+The upstream SC design is authoritative: SC alone authors ordinary communication;
+Planner authors Work and planning facts. Preserve SC > GI > GA > Fast scheduling,
+separate Vocal/Activity waiting queues, prepared-start alignment and all remote
+weather/evidence/catalog/argument-validation repairs. The old Planner wording
+prompts were not restored. Complete catalog projection now uses the existing
+transport budget at the new common Work prompt owner and layered projections.
+Applicable local Schema/DTO, technical re-entry containment, typed diagnostics,
+preflight/integrity collection and post-failure status regressions are integrated.
+Soridormi keeps its new manifest validator and existing resource mappings,
+adding only route-to-source realization and structured-input regression coverage.
+Unrelated submodule content remains untouched.
+
+Combined canonical passes 3,382 tests / 1,139 subtests, 145 benchmarks and 20
+legacy tests, including policy, ownership, pinned static/configuration/docs gates.
+Two existing FastAPI warnings remain. Full 6,000 SC-aware workflow replay passes
+with source unchanged: 1,400 workflows, 1,800 expected states, 2,580 expected
+rejections and 220 expected nonexecution outcomes. Level A passes 45/45.
+Focused SC/Planner/acceptance: 785 tests / 364 subtests; rebound workflow: 104/104;
+final re-entry: 15 tests / three subtests. Provider: 798 tests / two skips, body
+165, task 147, governance, compile and manifest pass. The initial 68 failures were
+exact Schema mismatches; only input-format snapshots and hashes were rebound on
+the remote SC-aware corpus. The provider automatic merge also hid upstream mapping
+keys; the existing regression caught it and all upstream declarations were restored.
+Large corpus manifest: `3ba46381bf230f7a930982b05f8cebd9cb672ccd4efbfbdee14d0c4994084f04`.
+
+Evidence: `.chromie/acceptance/sc-integration-20260915/` retains source recovery,
+focused/failing/final logs, Schema rebind accounting and the aggregate replay.
+The prior `.chromie/acceptance/engineering-18-20260914/` twelve-iteration Qwen
+proof is historical pre-SC evidence only: 3,296 tests / 1,071 subtests and 6,000
+replays passed there, but its native cohorts were incomplete. It cannot qualify
+this SC integration. See the audit for original root causes and changed ownership.
+No model weights, production model profile or decoding defaults are changed in
+this integration; retain upstream's single-Gemma configuration. Local services
+still package the pre-integration revision and are not fresh SC target evidence.
+The earlier simulator/MCP were safely stopped; no new physical proof is claimed.
+Fine-tuning/release readiness remains false; #24/#32, independent reference review,
+hidden semantic-family evaluation and current target closure remain open.
+
+Cross-machine resume: fetch and fast-forward both named branches, initialize
+Soridormi submodules and follow CHROMIE_RUNBOOK.md for that machine's generated
+profile and rebuild. Never copy another machine's PIDs or edit `.env.runtime`.
+Run `./scripts/run_tests.sh`, `python scripts/general_ability_acceptance.py --mode
+level-a --evidence-dir <new-path>`, and `python scripts/run_workflow_replay.py
+--workers 4 --evidence-dir <new-path>`. Before native evaluation verify packaged
+Agent source and capture a fresh runtime identity using the current CLI. Run a
+complete discovered cohort with one revision and retain one bundle at its end;
+judge every case and leave unrun coverage explicit. Private traces/scripts and
+recovery archives are ignored/local and do not accompany a fresh clone.
+
 ## Delivery — 2026-09-14
 
 Owner authorization: commit all accumulated project changes and push both paired

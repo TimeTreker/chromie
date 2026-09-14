@@ -43,7 +43,10 @@ See the [interaction contract](../docs/HUMAN_LIKE_INTERACTION_CONTRACT.md).
 Required Planner projections preserve complete admitted Goals, bindings, Work,
 Evidence, source Plans, delivery context and capability applicability contracts.
 Existing per-section character budgets reject oversized required inputs before
-inference instead of omitting fields or entries. Streaming applies the same rule
+inference instead of omitting fields or entries. Complete Fast/Deep executable
+catalogs are serialized losslessly under the transport whole-request budget,
+including reserved output and safety margin, without a separate character cap.
+Streaming applies the same rule
 before any Work commitment. Budget rejection retains the full Goal scope,
 records zero model attempts, and cannot trigger semantic Deep delegation or
 partial execution. Optional Situation relevance and auxiliary decoration remain

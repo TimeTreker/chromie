@@ -590,3 +590,377 @@ The [preceding audit](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed6
 GitHub closure is verified for #35 and #52–#58, including the supported-version CI evidence linked on #56. #24/#32 remain the only open Issues, with the failed native-model/live evidence above.
 
 A fresh clone can run the tracked source gates and full Planner corpus. Exact candidate raw replay, local-model comparison, captured persisted-wake requests and live evidence require the private archive identified in HANDOFF. Physical microphone/speaker/robot evidence remains absent. Close Issues only against delivered acceptance; keep #24/#32 and any still-failing qualification open with concrete evidence and resume commands.
+
+## Engineering integrity continuation — #24/#32, 2026-09-14
+
+Scope: acceptance collection and evidence, based on `d5a7985e`; no model, prompt,
+semantic Schema, production authority, or provider change. The originating live
+workflow is retained in the native GI continuation section. This diagnosis concerns
+why collection continued after a correctly reported hard failure, not why the model
+misinterpreted the turn. Model-inference root cause for that separate question remains
+unresolved by this slice.
+
+| Order / owner | Authoritative input and actual output | Expected output / verdict |
+| --- | --- | --- |
+| 1. Native GI → GA and Fast Planner | Compound walk/nod/turn session `cbe8a87b`: deeper GI supplied three Responsibilities after primary fusion; GA conserved speed `0.2`; Fast authored `0.02`. Exact native correlations and raw-output review remain in the earlier section. | GI primary meaning and Fast numeric result failed the semantic contract. This slice does not repair or requalify them. |
+| 2. Host validation / Runtime | Fast result rejected with `failure_domain=model_contract`, `failure_class=fast_stream_contract_invalid`, stage `fast_planner_stream`; no capability work started. | Correct containment. No second semantic repair call or substituted argument. |
+| 3. Text-check harness | Returned `ok=false`, the structured failure, SID and errors to General Ability. `status_after=null`; a separately retained later query proves post-stop safe idle only. | Correct failure propagation; per-case post-run idle remained unproven. |
+| 4. General Ability collection | Received that completed result, appended it, and immediately started the next selected case. It checked failure only after finishing the entire stage. | First wrong collection boundary. Integrity should stop before another case; ordinary scenario mismatches may finish the stage. |
+| 5. Private asynchronous watcher | Polled completed summary files; original domain set omitted `model_contract`. Second case `8a11295e` failed; reviewer stopped during the third. | Incorrect/missing automatic stop. Adding the domain alone would still leave a poll/start race. |
+| 6. Evidence/report handoff | Live run ended 2 failed / 1 interrupted / 48 unrun with one externally collected bundle. Final aggregate generation was interrupted. | Incomplete diagnostic, not a passing subset or qualification. |
+
+```text
+case finishes -> structured hard failure -> synchronous collection check
+                                          -> retain failed case + unrun coverage
+                                          -> aggregate + reviewer artifacts -> exit
+                                                                           -> one debug bundle
+ordinary scenario mismatch -> remaining stage cases -> existing stage gate
+```
+
+The repair stays in `scripts/general_ability_acceptance.py`: inspect structured
+Runtime/model failure, existing LLM-integrity evidence and omission/provenance
+metrics, existing safe-idle checks, and typed harness exceptions before launching
+another case. Nested episode failure retains the actual runtime turn/SID separately
+from scenario-turn identity. Unavailable post-run status in execution mode is a stop,
+not fabricated unsafe-state evidence or proof of recovery. Collected records keep
+hard failures even when their incoming `ok` is accidentally true. Skipped cases
+remain explicit; incomplete episodes also make collection incomplete. Semantic
+review remains pending and cannot override the mechanical gate. No error-string
+phrase classifier, polling process, new model invocation or production switch.
+
+Primary attribution: `context_or_harness`, specifically an implementation/process
+contract mismatch. Lower acceptance documents required unconditional stage completion;
+they now agree with the higher-authority integrity exception. The private watcher's
+missing domain and poll race contributed. The underlying semantic failure is the
+trigger, not an explanation for the collection defect.
+
+Evidence under `.chromie/acceptance/engineering-integrity-20260914/`: 21 new tests
+fail on old source; focused runner/text-check suite passes 92 tests; all 45 Level A
+scenarios pass. `replay-boundary.py` injects each of the two exact retained failure
+summaries independently into the original and patched collection boundary over the
+frozen 51-case discovery. Before: 51 attempted slots. After: 1 attempted / 50 unrun.
+Repeated fault slots are scheduling probes, not 51 independent model results.
+Positive controls collect all selected cases in preview and execution-shaped fixtures;
+ordinary failure still exercises the existing stage gate. Final canonical result is
+recorded in the checkpoint/handoff after completion.
+
+Evidence ceiling: Level A harness/source validation only. No native call, deployed
+change, physical audio, simulator action, model-quality improvement or fine-tuning
+readiness is claimed. Existing source/workflow replay cannot replace independent
+positive-reference review, injected-fault exclusion, hidden semantic-family holdouts,
+or isolated and combined production-role qualification. #24/#32 remain open.
+
+Surface review: no new Markdown document, environment variable, profile, service or
+model-facing field. The existing collection owner gains one internal inspection
+function; file size grows because it now owns the previously private stop/report
+responsibility. A separate watchdog/module would add a handoff and preserve the race,
+so no extraction is justified. The private polling watcher is the consolidation
+opportunity and must not be used for future launches. Rollback would restore the
+proven collection defect; no model/runtime rollback is needed for this patch.
+
+
+## Preflight admission continuation — #24/#32, 2026-09-14
+
+A controlled dependency reproduction found that the text acceptance checker recorded
+failed provider/state checks but still created a session. The triggering probe was
+`walk forward`; rejection is independent of its semantics. Models, prompts, runtime
+profiles and production semantic authorities are unchanged.
+
+| Order / owner | Authoritative input and actual output before repair | Expected output / verdict |
+| --- | --- | --- |
+| 1. Agent health / harness | Controlled health has no Soridormi manifest, or healthy manifest for status variants. Health JSON retained; missing manifest adds an error. | Correct detection; capability invocation beyond status must not be admitted after failure. |
+| 2. Soridormi status / harness | Controlled status varies simulator mode, safe-idle, active task, fallen or emergency state. Status JSON retained; mode and existing `safe_idle_errors` checks add errors. | Correct detection. The fixture establishes returned state, not physical state. |
+| 3. Text-check admission | Nonempty preflight errors still reach `create_session()`. All 28 invalid combinations reproduce this across preview/execution and owned/shared assistant lifecycles. | First wrong boundary: reject before session/Gateway admission. |
+| 4. Gateway → Core or reflex → final dispatch | Source inspection shows these paths follow session creation; Core permits early typed presentation before final planning. The outer dispatch guard checks accumulated errors later. Test deliberately stops at session creation. | Late guard cannot establish non-admission. Actual downstream effects were not measured; no physical leak is claimed. |
+| 5. Evidence and lifecycle | Before repair the admission sentinel raises; after repair a failed summary with null SID/cognition/execution/post-status returns to the caller, and owned-assistant cleanup runs. Shared cleanup remains with the sequence owner. | Correct repair/containment. Initial status is not relabeled post-run evidence. |
+| 6. General Ability collection | Structured preflight rejection reaches the existing synchronous integrity gate. Stage contrasts prove one attempted case and explicit unrun coverage. | Correct stop before another case; no model failure or semantic judgment is invented. |
+
+```text
+Agent health -> Soridormi initial status -> existing preflight checks
+                                             | failure
+                                             v
+                                retain rejection -> owner cleanup
+                                             -> cohort stop + unrun coverage
+                                             | no session/Gateway/Core/dispatch
+checks pass -> existing session admission -> unchanged production turn workflow
+```
+
+Root cause is a harness control-flow error: preflight validation accumulated errors
+without enforcing its admission contract. The later execution guard was a contributing
+condition, not an adequate boundary for the complete turn workflow. The repair adds
+an early failed result to the existing `run_check` owner. It uses the existing
+`harness_failure` channel and safe-idle validator; no additional runtime authority,
+semantic classifier, environment variable, flag, or document. Production deterministic
+stop/emergency processing remains unchanged; this gate controls acceptance-case
+admission only.
+
+Evidence: `.chromie/acceptance/engineering-preflight-20260914/`. Fail-first run has
+28 failures and three valid-admission controls passing; final focused runner/checker
+suite passes 125 tests. Canonical passes 3,273 tests / 818 subtests, 145 benchmarks
+and 20 legacy tests, including policy/static/ownership/configuration/docs checks;
+Level A passes 45/45. `replay-admission.py` additionally drives the real checker,
+result validation and aggregate with controlled dependencies. Missing manifest
+rejects before session creation; one of 74 discovered cases is attempted and 73
+remain unrun. `admission-replay.json` retains that scheduling result, not semantic
+qualification of 74 cases. The positive
+non-simulator override uses controlled dependencies and proves option compatibility,
+not supervised hardware validation. No native inference or live target action ran.
+This removes a reproduced engineering blocker but does not close #24/#32 or establish
+fine-tuning readiness. Surface count remains 102 Markdown documents / 15 core-path;
+no new document, profile, service, environment variable or model-facing field.
+
+
+## Bounded engineering iterations — #24/#32, 2026-09-14
+
+Historical pre-SC checkout evidence. The subsequent integration section supersedes
+its Planner communication ownership and runtime/model resume assumptions.
+
+Owner requested up to 18 test/diagnose/repair/retest iterations, keeping models fixed.
+Private ledger: `.chromie/acceptance/engineering-18-20260914/iterations.json`.
+Iteration 1 is an unchanged deployed baseline: one discovered 74-case live-text
+cohort, stdin/discard against headless MuJoCo. It stopped after the first hard failure,
+retained 73 unrun cases, and collected exactly one debug bundle. All 113 Agent/shared
+files matched source; Chromie and Soridormi identities remained stable. Four native
+calls and their exact requests/raw responses are retained and reviewed, with
+same-model/non-independent review explicitly recorded in `iteration-01/review.json`.
+
+| Order / owner | Actual input → output | Contract / verdict |
+| --- | --- | --- |
+| Gateway → GI primary/deeper | Session `eb404c88`, compound walk/nod/turn source. Primary merges independent outcomes and invents actor uncertainty; designated deeper GI keeps fusion and introduces speed-unit uncertainty. | WHAT must preserve independent outcomes. Semantic failure remains separate from the budget defect; no downstream resegmentation is authorized. |
+| GA and Fast concurrently | Same admitted one-Responsibility result. GA preserves it in one Goal; Fast has null presentation and escalates, with no executable activities. | GA conservation is correct for defective upstream input; Fast does not repair WHAT. Ambiguity sufficiency remains a semantic/oracle question. |
+| Deep catalog projection | 23 executable provider contracts serialize to 24,641 characters; fixed 12,000-character check raises `required_context_over_budget`, zero model attempts. | First wrong budget boundary. A catalog-only cap ignores the configured complete-request budget. |
+| Runtime → harness | Error is preserved, no Capability Work starts, cohort stops synchronously. Per-case post-status absent; separately queried post-stop state is safe idle. | Correct containment; separate state query cannot backfill per-case evidence. |
+
+Iteration 2 removes only the duplicate catalog character ceiling from both existing
+Deep prompt render paths. Exact schema/safety/resource/applicability facts and ordering
+are preserved. The existing transport rejects the whole request against model context,
+reserved output and safety margin before HTTP; the resolver's count bound remains.
+No model, context size, output allowance, semantic authority, Schema or runtime flag
+changed. This consolidates budget ownership without truncating the catalog or giving
+Host semantic selection. A new regression fails on the original 31,312-character
+catalog fixture, passes with complete preservation, and verifies an undersized context
+still rejects before HTTP. The captured provider catalog with a controlled Goal
+context needs an estimated 35,592 tokens including reserve/margin, below the unchanged
+49,152-token window. This controlled projection replay is not native inference.
+
+The full 6,000 workflow replay passes on unchanged source: 1,400 workflows, 1,800
+expected state/fault/permission outcomes, 2,580 expected rejections, 220 safe nonexecuting
+rejections. No candidate calls. Frozen Fast 204 / Deep 40 reference corpora validate;
+focused Deep/projection/Ollama tests pass 89 tests / 108 subtests. Native rerun and
+final gate outcomes belong in the checkpoint/handoff after completion. No model or
+training-reference qualification is inherited from these mechanical checks.
+
+
+Iteration 2's full native rerun reached Deep inference (five calls total), proving
+the catalog blocker removed. The same first case still fails and 73 remain unrun;
+one bundle was collected, both source identities stayed stable, and the separate
+post-stop query confirms safe idle. Deep's raw result passes the exact supplied
+Schema but fails the existing DTO. It authors an `ask_user` resolution for
+`clarification_needed` / `speed_unit`, omits `blocking`, and provides no value.
+The DTO defaults `blocking` to false and rejects. It also authors a mixed aggregate for one clarify outcome and speech that omits
+turn-left; fixing the first structural failure does not certify those semantics.
+The `clarification_needed` reference is prospective: blocking parameter records
+may legitimately have no executable step, so that fact alone is not a defect. All five calls are reviewed in `iteration-02/review.json`.
+
+| Iteration 3 boundary | Actual → expected / repair |
+| --- | --- |
+| Shared `PlanParameterResolution` Schema | Omits the DTO's strategy/blocking/value invariant. Exact retained native raw object passes the full old Schema. Schema must expose the already-binding DTO invariant; this is a mechanical realization, not new meaning. |
+| Model → DTO | `ask_user`, omitted blocking → default false → rejection. Host correctly rejects rather than filling blocking or inventing a value. |
+| Runtime → acceptance | Error retained as `unclassified_model_failure`; no Work starts, cohort stops. This repair addresses the earlier decoder contract; error taxonomy and missing per-case final status are separate review items. |
+
+The shared DTO's generated Schema now requires explicit blocking for unresolved
+strategies, permits only null/absent value for those strategies, and requires a
+non-null value for resolved strategies. DTO behavior, valid semantic outcomes and
+model identities are unchanged. The Schema/DTO contrast matrix fails 68 subcases
+before repair and passes all 146 after, across raw DTO, canonical Fast and Deep.
+The exact native row now fails the new Schema at the predicted boundary. Focused
+Planner tests pass 200 / 319 subtests; 104 workflow tests pass after a reviewed
+mechanical input-schema rebind. Only request-format snapshots/hashes change in five
+prototype and 4,600 large-corpus cases, replacing 135 shared Schema artifacts.
+References, prompts, decoding options, scenarios, fault labels, splits and training
+eligibility are byte-value preserved outside those request-format changes.
+`iteration-03/schema-rebind.json` retains old/new manifest hashes and proof scope;
+the old 6,000 manifest remains immutable historical evidence. No reference or training
+promotion follows from rebinding an executable input contract.
+
+
+Iterations 3–6 exposed a decoder implementation constraint: partial `anyOf`
+branches admitted incomplete native parameter objects when intersected by the
+provider. Iteration 3's focused call returned only strategy/value, omitting the
+required step/parameter. Iteration 4 repeats every required object property in
+both complete branches and propagates Fast/Deep field constraints into them.
+The same retained Deep input then passed the full Schema and parameter DTO
+invariant, but failed the separate single-Goal `mixed` aggregate invariant.
+Iteration 5 removes that invalid aggregate option for a single expected Goal.
+Its focused native reply no longer uses `mixed`, but violates already-exposed
+execution/unresolved and confirmation constraints; those remain failures.
+No Host filling, semantic rewriting or extra model reviewer was introduced.
+The final iteration 5 local gate passes 3,275 tests / 988 subtests, 145 benchmarks,
+20 legacy and the complete 6,000 workflow replay. All references remain
+training-ineligible and non-independent. Rebinding generated input Schemas does
+not qualify references or alter frozen expected answers.
+
+Iteration 5's first live run started while the rebuilt service was still warming:
+Host admission at 00:14:04 encountered a connection reset; Agent startup completed
+at 00:14:06. Only the explicit one-token startup warm call was observed, not a
+user semantic transaction. The run remains incomplete (one attempted / 73 unrun).
+Iteration 6 is the unchanged-source rerun after Docker reports healthy, not a
+silent replacement of that failed run. It attempted two cases and retained 72
+unrun. Its eight model-role records, and iteration 4's nine, were reviewed.
+
+| Actual re-entry episode / owner | Material input → actual output | Expected / first divergence |
+| --- | --- | --- |
+| GI → GA → Fast primary, iteration 6 SID `51e18a48` | Walk at 0.2 speed for 10 seconds, nod twice, turn left. GI retains a fused outcome; GA conserves one Goal with degraded subtype binding. Fast admits only `walk_velocity(vx_mps=0.2,duration_s=10)` while claiming complete coverage. | Required nod/turn absent. Complete semantic coverage remains unqualified; no downstream semantic splitting is authorized. |
+| Trusted Capability Runtime → Soridormi | The admitted walk runs and completes in headless MuJoCo. Completion Evidence reactivates Planner; post-run safe idle is true. | Correct mechanical execution of the authored Work, not proof that all requested Work was authored. |
+| Fast result projection | Current common catalog is 17,041 characters; fixed 9,000-character projection cap rejects before inference with `contract_failure`. | Separate catalog admission blocker; no model attempted. |
+| Host `_planner_state_reentry_response` | Returned Fast failure is recorded `resolved`; every `escalate` delegates to Deep without checking failure classification. | Earliest routing defect: technical failure must stop before Deep. Initial planning already enforced this rule, re-entry did not. |
+| Deep transport | Complete re-entry request exceeds the fixed context plus reserve/margin and rejects before inference. Iteration 4 required 50,391 against 49,152 tokens. | Correct budget containment; this cannot count as a semantic Deep answer or successful recovery. |
+| Host → General Ability | Deep failure also recorded `resolved`. Initial turn summary remains `applied`; collector proceeds to the next case. No TTS was scheduled. | Incorrect failure evidence/collection. Absent speech cannot be attributed only to model wording because re-entry failed. |
+| Next case, SID `8b94a64c` | Gaze three seconds with blink twice. Fast authors a Capability primary but a blink auxiliary with `anchor_kind=communicative_act`. | Host correctly rejects anchor-kind mismatch before dispatch; it exposes a raw contract failure and stops the cohort. Required blink as decoration is not independently qualified. |
+
+Iteration 7 restores the existing rule at the shared Host re-entry owner. Both
+Fast and Deep calls now pass through one observed boundary: returned technical
+failures, exceptions and changed Goal scope record `failed` and re-raise before
+adaptation or commitment. A Fast contract failure cannot reach Deep. Semantic
+escalation and direct slow readiness retain their existing permitted paths.
+Acceptance reads the trusted failed-stage status, including when initial dispatch
+was already applied; it does not interpret redacted error prose. Structured
+metrics and cohort stopping use the same stage evidence. The existing classified
+exception handler moves into this shared boundary, still a diagnostic re-raise;
+no broad-exception exemption or blanket ignore was added.
+
+Nine regressions fail at these boundaries on original source after correcting
+fixture construction (the earlier fixture failures are retained separately).
+The focused suite passes 103 tests / three subtests, including provider, result,
+cancellation and turn closure. The full 6,000 replay passes with stable source;
+Level A passes 45/45. Final canonical/native evidence remains in the active
+checkpoint and iteration ledger. These repairs change routing/evidence, not
+semantic authority, model weights/options or physical execution policy.
+
+Iterations 8–12 continued the same fixed-model line. Iteration 7's canonical gate
+passed 3,285 tests / 988 subtests and its native cohort attempted two cases / 72
+unrun. Its Deep clarification satisfied the repaired parameter and single-Goal
+Schema contracts; the second Fast result failed unresolved-meaning conservation.
+That run did not reach result re-entry, so iteration 7's routing repair initially
+had focused executable evidence only.
+
+| Episode / ordered owner | Material input → actual output | Earliest boundary, repair and evidence |
+| --- | --- | --- |
+| Iteration 8: Fast catalog projection → transport | Retained result re-entry catalogs exceed the separate 9,000-character cap. Non-streaming initial/layered/re-entry renderers rejected before inference, although complete-request admission owns the actual budget. | Removed the three duplicate limits; preserved complete catalog facts and transport rejection. Streaming projection remains its existing smaller authorized surface. The regression covers each variant, lossless content and rejection by an undersized transport budget. |
+| Iteration 8 native aggregate: GI → GA/Fast → Host | GI preserves three requested outcomes; Fast changes speed 0.2 to 0.02. Host numeric conservation rejects before execution: one attempted / 73 unrun. | Model numeric error, correctly contained. No numerical default or semantic repair was added. |
+| Iteration 8 isolated blink: GI → GA/Fast → Runtime/provider → Fast re-entry | SID `0fdb87af`: one requested blink, one executed blink. Result re-entry supplies all 10 common contracts / 15,653 characters; Fast returns a grounded completion with no further Work. | Native proof that the Fast catalog obstruction is removed and legitimate re-entry remains operational. Safe idle retained. This one-case pass does not qualify the aggregate or physical hardware. |
+| Iteration 9: typed Planner DTO rejection → shared error taxonomy → Runtime/collector | Retained iteration 2 raw reply raises `PlannerDTOContractError`, previously reported as `unclassified_model_failure`. | Existing typed error now supplies `structured_output_validation` / `model_contract`, non-retryable, attribution not evaluated; shared metadata extraction honors the existing exception protocol. Unknown exceptions remain unclassified. Three fail-first subtests, 215 focused tests / 349 subtests and exact native-raw replay prove classification; no semantic diagnosis is invented from error prose. |
+| Iteration 9 native gaze/blink: GI → GA → Fast → provider → Fast re-entry | SID `ff3f04e7`: GI fuses gaze and blink, GA conserves that input, Fast authors only gaze. Provider executes gaze; Fast result speech claims blinking twice without blink evidence. | Hard semantic failure despite mechanical success and safe idle. The first omission is upstream WHAT fusion; downstream false completion is separately unqualified. No phrase detector, second model critic or Host resegmentation was introduced. |
+| Iteration 9 resource: GI → GA and Fast → Host conservation | SID `bcd2ab86`: accepted recipient `me`; Fast emits `recipient.description="me"`. The live provider declares a structured recipient input but omits its argument realization. Host falls back to comparing the object with the scalar and rejects. Runtime/provider are not invoked. | Earliest responsible declaration belongs to Soridormi. This was a false structural contradiction, not evidence that the model substituted a recipient. |
+| Iteration 10: admitted runtime failure → text-check harness → collector | After a handled non-preview runtime failure, the existing dispatch guard skipped the final status probe. The collector could not establish post-case state. | Moved the existing probe outside the success-only dispatch block; rejected Work still cannot dispatch. Six controlled safe/unsafe/unavailable and preview contrasts include three fail-first failures. SID `f427576b` natively rejects malformed Fast meaning and now retains fresh stand/safe-idle/no-active-task status. Preflight rejection and preview still do not imply post-execution evidence. |
+| Iteration 11: provider declaration → Agent catalog → Fast/Host → provider → re-entry | Existing resource skill now declares entity/quantity→resource, recipient→recipient, direction/location/distance/route→source. Input Schema and embodied safety policy are unchanged. MCP reload and Agent refresh expose all seven mappings. SID `add2cbb0` preserves milk, source and recipient, executes the scripted resource provider and reaches completion speech with safe idle. | Provider-owned contract repair; Planner still authors values and Host does not infer missing semantics. Exact retained raw result now passes; changing recipient to `someone else` still rejects. The mock resource sequence is not real-world acquisition/delivery evidence, and completion perspective is not independently qualified. |
+| Iteration 11 aggregate: GI → GA/Fast → Deep Schema → DTO → Runtime/harness | SID `cd1b19d7`: fused compound, a speed-unit gap, Fast semantic escalation; Deep authors a nonexecuting clarification with `ask_user`, `blocking=true`, but omits `source_goal_ids`. Exact supplied Schema accepts; CanonicalPlan rejects before Work. Fresh safe-idle status is retained. | Another decoder/DTO mismatch. Iteration 12 requires explicit Goal ownership in Deep's complete unresolved-resolution branches. Existing enum/minimum validation and Host ownership remain; no IDs are filled. Exact raw replay fails under repaired Schema, a controlled correct Goal passes Schema and CanonicalPlan, and foreign ownership rejects. Eight fail-first subtests and 194 focused tests / 423 subtests pass. |
+
+The post-admission failure path is now:
+`admitted turn → failed Planner boundary → Runtime error → fresh status probe →
+retained failed stage/status → cohort integrity stop`. Successful execution still
+follows `Runtime → provider result → owned Fast re-entry → validated response`.
+The former success-only status probe and technical Fast-to-Deep delegation are
+removed at their original owners. Model failures are retained, not repaired by
+another same-authority call.
+
+Iteration 11's paired Soridormi gate passes 792 tests with two target-dependent
+skips, 159 body-concurrency tests, 142 task-contract tests, governance, compilation
+and manifest validation. Its mounted manifest SHA is
+`b12a2d75832ede53efa3107da50af59d507f37201e78b567f56ceefb6107053c`.
+The local host lacks the provider dependencies; the full suite ran inside the
+existing dependency-complete Compose container against the mounted whole checkout.
+No skip is counted as target proof. Provider changes are confined to the existing
+manifest, registry execution tests, interface guide and Status; unrelated dirty
+workspace content is preserved.
+
+Iteration 12 mechanically rebinds two prototype and 2,000 large-corpus request
+Schemas (64 shared artifact replacements). It preserves every expected output,
+prompt, decoding option, case, fault label, split and training-eligibility value.
+Large manifest: `e67d15d3025667b667f19cfb976eaabd0f610692b3569d2a75399de0bc5db35a`;
+prototype: `24cb3921f304643a7d5b422f8866fefbe16f87807660aa621048c0ac8d1ea1fa`.
+Earlier rebind manifests remain historical evidence in the retained archives.
+
+Review distinguishes supported contract defects from semantic/oracle uncertainty.
+For example, clarification of a unitless speed is not itself proven wrong, even
+when the scenario expected execution. Remaining GI fusion, invented uncertainty,
+Planner omission/numeric errors and unsupported completion claims are not repaired
+by stronger mechanical pass counts. The 6,000 authored references remain
+non-independent, training-ineligible and without hidden semantic-family splits.
+Current evidence does not establish fine-tuning or default target-evidence closure.
+No model, context/decoding setting, architectural authority, profile, runtime
+switch or current document was added; Chromie's surface remains 102 documents /
+15 core-path documents. Final gate/native counts and resume commands are recorded
+in the checkpoint and handoff; the private per-iteration reviews retain each call,
+source identities, exact stopping point, unrun coverage and one bundle per run.
+
+Iteration 12 final canonical passes 3,296 tests / 1,071 subtests, 145 benchmarks
+and 20 legacy tests; all pinned checks pass with the two existing FastAPI warnings.
+The full 6,000 replay remains source-stable and Level A passes 45/45. Aggregate SID
+`fd0a301a` stops after one attempted / 73 unrun: primary GI fuses the request,
+designated deeper GI recovers three ordered outcomes, GA conserves, and Fast
+authors 0.02 speed / six seconds instead of 0.2 / ten, plus head movement instead
+of a body turn. Host numeric conservation rejects before dispatch; fresh safe idle
+is retained. All four role calls were reviewed; Deep was not invoked in that run.
+The isolated exact iteration 11 Deep packet, changing only the ownership Schema,
+then natively supplies the correct Goal ID and passes the full supplied Schema and
+CanonicalPlan. It is a model-boundary proof without runtime effects, not a full
+workflow or independent semantic qualification. One bundle is retained per run.
+Final safe idle/no active task was observed, owned simulator/MCP were stopped,
+and ports 5555/8000 no longer listen. The twelve-iteration ledger retains six
+unused iterations; no further engineering change is justified by this final
+failure without a new boundary diagnosis. Fine-tuning readiness remains false.
+
+## Integrating upstream Social Cognition — 2026-09-15
+
+Both upstream branches advanced during the pre-SC experiment. The owner explicitly
+authorized integration and required fetch-before-development as a durable rule.
+Recovery stashes retain all old source and generated artifacts; integration starts
+from Chromie `2e18f86a` and Soridormi `0af3d09`, without rewriting remote history.
+The upstream amendment is binding: SC owns words, silence and social expression;
+Planner owns Work/facts, never a draft for SC to review. Remote priority scheduling,
+Vocal/Activity waiting queues, prepared-start alignment, weather/evidence handling
+and manifest validation are preserved.
+
+| Boundary | Conflict and integration decision | Evidence / qualification |
+| --- | --- | --- |
+| Planner prompt projection | Old local renderers combine planning and wording; remote replaces them with `_canonical_work_prompt`. Keep the new Work owner and port only lossless catalog budgeting there and into layered projections. | Focused Fast/Deep catalog preservation, transport refusal and SC authority tests pass. No old response-writer path restored. |
+| Parameter DTO → generated Schema | Shared invariant remains present after SC migration; local complete branches, single-Goal aggregate and blocking ownership constraints remain applicable. | Upstream frozen requests initially mismatch only Schema. Rebind current SC-aware format snapshots; preserve every prompt, response, case, option, fault and training flag. Old pre-SC artifacts are not substituted. |
+| Runtime result → Work re-entry / independent SC | Remote adds independent SC fixtures and communication. Local failure handler rejects technical/scope failures before Work adaptation and improper Deep delegation. | Combine both test sets. SC stays a distinct authority; failed Work is not repaired through SC or Host wording. |
+| Provider declaration → manifest validator → Host | Remote adds generic validation and primitive argument mappings; local adds composite resource mappings. | Retain upstream validator, add complete resource mapping regressions and rerun the paired provider suite. No raw motor fields or changed embodied policy. |
+| Acceptance admission/results | Local preflight rejection, structured asynchronous failure stopping and post-failure state capture apply around current SC-aware runtime. | Focused acceptance/SC suite passes. Original native counts and current target qualification remain separate. |
+
+Initial focused combined suite passes 785 tests / 364 subtests. The first 104-case
+workflow suite has 68 exact request-Schema mismatches; this is stale executable
+input evidence, not permission to change model answers. Final combined gates,
+manifest identities, remote delivery revisions and limitations belong in the two
+handoffs. The earlier raw Qwen traces remain historical and cannot prove SC behavior.
+
+The provider auto-merge produced overlapping `argument_realization` objects;
+JSON loading selected the later local object and hid upstream named entries.
+The upstream manifest regression failed before delivery. Resolution restores
+all upstream entries and names, then adds only `physical_resource_route`.
+Eight execution-contract cases cover entity/item/quantity/recipient and four
+source bindings; the existing manifest tests prove upstream keys remain visible.
+Combined provider validation passes 798 tests / two skips, body 165 and task 147,
+plus governance, compile and manifest checks. Commit `fa6331f` is pushed to
+`origin/codex/turn-count`; unrelated Open_Duck_Playground content is preserved.
+
+The current SC-aware corpus rebind changes five prototype and 4,600 large cases,
+replacing 126 Schema artifacts. Each changed case is compared with its original
+with only request.format excluded; all other fields are equal. Large manifest:
+`9ad69c12b0f60554df1ec5da249cd1cb300e81a79cec9d7d09b8933c6137dba8` →
+`3ba46381bf230f7a930982b05f8cebd9cb672ccd4efbfbdee14d0c4994084f04`.
+Prototype manifest: `cf242af89fac44494202247c90e5056cc2ac024c252bbb225176f8f84109dc5e`.
+The rebound focused workflow suite passes 104/104. Work re-entry diagnostics now
+identify the Fast planning pass instead of incorrectly labeling it the wording
+owner; regressions assert that SC's ownership is not assigned to Planner metadata.
+
+Final combined canonical passes 3,382 tests / 1,139 subtests, 145 benchmarks and
+20 legacy tests; pinned policy, ownership, static/configuration/docs checks pass.
+The two existing FastAPI warnings remain. Full SC-aware 6,000 replay passes with
+source unchanged, retaining the 1,400 / 1,800 / 2,580 / 220 expected-outcome split.
+Level A passes 45/45. No new native SC, deployment, model or physical evidence is
+claimed; reference independence, hidden semantic-family evaluation and target
+closure remain open. Both handoffs carry the exact integrated scope and resume
+boundary; the fetch-before-development rule is committed in both AGENTS.md files.

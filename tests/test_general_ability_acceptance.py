@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import os
 import tempfile
@@ -10,6 +11,8 @@ from dataclasses import replace
 from io import StringIO
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from scripts.general_ability_acceptance import (
     DEFAULT_LEVEL_A_SCENARIO_ROOT,
@@ -36,6 +39,95 @@ from scripts.general_ability_acceptance import (
     validate_library,
 )
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
+
+
+@pytest.mark.parametrize("stage", ["must_pass", "core"])
+@pytest.mark.parametrize("failure", [
+    {"turn_id": "scenario-turn", "sid": "cbe8a87b", "cognitive_runtime": {"status": "error", "metadata": {
+        "failure_domain": "model_contract", "failure_class": "fast_stream_contract_invalid",
+        "failure_stage": "fast_planner_stream", "turn_id": "cbe8a87b",
+    }}},
+    {"cognitive_runtime": {"status": "failed", "metadata": {"failure_domain": "service"}}},
+    {"session_state": {"workflow_events": [{"event": "llm_output_truncated"}]}},
+    {"cognitive_runtime": {"status": "applied"}, "session_state": {
+        "cognitive_workflow_stages": [{"stage": "fast_planner_evidence_reentry", "status": "failed"}]}},
+    {"cognitive_runtime": {"status": "applied"}, "session_state": {
+        "cognitive_workflow_stages": [{"stage": "planner_deep_pass_evidence_reentry", "status": "failed"}]}},
+    {"status_before": {"safe_idle": False}},
+    {"status_after": {"safe_idle": False}},
+    {"harness_failure": {"failure_domain": "preflight", "failure_class": "preflight_rejected"},
+     "sid": None, "cognitive_runtime": None, "execution": None, "status_after": None},
+    {"diagnostic_evaluation": {"metrics": {"goal_omission_rate": 0.5}}},
+    {"diagnostic_evaluation": {"metrics": {"provenance_attachment_rejected": True}}},
+    {"turns": [{"turn_id": "first", "cognitive_runtime": {
+        "status": "error", "metadata": {"failure_domain": "model_contract"},
+    }}]},
+    TimeoutError("case deadline"),
+    ConnectionError("service unavailable"),
+])
+def test_live_cohort_stops_before_next_case_on_integrity_failure(stage, failure):
+    args = build_parser().parse_args(["--mode", "live-text", "--stage", stage, "--no-write"])
+    # Even a superficially passing summary cannot override retained hard evidence.
+    result = {"ok": True, "errors": [], **copy.deepcopy(failure)} if isinstance(failure, dict) else failure
+    runner = AsyncMock(side_effect=[result] if isinstance(result, Exception) else None,
+                       return_value=result)
+    with patch("scripts.general_ability_acceptance._run_live_case", runner):
+        report = asyncio.run(run_live_text(args))
+    assert runner.await_count == 1
+    assert report["ok"] is False
+    assert report["qualification_complete"] is False
+    assert report["cohort_complete"] is False
+    assert report["case_count"] == 1
+    assert report["skipped_case_count"] == report["planned_case_count"] - 1
+    assert report["integrity_stop"]["case_id"] == report["cases"][0]["case_id"]
+    assert report["stage_results"][0]["status"] == "incomplete"
+    assert len({item["case_id"] for item in report["skipped_cases"]}) == report["skipped_case_count"]
+    if isinstance(failure, dict) and failure.get("harness_failure"):
+        assert report["integrity_stop"]["failure_domain"] == "preflight"
+        assert report["integrity_stop"]["failure_class"] == "preflight_rejected"
+    if isinstance(failure, dict) and failure.get("sid") == "cbe8a87b":
+        assert report["integrity_stop"]["turn_id"] == "cbe8a87b"
+        assert report["integrity_stop"]["scenario_turn_id"] == "scenario-turn"
+        assert report["integrity_stop"]["sid"] == "cbe8a87b"
+
+
+def test_live_cohort_retains_stop_and_unrun_coverage_in_reviewer_packet(tmp_path):
+    identity = tmp_path / "identity.json"
+    identity.write_text(json.dumps({"identity_sha256": "fixture-only"}))
+    args = build_parser().parse_args([
+        "--mode", "live-text", "--execute", "--runtime-identity", str(identity),
+        "--evidence-dir", str(tmp_path / "evidence"),
+    ])
+    runner = AsyncMock(return_value={"ok": True, "errors": [], "status_after": None})
+    with patch("scripts.general_ability_acceptance._run_live_case", runner):
+        report = asyncio.run(run_live_text(args))
+    assert runner.await_count == 1
+    assert report["integrity_stop"]["failure_domain"] == "safe_idle"
+    for path in (tmp_path / "evidence" / "summary.json", tmp_path / "evidence" / "reviewer-packet" / "summary.json"):
+        retained = json.loads(path.read_text())
+        assert retained["cohort_complete"] is False
+        assert retained["planned_case_count"] == report["planned_case_count"]
+        assert retained["skipped_cases"] == report["skipped_cases"]
+        assert retained["integrity_stop"] == report["integrity_stop"]
+
+
+@pytest.mark.parametrize("execute", [False, True])
+def test_live_cohort_finishes_all_selected_cases_without_integrity_failure(execute):
+    args = build_parser().parse_args(["--mode", "live-text", "--no-write"])
+    args.execute = execute
+    safe = {"safe_idle": True, "active_task": None, "fallen": False, "emergency_stop": False}
+    runner = AsyncMock(side_effect=lambda *args: {
+        "ok": True, "errors": [], "status_before": safe,
+        "status_after": safe if execute else None,
+    })
+    with patch("scripts.general_ability_acceptance._run_live_case", runner):
+        report = asyncio.run(run_live_text(args))
+    assert runner.await_count == report["planned_case_count"]
+    assert report["cohort_complete"] is True
+    assert report["ok"] is True
+    assert report["integrity_stop"] is None
+    assert report["skipped_cases"] == []
+    assert report["qualification_complete"] is False  # Semantic review is still pending.
 
 
 class GeneralAbilityAcceptanceTests(unittest.TestCase):
@@ -1374,6 +1466,15 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertEqual(namespaces[0].text, "first")
         self.assertEqual(namespaces[1].text, "second")
         self.assertEqual(result["diagnostic_evaluation"]["overall_score"], 100)
+        self.assertTrue(result["cohort_complete"])
+        with patch(
+            "scripts.general_ability_acceptance.run_check_sequence",
+            AsyncMock(return_value=summaries[:1]),
+        ):
+            incomplete = asyncio.run(_run_live_case(args, case, Path("/tmp/episode-evidence")))
+        self.assertFalse(incomplete["cohort_complete"])
+        self.assertFalse(incomplete["ok"])
+        self.assertIn("not run", incomplete["turns"][1]["errors"][0])
 
     def test_live_case_namespace_matches_text_checker_argument_contract(self) -> None:
         args = build_parser().parse_args(["--mode", "live-text"])

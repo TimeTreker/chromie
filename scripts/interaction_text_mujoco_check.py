@@ -867,6 +867,35 @@ async def run_check(
             )
         errors.extend(safe_idle_errors(status_before))
 
+        if errors:
+            # Core realization and deterministic reflexes can run before the
+            # final capability dispatch guard. Reject the qualification case
+            # before admitting a turn when its provider/state checks fail.
+            timings_ms["total_ms"] = (time.perf_counter() - total_start) * 1000.0
+            summary = {
+                "ok": False,
+                "text": args.text,
+                "sid": None,
+                "speaker": args.speaker,
+                "preview_only": args.preview_only,
+                "evidence_dir": str(evidence_dir),
+                "timings_ms": timings_ms,
+                "debug_summary": build_debug_summary(
+                    interpretation={}, response=None, errors=errors
+                ),
+                "errors": errors,
+                "harness_failure": {
+                    "failure_domain": "preflight",
+                    "failure_class": "preflight_rejected",
+                },
+                "status_before": status_before,
+                "status_after": None,
+                "cognitive_runtime": None,
+                "execution": None,
+            }
+            _write_json(evidence_dir / "summary.json", summary)
+            return summary
+
         sid = assistant.create_session()
         context = assistant.build_context(sid)
         robot_state = dict(context.get("robot_state") or {})
@@ -1351,6 +1380,19 @@ async def run_check(
             except Exception as exc:
                 errors.append(f"session completion wait failed: {_exception_text(exc)}")
 
+            session_state = assistant.sessions.state.get(sid) or {}
+            require_tts = should_require_tts_speech(require_speech=args.require_speech)
+            if require_tts:
+                errors.extend(
+                    required_speech_delivery_errors(
+                        session_state,
+                        allow_interrupted=bool(args.interrupt_text),
+                    )
+                )
+
+        # An admitted turn may fail after provisional work or another runtime
+        # transition. Final state evidence must not depend on semantic success.
+        if not args.preview_only:
             try:
                 status_after_start = time.perf_counter()
                 status_after = await _invoke_soridormi_status(invoker)
@@ -1371,16 +1413,6 @@ async def run_check(
                         f"{status_after.get('mode')!r}"
                     )
                 errors.extend(safe_idle_errors(status_after))
-
-            session_state = assistant.sessions.state.get(sid) or {}
-            require_tts = should_require_tts_speech(require_speech=args.require_speech)
-            if require_tts:
-                errors.extend(
-                    required_speech_delivery_errors(
-                        session_state,
-                        allow_interrupted=bool(args.interrupt_text),
-                    )
-                )
 
         debug_summary = build_debug_summary(
             interpretation=interpretation_projection,

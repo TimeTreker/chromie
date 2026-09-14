@@ -130,11 +130,19 @@ python scripts/general_ability_acceptance.py --mode live-text \
 The output must include the evidence level and claim scope. Level A output
 means deterministic regression evidence only.
 
-The ordered live-text policy is stage-complete, then gate. All selected
-`must_pass` cases run even if an earlier case hard-fails, so the report shows the
-whole basic-regression shape. After the stage ends, any hard deterministic
-failure blocks `core` and `challenge`. If must-pass hard gates succeed, the
-runner proceeds in order. A focused `--only-case` or explicit `--stage` run is a
+The ordered live-text policy collects ordinary scenario mismatches through the
+current stage, then gates later stages. Structured Runtime/model-contract or
+LLM-integrity failures, observed Goal omission/provenance rejection, unsafe status,
+missing post-run status in execution mode, and harness exceptions stop collection
+before the next case in any stage. Nested episode failures retain their turn/SID
+correlation. No polling watcher or model reviewer decides this boundary.
+The aggregate and reviewer packet retain `integrity_stop`, `planned_case_count`,
+`skipped_cases`, and `cohort_complete`; skipped cases never become passes.
+Collect exactly one debug bundle after the runner exits. Normal semantic review
+remains required for every executed case, including mechanical passes.
+After a completed must-pass stage, any hard deterministic failure blocks `core`
+and `challenge`. If must-pass hard gates succeed, the runner proceeds in order.
+A focused `--only-case` or explicit `--stage` run is a
 diagnostic subset and does not prove that skipped prerequisite stages passed.
 
 Every live-text file declares a `hybrid` oracle. Exact response text is not the
@@ -249,8 +257,8 @@ Scope:
 - add Level A ability-class execution;
 - add live text preview/execution support using the existing text-to-MuJoCo
   boundary;
-- finish a stage before applying its gate, and block later stages after a
-  must-pass hard failure;
+- stop at the case boundary on integrity failure; otherwise finish the stage
+  before applying its gate and block later stages after a must-pass hard failure;
 - package natural-language outcomes for the existing hybrid semantic-review
   workflow instead of using exact response-string truth;
 - add focused tests and test-matrix wiring;

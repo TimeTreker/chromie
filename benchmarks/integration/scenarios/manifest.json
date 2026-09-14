@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "ad3fc1147fc66babccfbba09e3bd2e04b1eb161ead20bd4a9ee57e13e919fe35",
-    "workflow-conditional-dry.json": "9e5c8eecb203d6cf82265b0c52884303adb82c31683e1822f7dbe88f0a4111c8",
-    "workflow-conditional-rain.json": "ee397e3745d70f6908bb4f3e27cabcfc89f02cbebf72de2a4c406d7f36b36920",
-    "workflow-delayed.json": "1e7689dee6e6782c9f2ff21d6447be2ac3aa1816d17ee7e952b87d7e32c45a4b",
-    "workflow-normal.json": "e3d8ca2d59b60370b57d49ff2a8752b95f29e539fc3bfbd8bf577e370f49cdf6"
+    "workflow-cancellation.json": "0a13ad8fb969cc10781ffa4ea363d59681edf233a7c09ff4fc1b34a67059957d",
+    "workflow-conditional-dry.json": "cb79d6d025ae7d1d7fa870d2cd582cb3a0dbcffc3bf59b0b44df8305e69ce52d",
+    "workflow-conditional-rain.json": "5b1417ca989400f8b35b3dd38aa5838e463fc21df20f3358b45dbcfda19f6042",
+    "workflow-delayed.json": "d81cfacec33675e16e8363b81e4059c66acbdc73afb413ae24b348db98790a84",
+    "workflow-normal.json": "8a322e54ad4ea56c25d66dbbc3183e778bea29505a8986d0dcd23707baa7b58d"
   },
-  "freeze_revision": 4,
-  "freeze_note": "Final reference review corrected conditional GI source span to t0\u2013t7, covering the full condition and location. Unique deterministic UUID prefixes retained. Preparation evidence is separate.",
+  "freeze_revision": 5,
+  "freeze_note": "Mechanical Schema alignment on the upstream Social Cognition/Work corpus: complete parameter-resolution branches and canonical Goal ownership. Only request format snapshots and hashes changed; all references, targets, splits and training eligibility unchanged.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

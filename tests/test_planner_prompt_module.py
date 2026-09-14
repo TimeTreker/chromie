@@ -135,6 +135,35 @@ def _render_required(request, variant):
     return str(getattr(planner_prompt, variant)(request, [], **kwargs))
 
 
+@pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt", "fast_advance_layered_prompt"])
+def test_fast_catalog_is_lossless_with_transport_owned_budget(variant):
+    from unittest.mock import patch
+    from agent.app.clients.ollama_client import OllamaClient, OllamaGenerationError
+
+    request = _retained_request(count=1)
+    catalog = [{"capability_id": f"provider.action_{index}", "description": "Exact applicability. " * 50,
+                "input_schema": {"type": "object", "properties": {"duration_s": {"type": "number", "maximum": 20}}}}
+               for index in range(20)]
+    encoded = json.dumps(catalog, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    assert len(encoded) > 17041
+    if variant == "fast_advance_layered_prompt":
+        prompt = planner_prompt.fast_advance_layered_prompt(
+            request, capabilities=catalog, responsibilities=request.responsibilities, response_schema={},
+        )
+        encoded = json.dumps(planner_prompt.fast_advance_streaming_capability_prompt_projection(catalog),
+                             ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    else:
+        prompt = getattr(planner_prompt, variant)(request, catalog, response_schema={})
+    assert encoded in str(prompt)
+    with patch("agent.app.clients.ollama_client.httpx.AsyncClient") as http:
+        with pytest.raises(OllamaGenerationError) as rejected:
+            asyncio.run(OllamaClient(base_url="http://unused.invalid", model="fixed-test-model", purpose="fast_planner").generate(
+                prompt, options={"num_ctx": 4096, "num_predict": 1024},
+            ))
+    assert rejected.value.failure_class == "prompt_budget_exceeded"
+    http.assert_not_called()
+
+
 @pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt", "deep_plan_prompt", "deep_layered_prompt"])
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
 @pytest.mark.parametrize("oversized", [False, True])

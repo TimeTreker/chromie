@@ -16,6 +16,31 @@ from agent.app.inference_compute import CognitionComputeClass
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
+    def test_typed_planner_dto_failure_keeps_classification_through_fallbacks(self) -> None:
+        from agent.app.clients.ollama_client import llm_failure_metadata
+        from agent.app.planner_model_contract import PlannerDTOContractError
+        from agent.app.planner_fallback import materialize_fast_escalation, materialize_deep_clarify
+        from tests.cognitive_work_test_support import cognitive_work_request
+
+        error = PlannerDTOContractError("ask_user requires blocking=true without a resolved value")
+        request = cognitive_work_request(sid="contract-rejection", text="Perform the requested action.", context={})
+        for tier in ("direct", "fast", "deep"):
+            with self.subTest(tier=tier):
+                if tier == "direct":
+                    metadata = llm_failure_metadata(error)
+                else:
+                    materialize = materialize_fast_escalation if tier == "fast" else materialize_deep_clarify
+                    plan = materialize("rejected-plan", request, "model_contract_failed", error=error)
+                    metadata = plan.metadata
+                    self.assertEqual(plan.steps, [])
+                    self.assertEqual(plan.response_text, "")
+                self.assertEqual(metadata["failure_class"], "structured_output_validation")
+                self.assertEqual(metadata["failure_domain"], "model_contract")
+                self.assertEqual(metadata["architecture_attribution"], "not_evaluated")
+                self.assertFalse(metadata["retryable"])
+        self.assertEqual(llm_failure_metadata(ValueError("unknown origin"))["failure_class"],
+                         "unclassified_model_failure")
+
     async def test_generate_records_only_its_own_completion_or_failure(self) -> None:
         from agent.app.clients.ollama_client import _PREFIX_CACHE_TRACKER
 

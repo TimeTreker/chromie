@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +26,7 @@ from scripts.interaction_text_mujoco_check import (
     dispatch_initial_reflex,
     parse_expected_arg,
     record_execution_bindings,
+    run_check,
     required_speech_delivery_errors,
     safe_idle_errors,
     should_require_tts_speech,
@@ -33,6 +37,129 @@ from scripts.interaction_text_mujoco_check import (
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.reflex import ReflexFilter
+
+
+@pytest.mark.parametrize("preview", [True, False])
+@pytest.mark.parametrize("owns_assistant", [True, False])
+@pytest.mark.parametrize("sources,status_change", [
+    ([], {}),
+    (["soridormi"], {"mode": "physical"}),
+    (["soridormi"], {"mode": None}),
+    (["soridormi"], {"safe_idle": False}),
+    (["soridormi"], {"active_task": "existing-task"}),
+    (["soridormi"], {"fallen": True}),
+    (["soridormi"], {"emergency_stop": True}),
+])
+def test_failed_preflight_retains_evidence_without_entering_turn(
+    tmp_path, preview, owns_assistant, sources, status_change,
+):
+    status = {"mode": "sim", "safe_idle": True, "active_task": None,
+              "fallen": False, "emergency_stop": False, **status_change}
+    args = build_parser().parse_args(["walk forward", "--evidence-dir", str(tmp_path)])
+    args.preview_only = preview
+    assistant = SimpleNamespace(
+        get_http_session=AsyncMock(return_value=object()),
+        agent_client=SimpleNamespace(health=AsyncMock(return_value={"capability_sources": sources})),
+        interaction_runtime=SimpleNamespace(soridormi_invoker=object()),
+        create_session=Mock(side_effect=AssertionError("turn entered after failed preflight")),
+    )
+    shutdown = AsyncMock()
+    with (
+        patch("orchestrator.orchestrator.VoiceAssistant", return_value=assistant),
+        patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", AsyncMock(return_value=status)),
+        patch("scripts.interaction_text_mujoco_check.shutdown_voice_assistant", shutdown),
+        patch("scripts.interaction_text_mujoco_check.playback_transport_for", return_value=SimpleNamespace(close_output_stream=Mock())),
+    ):
+        result = asyncio.run(run_check(
+            args, assistant=None if owns_assistant else assistant, configure_environment=False,
+        ))
+    assistant.create_session.assert_not_called()
+    assert shutdown.await_count == int(owns_assistant)
+    assert result["ok"] is False
+    assert result["harness_failure"]["failure_domain"] == "preflight"
+    assert result["errors"]
+    assert result["status_before"] == status
+    assert result["status_after"] is None
+    assert result["cognitive_runtime"] is None
+    assert result["execution"] is None
+    assert result["sid"] is None
+    assert json.loads((tmp_path / "summary.json").read_text()) == result
+    assert (tmp_path / "agent_health.json").exists()
+    assert (tmp_path / "status_before.json").exists()
+
+
+@pytest.mark.parametrize("preview,mode,allow_non_sim", [
+    (True, "sim", False), (False, "sim", False), (False, "physical", True),
+])
+def test_valid_preflight_reaches_turn_admission(tmp_path, preview, mode, allow_non_sim):
+    args = build_parser().parse_args(["walk forward", "--evidence-dir", str(tmp_path)])
+    args.preview_only, args.allow_non_sim = preview, allow_non_sim
+    assistant = SimpleNamespace(
+        get_http_session=AsyncMock(return_value=object()),
+        agent_client=SimpleNamespace(health=AsyncMock(return_value={"capability_sources": ["soridormi"]})),
+        interaction_runtime=SimpleNamespace(soridormi_invoker=object()),
+        create_session=Mock(side_effect=RuntimeError("valid preflight reached admission")),
+    )
+    status = {"mode": mode, "safe_idle": True, "active_task": None,
+              "fallen": False, "emergency_stop": False}
+    with patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", AsyncMock(return_value=status)):
+        with pytest.raises(RuntimeError, match="valid preflight reached admission"):
+            asyncio.run(run_check(args, assistant=assistant, configure_environment=False))
+    assistant.create_session.assert_called_once()
+
+
+@pytest.mark.parametrize("preview", [False, True])
+@pytest.mark.parametrize("post_state", ["safe", "unsafe", "unavailable"])
+def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_path, preview, post_state):
+    from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+    from shared.chromie_contracts.core_interpretation import CoreInterpretationResult, CognitiveResponsibilityProposal
+
+    args = build_parser().parse_args(["blink once", "--evidence-dir", str(tmp_path)])
+    args.cognitive_runtime, args.preview_only = True, preview
+    safe = {"mode": "sim", "safe_idle": True, "active_task": None, "fallen": False, "emergency_stop": False}
+    final = {**safe, "safe_idle": post_state != "unsafe", "standing": True}
+    gateway = CognitiveGateway()
+    assistant = SimpleNamespace(
+        get_http_session=AsyncMock(return_value=object()), create_session=Mock(return_value="admitted"),
+        build_context=Mock(return_value={}),
+        agent_client=SimpleNamespace(
+            health=AsyncMock(return_value={"capability_sources": ["soridormi"]}),
+            review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
+            interpret_turn=AsyncMock(return_value=CoreInterpretationResult(
+                turn_id="admitted", session_id="admitted", confidence=1.0,
+                responsibilities=[CognitiveResponsibilityProposal(local_ref="r-blink", outcome="Blink once.", output_mode="body_action", confidence=1.0)],
+            )),
+        ),
+        interaction_runtime=SimpleNamespace(soridormi_invoker=object(), confirmation_request_ids=AsyncMock(return_value=[])),
+        _cognitive_gateway_adapter=Mock(return_value=gateway), session_log=Mock(),
+        _run_cognitive_runtime_pipeline=AsyncMock(return_value=CognitiveRuntimeResolution(
+            mode="apply", status="error", fallback_reason="controlled contract rejection")),
+        _host_speech_response=Mock(return_value=InteractionResponse(interaction_id="rejected", status="ok")),
+        conversation_state=SimpleNamespace(record_user_turn=Mock(), record_interaction_response=Mock()),
+        sessions=SimpleNamespace(state={"admitted": {}}), cognitive_evidence=None,
+        _dispatch_detached_interaction=AsyncMock(),
+    )
+    probe = AsyncMock(side_effect=[safe, ConnectionError("status unavailable") if post_state == "unavailable" else final])
+    with (patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", probe),
+          patch("scripts.interaction_text_mujoco_check.record_cognitive_runtime_evidence"),
+          patch("scripts.interaction_text_mujoco_check.collect_run_provenance", return_value={})):
+        result = asyncio.run(run_check(args, assistant=assistant, configure_environment=False))
+    assert result["ok"] is False
+    assert result["sid"] == "admitted"
+    assert result["cognitive_runtime"]["status"] == "error"
+    assistant._dispatch_detached_interaction.assert_not_awaited()
+    assistant.conversation_state.record_user_turn.assert_called_once()
+    assert probe.await_count == (1 if preview else 2)
+    assert result["status_after"] == (None if preview or post_state == "unavailable" else final)
+    assert json.loads((tmp_path / "summary.json").read_text()) == result
+    if not preview and post_state == "unavailable":
+        assert (tmp_path / "status_after_error.json").exists()
+        assert any("post-run Soridormi status probe failed" in error for error in result["errors"])
+    elif not preview:
+        assert json.loads((tmp_path / "status_after.json").read_text()) == final
+        if post_state == "unsafe":
+            assert any("safe_idle" in error for error in result["errors"])
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):

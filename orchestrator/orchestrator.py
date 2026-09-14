@@ -75,6 +75,7 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     CognitiveRuntimeResolution,
+    CognitiveStageFailure,
     GoalDrivenRuntimeCoordinator,
 )
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
@@ -5703,7 +5704,6 @@ class VoiceAssistant:
         context["existing_work_activities"] = planning_runtime.planning_work_activities(planning_snapshot)
         request = request.model_copy(deep=True, update={"context": context})
         session = await self.get_http_session()
-        planner_started_ms = now_ms()
         workflow_input = {
             "source_goal_ids": normalized_goal_ids,
             "evidence_goal_ids": normalized_evidence_goal_ids,
@@ -5724,42 +5724,52 @@ class VoiceAssistant:
             )
             return None
 
-        replanned: CanonicalPlan | None = None
-        if preferred_mode != "slow":
+        async def resolve_reentry_plan(tier, operation, workflow_stage, stage_metadata):
+            started_ms = now_ms()
+            result = None
             try:
-                replanned = await self.agent_client.resolve_fast_plan(
-                    session,
-                    request=request,
-                    timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+                result = await operation
+                failure = self.cognitive_runtime._optional_stage_failure_metadata(
+                    workflow_stage, result.metadata,
                 )
+                if (
+                    tier == "fast"
+                    and self.cognitive_runtime._fast_plan_path(result) == "contract_failure"
+                ) or (tier == "deep" and failure is not None):
+                    raise CognitiveStageFailure(
+                        workflow_stage,
+                        failure or self.cognitive_runtime._stage_failure_metadata(
+                            workflow_stage, result.metadata,
+                            default_failure_class="fast_planner_contract_failure",
+                        ),
+                    )
+                if set(result.goal_ids) != set(normalized_goal_ids):
+                    raise ValueError("Planner state re-entry changed the bound Goal set")
             except Exception as exc:
                 record_session_workflow_stage(
-                    self,
-                    session_id,
-                    stage=fast_workflow_stage,
-                    started_monotonic_ms=planner_started_ms,
-                    finished_monotonic_ms=now_ms(),
-                    status="failed",
-                    input_payload=workflow_input,
-                    output_payload=None,
+                    self, session_id, stage=workflow_stage,
+                    started_monotonic_ms=started_ms, finished_monotonic_ms=now_ms(),
+                    status="failed", input_payload=workflow_input, output_payload=result,
                     errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
-                    metadata={"wording_owner": "fast_planner"},
+                    metadata={**stage_metadata, **getattr(exc, "failure_metadata", {})},
                 )
                 raise
             record_session_workflow_stage(
-                self,
-                session_id,
-                stage=fast_workflow_stage,
-                started_monotonic_ms=planner_started_ms,
-                finished_monotonic_ms=now_ms(),
-                status="resolved",
-                input_payload=workflow_input,
-                output_payload=replanned,
-                errors=[],
-                metadata={"wording_owner": "fast_planner"},
+                self, session_id, stage=workflow_stage,
+                started_monotonic_ms=started_ms, finished_monotonic_ms=now_ms(),
+                status="resolved", input_payload=workflow_input, output_payload=result,
+                errors=[], metadata=stage_metadata,
             )
-            if set(replanned.goal_ids) != set(normalized_goal_ids):
-                raise ValueError("Planner state re-entry changed the bound Goal set")
+            return result
+
+        replanned: CanonicalPlan | None = None
+        if preferred_mode != "slow":
+            replanned = await resolve_reentry_plan(
+                "fast", self.agent_client.resolve_fast_plan(
+                    session, request=request,
+                    timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+                ), fast_workflow_stage, {"planner_pass": "fast"},
+            )
 
         if preferred_mode == "slow" or (
             replanned is not None and replanned.disposition == "escalate"
@@ -5772,31 +5782,13 @@ class VoiceAssistant:
                     phase,
                 )
                 return None
-            deep_started_ms = now_ms()
-            replanned = await deep_call(
-                session,
-                request=request,
-                timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
+            replanned = await resolve_reentry_plan(
+                "deep", deep_call(
+                    session, request=request,
+                    timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
+                ), deep_workflow_stage,
+                {"planner_pass": "deep", "readiness_mode": preferred_mode},
             )
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage=deep_workflow_stage,
-                started_monotonic_ms=deep_started_ms,
-                finished_monotonic_ms=now_ms(),
-                status="resolved",
-                input_payload=workflow_input,
-                output_payload=replanned,
-                errors=[],
-                metadata={
-                    "planner_pass": "deep",
-                    "readiness_mode": preferred_mode,
-                },
-            )
-            if set(replanned.goal_ids) != set(normalized_goal_ids):
-                raise ValueError(
-                    "Deep Planner state re-entry changed the bound Goal set"
-                )
         if replanned is None:
             return None
         if (

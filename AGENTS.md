@@ -2,6 +2,14 @@
 
 Guidance for coding agents working on Chromie.
 
+## Before development
+
+Before editing source, fetch the configured remote and verify the working branch
+contains the newest upstream revision. Preserve dirty work before integrating
+remote changes; reconcile against the latest design and rerun relevant validation.
+Do not start development from a stale checkout. Check upstream again before push;
+never force-push to overwrite others' work.
+
 ## Read first
 
 1. `docs/PROJECT_CHARTER.md` — stable goal, boundaries, and non-goals

@@ -247,9 +247,7 @@ def _canonical_work_prompt(
         trusted_target_evidence_prompt_section(context),
     ]
     if include_capability_catalog:
-        sections.append(catalog_label + ":\n" + required_json(
-            catalog, 9000 if tier == "fast" else 12000, label=tier.title() + " Planner capability catalog",
-        ) + "\n\n")
+        sections.append(catalog_label + ":\n" + json.dumps(catalog, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n\n")
     projections = {
         "Goal association": goal_association_prompt_projection(context, goal_ids=scope if request.planner_reentry_scope else None),
         "Scoped canonical Goals": list(goals.authoritative_goals),
@@ -681,7 +679,7 @@ def fast_layered_prompt(
         agent_skill_prompt_section(context, agent_role="fast_planner")
         + trusted_target_evidence_prompt_section(context)
         + "Executable common capability catalog JSON:\n"
-        + required_json(capabilities, 9000, label='Fast Planner capability catalog')
+        + json.dumps(capabilities, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         + "\n\n"
     )
     rendered = role_memory_context(context, role="planner") + fast_plan_prompt(
@@ -741,7 +739,7 @@ def deep_layered_prompt(
         agent_skill_prompt_section(context, agent_role="deep_planner")
         + trusted_target_evidence_prompt_section(context)
         + "Executable capability catalog JSON:\n"
-        + required_json(prompt_capabilities, 12000, label='Deep Planner capability catalog')
+        + json.dumps(prompt_capabilities, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         + "\n\n"
     )
     rendered = role_memory_context(context, role="planner") + deep_plan_prompt(

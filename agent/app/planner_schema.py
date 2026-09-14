@@ -651,6 +651,11 @@ def canonical_plan_response_schema(
             "refused",
         ]
 
+    if isinstance(disposition, dict) and len(set(expected_goal_ids)) < 2:
+        # Mixed is an aggregate of distinct per-Goal dispositions, never a
+        # different way to label one Goal's clarification or executable result.
+        disposition["enum"] = [value for value in disposition["enum"] if value != "mixed"]
+
     if unavailable_provider_vocal_goal_set:
         planner_response_text = properties.get("response_text")
         if isinstance(planner_response_text, dict):
@@ -1220,6 +1225,16 @@ def canonical_plan_response_schema(
         resolution_model = schema.get("$defs", {}).get("PlanParameterResolution")
         if isinstance(resolution_model, dict):
             bound_deep_text(resolution_model.get("properties", {}), "rationale", 240)
+            for branch in resolution_model.get("anyOf", []):
+                branch_properties = branch.get("properties", {})
+                bound_deep_text(branch_properties, "rationale", 240)
+                # Unresolved strategies already require blocking. CanonicalPlan
+                # also requires their exact Goal ownership; expose that in each
+                # complete decoder branch, without Host filling missing IDs.
+                if branch_properties.get("blocking", {}).get("const") is True:
+                    branch_required = branch.setdefault("required", [])
+                    if "source_goal_ids" not in branch_required:
+                        branch_required.append("source_goal_ids")
         satisfaction_model = schema.get("$defs", {}).get("PlannerGoalSatisfaction")
         if isinstance(satisfaction_model, dict):
             bound_deep_text(satisfaction_model.get("properties", {}), "rationale", 320)
@@ -1471,6 +1486,9 @@ def fast_multi_goal_response_schema(
             else ["respond", "execute", "mixed", "clarify", "escalate"]
         )
 
+    if isinstance(disposition, dict) and len(set(expected_goal_ids)) < 2:
+        disposition["enum"] = [value for value in disposition["enum"] if value != "mixed"]
+
     allowed_goals = list(dict.fromkeys(expected_goal_ids))
     allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
@@ -1708,6 +1726,11 @@ def fast_multi_goal_response_schema(
                 "object, such as speed_mps or duration_s. Do not prefix it "
                 "with a step ID or capability ID."
             )
+        for branch in resolution_schema.get("anyOf", []):
+            branch["required"] = list(resolution_required)
+            for name, contract in resolution_properties.items():
+                if name not in {"strategy", "blocking", "value"}:
+                    branch["properties"][name] = copy.deepcopy(contract)
     goal_list_fields = {
         "goal_ids",
         "source_goal_ids",

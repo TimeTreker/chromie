@@ -616,7 +616,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "65ef7edeee05cfc4e7c8eab8286b18e7972c18db8717a1f0db9f032879625051"
+          "$artifact": "273b1726d03dd07b2a62471ef22811fd1759765600eb9b3a5df3a994565caf00"
         }
       }
     },
@@ -712,7 +712,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "72f280217e6181462633ff808f20cd0b718ace557b7288c333453d3bd061780e"
+          "$artifact": "f23cf843f500254dded6c5bc1c043769fda2e6d93b47ea8defb2506208755d73"
         }
       }
     }

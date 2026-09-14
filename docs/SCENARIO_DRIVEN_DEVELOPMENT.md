@@ -480,10 +480,14 @@ then run its complete ability class before the canonical repository gate.
 
 Every maintained general-ability live episode owns one file under
 `scenarios/general_ability/<must_pass|core|challenge>/` and declares its own
-ability and oracle metadata; there is no central scenario index. For broad changes, finish the
-complete `must_pass` stage before evaluating its gate. Retain and report every
-must-pass result even when an earlier case fails, then block `core` and
-`challenge` if any non-overridable hard gate failed. Natural-language outcomes
+ability and oracle metadata; there is no central scenario index. For broad changes,
+collect the complete `must_pass` stage for ordinary scenario mismatches, then block
+`core` and `challenge` if any non-overridable hard gate failed. The aggregate-first
+integrity exception applies within every stage: stop before the next case on
+structured Runtime/model-contract, LLM-integrity, Goal-omission/provenance,
+unsafe/unverified execution status, or harness failure. Retain the triggering
+case and every unrun case explicitly, collect one bundle after exit, and report
+incomplete coverage. Natural-language outcomes
 use the declared hybrid semantic-review contract rather than exact response
 strings; deterministic safety, authorization, capability, execution,
 provenance, and LLM-integrity failures remain final.

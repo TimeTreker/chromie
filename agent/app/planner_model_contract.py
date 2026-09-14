@@ -329,6 +329,14 @@ class PlannerModelOutput(BaseModel):
 class PlannerDTOContractError(ValueError):
     """Planner output is mechanically malformed or internally inconsistent."""
 
+    def metadata(self) -> dict[str, Any]:
+        return {
+            "failure_class": "structured_output_validation",
+            "failure_domain": "model_contract",
+            "architecture_attribution": "not_evaluated",
+            "retryable": False,
+        }
+
 class ResourceResponsibilityCapabilityGroundingError(ValueError):
     """A selected Capability does not satisfy a typed resource contract."""
 
