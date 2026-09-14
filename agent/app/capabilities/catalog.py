@@ -375,14 +375,10 @@ class CapabilityCatalog:
     async def refresh_live_named_capabilities(self, *, force: bool = False) -> None:
         if self.live_invoker is None:
             return
-        now = time.monotonic()
-        if not force and now - self._last_refresh_monotonic < self.refresh_ttl_s:
-            return
         async with self._refresh_lock:
             now = time.monotonic()
             if not force and now - self._last_refresh_monotonic < self.refresh_ttl_s:
                 return
-            self._last_refresh_monotonic = now
             try:
                 outcome = await self.live_invoker.invoke("soridormi.skill.list", {})
                 if getattr(outcome, "status", None) != "success":
@@ -564,6 +560,10 @@ class CapabilityCatalog:
             except Exception as exc:  # keep the last known-good catalog
                 self._last_refresh_error = f"{type(exc).__name__}: {exc}"
                 logger.warning("live capability refresh failed: %s", self._last_refresh_error)
+            # Freshness describes a published result, never an in-flight lookup.
+            # Concurrent cognitive owners must join that lookup before reading;
+            # cancellation leaves it stale so the next reader can retry.
+            self._last_refresh_monotonic = time.monotonic()
 
     def _static_entries(self, registry: CapabilityRegistry) -> list[CatalogCapability]:
         entries: list[CatalogCapability] = []

@@ -644,24 +644,13 @@ async def apply_goal_free_situation_opportunity(
     if not callable(deliver):
         return "delivery_unavailable"
     resolution = SocialCognitionResolution.model_validate(response.metadata["social_cognition_resolution"])
-    # Both modalities belong to the same admitted decision. Optional expression
-    # uses the existing resource arbiter and cannot authorize requested task Work.
-    expression = any(act.auxiliary_activities for act in resolution.activities)
-    if expression:
-        speech_result, expression_result = await asyncio.gather(
-            deliver(response, session_id=session_id, detached_delivery=True),
-            host.cognitive_runtime.adapter.execute_auxiliary_activities(
-                social_cognition=resolution, session_id=str(response.metadata["session_id"]),
-                turn_id=resolution.request_id, interaction=response,
-                context=host.build_context(session_id),
-                snapshot_is_current=lambda: getattr(host, "_social_situation_revisions", {}).get(observation.source_id)
-                    == (observation.source_revision, observation.projection.digest),
-            ),
-        )
-        host.session_log(session_id, "social_expression_result: %s", expression_result)
-        if not response.speech:
-            return "social_expression_" + str(expression_result["status"])
-        return speech_result
+    if any(act.auxiliary_activities for act in resolution.activities):
+        current = lambda: getattr(host, "_social_situation_revisions", {}).get(observation.source_id) == (observation.source_revision, observation.projection.digest)
+        response = await host.cognitive_runtime.adapter.prepare_social_response(
+            response, social_cognition=resolution, session_id=str(response.metadata["session_id"]),
+            turn_id=resolution.request_id, context=host.build_context(session_id), snapshot_is_current=current)
+        if not current():
+            return "stale_situation"
     return await deliver(response, session_id=session_id, detached_delivery=True)
 
 
@@ -848,7 +837,6 @@ async def resolve_goal_free_situation_response(
         "authority_scope": "goal_free_situation",
         "cognitive_opportunity": opportunity.prompt_projection(),
         "situation": observation.projection.prompt_projection(),
-        "social_cognition_resolution": resolution.model_dump(mode="json"),
     })
     return response
 

@@ -779,7 +779,9 @@ async def test_environment_nonverbal_sc_uses_existing_soridormi_expression_runti
     deliveries = []
     async def deliver(response, **kwargs):
         deliveries.append(response)
-        return "speech_runtime_completed"
+        dispatch = await provider.submit_response(response, session_id="sid")
+        await provider.wait_dispatch(dispatch)
+        return "interaction_runtime_completed"
     host = SimpleNamespace(
         build_context=lambda sid: {}, session_log=lambda *args: None,
         get_http_session=lambda: asyncio.sleep(0, result=object()),
@@ -792,7 +794,7 @@ async def test_environment_nonverbal_sc_uses_existing_soridormi_expression_runti
         ),
     )
     await apply_goal_free_situation_opportunity(host, goal_free_observation(), session_id="sid")
-    assert deliveries[0].speech == [] and deliveries[0].capabilities == []
+    assert deliveries[0].speech == [] and len(deliveries[0].capabilities) == 1
     request = provider.executed[0][0].capabilities[0]
     assert request.capability_id == "soridormi.blink_eyes"
     assert request.metadata["anchor_id"] == "wordless"

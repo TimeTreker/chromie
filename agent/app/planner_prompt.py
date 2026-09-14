@@ -651,7 +651,14 @@ def fast_advance_capability_prompt_projection(
 
 
 def fast_streaming_advance_system_prompt() -> str:
-    return PLANNER_WORK_AUTHORITY_PROMPT + "Return one complete Work JSON object, with no extra text."
+    return PLANNER_WORK_AUTHORITY_PROMPT + (
+        "Return one complete Work JSON object, with no extra text.\n"
+        "Serialize each Capability args object in the lexicographic property order shown in "
+        "args_schema, including nested objects. Decide all needed arguments before writing "
+        "that object: after emitting a later property, the constrained decoder cannot return "
+        "to an earlier property. This is only serialization order; retain every supplied "
+        "material binding."
+    )
 
 
 def fast_layered_prompt(

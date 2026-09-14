@@ -131,3 +131,47 @@ class PlaybackCompletionEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 await playback
                 self.assertEqual(await verified, outcome == "completed")
                 self.assertEqual(event["status"], "playback_completed" if outcome == "completed" else "playback_interrupted")
+
+    async def test_pcm_ready_waits_for_required_body_and_failure_never_plays(self):
+        import asyncio
+        from contextlib import nullcontext
+        from orchestrator.runtime.scheduler import CoordinatedStart, ExecutionStart
+        for body_failure in (False, True):
+            with self.subTest(body_failure=body_failure):
+                lifecycle = PlaybackDeliveryLifecycle()
+                lifecycle.create_playback_start_waiter(generation=1, order=0, session_id="sid")
+                event = lifecycle.register_turn_speech_event(session_id="sid", generation=1, orders=[0],
+                    normalized_text="Hello.", stage="result", purpose="answer", communicative_activity_ids=["a"])
+                gate = CoordinatedStart({"speech", "body"}, set())
+                lifecycle.execution_starts[(1, 0, "sid")] = ExecutionStart(gate, "speech")
+                def resolve(generation, order, sid, **kwargs):
+                    lifecycle.resolve_playback_start_waiter(generation=generation, order=order, session_id=sid, **kwargs)
+                host = SimpleNamespace(_playback_state=lambda: lifecycle, playback_start_key=lifecycle.key,
+                    cancelled_playback_orders=set(), is_stale_playback=lambda *args: False,
+                    sessions=SimpleNamespace(state={"sid": {}}, trace_mark=lambda *args, **kwargs: None, trace_context=lambda *args: nullcontext()),
+                    output_rate=16000, session_log=lambda *args, **kwargs: None,
+                    resolve_playback_start_waiter=resolve, save_audio=lambda *args, **kwargs: None,
+                    maybe_session_done=lambda *args: None, is_playing_audio=False)
+                transport = PlaybackTransport(host)
+                played = []
+                async def play(*args):
+                    played.append(True)
+                transport.play_audio = play
+                task = asyncio.create_task(transport.play_one_order(1, 0, b"\x00\x00", 16000, "sid"))
+                try:
+                    async with asyncio.timeout(1):
+                        while "speech" not in gate.ready_members:
+                            await asyncio.sleep(0)
+                        self.assertEqual(played, [])
+                        self.assertNotEqual(event["status"], "playback_started")
+                        if body_failure:
+                            gate.finished("body")
+                        else:
+                            await gate.ready("body")
+                        await task
+                    self.assertEqual(played, [] if body_failure else [True])
+                    self.assertEqual(event["status"], "not_delivered" if body_failure else "playback_completed")
+                    self.assertEqual(lifecycle.execution_starts, {})
+                finally:
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)

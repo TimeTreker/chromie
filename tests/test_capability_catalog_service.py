@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 
 from agent.app.capabilities.catalog import CapabilityCatalog
@@ -217,6 +218,60 @@ def _registry_with_planning_tool() -> CapabilityRegistry:
 
 
 class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test_concurrent_readers_wait_for_complete_provider_snapshot(self) -> None:
+        for fail in (False, True):
+            with self.subTest(provider_failure=fail):
+                started, release = asyncio.Event(), asyncio.Event()
+
+                class DelayedInvoker(_Invoker):
+                    async def invoke(self, *args, **kwargs):
+                        started.set()
+                        await release.wait()
+                        outcome = await super().invoke(*args, **kwargs)
+                        if fail:
+                            return _Outcome(status="error", error="provider unavailable")
+                        return outcome
+
+                invoker = DelayedInvoker()
+                catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
+                first = asyncio.create_task(catalog.snapshot())
+                await started.wait()
+                readers = [asyncio.create_task(catalog.snapshot()) for _ in range(3)]
+                await asyncio.sleep(0)
+                premature = [reader.done() for reader in readers]
+                release.set()
+                snapshots = await asyncio.gather(first, *readers)
+                self.assertEqual(premature, [False] * 3)
+                self.assertEqual(invoker.calls, 1)
+                self.assertTrue(all(item == snapshots[0] for item in snapshots))
+                if fail:
+                    self.assertIn("provider unavailable", snapshots[0]["live_refresh_error"])
+                else:
+                    self.assertIn("soridormi.walk_forward", {
+                        item["capability_id"] for item in snapshots[0]["capabilities"]
+                    })
+
+    async def test_cancelled_refresh_does_not_mark_absent_catalog_fresh(self) -> None:
+        started = asyncio.Event()
+
+        class CancelledInvoker(_Invoker):
+            async def invoke(self, *args, **kwargs):
+                if not started.is_set():
+                    started.set()
+                    await asyncio.Event().wait()
+                return await super().invoke(*args, **kwargs)
+
+        catalog = CapabilityCatalog(_registry(), live_invoker=CancelledInvoker())
+        first = asyncio.create_task(catalog.snapshot())
+        await started.wait()
+        first.cancel()
+        with self.assertRaises(asyncio.CancelledError):
+            await first
+        snapshot = await catalog.snapshot()
+        self.assertIn("soridormi.walk_forward", {
+            item["capability_id"] for item in snapshot["capabilities"]
+        })
 
     async def test_live_catalog_refresh_is_atomic_and_matches_nested_contracts(self) -> None:
         invoker = _SequenceInvoker(

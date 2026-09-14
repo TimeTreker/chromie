@@ -200,13 +200,22 @@ policy, or resource reservation, but it may not own Responsibility, Goal, Capabi
 Plan semantics, response wording, or truth.
 
 `agent/app/inference_compute.py` defines only relative provider-neutral classes:
-`REALTIME`, `INTERACTIVE`, `CONTINUITY`, `DELIBERATIVE`, and `BACKGROUND`. Their ordinal
+`REALTIME`, `INTERPRETATION`, `CONTINUITY`, `INTERACTIVE`, `DELIBERATIVE`, and `BACKGROUND`. Their ordinal
 rank is not a raw provider priority. Exact provider values and preemption thresholds are
 qualification knobs retained with evidence rather than prompt or semantic-DTO constants.
 Existing Ollama transactions record the class for observability without sending unsupported
 priority fields.
 
-The topology decision is evidence-driven:
+On 2026-09-14, after dual-engine resource probes, the owner explicitly selected
+one resident Gemma 12B SGLang instance shared by all cognition roles. SC, GI, GA
+and Planner retain independent semantic authority and request context. The order
+is SC > GI > GA > Fast Planner > deliberative Work > background, mapped by the
+default step to 500/400/300/200/100/0. Depth does not lower SC/GI urgency.
+SGLang must actually preempt and resume lower-priority requests; a priority field
+alone is not sufficient evidence. The two-instance Qwen/Gemma experiments are
+retained as failed/unqualified candidates, not the maintained topology.
+
+The topology decision remains evidence-driven:
 
 ```text
 Level 1: one candidate engine with foreground priority/preemption

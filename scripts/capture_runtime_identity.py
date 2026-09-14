@@ -16,7 +16,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -46,6 +46,91 @@ MODEL_KEYS = (
     "AGENT_MODEL",
     "OLLAMA_MODEL",
 )
+
+
+AGENT_SOURCE_TREES = (
+    (ROOT / "agent" / "app", "app"),
+    (ROOT / "agent-skills", "agent-skills"),
+    (ROOT / "shared" / "chromie_contracts", "chromie_contracts"),
+    (ROOT / "shared" / "chromie_runtime", "chromie_runtime"),
+)
+
+def _source_tree_digest(trees: Sequence[tuple[Path, str]]) -> str:
+    digest = hashlib.sha256()
+    for source_root, label in sorted(trees, key=lambda item: item[1]):
+        if not source_root.is_dir():
+            raise FileNotFoundError(source_root)
+        for path in sorted(source_root.rglob("*")):
+            if (
+                not path.is_file()
+                or "__pycache__" in path.parts
+                or path.suffix in {".pyc", ".pyo"}
+            ):
+                continue
+            relative = path.relative_to(source_root).as_posix()
+            digest.update(f"{label}/{relative}\0".encode("utf-8"))
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def agent_runtime_source_identity(container: str = "chromie-agent") -> dict[str, Any]:
+    host_digest = _source_tree_digest(AGENT_SOURCE_TREES)
+    container_script = """
+from pathlib import Path
+import hashlib
+import json
+
+trees = (
+    (Path('/app/app'), 'app'),
+    (Path('/app/agent-skills'), 'agent-skills'),
+    (Path('/app/chromie_contracts'), 'chromie_contracts'),
+    (Path('/app/chromie_runtime'), 'chromie_runtime'),
+)
+digest = hashlib.sha256()
+for source_root, label in sorted(trees, key=lambda item: item[1]):
+    if not source_root.is_dir():
+        raise FileNotFoundError(source_root)
+    for path in sorted(source_root.rglob('*')):
+        if not path.is_file() or '__pycache__' in path.parts or path.suffix in {'.pyc', '.pyo'}:
+            continue
+        relative = path.relative_to(source_root).as_posix()
+        digest.update(f'{label}/{relative}\\0'.encode('utf-8'))
+        digest.update(path.read_bytes())
+        digest.update(b'\\0')
+print(json.dumps({'digest': digest.hexdigest()}))
+"""
+    try:
+        completed = subprocess.run(
+            ["docker", "exec", container, "python", "-c", container_script],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "host_digest": host_digest,
+            "container_digest": None,
+            "matches": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    container_digest = None
+    error = completed.stderr.strip() or None
+    if completed.returncode == 0:
+        try:
+            payload = json.loads(completed.stdout)
+            container_digest = str(payload.get("digest") or "") or None
+        except (json.JSONDecodeError, AttributeError) as exc:
+            error = f"{type(exc).__name__}: {exc}"
+    return {
+        "host_digest": host_digest,
+        "container_digest": container_digest,
+        "matches": bool(container_digest) and container_digest == host_digest,
+        "returncode": completed.returncode,
+        "error": error,
+    }
 
 
 class CaptureError(RuntimeError):
@@ -411,6 +496,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument(
+        "--verify-agent-source", metavar="CONTAINER",
+        help="Fail unless the running Agent packaged source matches this checkout.",
+    )
+    parser.add_argument(
         "--runtime-profile",
         type=Path,
         default=ROOT / ".chromie" / "runtime_profile.json",
@@ -439,6 +528,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.verify_agent_source is not None:
+            identity = agent_runtime_source_identity(args.verify_agent_source)
+            print(json.dumps(identity, sort_keys=True))
+            if not identity["matches"]:
+                print(
+                    "[runtime-identity][error] Running Agent source does not match "
+                    "this checkout, or could not be verified. Stop the Host, then "
+                    "rebuild and recreate chromie-agent before restarting Chromie.",
+                    file=sys.stderr,
+                )
+                return 1
+            return 0
         payload = capture_identity(args)
     except Exception as exc:
         print(f"[runtime-identity][error] {exc}", file=sys.stderr)

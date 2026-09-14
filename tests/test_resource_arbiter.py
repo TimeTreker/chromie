@@ -200,3 +200,77 @@ class ResourceArbiterTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LaneReservationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_action_saturation_preserves_a_voice_slot(self):
+        arbiter = ResourceArbiter(3, vocal_reservation=1)
+        async with arbiter.claim(lane="activity", resource_claims=["a"]):
+            async with arbiter.claim(lane="activity", resource_claims=["b"]):
+                entered = asyncio.Event()
+                async def extra_action():
+                    async with arbiter.claim(lane="activity", resource_claims=["c"]):
+                        entered.set()
+                waiting = asyncio.create_task(extra_action())
+                await asyncio.sleep(0)
+                self.assertFalse(entered.is_set())
+                async with asyncio.timeout(0.5):
+                    async with arbiter.claim(lane="vocal", resource_claims=["voice"]):
+                        self.assertEqual(arbiter.active_count, 3)
+                waiting.cancel()
+                await asyncio.gather(waiting, return_exceptions=True)
+        self.assertEqual(arbiter.active_count, 0)
+
+    async def test_group_releases_completed_voice_without_waiting_for_body(self):
+        arbiter = ResourceArbiter(3, vocal_reservation=1)
+        members = [("speech", "vocal", frozenset({"voice"})), ("body", "activity", frozenset({"body"}))]
+        async with arbiter.claim_group(members, optional=set()) as (accepted, release):
+            self.assertEqual(accepted, {"speech", "body"})
+            await release("speech")
+            async with asyncio.timeout(0.5):
+                async with arbiter.claim(lane="vocal", resource_claims=["voice"]):
+                    self.assertEqual(arbiter.active_count, 2)
+        self.assertEqual(arbiter.active_count, 0)
+
+    async def test_busy_optional_resource_cannot_hold_required_voice(self):
+        arbiter = ResourceArbiter(3, vocal_reservation=1)
+        async with arbiter.claim(lane="activity", resource_claims=["eyes"]):
+            members = [("speech", "vocal", frozenset({"voice"})), ("blink", "activity", frozenset({"eyes"}))]
+            async with asyncio.timeout(0.5):
+                async with arbiter.claim_group(members, optional={"blink"}) as (accepted, _):
+                    self.assertEqual(accepted, {"speech"})
+
+    async def test_lane_waiters_keep_eligible_fifo_and_cancelled_head_leaves(self):
+        arbiter = ResourceArbiter(3, vocal_reservation=1)
+        order = []
+        async def voice(index):
+            async with arbiter.claim(lane="vocal"):
+                order.append(index)
+                await asyncio.sleep(0)
+        async with arbiter.claim(lane="vocal"):
+            tasks = [asyncio.create_task(voice(index)) for index in range(4)]
+            await asyncio.sleep(0)
+            tasks[0].cancel()
+            await asyncio.gather(tasks[0], return_exceptions=True)
+            self.assertEqual(order, [])
+        async with asyncio.timeout(1):
+            await asyncio.gather(*tasks[1:])
+        self.assertEqual(order, [1, 2, 3])
+        self.assertEqual(arbiter.snapshot().waiting_count, 0)
+
+    async def test_blocked_activity_head_does_not_block_disjoint_work(self):
+        arbiter = ResourceArbiter(3, vocal_reservation=1)
+        async def blocked():
+            async with arbiter.claim(lane="activity", resource_claims=["body"]):
+                self.fail("body still held")
+        async with arbiter.claim(lane="activity", resource_claims=["body"]):
+            waiter = asyncio.create_task(blocked())
+            await asyncio.sleep(0)
+            try:
+                async with asyncio.timeout(1):
+                    async with arbiter.claim(lane="activity", resource_claims=["eyes"]):
+                        self.assertEqual(arbiter.active_count, 2)
+            finally:
+                waiter.cancel()
+                await asyncio.gather(waiter, return_exceptions=True)
+        self.assertEqual(arbiter.snapshot().waiting_count, 0)

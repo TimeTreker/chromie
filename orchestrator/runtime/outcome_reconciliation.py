@@ -1146,14 +1146,14 @@ class ExecutionOutcomeReconciler:
             ).strip()
             declared_step_id = str(metadata.get("step_id") or "").strip()
             if metadata.get("auxiliary_plan_activity") is True:
-                if source != "canonical_plan_auxiliary_activity":
+                if (source != "social_cognition_auxiliary_activity"
+                        or metadata.get("semantic_owner") != "social_cognition"
+                        or metadata.get("source_goal_ids")):
                     raise ValueError(
                         "auxiliary request has an invalid source"
                     )
-                if declared_plan_id != plan.plan_id:
-                    raise ValueError(
-                        "auxiliary request references a different plan"
-                    )
+                if declared_plan_id and declared_plan_id != plan.plan_id:
+                    raise ValueError("auxiliary request references a different plan")
                 auxiliary_by_request[request.request_id] = request
                 ignored += 1
                 continue

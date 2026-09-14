@@ -23,6 +23,7 @@ from .agent_skills import (
 )
 from .clients.external_information_client import HttpExternalInformationClient
 from .clients.model_client_factory import build_model_client
+from .clients.ollama_client import OllamaGenerationError, llm_failure_metadata
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
@@ -612,7 +613,12 @@ async def resolve_deep_plan(request: CognitiveWorkRequest):
 async def resolve_social_cognition(request: SocialCognitionRequest):
     if social_cognition_resolver is None:
         raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
-    return await social_cognition_resolver.resolve(request)
+    try:
+        return await social_cognition_resolver.resolve(request)
+    except OllamaGenerationError as exc:
+        raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/reflection")

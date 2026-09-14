@@ -1,5 +1,93 @@
 # Chromie Current Status
 
+## Frozen model comparison — 2026-09-14
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| Owner-authorized official Qwen3.5-9B versus Gemma-4-12B-it experiment completed; semantic source/config unchanged; single Gemma and operator text Host restored. | Same 44 requests per model, online FP8/non-thinking. Schema 44/44 each; DTO/Host 41/44 Gemma and 40/44 Qwen. Reviewed Fast stage 3/8 versus 1/8; GA stage 4/6 versus 5/6. | Isolated native inference only, with bounded reconstructed Host inputs. Qwen request medians about 38%–41% lower but wrong direction and incomplete-work coverage remain. No SC, Deep, whole-runtime or physical proof. | Neither model qualified by this screen; no Qwen promotion. Existing semantic and #24/#32 blockers remain. |
+
+Artifacts: `.chromie/acceptance/qwen9b-comparison-20260914/`, including all 88
+reviewed responses and paired input hashes. GA stage results preserve upstream
+WHAT even where defective; they are not end-to-end passes. GI strict-oracle results
+contain known lexical/span issues and are not semantic accuracy. A harness-only
+constructor error was corrected by common offline revalidation without rerunning
+inference. Checkpoint/handoff own exact model/runtime identities and resume state.
+
+## Failed-case root-cause follow-up — 2026-09-14
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| Weather identity and early-result handoff, SC evidence ownership, Fast argument ordering, provider argument declarations and concurrent catalog publication repaired; text Host restored. | Canonical: 3,303 tests / 886 subtests, 145 benchmarks, 20 legacy tests; 6,000 workflows and 45 Level A cases pass. Paired Soridormi: 790 passed / 2 skipped. | Native focused right-turn and weather regressions pass 2/2 after manual review. Cold-start catalog complete; compound Plan still reverses left/right. Full 51-case aggregate stopped during first case after simulator safe idle: no completed summary, 1 interrupted, 50 unrun. No physical proof. | Development only. GI decomposition, GA resource classification, Fast semantic coverage and signed direction remain blockers; #24/#32 open. |
+
+Current evidence: `.chromie/acceptance/failed-case-repair-20260914/`.
+Checkpoint/handoff retain the module I/O, exact identities, failed experiments, full
+cohort interruption, focused evidence and operator state. No case-specific prompt or
+workflow rules, extra model judge or model replacement were added. Earlier sections
+retain historical evidence; they do not override these current qualification limits.
+
+## Scheduler alignment follow-up — 2026-09-14
+
+Vocal and Activity now have separate waiting queues and capacity guarantees under
+one resource/safety arbiter. SC's anchored modalities enter Runtime together;
+prepared-start adapters coordinate Host PCM readiness and Soridormi preflight,
+with independent terminal release and fail-soft optional expression.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| Separate lane admission, exact prepared groups, SC materialization and terminal ledger implemented; operator Host restored. | Canonical: 3,295 tests / 876 subtests, 145 benchmarks, 20 legacy tests; 6,000 workflows and 45 Level A cases pass. | Bound controlled speech+blink completes through real TTS/discarded PCM and simulator with a common release and safe idle. Native aggregate: six failures, seventh interrupted, 44 unrun. No physical proof. | Development only. GI/Planner Goal coverage, parameter grounding, weather entity resolution and acceptance SC projection remain unresolved; #24/#32 are open. |
+
+Current evidence: `.chromie/acceptance/lane-coordination-20260914/`.
+Prepared synchronization currently covers speech and a single Soridormi plan;
+unsupported compound preparation fails closed. Common Host release does not prove
+identical physical onset or atomic rollback. Checkpoint/handoff own exact module
+workflows, identities, limitations and restored operator state. Following entries
+retain prior evidence rather than claiming current native qualification.
+
+## SC Runtime handoff follow-up — 2026-09-14
+
+Independent SC verbal/nonverbal results now retain their exact source snapshot
+through existing Runtime admission. Source-turn correlation preserves early speech
+across Goal binding, expression terminal results return to the ledger, and the
+Soridormi provider recognizes SC's reviewed auxiliary ownership while preserving
+confirmation and safety requirements. No new model/semantic authority was added.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| SC handoff, correlation, terminal feedback and Soridormi source-owner repair implemented; operator text Host restored. | Final canonical: 3,284 tests / 868 subtests, 145 benchmarks, 20 legacy tests; 6,000 workflows and 45 Level A cases pass. | Controlled SC blink completes through real Runtime and deployed simulator, with terminal ledger and safe idle. Native aggregate: 0/3 completed cases pass; fourth stops on GI source validation, 47 unrun. Both weather results delivered in about 83–84 s; early speech is now visible but greetings still repeat. No physical proof. | Development only; early-act/communication-Need linkage, model/Planner coverage, latency and #24/#32 remain open. |
+
+Current evidence: `.chromie/acceptance/sc-runtime-handoff-20260914/`;
+checkpoint/handoff contain actual module I/O, runtime identity, retained failures,
+operator state and resume instructions. The following single-engine entries retain
+preceding evidence, not a claim that the current full live cohort passes.
+
+## Single-engine priority scheduling — 2026-09-14
+
+The owner selected one resident Gemma 12B SGLang instance after the dual-engine
+resource probes. SC, GI, GA and Planner share weights but keep independent context
+and semantic authority. SC > GI > GA > Fast Planner priority is implemented without
+adding an inference service, model, environment key or compatibility path. The
+Qwen/Gemma dual-instance and Qwen prompt/schema experiments are retained only as
+unqualified evidence; their configuration and semantic edits were withdrawn.
+
+The prior repairs were rebuilt for an immutable baseline. The live must-pass cohort was
+stopped on SC HTTP 500 after 12 completed cases (three mechanical passes); case 13 was
+interrupted. Every completed case was inspected. Model/plan coverage and silence failures
+remain; two SC result reentries failed at estimated prompt-budget checks before inference.
+A retained focused replay reproduces that boundary. The unchanged complete packet needs
+53,132 actual tokens including output/margin, versus 65,536 available, although the
+character estimate rejects it. SGLang client preflight now verifies estimated overflows
+with the serving tokenizer, preserving all input and failing closed if verification fails.
+The original packet is retained even for a preflight failure; SC reports typed provider
+unavailability instead of an unhandled exception. No second semantic invocation is added.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| Single-engine priorities, exact budget verification and existing SC decoder invariants implemented; packaged Agent and text Host deployed with verified source. | Canonical gate: 3,274 tests / 860 subtests, 145 benchmarks, 20 legacy tests pass. All 6,000 frozen workflows and 45 Level A cases pass. | Native Gemma priority preemption/resumption proved; exact budget replay passes. SC cohort 12/13; weather output truncates. Current live aggregate: 0/3 completed cases pass, fourth stopped on GI binding validation; 47 unrun. Milk plan omitted acquisition/delivery but executed a walk in simulation. Both weather lookups/final replies complete in 78–83 s, with duplicate greetings. No physical proof. | Development only; semantic stability, latency and #24/#32 closure remain open. |
+
+Current artifacts: `.chromie/acceptance/dual-inference-20260914/`. Checkpoint/handoff
+own exact service state and resume commands. Earlier paragraphs below are historical
+repair evidence, not the present operator-Host or deployment state.
+
 ## Social Cognition migration
 
 **Updated:** 2026-09-14. The owner-authorized
@@ -10,6 +98,38 @@ paths. SC and Work Planner share existing state and retain distinct authority.
 | Implementation | Automated verification | Target validation | Release readiness |
 |---|---|---|---|
 | Source-complete: shared SC transaction, independent GI fan-out, word-free Work/communication needs, exact confirmation/order joins, delivery-qualified dialogue, cancellation/freshness, trusted environment initiative and qualified optional expression. Retired presentation and executable Planner-wording paths removed. | Canonical `canonical-sc-closed.log` exits 0: 3,245 tests / 820 subtests, 145 benchmarks and 20 legacy tests pass; pinned static, policy, ownership, config and docs checks pass. Strict final 6,000 workflows and all 45 Level A scenarios pass. | Earlier native SC 12/12 and Work 8/8 pass Schema/DTO/Host plus implementer semantic review; current production packets match those exact native packets and recorded replies replay successfully. A later fresh native attempt failed to connect, with zero outputs. No current deployed full-chain, contention/latency or physical proof. | Implementation ready for review; development only. Current-target deployment and existing #24/#32 evidence closure remain open. Owner-authorized Git delivery; no service restart/deployment performed. |
+
+Latest GA/Host follow-up on 2026-09-14: the user loaded the preceding fixes and
+SC successfully acknowledged a weather request. GA failed a different existing
+source-status invariant; Host then omitted both the failure notice and terminal
+dispatch because early speech existed. Local source repairs use explicit source
+decoder alternatives and ordered terminal failure dispatch. Four frozen native
+requests pass Schema/DTO/Host after repair; focused completion/silence tests pass.
+Canonical gate passes 3,262 tests / 849 subtests, 145 benchmarks and 20 legacy tests;
+all 6,000 frozen workflows and 45 Level A scenarios pass. The operator Host remains active;
+independent headless deployment/aggregate proof and response latency are unqualified.
+Exact current evidence and resume state are in checkpoint/handoff.
+
+Earlier SC/GA follow-up on 2026-09-14: the newly deployed user turn exposed two decoder
+contract gaps (SC progress kind and GA location type), plus omitted SC failure
+telemetry. Local source repairs pass the two original native-role transactions,
+the paired frozen 12-case SC cohort and 45 Level A cases. These are bounded
+transaction checks: operator-Host pause/rebuild permission and independent
+headless whole-turn/live-cohort validation remain pending. Exact evidence and
+failed iterations are retained in the latest checkpoint/handoff; no deployed
+completion or rapid-response improvement is claimed.
+
+Deployment follow-up on 2026-09-14 (source baseline `ec4a5c26`, local repair):
+a reported SC 404 and retired stream frame were traced to a reused old Agent
+image. Startup now verifies packaged Agent source using the same identity owner
+as closed-loop qualification. The user's subsequent `--build` produced matching
+Host/container source and the current SC API. An observed `hello` turn completed
+through SC without that failure, but first playback took 32.04 s and total time
+34.84 s; rapid-response and full live-cohort validation remain open. This is
+user-initiated runtime-log evidence, not automated exact replay or physical audio
+qualification. Repair evidence, checks and resume details are in the current
+[checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md). The earlier
+“no restart/deployment” statement above applies to the original Git delivery.
 
 Delivery is from `main` to `origin/main`, with pre-delivery base
 `d5a7985ec74b02cd01c11b0d538fca7ae13a3498`. SC receives shared history,
@@ -47,7 +167,7 @@ connection errors and zero model outputs. Read-only `docker ps` then showed no
 running containers; the cause of the stop is unknown and no restart was attempted.
 Before that, SGLang 0.5.19 / `chromie-gemma4-12b` was observed with higher-first
 priority scheduling, two running-request slots and preemption threshold 10.
-SC foreground/deep priorities are 400/100; ordinary Planner is 300. No speedup,
+That earlier configuration used SC foreground/deep priorities 400/100 and Planner 300. No speedup,
 starvation prevention, paired contention or audible latency result follows from
 that configuration. Isolated earlier SC calls were roughly 2–5 seconds, excluding
 GI, TTS and playback. Live acceptance now reads SC decisions and completed

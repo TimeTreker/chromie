@@ -17,6 +17,8 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from shared.chromie_runtime import ResourceArbiter
+from orchestrator.runtime.scheduler import CoordinatedStart, CoordinatedStartError, ExecutionStart, current_execution_start
+from contextlib import nullcontext
 from shared.chromie_contracts.execution_outcome import ClaimQualificationPolicy
 from shared.chromie_contracts.json_schema import json_schema_validation_errors
 from shared.chromie_contracts.interaction import (
@@ -159,6 +161,8 @@ class CapabilityDefinition(CapabilityIdentityModel):
     @field_validator("metadata")
     @classmethod
     def validate_resource_claims(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if value.get("execution_lane", "activity") not in {"vocal", "activity"}:
+            raise ValueError("execution_lane must be vocal or activity")
         claims = value.get("resource_claims", [])
         if not isinstance(claims, list) or any(
             not isinstance(name, str) or not name or name != name.strip()
@@ -268,6 +272,7 @@ class CapabilityExecutionContext(BaseModel):
         exclude=True,
         repr=False,
     )
+    start_gate: ExecutionStart | None = Field(default=None, exclude=True, repr=False)
     trace: CapabilityTrace
 
     async def publish_progress(
@@ -410,7 +415,7 @@ class CapabilityRuntime:
     ) -> None:
         self.registry = registry
         self._providers: dict[str, CapabilityProvider] = {}
-        self._resource_arbiter = resource_arbiter or ResourceArbiter(max_concurrency)
+        self._resource_arbiter = resource_arbiter or ResourceArbiter(max_concurrency, vocal_reservation=1)
         self._active: dict[
             tuple[str, str],
             tuple[
@@ -572,7 +577,8 @@ class CapabilityRuntime:
             # competing Plan revision. Preserve its Evidence without replaying Work.
             terminal_keys = {
                 event.interaction_id + "/" + event.request_id
-                for event in self._event_history if event.result is not None and event.type == "completed"
+                for event in self._event_history if event.result is not None
+                and event.type in {"completed", "failed", "refused", "timed_out"}
             }
             for key in list(expected["work"]):
                 if key not in current["work"] and key in terminal_keys:
@@ -1007,6 +1013,9 @@ class CapabilityRuntime:
             authorization = authorization or RuntimeAuthorization()
             scheduled = self._scheduled_requests(response)
             validated = [self._validate_request(request, authorization) for request in scheduled]
+            if any(request.metadata.get("lane_start_policy") == "prepared_start"
+                   and not definition.can_run_parallel for request, definition in validated):
+                raise ValueError("prepared start cannot override provider serialization")
         except BaseException:
             if auto_managed:
                 self.end_interaction(response.interaction_id)
@@ -1954,6 +1963,16 @@ class CapabilityRuntime:
             scheduled.extend(buckets[index])
             scheduled.append(capability)
         scheduled.extend(buckets[-1])
+        anchored = [request for request in scheduled
+                    if request.metadata.get("lane_start_policy") == "prepared_start"
+                    and request.metadata.get("execution_role") == "social_decoration"]
+        for decoration in anchored:
+            identity = decoration.metadata.get("coordination_id")
+            voice = next((item for item in scheduled if item.capability_id == "chromie.speak"
+                          and item.metadata.get("coordination_id") == identity), None)
+            if voice is not None:
+                scheduled.remove(decoration)
+                scheduled.insert(scheduled.index(voice) + 1, decoration)
         vocal_positions = [
             index
             for index, request in enumerate(scheduled)
@@ -1971,6 +1990,20 @@ class CapabilityRuntime:
                 metadata["abort_remaining_on_failure"] = True
                 args["metadata"] = metadata
                 scheduled[index] = request.model_copy(update={"args": args})
+        coordinated: dict[str, list[CapabilityRequest]] = {}
+        for request in scheduled:
+            if request.metadata.get("lane_start_policy") == "prepared_start":
+                identity = str(request.metadata.get("coordination_id") or "").strip()
+                if not identity or request.timing != "parallel":
+                    raise ValueError("prepared start requires a parallel request and exact group identity")
+                coordinated.setdefault(identity, []).append(request)
+        for identity, members in coordinated.items():
+            positions = [scheduled.index(member) for member in members]
+            if len(members) < 2 or positions != list(range(min(positions), max(positions) + 1)):
+                raise ValueError("prepared start members must form one complete contiguous group")
+            if any(request.metadata.get("coordination_id") == identity
+                   and request.metadata.get("lane_start_policy") != "prepared_start" for request in scheduled):
+                raise ValueError("coordination group has conflicting start policies")
         request_ids = [request.request_id for request in scheduled]
         if len(request_ids) != len(set(request_ids)):
             raise ValueError("scheduled request IDs must be unique within one interaction")
@@ -1978,7 +2011,10 @@ class CapabilityRuntime:
 
     def _speech_request(self, speech: InteractionSpeech) -> CapabilityRequest:
         speech_metadata = dict(speech.metadata)
+        prepared_start = speech_metadata.get("lane_start_policy") == "prepared_start"
         playback_barrier = speech_metadata.get("wait_for_playback_start") is True
+        if prepared_start:
+            speech_metadata["wait_for_voice_release"] = True
         if playback_barrier:
             speech_metadata["abort_remaining_on_failure"] = True
         authority_metadata = {
@@ -2010,7 +2046,7 @@ class CapabilityRuntime:
             },
             timing=(
                 "sequential"
-                if playback_barrier or speech.timing in {"sequential", "after_capabilities"}
+                if not prepared_start and (playback_barrier or speech.timing in {"sequential", "after_capabilities"})
                 else "parallel"
             ),
             timeout_ms=speech.timeout_ms,
@@ -2057,6 +2093,98 @@ class CapabilityRuntime:
         # provider still receives all simultaneous body members in one compile.
         return (definition.provider_id, "__parallel_body_batch__")
 
+    async def _run_prepared_group(
+        self, interaction_id: str,
+        items: list[tuple[CapabilityRequest, CapabilityDefinition]],
+        authorization: RuntimeAuthorization,
+    ) -> list[tuple[CapabilityResult, CapabilityTrace]]:
+        identities = {request.request_id for request, _ in items}
+        optional = {request.request_id for request, _ in items
+                    if request.metadata.get("execution_role") == "social_decoration"
+                    and request.metadata.get("source") == "social_cognition_auxiliary_activity"
+                    and request.metadata.get("auxiliary_plan_activity") is True
+                    and request.metadata.get("semantic_owner") == "social_cognition"
+                    and not request.metadata.get("source_goal_ids")}
+        barrier = CoordinatedStart(set(identities), set(optional))
+        compiled: dict[str, list[str]] = {}
+        for request, definition in items:
+            if definition.metadata.get("provider_local_activity_compilation") is True:
+                compiled.setdefault(definition.provider_id, []).append(request.request_id)
+        unsupported_members: set[str] = set()
+        for provider_members in compiled.values():
+            if len(provider_members) > 1:
+                required_members = set(provider_members) - optional
+                unsupported_members.update(set(provider_members) if len(required_members) > 1
+                                           else set(provider_members) & optional)
+        loop = asyncio.get_running_loop()
+        reserved: asyncio.Future[set[str]] = loop.create_future()
+        release = asyncio.Event()
+        release_member = None
+        members = []
+        for request, definition in items:
+            if request.request_id in unsupported_members:
+                continue
+            claims = set(definition.metadata.get("resource_claims", []))
+            if definition.exclusive_group:
+                claims.add(definition.exclusive_group)
+            members.append((request.request_id, str(definition.metadata.get("execution_lane") or "activity"), frozenset(claims)))
+
+        async def reserve() -> None:
+            nonlocal release_member
+            try:
+                async with self._resource_arbiter.claim_group(members, optional=optional) as reservation:
+                    accepted, release_member = reservation
+                    reserved.set_result(accepted)
+                    await release.wait()
+            except ValueError as exc:
+                if not reserved.done():
+                    reserved.set_exception(exc)
+
+        async def run(request: CapabilityRequest, definition: CapabilityDefinition):
+            try:
+                provider = self._providers[definition.provider_id]
+                if request.request_id in unsupported_members or not getattr(provider, "supports_coordinated_start", False):
+                    pair = self._cancelled_pair(interaction_id, request, definition,
+                        reason_code="coordination_unsupported", message="provider has no prepared-start boundary for this member or compound body group")
+                    pair[0].status = pair[1].status = "failed"
+                    pair[1].events[-1].type = "failed"
+                    await self._publish_request_event(dispatch_id=self._dispatch_id_for_interaction(interaction_id),
+                        interaction_id=interaction_id, request=request, definition=definition,
+                        event_type="failed", result=pair[0])
+                    return pair
+                return await self._run_one(interaction_id, request, definition, authorization,
+                    start_gate=ExecutionStart(barrier, request.request_id, reserved), resources_reserved=True)
+            finally:
+                barrier.finished(request.request_id)
+                if release_member is not None:
+                    await release_member(request.request_id)
+
+        reservation = asyncio.create_task(reserve())
+        tasks = [asyncio.create_task(run(request, definition)) for request, definition in items]
+        try:
+            pairs = await asyncio.gather(*tasks)
+            for (request, _), (result, _) in zip(items, pairs, strict=True):
+                result.metadata["coordination_start"] = {
+                    "coordination_id": request.metadata.get("coordination_id"),
+                    "ready_monotonic_s": barrier.ready_at.get(request.request_id),
+                    "release_monotonic_s": barrier.released_at,
+                    "dropped": request.request_id in barrier.dropped,
+                    "error": barrier.error,
+                    "evidence_scope": "host_prepared_release_not_physical_onset",
+                }
+            return pairs
+        finally:
+            barrier.abort()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            release.set()
+            reservation.cancel()
+            await asyncio.gather(reservation, return_exceptions=True)
+            if reserved.done() and not reserved.cancelled():
+                reserved.exception()
+
     async def _run_parallel(
         self,
         interaction_id: str,
@@ -2073,8 +2201,18 @@ class CapabilityRuntime:
                 "parallel execution cannot contain multiple chromie.voice owners: "
                 + ",".join(personal_voice_request_ids)
             )
+        prepared_indices: dict[str, list[int]] = {}
+        for index, (request, _) in enumerate(items):
+            if request.metadata.get("lane_start_policy") == "prepared_start":
+                identity = str(request.metadata.get("coordination_id") or "").strip()
+                if not identity:
+                    raise ValueError("prepared start requires exact coordination identity")
+                prepared_indices.setdefault(identity, []).append(index)
+        prepared_members = {index for indices in prepared_indices.values() for index in indices}
         grouped_indices: dict[tuple[str, str], list[int]] = {}
         for index, (request, definition) in enumerate(items):
+            if index in prepared_members:
+                continue
             provider = self._providers[definition.provider_id]
             group_key = self._provider_group_key(request, definition)
             if group_key is None or not callable(getattr(provider, "execute_group", None)):
@@ -2082,7 +2220,11 @@ class CapabilityRuntime:
             grouped_indices.setdefault(group_key, []).append(index)
 
         jobs: list[tuple[list[int], asyncio.Task[Any]]] = []
-        consumed: set[int] = set()
+        consumed: set[int] = set(prepared_members)
+        for indices in prepared_indices.values():
+            jobs.append((indices, asyncio.create_task(self._run_prepared_group(
+                interaction_id, [items[index] for index in indices], authorization,
+            ))))
         for indices in grouped_indices.values():
             if len(indices) < 2:
                 continue
@@ -2144,7 +2286,7 @@ class CapabilityRuntime:
                     )
                     for index in indices
                 ]
-            elif len(indices) == 1:
+            elif len(indices) == 1 and indices[0] not in prepared_members:
                 pairs = [outcome]
             else:
                 pairs = list(outcome)
@@ -2311,6 +2453,7 @@ class CapabilityRuntime:
             async with self._resource_arbiter.claim(
                 can_run_parallel=True,
                 exclusive_group=f"{provider_id}.compiled_body_activity",
+                lane="activity",
                 resource_claims={
                     resource
                     for _, definition in items
@@ -2660,6 +2803,9 @@ class CapabilityRuntime:
         request: CapabilityRequest,
         definition: CapabilityDefinition,
         authorization: RuntimeAuthorization,
+        *,
+        start_gate: ExecutionStart | None = None,
+        resources_reserved: bool = False,
     ) -> tuple[CapabilityResult, CapabilityTrace]:
         provider = self._providers[definition.provider_id]
         trace = CapabilityTrace(
@@ -2671,6 +2817,7 @@ class CapabilityRuntime:
         )
         context = CapabilityExecutionContext(
             interaction_id=interaction_id,
+            start_gate=start_gate,
             confirmed=request.request_id in authorization.confirmed_request_ids,
             safety_monitor_active=authorization.safety_monitor_active,
             progress_publisher=self._progress_publisher(
@@ -2681,11 +2828,14 @@ class CapabilityRuntime:
         timeout_s = (request.timeout_ms or definition.timeout_ms) / 1000.0
 
         async def invoke() -> CapabilityResult:
-            async with self._resource_arbiter.claim(
+            async with (nullcontext() if resources_reserved else self._resource_arbiter.claim(
                 can_run_parallel=definition.can_run_parallel,
                 exclusive_group=definition.exclusive_group,
                 resource_claims=definition.metadata.get("resource_claims", []),
-            ):
+                lane=str(definition.metadata.get("execution_lane") or "activity"),
+            )):
+                if start_gate is not None:
+                    await start_gate.wait_resources()
                 async with self._active_lock:
                     context.provider_started = True
                     trace.events.append(CapabilityTraceEvent(type="started"))
@@ -2696,7 +2846,10 @@ class CapabilityRuntime:
                     definition=definition,
                     event_type="running",
                 )
-                return await provider.execute(request, definition, context)
+                result = await provider.execute(request, definition, context)
+                if start_gate is not None and result.status == "completed" and start_gate.member not in start_gate.group.ready_members:
+                    raise RuntimeError("provider omitted declared prepared-start boundary")
+                return result
 
         active_key = (interaction_id, request.request_id)
         prestart_result: CapabilityResult | None = None
@@ -2860,6 +3013,16 @@ class CapabilityRuntime:
                     + (f"; provider cancellation failed: {cancel_error}" if cancel_error else "")
                 ),
             )
+        except CoordinatedStartError as exc:
+            result = CapabilityResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
+                status="refused",
+                provider_id=definition.provider_id,
+                reason_code="coordination_not_started",
+                message=str(exc),
+            )
         except Exception as exc:
             result = CapabilityResult(
                 request_id=request.request_id,
@@ -2896,6 +3059,15 @@ class CapabilityRuntime:
                 data={"reason_code": result.reason_code},
             )
         )
+        if start_gate is not None:
+            result.metadata["coordination_start"] = {
+                "coordination_id": request.metadata.get("coordination_id"),
+                "ready_monotonic_s": start_gate.group.ready_at.get(request.request_id),
+                "release_monotonic_s": start_gate.group.released_at,
+                "error": start_gate.group.error,
+                "dropped": request.request_id in start_gate.group.dropped,
+                "evidence_scope": "host_prepared_release_not_physical_onset",
+            }
         await self._publish_request_event(
             dispatch_id=self._dispatch_id_for_interaction(interaction_id),
             interaction_id=interaction_id,
@@ -3329,6 +3501,7 @@ class MediaPlaybackCapabilityProvider:
 
 class LocalSpeechCapabilityProvider:
     provider_id = "chromie.local_speech"
+    supports_coordinated_start = True
 
     def __init__(
         self,
@@ -3345,9 +3518,16 @@ class LocalSpeechCapabilityProvider:
         definition: CapabilityDefinition,
         context: CapabilityExecutionContext,
     ) -> CapabilityResult:
-        raw = self._handler(request.args)
-        output = await raw if inspect.isawaitable(raw) else raw
-        metadata = request.args.get("metadata")
+        args = dict(request.args)
+        if context.start_gate is not None:
+            args["metadata"] = {**args.get("metadata", {}), "wait_for_voice_release": True}
+        token = current_execution_start.set(context.start_gate)
+        try:
+            raw = self._handler(args)
+            output = await raw if inspect.isawaitable(raw) else raw
+        finally:
+            current_execution_start.reset(token)
+        metadata = args.get("metadata")
         playback_barrier = bool(
             isinstance(metadata, dict) and metadata.get("wait_for_playback_start") is True
         )

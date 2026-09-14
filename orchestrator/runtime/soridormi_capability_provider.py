@@ -257,6 +257,7 @@ class SoridormiCapabilityProvider:
     """
 
     provider_id = "soridormi.mcp"
+    supports_coordinated_start = True
 
     def __init__(
         self,
@@ -342,6 +343,13 @@ class SoridormiCapabilityProvider:
             definition,
             planned.output,
         )
+        if context.start_gate is not None:
+            if not context.confirmed and not trusted_preflight_authorized:
+                return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
+                    status="refused", provider_id=self.provider_id, reason_code="coordination_preflight_refused",
+                    message="prepared execution requires confirmed or body-authorized preflight")
+            await context.start_gate.ready()
+            context.provider_state["coordinated_effect_released"] = True
         executed = await self.invoker.invoke(
             "soridormi.skill.execute_plan",
             {"plan_id": plan_id},
@@ -664,7 +672,8 @@ class SoridormiCapabilityProvider:
         metadata = request.metadata if isinstance(request.metadata, dict) else {}
         source_goal_ids = metadata.get("source_goal_ids") or []
         return bool(
-            metadata.get("source") == "canonical_plan_auxiliary_activity"
+            metadata.get("source") == "social_cognition_auxiliary_activity"
+            and metadata.get("semantic_owner") == "social_cognition"
             and metadata.get("auxiliary_plan_activity") is True
             and not any(str(value).strip() for value in source_goal_ids)
         )
@@ -863,8 +872,8 @@ class SoridormiCapabilityProvider:
 
         * Soridormi's freshly created plan says ``requires_confirmation=false``;
         * the live named-skill definition and committed request agree;
-        * the request came from either a goal-grounded canonical plan or reviewed
-          a Planner-owned auxiliary activity; and
+        * the request came from either a goal-grounded canonical plan or a reviewed
+          SC-owned auxiliary activity; and
         * Soridormi's safety monitor has already accepted the motion.
 
         This is not a fabricated ``confirmed=true`` claim.  The execution context
@@ -886,7 +895,8 @@ class SoridormiCapabilityProvider:
         }
 
         reviewed_auxiliary = bool(
-            source == "canonical_plan_auxiliary_activity"
+            source == "social_cognition_auxiliary_activity"
+            and metadata.get("semantic_owner") == "social_cognition"
             and metadata.get("auxiliary_plan_activity") is True
             and safety_class == "low_risk_action"
             and "physical_motion" not in effects
@@ -1076,6 +1086,8 @@ class SoridormiCapabilityProvider:
         definition: CapabilityDefinition,
         context: CapabilityExecutionContext,
     ) -> None:
+        if context.start_gate is not None and not context.provider_state.get("coordinated_effect_released"):
+            return
         activity_id = str(
             context.provider_state.get("provider_activity_id") or ""
         ).strip()

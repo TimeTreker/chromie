@@ -157,6 +157,7 @@ class ExecutionLaneContractTests(unittest.TestCase):
             lane_coordination=[
                 LaneCoordinationGroup(
                     coordination_id="together-1",
+                    start_policy="best_effort_parallel",
                     lanes=["vocal", "activity"],
                     activity_step_ids=["walk"],
                     reason_summary="The user requested overlapping behavior.",
@@ -552,7 +553,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 registry = CapabilityRegistry()
                 for definition in definitions:
                     registry.register(definition)
-                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                runtime = CapabilityRuntime(registry, max_concurrency=3)
                 body, other = Provider(), Provider()
                 other.provider_id = "other"
                 runtime.register_provider(body)
@@ -753,3 +754,136 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
+    async def test_prepared_group_waits_for_slowest_member_before_effect(self):
+        starts = {}
+        class Provider(MockCapabilityProvider):
+            supports_coordinated_start = True
+            async def execute(self, request, definition, context):
+                await asyncio.sleep(0.08 if request.request_id == "body" else 0)
+                gate = getattr(context, "start_gate", None)
+                if gate is not None:
+                    await gate.ready()
+                starts[request.request_id] = time.monotonic()
+                return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
+                    status="completed", provider_id=self.provider_id, output={"completed": True})
+        registry = CapabilityRegistry()
+        for name, lane in [("voice", "vocal"), ("body", "activity")]:
+            definition = _definition("test." + name, group=name, resources=[name])
+            definition.metadata["execution_lane"] = lane
+            registry.register(definition)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime.register_provider(Provider("body"))
+        response = InteractionResponse(interaction_id="prepared", capabilities=[CapabilityRequest(
+            request_id=name, capability_id="test." + name, timing="parallel", metadata={
+                "execution_lane": lane, "coordination_id": "same-expression", "lane_start_policy": "prepared_start",
+            }) for name, lane in [("voice", "vocal"), ("body", "activity")]])
+        execution = await submit_and_wait_terminal(runtime, response)
+        self.assertEqual(execution.status, "completed")
+        self.assertLess(abs(starts["voice"] - starts["body"]), 0.04)
+
+    async def test_preparation_failure_timeout_and_optional_lateness(self):
+        for mode in ("required_failure", "required_timeout", "optional_failure", "optional_late"):
+            with self.subTest(mode=mode):
+                starts = []
+                class Provider(MockCapabilityProvider):
+                    supports_coordinated_start = True
+                    async def execute(self, request, definition, context):
+                        if request.request_id == "body":
+                            if mode.endswith("failure"):
+                                raise RuntimeError("body preparation rejected")
+                            await asyncio.sleep(0.06 if mode == "optional_late" else 1)
+                        else:
+                            await asyncio.sleep(0.01)
+                        await context.start_gate.ready()
+                        starts.append(request.request_id)
+                        return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
+                            status="completed", provider_id=self.provider_id, output={"completed": True})
+                registry = CapabilityRegistry()
+                for name, lane in [("voice", "vocal"), ("body", "activity")]:
+                    definition = _definition("test." + name, group=name, resources=[name])
+                    definition.metadata["execution_lane"] = lane
+                    registry.register(definition)
+                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                runtime.register_provider(Provider("body"))
+                requests = [CapabilityRequest(request_id=name, capability_id="test." + name, timing="parallel",
+                    timeout_ms=100 if mode == "required_timeout" and name == "body" else 500,
+                    metadata={"coordination_id": "group", "lane_start_policy": "prepared_start",
+                        **({"execution_role": "social_decoration", "semantic_owner": "social_cognition", "source_goal_ids": [],
+                            "source": "social_cognition_auxiliary_activity", "auxiliary_plan_activity": True}
+                           if name == "body" and mode.startswith("optional") else {})}) for name in ("voice", "body")]
+                async with asyncio.timeout(1):
+                    result = await submit_and_wait_terminal(runtime, InteractionResponse(interaction_id=mode, capabilities=requests))
+                self.assertEqual(starts, ["voice"] if mode.startswith("optional") else [])
+                self.assertEqual(runtime._resource_arbiter.active_count, 0)
+                self.assertTrue(any(row.status != "completed" for row in result.results))
+
+    async def test_cancel_before_release_drains_both_lanes_without_effect(self):
+        from shared.chromie_contracts.reflex import CancellationDirective
+        ready, finish = asyncio.Event(), asyncio.Event()
+        effects = []
+        class Provider(MockCapabilityProvider):
+            supports_coordinated_start = True
+            async def execute(self, request, definition, context):
+                ready.set()
+                await finish.wait()
+                await context.start_gate.ready()
+                effects.append(request.request_id)
+                return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
+                    provider_id=self.provider_id, status="completed", output={"completed": True})
+        registry = CapabilityRegistry()
+        for name, lane in (("voice", "vocal"), ("body", "activity")):
+            definition = _definition("test." + name, group=name, resources=[name])
+            definition.metadata["execution_lane"] = lane
+            registry.register(definition)
+        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime.register_provider(Provider("body"))
+        response = InteractionResponse(interaction_id="cancel-prepared", capabilities=[CapabilityRequest(
+            request_id=name, capability_id="test." + name, timing="parallel", metadata={
+                "coordination_id": "cancel-group", "lane_start_policy": "prepared_start"}) for name in ("voice", "body")])
+        receipt = await runtime.submit(response)
+        async with asyncio.timeout(1):
+            await ready.wait()
+            await runtime.cancel_scope(CancellationDirective(source_turn_id="stop", requested_scope="current_interaction",
+                foreground_interaction_id=response.interaction_id))
+            result = await runtime.wait_terminal(receipt)
+        self.assertEqual(effects, [])
+        self.assertEqual(result.status, "cancelled")
+        self.assertEqual(runtime.scheduler_status().active_count, 0)
+        self.assertEqual(runtime.scheduler_status().waiting_count, 0)
+
+    async def test_compound_body_requires_preparation_support_and_optional_failure_is_soft(self):
+        for optional in (False, True):
+            with self.subTest(optional=optional):
+                effects = []
+                class Provider(MockCapabilityProvider):
+                    supports_coordinated_start = True
+                    async def execute(self, request, definition, context):
+                        await context.start_gate.ready()
+                        effects.append(request.request_id)
+                        return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
+                            provider_id=self.provider_id, status="completed", output={"completed": True})
+                registry = CapabilityRegistry()
+                requests = []
+                for name, lane in (("voice", "vocal"), ("body-a", "activity"), ("body-b", "activity")):
+                    definition = _definition("test." + name, group=name, resources=[name])
+                    definition.metadata["execution_lane"] = lane
+                    definition.metadata["provider_local_activity_compilation"] = lane == "activity"
+                    registry.register(definition)
+                    metadata = {"coordination_id": "compound", "lane_start_policy": "prepared_start"}
+                    if optional and lane == "activity":
+                        metadata.update(source="social_cognition_auxiliary_activity", semantic_owner="social_cognition",
+                            auxiliary_plan_activity=True, execution_role="social_decoration", source_goal_ids=[])
+                    requests.append(CapabilityRequest(request_id=name, capability_id=definition.capability_id,
+                        timing="parallel", metadata=metadata))
+                runtime = CapabilityRuntime(registry, max_concurrency=3)
+                runtime.register_provider(Provider("body"))
+                async with asyncio.timeout(1):
+                    result = await submit_and_wait_terminal(runtime, InteractionResponse(
+                        interaction_id=f"compound-{optional}", capabilities=requests))
+                self.assertEqual(effects, ["voice"] if optional else [])
+                self.assertEqual([row.reason_code for row in result.results if row.request_id.startswith("body")],
+                    ["coordination_unsupported", "coordination_unsupported"])
+                self.assertEqual(runtime.scheduler_status().active_count, 0)

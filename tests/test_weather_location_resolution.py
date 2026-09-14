@@ -15,6 +15,38 @@ from agent.app.local_tool_execution import _weather_output
 
 
 class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_transliterated_search_match_is_not_location_identity(self) -> None:
+        # Retrieval keys may collide or choose the wrong reading of a name.
+        for requested, returned in (("重庆", "Zhongqing"), ("南京", "南津")):
+            with self.subTest(requested=requested, returned=returned):
+                def handler(request: httpx.Request) -> httpx.Response:
+                    self.assertTrue(request.url.path.endswith("/search"))
+                    return httpx.Response(200, json={"results": [{
+                        "name": returned, "latitude": 27.0, "longitude": 107.0,
+                    }]})
+
+                client = OpenMeteoWeatherClient(
+                    geocoding_url="https://example.test/v1/search",
+                    forecast_url="https://example.test/v1/forecast",
+                    transport=httpx.MockTransport(handler),
+                )
+                with self.assertRaises(WeatherLookupError) as caught:
+                    await client.lookup(WeatherQuery(location=requested, language="zh-CN"))
+                self.assertEqual(caught.exception.reason_code, "location_not_found")
+
+    def test_explicit_geographic_qualifiers_must_all_match(self) -> None:
+        client = OpenMeteoWeatherClient()
+        for country, admin1 in (("Canada", "Illinois"), ("United States", None)):
+            with self.subTest(country=country, admin1=admin1):
+                result = client._select_geocoding_result(
+                    {"results": [{"name": "Springfield", "country": country,
+                                  "admin1": admin1, "latitude": 39.8, "longitude": -89.6}]},
+                    requested_location="Springfield", query_candidate="Springfield",
+                    context=WeatherLocationContext(locality="Springfield", admin1="Illinois",
+                                                   country="United States"),
+                )
+                self.assertIsNone(result)
+
     async def test_night_query_returns_hourly_period_evidence(self) -> None:
         forecast_requests: list[httpx.Request] = []
 
@@ -527,9 +559,9 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
                         json={
                             "results": [
                                 {
-                                    "name": "Neixiang",
-                                    "admin1": "Henan",
-                                    "country": "China",
+                                    "name": "内乡县",
+                                    "admin1": "河南省",
+                                    "country": "中国",
                                     "latitude": 33.046,
                                     "longitude": 111.849,
                                 }
@@ -562,13 +594,13 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
             WeatherQuery(location="河南省内乡县", language="zh-CN")
         )
 
-        self.assertIn(("neixiang", "en"), geocode_queries)
-        self.assertNotIn(("Neixiang", "en"), geocode_queries)
-        self.assertEqual(report.location_name, "Neixiang")
+        self.assertIn(("neixiang", "zh"), geocode_queries)
+        self.assertNotIn(("Neixiang", "zh"), geocode_queries)
+        self.assertEqual(report.location_name, "内乡县")
         self.assertEqual(report.current_temperature_c, 28.0)
         self.assertEqual(report.requested_location, "河南省内乡县")
         self.assertEqual(report.provider_query, "neixiang")
-        self.assertEqual(report.provider_admin1, "Henan")
+        self.assertEqual(report.provider_admin1, "河南省")
 
     async def test_location_not_found_is_typed_after_all_equivalent_queries_fail(self) -> None:
         queries: list[str] = []

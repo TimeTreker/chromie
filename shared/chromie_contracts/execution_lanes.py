@@ -11,7 +11,7 @@ ChromieExecutionLane = Literal[
     "activity",
 ]
 LaneCoordinationRelation = Literal["parallel"]
-LaneCoordinationStartPolicy = Literal["best_effort_parallel"]
+LaneCoordinationStartPolicy = Literal["best_effort_parallel", "prepared_start"]
 LaneCoordinationFailurePolicy = Literal["independent"]
 CHROMIE_PERSONAL_VOICE_RESOURCE = "chromie.voice"
 
@@ -42,10 +42,9 @@ class LaneCoordinationGroup(BaseModel):
 
     Social Attention is not an execution lane and never appears here. The group
     coordinates execution channels; it does not create another mind,
-    select a provider, authorize an effect, or weaken provider safety.  This
-    first maintained contract deliberately supports best-effort overlap only.
-    Synchronized start barriers and atomic cross-provider failure semantics must
-    be introduced by a later trusted-runtime contract rather than implied here.
+    select a provider, authorize an effect, or weaken provider safety.
+    Prepared start waits for required provider readiness before common Host
+    release; it does not promise identical physical onset or atomic rollback.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -55,7 +54,7 @@ class LaneCoordinationGroup(BaseModel):
     lanes: list[ChromieExecutionLane] = Field(min_length=2, max_length=2)
     vocal_step_ids: list[str] = Field(default_factory=list)
     activity_step_ids: list[str] = Field(default_factory=list)
-    start_policy: LaneCoordinationStartPolicy = "best_effort_parallel"
+    start_policy: LaneCoordinationStartPolicy = "prepared_start"
     failure_policy: LaneCoordinationFailurePolicy = "independent"
     reason_summary: str = ""
 

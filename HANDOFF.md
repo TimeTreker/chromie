@@ -1,5 +1,722 @@
 # Chromie Latest Handoff
 
+## Delivery — 2026-09-14
+
+Owner authorization: commit all accumulated project changes and push both paired
+repositories. Chromie base is `ec4a5c268a557ac0f4281c668b1404edb96c57cc` on `main`,
+remote `origin/main`; resume at the latest commit containing this checkpoint and
+handoff. Paired Soridormi commit is `0af3d09` on `codex/turn-count`, containing
+provider argument-realization contracts, manifest validation and tests.
+
+This delivery includes single-Gemma priority scheduling (SC > GI > GA > Fast),
+SC verbal/nonverbal Runtime handoff, separate Vocal/Activity waiting queues and
+prepared-start alignment, token-budget verification and existing Schema invariants,
+plus the reproduced catalog, weather, terminal-evidence and argument-serialization
+repairs. The detailed module I/O and failure workflows below remain authoritative.
+No case-specific semantic rules, extra model reviewer or Qwen promotion is included.
+
+Latest unchanged-code gate: `.chromie/acceptance/qwen9b-comparison-20260914/canonical.log`
+records 145 benchmarks, 3,303 tests / 886 subtests and 20 legacy tests passing,
+including policy/ownership/static checks; two existing FastAPI warnings remain.
+Documentation checks passed after comparison updates and are rerun for this delivery.
+Earlier same-source evidence: 6,000 workflows and 45 Level A cases pass; paired
+Soridormi full suite 790 passed / 2 skipped, governance and body concurrency pass.
+Both executable patches were compared to their retained tested snapshots before
+commit; full tests are not rerun solely for this delivery-document update.
+
+Release readiness remains blocked: the 51-case native cohort stopped on wrong-sign
+turning during its first case; focused right-turn/weather pass 2/2 does not replace
+it. GI/GA/Planner semantic failures and #24/#32 remain open. The 44-request-per-model
+Qwen comparison found lower latency but no qualified replacement; SC/Deep/physical
+proof was not obtained. The failed and passing evidence below retains those limits.
+
+Runtime stays on the restored single Gemma and existing operator Host (PID 854858,
+launcher 852382, preserved text client 400841); details below are a local snapshot,
+not a portable process identity. Commit metadata changes do not rebuild running
+images. Before live validation, verify packaged source and capture a fresh identity.
+
+Cross-machine resume: fast-forward Chromie `main` and Soridormi `codex/turn-count`,
+initialize Soridormi submodules, read this delivery and the current comparison,
+then follow `CHROMIE_RUNBOOK.md` to generate the machine profile and rebuild services.
+Use `python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent`
+and `python scripts/capture_runtime_identity.py --allow-dirty --output <path>`
+as separate checks before an authorized full native cohort. Preserve single Gemma,
+non-thinking, Soridormi safety ownership and supervised physical-evidence limits.
+
+Raw traces, model weights, `.env.runtime`, `.chromie/acceptance/` and debug bundles
+are local/generated or ignored artifacts, not included in Git. Their exact paths and
+summaries are retained below; a new clone does not itself contain raw proof. Generated
+social-eyes XML inside Soridormi's Open_Duck_Playground submodule also stays local;
+no third-party submodule revision is changed. No tracked project edits are excluded.
+
+## Qwen3.5-9B comparison — retained 2026-09-14
+
+The owner authorized model comparison after the failed-case repair. Both frozen
+44-request cohorts completed: GI 30, GA 6, Fast 8. Messages, dynamic Schema,
+sampling, stream mode and non-thinking were identical except served model ID.
+Official Qwen3.5-9B and Gemma-4-12B-it both used online FP8 in the same pinned
+SGLang image, context 65,536; architecture-specific templates/parsers/cache differ.
+The comparison made no production model replacement, semantic code/prompt change
+or retry/judge call. Its preceding implementation is included in the delivery above.
+
+Evidence: `.chromie/acceptance/qwen9b-comparison-20260914/`.
+`report.md` owns this experiment's readable comparison; `adjudication.json` retains
+all 88 reviewed outputs, module input/output evidence, earliest divergence and
+containment. `manifest.json` freezes 44 case hashes; paired request equality was
+verified with only model ID excluded. `source-before.patch`, exact raw requests,
+responses, engine/model identities and offline validation are retained.
+
+Both models pass 44/44 Schema checks. Corrected DTO/Host results: Gemma GI 30/30,
+GA 6/6, Fast 5/8; Qwen GI 28/30, GA 6/6, Fast 6/8. A missing GI validator constructor
+argument was a harness error, corrected offline for both complete raw cohorts;
+there was no repeat inference or changed criterion. Reviewed Fast plans acceptable:
+Gemma 3/8, Qwen 1/8. GA stage results: 4/6 versus 5/6, including required conservation
+of invalid upstream WHAT, not successful originating episodes. GI strict oracle
+5/24 versus 2/24 includes lexical/span false positives; no GI semantic accuracy
+claim is derived from it. Uncertain manual GI judgments remain explicitly review.
+
+Sequential request latency medians (Gemma/Qwen): GI 4.54/2.80 s, GA 6.81/4.01 s,
+Fast 5.57/3.42 s. Qwen improves latency and one acquisition/handover classification,
+but retains wrong turn direction, incomplete work claimed complete, misbound values
+and invented semantic uncertainty. Both candidates remain unqualified. No SC, Deep,
+whole-runtime, physical voice/robot or real-time scheduling proof was obtained.
+Do not promote Qwen or infer a role split from this failure-focused sample.
+
+Production restored to single `chromie-gemma4-12b`; temporary Qwen container is
+stopped. Launcher PID 852382, text Host PID 854858, PTY 39865; existing client
+PID 400841 preserved. Host evidence: `.chromie/acceptance/psm-live-text/20260914T120750Z/`.
+Soridormi and configured speaker remain enabled; startup synthesis discarded PCM,
+and no audible or embodied test was submitted. `restored-source-verification.json`
+confirms packaged Agent matches source; `restored-models.json` confirms Gemma.
+
+Current comparison follow-up gates pass: `canonical.log` records 145 benchmarks,
+3,303 tests / 886 subtests and 20 legacy tests, with two existing FastAPI warnings.
+Repository policy, test ownership, documentation and incremental static gates pass.
+The comparison changed only retained evidence and existing status/handoff documents;
+the preceding 6,000-workflow/45-Level-A and Soridormi results were not rerun here.
+
+Next: retain the engineering patch and compare the remaining semantic failure clusters
+at their earliest owner under the frozen-cohort method. No case rules, downstream WHAT
+repair, or extra semantic-review call. #24/#32 and physical evidence gaps remain open.
+Before another live cohort, gracefully stop the current Host, verify/capture fresh
+runtime identity, run the whole discovered cohort, adjudicate every case and retain
+one debug bundle per aggregate stop; restore the operator afterward.
+
+## Failed-case repair — preceding 2026-09-14
+
+Current source includes weather entity validation, early-read language and terminal
+result handoff, SC structural evidence retention, aligned Fast argument serialization,
+provider direction/duration realization metadata, and atomic catalog refresh visibility.
+The checkpoint's current section owns the per-module failure/repaired workflow table;
+`final-native/adjudication.json` retains the final actual episode and I/O. No case rules,
+extra model reviewer, model substitution, commit or push were made. Preserve all prior
+dirty work in both Chromie and `/home/chromie/github/soridormi`.
+
+Chromie base is `ec4a5c268a557ac0f4281c668b1404edb96c57cc`, branch main, dirty.
+Evidence root: `.chromie/acceptance/failed-case-repair-20260914/`.
+`baseline.patch` and `soridormi-baseline.patch` preserve pre-repair state.
+`final-canonical.log`: 3,303 tests / 886 subtests, 145 benchmarks, 20 legacy tests,
+policy/ownership/static/docs checks pass (two existing FastAPI warnings).
+`final-workflow/`: 6,000/6,000, unchanged source; `final-level-a/`: 45/45.
+Paired Soridormi: 790 passed / 2 skipped in `soridormi-final-canonical.log`;
+body concurrency/governance pass. Failed environment-only test attempts remain retained.
+
+Final deployed identity: `cb2a9d0db2b062372758bc9be97d93c009f02b58cf9041233df4b882d0d092ff`.
+Agent host/container source: `2b0283a4087a081d143a7d0d8bac655808555f7b0c9c0150b60f48bbd996e593`.
+Full 51-case native aggregate stopped during first case after wrong-sign turn executed
+and simulator returned safe idle: 0 completed summaries, 1 interrupted, 50 unrun.
+Bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260914_194741.tar.gz`.
+This is a hard semantic/provenance failure, not a passing revision. Final cold request
+proves full provider catalog and complete numeric output but still plans right for left.
+Other retained blockers: GI effect merging, GA dropping acquisition/handover resource
+shape, Fast substituting partial locomotion or an unsupported vocal provider. Six-packet
+Fast variant reviews and the unchanged 24-case GI screen are retained with separate
+mechanical/oracle/semantic verdicts; neither qualifies the whole model role. No physical
+microphone/speaker/robot proof or whole-runtime release readiness is claimed.
+
+Post-aggregate focused regressions on the same runtime source pass 2/2:
+`final-native/focused-live/` (right turn SID `6878f992`, weather SID `28a14ee0`).
+Manual review confirms walk 3 s then negative-yaw right turn; weather uses 重庆/night,
+returns matching provider data and SC reports grounded values through discarded PCM.
+`final-native/focused-adjudication.json` records both. These focused passes do not
+replace the failed complete-cohort attempt or establish prompt nonregression.
+
+Operator restored: launcher PID 838087, Host PID 840376, PTY 28859;
+`./scripts/start_chromie.sh --text-console --keep-services`. Existing text client
+PID 400841 remains. Host evidence:
+`.chromie/acceptance/psm-live-text/20260914T115053Z/`.
+Capabilities and configured speaker are enabled; no automatic audible test was sent.
+`restored-source-verification.json` confirms packaged Agent matches the checkout.
+Documentation updates after runtime capture do not alter the tested executable source.
+
+Next: retain the current engineering patch and review residual semantic failures before
+any release claim. The subsequently authorized Qwen comparison is recorded above;
+it did not qualify a production replacement. Keep Gemma 12B fixed and preserve the
+global non-thinking boundary. The active #24/#32
+line remains open; no scoped semantic acceptance or release acceptance is inferred.
+Before any live rerun, inspect/stop the operator Host gracefully, verify packaged source
+with `python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent`,
+then separately capture a fresh identity with `--allow-dirty --output <path>`.
+Reuse directory-discovered frozen scenarios, adjudicate every result, retain one debug
+bundle per aggregate stop, and restore the operator afterward. Do not use phrase rules,
+new semantic judge calls, or Host reinterpretation to repair GI/GA/Planner meaning.
+
+## Scheduler alignment — preceding 2026-09-14
+
+The owner-authorized lane scheduling and prepared-start change is implemented.
+Preserve the earlier dirty work below; no commit or push was made. Evidence root:
+`.chromie/acceptance/lane-coordination-20260914/`. The preceding SC handoff section
+retains baseline/history; this section owns the current validation and operator state.
+
+The reproduced defect was execution starting as soon as each provider returned
+from its own preparation: parallel submission alone left an 80 ms start gap
+(`baseline.log`). Runtime now maintains separate eligible-FIFO Vocal/Activity
+waiting queues under one capacity/resource arbiter. Total capacity is unchanged;
+with capacity > 1, one slot is reserved for Vocal and the remainder supports
+compatible Activity concurrency. Required prepared members reserve resources
+atomically and await one release; optional SC decoration cannot hold ready speech.
+Each member releases resources independently after completion/cancellation.
+
+SC's exact anchored verbal/nonverbal result is materialized once before Runtime
+submission, including Situation and wordless entry points. Host waits for first
+PCM/output readiness, Soridormi waits for plan/monitor/confirmation or existing
+trusted SC preflight, and terminal results return to the social ledger. A reproduced
+old Planner-only outcome guard now recognizes SC's source/owner without granting
+Goal-completion authority. Optional provider loss is retained without suppressing
+speech. No new prompt/model call, service, environment key or document was added;
+existing `LaneCoordinationGroup.start_policy` adds/defaults to `prepared_start`.
+
+| Actual controlled workflow | Input → observed output | Verdict |
+|---|---|---|
+| SC / semantic owner | One controlled informative utterance plus one exact anchored blink → unchanged act/anchor IDs | Controlled decision; not native inference |
+| Adapter / materialization | Complete SC result → one packet, one coordination ID, no Goal ownership for blink | Correct; no independent expression dispatch |
+| Runtime / scheduling | Two accepted members with distinct resources → one common release at monotonic 35952.817652954 | Correct shared Host release |
+| Host PCM and Soridormi preparation | Blink ready 719 ms before PCM → neither advances before release; both complete | Correct preparation/transport, no physical-onset claim |
+| Ledger / evidence | Real terminal results → speech completed and social decoration completed; simulator safe idle | Correct; admission is not completion |
+
+Validation: `final-canonical.log` passes policy, ownership, static analysis, docs,
+145 benchmarks, 3,295 tests / 876 subtests and 20 legacy tests (two existing FastAPI
+warnings). `final-workflow/` passes all 6,000 cases with source unchanged;
+`final-level-a/` passes 45/45. Focused scheduling/playback/SC matrix passes 107 tests /
+32 subtests; broader Runtime checks pass 71 tests / 15 subtests. Negative cases cover
+required preparation failure/timeout, optional lateness/resource conflict/provider
+loss, unsupported compound preparation, cancellation, lane fairness and resource drain.
+
+`queue-sim-bound/` proves real Host/TTS (discarded PCM) plus deployed Soridormi
+simulator execution for controlled speech+blink. Identity SHA-256:
+`e5462d3261e19898aa18f2f4153e63ff409c2ca093db368adce0f8360fa13f93`.
+Agent packaged-source host/container digest both:
+`5c335cd307cce67c8047b11721378b857a9c39a272caf0421f8321bbb7ee4ef0`.
+The full directory-discovered native cohort was invoked once on this bound source,
+without edits/restarts between cases, then manually stopped for confirmed hard
+Goal-coverage/provenance failures: 0/6 completed cases pass, seventh interrupted,
+44 unrun. `final-live-adjudication.json` records every completed module workflow,
+actual inputs/outputs, expected contract, first wrong boundary and containment.
+All 33 native call records are retained in `final-live-transactions/`; separated
+Docker stderr avoids two interleaved records in the combined monitoring log.
+One bundle for this aggregate:
+`/home/chromie/Downloads/chromie_debug_bundle_20260914_190044.tar.gz`.
+
+Remaining native failures are outside this scheduler repair: Fast output truncation;
+GI merging independent gaze/blink or walk/sing responsibilities; Fast claiming full
+milk acquisition/delivery from one 10-second walk; right-turn intent lost to an
+omitted direction parameter; and weather resolving 重庆 to Zhongqing, Guizhou then
+SC reporting those values as Chongqing weather. Case 6's separate missing-SC check
+is an evidence-projection gap: SC actually returned an utterance and three PCM
+segments completed. These failures are not averaged into a passing revision.
+
+Evidence limits: initial adapters cover Host speech and a single Soridormi plan per
+prepared group. Unsupported compound body preparation fails closed (optional
+members may be omitted); ordinary same-provider batches retain embodied compilation.
+There is no guarantee of identical physical onset, word/gesture alignment, atomic
+cross-provider rollback or physical microphone/speaker/robot behavior. Physical
+WorkDAG nodes remain sequential. Current release readiness remains development-only.
+
+Retained harness failures are not production passes: initial build raced old Host
+shutdown; the first identity command verified source but did not write an identity.
+`queue-sim/` and `unbound-harness-run/` therefore do not establish bound evidence.
+That incomplete native attempt was stopped and has one bundle,
+`/home/chromie/Downloads/chromie_debug_bundle_20260914_185559.tar.gz`.
+The corrected bound proof/cohort above replaces those claims. Early full-test runs
+exposed fixtures assuming two Activity slots at total capacity two; those fixtures
+now request capacity three while preserving their original concurrency assertions.
+
+Operator restored: launcher PID 719138, Host PID 721389, PTY 27611;
+`./scripts/start_chromie.sh --text-console --keep-services`. Existing user client
+PID 400841 remains. New Host evidence:
+`.chromie/acceptance/psm-live-text/20260914T110210Z/`. Source verification passed;
+one resident Gemma 12B, capabilities and configured speaker remain enabled.
+No automated physical playback was performed. Final documentation edits follow
+runtime evidence capture and do not alter tested runtime source.
+
+Next resume: inspect the retained native workflows and continue the existing
+canonical/target-evidence delivery line (#24/#32), repairing earliest semantic or
+provider evidence boundaries under the frozen qualification method. Recheck the
+running Agent with `python scripts/capture_runtime_identity.py --verify-agent-source
+chromie-agent`; inspect operator state before any further acceptance run. Stop the
+Host before immutable live testing; preserve its separate dialogue client and
+restore `./scripts/start_chromie.sh --text-console --keep-services` afterward.
+Configuration keys 381 → 381; maintained Markdown documents 102 → 102; reading-path
+entries 15 → 15. Existing execution-lane prose was consolidated rather than adding
+a design document; one existing start-policy enum gained a value, no new architecture
+layer or semantic authority.
+
+## SC Runtime handoff — current 2026-09-14
+
+The owner's SC speaking/social-attention queue requirement is implemented through
+existing owners. One resident Gemma 12B remains; no prompt, model, semantic DTO,
+service, environment key, architecture term or current document was added. Existing
+dirty work is preserved; this continuation did not commit or push.
+Evidence root: `.chromie/acceptance/sc-runtime-handoff-20260914/`.
+
+Confirmed and repaired boundaries:
+- The common independent SC response discarded its resolution, so GI-triggered
+  optional expressions never reached Runtime admission. It now carries the exact
+  request/snapshot and complete SC result, including wordless and mixed acts.
+- SC invocation identity replaced the admitted user-turn ID, hiding early completed
+  speech from later Goal-scoped context. Delivery now retains the source turn;
+  inference/snapshot identity stays separate. Both weather live packets confirm
+  that the later SC request sees the initial completed speech.
+- Independent expression execution omitted terminal ledger feedback. The adapter
+  now records actual completed/failed/cancelled results through the existing owner;
+  admission alone never becomes completion or Goal satisfaction.
+- Deployed Soridormi preflight still recognized the retired Planner auxiliary
+  source; SC's queued blink therefore failed before execution. The same old source
+  check also marked grouped SC decoration mandatory. Both now recognize SC source
+  and semantic owner. Low-risk/non-motion restrictions, request/definition/body
+  confirmation requirements and safety monitoring remain; no consent is fabricated.
+  Situation's redundant resolution assignment was removed, preserving its dedicated
+  freshness/concurrent-delivery path.
+
+Actual repaired workflow (controlled decision; native GI/model choice is not
+claimed by the queue probe):
+
+| Owner / boundary | Authoritative input and expected output | Observed before repair → after repair | Handoff / evidence |
+|---|---|---|---|
+| GI → independent SC | Existing greeting Responsibility r1, original turn; SC may propose wordless blink. | Controlled request and complete SC result valid; real GI not invoked in this probe. | Exact request/snapshot retained in `queue-sim-final/`. |
+| Common Host response | Complete SC result must survive transport. | Dropped expression result → exact request/result retained. | `baseline-boundary-replay.log`; mixed/wordless regressions. |
+| SC adapter → Runtime | Validate source, anchor, live Capability, arguments, freshness, resources; enqueue optional request without Goal authority. | Missing result yielded no request → blink committed under original turn. | `social_decoration_committed`, real Runtime queue. |
+| Soridormi provider | Fresh body plan says no confirmation required; low-risk blink and monitor accepted. | Old Planner-source check rejected SC → SC-owned preflight accepted; actual blink completed. | `queue-sim/` failure vs `queue-sim-final/` completion. |
+| Completion → ledger | Record actual terminal provider result, never infer success from admission. | Missing independent terminal event → completed/failed/cancelled retained. | Live completed blink; controlled failure/cancellation regressions. |
+| Playback → later SC | Completed early speech remains visible after GA Goal identity binding. | SC request ID hid user-turn speech → later native weather context has `already_spoken=1`. | Playback regression and both weather packets; duplicate new greeting remains a separate failure. |
+
+Validation: `final-canonical.log` passes repository policy, ownership, documentation,
+pinned static analysis, 145 benchmarks, 3,284 tests / 868 subtests and 20 legacy tests
+(two existing FastAPI warnings). `final-workflow/` passes 6,000 cases with source
+unchanged; `final-level-a/` passes 45/45. Earlier focused transport proof is 136 tests /
+16 subtests; final provider/SC proof is 100 tests / 12 subtests. Negative preflight
+cases cover retired/missing ownership, physical effects/class and all confirmation
+sources. These local gates do not establish native-model ability.
+
+`queue-sim/` retains the real queued-but-rejected blink; `provider-baseline.log`
+reproduces two source-owner failures. `queue-sim-final/` binds the final runtime
+identity and proves the same controlled SC nonverbal decision reaches the real
+Runtime queue and deployed Soridormi simulator, then records
+`social_decoration_committed` → `social_decoration_completed`, with safe idle.
+The SC output is controlled, not a native semantic inference or physical proof.
+`queue-sim-provider-focused/` retains the earlier successful focused replay.
+Retained harness errors are not production failures: initial empty Responsibility
+fixtures, first queue probe's wrong ledger accessor, and a final-cohort CLI typo
+that started no case. Corrected failures/proofs have separate artifacts.
+
+Final native/live identity SHA-256:
+`b7ceb2c4973bf76e6716a04b4a256fb0021321597075222181c2a222a8ab1043`.
+The complete directory-discovered cohort was invoked on each evaluated source,
+without changes between cases. Each stopped incomplete at the fourth case's GI
+HTTP503; three completed cases failed and 47 were unrun. One bundle per aggregate:
+- Before provider-source repair: `live/`, `live-adjudication.json`, bundle
+  `/home/chromie/Downloads/chromie_debug_bundle_20260914_173851.tar.gz`.
+- Final source: `final-live/`, `final-live-adjudication.json`, 15 retained native
+  transactions in `final-live-transactions/`, bundle
+  `/home/chromie/Downloads/chromie_debug_bundle_20260914_174407.tar.gz`.
+
+The final failures remain substantive: Fast Planner truncates the compound motion
+output; another plan has a singleton parallel member; the milk request falsely
+claims complete coverage with only a 10-second walk. Host admits that incomplete
+milk Plan and the simulator executes the walk, without acquisition/delivery.
+Fast/Deep evidence reentry then rejects required catalog projections (22,097 >
+9,000 / 28,410 > 12,000 chars), while SC silence relies on an overbroad completed-task
+projection. GI's singing/walking Responsibilities reuse overlapping source spans;
+its HTTP503 is validation containment, not an engine outage. The supported
+`coordination` wire field is not the defect. SC/GA/Planner were not invoked in that
+interrupted fourth case. Do not report overall SC/Planner/robot qualification.
+
+Both original weather probes complete native lookup and final grounded result
+speech with discarded audio: 83.89 s / 83.05 s total, first simulated playback ends
+at 15.93 s / 14.85 s. `weather-adjudication.json` and `weather-transactions/` retain
+all results. Later SC context now contains initial speech, but both cases still
+repeat the greeting under a newly created Planner communication Need. Current
+Need coverage requires a new explicit verbal act; interpretation-triggered unbound
+acts cannot respond/ask. Qualify that early-act/Need linkage as a complete semantic
+transaction before changing it. Do not substitute a wording filter, invent Goal
+completion, or let acknowledgement discharge an unresolved answer/action Need.
+Repetition, latency, prior SC model truncation and #24/#32 release closure remain open.
+
+Operator state restored: text Host PID 654715, launcher PID 652481, PTY session
+2104, Host evidence `.chromie/acceptance/psm-live-text/20260914T094729Z/`.
+Existing interaction client PID 400841 remains. Startup verified packaged Agent
+source digest `62d104f162af5d3bd29046160e46098b60f19d3a4889f46c30cfb02e5fbdbd68`
+and the single Gemma profile; capabilities and normal operator speaker are enabled.
+Automated dialogue used discarded audio only; no physical microphone/speaker/robot
+claim. The app terminal-open request is queued, not confirmed visibly opened.
+
+Resume from `weather-adjudication.json`, the original weather packets and the
+active SC exception: audit complete Need/early-act authority with the semantic
+qualification skill, freeze the contrast cohort before semantic edits, then run
+focused and full qualification. Preserve the current failed aggregate and prior
+single-engine evidence below. For operator interaction use
+`python scripts/chromie_psm_live_text_console.py`; logs stay with
+`./scripts/start_chromie.sh --text-console --keep-services`.
+Surface inventory remains 381 configuration keys, 102 Markdown files and a
+15-document core reading path; no new current document/configuration surface.
+
+## Single resident Gemma 12B — preceding evidence 2026-09-14
+
+The owner explicitly superseded the dual-instance request with one resident
+Gemma 12B SGLang engine. SC/GI/GA/Planner keep independent context and authority:
+SC=500 > GI=400 > GA=300 > Fast Planner=200; Deep Work=100, background=0.
+Both SC and GI preserve their priority in their permitted deeper pass. No new
+model/service/environment key/current document or semantic authority. Existing
+uncommitted startup, SC/GA and terminal-dispatch repairs remain intact. Dual
+configuration and Qwen prompt experiments were withdrawn. No new commit/push.
+
+Evidence root: `.chromie/acceptance/dual-inference-20260914/`; the historical root
+name does not imply the selected topology. Dual Qwen AWQ/Gemma FP8 probes failed
+at 18 GiB CPU offload (lazy NCCL CUDA allocation) and at 24 GiB (Deep exceeded its
+unchanged 120 s deadline). Probe containers are stopped. The selected engine is
+the original pinned Gemma FP8 profile without CPU offload; ASR/TTS and Soridormi
+remain enabled. Generated `.env.runtime` is single Gemma again.
+
+`priority-single-gemma/` proves both running priority-200 requests retracted once
+for SC/GI and then resumed/completed. Foreground first tokens arrived 77–78 ms
+after submission. This is synthetic native scheduling evidence, not whole-turn
+response latency or semantic qualification. `single-budget-proof-margin2048/`
+replays the complete original SC packet with the production 2,048-token margin:
+50,060 input + 1,024 output + 2,048 margin = 53,132 < 65,536; native primary output
+passes Schema/DTO/Host in 15.18 s. The provider now confirms estimated overflow
+using its own tokenizer, retains full failure packets and returns typed failure.
+No content pruning, second semantic call or increased timeout is involved.
+
+Whole-turn evidence remains mixed. The original baseline completed 12/51 cases,
+then stopped incomplete on an SC false budget rejection; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20260914_162109.tar.gz`.
+The rebuilt single-engine aggregate completed three cases, all failed, and stopped
+at case four's GI source-provenance rejection; 47 not run. Its one bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260914_165712.tar.gz`.
+Every completed/interrupted result is adjudicated in `single-live-adjudication.json`.
+Independent Planner numeric/coverage/schema failures and GI overlapping source
+spans remain unqualified; the GI 503 is validation containment, not engine outage.
+
+The two reported weather episodes were retained separately: `weather-today/`
+completed lookup and result speech in 75.93 s headlessly; `weather-rain/` failed
+an SC pre-action ordering invariant. Native frozen SC comparisons retain every
+iteration, including failed output binding, missing expression and one truncated
+output. The bounded decoder repair preserves upstream delivery-phase choices,
+authors Need bindings before timing/wording, and requires a real expression for
+wordless acts. Prompt, model, Host authority and generation budget are unchanged.
+A focused native retry with recording passes, but does not erase the truncation.
+
+Current-source canonical gate `expression-canonical.log` passes 3,274 tests /
+860 subtests, 145 benchmarks and 20 legacy tests (two existing FastAPI warnings).
+`expression-workflow/` passes all 6,000 cases with source unchanged;
+`expression-level-a/` passes 45/45 cases. The earlier interrupted
+`final-canonical.log` is not a passing gate. Native `sc-order-expression/` retains
+12/13 passes; the weather case repeats acts until truncation. The original phase
+and empty-expression shapes are now excluded, but the transaction remains
+unqualified. Agent rebuild/source verification completed (digest
+`62d104f162af5d3bd29046160e46098b60f19d3a4889f46c30cfb02e5fbdbd68`).
+Current diagnostic runtime identity is
+`7ac0718629eed501840a27d4f68564f7fb1049dd23af3fa6493cedf85411f79a`
+(`expression-runtime-identity.json`, dirty/non-release evidence).
+Native/physical stability, rapid interaction and #24/#32 release closure remain open.
+
+The current-source live aggregate (`expression-live/`) again completed three of
+51 cases, zero passes, then stopped at case four's GI validation failure (whole
+admitted turn copied into `comparison`, not the prior run's overlapping spans).
+One bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260914_171846.tar.gz`.
+All 15 native calls and all completed/interrupted cases were inspected; see
+`expression-live-adjudication.json`. In the milk case, unlike the prior rejection,
+Fast claimed complete coverage with only a 10-second walk. Host admitted it and
+the simulator completed locomotion, without acquisition/delivery. Later Fast/Deep
+reentry hit required Capability-catalog projection limits (22,097>9,000 and
+28,410>12,000 chars). Safe idle was observed afterward; the user goal was not met.
+This is a real Goal-coverage failure and cannot be averaged into a pass.
+
+Both original weather episodes subsequently completed lookup and grounded final
+SC replies on the same revision: `weather-rain-expression/` 83.08 s and
+`weather-today-expression/` 77.83 s; first virtual playback 14.79 / 14.04 s.
+Both repeated the initial greeting in the later required response. Thus their
+mechanical passes do not establish natural interaction or rapid response.
+`weather-expression-adjudication.json` binds replies to provider data and retains
+the duplication. The old packet has completed early SC speech in
+`conversation.history` but no `interaction_context.already_spoken`; projection
+and request/user-turn correlation remain an unresolved provenance audit, not a
+claimed repair. No semantic same-stage repair call or latency budget increase.
+
+Text Host is restored with `./scripts/start_chromie.sh --text-console --keep-services`;
+ASR is bypassed, Soridormi remains enabled, and launcher logs stay separate from
+the interaction client. Host PID 584502; retained Host evidence directory
+`.chromie/acceptance/psm-live-text/20260914T092337Z`; launcher terminal session 49319.
+The original client PID 400841 was left intact. The app terminal open request was
+queued. Earlier pause/no-restart statements below are historical. Physical
+microphone/speaker proof remains unclaimed; the restored operator Host uses the
+normal speaker, while all automated scenarios above used no speaker.
+
+Next resume: audit early SC delivery identity/projection and duplicate need
+fulfillment at the existing authority; qualify complete Planner Goal coverage and
+required Capability catalog projection, and the GI atomic-binding failure. Keep
+one immutable aggregate per deployed revision, retain one bundle per stopped/full
+cohort, and never promote focused passes over these failed whole-turn results.
+To interact from repository root: `python scripts/chromie_psm_live_text_console.py`.
+Do not start a second Host. No new commit or push; branch/base remains
+`main` / `ec4a5c268a557ac0f4281c668b1404edb96c57cc` plus the preserved dirty patch.
+
+### Current failure workflow and repair ownership
+
+| Boundary / owner | Material input → actual result → expected result; verdict |
+|---|---|
+| Host admission → GI | Exact weather text admitted without ASR; GI accepted greeting r1 and weather r2. Correct transport; broader GI quality not inferred. |
+| GI → concurrent SC/GA/Fast | Separate requests share the engine at their role priorities. SC has no dependency on Fast completion; independent Work still needs its canonical GA join. |
+| Planner Need → SC | Greeting Need binds r1/Goal and requires `pre_action`. SC originally authored `final`; conditional Schema admitted it to native generation, strict validation rejected. Earliest defect: decoder did not enforce existing phase dependency. |
+| SC decoder → DTO/Host | Explicit phase alternatives stop wrong-phase Need binding; binding-first generation fixes the retained omission. A further native output proposed an empty nonverbal act without expression: now explicit verbal/nonverbal alternatives enforce the existing DTO requirement. Host still rejects incomplete or unsupported output. |
+| Work/Evidence → later SC | A complete 50,060-token input was falsely rejected by character estimate before inference. Same-model tokenizer now verifies it fits; exact native replay succeeds without removing context. |
+| Failed cognition → Host/CLI | Prior acknowledgement must not hide later failure or skip terminal dispatch. Preserved earlier repair sends the bounded operational failure through ordered delivery and session completion, respecting explicit silence. |
+
+Flow: text → GI → **concurrent {SC, GA, Fast Work}** → canonical join →
+required SC pre-action delivery → provider Work → Evidence → SC result → terminal
+completion. At a failed boundary, no fabricated communication or executable Work
+is supplied. The native role repair remains one primary invocation; qualification
+replays are offline evidence, never runtime semantic retries.
+
+## GA source status and terminal failure repair — 2026-09-14
+
+Baseline remains `ec4a5c268a557ac0f4281c668b1404edb96c57cc` plus local startup and
+SC/GA repairs below. The user independently loaded the preceding patch; before
+this new repair, checkout and Agent digest both equaled
+`56a44ed330ee66db91efec01808622abdf61ebdb3a122689064ca04009c6f636`.
+Current additional source changes remain local/uncommitted and undeployed.
+
+User SID `f1c26dc9`, 15:45:11 Asia/Shanghai, explicit text:
+`hello, what's the weather today in chongqing?`.
+
+| Owner / handoff | Material input → actual output; boundary verdict |
+|---|---|
+| Host admission → GI | Empty history/Goals, explicit text → admitted envelope. ASR bypassed; correct transport. |
+| GI WHAT → fan-out | r1 greeting/speech, r2 weather/information with entity=weather, location=chongqing, time=today; accepted at 8.910 s. Fine-grained segmentation not independently qualified. |
+| SC interaction → TTS | GI/snapshot → pre_evidence acknowledgement with acknowledge_work, 8.31 s SC call. First playback 17.704 s, final early playback 21.134 s; valid DTO and observed playback logs. |
+| Fast Work → held join | Greeting obligation plus weather lookup proposal, 14.30 s call. Resolved terminal is not execution authority; GA join unavailable. |
+| GA continuity → DTO | Information source status unknown but source_name literal none. Conditional decoder constraint not enforced; primary output invalid. DTO correctly rejects at 28.969 s into turn. No Goal or weather provider dispatch. |
+| Host containment → session | Existing early SC speech caused failure notice and final dispatch to be suppressed. This was incorrect: no notice of later failure and no llm_done transition. |
+| Session → CLI | Idle abandonment at 152.274 s, then CLI timeout 180 s after handler completion. Downstream symptom of omitted terminal dispatch. |
+
+Flow: text → GI → **concurrent {SC → TTS, GA → reject, Fast → held Work}** →
+Host skips terminal dispatch → session abandonment / CLI timeout. Source repair
+changes only the GA decoder dependency and Host's failed-resolution branch.
+Explicit source alternatives preserve the existing DTO and supplied referent IDs;
+Host does not infer a missing source. The operational fallback always traverses
+normal terminal dispatch, retains earlier playback order, honors silence and
+authorizes no effects. No prompt/model/new semantic invocation or authority change.
+
+Evidence root `.chromie/acceptance/sc-ga-terminal-failure-20260914/` is local/Git-ignored:
+
+- `originating-turn.log`, `originating-workflow.json`, `agent-before.log`, four
+  `*-transaction.json` files and `diagnosis.md` retain the episode and owner audit.
+- One bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260914_155414.tar.gz`.
+  No independent live aggregate was started: the operator holds the Host lock.
+- Four frozen `corpus/*.json` packets: previous two repaired-role requests and
+  this episode's SC/GA. `native-before/` repeats the new GA source failure; the
+  other three pass. `native-after/` all pass; `adjudication.json` applies real SC
+  DTO/source validation and GA materialization. Full rendered GA schemas equal
+  replay packets; one primary call per role, no targets or repair calls.
+- GA after-results retain both Responsibilities, location and time, with absent
+  or empty source names under unknown status. SC acknowledges without claiming
+  a weather result. `semantic-review.json` retains limits: the prior weather
+  probe still invites unnecessary reconfirmation, and both SC acknowledgements
+  mention lookup while citing only the greeting Responsibility. Finer semantic
+  source coverage and communication quality remain unqualified. This is bounded
+  implementer review, not independent general language, complete turn,
+  contention latency or physical evidence.
+- `fail-first-corrected.log`: 10 failures at the predicted schema/dispatch
+  boundaries. Initial `fail-first.log` also contained test setup mistakes and is
+  excluded from that count. `focused-after.log`: 122 tests / 155 subtests pass,
+  including six controlled-delivery cases using real dispatch, session completion
+  and CLI wait. `workflow-focused.log`: all 104 strict tests pass, no fixture edits.
+- `canonical.log` exits 0: 3,262 tests / 849 subtests, 145 benchmarks and 20 legacy
+  tests; pinned static/policy/ownership/config/docs checks pass, two existing
+  FastAPI deprecation warnings. `workflow-final/summary.json`: all 6,000 cases
+  pass their declared verdicts, source unchanged, no fixture edits. All 45 Level A
+  cases pass in `general-ability/summary.json`. These are bounded automated gates.
+
+No services stopped/rebuilt and no commit/push. Pending pause authorization from
+the prior turn still applies. After approval, stop the operator Host gracefully,
+use the saved operator overrides and selective Agent rebuild commands below,
+verify source/profile identity, then run the directory-discovered safe live cohort
+under one immutable identity. Retain exactly one debug bundle at completion or a
+hard-failure stop and review every output. Exact follow-up probes are the two
+weather utterances above/below; use `--no-speaker` and keep capabilities enabled
+(do not use the earlier greeting's `--expect-no-capabilities`). Restore the
+operator text Host after validation. #24/#32 and rapid-response latency remain open.
+
+Subsequent scheduling discussion is not a deployment amendment: user proposes
+two resident Fast/Deep inference instances and priority SC > GI > GA > Fast.
+Read-only inspection (`scheduling-inspection.json`) confirms one deployed SGLang
+0.5.19 instance, `max-running-requests=2`, priority enabled, preemption threshold 10;
+current purpose ranks are SC=400, GI/Fast=300, GA=200. One RTX 5090 was observed,
+32,607 MiB total and 26,893 MiB used (about 26.3 GiB at first check).
+Use exact raw measurements in the retained artifact for capacity decisions.
+Host's GI fan-out starts all three independent requests; serial arrows in the
+summary do not establish GPU start order or observed preemption. Two independent
+engines have separate queues and do not automatically coordinate cross-engine
+GPU preemption. No model, priority or topology changes were made for this discussion;
+the existing foreground/deep-load measurement gate still applies.
+
+## SC / GA decoder and workflow repair — 2026-09-14
+
+Source baseline `ec4a5c268a557ac0f4281c668b1404edb96c57cc` plus the preceding
+uncommitted startup-identity patch. Current additional changes are also local.
+No model, prompt, semantic authority or runtime permission was changed.
+
+User episode: SID `1d3e19dc`, `hi, will it rain today in Chongqing?`, 14:43:34
+Asia/Shanghai. SC owns interaction, GA owns canonical Goal continuity, Fast owns
+Work, and Host owns admission/delivery. Actual workflow:
+
+| Boundary | Actual input/output and result |
+|---|---|
+| Gateway → GI | Explicit text admitted; GI accepted r1 greeting and r2 rain query with Chongqing/today bindings in 9.204 s. |
+| Host fan-out | GA, Fast and SC inference began at 14:43:44.308/.329/.372 after GI completed .081. SC was invoked. |
+| SC → DTO | Model authored a pre_evidence acknowledgement without progress_kind. Schema allowed it; DTO rejected it; HTTP 500. No SC speech delivered. |
+| Fast → join | Returned greeting communication obligation plus weather Work after 10.016 s. A terminal frame is not an accepted complete Goal/Plan join. |
+| GA → materializer | Preserved Chongqing but query_scope.location.entity_type=string. Schema accepted; existing location validator rejected after 16.458 s. |
+| Host → TTS | No valid Goal/Plan join or weather/body execution. Generic failure fallback, 2/2 recorded playback completions, 30.734 s session. |
+| Workflow observation | SC was recorded only after success, so the failure vanished from session_flow; an old log incorrectly named Fast as communication owner. |
+
+Earliest failing owners: model-facing schemas did not expose invariants already
+required downstream. Conditional-only tightening was insufficient for SGLang.
+Final source fix uses explicit SC truth-stage alternatives and direct location
+vocabulary on GA's GI-bound query-scope row. The vocabulary has one contract
+owner shared with the Host validator. SC invalid output returns a 422 contract
+error; initial SC start/failure/cancellation/stale outcomes are observable. Host
+never supplies missing semantic fields, adds a reviewer, or executes a failed Plan.
+
+Evidence root: `.chromie/acceptance/sc-ga-live-failure-20260914/` (local/Git-ignored).
+`diagnosis.md` retains full I/O, earliest-boundary reasoning and distinctions among
+trigger, root cause, symptom and remaining gaps. Original files:
+`originating-turn.log`, `originating-workflow.json`, `agent-before.log`, and four
+`*-transaction.json` files. One stdout/stderr-interleaved SC evidence record was
+reconstructed by removing the exact HTTP access-log fragment; untouched raw logs
+are retained. One baseline debug bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260914_144922.tar.gz`.
+
+- `fail-first.log`: original code fails the new schema, SC observation and HTTP
+  error assertions (8 failures, including three location-type subtests).
+- `native-before/`: complete frozen two-request failure cluster; both reproduce
+  the original Schema/DTO/Host mismatch with chromie-gemma4-12b on SGLang.
+- `native-after/`: invalid harness attempt omitted the production wire-schema
+  transform; excluded from production-regression claims.
+- `native-after-wire/`: conditional-only repair still fails native constraints.
+- `native-after-branches/`, `adjudication.json`: both primary outputs pass; SC
+  validates against the authoritative request and GA resolves through its real
+  materializer with one call. Prompts/model unchanged; production schemas changed.
+- `broad-sc-before/`, `broad-sc-after/`: same frozen 12-case SC corpus, both 12/12
+  contract passes. Old SC source is loaded in isolation from retained ec4a5c26;
+  the before manifest identifies it separately from workspace source hashes.
+  `broad-semantic-review.json` is implementing-agent, non-independent review.
+  Controlled source facts/empty expression catalog do not prove full live behavior;
+  formal wording remains a limitation, and no latency improvement is claimed.
+- `focused-after.log`: 234 tests / 156 subtests passed; `general-ability/`: all
+  45 Level A scenarios passed. `native-final/` repeats both original packets with
+  the final production wire schemas and passes both DTO/Host checks.
+- `canonical.log` retains an intermediate 74-failure request-snapshot run caused
+  by a decoder-ineffective global conditional. Removing that unnecessary clause
+  preserved the direct location-row fix and restored all 104 workflow tests.
+  No fixture or expected outcome was rewritten. Final canonical results are
+  retained separately in `canonical-final.log`: exit 0, 3,255 tests / 835 subtests,
+  145 benchmarks and 20 legacy tests; two existing FastAPI deprecation warnings.
+  Pinned static, policy, ownership, configuration and docs checks passed.
+- `workflow-final/`: unchanged full 6,000-case offline aggregate passed;
+  source_unchanged=true, 1,400 passes / 1,800 expected state outcomes / 2,580 expected
+  rejections / 220 expected nonexecuting rejections. No native/physical claim.
+
+Deployment remains pending. The active operator Host holds the exclusive lock;
+permission to pause it, rebuild Agent and run headless replay was requested
+asynchronously and has not arrived. No deployment or Host interruption was done.
+The earlier runbook/source-identity commands below remain applicable after the
+Host is stopped. Replay this turn with the existing interaction runner using
+`'hi, will it rain today in Chongqing?' --no-speaker`; then run the complete safe
+live cohort under one fixed deployment and retain/adjudicate one post-run bundle.
+Do not edit/restart between aggregate cases, bypass the lock, or claim physical
+microphone/speaker/robot evidence. The #24/#32 and rapid-response targets stay open.
+
+## Agent source verification repair — 2026-09-14
+
+Current source baseline: `ec4a5c268a557ac0f4281c668b1404edb96c57cc` on `main`,
+already pushed by the preceding delivery. This follow-up is local/uncommitted.
+The user reported SID `037d1216`, `hi, how are you?`: GI was accepted, but SC
+returned 404 and the Agent emitted retired `presentation_commit` frames. Direct
+container-file inspection confirmed old Agent source attached to the current
+Host. The earliest failure was startup accepting configuration/health without
+checking packaged source; the generic TTS fallback was downstream containment.
+
+Implemented: startup profile verification now shares the existing closed-loop
+Agent content digest through `scripts/capture_runtime_identity.py`. It checks
+Agent app, Agent Skills, shared contracts and shared runtime, fails closed for
+mismatch/unavailability, and gives rebuild/recreate instructions. No semantic
+prompt, runtime behavior contract, dependency lock, or compatibility path changed.
+No new document, environment variable, service or architectural term was added;
+the source-identity implementation has one owner.
+
+Evidence: `.chromie/acceptance/agent-source-startup-20260914/` (local/Git-ignored).
+`diagnosis.md` reconstructs the actual module I/O, provenance, root cause and
+repair mechanism; `originating-turn.log` retains the user's report. One debug
+bundle was retained at
+`/home/chromie/Downloads/chromie_debug_bundle_20260914_142622.tar.gz`.
+The later `before-source.json` probe found the old container already stopped
+during the user's independent rebuild; it is unavailable-evidence rejection,
+not an old full-tree digest. Pre-rebuild main-file hashes and missing-route
+inspection are recorded in the diagnosis.
+
+The user independently restarted with `--build` during diagnosis. Afterward,
+`after-source.json` records equal Host/container digest
+`a02e65fd1f453deb413a6b578540695f02425f7d40a16cb6b195e0dc84b443ce`;
+`after-profile.log` passes; `deployed-api.json` contains `/social-cognition` and
+no `PresentationCommit` schema. The agent did not restart services or interrupt
+the user's active Host.
+
+Observed user-initiated follow-up `hello`, SID `0fec435f`: GA/Fast and SC accepted;
+“Hello! How can I help you today?”; 2/2 playback completions recorded, no Work
+steps or runtime fallback. See `after-hello-workflow.json` and
+`after-hello-events.json`. First playback 32.04 s, completion 34.84 s: quick
+response remains unqualified. This different greeting is not an automated exact
+replay, full live cohort pass, warm latency proof or physical audio qualification.
+The active Host lock prevented an independent headless run; it was not bypassed.
+
+Focused tests: `focused.log`, 24 passed / 12 subtests; `general-ability/`, all
+45 Level A cases passed. Canonical `canonical-final.log` exits 0: 3,248 tests / 832 subtests, 145 benchmarks,
+20 legacy tests; two existing FastAPI deprecation warnings. Policy, static,
+ownership, configuration and documentation gates passed. Target #24/#32 closure and
+response-latency diagnosis remain open.
+
+Next: use the existing runbook startup instructions; once the operator Host is
+stopped, verify the Agent digest, retain a current runtime identity, reproduce
+`hi, how are you?` headlessly, then run and adjudicate the directory-discovered
+safe live cohort before any semantic/latency repair. Do not rebuild or edit
+source between aggregate cases. The existing `scripts/general_ability_acceptance.py`
+`--mode live-text --stage must_pass --execute` uses the simulator with speaker
+disabled by default; verify the runtime identity and simulator provenance first.
+Physical microphone/speaker/robot evidence still requires supervision.
+After stopping the operator Host, resume with the existing generated profile:
+
+```bash
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+python scripts/capture_runtime_identity.py --allow-dirty --compose-override docker-compose.sglang.yml --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --output .chromie/acceptance/agent-source-startup-20260914/runtime-identity.json
+flock -n /tmp/chromie-orchestrator.lock python scripts/interaction_text_mujoco_check.py 'hi, how are you?' --no-speaker --expect-no-capabilities --language en-US --runtime-identity .chromie/acceptance/agent-source-startup-20260914/runtime-identity.json --evidence-dir .chromie/acceptance/agent-source-startup-20260914/exact-replay
+python scripts/general_ability_acceptance.py --mode live-text --stage must_pass --execute --runtime-identity .chromie/acceptance/agent-source-startup-20260914/runtime-identity.json --evidence-dir .chromie/acceptance/agent-source-startup-20260914/live-must-pass
+```
+
+`--allow-dirty` records the local source identity for development diagnostics;
+it does not qualify a dirty revision for target release. Do not omit a required
+identity/service or override the Host lock to make a run pass.
+
 ## Social Cognition implementation handoff — 2026-09-14
 
 Repository `/home/chromie/github/chromie`, `main`, base

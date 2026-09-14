@@ -109,9 +109,10 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         self.assertEqual(
             _priority_mapping("sglang", step=100),
             {
-                "realtime": 400,
-                "interactive": 300,
-                "continuity": 200,
+                "realtime": 500,
+                "interpretation": 400,
+                "interactive": 200,
+                "continuity": 300,
                 "deliberative": 100,
                 "background": 0,
             },
@@ -120,10 +121,11 @@ class InferenceProviderQualificationTests(unittest.TestCase):
             _priority_mapping("vllm", step=100),
             {
                 "realtime": 0,
-                "interactive": 100,
+                "interpretation": 100,
+                "interactive": 300,
                 "continuity": 200,
-                "deliberative": 300,
-                "background": 400,
+                "deliberative": 400,
+                "background": 500,
             },
         )
 
@@ -205,6 +207,7 @@ class InferenceProviderQualificationTests(unittest.TestCase):
             _priority_mapping("ollama", step=100),
             {
                 "realtime": None,
+                "interpretation": None,
                 "interactive": None,
                 "continuity": None,
                 "deliberative": None,

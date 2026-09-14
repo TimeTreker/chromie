@@ -105,12 +105,13 @@ class SGLangClient(OllamaClient):
             priority_step=self.priority_step,
         )
 
-    def _preflight(
+    async def _preflight(
         self,
         *,
         prompt: str,
         system: str | None,
         options: dict[str, Any],
+        payload: dict[str, Any],
     ) -> None:
         diagnostics = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(prompt),
@@ -119,8 +120,6 @@ class SGLangClient(OllamaClient):
             chars_per_token=self.prompt_chars_per_token_estimate,
             safety_margin_tokens=self.context_safety_margin_tokens,
         )
-        for diagnostic in diagnostics:
-            self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
         blocking = next(
             (
                 item
@@ -130,9 +129,45 @@ class SGLangClient(OllamaClient):
             ),
             None,
         )
+        for diagnostic in diagnostics:
+            if diagnostic is not blocking:
+                self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
         if blocking is not None:
+            # A character estimate is a screening bound, not the model's token
+            # count. Verify the identical chat packet with the serving tokenizer
+            # before rejecting it. This performs no generation or semantic retry.
+            try:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(self.timeout_ms / 1000.0), trust_env=False,
+                ) as client:
+                    response = await client.post(f"{self.base_url}/tokenize", json=payload)
+                response.raise_for_status()
+                counted = response.json()
+                count, limit, tokens = counted.get("count"), counted.get("max_model_len"), counted.get("tokens")
+                if (type(count) is not int or count < 0 or type(limit) is not int or limit <= 0
+                    or not isinstance(tokens, list) or len(tokens) != count
+                    or any(type(token) is not int or token < 0 for token in tokens)):
+                    raise ValueError("Invalid SGLang tokenizer budget evidence")
+            except (httpx.HTTPError, ValueError, TypeError, AttributeError) as exc:
+                raise SGLangGenerationError(
+                    "SGLang prompt budget could not be verified with its serving tokenizer",
+                    failure_class="prompt_budget_unverified", failure_domain="llm_budget",
+                    architecture_attribution="sglang", retryable=False,
+                    details={"purpose": self.purpose, "model": self.model,
+                             "result_trusted": False, "new_execution_allowed": False},
+                ) from exc
+            configured_limit = int(options.get("num_ctx") or limit)
+            effective_limit = min(configured_limit, limit)
+            required = count + int(payload.get("max_tokens") or 0) + self.context_safety_margin_tokens
+            logger.info(
+                "sglang_prompt_budget_verified purpose=%s model=%s estimated=%s actual=%s required=%s limit=%s",
+                self.purpose, self.model, blocking.fields.get("estimated_prompt_tokens"),
+                count, required, effective_limit,
+            )
+            if required <= effective_limit:
+                return
             raise SGLangGenerationError(
-                f"SGLang request rejected before inference: {blocking.render()}",
+                f"SGLang tokenized request exceeds context: required={required} limit={effective_limit}",
                 failure_class="prompt_budget_exceeded",
                 failure_domain="llm_budget",
                 architecture_attribution="not_evaluated",
@@ -141,6 +176,9 @@ class SGLangClient(OllamaClient):
                     "purpose": self.purpose,
                     "model": self.model,
                     **blocking.fields,
+                    "actual_prompt_tokens": count,
+                    "actual_required_context_tokens": required,
+                    "effective_context_limit": effective_limit,
                     "result_trusted": False,
                     "new_execution_allowed": False,
                 },
@@ -157,7 +195,6 @@ class SGLangClient(OllamaClient):
         evidence_context: dict[str, Any] | None = None,
     ) -> str | dict[str, Any]:
         request_options = dict(options or {})
-        self._preflight(prompt=prompt, system=system, options=request_options)
         payload = self._payload(
             prompt,
             system=system,
@@ -171,6 +208,7 @@ class SGLangClient(OllamaClient):
         parsed: dict[str, Any] | None = None
         completed = False
         try:
+            await self._preflight(prompt=prompt, system=system, options=request_options, payload=payload)
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout_ms / 1000.0),
                 trust_env=False,
@@ -266,11 +304,6 @@ class SGLangClient(OllamaClient):
             if layered_prompt is not None
             else None
         )
-        self._preflight(
-            prompt=rendered_prompt,
-            system=system,
-            options=request_options,
-        )
         payload = self._payload(
             rendered_prompt,
             system=system,
@@ -311,6 +344,9 @@ class SGLangClient(OllamaClient):
         finish_reason: str | None = None
         status = "failed"
         try:
+            await self._preflight(
+                prompt=rendered_prompt, system=system, options=request_options, payload=payload,
+            )
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout_ms / 1000.0),
                 trust_env=False,

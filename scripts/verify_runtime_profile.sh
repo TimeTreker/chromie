@@ -174,8 +174,16 @@ if [ -z "$built_profile" ] || [ "$built_profile" = "unknown" ]; then
   failures=$((failures + 1))
 fi
 
+# Environment fingerprints cannot establish that the image contains the current
+# Agent endpoints, stream contracts, shared DTOs, or skill definitions.
+agent_container_id="$(docker compose "${compose_args[@]}" ps -q chromie-agent)"
+if ! python3 scripts/capture_runtime_identity.py --verify-agent-source "$agent_container_id"; then
+  echo "[profile-check][hint] Stop the Host, then run ./scripts/compose.sh build chromie-agent and ./scripts/compose.sh up -d --no-deps --force-recreate chromie-agent" >&2
+  failures=$((failures + 1))
+fi
+
 if [ "$failures" -ne 0 ]; then
-  echo "[profile-check][error] Runtime containers or images do not match the auto-detected hardware profile." >&2
+  echo "[profile-check][error] Runtime containers or images do not match the profile or current Agent source." >&2
   exit 1
 fi
 
@@ -188,4 +196,4 @@ if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
 else
   echo "[profile-check] Active Ollama models: $(./scripts/list_runtime_ollama_models.sh | paste -sd, -)"
 fi
-echo "[profile-check] All container environments match .env.runtime."
+echo "[profile-check] All container environments match .env.runtime; Agent packaged source matches this checkout."

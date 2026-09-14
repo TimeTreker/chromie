@@ -1558,7 +1558,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 )
 
             async def start_fast_planner_capability_activities(
-                self, activities, *, session_id: str, turn_id: str
+                self, activities, *, session_id: str, turn_id: str, language: str
             ):
                 del session_id
                 self.started.append((turn_id, [item.activity_id for item in activities]))
@@ -1725,7 +1725,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     self.runtime = CancellationRuntime()
 
                 async def start_fast_planner_capability_activities(
-                    self, activities, *, session_id: str, turn_id: str
+                    self, activities, *, session_id: str, turn_id: str, language: str
                 ):
                     del session_id
                     provisional_started.set()
@@ -1840,7 +1840,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 self.bound: list[str] = []
 
             async def start_fast_planner_capability_activities(
-                self, activities, *, session_id: str, turn_id: str
+                self, activities, *, session_id: str, turn_id: str, language: str
             ):
                 del session_id
                 self.started.extend(item.activity_id for item in activities)
@@ -2007,7 +2007,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 return result
 
             async def start_fast_planner_capability_activities(
-                self, activities, *, session_id: str, turn_id: str
+                self, activities, *, session_id: str, turn_id: str, language: str
             ):
                 del session_id
                 return type(

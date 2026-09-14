@@ -689,7 +689,8 @@ class ExecutionOutcomeReconciliationTests(unittest.TestCase):
             request_id="social-look",
             capability_id="soridormi.look_at_person",
             metadata={
-                "source": "canonical_plan_auxiliary_activity",
+                "source": "social_cognition_auxiliary_activity",
+                "semantic_owner": "social_cognition",
                 "auxiliary_plan_activity": True,
                 "canonical_plan_id": plan.plan_id,
             },

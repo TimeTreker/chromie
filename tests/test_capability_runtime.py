@@ -348,7 +348,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         registry.register(_tool_definition(capability_id="chromie.fast"))
         registry.register(_tool_definition(capability_id="chromie.slow"))
         provider = SplitProvider("mock.tool")
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
         receipt = await runtime.submit(
             InteractionResponse(
@@ -1046,7 +1046,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
         provider = VariableProvider("mock.body")
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
 
         runtime.register_provider(provider)
         execution = await submit_and_wait_terminal(runtime,
@@ -1085,7 +1085,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         registry = CapabilityRegistry()
         registry.register(_body_definition())
         provider = ExclusiveProvider("mock.body")
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
 
         await asyncio.gather(
@@ -1151,7 +1151,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         ((left, left_group), (right, right_group))
                     )
                 ]
-                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                runtime = CapabilityRuntime(registry, max_concurrency=3)
                 for definition in definitions:
                     registry.register(definition)
                     runtime.register_provider(Provider(definition.provider_id))
@@ -1198,7 +1198,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         capability_id=f"test.resource.{index}", provider_id="mock.resource",
                         metadata={"resource_claims": resources},
                     ))
-                runtime = CapabilityRuntime(registry, max_concurrency=2)
+                runtime = CapabilityRuntime(registry, max_concurrency=3)
                 runtime.register_provider(Provider("mock.resource"))
 
                 async def submit(name: str, index: int, timeout_ms: int = 2000):
@@ -1293,7 +1293,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 exclusive_group=None,
             )
         )
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
 
         executions = [
@@ -1380,7 +1380,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         provider = IsolatedProvider("mock.body")
         registry = CapabilityRegistry()
         registry.register(_body_definition(exclusive_group=None))
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
 
         cancel_task = asyncio.create_task(
@@ -2210,7 +2210,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         registry.register(definition_a)
         registry.register(definition_b)
         provider = Provider("mock.body")
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
         plan_metadata = {
             "canonical_plan_id": "plan-physical",
@@ -2398,7 +2398,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         provider = Provider("mock.tool")
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
         cancel_task = asyncio.create_task(
             submit_and_wait_terminal(runtime,
@@ -3146,7 +3146,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         registry = CapabilityRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
-        runtime = CapabilityRuntime(registry, max_concurrency=2)
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
         first_execution = asyncio.create_task(
             submit_and_wait_terminal(runtime,
@@ -3643,6 +3643,33 @@ if __name__ == "__main__":
 
 
 class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_failure_is_terminal_evidence_not_a_new_plan(self) -> None:
+        for status in ("completed", "failed", "refused", "timed_out"):
+            with self.subTest(status=status):
+                release = asyncio.Event()
+
+                class TerminalProvider(MockCapabilityProvider):
+                    async def execute(self, request, definition, context):
+                        await release.wait()
+                        result = await super().execute(request, definition, context)
+                        return result.model_copy(update={"status": status})
+
+                registry = CapabilityRegistry()
+                registry.register(_body_definition(exclusive_group=None))
+                runtime = CapabilityRuntime(registry)
+                runtime.register_provider(TerminalProvider("mock.body"))
+                receipt = await runtime.submit(InteractionResponse(
+                    interaction_id="provider-outcome", capabilities=[{
+                        "request_id": "work", "capability_id": "soridormi.nod_yes",
+                        "metadata": {"source_goal_ids": ["goal-a"]},
+                    }],
+                ))
+                snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
+                release.set()
+                result = await runtime.wait_terminal(receipt)
+                self.assertEqual(result.results[0].status, status)
+                await runtime.validate_planning_state(snapshot)
+
     async def test_overlapping_plans_reject_late_commit_but_other_goals_proceed(self) -> None:
         runtime = CapabilityRuntime(CapabilityRegistry())
         older = await runtime.planning_state_snapshot(["goal-a"], "turn-old")

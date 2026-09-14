@@ -272,7 +272,8 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                         "timing": "parallel",
                         "requires_confirmation": False,
                         "metadata": {
-                            "source": "canonical_plan_auxiliary_activity",
+                            "source": "social_cognition_auxiliary_activity",
+                            "semantic_owner": "social_cognition",
                             "auxiliary_plan_activity": True,
                         },
                     }
@@ -294,6 +295,39 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(execute_context.confirmed)
         self.assertTrue(execute_context.trusted_preflight_authorized)
         self.assertTrue(execute_context.safety_monitor_active)
+
+    def test_sc_preflight_preserves_owner_risk_and_confirmation_boundaries(self) -> None:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [{
+            "skill_id": "blink_eyes", "available": True,
+            "parameters_schema": {"type": "object"},
+            "requires_confirmation": False, "safety_class": "low_risk_action",
+            "effects": ["social_expression"],
+        }])
+        definition = registry.get("soridormi.blink_eyes")
+        self.assertIsNotNone(definition)
+        request = CapabilityRequest(
+            request_id="social-blink", capability_id="soridormi.blink_eyes",
+            requires_confirmation=False, metadata={
+                "source": "social_cognition_auxiliary_activity",
+                "semantic_owner": "social_cognition", "auxiliary_plan_activity": True,
+            },
+        )
+        for name, request_changes, definition_changes, plan in [
+            ("retired_owner", {"metadata": {**request.metadata, "source": "canonical_plan_auxiliary_activity"}}, {}, {"requires_confirmation": False}),
+            ("missing_owner", {"metadata": {**request.metadata, "semantic_owner": ""}}, {}, {"requires_confirmation": False}),
+            ("physical_effect", {}, {"metadata": {**definition.metadata, "effects": ["physical_motion"]}}, {"requires_confirmation": False}),
+            ("physical_class", {}, {"metadata": {**definition.metadata, "safety_class": "physical_motion"}}, {"requires_confirmation": False}),
+            ("request_confirmation", {"requires_confirmation": True}, {}, {"requires_confirmation": False}),
+            ("definition_confirmation", {}, {"requires_confirmation": True}, {"requires_confirmation": False}),
+            ("body_confirmation", {}, {}, {"requires_confirmation": True}),
+            ("missing_body_decision", {}, {}, {}),
+        ]:
+            with self.subTest(name=name):
+                self.assertFalse(SoridormiCapabilityProvider._trusted_named_skill_preflight(
+                    request.model_copy(update=request_changes),
+                    definition.model_copy(update=definition_changes), plan,
+                ))
 
     async def test_social_preflight_does_not_override_provider_confirmation(self) -> None:
         invoker = _RecordingInvoker()
@@ -327,7 +361,8 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                         "args": {},
                         "requires_confirmation": False,
                         "metadata": {
-                            "source": "canonical_plan_auxiliary_activity",
+                            "source": "social_cognition_auxiliary_activity",
+                            "semantic_owner": "social_cognition",
                             "auxiliary_plan_activity": True,
                         },
                     }

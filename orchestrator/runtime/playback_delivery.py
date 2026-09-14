@@ -48,6 +48,7 @@ class PlaybackDeliveryLifecycle:
     )
     order_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     speech_submission_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    execution_starts: dict[PlaybackKey, Any] = field(default_factory=dict)
     playback_queue: asyncio.Queue[Any] = field(default_factory=asyncio.Queue)
     playback_task: asyncio.Task[Any] | None = None
     active_synthesis_tasks: set[asyncio.Task[Any]] = field(default_factory=set)
@@ -403,6 +404,7 @@ class PlaybackDeliveryLifecycle:
             generation=generation, order=order, session_id=session_id,
             state="playback_completed" if completed else "not_delivered", reason=reason,
         )
+        self.execution_starts.pop((generation, order, session_id), None)
         self.resolve_playback_release_waiter(generation=generation, order=order,
             session_id=session_id, reason=reason)
 
@@ -652,6 +654,7 @@ class PlaybackDeliveryLifecycle:
         self.synthesis_order = 0
         self.next_playback_order = 0
         self.pending_audio.clear()
+        self.execution_starts.clear()
         self.cancelled_playback_orders.clear()
 
     def begin_output_duck(

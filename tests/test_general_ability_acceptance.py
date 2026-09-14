@@ -1446,3 +1446,29 @@ def test_silent_or_missing_sc_output_cannot_satisfy_spoken_latency_target():
             "started_elapsed_ms": 100, "finished_elapsed_ms": 200, "duration_ms": 100,
         }]}}
         assert _social_response_timing_evidence(summary)["derived"]["sc_decision_ms"] is None
+
+
+def test_redacted_sc_reentry_retains_verifiable_communication_structure(tmp_path):
+    from orchestrator.runtime.session import SessionTracker, now_ms
+    from scripts.general_ability_acceptance import _social_activities
+
+    tracker = SessionTracker(workflow_report_root=tmp_path, workflow_report_include_text=False)
+    sid = tracker.create()
+    tracker.record_cognitive_stage(
+        sid, stage="social_cognition", status="accepted",
+        started_monotonic_ms=now_ms(), finished_monotonic_ms=now_ms(),
+        output_payload={
+            "semantic_owner": "social_cognition", "request_id": "sc-result-reentry",
+            "disposition": "communicate", "activities": [{
+                "activity_id": "result-act", "function": "inform",
+                "delivery_phase": "final", "truth_stage": "result_grounded",
+                "text": "Private result for a private person.",
+            }],
+        },
+    )
+    summary = {"interaction_response": {"speech": []}, "session_state": tracker.state[sid]}
+    acts = _social_activities(summary)
+    assert len(acts) == 1
+    assert acts[0]["function"] == "inform"
+    assert acts[0]["text"]["redacted"] is True
+    assert "Private result" not in json.dumps(summary)

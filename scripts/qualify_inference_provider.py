@@ -506,7 +506,7 @@ def _provider_priority(
     if provider == "sglang":
         return rank * step
     if provider == "vllm":
-        return (4 - rank) * step
+        return (max(compute_rank(item) for item in CognitionComputeClass) - rank) * step
     if provider == "ollama":
         return None
     raise ValueError(f"unsupported provider: {provider!r}")
@@ -1372,6 +1372,7 @@ async def _qualify_foreground_under_deep_load(
     priorities = _priority_mapping(provider, step=priority_step)
     deep_priority = priorities[CognitionComputeClass.DELIBERATIVE.value]
     foreground_priority = priorities[CognitionComputeClass.INTERACTIVE.value]
+    interpretation_priority = priorities[CognitionComputeClass.INTERPRETATION.value]
 
     if presentation_lease_mode is not None:
         if presentation_lease_mode != "in_place":
@@ -1460,7 +1461,7 @@ async def _qualify_foreground_under_deep_load(
             provider=provider,
             stream=True,
             max_tokens=32,
-            priority=foreground_priority,
+            priority=interpretation_priority,
         ),
         label="foreground_fast_gi",
     )
@@ -2266,7 +2267,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 model=args.model,
                 priority=_provider_priority(
                     args.provider,
-                    CognitionComputeClass.INTERACTIVE,
+                    CognitionComputeClass.INTERPRETATION,
                     step=args.priority_step,
                 ),
                 manifest_path=args.goal_interpreter_manifest,

@@ -3,42 +3,29 @@
 ## Status
 
 The [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
-changes ordinary communication ownership, not the two execution lanes or their
-resource/safety authority. Source still carries Planner-authored speech and
-auxiliary anchors as described below. Migration must preserve immutable
-communicative anchors, Planner-owned requested task actions and fail-soft
-SC-owned social expression without a decoration-only model call; see the
-[migration inventory](COGNITIVE_TURN_LOOP.md#source-migration-inventory).
+owns communication and optional social expression; Work Planner owns requested
+work. The owner authorized scheduler alignment on 2026-09-14. The existing
+Trusted Capability Runtime now keeps separate Vocal and Activity waiting queues
+under one resource/safety arbiter. With total capacity greater than one, one slot
+is reserved for Vocal; Activity can use the remaining slots concurrently. At a
+configured total of one, execution is necessarily serial. Eligible waiters retain
+FIFO order within their lane; resource-blocked work holds no partial reservation.
 
-The [Project Charter](PROJECT_CHARTER.md) expanded primary diagram is the
-authoritative main workflow. This document elaborates only the `realization`
-branches beneath semantic Primary Activities; the lane topology below is not a
-second or alternative primary architecture.
-
-Chromie has one Goal-Driven Cognitive Core and two execution lanes:
+The [Project Charter](PROJECT_CHARTER.md) remains the authoritative main workflow.
+These are execution mechanisms below semantic Activities, not separate minds:
 
 ```text
-Chromie Cognitive Core
-├── Vocal Execution Lane
-└── Activity Execution Lane
-      └── Capability Providers
-          ├── Soridormi
-          ├── Media Playback
-          ├── External Information
-          ├── Weather
-          ├── Memory
-          └── future providers
-
-Planner-owned auxiliary Activities
-  └── may add optional embodied decoration around an anchored Main Activity
-      └── accepted body decoration executes through Activity
+SC / Work Planner author exact acts and temporal relationships
+  -> Trusted Capability Runtime
+       -> Vocal queue: ordered personal voice
+       -> Activity queue: compatible non-Vocal providers
+            -> Soridormi owns embodied preparation, execution and safety
+       -> one arbiter reserves capacity and exact resources across both queues
 ```
 
-The shared contracts and maintained runtime support explicit best-effort
-coordination between Vocal and Activity. Social Attention is deliberately not a
-third lane or background cognition. It is a Planner-owned behavior domain for small auxiliary
-body decoration such as gaze, blink, nod, a small wave, or slight posture /
-orientation when the live catalog and interaction make that appropriate.
+`prepared_start` coordinates declared members after their preparation boundaries.
+Ordinary independent tasks remain independently schedulable. Social Attention is
+a behavior domain expressed through Activity, not a third execution lane.
 
 ### Terminology boundary: semantic Activity is not the Activity Execution Lane
 
@@ -65,88 +52,38 @@ body work and still remain one greeting Activity. Independent semantic `walk` an
 `sing` responsibilities remain distinct Activities even when their execution lanes
 overlap in time.
 
-This is not a second brain, a second planner, or a provider-selection shortcut.
-Goal meaning, Goal Association, planning, and response meaning remain owned by
-the one Cognitive Core. Social Attention cannot author response text, create a
-Goal, own completion, or enter lane coordination.
-
-The current source can start eligible requests concurrently inside the Trusted
-Capability Runtime, but its maintained coordinator still aggregates terminal results
-behind the originating execution call. The approved `CapabilityRuntime` target removes
-that batch-completion barrier: each request has an independent asynchronous lifecycle and
-publishes correlated runtime events as progress or terminal results arrive. This does not
-create another execution lane or change semantic Activity ownership. A synchronized
-cross-provider start barrier, atomic multi-provider cancellation, and verified temporal-
-overlap evidence still require explicit provider/runtime contracts and are not implied by
-ordinary asynchronous dispatch.
-
 ## Ownership
 
 | Layer | Owns | Must not own |
 |---|---|---|
-| Cognitive Core / primary Planner | user meaning, Goal lifecycle, Main Activities, response meaning, temporal intent, and optional auxiliary decoration in one Plan result | motor control, provider internals |
-| Vocal Execution Lane | realization of one personal `Vocal Expression`: speaking (`mode=speech`), expressive speech, recitation, singing, humming, nonverbal vocalization; playback/interruption/cancellation/output ordering | independent personality, semantic Primary-Activity meaning, or existing-media lifecycle ownership |
-| Activity Execution Lane | non-Vocal provider calls, primary execution work, optional Social Attention body decoration, asynchronous lifecycle monitoring, cancellation, recovery, and correlated outcome collection | Goal or semantic Primary-Activity meaning, or raw motor control |
-| Soridormi | embodied feasibility, body arbitration, safety supervision, controller execution, stop, recovery, and physical evidence | conversational meaning or provider selection |
+| Work Planner | requested work, exact Capability selection, temporal intent and Goal coverage | SC wording, motor control or provider internals |
+| Social Cognition | communication, silence and optional social expression in its primary result; exact observable act anchors | rewriting Work or claiming unobserved completion |
+| Vocal lane / Host | personal voice preparation, ordered playback, interruption and delivery evidence | conversational meaning |
+| Activity lane / Runtime | provider lifecycle, resource admission, coordinated release and correlated outcomes | Goals or raw motor control |
+| Soridormi | embodied feasibility, compilation, safety supervision, execution, stop and recovery | conversational meaning or cognitive provider selection |
 
-The Activity lane executes work; it does not own Goals. Optional Social
-Attention decoration also executes through Activity, but carries
-`auxiliary_plan_activity=true` and `execution_role=social_decoration` so it
-cannot be mistaken for primary completion work. Vocal delivers Chromie-authored
-personal voice output; it is not a separate conversational agent.
+## Social Attention
 
-## Planner-owned Social Attention
+SC may author `auxiliary_activities[]` attached to its exact observable
+Communicative Act. Empty output is normal; a nonverbal act may have no speech.
+The Host materializes that result in the same InteractionResponse as its anchored
+speech, without a decoration-only model call. It validates catalog grounding,
+arguments, target evidence, freshness, resource compatibility and safety; it may
+suppress the exact proposal but never replace or retarget it.
 
-`PresentationCommit`, terminal Fast output, and canonical Fast/Deep Planner calls may
-author bounded `auxiliary_activities[]` beside their Main Activities. Empty output is
-normal. There is no later social model call or
-event-driven reconsideration solely because an Activity becomes ready, target evidence
-changes, or execution completes.
+Accepted decoration carries `source=social_cognition_auxiliary_activity`,
+`semantic_owner=social_cognition`, `auxiliary_plan_activity=true` and
+`execution_role=social_decoration`, with no Goal ownership. A requested blink is
+primary work even if it uses the same provider Capability. Optional decoration
+cannot satisfy or change a Work Goal and its terminal result goes to the social
+interaction ledger. An unavailable optional provider leaves anchored speech
+eligible, with the failed admission retained explicitly.
 
-Fast understanding, Goal Association, provider readiness, Evidence arrival, and
-Vocal/Activity lane transitions are **not anchors**. Only a human-observable
-Planner-authored Communicative Act, Plan response, or Plan step can be an anchor.
-A decoration is useful only when it supports that Activity and remains small,
-non-disruptive, interruptible, optional, and subordinate.
-
-Social Attention must not become a generic idle-animation loop. A blink attached to
-an active Main Activity may be decoration; an autonomous idle blink with no interaction
-anchor belongs to baseline embodiment/liveliness.
-
-The same Fast/Deep Planner primary result is the single semantic writer for optional
-decoration, exact wording, speech acts, and Vocal style. Runtime validates and
-materializes the exact auxiliary proposal through Activity; it may suppress but never
-reselect or retarget it. Eligible candidates are decoder-constrained from the live
-catalog. Trusted code checks arguments, target evidence, resources, safety, provider
-availability, and concurrency without reconstructing controller policy.
-
-Optional decoration fails soft with respect to primary work. An invalid, stale,
-unavailable, conflicting, or rejected auxiliary proposal must not delay ready Vocal or
-Activity work and must not change Goal truth. Auxiliary-only changes/results cannot
-construct a Goal-scoped `CognitiveOpportunity`.
-
-Example:
-
-```text
-Goal: greet Alice
-  -> Vocal says "Hello!"
-  -> the same Planner result may optionally propose look/blink/small wave
-       -> accepted decoration executes as auxiliary Activity
-       -> decoration failure does not make the greeting Goal false
-```
-
-If the user explicitly asks "blink twice", that blink is instead primary
-Activity responsibility. The physical Capability may be the same; the semantic
-role and completion authority are not.
-
-Social meaning may coexist with that exact responsibility. For "blink twice and
-be cute", Core still owns the two required blinks. The primary Planner
-may use the supplied playful framing to propose one different compatible cue;
-it may not issue another blink, change the count, replace the primary action, or
-claim its completion. Trusted Runtime rejects duplicate Capability IDs and
-declared resource/exclusive-group conflicts. When the request is exact-only,
-calls for stillness, lacks sufficient social support, or has no compatible cue,
-the auxiliary decision is `none`.
+Social Attention is not an idle-animation loop. An autonomous blink without a
+social interaction anchor belongs to baseline embodiment. GI/GA execution and
+provider transitions are evidence for SC consideration, not themselves observable
+act anchors. Situation-triggered SC uses the same materialization and freshness
+checks as other SC entry points.
 
 ## Soridormi embodied compilation contract
 
@@ -187,7 +124,7 @@ those values from a skill name or user phrase. Flattened `body_lane` and
 `resource_claims` fields are compatibility projections only; the nested
 provider contract remains authoritative.
 
-When a parallel batch contains multiple exact Soridormi body capabilities, the
+When an independent best-effort batch contains multiple exact Soridormi body capabilities, the
 Trusted Capability Runtime does not start them as independent physical calls.
 It asks the provider adapter to execute one provider-local group:
 
@@ -213,7 +150,7 @@ media execution.
 `LaneCoordinationGroup` records model-authored execution overlap after the
 Canonical Plan already exists. It coordinates only the two execution lanes:
 Vocal and Activity. It does not create capabilities, authorize an effect, or
-represent Social Attention.
+make Social Attention a third lane.
 
 ```json
 {
@@ -221,7 +158,7 @@ represent Social Attention.
   "relation": "parallel",
   "lanes": ["vocal", "activity"],
   "activity_step_ids": ["step_walk"],
-  "start_policy": "best_effort_parallel",
+  "start_policy": "prepared_start",
   "failure_policy": "independent",
   "reason_summary": "Walk while speaking."
 }
@@ -241,22 +178,11 @@ The participating response stage may copy the same identifier:
 }
 ```
 
-An auxiliary Social Attention decoration does **not** join that coordination group and does
-not carry `coordination_id`:
-
-```json
-{
-  "capability_id": "soridormi.blink_eyes",
-  "args": {"count": 1},
-  "timing": "parallel",
-  "social_function": "engagement"
-}
-```
-
-If accepted, the Host materializes that body decoration as auxiliary Activity.
-Actual overlap with primary body realization through the Activity Execution Lane is then decided mechanically from the
-runtime batch and provider concurrency/safety declarations. Cross-lane
-coordination IDs are not reused as embodied-provider grouping semantics.
+An accepted SC auxiliary expression uses the same Runtime coordination identity
+as its exact anchored speech. The Host derives that identity from the SC request
+and immutable act anchor; it does not infer a relationship from wording. This
+identity is not Soridormi body-compilation authority. Wordless expression enters
+Activity directly without inventing a Vocal member.
 
 The referenced Canonical Plan Activity steps must already use
 `timing=parallel`. The Host cannot convert a sequential primary step
@@ -289,59 +215,50 @@ A provider confirmation requirement remains authoritative. Lane coordination
 cannot weaken confirmation, capability availability, argument validation,
 resource conflict checks, or provider safety.
 
-Response presentation is not execution authority. Malformed optional
-`lane_coordination` members are pruned before DTO validation when their lane
-membership or activity references cannot be reconciled with the immutable
-Canonical Plan. A presentation-only failure must not cancel an otherwise valid
-pure Activity Plan. After one bounded model repair, a non-confirmation
-`execute` Plan may reuse an exact model-authored current-turn acknowledgement
-as its existing playback-start barrier and continue to the Trusted Capability
-Runtime. This fail-soft path never invents speech, selects a Capability, removes
-confirmation, or applies to mixed, clarification, or confirmation-bound Plans.
-
-For a non-confirmation `mixed` Plan, the requested spoken outcome and the
-pending Activity acknowledgement may occupy separate ResponsePlan stages. If
-the model covers all non-execute Goals but omits only execute Goal coverage, the
-Host may reuse an exact source-authored, mechanically validated current-turn
-`robot_action` Fast Response as `pre_action` coverage. It may not invent text, cover a clarification
-or unavailable Goal mechanically, or change the immutable Capability Plan.
-
-Optional Social Attention is likewise not execution authority. A malformed or invalid
-`auxiliary_activities[]` proposal is suppressed at the bounded Runtime boundary.
-Runtime cannot replace it, and decoration cannot fall back to changing
-speech text. Dropping optional decoration leaves the immutable Vocal/Activity
-work unchanged.
-
-Eligible `tool`, `robot_action`, and `deep_thought` fast acknowledgements receive
-an independent semantic review before playback. Persona may shape wording but
-may not invent another errand, destination, person, object, household activity,
-unsupported ability, or external result. Tool speech is restricted to the typed
-`acknowledge_and_check`/`checking_only` act; memory speech remains suppressed
-until commit. The Host may use its bounded low-commitment generic cache for any
-suppressed, unavailable, or invalid dynamic acknowledgement.
+Response presentation and optional Social Attention are not execution authority.
+Invalid optional decoration is suppressed with a retained reason; it cannot alter
+speech or the immutable Work Plan. Canonical Charter principles 30–31 govern
+semantic ownership and forbid a second semantic review/repair invocation.
 
 ## Runtime behavior
 
-The maintained runtime:
+For `prepared_start`, Runtime validates exact contiguous parallel membership and
+provider readiness support, then atomically admits required members across lanes
+with all declared resources. An optional SC member joins only if compatible
+capacity/resources are immediately available. It cannot delay required admission.
 
-1. validates Vocal/Activity coordination references and lane membership;
-2. requires referenced primary Activity steps to be parallel Canonical Plan steps;
-3. keeps ordinary pre-action speech behind the playback-start barrier;
-4. runs Vocal and Activity work as a best-effort parallel batch;
-5. materializes accepted Social Attention body decoration as auxiliary Activity
-   with no Goal-completion authority;
-6. groups compatible same-provider Soridormi body members from the actual
-   parallel runtime batch into one deterministic embodied compilation and
-   execution, independent of cross-lane coordination IDs;
-7. requires provider concurrency metadata and safety validation for body overlap;
-8. maps Soridormi aggregate member evidence back to original request identities
-   while preserving primary-versus-decoration semantics; and
-9. reconciles each Goal only from its own capability-specific outcome evidence.
+Local speech readiness means first nonempty PCM and output preparation; Soridormi
+readiness means a created plan, safety monitoring and accepted confirmation or
+trusted low-risk SC preflight. Neither readiness event is user-visible completion.
+Required members wait at one Host monotonic release barrier. Optional members
+still unready at release are omitted; required preparation failure prevents every
+member from beginning. Unsupported providers fail explicitly rather than silently
+running without the declared timing contract.
 
-Cross-provider Vocal/body start remains best-effort. Inside Soridormi, body
-members are compiled and cancelled as one provider-local physical activity. A
-future cross-provider contract may add prepared states, a shared monotonic start
-barrier, measured overlap, and explicit degraded/optional outcome vocabulary.
+After release, members complete and free their own slots/resources independently.
+Cancellation and timeout retain existing provider safety ownership. A required
+member failure after release does not undo another member's effects; there is no
+atomic distributed rollback. Each result retains readiness/release evidence,
+omission/error information and its original request identity. Actual playback and
+provider terminal evidence remain separate from the release event.
+
+The initial prepared-start adapters cover Host speech and individual Soridormi
+plans. Other adapters, including the generic Vocal-performance backend, require
+an explicit preparation boundary before they can join. Conflicting simultaneous
+body plans fail closed; no physical WorkDAG parallelism is introduced. Independent
+best-effort body batches retain Soridormi's existing provider-local compilation.
+
+The common release is a Host scheduling guarantee, not proof of identical physical
+onset, equal duration or word/gesture alignment. Device/network latency and physical
+onset tolerance need separately retained target measurements. `best_effort_parallel`
+remains an explicit weaker overlap policy and carries no prepared-start guarantee.
+
+Current evidence is retained in `.chromie/acceptance/lane-coordination-20260914/`.
+The bound controlled speech+blink proof records a 719 ms difference in preparation
+readiness followed by one shared Host release, both terminal completions and safe
+idle. It uses real TTS with discarded PCM and a deployed simulator, not native SC
+inference or physical observation. See [Status](STATUS.md) for broader verification
+and unresolved native-model failures.
 
 ## Typed Goal WHAT contract and execution projection
 

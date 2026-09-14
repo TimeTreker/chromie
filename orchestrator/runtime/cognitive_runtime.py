@@ -810,7 +810,7 @@ class CanonicalPlanRuntimeAdapter:
                 return True
         return False
 
-    async def execute_auxiliary_activities(
+    async def prepare_auxiliary_response(
         self,
         *,
         social_cognition: SocialCognitionResolution,
@@ -819,7 +819,7 @@ class CanonicalPlanRuntimeAdapter:
         interaction: InteractionResponse | None,
         context: dict[str, Any] | None = None,
         snapshot_is_current: Callable[[], bool] | None = None,
-    ) -> dict[str, Any]:
+    ) -> InteractionResponse | dict[str, Any]:
         """Validate and execute SC-owned optional social expression.
 
         Runtime may accept or suppress the exact proposal. It never reselects the
@@ -1060,6 +1060,23 @@ class CanonicalPlanRuntimeAdapter:
             capabilities=requests,
             metadata=response_metadata,
         )
+        response.metadata["auxiliary_reasons"] = reasons
+        return response
+
+    async def execute_auxiliary_activities(
+        self, *, social_cognition: SocialCognitionResolution, session_id: str,
+        turn_id: str, interaction: InteractionResponse | None,
+        context: dict[str, Any] | None = None,
+        snapshot_is_current: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
+        response = await self.prepare_auxiliary_response(social_cognition=social_cognition,
+            session_id=session_id, turn_id=turn_id, interaction=interaction,
+            context=context, snapshot_is_current=snapshot_is_current)
+        if not isinstance(response, InteractionResponse):
+            return response
+        requests = response.capabilities
+        interaction_id = response.interaction_id
+        reasons = response.metadata.get("auxiliary_reasons", [])
         for request in requests:
             self._record_auxiliary_behavior_request(request, session_id=session_id)
         dispatch = await self.interaction_runtime.submit_response(
@@ -1067,6 +1084,12 @@ class CanonicalPlanRuntimeAdapter:
             session_id=session_id,
         )
         execution = await self.interaction_runtime.wait_dispatch(dispatch)
+        ledger = getattr(self.interaction_runtime, "interaction_ledger", None)
+        if ledger is not None:
+            ledger.record_social_results(
+                session_id=session_id, turn_id=turn_id, interaction_id=interaction_id,
+                requests=requests, results=execution.results,
+            )
         return {
             "status": execution.status,
             "materialized_count": len(requests),
@@ -1074,6 +1097,37 @@ class CanonicalPlanRuntimeAdapter:
             "reasons": reasons,
         }
 
+
+    async def prepare_social_response(
+        self, response: InteractionResponse, *, social_cognition: SocialCognitionResolution,
+        session_id: str, turn_id: str, context: dict[str, Any] | None = None,
+        snapshot_is_current: Callable[[], bool] | None = None,
+    ) -> InteractionResponse:
+        """Materialize exact SC anchors before either modality enters Runtime."""
+        if response.metadata.get("social_expression_materialized") is True:
+            return response
+        auxiliary = await self.prepare_auxiliary_response(social_cognition=social_cognition,
+            session_id=session_id, turn_id=turn_id, interaction=response,
+            context=context, snapshot_is_current=snapshot_is_current)
+        response = response.model_copy(deep=True)
+        response.metadata["social_expression_materialized"] = True
+        response.metadata.update({"session_id": session_id, "turn_id": turn_id})
+        if not isinstance(auxiliary, InteractionResponse):
+            response.metadata["social_expression_admission"] = auxiliary
+            return response
+        for request in auxiliary.capabilities:
+            anchor = request.metadata.get("anchor_id")
+            speeches = [speech for speech in response.speech
+                        if anchor in speech.metadata.get("communicative_activity_ids", [])]
+            if len(speeches) == 1:
+                speech = speeches[0]
+                identity = "sc:" + hashlib.sha256(f"{social_cognition.request_id}|{anchor}".encode()).hexdigest()[:24]
+                shared = {"coordination_id": identity, "lane_start_policy": "prepared_start"}
+                request.metadata.update(shared)
+                speech.metadata.update({**shared, "execution_lane": "vocal"})
+            self._record_auxiliary_behavior_request(request, session_id=session_id)
+        response.capabilities.extend(auxiliary.capabilities)
+        return response
 
     async def build_execution_only_response(
         self,
@@ -1173,6 +1227,10 @@ class CanonicalPlanRuntimeAdapter:
             key for key, value in resolution.need_outcomes.items() if value == "pending"
         ]
         response.metadata["social_cognition_resolution"] = resolution.model_dump(mode="json")
+        if any(act.auxiliary_activities for act in resolution.activities):
+            response = await self.prepare_social_response(response, social_cognition=resolution,
+                session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
+                context=context or request.context)
         return response
 
 
@@ -2095,6 +2153,8 @@ class GoalDrivenRuntimeCoordinator:
         snapshot_is_current: Callable[[], bool] | None = None,
     ) -> None:
         """Realize SC expression after its exact primary response is admitted."""
+        if response.metadata.get("social_expression_materialized") is True:
+            return
         raw = response.metadata.get("social_cognition_resolution")
         if self.policy.mode != "apply" or not isinstance(raw, dict):
             return
@@ -2102,8 +2162,10 @@ class GoalDrivenRuntimeCoordinator:
         if not any(act.auxiliary_activities for act in result.activities):
             return
         if context is None:
-            projection = response.metadata.get("planner_response_projection")
-            request_payload = projection.get("social_cognition_request") if isinstance(projection, dict) else None
+            request_payload = response.metadata.get("social_cognition_request")
+            if not isinstance(request_payload, dict):
+                projection = response.metadata.get("planner_response_projection")
+                request_payload = projection.get("social_cognition_request") if isinstance(projection, dict) else None
             if isinstance(request_payload, dict):
                 source_request = SocialCognitionRequest.model_validate(request_payload)
                 result.validate_request(source_request)
@@ -2154,7 +2216,7 @@ class GoalDrivenRuntimeCoordinator:
                 return
             result, response = resolved
             dispatch = None
-            if response.speech:
+            if response.speech or response.capabilities:
                 self._social_dispatches[request.request_id] = response.interaction_id
                 dispatch = await self.adapter.interaction_runtime.submit_response(response, session_id=sid)
             if current():
@@ -2232,31 +2294,39 @@ class GoalDrivenRuntimeCoordinator:
         if self.policy.mode == "off" or not snapshot_is_current():
             return None
         request = request.model_copy(deep=True)
-        started = time.perf_counter() * 1000.0
-        result = await self.agent_client.resolve_social_cognition(
-            session, request=request,
-            timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+        metadata = {"semantic_owner": "social_cognition", "trigger": request.trigger,
+                    "execution_authority": False}
+        logger.info("social_cognition_start sid=%s request_id=%s trigger=%s",
+                    session_id, request.request_id, request.trigger)
+        async def resolve() -> SocialCognitionResolution:
+            result = await self.agent_client.resolve_social_cognition(
+                session, request=request,
+                timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+            )
+            result.validate_request(request)
+            metadata["model_call_count"] = result.model_call_count
+            return result
+        result = await self._observe_workflow_stage(
+            sid=session_id, stage="social_cognition", input_payload=request,
+            operation=resolve(), metadata=metadata,
+            status_resolver=lambda _: "resolved" if snapshot_is_current() else "stale",
         )
-        result.validate_request(request)
         current = snapshot_is_current()
-        self._record_workflow_stage(
-            sid=session_id, stage="social_cognition", started_monotonic_ms=started,
-            finished_monotonic_ms=time.perf_counter() * 1000.0,
-            status="resolved" if current else "stale", input_payload=request,
-            output_payload=result, errors=[], attempt=1,
-            metadata={"semantic_owner": "social_cognition", "trigger": request.trigger,
-                      "model_call_count": result.model_call_count, "execution_authority": False},
-        )
         if not current:
             return None
         interaction_context = (
             self.interaction_ledger.context(session_id, goal_ids=request.goal_ids,
-                                            turn_id=request.request_id).model_dump(mode="json")
+                                            turn_id=str(request.source_turn.get("turn_id") or request.request_id)).model_dump(mode="json")
             if self.interaction_ledger is not None else request.context.get("interaction_context")
         )
-        return result, build_social_interaction_response(
+        response = build_social_interaction_response(
             request, result, session_id=session_id, interaction_context=interaction_context,
         )
+        if any(act.auxiliary_activities for act in result.activities):
+            response = await self.adapter.prepare_social_response(response, social_cognition=result,
+                session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
+                context=request.context, snapshot_is_current=snapshot_is_current)
+        return result, response
 
     def _track_auxiliary_execution_task(self, task: asyncio.Task[Any]) -> None:
         """Retain fail-soft Runtime execution without creating cognition work."""
@@ -2454,6 +2524,7 @@ class GoalDrivenRuntimeCoordinator:
         operation: Awaitable[Any],
         attempt: int = 1,
         metadata: dict[str, Any] | None = None,
+        status_resolver: Callable[[Any], str] | None = None,
     ) -> Any:
         started_monotonic_ms = time.perf_counter() * 1000.0
         try:
@@ -2496,7 +2567,7 @@ class GoalDrivenRuntimeCoordinator:
             stage=stage,
             started_monotonic_ms=started_monotonic_ms,
             finished_monotonic_ms=time.perf_counter() * 1000.0,
-            status=self._workflow_output_status(output),
+            status=status_resolver(output) if status_resolver else self._workflow_output_status(output),
             input_payload=input_payload,
             output_payload=output,
             errors=self._workflow_output_errors(output),
@@ -3911,7 +3982,7 @@ class GoalDrivenRuntimeCoordinator:
                         )
                         if eligible:
                             ready_fast_capability_execution = await self.adapter.interaction_runtime.start_fast_planner_capability_activities(
-                                eligible, session_id=sid, turn_id=turn_id,
+                                eligible, session_id=sid, turn_id=turn_id, language=language,
                             )
                             ready_fast_capability_status = "safe_reads_dispatched_before_goal_binding"
                     needs_deep_planner = "deep_planner" in fast_advance.continuations

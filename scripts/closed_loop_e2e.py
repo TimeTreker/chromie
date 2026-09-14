@@ -50,6 +50,7 @@ from orchestrator.runtime.playback_transport import (  # noqa: E402
 from orchestrator.runtime.shutdown_lifecycle import (  # noqa: E402
     shutdown_voice_assistant,
 )
+from scripts.capture_runtime_identity import agent_runtime_source_identity  # noqa: E402
 from scripts.acceptance_audio import (  # noqa: E402
     AudioFixture,
     HostSpeakerPlayer,
@@ -65,12 +66,7 @@ from benchmarks.review.bundle import build_review_bundle  # noqa: E402
 
 DEFAULT_MANIFEST = ROOT / "benchmarks" / "manifests" / "closed_loop_e2e_v1.json"
 DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "acceptance" / "closed-loop-e2e"
-AGENT_SOURCE_TREES = (
-    (ROOT / "agent" / "app", "app"),
-    (ROOT / "agent-skills", "agent-skills"),
-    (ROOT / "shared" / "chromie_contracts", "chromie_contracts"),
-    (ROOT / "shared" / "chromie_runtime", "chromie_runtime"),
-)
+
 
 
 @dataclass(frozen=True)
@@ -459,83 +455,6 @@ def collect_run_diagnostics(output_dir: Path) -> list[dict[str, Any]]:
             )
     return records
 
-
-def _source_tree_digest(trees: Sequence[tuple[Path, str]]) -> str:
-    digest = hashlib.sha256()
-    for source_root, label in sorted(trees, key=lambda item: item[1]):
-        if not source_root.is_dir():
-            raise FileNotFoundError(source_root)
-        for path in sorted(source_root.rglob("*")):
-            if (
-                not path.is_file()
-                or "__pycache__" in path.parts
-                or path.suffix in {".pyc", ".pyo"}
-            ):
-                continue
-            relative = path.relative_to(source_root).as_posix()
-            digest.update(f"{label}/{relative}\0".encode("utf-8"))
-            digest.update(path.read_bytes())
-            digest.update(b"\0")
-    return digest.hexdigest()
-
-
-def agent_runtime_source_identity() -> dict[str, Any]:
-    host_digest = _source_tree_digest(AGENT_SOURCE_TREES)
-    container_script = """
-from pathlib import Path
-import hashlib
-import json
-
-trees = (
-    (Path('/app/app'), 'app'),
-    (Path('/app/agent-skills'), 'agent-skills'),
-    (Path('/app/chromie_contracts'), 'chromie_contracts'),
-    (Path('/app/chromie_runtime'), 'chromie_runtime'),
-)
-digest = hashlib.sha256()
-for source_root, label in sorted(trees, key=lambda item: item[1]):
-    if not source_root.is_dir():
-        raise FileNotFoundError(source_root)
-    for path in sorted(source_root.rglob('*')):
-        if not path.is_file() or '__pycache__' in path.parts or path.suffix in {'.pyc', '.pyo'}:
-            continue
-        relative = path.relative_to(source_root).as_posix()
-        digest.update(f'{label}/{relative}\\0'.encode('utf-8'))
-        digest.update(path.read_bytes())
-        digest.update(b'\\0')
-print(json.dumps({'digest': digest.hexdigest()}))
-"""
-    try:
-        completed = subprocess.run(
-            ["docker", "exec", "chromie-agent", "python", "-c", container_script],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=120,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {
-            "host_digest": host_digest,
-            "container_digest": None,
-            "matches": False,
-            "error": f"{type(exc).__name__}: {exc}",
-        }
-    container_digest = None
-    error = completed.stderr.strip() or None
-    if completed.returncode == 0:
-        try:
-            payload = json.loads(completed.stdout)
-            container_digest = str(payload.get("digest") or "") or None
-        except (json.JSONDecodeError, AttributeError) as exc:
-            error = f"{type(exc).__name__}: {exc}"
-    return {
-        "host_digest": host_digest,
-        "container_digest": container_digest,
-        "matches": bool(container_digest) and container_digest == host_digest,
-        "returncode": completed.returncode,
-        "error": error,
-    }
 
 
 def _manifest_source_path(manifest_path: Path | None) -> str:

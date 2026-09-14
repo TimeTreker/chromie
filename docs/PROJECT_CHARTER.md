@@ -1532,6 +1532,21 @@ Prefer the smallest existing trusted mechanism that establishes the invariant.
 For personal voice exclusivity Chromie reuses its maintained ResourceArbiter
 rather than creating a parallel resource subsystem.
 
+The owner approved scheduler-level alignment on 2026-09-14: Vocal and Activity
+retain distinct scheduling capacity under the same ResourceArbiter. The total
+Runtime limit remains bounded; when it exceeds one, one slot is reserved for
+Vocal and the remaining slots admit concurrent Activity work. Shared resources,
+provider serialization, confirmation and safety remain binding across both lanes.
+Explicitly coordinated members prepare before a common Runtime release; cognition
+owns their membership and temporal meaning, while Host owns mechanical scheduling.
+A single SC act with parallel auxiliary expression preserves that exact anchor in
+one admission. Required members wait for one another; optional SC decoration may
+be omitted when busy, unavailable or not ready and cannot stall the required voice.
+Each completed member releases its own resources without waiting for the entire
+group. Preparation/release evidence is distinct from actual audio/body onset;
+hardware-clock synchronization and distributed atomic rollback are not implied.
+Physical WorkDAG nodes remain sequential.
+
 Existing-media playback is Activity, not Vocal. Its mixer and physical-output
 policy are separate from the semantic `chromie.voice` resource.
 

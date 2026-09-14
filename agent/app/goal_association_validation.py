@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from .prompt_projection import required_json
 from .goal_association_contract import (
+    CANONICAL_LOCATION_ENTITY_TYPES,
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
@@ -910,17 +911,6 @@ def non_verbatim_explicit_location_bindings(
         for item in model_output.resolved_references
     }
     rejected: list[str] = []
-    canonical_location_types = {
-        "address",
-        "city",
-        "country",
-        "county",
-        "geographic",
-        "location",
-        "place",
-        "relative_location",
-        "region",
-    }
     for goal_index, goal in enumerate(model_output.new_goals):
         for binding in goal.semantic_bindings:
             name = "_".join(
@@ -940,7 +930,7 @@ def non_verbatim_explicit_location_bindings(
                 "region",
             }:
                 continue
-            if name == "location" and entity_type not in canonical_location_types:
+            if name == "location" and entity_type not in CANONICAL_LOCATION_ENTITY_TYPES:
                 rejected.append(
                     f"new_goals[{goal_index}].bindings[{binding.name}]="
                     f"non_location_semantics({binding.entity_type!r})"

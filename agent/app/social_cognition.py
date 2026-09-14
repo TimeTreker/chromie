@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
+from typing import Any, get_args
 
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
@@ -12,12 +12,12 @@ from .planner_context import auxiliary_social_capability_payloads, auxiliary_soc
 from .prompt_projection import required_json
 
 try:
-    from chromie_contracts.plan import validate_communicative_activity_identity
+    from chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
     from chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     )
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.plan import validate_communicative_activity_identity
+    from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
     from shared.chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     )
@@ -185,6 +185,66 @@ def social_cognition_response_schema(
     else:
         act["progress_kind"] = {"type": "null"}
     act["truth_stage"] = {"type": "string", "enum": stages}
+    if "pre_evidence" in stages:
+        # XGrammar does not enforce cross-field if/then constraints. Compile the
+        # existing DTO relation into full alternatives before primary inference.
+        branches = []
+        for stage in stages:
+            branch = copy.deepcopy(act_schema)
+            branch["properties"]["truth_stage"] = {"const": stage, "type": "string"}
+            if stage == "pre_evidence":
+                branch["properties"]["progress_kind"] = {
+                    "type": "string", "enum": list(get_args(FastProgressKind)),
+                }
+                branch["required"] = list(dict.fromkeys([*branch["required"], "progress_kind"]))
+            else:
+                branch["properties"]["progress_kind"] = {"type": "null"}
+            branches.append(branch)
+        schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": branches}
+    if ordered_needs:
+        # Native decoding ignores conditional delivery-phase dependencies.
+        # Compile the existing Host rule into complete alternatives: an act may
+        # address only needs compatible with its chosen delivery phase. Optional
+        # acts and needs without an upstream phase retain all legal choices.
+        existing = schema["$defs"]["SocialCommunicativeAct"]
+        phase_branches = []
+        for branch in existing.get("oneOf", [existing]):
+            for phase in ("immediate", "pre_action", "final"):
+                variant = copy.deepcopy(branch)
+                properties = variant["properties"]
+                properties["delivery_phase"] = {"type": "string", "const": phase}
+                compatible_ids = [need.need_id for need in request.communication_needs
+                                  if need.delivery_phase is None or need.delivery_phase == phase]
+                if compatible_ids:
+                    properties["addressed_need_ids"]["items"] = {"type": "string", "enum": compatible_ids}
+                else:
+                    properties["addressed_need_ids"]["maxItems"] = 0
+                # Emit upstream need bindings before timing and wording so the
+                # decoder can commit to the compatible branch before prose.
+                first = ("addressed_need_ids", "delivery_phase")
+                variant["properties"] = {
+                    **{name: properties[name] for name in first},
+                    **{name: value for name, value in properties.items() if name not in first},
+                }
+                phase_branches.append(variant)
+        schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": phase_branches}
+    if candidates:
+        # A wordless act must actually propose an embodied expression. Keep both
+        # valid modalities representable in the primary decoder, as in the DTO.
+        existing = schema["$defs"]["SocialCommunicativeAct"]
+        expression_branches = []
+        for branch in existing.get("oneOf", [existing]):
+            verbal = copy.deepcopy(branch)
+            verbal["properties"]["function"]["enum"].remove("nonverbal")
+            verbal["properties"]["text"]["minLength"] = 1
+            expression_branches.append(verbal)
+            nonverbal = copy.deepcopy(branch)
+            nonverbal["properties"]["function"] = {"type": "string", "const": "nonverbal"}
+            nonverbal["properties"]["text"] = {"type": "string", "const": ""}
+            nonverbal["properties"]["auxiliary_activities"]["minItems"] = 1
+            nonverbal["required"].append("auxiliary_activities")
+            expression_branches.append(nonverbal)
+        schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": expression_branches}
     return schema
 
 

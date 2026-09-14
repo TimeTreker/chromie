@@ -47,6 +47,38 @@ class _StreamingModel:
 def _request() -> CognitiveWorkRequest:
     return CognitiveWorkRequest(sid='turn-stream', text='你好', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='reply', outcome='reply to the greeting', output_mode='speech', confidence=0.98)], interpretation_confidence=0.98, context={})
 
+
+def test_capability_argument_decoder_order_matches_sorted_catalog_recursively():
+    arguments = {"type": "object", "properties": {
+        "zeta": {"type": "number"},
+        "alpha": {"type": "array", "items": {"type": "object", "properties": {
+            "z": {"type": "number"}, "a": {"type": "string"}}, "required": ["z", "a"]}},
+    }, "required": ["zeta", "alpha"], "additionalProperties": False}
+    capability = {"capability_id": "test.object", "input_schema": arguments}
+    schema = fast_streaming_advance_response_schema(["r1"], capabilities=[capability])
+    found = []
+
+    def visit(node):
+        if isinstance(node, dict):
+            properties = node.get("properties", {})
+            if properties.get("capability_id", {}).get("enum") == ["test.object"]:
+                found.append(properties["args"])
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
+    assert found
+    for compiled in found:
+        assert list(compiled["properties"]) == ["alpha", "zeta"]
+        assert list(compiled["properties"]["alpha"]["items"]["properties"]) == ["a", "z"]
+        example = {"zeta": 0.2, "alpha": [{"z": 10, "a": "same source value"}]}
+        Draft202012Validator(arguments).validate(example)
+        Draft202012Validator(compiled).validate(example)
+    assert list(arguments["properties"]) == ["zeta", "alpha"]
+
 def _valid_output() -> dict[str, Any]:
     return {"disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["reply"],
         "activities": [{"role": "complete_response", "activity_id": "greeting-need", "source_responsibility_refs": ["reply"],

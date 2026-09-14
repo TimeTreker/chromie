@@ -1798,6 +1798,39 @@ if __name__ == "__main__":
 
 
 class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_early_safe_read_preserves_authoritative_language(self):
+        from orchestrator.runtime.agent_tool_provider import AgentToolCapabilityProvider
+        from orchestrator.runtime.capability_runtime import CapabilityDefinition
+        from shared.chromie_contracts.plan import FastPlannerCapabilityActivity
+        from shared.chromie_contracts.tool_result import ToolExecutionResponse
+
+        received = []
+
+        async def handler(request, timeout_ms):
+            received.append(request)
+            return ToolExecutionResponse(request_id=request.request_id, tool_id=request.tool_id,
+                                         status="completed", output={"value": "found"})
+
+        coordinator = InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})
+        coordinator.runtime.register_provider(AgentToolCapabilityProvider(handler))
+        coordinator.registry.register(CapabilityDefinition(
+            capability_id="test.localized_lookup", provider_id="chromie.agent_tool",
+            input_schema={"type": "object", "additionalProperties": False},
+            output_schema={"type": "object", "properties": {"value": {"type": "string"}},
+                           "required": ["value"], "additionalProperties": False},
+            metadata={"safety_class": "safe_read", "side_effect_free": True},
+        ))
+        for language in ("zh-CN", "en-GB", "fr-FR"):
+            execution = await coordinator.start_fast_planner_capability_activities([
+                FastPlannerCapabilityActivity(activity_id="lookup", role="capability",
+                    capability_id="test.localized_lookup", args={}, timing="sequential",
+                    source_responsibility_refs=["r1"]),
+            ], session_id=language, turn_id=language, language=language)
+            self.assertIsNotNone(execution)
+            result = await execution.task
+            self.assertEqual(result.status, "completed")
+            self.assertEqual(received[-1].language, language)
+
     async def test_only_explicit_safe_read_prefix_can_dispatch_before_ga(self):
         from orchestrator.runtime.capability_runtime import CapabilityDefinition
         from shared.chromie_contracts.plan import FastPlannerCapabilityActivity

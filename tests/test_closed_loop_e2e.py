@@ -7,11 +7,11 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 
+from scripts.capture_runtime_identity import _source_tree_digest
 from scripts.closed_loop_e2e import (
     AudioData,
     ClosedLoopCase,
     PipeWireMonitorCapture,
-    _source_tree_digest,
     collect_debug_bundle,
     closed_loop_review_bundle,
     expected_term_result,

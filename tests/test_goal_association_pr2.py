@@ -19,6 +19,7 @@ from agent.app.goal_association_contract import (
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelInformationResourceResponsibility,
+    GoalAssociationModelInformationSource,
     GoalAssociationModelOutput,
     GoalAssociationModelPhysicalResourceResponsibility,
     GoalSegmentationModelOutput,
@@ -381,6 +382,38 @@ class GoalExecutionContractTests(unittest.TestCase):
             GoalAssociationModelGoal.model_validate(
                 goal("Check 重庆 weather.", "information", resource=payload)
             )
+
+    def test_information_source_decoder_preserves_status_name_and_referent_contract(self):
+        schema = ga_schema.goal_association_response_schema(
+            GoalSegmentationModelOutput, [], [{"referent_id": "source-1"}],
+            responsibility_refs=["r1"]
+        )
+        validator = Draft202012Validator({
+            "$defs": schema["$defs"],
+            "$ref": "#/$defs/GoalAssociationModelInformationSource",
+        })
+        cases = [
+            ({"status": "known", "source_name": "BBC"}, True),
+            ({"status": "known", "source_name": "BBC", "referent_id": "source-1"}, True),
+            ({"status": "known"}, False),
+            ({"status": "known", "source_name": ""}, False),
+        ]
+        for status in ("unknown", "provider_resolved"):
+            cases.extend([
+                ({"status": status}, True),
+                ({"status": status, "source_name": "", "referent_id": ""}, True),
+                ({"status": status, "source_name": "none"}, False),
+                ({"status": status, "source_name": "BBC"}, False),
+                ({"status": status, "referent_id": "source-1"}, False),
+            ])
+        for payload, valid in cases:
+            with self.subTest(payload=payload):
+                self.assertEqual(not list(validator.iter_errors(payload)), valid)
+                if valid:
+                    GoalAssociationModelInformationSource.model_validate(payload)
+                else:
+                    with self.assertRaises(ValidationError):
+                        GoalAssociationModelInformationSource.model_validate(payload)
 
     def test_resource_kind_requires_its_semantic_completion_mode(self):
         information = resource_responsibility(
@@ -2796,6 +2829,11 @@ class GoalAssociationTransactionTests(unittest.TestCase):
         )
         complete.update(referent_updates=[], resolved_references=[])
         self.assertEqual(list(validator.iter_errors(complete)), [])
+        for entity_type in ("string", "temporal_scope", "person"):
+            with self.subTest(invalid_location_type=entity_type):
+                invalid = copy.deepcopy(complete)
+                invalid["new_goals"][0]["resource_responsibility"]["query_scope"][1]["entity_type"] = entity_type
+                self.assertFalse(validator.is_valid(invalid))
         incomplete = copy.deepcopy(complete)
         incomplete["new_goals"][0]["resource_responsibility"][
             "query_scope"

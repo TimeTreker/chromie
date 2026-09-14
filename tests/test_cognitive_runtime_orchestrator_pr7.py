@@ -4,6 +4,8 @@ import asyncio
 import unittest
 from types import SimpleNamespace
 
+import pytest
+
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
@@ -496,7 +498,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
 
 
-    def test_cognitive_failure_preserves_existing_planner_speech_playback(self):
+    def test_cognitive_failure_preserves_early_speech_and_dispatches_failure_notice(self):
         resolution = CognitiveRuntimeResolution(
             mode="apply",
             status="error",
@@ -537,17 +539,90 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             self.assertTrue(handled)
 
         asyncio.run(run())
-        self.assertEqual(len(assistant._launch_interaction_calls), 0)
+        self.assertEqual(len(assistant._launch_interaction_calls), 1)
+        self.assertFalse(assistant._launch_interaction_calls[0][1]["reset_playback"])
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         recorded_response = assistant.conversation_state.agent_results[0][0][1]
-        self.assertEqual(recorded_response.speech, [])
-        self.assertTrue(
-            recorded_response.metadata["user_visible_fallback_suppressed"]
+        self.assertTrue(recorded_response.speech)
+        self.assertEqual(recorded_response.metadata["semantic_status"], "failed")
+        self.assertEqual(recorded_response.capabilities, [])
+
+
+@pytest.mark.parametrize("early_status", ["scheduled", "playback_started", "playback_completed"])
+@pytest.mark.parametrize("silence", [False, True])
+def test_failure_after_sc_reaches_session_terminal_without_resetting_audio(early_status, silence):
+    from orchestrator.runtime.session import SessionTracker
+    from scripts.chromie_psm_live_text_console import _wait_for_session_done
+
+    async def run():
+        assistant = OrchestratorCognitiveRuntimeTests._assistant(CognitiveRuntimeResolution(
+            mode="apply", status="error",
+            fallback_reason="goal_association:structured_output_validation",
+            metadata={"failure_stage": "goal_association", "failure_class": "structured_output_validation"},
+        ))
+        assistant.sessions = SessionTracker(enabled=False)
+        sid = assistant.sessions.create()
+        assistant.playback_generation = 2
+        state = assistant.sessions.state[sid]
+        state.update(scheduled_tts=1, played_tts=int(early_status == "playback_completed"))
+        event = assistant._register_turn_speech_event(
+            session_id=sid, turn_id=sid, generation=2, orders=[0],
+            text="Hello! I'd be happy to check that for you.",
+            stage="social_cognition", purpose="acknowledge",
+            communicative_activity_ids=["greet_user"],
         )
-        self.assertEqual(
-            recorded_response.metadata["fallback_suppression_reason"],
-            "planner_communication_already_committed",
+        event["status"] = early_status
+        submitted = []
+        consumed = asyncio.Event()
+        release = asyncio.Event()
+
+        async def submit(response, **kwargs):
+            submitted.append(response)
+            assert not response.capabilities
+            return SimpleNamespace(source_response=response, runtime_response=response,
+                                   receipt=None, immediate_execution=None)
+
+        async def consume(dispatch, **kwargs):
+            consumed.set()
+            await release.wait()
+            state["scheduled_tts"] += len(dispatch.runtime_response.speech)
+            state["played_tts"] = state["scheduled_tts"]
+
+        async def reset():
+            pytest.fail("failure delivery must not reset existing SC playback")
+
+        assistant.interaction_runtime.submit_response = submit
+        assistant._consume_detached_non_cognitive_dispatch = consume
+        assistant.reset_playback_ordering = reset
+        assistant._launch_interaction = VoiceAssistant._launch_interaction.__get__(assistant)
+        core, envelope = _core_and_envelope(
+            "hello, what's the weather today in chongqing?", sid=sid
         )
+        context = {}
+        if silence:
+            context["user_turn_envelope"] = {
+                "admission": "reflex_and_admit",
+                "reflex": {"action": "interrupt", "should_speak": False},
+            }
+        await assistant._try_apply_cognitive_runtime(
+            object(), user_text=envelope.original_input.text, session_id=sid,
+            context=context, core_interpretation=core, turn_envelope=envelope,
+            core_interpretation_latency_ms=8910.0,
+        )
+        await asyncio.sleep(0)
+        assert submitted, "SC acknowledgement must not suppress terminal failure dispatch"
+        assert bool(submitted[0].speech) is not silence
+        await asyncio.wait_for(consumed.wait(), 1)
+        assert not state["llm_done"]
+        assert not state["done_logged"]
+        release.set()
+        await asyncio.gather(*list(assistant.active_cognitive_runtime_tasks))
+        await _wait_for_session_done(assistant, sid, 0.2, lambda: None)
+        assert state["done_logged"]
+        assert not state["interrupted"]
+        assert assistant.playback_generation == 2
+
+    asyncio.run(run())
 
 
 

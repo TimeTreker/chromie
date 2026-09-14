@@ -1457,6 +1457,21 @@
       "path": "orchestrator/runtime/playback_transport.py",
       "symbol": "PlaybackTransport.play_one_order",
       "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "A failed prepared-start or output-device preparation logs its cause, resolves the speech start as failed, cancels pending PCM and releases delivery waiters without playing uncoordinated audio.",
+      "review_status": "reviewed",
+      "body_sha256": "f5fd539ec966136ea9483c9fb68388a66733bf80838e6b0bb3b84c414ae9ef5f",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/playback_transport.py",
+      "symbol": "PlaybackTransport.play_one_order",
+      "ordinal": 2,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",

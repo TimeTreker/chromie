@@ -304,7 +304,8 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
                     timing="parallel",
                     metadata={
                         "coordination_id": "together-1",
-                        "source": "canonical_plan_auxiliary_activity",
+                        "source": "social_cognition_auxiliary_activity",
+                        "semantic_owner": "social_cognition",
                         "auxiliary_plan_activity": True,
                     },
                 ),
@@ -383,7 +384,8 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
                     timing="parallel",
                     metadata={
                         "coordination_id": "together-async",
-                        "source": "canonical_plan_auxiliary_activity",
+                        "source": "social_cognition_auxiliary_activity",
+                        "semantic_owner": "social_cognition",
                         "auxiliary_plan_activity": True,
                     },
                 ),

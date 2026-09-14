@@ -52,7 +52,11 @@ not set `CHROMIE_HARDWARE_PROFILE` in `.env.local` or on a launcher command.
 `./scripts/start_services.sh` is the low-level Docker service launcher. It first
 refreshes hardware detection and `.env.runtime`, validates Compose, builds or
 starts ASR, TTS, Ollama, Goal Interpretation, and Agent, and then verifies that containers
-and the TTS CUDA build match the detected profile. It does not start the host
+and the TTS CUDA build match the detected profile. It also compares the running
+Agent app, shared contracts/runtime and Agent Skills with the checkout using
+content digests. A healthy container with old source fails this check before the
+Host starts. Environment fingerprints alone do not establish source compatibility.
+It does not start the host
 Orchestrator and does not assume Soridormi is running.
 
 `./scripts/start_chromie.sh` is the operator launcher. It expects Soridormi MCP
@@ -75,6 +79,25 @@ Normal start:
 ```bash
 ./scripts/start_services.sh
 ```
+
+If startup reports an Agent source mismatch, stop the Host and rebuild/recreate
+only the Agent with the existing generated service overrides:
+
+```bash
+export CHROMIE_OPERATOR_MODE=voice_mujoco
+set -a
+source .chromie/voice-runtime/services.env  # full operator launcher, if present
+set +a
+./scripts/compose.sh build chromie-agent
+./scripts/compose.sh up -d --no-deps --force-recreate chromie-agent
+./scripts/verify_runtime_profile.sh
+```
+
+For a services-only deployment, use `CHROMIE_OPERATOR_MODE=services` and omit
+the operator override-file line. Alternatively,
+restart the normal operator launcher with `--build`. The check shares the same
+source-identity implementation as closed-loop qualification; it does not claim
+that installed dependency versions or live behavior have been qualified.
 
 Clean rebuild:
 

@@ -534,6 +534,24 @@ class PlaybackTransport:
                 )
                 host.maybe_session_done(session_id)
                 return True
+            execution_start = host._playback_state().execution_starts.pop(key, None)
+            if execution_start is not None:
+                try:
+                    await self.wait_for_output_duck_release(generation=generation, session_id=session_id)
+                    if getattr(host, "audio_output_mode", "discard") == "device":
+                        await apply_pending_output_device_change(host)
+                        await self.ensure_output_stream()
+                    await execution_start.ready()
+                except Exception as exc:
+                    skip_reason = "coordination_start_failed"
+                    host.session_log(session_id, "playback_coordination_failed: order=%s error=%s", order, exc)
+                    host.resolve_playback_start_waiter(generation, order, session_id,
+                        started=False, reason=skip_reason)
+                    if isinstance(audio, ProviderPcmStream):
+                        audio.cancel(skip_reason)
+                    return True
+                if host.is_stale_playback(generation, session_id) or key in host.cancelled_playback_orders:
+                    return False
             audio_ms = (len(initial_audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
             host.sessions.trace_mark(
                 session_id,
@@ -608,6 +626,7 @@ class PlaybackTransport:
             host.maybe_session_done(session_id)
             return True
         finally:
+            host._playback_state().execution_starts.pop(host.playback_start_key(generation, order, session_id), None)
             host._playback_state().complete_turn_speech_order(
                 generation=generation, order=order, session_id=session_id,
                 completed=bool(completed),

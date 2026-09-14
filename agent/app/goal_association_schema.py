@@ -10,6 +10,7 @@ import re
 from typing import Any, Literal
 
 from .goal_association_contract import (
+    CANONICAL_LOCATION_ENTITY_TYPES,
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
@@ -434,6 +435,11 @@ def goal_association_response_schema(
                         or re.search(r"[0-9]", value) is not None
                     ):
                         binding_branch.pop("allOf", None)
+                if normalized_name == "location" and canonical_entity_type is None:
+                    # This GI-fixed name must use the existing location type
+                    # vocabulary directly; decoder conditionals are insufficient.
+                    binding_properties["entity_type"] = {"enum": list(CANONICAL_LOCATION_ENTITY_TYPES)}
+                    binding_branch.pop("allOf", None)
                 binding_branch["required"] = list(
                     dict.fromkeys(
                         [
@@ -1054,28 +1060,24 @@ def resource_semantic_contract_response_schema(
 
     information_source = definitions.get("GoalAssociationModelInformationSource")
     if isinstance(information_source, dict):
-        information_source.setdefault("allOf", []).extend(
-            [
-                {
-                    "if": {
-                        "properties": {"status": {"enum": ["known"]}},
-                        "required": ["status"],
-                    },
-                    "then": {
-                        "properties": {"source_name": {"minLength": 1}}
-                    },
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "status": {"enum": ["unknown", "provider_resolved"]}
-                        },
-                        "required": ["status"],
-                    },
-                    "then": {
-                        "properties": {"source_name": {"maxLength": 0}}
-                    },
-                },
-            ]
-        )
+        # Native decoding does not enforce the former if/then dependency.
+        # Compile the existing DTO invariant into complete, disjoint objects;
+        # never turn an invented source such as "none" into an absent source.
+        branches = []
+        for status in information_source["properties"]["status"]["enum"]:
+            branch = copy.deepcopy(information_source)
+            properties = branch["properties"]
+            properties["status"] = {"type": "string", "const": status}
+            if status == "known":
+                properties["source_name"]["minLength"] = 1
+                branch["required"] = list(dict.fromkeys([
+                    *branch["required"], "source_name",
+                ]))
+            else:
+                properties["source_name"] = {"type": "string", "const": ""}
+                properties["referent_id"] = {"type": "string", "const": ""}
+            branches.append(branch)
+        definitions["GoalAssociationModelInformationSource"] = {
+            "title": information_source.get("title"), "oneOf": branches,
+        }
     return schema

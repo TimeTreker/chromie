@@ -11,26 +11,30 @@ from agent.app.inference_compute import (
 
 
 class InferenceComputePolicyTests(unittest.TestCase):
-    def test_social_response_precedes_work_but_deep_reasoning_is_bounded(self) -> None:
+    def test_social_response_precedes_work_in_each_independent_engine(self) -> None:
         self.assertGreater(
             compute_rank(compute_class_for_purpose("social_cognition")),
             compute_rank(compute_class_for_purpose("fast_planner")),
         )
-        self.assertLess(
+        self.assertGreater(
             compute_rank(compute_class_for_purpose("social_cognition_deep")),
-            compute_rank(compute_class_for_purpose("fast_planner")),
+            compute_rank(compute_class_for_purpose("deep_planner")),
         )
 
     def test_relative_rank_protects_foreground_from_deliberation(self) -> None:
         ordered = [
             CognitionComputeClass.REALTIME,
-            CognitionComputeClass.INTERACTIVE,
+            CognitionComputeClass.INTERPRETATION,
             CognitionComputeClass.CONTINUITY,
+            CognitionComputeClass.INTERACTIVE,
             CognitionComputeClass.DELIBERATIVE,
             CognitionComputeClass.BACKGROUND,
         ]
 
-        self.assertEqual([compute_rank(item) for item in ordered], [4, 3, 2, 1, 0])
+        self.assertEqual([compute_rank(item) for item in ordered], [5, 4, 3, 2, 1, 0])
+        roles = ["social_cognition", "goal_interpreter_fast", "goal_association", "fast_planner"]
+        ranks = [compute_rank(compute_class_for_purpose(role)) for role in roles]
+        self.assertTrue(all(left > right for left, right in zip(ranks, ranks[1:])))
 
     def test_known_purposes_map_without_semantic_content_inspection(self) -> None:
         self.assertEqual(
@@ -56,14 +60,14 @@ class InferenceComputePolicyTests(unittest.TestCase):
             CognitionComputeClass.INTERACTIVE,
         )
 
-    def test_goal_interpreter_depths_share_authority_but_not_compute_class(self) -> None:
+    def test_goal_interpreter_priority_is_independent_of_model_depth(self) -> None:
         self.assertEqual(
             goal_interpreter_compute_class("goal_interpretation_fast"),
-            CognitionComputeClass.INTERACTIVE,
+            CognitionComputeClass.INTERPRETATION,
         )
         self.assertEqual(
             goal_interpreter_compute_class("goal_interpretation_deep"),
-            CognitionComputeClass.DELIBERATIVE,
+            CognitionComputeClass.INTERPRETATION,
         )
         self.assertEqual(
             goal_interpreter_compute_class("startup_warm"),

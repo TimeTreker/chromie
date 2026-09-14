@@ -188,15 +188,12 @@ def _latin_provider_key(value: Any) -> str:
 
 
 def _equivalent_place_keys(value: Any) -> set[str]:
+    """Compare admitted names without promoting lossy retrieval keys to identity."""
     text = _normalize_location_text(value)
     stripped = _strip_admin_suffix(text)
     keys = {
         _compact_place_key(text),
         _compact_place_key(stripped),
-        _compact_place_key(_latin_place_text(text)),
-        _compact_place_key(_latin_place_text(stripped)),
-        _compact_place_key(_latin_compact_name(text)),
-        _compact_place_key(_latin_compact_name(stripped)),
     }
     return {item for item in keys if item}
 
@@ -294,9 +291,8 @@ def _provider_query_candidates(
         # normalization of that same alias, not selection of a new place.
         add(_strip_admin_suffix(item))
 
-    # Some providers index Chinese administrative places only by their Latin
-    # names. This is transport normalization for the same authoritative Goal
-    # binding, not semantic location substitution.
+    # Latin forms broaden retrieval only. A returned localized name must still
+    # match an admitted locality/alias and every explicit geographic qualifier.
     locality_source = context.locality or location
     locality_key = _latin_provider_key(_strip_admin_suffix(locality_source))
     locality_display = _latin_compact_name(_strip_admin_suffix(locality_source))
@@ -717,13 +713,7 @@ class OpenMeteoWeatherClient:
                 params={
                     "name": candidate,
                     "count": 10,
-                    "language": (
-                        "en"
-                        if candidate.isascii()
-                        else "zh"
-                        if language.lower().startswith("zh")
-                        else "en"
-                    ),
+                    "language": "zh" if language.lower().startswith("zh") else "en",
                     "format": "json",
                 },
             )
@@ -810,27 +800,21 @@ class OpenMeteoWeatherClient:
         if context.admin1:
             expected_admin1 = _equivalent_place_keys(context.admin1)
             actual_admin1 = _equivalent_place_keys(result.get("admin1"))
-            if actual_admin1:
-                if actual_admin1 & expected_admin1:
-                    score += 100
-                else:
-                    return None
-            elif not (query_keys & requested_keys):
+            if not (actual_admin1 & expected_admin1):
                 return None
+            score += 100
 
         if context.country:
-            expected_country = _compact_place_key(context.country)
-            actual_country = _compact_place_key(result.get("country"))
-            if actual_country:
-                if actual_country == expected_country:
-                    score += 40
-                elif expected_country not in actual_country and actual_country not in expected_country:
-                    score -= 60
+            expected_country = _equivalent_place_keys(context.country)
+            actual_country = _equivalent_place_keys(result.get("country"))
+            if not (actual_country & expected_country):
+                return None
+            score += 40
 
         # A fallback query must still identify the same lexical locality. This
         # guards against accepting an unrelated first provider result merely
         # because a broad query returned something.
-        if locality_keys and not (name_keys & locality_keys):
+        if not (name_keys & (locality_keys or requested_keys)):
             return None
         return score
 

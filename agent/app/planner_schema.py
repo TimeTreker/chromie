@@ -2725,7 +2725,7 @@ def fast_advance_response_schema(
                     "type": "string",
                     "enum": [capability_id_value],
                 }
-                branch_properties["args"] = copy.deepcopy(input_schema)
+                branch_properties["args"] = _ordered_capability_arguments(input_schema)
                 if capability.get("can_run_parallel") is False:
                     branch_properties["timing"] = {"type": "string", "const": "sequential"}
                 branches.append(
@@ -2872,6 +2872,29 @@ def _ollama_streaming_schema(
     if not isinstance(compiled_schema, dict):
         raise ValueError("compiled streaming response schema must remain an object")
     return compiled_schema
+
+
+def _ordered_capability_arguments(schema: dict[str, Any]) -> dict[str, Any]:
+    """Match the catalog's lexicographic JSON order without changing its values.
+
+    Constrained object decoding cannot return to an earlier optional property.
+    Keep argument objects aligned with the sorted catalog seen by the model;
+    decision/discriminator order outside arguments remains owned by the role.
+    """
+    result = copy.deepcopy(schema)
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            if isinstance(node.get("properties"), dict):
+                node["properties"] = dict(sorted(node["properties"].items()))
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(result)
+    return result
 
 
 def fast_streaming_advance_response_schema(

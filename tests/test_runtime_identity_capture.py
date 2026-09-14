@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,10 +15,76 @@ from scripts.capture_runtime_identity import (
     _deployment_identity,
     _git_source_tree_identity,
     build_parser,
+    agent_runtime_source_identity,
+    main,
 )
 
 
 class RuntimeIdentityCaptureTests(unittest.TestCase):
+    def test_packaged_agent_identity_detects_source_contract_and_skill_drift(self) -> None:
+        real_run = subprocess.run
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            host_trees = []
+            for label in ("app", "agent-skills", "chromie_contracts", "chromie_runtime"):
+                for side in ("host", "container"):
+                    tree = root / side / label
+                    tree.mkdir(parents=True)
+                    (tree / "source.py").write_text("original\n")
+                host_trees.append((root / "host" / label, label))
+
+            def container_run(command, **kwargs):
+                self.assertEqual(command[:3], ["docker", "exec", "selected-agent"])
+                script = command[-1].replace("/app/", str(root / "container") + "/")
+                return real_run([sys.executable, "-c", script], **kwargs)
+
+            with patch("scripts.capture_runtime_identity.AGENT_SOURCE_TREES", host_trees), patch(
+                "scripts.capture_runtime_identity.subprocess.run", side_effect=container_run
+            ):
+                self.assertTrue(agent_runtime_source_identity("selected-agent")["matches"])
+                cache = root / "container" / "app" / "__pycache__"
+                cache.mkdir()
+                (cache / "source.pyc").write_bytes(b"generated")
+                self.assertTrue(agent_runtime_source_identity("selected-agent")["matches"])
+                for label in ("app", "agent-skills", "chromie_contracts", "chromie_runtime"):
+                    with self.subTest(stale_tree=label):
+                        source = root / "container" / label / "source.py"
+                        source.write_text("old deployed source\n")
+                        self.assertFalse(agent_runtime_source_identity("selected-agent")["matches"])
+                        source.write_text("original\n")
+                extra = root / "container" / "app" / "removed_endpoint.py"
+                extra.write_text("retired\n")
+                self.assertFalse(agent_runtime_source_identity("selected-agent")["matches"])
+
+    def test_agent_verification_fails_closed_on_unavailable_or_malformed_probe(self) -> None:
+        for outcome in (
+            OSError("Docker unavailable"),
+            subprocess.TimeoutExpired("docker", 120),
+            subprocess.CompletedProcess([], 1, "", "container not running"),
+            subprocess.CompletedProcess([], 0, "not JSON", ""),
+            subprocess.CompletedProcess([], 0, json.dumps({}), ""),
+        ):
+            with self.subTest(outcome=outcome), patch(
+                "scripts.capture_runtime_identity.subprocess.run"
+            ) as run:
+                if isinstance(outcome, Exception):
+                    run.side_effect = outcome
+                else:
+                    run.return_value = outcome
+                self.assertFalse(agent_runtime_source_identity()["matches"])
+
+    def test_startup_verification_exit_status_blocks_mismatch(self) -> None:
+        for container, matches in (("running-container", False), ("running-container", True), ("", False)):
+            with self.subTest(container=container, matches=matches), patch(
+                "scripts.capture_runtime_identity.agent_runtime_source_identity",
+                return_value={"matches": matches},
+            ) as probe, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as error:
+                code = main(["--verify-agent-source", container])
+                probe.assert_called_once_with(container)
+                self.assertEqual(code, 0 if matches else 1)
+                if not matches:
+                    self.assertIn("rebuild and recreate", error.getvalue())
+
     def test_source_tree_digest_tracks_evaluated_nonignored_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

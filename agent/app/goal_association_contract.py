@@ -25,6 +25,12 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.text import normalize_whitespace
 
 
+# Existing location-binding vocabulary shared by the decoder and Host validator.
+CANONICAL_LOCATION_ENTITY_TYPES = (
+    "address", "city", "country", "county", "geographic", "location", "place",
+    "relative_location", "region",
+)
+
 GoalSegmentationDecision = Literal["create_goals"]
 InformationResourceDomain = Literal[
     "local_clock",

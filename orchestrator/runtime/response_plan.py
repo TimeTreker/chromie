@@ -188,6 +188,7 @@ def build_social_interaction_response(
     result.validate_request(request)
     if any(act.delivery_phase != "immediate" for act in result.activities):
         raise ValueError("ordered SC acts require the immutable Work response projection")
+    turn_id = str(request.source_turn.get("turn_id") or request.request_id)
     speech: list[InteractionSpeech] = []
     prohibited = user_turn_prohibits_speech(request.context.get("user_turn_envelope"))
     for act in result.activities:
@@ -203,7 +204,7 @@ def build_social_interaction_response(
             text=act.text, timing="immediate", style="brief", priority="normal",
             interruptible=True, metadata={
                 "source": "social_cognition", "wording_owner": "social_cognition",
-                "turn_id": request.request_id, "session_id": session_id,
+                "turn_id": turn_id, "session_id": session_id,
                 "language": request.language, "speech_act": act.function,
                 "truth_stage": act.truth_stage, "evidence_refs": list(act.evidence_refs),
                 "source_goal_ids": list(act.source_goal_ids),
@@ -229,8 +230,10 @@ def build_social_interaction_response(
             f"{request.request_id}|{result.snapshot_digest}".encode()
         ).hexdigest()[:24],
         speech=speech, capabilities=[], metadata={
-            "source": "social_cognition", "turn_id": request.request_id,
+            "source": "social_cognition", "turn_id": turn_id,
             "session_id": session_id, "social_cognition_snapshot_digest": result.snapshot_digest,
+            "social_cognition_request": request.model_dump(mode="json"),
+            "social_cognition_resolution": result.model_dump(mode="json"),
             "source_refs": list(request.source_refs), "goal_ids": [],
             "goal_completion_authority": False,
         },

@@ -541,6 +541,7 @@ class InteractionRuntimeCoordinator:
         *,
         session_id: str,
         turn_id: str,
+        language: str,
     ) -> ReadyFastPlannerCapabilityExecution | None:
         """Accept safe, side-effect-free Fast Activities without waiting for GA.
 
@@ -608,6 +609,7 @@ class InteractionRuntimeCoordinator:
                     metadata={
                         "source": "fast_planner_advance",
                         "turn_id": turn_id,
+                        "language": language,
                         "fast_activity_id": activity.activity_id,
                         "source_responsibility_refs": list(
                             activity.source_responsibility_refs
@@ -777,6 +779,50 @@ class InteractionRuntimeCoordinator:
             consumed_traces,
         )
 
+    async def _admit_social_expressions(
+        self, response: InteractionResponse, *, session_id: str | None,
+    ) -> InteractionResponse:
+        """An optional SC provider outage cannot suppress its anchored speech."""
+        if response.metadata.get("social_expression_materialized") is not True:
+            return response
+        rejected: list[CapabilityRequest] = []
+        failures: list[CapabilityResult] = []
+        for request in response.capabilities:
+            if not (request.metadata.get("source") == "social_cognition_auxiliary_activity"
+                    and request.metadata.get("semantic_owner") == "social_cognition"
+                    and request.metadata.get("execution_role") == "social_decoration"
+                    and request.metadata.get("auxiliary_plan_activity") is True
+                    and not request.metadata.get("source_goal_ids")):
+                continue
+            try:
+                await self.ensure_capability_definitions([request.capability_id])
+                definition = self.registry.get(request.capability_id)
+                if not definition.available:
+                    raise RuntimeError(definition.unavailable_reason or "unavailable")
+            except (RuntimeError, ValueError) as exc:
+                rejected.append(request)
+                failures.append(CapabilityResult(request_id=request.request_id,
+                    capability_id=request.capability_id, status="failed",
+                    reason_code="social_expression_unavailable", message=str(exc)))
+        if not rejected:
+            return response
+        response = response.model_copy(deep=True)
+        rejected_ids = {request.request_id for request in rejected}
+        response.capabilities = [request for request in response.capabilities if request.request_id not in rejected_ids]
+        remaining_groups = {request.metadata.get("coordination_id") for request in response.capabilities}
+        for speech in response.speech:
+            if speech.metadata.get("coordination_id") not in remaining_groups:
+                speech.metadata.pop("coordination_id", None)
+                speech.metadata.pop("lane_start_policy", None)
+        response.metadata["social_expression_admission_failures"] = [result.model_dump(mode="json") for result in failures]
+        if self.interaction_ledger is not None:
+            turn_id = str(response.metadata.get("turn_id") or response.interaction_id)
+            self.interaction_ledger.record_committed_requests(session_id=str(session_id or turn_id),
+                turn_id=turn_id, interaction_id=response.interaction_id, requests=rejected)
+            self.interaction_ledger.record_social_results(session_id=str(session_id or turn_id),
+                turn_id=turn_id, interaction_id=response.interaction_id, requests=rejected, results=failures)
+        return response
+
     async def submit_response(
         self,
         response: InteractionResponse,
@@ -793,6 +839,7 @@ class InteractionRuntimeCoordinator:
         terminal Evidence exists.
         """
 
+        response = await self._admit_social_expressions(response, session_id=session_id)
         raw_body_requests = [
             request
             for request in response.capabilities
@@ -840,7 +887,7 @@ class InteractionRuntimeCoordinator:
                 str(envelope.get("turn_id") or "").strip()
                 if isinstance(envelope, dict)
                 else ""
-            ) or prepared.interaction_id
+            ) or str(prepared.metadata.get("turn_id") or "").strip() or prepared.interaction_id
             self.interaction_ledger.record_committed_requests(
                 session_id=str(session_id or turn_id),
                 turn_id=turn_id,
@@ -1021,6 +1068,14 @@ class InteractionRuntimeCoordinator:
         if dispatch.receipt is None:
             raise RuntimeError("capability interaction dispatch has no Runtime receipt")
         execution = await self.runtime.wait_terminal(dispatch.receipt)
+        if (self.interaction_ledger is not None
+                and dispatch.runtime_response.metadata.get("social_expression_materialized") is True):
+            metadata = dispatch.runtime_response.metadata
+            self.interaction_ledger.record_social_results(
+                session_id=str(metadata.get("session_id") or metadata.get("turn_id") or ""),
+                turn_id=str(metadata.get("turn_id") or ""),
+                interaction_id=dispatch.runtime_response.interaction_id,
+                requests=dispatch.runtime_response.capabilities, results=execution.results)
         if not dispatch.preexecuted_results:
             return execution
         merged_results = [*dispatch.preexecuted_results, *execution.results]

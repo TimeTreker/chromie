@@ -50,6 +50,23 @@ remains bound to exact supplied Responsibilities/Goals or trusted Goal-free
 Situation. It cannot mutate any Goal or task. GA-only identity binding is
 mechanical and does not require another communication or planning invocation.
 
+Independent SC results retain their exact request/snapshot and complete decision
+through the Host response envelope, including nonverbal-only acts. The existing
+social-expression adapter validates each proposal and submits it through the
+same Runtime admission queue used by Capability execution. Queue admission is
+not completion: actual terminal results are appended to the interaction ledger
+with their exact completed/failed/cancelled state, without completing task Goals
+or re-entering Planner. Speech still requires confirmed playback before it enters
+heard dialogue. The admitted user-turn ID remains the delivery correlation when
+available; the distinct SC request ID remains the inference/snapshot identity.
+For Soridormi expression, the provider recognizes the Runtime-validated SC source
+and semantic owner. Its existing transport preflight still requires a low-risk,
+non-motion Capability, no confirmation requirement from request/definition/fresh
+body plan, and successful safety monitoring; this never fabricates user consent.
+Grouped SC decorations retain optional-member status. Goal-free Situation ingress
+retains its own observation identity. Later Goal
+binding therefore cannot hide early speech or expression from the same turn.
+
 Host applies an atomic compare-and-commit for each returned act and rechecks
 delivery eligibility before playback. Delivery records include pending, playing,
 completed, interrupted, cancelled and failed states; pending is relevant to
@@ -66,6 +83,33 @@ Responsibilities remain open; a failed output cannot manufacture a retry loop or
 another wording owner. An ordinary new turn does not cancel unrelated tasks.
 Stop/cancel/emergency/silence, shutdown and audio interruption retain their
 deterministic Host/Provider paths.
+
+At the primary decoder boundary, SC compiles the existing relationship between
+`truth_stage` and `progress_kind` into explicit alternatives: prospective acts
+must author a progress kind, and other acts cannot carry one. When an upstream
+Need specifies delivery order, complete act alternatives admit only Need IDs
+compatible with the authored phase; Need bindings and phase precede wording in
+the decoder. Verbal and nonverbal alternatives preserve the existing requirement
+that wordless interaction includes an actual embodied-expression proposal. These
+constraints do not supply a semantic decision or change SC/Planner ownership.
+GA likewise exposes
+the existing location-type vocabulary directly on GI-bound location values,
+including information query scope. Cross-field JSON Schema conditionals alone
+are insufficient for the maintained SGLang decoder. Host validators retain the
+same meaning and fail closed; they never fill in missing semantic fields.
+SC contract errors return an explicit 422 response, and the independent SC path
+records failures/cancellations in the session workflow as well as successful and
+stale decisions. Startup logging names SC as the communication owner.
+
+GA information-source status uses complete decoder alternatives too: `known`
+requires a source name; `unknown` and `provider_resolved` cannot name a source or
+referent. Host does not normalize invented names such as the literal `none` into
+absence. If cognition subsequently fails, earlier SC acknowledgement cannot
+replace the existing operational failure notice. Host dispatches that terminal
+response without resetting earlier playback, including a silent response when
+speech is prohibited. Normal delivery completion closes the session; skipping
+speech must never skip session finalization. This bounded operational path does
+not author a replacement Goal, Plan or ordinary social response.
 
 ### Source migration inventory
 
@@ -458,9 +502,29 @@ the Goal as cancelled. For a Goal replacement that defers GA persistence until W
 stop, the Host finalizes the same submission guard only after that authorized Goal-owner
 transaction succeeds; a competing Planner reservation still invalidates it.
 
+Concurrent SC/Planner catalog readers join the existing provider refresh lock before
+reading a snapshot. Freshness begins after a complete result or recorded provider
+failure is published, never when the lookup starts. Cancellation leaves the snapshot
+stale for the next reader; an in-flight initial refresh cannot masquerade as a fresh
+catalog containing only static capabilities. This changes no capability selection
+authority or provider-failure retention policy.
+
 Before GA, only a complete validated Planner result can enter Runtime preparation. Its
-leading eligible safe-read Activities may start under immutable Responsibility refs;
-an earlier held Activity also holds later reads to preserve ordering. Other Activities
+Capability argument objects use the same recursive lexicographic order in the Fast
+decoder and rendered catalog. The serialization instruction belongs to the existing
+Fast system prompt; it changes no argument value, semantic choice or coverage rule.
+This prevents an early optional field from making later-needed fields unreachable
+under a decoder that enforces property order. Schema/Host and semantic qualification
+remain separate: a parseable complete object does not establish correct Goal coverage.
+
+The result's
+leading eligible safe-read Activities may start under immutable Responsibility refs.
+The Host carries the admitted turn's language through the same provider request metadata
+used by canonical dispatch. Successful, failed, refused and timed-out provider results
+are terminal Evidence, not competing Plan revisions. Their disappearance from scheduled
+Work cannot alone stale a planning snapshot; Goal changes, competing commits and explicit
+cancellation retain their existing guards.
+An earlier held Activity also holds later reads to preserve ordering. Other Activities
 remain prepared. GA attaches canonical Goal IDs. A GI-derived canonical Plan adopts its
 prepared tasks; a later Planner explicitly reuses or cancels named prepared tasks.
 Omitted prepared tasks remain visible to later planning for their Goals, without dispatch
@@ -515,27 +579,27 @@ Goal Interpretation
       bindings: location=Chongqing, time=today
       relationship: new/reference existing dinner Goal as context
 
-Fast Planner first response
-  `-- one primary authored speaking Activity with prospective truth/provenance
-
-concurrent continuation
-  |-- same Fast Planner
-  |     `-- Capability Activity: exact weather lookup (parallel)
+independent GI-result fan-out
+  |-- Social Cognition (highest request priority)
+  |     `-- useful, grounded acknowledgement or silence; retain delivery history
+  |-- Fast Planner
+  |     `-- exact weather acquisition Work; no authored speech
   `-- Goal Association
-        `-- commit canonical weather Goal and its relationship to dinner
+        `-- canonical weather Goal and its relationship to dinner
 
 Trusted Capability Runtime
-  |-- start eligible safe read without waiting for GA
-  |-- bind the same request ID to the weather Goal task-list view
+  |-- join Work to canonical Goal, then authorize the exact provider request
+  |-- bind that same request ID to the weather Goal task-list view
   `-- provider -> trusted observation
 
 trusted observation + canonical Goal relationships
-  -> evidence-qualified answer focused on whether rain affects the user's plan
+  -> Social Cognition -> evidence-qualified answer
 ```
 
-The acknowledgement can overlap Goal Association because speech is already an
-observable Activity. The weather lookup itself cannot: provider work begins only
-after canonical Goal binding and Planner selection.
+SC acknowledgement may overlap GA and Fast planning. Provider execution still
+requires canonical Goal binding and the existing authorization barrier. SC may
+independently react to later Work/Evidence/Situation events; it does not require
+another GI invocation for every communication.
 
 ### 3.1a Logical concurrency is not fair compute scheduling
 
@@ -546,9 +610,13 @@ first meaningful foreground reaction. Human attention is selective: foreground c
 may temporarily dominate central inference while unrelated lower-priority cognition yields
 and later resumes.
 
-Chromie carries this only as provider-neutral operational compute class metadata. Fast GI
-and Fast Planner are interactive foreground work; Goal Association is continuity work;
-deep cognition is deliberative; Reflection/background consolidation is background work.
+Chromie carries this only as provider-neutral operational compute class metadata.
+SC precedes GI, then Goal Association, then Fast Planner; deliberative Work and
+background consolidation follow. These are request priorities within the selected engine.
+GI still produces one authoritative result and independently fans out to SC, GA and Fast.
+The owner-selected RTX 5090 topology shares one resident Gemma 12B SGLang instance.
+Each role keeps its own request context; designated depth changes do not create a
+second semantic reviewer or a second model instance.
 The mapping expresses relative scheduling intent, not semantic authority and not fixed raw
 provider integers. A runtime/provider adapter may translate it into SGLang, vLLM, or another
 engine's priority/preemption controls. Ollama may record the class without being able to
@@ -556,10 +624,11 @@ honor it. No scheduler may inspect user content and no compute class may alter t
 GI/GA/Planner transaction.
 
 Accordingly, Goal Association remains logically concurrent but is not on the critical path
-to an eligible independent SC acknowledgement. If a single engine can protect foreground tail
-latency under deep load, keep the simpler single-engine topology. Only measured failure
-justifies separate foreground/deliberative engines, and only further failure justifies
-physical compute isolation. See
+to an eligible independent SC acknowledgement. The owner selected one resident
+Gemma 12B engine after the dual-engine resource probes on 2026-09-14. Independent
+requests share model weights while retaining distinct context and authority.
+Actual preemption/resumption, whole-turn quality and speech latency require
+retained evidence. See
 [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md#foreground-priority-inference-runtime-candidate-qualification).
 
 ### 3.1.1 Progressive conversational continuation

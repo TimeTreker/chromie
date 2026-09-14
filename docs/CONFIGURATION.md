@@ -466,8 +466,13 @@ canonical string first, then bounded equivalent locality forms only for provider
 recognition; it never changes the conversational referent or Goal. For Chinese
 administrative names, the adapter also derives a compact lowercase Latin
 provider key such as `河南省内乡县` -> `neixiang` and tries that bare key before
-descriptive English forms. Candidates are qualified against available
-administrative context. If none match, the tool returns typed
+descriptive English forms. Transliterations are retrieval hints, never identity
+evidence: returned names must match an admitted locality or equivalent alias,
+and every supplied administrative and country qualifier must match. Result
+localization follows the requested language even for a Latin search key, so a
+provider-localized name can establish that match. Missing localization or an
+unconfirmed cross-language name fails closed; it does not authorize substitution.
+If none match, the tool returns typed
 `location_not_found`.
 | `AGENT_DAG_ENGINE_MAX_CONCURRENCY` | Process-local WorkDAG bound; default `4`, range 1–64. |
 | `AGENT_DAG_ENGINE_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
@@ -620,7 +625,7 @@ See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AN
 
 | Variable | Default |
 |---|---:|
-| `ORCH_CAPABILITY_MAX_CONCURRENCY` | `8`. |
+| `ORCH_CAPABILITY_MAX_CONCURRENCY` | `8` total Runtime slots. With a limit above one, one slot is reserved for Vocal and at most `limit - 1` admit Activity work; `1` serializes all work. Resource and provider limits still apply. |
 | `ORCH_SORIDORMI_MANIFEST` | `capabilities/soridormi.json`. |
 | `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
 | `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
@@ -756,8 +761,13 @@ full Fast request preflight failure without dropping authoritative prompt materi
 
 Before inference, Chromie estimates prompt tokens from the complete user and
 system text, reserves the entire declared output budget and the configured
-safety margin, and emits `llm_prompt_budget_exceeded` when the request cannot
-fit. No HTTP request is sent in that case. After inference, the following are
+safety margin. For SGLang model-client calls, an estimated overflow is checked with
+`/v1/tokenize` on the same serving endpoint and unchanged chat packet. The actual token
+count must fit both the request context and server limit, including output and margin.
+An unavailable or malformed tokenizer result fails closed; an actual overflow sends no
+generation request. This is tokenizer computation, not another LLM decision or semantic
+retry. Ordinary estimates that fit do not add a tokenizer round trip. GI retains its
+own existing conservative preflight. After inference, the following are
 untrusted hard failures:
 
 - `done_reason=length` or another explicit generation-limit reason;
@@ -970,7 +980,7 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
 | `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained development modes and the code/common fallback use `300000` so an unqualified model/profile can complete one legal GA/Fast/Deep workflow; explicit qualification mode uses `900000` as an evidence-collection watchdog. Neither value is a latency pass: the 2-second Planner-commit and 3-second playback targets are measured and failed independently. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
-| `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Enable raw text only under an explicit privacy decision. |
+| `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Structural SC ownership, function, delivery phase and truth-stage fields remain visible so asynchronous communication can be verified without exposing its words. Enable raw text only under an explicit privacy decision. |
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, latency, failure, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
 | `ORCH_COGNITIVE_RUN_IDENTITY_PATH` | `.chromie/evidence/runtime-identity.json`; optional digest-bound source/profile/model/image/manifest identity attached to cognitive evidence. Missing identity is allowed for ordinary development but fails source-bound qualification. |
 

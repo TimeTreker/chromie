@@ -1111,6 +1111,10 @@ class VoiceAssistant:
             return {"scheduled": False, "reason": "stale_playback"}
         self._remember_tts_text(generation, sentence)
         key = self.playback_start_key(generation, order, session_id)
+        from orchestrator.runtime.scheduler import current_execution_start
+        execution_start = current_execution_start.get()
+        if execution_start is not None:
+            self._playback_state().execution_starts[key] = execution_start
         self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
         self._playback_state().create_playback_release_waiter(
             generation=generation,
@@ -2425,13 +2429,13 @@ class VoiceAssistant:
         ):
             return False
 
-        # Maintained apply mode gives the first HOW/wording decision to Fast Planner.
+        # Maintained apply mode fans GI out to independent SC and task planning.
         # Goal Interpretation contributes Responsibility evidence only.
         fast_first_hedge = None
         runtime_context = dict(context)
         self.session_log(
             session_id,
-            "goal_progress_communication_owner=fast_planner_advance gi_speech_bypassed=true",
+            "goal_progress_communication_owner=social_cognition work_owner=planner gi_speech_bypassed=true",
         )
         resolution = await self._run_cognitive_runtime_pipeline(
             session,
@@ -2484,44 +2488,23 @@ class VoiceAssistant:
                 ),
                 failure_error=str(resolution.fallback_reason or ""),
             )
-            # A committed Planner-authored communication is already the user's
-            # visible progress for this turn. A later GA/Planner/runtime failure
-            # must remain observable in metadata/evidence, but it must not speak a
-            # second generic "that didn't go through" line over wording that was
-            # already scheduled or played. The failure remains fail-closed for
-            # effects; this suppresses only duplicate/conflicting Host speech.
-            fallback_speech_suppressed = bool(fast_first_scheduled)
-            if fallback_speech_suppressed:
-                safe_response = safe_response.model_copy(
-                    deep=True,
-                    update={
-                        "speech": [],
-                        "metadata": {
-                            **safe_response.metadata,
-                            "user_visible_fallback_suppressed": True,
-                            "fallback_suppression_reason": (
-                                "planner_communication_already_committed"
-                            ),
-                        },
-                    },
-                )
+            # Earlier SC acknowledgement cannot communicate this later failure.
+            # Preserve its playback ordering, then dispatch the operational
+            # fallback through the normal terminal path even when speech is
+            # prohibited: that path also closes the session after delivery.
             record_session_workflow_stage(
                 self,
                 session_id,
                 stage="fallback_speech",
                 started_monotonic_ms=fallback_started_ms,
                 finished_monotonic_ms=now_ms(),
-                status=(
-                    "suppressed" if fallback_speech_suppressed else "selected"
-                ),
+                status="selected" if safe_response.speech else "silent",
                 input_payload={
                     "cognitive_runtime_status": resolution.status,
                     "failure_stage": resolution.metadata.get("failure_stage"),
                     "fallback_reason": resolution.fallback_reason,
                     "user_text": user_text,
-                    "planner_communication_already_committed": (
-                        fallback_speech_suppressed
-                    ),
+                    "early_communication_already_scheduled": fast_first_scheduled,
                 },
                 output_payload=safe_response,
                 errors=list(resolution.metadata.get("stage_diagnostics") or []),
@@ -2558,12 +2541,14 @@ class VoiceAssistant:
                 resolution, session_id=session_id, user_text=user_text,
                 session_log=self.session_log,
             )
-            if not fallback_speech_suppressed:
-                self._launch_interaction(
-                    safe_response,
-                    session_id,
-                    reset_playback=True,
-                )
+            self._launch_interaction(
+                safe_response,
+                session_id,
+                reset_playback=not (
+                    fast_first_scheduled
+                    or resolution.metadata.get("social_cognition_started")
+                ),
+            )
             return True
 
         response = resolution.interaction_response.model_copy(deep=True)

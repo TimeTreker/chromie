@@ -139,7 +139,7 @@ class SGLangProtocolTests(unittest.TestCase):
             stream=True,
             priority_step=100,
         )
-        self.assertEqual(payload["priority"], 300)
+        self.assertEqual(payload["priority"], 200)
         self.assertEqual(payload["max_tokens"], 123)
         self.assertEqual(
             payload["chat_template_kwargs"],
@@ -225,7 +225,71 @@ class SGLangProtocolTests(unittest.TestCase):
             self.assertEqual(client.compute_class, CognitionComputeClass.INTERACTIVE)
 
 
+
 class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exact_serving_tokens_resolve_estimate_overflow_without_prompt_loss(self) -> None:
+        import httpx
+
+        prompt = "Evidence and shared task state. " * 100
+        for count, limit, expected in ((500, 1024, True), (972, 1024, True),
+                                       (973, 1024, False), (950, 1000, False)):
+            with self.subTest(count=count, limit=limit):
+                tokenized = httpx.Response(200, json={
+                    "count": count, "tokens": [1] * count, "max_model_len": limit,
+                }, request=httpx.Request("POST", "http://fast.invalid/v1/tokenize"))
+                completion = httpx.Response(200, json={"choices": [{
+                    "message": {"content": "ok"}, "finish_reason": "stop",
+                }]}, request=httpx.Request("POST", "http://fast.invalid/v1/chat/completions"))
+                http_client = AsyncMock()
+                http_client.post.side_effect = [tokenized, completion]
+                http_client.__aenter__.return_value = http_client
+                configured = Settings(llm_prompt_chars_per_token_estimate=2,
+                                      llm_context_safety_margin_tokens=20)
+                client = SGLangClient("http://fast.invalid/v1", "qwen3.5-test",
+                                      timeout_ms=1000, purpose="social_cognition",
+                                      service_settings=configured)
+                with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=http_client), patch(
+                    "agent.app.clients.sglang_client.log_llm_call_evidence"
+                ) as evidence:
+                    if expected:
+                        result = await client._generate(prompt, options={"num_ctx": 1024, "num_predict": 32})
+                        self.assertEqual(result, "ok")
+                        self.assertEqual(http_client.post.call_args_list[0].kwargs["json"],
+                                         http_client.post.call_args_list[1].kwargs["json"])
+                    else:
+                        with self.assertRaises(SGLangGenerationError) as caught:
+                            await client._generate(prompt, options={"num_ctx": 1024, "num_predict": 32})
+                        self.assertEqual(caught.exception.failure_class, "prompt_budget_exceeded")
+                    self.assertEqual(http_client.post.call_count, 2 if expected else 1)
+                    self.assertEqual(evidence.call_args.kwargs["request"]["messages"][-1]["content"], prompt)
+                    self.assertEqual(evidence.call_args.kwargs["status"], "accepted" if expected else "failed")
+
+    async def test_unverifiable_tokenizer_fails_closed_and_retains_stream_request(self) -> None:
+        import httpx
+
+        for data, status in (({"count": True, "tokens": [1], "max_model_len": 1024}, 200),
+                             ({"count": 2, "tokens": [1], "max_model_len": 1024}, 200),
+                             ({"count": 1, "tokens": [1], "max_model_len": 0}, 200),
+                             ({}, 503), ([], 200)):
+            with self.subTest(data=data, status=status):
+                response = httpx.Response(status, json=data,
+                    request=httpx.Request("POST", "http://fast.invalid/v1/tokenize"))
+                http_client = AsyncMock()
+                http_client.post.return_value = response
+                http_client.__aenter__.return_value = http_client
+                client = SGLangClient("http://fast.invalid/v1", "qwen3.5-test", timeout_ms=1000,
+                    purpose="fast_planner", service_settings=Settings(
+                        llm_prompt_chars_per_token_estimate=2, llm_context_safety_margin_tokens=20))
+                with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=http_client), patch(
+                    "agent.app.clients.sglang_client.log_llm_call_evidence"
+                ) as evidence:
+                    with self.assertRaises(SGLangGenerationError) as caught:
+                        async for _ in client.generate_stream("x" * 3000, options={"num_ctx": 1024, "num_predict": 32}):
+                            self.fail("unverified request emitted a model token")
+                    self.assertEqual(caught.exception.failure_class, "prompt_budget_unverified")
+                    http_client.stream.assert_not_called()
+                    self.assertEqual(evidence.call_args.kwargs["status"], "failed")
+
     async def test_nonstream_failures_retain_request_and_available_response(self) -> None:
         import httpx
 
@@ -341,6 +405,29 @@ class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SGLangGoalInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
+    async def test_gi_primary_and_designated_deep_share_engine_and_interpretation_priority(self) -> None:
+        import httpx
+
+        interpreter = OllamaGoalInterpreter(ollama_url="http://unused.invalid", model="qwen3.5-fast",
+            deep_model="gemma-deep", inference_provider="sglang", sglang_url="http://fast.invalid/v1",
+            timeout_ms=1000)
+        http_client = AsyncMock()
+        http_client.__aenter__.return_value = http_client
+        http_client.post.return_value = httpx.Response(200, json={"choices": [{
+            "message": {"content": "{}"}, "finish_reason": "stop",
+        }]}, request=httpx.Request("POST", "http://test.invalid"))
+        for stage, model, endpoint in (("goal_interpretation_fast", "qwen3.5-fast", "fast"),
+                                       ("goal_interpretation_deep", "gemma-deep", "fast")):
+            with self.subTest(stage=stage), patch(
+                "agent.app.cognitive_core.goal_interpreter.model_interpreter.httpx.AsyncClient",
+                return_value=http_client,
+            ), patch.object(interpreter, "_validate_completion"):
+                await interpreter._chat({"model": model, "messages": [{"role": "user", "content": "source"}],
+                    "options": {"num_ctx": 4096, "num_predict": 32}, "format": "json"}, stage=stage)
+                self.assertEqual(http_client.post.call_args.args[0], f"http://{endpoint}.invalid/v1/chat/completions")
+                self.assertEqual(http_client.post.call_args.kwargs["json"]["model"], model)
+                self.assertEqual(http_client.post.call_args.kwargs["json"]["priority"], 400)
+
     async def test_warm_probe_reserves_terminal_completion_headroom(self) -> None:
         interpreter = OllamaGoalInterpreter(
             ollama_url="http://ollama.invalid",
