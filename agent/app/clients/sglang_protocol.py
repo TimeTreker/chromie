@@ -70,12 +70,13 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         return {"type": "json_object"}
     if isinstance(response_format, dict):
         schema, _ = candidate_compatible_schema(response_format)
-        if schema.get("title") == "FastPlannerStreamingAdvanceOutput":
+        if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _stream_decoder_constraints(schema)
         if schema.get("title") in {
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
-            "FastPlannerStreamingAdvanceOutput",
+            "FastPlannerWorkAdvanceOutput",
+            "SocialCognitionOutput",
         }:
             # Native intersections can hide required object/array fields. Repeat
             # their existing shape for decoding; original DTO/Host rules remain.
@@ -83,7 +84,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         if schema.get("title") in {
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
-            "FastPlannerStreamingAdvanceOutput",
+            "FastPlannerWorkAdvanceOutput",
         }:
             # Formatting belongs to this request, never to the shared model's
             # global settings. This also prevents the reproduced Deep/Skill JSON

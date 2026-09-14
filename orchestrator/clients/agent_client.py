@@ -20,10 +20,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerStreamTerminal,
 )
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
-from shared.chromie_contracts.situation import (
-    SituationalCognitionRequest,
-    SituationalCognitionResolution,
-)
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -270,44 +267,29 @@ class AgentClient:
             span.set_attribute("step_count", len(result.steps))
             return result
 
-    async def resolve_situational_cognition(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        request: SituationalCognitionRequest,
+    async def resolve_social_cognition(
+        self, session: aiohttp.ClientSession, *, request: SocialCognitionRequest,
         timeout_ms: int | None = None,
-    ) -> SituationalCognitionResolution:
-        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+    ) -> SocialCognitionResolution:
+        timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        # The exact semantic snapshot is immutable across transport. Trace data
+        # belongs to the span rather than changing the digest being adjudicated.
+        request = request.model_copy(deep=True)
         async with runtime_tracer.span(
-            module=self.TRACE_MODULE,
-            operation="resolve_situational_cognition",
-            kind="tool_call",
-            attributes={
-                "endpoint": "/situational-cognition",
-                "timeout_ms": effective_timeout_ms,
-            },
+            module=self.TRACE_MODULE, operation="resolve_social_cognition", kind="tool_call",
+            attributes={"endpoint": "/social-cognition", "timeout_ms": timeout_ms},
         ) as span:
-            req = request.model_copy(
-                update={
-                    "context": runtime_tracer.inject_carrier(request.context),
-                }
-            )
-            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
-                f"{self.base_url}/situational-cognition",
-                json=req.model_dump(mode="json"),
-                timeout=timeout,
-            ) as resp:
-                body = await resp.text()
-                span.set_attribute("http_status", resp.status)
-                if resp.status != 200:
-                    raise RuntimeError(
-                        "Agent situational-cognition endpoint returned HTTP "
-                        f"{resp.status}: {body[:500]}"
-                    )
-                result = SituationalCognitionResolution.model_validate_json(body)
+                f"{self.base_url}/social-cognition", json=request.model_dump(mode="json"),
+                timeout=aiohttp.ClientTimeout(total=timeout_ms / 1000.0),
+            ) as response:
+                body = await response.text()
+                span.set_attribute("http_status", response.status)
+                if response.status != 200:
+                    raise RuntimeError(f"Agent Social Cognition HTTP {response.status}: {body[:500]}")
+                result = SocialCognitionResolution.model_validate_json(body)
+            result.validate_request(request)
             span.set_attribute("disposition", result.disposition)
-            span.set_attribute("has_activity", result.activity is not None)
             return result
 
     async def resolve_reflection(

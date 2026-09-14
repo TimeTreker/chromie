@@ -14,7 +14,7 @@ from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.plan import (
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
-    FastPlannerCompleteResponseAct,
+    FastPlannerResponseNeed,
     FastPlannerProgressAct,
 )
 
@@ -47,7 +47,7 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
 
     def test_post_evidence_response_requires_exact_evidence_refs(self) -> None:
         with self.assertRaises(ValidationError):
-            FastPlannerCompleteResponseAct(
+            FastPlannerResponseNeed(
                 activity_id="weather-answer",
                 role="complete_response",
                 text="上午不会下雨。",
@@ -56,18 +56,17 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
                 source_responsibility_refs=["weather"],
             )
 
-    def test_fast_plan_binds_planner_text_into_canonical_activity(self) -> None:
+    def test_fast_plan_binds_word_free_need_to_canonical_goal(self) -> None:
         advance = FastPlannerAdvance(
             turn_id="turn-greeting",
             disposition="respond",
             coverage="complete",
             covered_responsibility_refs=["greeting"],
             activities=[
-                FastPlannerCompleteResponseAct(
+                FastPlannerResponseNeed(
                     activity_id="greeting-response",
                     role="complete_response",
-                    text="你好呀！",
-                    speech_act="greeting",
+                    rationale="An answer is owed for the greeting.",
                     source_responsibility_refs=["greeting"],
                 )
             ],
@@ -94,12 +93,10 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             user_text="你好",
         )
 
-        self.assertEqual(plan.response_text, "你好呀！")
-        self.assertEqual(plan.communicative_acts[0].text, "你好呀！")
-        self.assertEqual(plan.communicative_acts[0].source_goal_ids, ["goal-greeting"])
-        self.assertEqual(
-            plan.metadata["presentation_commit_id"], "commit-greeting"
-        )
+        self.assertEqual(plan.response_text, "")
+        self.assertEqual(plan.communicative_acts, [])
+        self.assertEqual(plan.communication_needs[0].kind, "answer")
+        self.assertEqual(plan.communication_needs[0].source_goal_ids, ["goal-greeting"])
 
     def test_fast_activity_order_projects_after_work_speech_to_final_phase(self) -> None:
         advance = FastPlannerAdvance(
@@ -116,11 +113,10 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
                     timing="sequential",
                     source_responsibility_refs=["nod"],
                 ),
-                FastPlannerCompleteResponseAct(
+                FastPlannerResponseNeed(
                     activity_id="greeting-response",
                     role="complete_response",
-                    text="你好",
-                    speech_act="greeting",
+                    rationale="Greet after the requested nod.",
                     timing="sequential",
                     source_responsibility_refs=["greeting"],
                 ),
@@ -155,8 +151,8 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "mixed")
-        self.assertEqual(plan.communicative_acts[0].delivery_phase, "final")
-        self.assertEqual(plan.communicative_acts[0].source_goal_ids, ["goal-greeting"])
+        self.assertEqual(plan.communication_needs[0].delivery_phase, "final")
+        self.assertEqual(plan.communication_needs[0].source_goal_ids, ["goal-greeting"])
 
     def test_duplicate_semantic_endpoints_are_removed(self) -> None:
         paths = {route.path for route in app.routes}

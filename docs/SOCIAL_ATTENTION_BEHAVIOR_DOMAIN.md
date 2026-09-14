@@ -2,6 +2,15 @@
 
 ## Authority and purpose
 
+The owner-approved Social Cognition amendment transfers optional communication
+expression to Social Cognition's primary decision. It may use exact eligible
+social-domain Capability proposals with its immutable communicative anchor;
+Runtime/Soridormi retain validation and safe realization. This includes trusted
+Situation-driven initiative without GI. No additional decoration model is added.
+The representation below belongs to SC; Work Planner is not an expression author. Explicitly requested gestures remain
+Goal-owned Planner Work. Source and evidence progress are tracked in
+[Status](STATUS.md#social-cognition-migration).
+
 The [Project Charter](PROJECT_CHARTER.md), especially Principles 29, 35, and 37,
 is authoritative. This document defines the maintained optional social-decoration
 contract; it does not introduce another cognitive stage.
@@ -11,35 +20,28 @@ that accompanies a concrete human-observable Main Activity. It is not a separate
 agent, Planner, Goal, execution lane, or post-response model call.
 
 ```text
-new interaction
-  -> Cognitive Gateway
-  -> Goal Interpretation: understand this interaction
-  -> Goal Association: place it in longitudinal Goal continuity
-  -> primary Fast/Deep Planner invocation
-       -> Goal-owned Main Activities / steps[]
-       -> optional auxiliary_activities[]
-  -> Runtime mechanical validation
-       -> exact auxiliary proposal executes, or
-       -> proposal is suppressed locally
+GI / committed Work / trusted Situation / Evidence
+  -> SC primary interaction decision
+       -> exact communicative acts (spoken or nonverbal)
+       -> optional expression anchored to those acts
+  -> Runtime validates exact snapshot, act, target and resource authority
+       -> execute the exact proposal, or suppress optional expression
 ```
 
-The same primary Planner result owns both the Main Activity and any optional
-decoration. This preserves one HOW author: wording, Capability choice, arguments,
-timing, and optional expression are decided together from the same current state.
-There is no maintained `SocialAttentionPlanner`, `SocialAttentionPlan`,
-`/social-attention/plan` endpoint, Social Attention model role, or background
-opportunity/decision worker.
+SC decides wording and optional expression together from the same supplied state.
+No separate decoration reviewer or social-attention model reopens its decision.
+Planner independently owns requested task Work.
 
 ## Primary and auxiliary work
 
 `CanonicalPlan.steps[]` contains Goal-owned executable Work. Every executable step
 belongs to at least one Goal outcome and participates in Goal completion.
 
-`CanonicalPlan.auxiliary_activities[]` contains optional decoration. The field is
+`SocialCommunicativeAct.auxiliary_activities[]` contains optional decoration. The field is
 separate by construction so decoration:
 
 - carries no Goal IDs and cannot satisfy, complete, replace, or authorize a Goal;
-- is included in canonical Plan validation, fingerprinting, and revision identity;
+- is bound to the exact SC request snapshot and immutable act identity;
 - is limited to a bounded set of low-risk, parallel, confirmation-free candidates;
 - is always subordinate to an existing Main Activity anchor; and
 - may disappear without changing the correctness of the Main Activity.
@@ -47,15 +49,13 @@ separate by construction so decoration:
 The same physical Capability can occupy either role. “Blink twice” makes blinking
 Goal-owned primary Work in `steps[]`. A subtle blink accompanying a greeting can be
 an auxiliary activity. Runtime determines neither role from the actuator nor from a
-phrase; the primary Planner authors the role from Responsibility and Goal meaning.
+phrase; Planner owns explicitly requested actions; SC owns optional interaction expression.
 An auxiliary activity must not duplicate a Capability already used by its anchor's
 primary realization.
 
-## Planner input and output
+## SC input and output
 
-The Fast `PresentationCommit` may carry auxiliary items only for its exact early
-Communicative Activity. Its terminal result and canonical Fast/Deep planning receive,
-in the same primary model call when applicable:
+SC receives the following in its primary interaction request:
 
 - the semantic Main Activity or Plan response that may be decorated;
 - current Responsibility, Goal, Work, Evidence, and interaction context;
@@ -126,12 +126,10 @@ only about auxiliary decoration—target drift, invalidation, failure, completio
 new decorative possibility—must never construct a `CognitiveOpportunity`, borrow a
 Goal ID, or re-enter Planner. If the same world change also materially affects real
 Goal-owned Work, that independent Goal-relevant transition may create an ordinary
-bounded opportunity. The re-entered primary Planner then owns any new Plan revision,
-including a fresh optional auxiliary decision.
+bounded opportunity. Planner owns any new task Plan revision. The trusted state may separately inform SC; it does not grant an automatic gesture or repeat an old one.
 
 This boundary deliberately accepts harmless imperfection. A missed blink or stale
-nod ends locally. Fresh semantics are purchased only when the Goal itself warrants
-another Planner invocation.
+nod ends locally. A new SC decision requires relevant trusted interaction state; it cannot manufacture Goal work.
 
 ## Target and repetition evidence
 
@@ -145,7 +143,7 @@ Installation coordinates and calibration are not semantic target evidence.
 Soridormi resolves an accepted semantic target for the active embodiment.
 
 Recent accepted and terminal auxiliary evidence may be projected into a later
-primary Planner call to support restraint and variety. It does not create a global
+SC call to support restraint and variety. It does not create a global
 turn cooldown: distinct Main Activities may independently receive no decoration or
 one compatible decoration. Evidence never proves that a Goal progressed.
 
@@ -153,11 +151,11 @@ one compatible decoration. Evidence never proves that a Goal progressed.
 
 Startup orientation has no interaction anchor and remains Host-owned baseline
 liveliness, not Social Attention. Idle animation is also outside this contract.
-Speech remains a Planner-owned Communicative Activity. Stop, cancel, emergency,
+Speech remains an SC-owned Communicative Activity. Stop, cancel, emergency,
 confirmation, body planning, motion safety, calibration, and recovery retain their
 existing deterministic Host/Soridormi owners.
 
 The executable contract and regression ownership are in
-`shared/chromie_contracts/plan.py`, Planner schema/prompt tests, Runtime adapter
+`shared/chromie_contracts/social_cognition.py`, SC schema/prompt tests, Runtime adapter
 tests, and repository architecture guards. Historical Social Attention qualification
 artifacts are evidence only and do not restore the retired independent writer.

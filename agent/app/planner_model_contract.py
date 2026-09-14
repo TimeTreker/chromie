@@ -12,11 +12,12 @@ try:
         GoalOutcomeDisposition,
         GoalSatisfactionAssessment,
         GoalSatisfactionStatus,
-        AuxiliaryPlanActivity,
         PlanCoverage,
         PlanDisposition,
         PlanParameterResolution,
         PlannedGoalTimeCondition,
+        SocialCommunicationNeed,
+        communication_need_id,
         PlanStepPurpose,
         PlanTiming,
         validate_acquisition_stage_isolation,
@@ -29,11 +30,12 @@ except ImportError:  # pragma: no cover
         GoalOutcomeDisposition,
         GoalSatisfactionAssessment,
         GoalSatisfactionStatus,
-        AuxiliaryPlanActivity,
         PlanCoverage,
         PlanDisposition,
         PlanParameterResolution,
         PlannedGoalTimeCondition,
+        SocialCommunicationNeed,
+        communication_need_id,
         PlanStepPurpose,
         PlanTiming,
         validate_acquisition_stage_isolation,
@@ -130,31 +132,32 @@ class PlannerModelGoalOutcome(BaseModel):
     The enclosing JSON object supplies the goal ID as a unique key.  Keeping
     that ID out of the value prevents a decoder from emitting duplicate or
     conflicting per-goal identifiers while preserving the model's semantic
-    responsibility for disposition, coverage, response text, and step links.
+    responsibility for Work disposition, coverage, input needs, and step links.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     disposition: GoalOutcomeDisposition
     coverage: PlanCoverage
-    response_text: str = ""
     unresolved: list[str] = Field(default_factory=list)
     step_ids: list[str] = Field(default_factory=list)
     satisfaction: PlannerGoalSatisfaction | None = None
     rationale: str = ""
+    precedes_step_ids: list[str] = Field(default_factory=list, max_length=64, description="This communication must finish BEFORE each listed Work step starts.")
+    follows_step_ids: list[str] = Field(default_factory=list, max_length=64, description="This communication waits until AFTER each listed Work step finishes.")
 
     @model_validator(mode="after")
     def validate_outcome_shape(self) -> "PlannerModelGoalOutcome":
+        if self.disposition in {"execute", "escalate"} and (self.precedes_step_ids or self.follows_step_ids):
+            raise ValueError("only communication outcomes may order a communication need")
         if self.disposition == "execute":
             if self.coverage != "complete" or not self.step_ids:
                 raise ValueError("execute goal outcome requires complete coverage and step_ids")
             if self.unresolved:
                 raise ValueError("execute goal outcome must not retain unresolved work")
         elif self.disposition == "respond":
-            if self.coverage != "complete" or not self.response_text.strip():
-                raise ValueError(
-                    "respond goal outcome requires complete coverage and response_text"
-                )
+            if self.coverage != "complete":
+                raise ValueError("respond goal outcome requires complete coverage")
             if self.step_ids:
                 raise ValueError("respond goal outcome must not reference steps")
             if self.unresolved:
@@ -164,8 +167,6 @@ class PlannerModelGoalOutcome(BaseModel):
                 raise ValueError("escalate goal outcome requires partial or uncertain coverage")
             if self.step_ids:
                 raise ValueError("escalate goal outcome must not reference steps")
-            if self.response_text.strip():
-                raise ValueError("escalate goal outcome must not claim a conversational answer")
             if not self.unresolved and not self.rationale.strip():
                 raise ValueError("escalate goal outcome requires an unresolved need or rationale")
         elif self.disposition == "clarify":
@@ -173,10 +174,8 @@ class PlannerModelGoalOutcome(BaseModel):
                 raise ValueError("clarify goal outcome requires partial or uncertain coverage")
             if self.step_ids:
                 raise ValueError("clarify goal outcome must not reference steps")
-            if not self.unresolved and not self.response_text.strip():
-                raise ValueError(
-                    "clarify goal outcome requires an unresolved need or response_text"
-                )
+            if not self.unresolved:
+                raise ValueError("clarify goal outcome requires an unresolved input need")
         elif self.step_ids:
             raise ValueError(
                 "unavailable and refused goal outcomes must not reference steps"
@@ -216,13 +215,8 @@ class PlannerModelOutput(BaseModel):
     coverage: PlanCoverage
     confidence: float = Field(ge=0.0, le=1.0)
     goal_summary: str = ""
-    response_text: str = ""
     steps: list[PlannerModelStep] = Field(default_factory=list)
     cancel_activity_ids: list[str] = Field(default_factory=list, max_length=32)
-    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
-        default_factory=list,
-        max_length=3,
-    )
     escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
@@ -250,38 +244,6 @@ class PlannerModelOutput(BaseModel):
             )
         if self.coverage != "complete" and self.steps:
             raise ValueError("non-complete planner output must not carry executable steps")
-        if self.disposition == "escalate" and self.auxiliary_activities:
-            raise ValueError(
-                "an escalating Planner result cannot author auxiliary Activities"
-            )
-        step_ids = {step.step_id for step in self.steps if step.step_id}
-        primary_capability_ids = {step.capability_id for step in self.steps}
-        auxiliary_ids = [
-            item.auxiliary_activity_id for item in self.auxiliary_activities
-        ]
-        if len(auxiliary_ids) != len(set(auxiliary_ids)):
-            raise ValueError("Planner auxiliary Activity IDs must be unique")
-        for auxiliary in self.auxiliary_activities:
-            if auxiliary.anchor_kind == "plan_step" and auxiliary.anchor_id not in step_ids:
-                raise ValueError(
-                    "Planner auxiliary Activity references an unknown plan step"
-                )
-            if auxiliary.anchor_kind == "communicative_act":
-                raise ValueError(
-                    "flat Planner output has no communicative-act identity; use "
-                    "anchor_kind=plan_response for response_text"
-                )
-            if auxiliary.anchor_kind == "plan_response" and (
-                auxiliary.anchor_id != "response" or not self.response_text.strip()
-            ):
-                raise ValueError(
-                    "plan_response auxiliary Activity requires anchor_id=response "
-                    "and Planner-owned response_text"
-                )
-            if auxiliary.capability_id in primary_capability_ids:
-                raise ValueError(
-                    "an auxiliary Activity cannot duplicate a primary Plan Capability"
-                )
         if self.disposition == "execute" and not self.steps:
             raise ValueError("execute planner output requires at least one step")
         if self.disposition == "mixed":
@@ -297,19 +259,6 @@ class PlannerModelOutput(BaseModel):
                     raise ValueError("mixed output without steps requires response and limitation outcomes")
                 if self.user_confirmation_required or self.plan_relation != "exact":
                     raise ValueError("mixed output without steps cannot authorize or schedule Work")
-        if self.disposition == "respond" and not self.response_text.strip():
-            raise ValueError("respond planner output requires response_text")
-        if self.disposition in {"clarify", "unavailable", "refused"} and not (
-            self.response_text.strip()
-            or any(
-                outcome.response_text.strip()
-                for outcome in self.goal_outcomes.values()
-            )
-        ):
-            raise ValueError(
-                f"{self.disposition} planner output requires exact "
-                "Planner-owned response_text"
-            )
         if self.disposition not in {"execute", "mixed"} and self.steps:
             raise ValueError(f"{self.disposition} planner output must not carry executable steps")
         if self.disposition == "escalate" and not self.escalation_reason.strip():
@@ -333,11 +282,6 @@ class PlannerModelOutput(BaseModel):
                 raise ValueError("safe-adjusted and alternative plans must be executable")
             if not self.user_confirmation_required:
                 raise ValueError("safe-adjusted and alternative plans require user confirmation")
-            if not self.response_text.strip():
-                raise ValueError(
-                    "safe-adjusted and alternative plans require response_text "
-                    "explaining the material change"
-                )
         elif self.user_confirmation_required and self.disposition not in {
             "execute",
             "mixed",
@@ -432,7 +376,7 @@ def materialize_goal_outcomes(
     return [
         {
             "goal_id": goal_id,
-            **output.goal_outcomes[goal_id].model_dump(mode="python"),
+            **output.goal_outcomes[goal_id].model_dump(mode="python", exclude={"precedes_step_ids", "follows_step_ids"}),
         }
         for goal_id in ordered_ids
     ]
@@ -471,6 +415,26 @@ def materialize_planner_output(
     out["plan_id"] = plan_id
     out["planner_tier"] = planner_tier
     out["goal_ids"] = list(expected_goal_ids_for_turn)
+    # The validated disposition establishes WHAT must be communicated, not words.
+    # SC owns fulfillment; an answer need is prospective until actual delivery.
+    needs = []
+    for goal_id, outcome in model_output.goal_outcomes.items():
+        kind = {"respond": "answer", "clarify": "input", "unavailable": "result", "refused": "result"}.get(outcome.disposition)
+        if kind is not None:
+            needs.append(SocialCommunicationNeed(
+                need_id=communication_need_id(plan_id, goal_id), owner="planner", kind=kind,
+                reference_id=plan_id, source_goal_ids=[goal_id],
+                facts=outcome.model_dump(mode="json", exclude_none=True),
+                before_step_ids=list(outcome.precedes_step_ids), after_step_ids=list(outcome.follows_step_ids),
+            ).model_dump(mode="python"))
+    if model_output.user_confirmation_required:
+        executing = [goal_id for goal_id, outcome in model_output.goal_outcomes.items() if outcome.disposition == "execute"]
+        needs.append(SocialCommunicationNeed(
+            need_id=communication_need_id(plan_id, "confirmation"), owner="planner", kind="confirmation",
+            reference_id=plan_id, source_goal_ids=executing, delivery_phase="pre_action",
+            facts={"plan_relation": model_output.plan_relation, "user_confirmation_required": True},
+        ).model_dump(mode="python"))
+    out["communication_needs"] = needs
     expected_goal_set = set(expected_goal_ids_for_turn)
     planned_time_conditions: list[dict[str, Any]] = []
     for index, condition in enumerate(model_output.time_conditions):

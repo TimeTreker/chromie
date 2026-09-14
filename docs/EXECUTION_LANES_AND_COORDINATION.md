@@ -2,6 +2,14 @@
 
 ## Status
 
+The [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+changes ordinary communication ownership, not the two execution lanes or their
+resource/safety authority. Source still carries Planner-authored speech and
+auxiliary anchors as described below. Migration must preserve immutable
+communicative anchors, Planner-owned requested task actions and fail-soft
+SC-owned social expression without a decoration-only model call; see the
+[migration inventory](COGNITIVE_TURN_LOOP.md#source-migration-inventory).
+
 The [Project Charter](PROJECT_CHARTER.md) expanded primary diagram is the
 authoritative main workflow. This document elaborates only the `realization`
 branches beneath semantic Primary Activities; the lane topology below is not a

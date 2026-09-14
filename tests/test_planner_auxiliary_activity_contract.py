@@ -9,19 +9,16 @@ from agent.app.planner_context import (
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
 )
-from agent.app.planner_prompt import auxiliary_social_planning_prompt_section
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
-    fast_presentation_commit_response_schema,
 )
 from orchestrator.runtime.capability_runtime import CapabilityDefinition
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
 from shared.chromie_contracts.plan import (
     AuxiliaryPlanActivity,
     CanonicalPlan,
     GoalSatisfactionAssessment,
-    PresentationCommit,
     canonical_plan_fingerprint,
 )
 
@@ -137,45 +134,36 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "existing primary Plan Activity"):
             CanonicalPlan.model_validate(payload)
 
-    def test_presentation_commit_schema_owns_early_auxiliary_surface(self) -> None:
-        schema = fast_presentation_commit_response_schema(
-            ["r1"],
-            auxiliary_social_capabilities=[],
-        )
-        self.assertIn("auxiliary_activities", schema.get("properties", {}))
-        progress = schema["$defs"]["FastPlannerProgressAct"]
-        self.assertIn("activity_id", progress["properties"])
-        self.assertIn("activity_id", progress["required"])
-        self.assertIn("anchor_id", schema["$defs"]["AuxiliaryPlanActivity"]["properties"])
+    def test_work_schema_has_no_auxiliary_writer(self):
+        schema = canonical_plan_response_schema(planner_tier="deep", expected_goal_ids=[], allowed_capability_ids=[])
+        self.assertNotIn("auxiliary_activities", schema["properties"])
 
-    def test_canonical_schema_binds_auxiliary_capability_and_args(self) -> None:
+    def test_social_schema_binds_auxiliary_capability_and_args(self) -> None:
+        from agent.app.social_cognition import social_cognition_response_schema
+        from shared.chromie_contracts.social_cognition import SocialCognitionRequest
         candidate = {
             "capability_id": "soridormi.blink_eyes",
             "input_schema": {
                 "type": "object",
                 "properties": {"count": {"type": "integer", "minimum": 1}},
-                "required": ["count"],
-                "additionalProperties": False,
+                "required": ["count"], "additionalProperties": False,
             },
         }
-        schema = canonical_plan_response_schema(
-            planner_tier="deep",
-            expected_goal_ids=["goal-1"],
-            allowed_capability_ids=["chromie.weather.lookup"],
-            auxiliary_social_capabilities=[candidate],
-            response_only=True,
+        schema = social_cognition_response_schema(
+            SocialCognitionRequest(request_id="sc-test", trigger="goal_state", source_refs=["goal-1"]),
+            [candidate],
         )
         definition = schema["$defs"]["AuxiliaryPlanActivity"]
-        self.assertEqual(
-            definition["properties"]["capability_id"]["enum"],
-            ["soridormi.blink_eyes"],
-        )
-        branch = definition["oneOf"][0]
-        self.assertEqual(
-            branch["properties"]["capability_id"]["enum"],
-            ["soridormi.blink_eyes"],
-        )
-        self.assertEqual(branch["properties"]["args"], candidate["input_schema"])
+        import jsonschema
+        proposal = {"auxiliary_activity_id": "gesture", "anchor_kind": "communicative_act",
+                    "anchor_id": "greeting", "capability_id": candidate["capability_id"],
+                    "args": {"count": 1}, "social_function": "engagement",
+                    "reason_summary": "A coherent greeting expression."}
+        jsonschema.validate(proposal, definition)
+        for change in ({"args": {"count": 0}}, {"capability_id": "unknown"}):
+            with self.subTest(change=change), self.assertRaises(jsonschema.ValidationError):
+                jsonschema.validate({**proposal, **change}, definition)
+
 
     def test_catalog_filter_is_mechanical_and_prompt_names_planner_owner(self) -> None:
         eligible = CapabilityMatch(
@@ -203,25 +191,21 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
             ["soridormi.blink_eyes"],
         )
         context = auxiliary_social_prompt_context({}, candidates)
-        prompt = auxiliary_social_planning_prompt_section(
-            {"planner_auxiliary_social_context": context}
-        )
-        self.assertIn("same primary Planner result", prompt)
-        self.assertIn("never satisfy", prompt)
-        self.assertNotIn("background Social Attention planner", prompt)
+        self.assertEqual(context["eligible_capabilities"][0]["capability_id"], "soridormi.blink_eyes")
+        self.assertEqual(context["max_activities"], 3)
 
     def test_runtime_executes_exact_proposal_without_goal_authority(self) -> None:
         runtime = _Runtime([_definition()])
         adapter = CanonicalPlanRuntimeAdapter(runtime)
-        plan = _plan()
         outcome = asyncio.run(
             adapter.execute_auxiliary_activities(
-                plan=plan,
+                social_cognition=_decision(),
                 session_id="session-1",
                 turn_id="turn-1",
                 interaction=InteractionResponse(
                     interaction_id="primary",
                     status="ok",
+                    speech=[InteractionSpeech(id="primary-speech", text="Hello!", metadata={"communicative_activity_ids": ["greeting"]})],
                 ),
                 context={},
             )
@@ -237,59 +221,25 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
             runtime.executed[0][0].metadata["cognitive_reentry_eligible"]
         )
 
-    def test_runtime_executes_commit_decoration_after_primary_launch(self) -> None:
+    def test_runtime_suppresses_expression_without_primary_launch(self):
         runtime = _Runtime([_definition()])
-        commit = PresentationCommit(
-            commit_id="presentation-social",
-            turn_id="turn-social",
-            activity={
-                "activity_id": "greeting",
-                "role": "complete_response",
-                "text": "你好！",
-                "source_responsibility_refs": ["r1"],
-            },
-            auxiliary_activities=[
-                AuxiliaryPlanActivity(
-                    auxiliary_activity_id="aux-blink",
-                    anchor_kind="communicative_act",
-                    anchor_id="greeting",
-                    capability_id="soridormi.blink_eyes",
-                    args={"count": 1},
-                    social_function="engagement",
-                )
-            ],
-        )
-        outcome = asyncio.run(
-            CanonicalPlanRuntimeAdapter(runtime).execute_auxiliary_activities(
-                presentation_commit=commit,
-                session_id="session-1",
-                turn_id="turn-social",
-                interaction=InteractionResponse(
-                    interaction_id="primary",
-                    status="ok",
-                ),
-                context={},
-            )
-        )
-
-        self.assertEqual(outcome["materialized_count"], 1)
-        request = runtime.executed[0][0].capabilities[0]
-        self.assertEqual(
-            request.metadata["presentation_commit_id"], "presentation-social"
-        )
-        self.assertNotIn("canonical_plan_id", request.metadata)
-        self.assertEqual(request.metadata["source_goal_ids"], [])
+        outcome = asyncio.run(CanonicalPlanRuntimeAdapter(runtime).execute_auxiliary_activities(
+            social_cognition=_decision(), session_id="session-1", turn_id="turn-social",
+            interaction=None, context={}))
+        self.assertEqual(outcome["materialized_count"], 0)
+        self.assertEqual(runtime.executed, [])
 
     def test_runtime_drops_non_social_capability_instead_of_reselecting(self) -> None:
         runtime = _Runtime([_definition(domains=["locomotion"])])
         outcome = asyncio.run(
             CanonicalPlanRuntimeAdapter(runtime).execute_auxiliary_activities(
-                plan=_plan(),
+                social_cognition=_decision(),
                 session_id="session-1",
                 turn_id="turn-1",
                 interaction=InteractionResponse(
                     interaction_id="primary",
                     status="ok",
+                    speech=[InteractionSpeech(id="primary-speech", text="Hello!", metadata={"communicative_activity_ids": ["greeting"]})],
                 ),
                 context={},
             )
@@ -301,3 +251,14 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _decision():
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+    return SocialCognitionResolution(request_id="sc-expression", snapshot_digest="a" * 64,
+        disposition="communicate", reason_summary="Greet with an expression.", model_call_count=1,
+        activities=[{"activity_id": "greeting", "text": "Hello!", "function": "acknowledge",
+            "truth_stage": "context_grounded", "auxiliary_activities": [{
+                "auxiliary_activity_id": "blink", "anchor_kind": "communicative_act",
+                "anchor_id": "greeting", "capability_id": "soridormi.blink_eyes", "args": {"count": 1},
+                "social_function": "engagement"}]}])

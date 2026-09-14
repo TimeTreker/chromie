@@ -15,7 +15,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from types import MethodType
+from types import MethodType, SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -68,11 +68,11 @@ from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
+    FastPlannerResponseNeed,
     FastPlannerClarificationAct,
     FastPlannerCompleteResponseAct,
     FastPlannerProgressAct,
     FastPlannerStreamTerminal,
-    PresentationCommit,
 )
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
@@ -190,6 +190,7 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
 
 class _CognitiveScenarioRuntime:
     def __init__(self, capabilities: list[dict[str, Any]]) -> None:
+        self.scheduled_social_responses: list[InteractionResponse] = []
         self.definitions: dict[str, CapabilityDefinition] = {}
         for item in capabilities:
             capability_id = str(
@@ -236,6 +237,17 @@ class _CognitiveScenarioRuntime:
         for definition in self.definitions.values():
             registry.register(definition)
         self.runtime = CapabilityRuntime(registry)
+
+    async def submit_response(self, response: InteractionResponse, **kwargs: Any) -> InteractionResponse:
+        self.scheduled_social_responses.append(response)
+        return response
+
+    async def wait_dispatch(self, dispatch: InteractionResponse) -> Any:
+        return SimpleNamespace(results=[])
+
+    async def record_social_delivery(self, *args: Any, **kwargs: Any) -> None:
+        # This Level A owner records no playback receipt or heard dialogue.
+        return None
 
     async def prepare_fast_planner_capability_activities(self, activities: list[Any], *, turn_id: str) -> list[Any]:
         await self.runtime.prepare_planner_work(turn_id, [item.model_dump(mode="json") for item in activities])
@@ -563,8 +575,6 @@ class _CognitiveScenarioClient:
     def _streamed_fast_fixture(
         self,
         request: Any,
-        *,
-        presentation_commit_id: str,
     ) -> FastPlannerAdvance:
         """Project the retained canonical fixture onto the one-call Fast stream."""
 
@@ -617,106 +627,14 @@ class _CognitiveScenarioClient:
                     reason_summary=step.reason_summary,
                 )
             )
-        for act in plan.communicative_acts:
-            source_refs = list(act.source_responsibility_refs) or refs_for_goal_ids(
-                list(act.source_goal_ids)
-            )
-            if act.role == "complete_response":
-                source_goal_ids = list(act.source_goal_ids)
-                executes_goal = any(
-                    outcome.goal_id in source_goal_ids
-                    and outcome.disposition == "execute"
-                    for outcome in plan.goal_outcomes
-                )
-                if executes_goal:
-                    # Legacy canonical fixtures used complete_response wording for
-                    # pre-action acknowledgement.  In the streamed contract that
-                    # speech is prospective progress because the effect is not yet
-                    # complete.
-                    activities.append(
-                        FastPlannerProgressAct(
-                            activity_id=act.activity_id,
-                            role="progress",
-                            text=act.text,
-                            timing=act.timing,
-                            progress_kind="perform_action",
-                            source_responsibility_refs=source_refs,
-                        )
-                    )
-                else:
-                    activities.append(
-                        FastPlannerCompleteResponseAct(
-                            activity_id=act.activity_id,
-                            role="complete_response",
-                            text=act.text,
-                            timing=act.timing,
-                            speech_act=act.speech_act,
-                            source_responsibility_refs=source_refs,
-                            truth_stage=act.truth_stage,
-                            evidence_refs=list(act.evidence_refs),
-                        )
-                    )
-            elif act.role == "clarification":
-                activities.append(
-                    FastPlannerClarificationAct(
-                        activity_id=act.activity_id,
-                        role="clarification",
-                        text=act.text,
-                        timing=act.timing,
-                        speech_act="ask_clarification",
-                        source_responsibility_refs=source_refs,
-                        truth_stage="context_grounded",
-                        information_gaps=list(act.information_gaps),
-                    )
-                )
-            elif act.role == "progress":
-                activities.append(
-                    FastPlannerProgressAct(
-                        activity_id=act.activity_id,
-                        role="progress",
-                        text=act.text,
-                        timing=act.timing,
-                        progress_kind=act.progress_kind or "think",
-                        source_responsibility_refs=source_refs,
-                    )
-                )
-
-        for outcome in plan.goal_outcomes:
-            if outcome.disposition != "respond" or not outcome.response_text:
-                continue
-            source_refs = refs_for_goal_ids([outcome.goal_id])
-            if any(
-                activity.role == "complete_response"
-                and set(activity.source_responsibility_refs).intersection(source_refs)
-                for activity in activities
-            ):
-                continue
-            activities.append(
-                FastPlannerCompleteResponseAct(
-                    activity_id=f"fixture-response-{outcome.goal_id}",
-                    role="complete_response",
-                    text=outcome.response_text,
-                    speech_act="respond",
-                    source_responsibility_refs=source_refs,
-                    truth_stage="context_grounded",
-                )
-            )
-
-        if (
-            plan.response_text
-            and plan.disposition in {"respond", "mixed"}
-            and not any(item.role == "complete_response" for item in activities)
-        ):
-            activities.append(
-                FastPlannerCompleteResponseAct(
-                    activity_id="fixture-complete-response",
-                    role="complete_response",
-                    text=plan.response_text,
-                    speech_act="respond",
-                    source_responsibility_refs=list(all_refs),
-                    truth_stage="context_grounded",
-                )
-            )
+        for need in plan.communication_needs:
+            if need.kind != "answer":
+                raise ValueError("A streamed input fixture requires an explicit qualified information gap.")
+            activities.append(FastPlannerResponseNeed(
+                activity_id=need.need_id, role="complete_response", timing="parallel",
+                source_responsibility_refs=refs_for_goal_ids(list(need.source_goal_ids)),
+                rationale="The explicit scenario Work fixture establishes this answer obligation.",
+            ))
 
         return FastPlannerAdvance(
             turn_id=str(request.sid),
@@ -735,29 +653,35 @@ class _CognitiveScenarioClient:
                 or plan.goal_summary
                 or "Retained scenario Fast decision."
             ),
-            metadata={"presentation_commit_id": presentation_commit_id},
+            metadata={"semantic_authority": "level_a_work_fixture"},
         )
 
     async def stream_fast_advance(self, *args: Any, **kwargs: Any):
-        del args
         self.calls.append("fast_stream")
         request = kwargs["request"]
-        commit = PresentationCommit(
-            commit_id=f"fixture-presentation-{request.sid}",
-            turn_id=str(request.sid),
-            activity=None,
-            metadata={"semantic_authority": "level_a_fixture"},
-        )
-        yield commit
-        advance = self._streamed_fast_fixture(
-            request,
-            presentation_commit_id=commit.commit_id,
-        )
-        yield FastPlannerStreamTerminal(
-            turn_id=str(request.sid),
-            presentation_commit_id=commit.commit_id,
-            advance=advance,
-        )
+        yield FastPlannerStreamTerminal(turn_id=str(request.sid), advance=self._streamed_fast_fixture(request))
+
+    async def resolve_social_cognition(self, session: Any, *, request: Any, **kwargs: Any) -> Any:
+        from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+        if request.trigger == "interpretation":
+            return SocialCognitionResolution(request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                disposition="silence", activities=[], reason_summary="No optional acknowledgement in this fixture.", model_call_count=1)
+        tier = request.context["canonical_plan_resolution"]["planner_tier"]
+        fixture = self.stub["social_cognition"][tier]
+        acts = json.loads(json.dumps(fixture["activities"]))
+        covered = set()
+        for act in acts:
+            needs = [need for need in request.communication_needs if set(need.source_goal_ids).intersection(act["source_goal_ids"])]
+            act["addressed_need_ids"] = [need.need_id for need in needs]
+            act["source_responsibility_refs"] = list(dict.fromkeys(ref for need in needs for ref in need.source_responsibility_refs))
+            covered.update(act["addressed_need_ids"])
+            if any(need.kind == "confirmation" for need in needs):
+                act["function"] = "ask"
+                act["delivery_phase"] = "pre_action"
+        return SocialCognitionResolution(request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+            disposition="communicate" if acts else "silence", activities=acts,
+            need_outcomes={need.need_id: "covered" if need.need_id in covered else "pending" for need in request.communication_needs},
+            reason_summary=fixture["reason_summary"], model_call_count=1)
 
     async def resolve_fast_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
         del args, kwargs
@@ -1476,6 +1400,8 @@ async def evaluate_cognitive_runtime_scenario(
         language=envelope.normalized_input.language,
         turn_envelope=envelope,
     )
+    if coordinator._auxiliary_execution_tasks:
+        await asyncio.gather(*tuple(coordinator._auxiliary_execution_tasks), return_exceptions=False)
     terminal = resolution.terminal_plan
     interaction = resolution.interaction_response
     goal_outcomes = (
@@ -1491,11 +1417,12 @@ async def evaluate_cognitive_runtime_scenario(
         if terminal is not None
         else []
     )
-    speech_items = list(interaction.speech) if interaction else []
+    speech_items = [*(interaction.speech if interaction else []),
+                    *(speech for response in runtime.scheduled_social_responses for speech in response.speech)]
     speech_covers_goal_ids: list[str] = []
     for item in speech_items:
         metadata = item.metadata if isinstance(item.metadata, dict) else {}
-        for goal_id in metadata.get("covers_goal_ids") or []:
+        for goal_id in metadata.get("covers_goal_ids") or metadata.get("source_goal_ids") or []:
             goal_id = str(goal_id)
             if goal_id and goal_id not in speech_covers_goal_ids:
                 speech_covers_goal_ids.append(goal_id)

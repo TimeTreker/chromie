@@ -34,6 +34,34 @@ from shared.chromie_contracts.tool_result import (
 )
 
 
+def _work_result(plan):
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    data = plan.model_dump(mode="json")
+    data["response_text"] = ""
+    data["communication_needs"] = [SocialCommunicationNeed(
+        need_id="answer:" + goal_id, owner="planner", kind="answer",
+        reference_id=plan.plan_id, source_goal_ids=[goal_id],
+        facts={"rationale": "Re-entry Work requests communication of retained evidence."},
+    ).model_dump(mode="json") for goal_id in plan.goal_ids]
+    for outcome in data["goal_outcomes"]:
+        outcome["response_text"] = ""
+    return CanonicalPlan.model_validate(data)
+
+
+async def _social_result(request, plan):
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+    return SocialCognitionResolution(
+        request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+        disposition="communicate", model_call_count=1,
+        reason_summary="Independent SC fixture communicates the retained evidence.",
+        need_outcomes={need.need_id: "covered" for need in request.communication_needs},
+        activities=[{"activity_id": "sc-answer", "text": plan.response_text,
+            "function": "respond", "truth_stage": "context_grounded",
+            "source_goal_ids": plan.goal_ids, "evidence_refs": request.evidence_refs,
+            "addressed_need_ids": [need.need_id for need in request.communication_needs]}],
+    )
+
+
 async def _planner_evidence_reentry(
     assistant: VoiceAssistant,
     *,
@@ -188,15 +216,17 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                return await _social_result(request, replanned)
             request = None
 
             async def resolve_fast_plan(self, _session, *, request, timeout_ms):
                 self.request = request
-                return replanned
+                return _work_result(replanned)
 
         class Adapter(CanonicalPlanRuntimeAdapter):
             context = None
-            async def build_planner_owned_response(self, **_kwargs):
+            async def build_social_cognition_response(self, **_kwargs):
                 self.context = _kwargs.get("context")
                 return InteractionResponse(
                     interaction_id="answer",
@@ -399,14 +429,16 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                return await _social_result(request, replanned)
             request = None
 
             async def resolve_fast_plan(self, _session, *, request, timeout_ms):
                 self.request = request
-                return replanned
+                return _work_result(replanned)
 
         class Adapter(CanonicalPlanRuntimeAdapter):
-            async def build_planner_owned_response(self, **_kwargs):
+            async def build_social_cognition_response(self, **_kwargs):
                 return InteractionResponse(
                     interaction_id="reminder-due",
                     status="ok",
@@ -512,6 +544,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                return await _social_result(request, replanned)
             fast_calls = 0
             deep_calls = 0
 
@@ -522,10 +556,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             async def resolve_deep_plan(self, _session, *, request, timeout_ms):
                 self.deep_calls += 1
                 self.request = request
-                return replanned
+                return _work_result(replanned)
 
         class Adapter(CanonicalPlanRuntimeAdapter):
-            async def build_planner_owned_response(self, **_kwargs):
+            async def build_social_cognition_response(self, **_kwargs):
                 return InteractionResponse(
                     interaction_id="recover-deep",
                     status="ok",
@@ -852,6 +886,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                return await _social_result(request, replanned)
             called = False
 
             async def resolve_fast_plan(self, _session, *, request, timeout_ms):
@@ -911,8 +947,8 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class PlannerSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
-    async def test_host_preserves_planner_delta_after_successful_body_and_sibling_speech(self):
+class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_host_preserves_sc_delta_after_successful_body_and_sibling_speech(self):
         from orchestrator.runtime.interaction_ledger import InteractionLedger
         for wording in ("I blinked twice.", "Correction: that earlier answer was incomplete.", "A joke."):
             with self.subTest(wording=wording):
@@ -926,12 +962,14 @@ class PlannerSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                     confidence=1.0, goal_ids=[goal_id], response_text=wording,
                     goal_outcomes=[RespondGoalPlanOutcome(goal_id=goal_id, disposition="respond", coverage="complete", response_text=wording)])
                 class Client:
+                    async def resolve_social_cognition(self, session, *, request, **kwargs):
+                        return await _social_result(request, replanned)
                     request = None
                     async def resolve_fast_plan(self, _session, *, request, timeout_ms):
                         self.request = request
-                        return replanned
+                        return _work_result(replanned)
                 class Adapter(CanonicalPlanRuntimeAdapter):
-                    async def build_planner_owned_response(self, **kwargs):
+                    async def build_social_cognition_response(self, **kwargs):
                         return InteractionResponse(interaction_id="body-result", speech=[InteractionSpeech(text=wording,
                             metadata={"communicative_activity_ids": ["activity-new"], "turn_id": "turn"})])
                 assistant = VoiceAssistant.__new__(VoiceAssistant)

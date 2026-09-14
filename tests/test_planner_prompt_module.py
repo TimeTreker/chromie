@@ -93,8 +93,8 @@ def test_fast_prompt_keeps_supportive_speech_grounded() -> None:
 
     prompt = planner_prompt.fast_plan_prompt(request, [], response_schema={})
 
-    assert "must not state or imply an unprovided user history" in prompt
-    assert "express support without inventing familiarity or evidence" in prompt
+    assert "SC will compose the actual words" in prompt
+    assert "supplied context/Evidence" in prompt
 
 
 
@@ -149,8 +149,6 @@ def test_all_retained_goal_meanings_survive_or_prompt_rejects(variant, language,
     else:
         prompt = _render_required(request, variant)
         label = "FINAL CANONICAL GOALS JSON"
-        if variant.startswith("deep"):
-            label += " (copy goal IDs exactly and satisfy these meanings only)"
         actual, _ = json.JSONDecoder().raw_decode(prompt.split(label + ":\n")[-1])
         assert actual == expected
         assert len(actual) == 8

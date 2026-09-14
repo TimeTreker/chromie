@@ -144,7 +144,6 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "step_ids": [
                         "blink"
                     ],
@@ -206,7 +205,6 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "goal-walk": {
                     "disposition": "clarify",
                     "coverage": "partial",
-                    "response_text": "你希望我往前走多久？",
                     "step_ids": [],
                     "unresolved": [
                         "walking duration"
@@ -226,7 +224,6 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             "confidence": 0.9,
             "goal_ids": ["goal-walk"],
             "goal_summary": "walk forward",
-            "response_text": "你希望我往前走多久？",
             "steps": [],
             "unresolved": ["walking duration"],
             "parameter_resolutions": [
@@ -261,7 +258,6 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "step_ids": [
                         "blink"
                     ],
@@ -299,7 +295,6 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "step_ids": [
                         "blink"
                     ],
@@ -346,19 +341,21 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
         plan = CanonicalPlan.model_validate(
             {
                 "plan_id": "plan-failed-result",
+                "communication_needs": [{"need_id": "failed-weather", "owner": "planner",
+                    "kind": "answer", "reference_id": "plan-failed-result",
+                    "source_goal_ids": ["goal-weather"],
+                    "facts": {"execution_status": "failed"}}],
                 "planner_tier": "deep",
                 "disposition": "respond",
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_ids": ["goal-weather"],
-                "response_text": "The weather lookup failed, so I have no result.",
                 "steps": [],
                 "goal_outcomes": [
                     {
                         "goal_id": "goal-weather",
                         "disposition": "respond",
                         "coverage": "complete",
-                        "response_text": "The weather lookup failed, so I have no result.",
                         "step_ids": [],
                         "satisfaction": {
                             "score": 0.0,
@@ -425,8 +422,8 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )
-        self.assertIn("low-consequence", ollama.prompts[0])
-        self.assertIn("goal_satisfaction", ollama.prompts[0])
+        self.assertIn("Satisfaction measures prospective Goal fulfillment", ollama.prompts[0])
+        self.assertIn("minimum_goal_satisfaction", ollama.prompts[0])
 
 
 if __name__ == "__main__":

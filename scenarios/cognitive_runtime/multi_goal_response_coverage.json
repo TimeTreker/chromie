@@ -45,19 +45,16 @@
         "goal-calendar"
       ],
       "goal_summary": "Answer both information goals.",
-      "response_text": "",
       "goal_outcomes": [
         {
           "goal_id": "goal-weather",
           "disposition": "respond",
-          "coverage": "complete",
-          "response_text": "今天有雨。"
+          "coverage": "complete"
         },
         {
           "goal_id": "goal-calendar",
           "disposition": "respond",
-          "coverage": "complete",
-          "response_text": "下午三点有会议。"
+          "coverage": "complete"
         }
       ],
       "goal_satisfaction": {
@@ -68,22 +65,63 @@
           "goal-calendar"
         ]
       },
-      "communicative_acts": [
+      "communication_needs": [
         {
-          "activity_id": "scenario-final",
-          "text": "今天有雨，下午三点有会议。",
-          "role": "complete_response",
-          "timing": "parallel",
-          "speech_act": "inform",
+          "need_id": "need:0b1132551019b56afc51dad3c42426e4074890db9268b93ee3a711cf0b622666",
+          "owner": "planner",
+          "kind": "answer",
           "source_goal_ids": [
-            "goal-weather",
+            "goal-weather"
+          ],
+          "source_responsibility_refs": [],
+          "reference_id": "plan-multi",
+          "facts": {
+            "disposition": "respond",
+            "unresolved": []
+          },
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
+        },
+        {
+          "need_id": "need:fae4f47e2b7f4b7658c24565270032fea05f69a0a444af5fe43007da203a43a3",
+          "owner": "planner",
+          "kind": "answer",
+          "source_goal_ids": [
             "goal-calendar"
           ],
-          "truth_stage": "context_grounded",
-          "evidence_refs": [],
-          "information_gaps": []
+          "source_responsibility_refs": [],
+          "reference_id": "plan-multi",
+          "facts": {
+            "disposition": "respond",
+            "unresolved": []
+          },
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
         }
       ]
+    },
+    "social_cognition": {
+      "fast": {
+        "activities": [
+          {
+            "activity_id": "scenario-final",
+            "text": "今天有雨，下午三点有会议。",
+            "function": "respond",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-weather",
+              "goal-calendar"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
     }
   },
   "expect": {

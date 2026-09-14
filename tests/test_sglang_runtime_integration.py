@@ -76,7 +76,7 @@ class SGLangProtocolTests(unittest.TestCase):
             "allOf": [{"properties": {"text": {"minLength": 1}}}],
         }
         original = copy.deepcopy(schema)
-        declared = {"title": "FastPlannerStreamingAdvanceOutput", **schema}
+        declared = {"title": "FastPlannerWorkAdvanceOutput", **schema}
         payload = build_sglang_chat_payload(
             model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
             options={}, response_format=declared, stream=True, priority_step=100,

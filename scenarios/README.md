@@ -22,13 +22,13 @@ python scripts/general_ability_acceptance.py --mode level-a
 criteria-based removal schedule in the Benchmark migration manifest. Neither it
 nor a Level A pass alone proves natural live robot behavior.
 
-Eligible planning/embodied pending-work regressions assert the typed Fast Planner
-progress Communicative Activity in `cognitive_runtime.fast_advance`. Live-text
-cases can set `require_fast_communicative_act=true` together with
-`expected_fast_communicative_speech_acts`, or set
-`forbid_fast_communicative_act=true` when pre-effect speech is not allowed.
-These assertions inspect Planner-owned semantic activity evidence rather than a
-separate Goal-Interpreter speech contract.
+Interaction regressions inspect SC results retained in the response metadata and
+session workflow stages. Cases can require `require_social_communicative_act` with
+`expected_social_communicative_functions`, or forbid interaction with
+`forbid_social_communicative_act`. Work needs never count as utterances. Detached
+speech counts as delivered only through correlated completed playback records.
+Latency bounds use `max_warm_sc_decision_ms` and
+`max_warm_sc_to_playback_start_ms`; SC computation and delivery remain separate.
 
 Create and validate scenarios with:
 

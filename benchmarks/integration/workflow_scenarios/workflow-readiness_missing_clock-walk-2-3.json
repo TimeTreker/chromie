@@ -487,5 +487,6 @@
   ],
   "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
   "probe": "readiness_missing_clock",
-  "expected_rejection": "gi"
+  "expected_rejection": "gi",
+  "social_cognition": {}
 }

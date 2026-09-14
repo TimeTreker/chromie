@@ -43,9 +43,10 @@
   },
   "text": "查一下重庆今晚热不热。",
   "language": "zh-CN",
-  "require_fast_communicative_act": true,
-  "expected_fast_communicative_speech_acts": [
-    "acknowledge_and_check"
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": [
+    "acknowledge",
+    "inform"
   ],
   "require_fast_planner_evidence_reentry": true,
   "min_new_goal_count": 1,

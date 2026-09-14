@@ -1,5 +1,29 @@
 # Goal-Driven Cognitive Architecture
 
+## Accepted communication authority
+
+The [Social Cognition amendment](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+defines the authority for ordinary communication. Interaction is a primary
+cognitive responsibility with independent value, including substantive discussion
+when no action task exists. GI owns WHAT, GA owns canonical continuity, Social
+Cognition owns whether/when/how to communicate, and Planner owns Work HOW.
+All use the same existing Mind, Memory, Situation, Goal, Work and Interaction
+truth; a separate inference task creates no separate personality or truth store.
+
+The runtime admits independently ready GA, communication and planning tasks from
+one complete GI result. New trusted state may reactivate the appropriate owner;
+it does not require every event to run every role. Optional acknowledgement
+cannot gate Work, and communication cannot authorize or claim unobserved effects.
+One primary result per distinct authority remains required; neither role is a
+reviewer or repairer of the other. See the
+[target lifecycle and source inventory](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle).
+
+**Implementation boundary:** SC now owns the shared interaction transaction for
+ordinary turns, required communication and trusted Situation wakes. Planner model
+outputs are word-free Work decisions. The [status record](STATUS.md#social-cognition-migration)
+owns validation and deployment claims; source integration alone does not prove
+native-model reliability, latency or physical behavior.
+
 ## Provider-neutral resource acquisition and delivery
 
 Physical fetching and external-information retrieval share one semantic responsibility: acquire a requested resource and make it available to the recipient. `SemanticGoal.resource_responsibility` carries this provider-neutral meaning. Goal Association never names Soridormi, a website, or another provider; the Planner selects an exact registered capability from declared semantic scope, and the Trusted Capability Runtime invokes the owning peer Provider. See [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md).
@@ -19,19 +43,17 @@ confidence/unresolved meaning. No route/intent compatibility projection exists o
 maintained Core handoff. Retained source-bound live-text and MuJoCo evidence remains open.
 
 
-## One Core, two execution lanes, and Planner-owned social decoration
+## One Core, two execution lanes, and SC-owned social expression
 
 The Goal-Driven Cognitive Core remains the single semantic authority. The
 maintained runtime has two execution lanes: **Vocal** and **Activity**. Social
 Attention is not a third lane or another cognitive stage. It is a behavior domain
-from which the primary Planner may add small optional embodied decoration around
-an already-authored Main Activity.
+from which SC may choose optional embodied expression around its communicative act.
 Accepted decoration executes through Activity with explicit auxiliary metadata
 and no Goal-completion authority.
 
 Planner may author explicit best-effort lane coordination only between Vocal
-and Activity around parallel Canonical Plan work. The same Planner primary result
-owns optional `auxiliary_activities[]`; no separate social model reopens the Plan.
+and Activity around parallel Canonical Plan work. SC owns optional `auxiliary_activities[]` in its primary interaction result; it never reopens the Work Plan.
 Social Attention never appears in `LaneCoordinationGroup`,
 never authors response text, and never owns a user Responsibility. Provider metadata and the Trusted Capability Runtime remain
 authoritative for physical overlap. Soridormi is a peer Capability Provider
@@ -236,7 +258,7 @@ externalized current judgment, not proof that cognition has terminated.
 The continuation is not another semantic manager. It owns no durable belief state, Goal,
 Work mutation, Evidence, or independent wording channel. It consumes the same
 Responsibility, Situation, Memory, Evidence, and Interaction Ledger projections as the
-Cognitive Core and returns through the same Planner-owned Communicative-Activity authority.
+Cognitive Core and returns through the same SC-owned Communicative-Activity authority.
 Implementation should reuse common model-transaction, grounding, and validation mechanics
 rather than clone a parallel agent stack. A communication-only Planner pass has no
 Capability/Work authority. Capability planning
@@ -348,35 +370,29 @@ Planner implementation may separate prompt/projection mechanics without creating
 
 The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep mechanical-repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. Fast/Deep Resolvers retain the primary model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
 
-### Planner owns how Chromie says established meaning
+### SC owns how Chromie communicates established meaning
 
-Planner owns every complete Communicative Activity: function, exact natural
-wording, timing, truth stage, Goal/Responsibility provenance, Evidence
-references, and constraints. Goal Interpretation owns Responsibility meaning
-and does not author speech. Goal Association and Runtime may bind or exactly
-reuse an activity but may not rewrite it. The Host mechanically validates
-schema, truth/provenance, cancellation generation, and delivery bookkeeping; it
-does not invoke a second response author.
+SC owns complete Communicative Activities: whether to communicate, exact words,
+function, timing, truth stage, source/Evidence references and optional expression.
+GI owns Responsibility meaning; Planner owns task Work and established answer,
+input, confirmation and result Needs. Neither produces utterances for SC to polish.
+The Host joins an SC decision against the exact immutable Plan and input snapshot.
+It validates identity, freshness, consent and delivery without rewriting meaning.
 
-Goal coverage such as `covers_goal_ids` remains a read-only Host projection from
-the immutable Canonical Plan, per-Goal outcomes, and exact reused-speech
-provenance. Speech never authorizes or proves a physical/provider effect. If a
-Communicative Activity violates trusted truth or provenance, reject it or use an
-already contract-defined deterministic fail-safe; do not repair semantics
-through a composer or reviewer chain.
+Actual speech delivery can complete only a covered answer Need for a responding
+Goal. Progress, silence, scheduling and optional expression cannot complete an
+executable Goal or prove an external effect.
 
 ### Terminal Capability Evidence re-enters Planner through Fast first
 
 Trusted Runtime publishes a correlated terminal event. The Host validates the
 immutable request/result join and schema, binds bounded Evidence only to the
 request's exact canonical Goal IDs, updates Goal/task state, and reactivates
-Fast Planner first. Planner selects relevant facts and decides answer, follow-up
-Work, clarification, retry Plan, or silence. Fast may make the terminal decision
+Fast Planner first. Planner decides follow-up Work, clarification, retry or a required answer/result Need. SC decides whether and how to communicate from the scoped facts. Fast may make the terminal decision
 or escalate genuinely complex HOW to Deep under the existing Planner contract; the
 terminal response from either tier must preserve evidence scope, probability strength,
 execution-status truth, and exact Goal boundaries in that tier's primary result.
-Escalation cannot bypass those contracts. No second model qualifies, reviews, or repairs
-the primary wording. Planner may not widen the supplied Goal set or duplicate the
+Escalation cannot bypass those contracts. SC is the distinct downstream interaction owner, not a reviewer of Planner semantics. Planner may not widen the supplied Goal set or duplicate the
 completed execution.
 
 Result content, place names, provider fields, recency, or text similarity never
@@ -865,14 +881,11 @@ planner tier.
 
 ### 4.7 Auxiliary Plan activities
 
-`CanonicalPlan.auxiliary_activities[]` describes optional nonverbal decoration
-authored in the same primary Planner result as its Main Activity. It is canonical
-fingerprinted Plan truth but structurally carries no Goal ownership or completion
-authority. Malformed output fails soft to no decoration and is not repaired because
-the expression is optional.
-
-It is not a user goal unless the user explicitly requested the behavior; in that
-case the requested behavior is ordinary primary Activity instead.
+`SocialCommunicativeAct.auxiliary_activities[]` describes optional nonverbal
+expression from the same SC decision as its exact communicative anchor. It has
+no task Goal or completion authority. Runtime may suppress invalid, unavailable
+or conflicting optional expression. A requested gesture instead belongs to the
+Planner's ordinary Goal-owned Capability Work.
 
 ### 4.8 Execution evidence
 
@@ -905,36 +918,11 @@ the existing tea Goal; it is not interpreted as an isolated new request. This do
 make GI the owner of why Planner asked or which source policy it chose. GA remains the
 sole authority that commits that Goal version.
 
-The same immutable GI result starts Goal Association and one Fast Planner stream
-concurrently. The model emits one JSON document containing exactly two ordered
-members: `presentation_commit` first and `terminal_result` second,
-inside one outer object. Each member contains one payload object for strict DTO
-validation; only a complete validated member may escape the incremental parser. The Agent exposes the
-first payload only after that member is complete and its payload is
-schema-valid, then serializes it as a typed NDJSON `PresentationCommit`. That commit holds
-intentional silence or one exact immediately truthful Communicative Activity, plus
-optional auxiliary Activities anchored to the exact communication. It carries no Goal
-identity, executable Work, confirmation, result, or completion authority. Raw tokens,
-unclosed tags, and partial payloads never cross the Agent boundary.
-
-The same model invocation then emits a typed `FastPlannerStreamTerminal` containing
-`FastPlannerAdvance`. Both the wire terminal and the advance reference the immutable
-commit ID; the accepted act and decoration cannot be repeated, reworded, contradicted, or
-omitted. A typed failure records whether it occurred before or after commit. Before commit
-the path is silent. After commit the already-launched truthful presentation remains, but
-no Goal-owned Work is dispatched. There is no same-owner reviewer or repair call for the
-streamed semantic result.
-
-Goal Interpretation has no progress-speech or response-authoring contract. Goal
-Association consumes the same authoritative GI result concurrently and alone commits
-canonical Goal continuity. A complete validated GI-triggered Planner result may prepare
-Capability Work under Responsibility provenance before GA. Only available, explicitly
-side-effect-free safe reads requiring no confirmation may dispatch at that point;
-other Work waits for canonical Goal binding and Plan/Runtime validation. Partial streamed
-frames never authorize Capability Work. Confirmation, authorization, resource, provider,
-and safety barriers remain unchanged. Retained Work from prior valid Plans may
-still be projected into later Planner re-entry; GA never judges compatibility, and Host
-never invents semantic reuse.
+The same immutable GI result starts GA, SC and Fast Work independently. Fast emits
+one complete validated Work decision; there is no presentation prefix. SC may
+acknowledge understanding while Work is pending, but cannot predict its result.
+Capability dispatch requires the complete Work decision and applicable provenance,
+Goal binding, authorization and Runtime checks. Partial provider output is inert.
 
 ### 4.11 Continuous Mind candidate vocabulary — retained problem-space inventory
 
@@ -2443,14 +2431,10 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 
 ### 8.1 Fast Planner
 
-The Fast Planner is the low-latency first HOW owner once Goal Interpretation has
-produced contextual Responsibility evidence. One streamed primary invocation authors an
-early typed `PresentationCommit` and its complete terminal Activity decision while GA
-independently establishes canonical Goal identity. The commit owns the exact act,
-prospective/context-grounded truth, Responsibility provenance, and any exact anchored
-auxiliary decoration. Typed code validates shape, closed references, and mechanical
-provenance without asking another model to confirm the same semantics. This remains one
-Planner authority with typed incremental readiness.
+Fast Planner is the first task Work owner after GI. Its one primary invocation
+establishes complete Work over accepted Responsibility references while GA commits
+canonical Goal identity and SC independently decides interaction. No early speech
+prefix or optional decoration remains in the Work model result.
 Fast Planner may use:
 
 - the complete current canonical Goal;
@@ -2477,8 +2461,8 @@ not an invitation for Planner to run another interpretation.
 
 It may:
 
-- complete a simple conversational Responsibility with a speaking Activity;
-- combine prospective conversational progress with still-needed terminal Capability Activities;
+- establish an answer Need for an ordinary conversational Responsibility;
+- combine independent Capability Work with word-free communication Needs;
 - derive execution-input needs only from the immutable Responsibility and applicable
   Plan/Agent-Skill/Capability/safety contracts, then resolve them from an authoritative
   source or ask a user-resolvable clarification;
@@ -2490,11 +2474,9 @@ It may:
 - propose a low-consequence bounded default in canonical planning;
 - escalate.
 
-When GI binds `prior_assistant_utterance` for an exact repeat request, the Fast
-`PresentationCommit` decoder constrains the complete response to that immutable
-already-delivered text. This is dialogue provenance projection, not new
-Host-authored wording; prefixes, the current question, and planner prose cannot
-replace what the user asked Chromie to repeat.
+When GI binds an exact repeat request to previously delivered words, that immutable
+dialogue value reaches SC as source evidence. SC owns expressing the requested
+repeat; current questions, prefixes or new paraphrases do not replace the bound text.
 
 It must report coverage:
 
@@ -2868,43 +2850,25 @@ reconstructs action meaning from capability-specific phrase templates.
 
 ## 12. Social interaction layer
 
-### 12.1 One Planner result, two structural roles
+### 12.1 Distinct Work and interaction decisions
 
-A primary Fast or Deep Planner result may contain both Goal-owned Main Activities
-and optional social decoration. `steps[]` remains Goal-owned Work;
-`auxiliary_activities[]` is separate, bounded, subordinate Plan truth. Both enter
-the canonical Plan fingerprint, but only `steps[]` can advance Goal completion.
+Planner's `steps[]` is Goal-owned task Work. SC's `activities[]` contains exact
+communicative acts, each optionally carrying bounded social expression. They share
+read-only state and are joined by exact provenance, not by asking SC to review
+or rewrite a completed Planner response.
 
-```text
-Planner primary result
-  +-- Main Activities / steps[]       Goal-owned
-  `-- auxiliary_activities[]          no Goal ownership
-```
+### 12.2 Explicit Activity and optional social expression
 
-The Fast Planner `PresentationCommit` may emit auxiliary activities only when they
-anchor its exact Communicative Main Activity. The terminal Fast result and canonical
-Fast/Deep planning may emit auxiliary activities for other primary anchors in their
-single primary invocation. There is no post-response Social Attention model, endpoint,
-or background decision worker.
+A requested action such as “blink twice” is mandatory Goal-owned Work. Optional
+expression cannot replace, repeat, authorize or complete it. SC may use an eligible
+compatible gesture to support acknowledgement, engagement or turn-taking, including
+a nonverbal-only act. Empty expression is normal; it never blocks task Work.
 
-### 12.2 Explicit Activity and auxiliary social decoration
+### 12.3 SC and Runtime authority
 
-A concrete user request such as “blink twice” or “look at me” remains an explicit
-Goal-owned Plan step. It is non-droppable and cannot be replaced by a convenient
-gesture. The same Capability may be optional decoration only when the Planner
-places it in `auxiliary_activities[]` under a different Main Activity anchor.
-
-Decoration may support acknowledgement, engagement, empathy, turn taking,
-deference, or neutral presence. It cannot satisfy, replace, authorize, delay, or
-claim completion of a Goal. Empty auxiliary output is normal and complete.
-
-### 12.3 Planner and Runtime authority
-
-The primary Planner receives exact eligible catalog candidates, target evidence,
-owner-approved Social Interaction Style, recent auxiliary evidence, and the Main
-Activity in the same request that authors the Plan. It alone chooses whether to
-decorate, and if so the exact Capability, arguments, anchor, social function, and
-target.
+SC receives the same supplied Situation, trusted targets, owner-approved style,
+recent delivered/pending interaction, task state and eligible Capability catalog.
+Its primary invocation chooses the exact act, expression, target and arguments.
 
 Runtime validates catalog membership, schema, anchor identity, current target
 evidence, availability, confirmation, safety, low-level-field exclusion,
@@ -3147,37 +3111,13 @@ interaction with no Goal Association, Plan, or provider request. The interaction
 whose trusted result is empty. Speech delivery can express the distinction but cannot
 change it, and `chromie.speak` cannot stand in for the missing substantive Capability.
 
-The Host may schedule a complete, schema-valid, Planner-worded Communicative
-Activity only after mechanical validation authorizes it against
-the applicable turn correlation, commitment/evidence state, claim guards, and
-cancellation generation; it need not wait for unrelated later response fields. Raw
-model-token deltas, partial JSON, private reasoning, and incomplete sentences are not
-response contracts. Goal Interpretation owns Responsibility meaning, not dynamic reply
-wording. Fast Planner owns the semantic role, exact wording, timing, truth stage,
-and provenance of every Communicative Activity it authors. The Host derives transport/claim-envelope facts and
-may reject malformed or authority-violating output, but it does not become a second
-semantic writer. Progress speech carries no Capability/Goal completion claim.
-Goal Interpretation has no speech fields. Tool progress communication uses the typed
-`acknowledge_and_check`/
-`checking_only` contract before result evidence; a memory acknowledgement is
-likewise purely prospective and cannot claim that the commit already happened.
-The Host does not classify ordinary wording by keywords. An immediate
-acknowledgement may claim only understanding/evaluation and prospective intent;
-a proposal or confirmation requires a validated plan, starting speech requires
-committed execution, progress requires correlated runtime evidence, and final
-speech requires reconciled terminal evidence.
-
-Response stages reuse earlier current-turn speech by exact speech-event ID and
-structured act fields, not text comparison. The playback event preserves turn,
-source Goal IDs, canonical Plan identity/fingerprint, delivery role, claims,
-and the completion-claim restriction emitted by the Core. A Fast Planner Communicative Activity scheduled
-before GA finishes retains GI Responsibility refs until canonical binding;
-Goal-bound speech cannot later be reassigned to an
-unrelated Goal or Plan. Only playback-started or completed events satisfy an
-audible act. A scheduled event remains pending; if it never becomes audible,
-Runtime may fulfill the referenced act once. This does not suppress independent
-result, failure, limitation, clarification, confirmation, progress, or
-completion responsibilities.
+The Host schedules only complete, schema-valid SC decisions after exact source,
+snapshot, provenance, cancellation and delivery checks. Raw model tokens are never
+speech. At GI ingress SC may acknowledge understanding while Work is pending; it
+cannot claim a specific action is planned, started or complete before those facts
+exist. A required confirmation cites the exact immutable proposal and remains a
+consent barrier. Input questions express Planner-established gaps. Optional progress
+does not hold Work. Result-dependent words require admitted terminal Evidence.
 
 ### 15.1.1 Interaction Ledger and Interaction Context
 
@@ -3267,61 +3207,27 @@ Internal modules, schemas, provider plumbing, planning mechanics, and ordinary
 low-level steps are not milestones merely because they occurred.
 
 Every ready human-observable Communicative Act may be an auxiliary-activity anchor
-when it is present in the owning `PresentationCommit`, terminal Fast result, or
-canonical Fast/Deep Planner result. Empty decoration is normal and speech never
+when it is present in the same SC interaction result. Empty decoration is normal and speech never
 requires a gesture. Conversely, a tool lookup or internal cognition
 milestone is not promoted into an anchor merely because it happened.
 
-Each Communicative Act has one Planner wording owner and one downstream delivery owner,
+Each Communicative Act has one SC wording owner and one downstream delivery owner,
 with deterministic authority, evidence, cancellation, and delivery validation. The architecture does not add a
 second LLM to repair ordinary progress wording, and Goal Interpretation has no
 maintained response-authoring path.
 
-### 15.1.3 Early typed presentation commit
+### 15.1.3 Independent early interaction
 
-Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this implemented latency
-boundary. It keeps one semantic author and changes only when a closed subset of that
-author's result becomes executable:
+One accepted GI result may start SC, GA and Work planning independently. SC
+receives relevant history, Memory, Goal overview, Work state and delivery records
+and may acknowledge understanding or remain silent. The Fast model emits one
+complete Work result; it has no presentation prefix or writable speech fields.
+No partial Work crosses the Host boundary. Required Needs are joined to the exact
+Plan, while optional SC output cannot delay an otherwise eligible Work dispatch.
 
-```text
-UserTurnEnvelope + validated GI Responsibilities + bounded trusted context
-  -> one Fast Planner streaming invocation
-       -> zero or one complete typed PresentationCommit frame
-       -> one complete typed terminal Planner result
-```
-
-Goal Association starts concurrently from the unchanged GI result. A trusted incremental
-parser may expose a `PresentationCommit` only after its complete frame has been parsed and
-validated. It is not a raw token stream, an opening tag, a partial payload, another model call, or a
-second response owner. The maintained module I/O is:
-
-| Boundary | Authoritative input | Authoritative output | Forbidden authority |
-|---|---|---|---|
-| Fast Planner stream | immutable GI Responsibilities; applicable Goal/Work/Situation/Evidence projection; exact catalog/schema, presentation, style, target, and recent-interaction facts | at most one early `PresentationCommit`, followed by one complete Planner result from the same invocation | Goal identity, execution truth, provider mutation, or later rewriting of an accepted commit |
-| Agent stream decoder | ordered provider text deltas plus the ordered JSON response Schema and request identity | a complete schema-valid commit event and a complete schema-valid terminal result, or typed failure | semantic repair, text completion, frame reordering, trailing content, or calling another model |
-| Host presentation commit | validated commit plus exact turn/Responsibility/claim/anchor/catalog/resource bindings | immutable commit receipt; primary presentation launch; optional post-primary auxiliary scheduling/suppression | choosing wording, changing truth stage, selecting/reselecting a gesture or target, or dispatching Goal-owned Work |
-| Terminal Plan join | complete Planner result plus GA-owned canonical Goal binding and accepted-commit receipt | validated canonical Plan, confirmation/dispatch/deep-escalation/silence/fail-closed outcome | contradiction, duplication, omission, or reinterpretation of the accepted commit |
-
-An accepted commit may contain one immediately truthful Communicative Activity or
-silence and optional subordinate auxiliary activities. Early progress cannot claim that
-Capability Work started or completed, that confirmation was granted, that an effect
-occurred, or that a result is known without the corresponding full-Plan/Evidence boundary.
-A speech-only turn may complete in the early Activity only when no downstream Work,
-confirmation, or fresh Evidence is required.
-
-Accepted wording, truth stage, provenance, Main-Activity anchor, and auxiliary proposals
-are immutable. The terminal result references the exact commit identity and may not
-regenerate, contradict, duplicate, or silently omit it. Failure before commit is silent.
-Failure after an accepted truthful commit preserves its delivery truth but dispatches no
-Goal-owned Work and cannot cause the Host to author replacement speech. Capability work
-always waits for the complete Planner result, applicable canonical Goal grounding, and
-trusted validation.
-
-Source and deterministic contract closure do not by themselves qualify a target model or
-live voice path. Model promotion still requires retained evidence for structured frame
-emission, mid-stream error containment, commit/terminal consistency, accepted-commit and
-playback latency, and actual single-slot resource contention. A non-streaming call duration
-is not evidence of streaming time to first commit.
+When current state supersedes an SC request, Host cancels its inference and any
+queued delivery. Playback-completed receipts remain history; generated, queued or
+interrupted output is never relabeled as something the user heard.
 
 ### 15.1.4 Progressive conversational commitment and delivered-claim reconciliation
 
@@ -3386,7 +3292,7 @@ new follow-up, retry, alternative, cancellation, replacement, or clarification W
 the still-open Responsibility and trusted Evidence justify it. Any new effect still crosses
 ordinary Runtime validation, confirmation, authorization, and provider-safety boundaries.
 
-The Fast or Deep primary Planner result owns post-Evidence wording and its complete
+The SC primary result owns post-Evidence wording and its complete
 Goal/Evidence interpretation in one invocation. A probability below 100% remains
 uncertain; execution tense must match trusted outcome state; and excluded sibling Goals
 must remain excluded. The constrained schema, per-Goal outcome/satisfaction fields, and
@@ -3654,9 +3560,9 @@ Exit criteria:
 
 Deliver:
 
-- multi-Goal Planner communication;
+- SC interaction across multiple Goal/Work owners;
 - validated response commitments;
-- Planner-owned auxiliary social activities;
+- SC-owned optional social expression;
 - target-evidence and resource-conflict validation;
 - latency-bounded optional behavior.
 

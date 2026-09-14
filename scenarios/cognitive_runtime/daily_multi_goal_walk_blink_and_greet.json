@@ -47,7 +47,8 @@
       "disposition": "escalate",
       "coverage": "partial",
       "confidence": 0.9,
-      "escalation_reason": "Three independent goals span effectful and conversational outcomes."
+      "escalation_reason": "Three independent goals span effectful and conversational outcomes.",
+      "communication_needs": []
     },
     "deep_plans": [
       {
@@ -106,8 +107,7 @@
           {
             "goal_id": "goal-greet",
             "disposition": "respond",
-            "coverage": "complete",
-            "response_text": "早上好！"
+            "coverage": "complete"
           }
         ],
         "goal_satisfaction": {
@@ -119,36 +119,23 @@
             "goal-greet"
           ]
         },
-        "response_text": "",
-        "communicative_acts": [
+        "communication_needs": [
           {
-            "activity_id": "scenario-immediate",
-            "text": "早上好！",
-            "role": "complete_response",
-            "timing": "parallel",
-            "delivery_phase": "immediate",
-            "speech_act": "inform",
+            "need_id": "need:71e81abb778024d4d614cfe7e980f4f2bb802c0f0b50a7d2bb4727ab84303adf",
+            "owner": "planner",
+            "kind": "answer",
             "source_goal_ids": [
               "goal-greet"
             ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
-          },
-          {
-            "activity_id": "scenario-pre_action",
-            "text": "我可以先往前走一秒，再眨两下眼睛。这样可以吗？你说“好”，我就开始啦！",
-            "role": "complete_response",
-            "timing": "parallel",
-            "delivery_phase": "pre_action",
-            "speech_act": "inform",
-            "source_goal_ids": [
-              "goal-walk",
-              "goal-blink"
-            ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
+            "source_responsibility_refs": [],
+            "reference_id": "deep-walk-blink-greet",
+            "facts": {
+              "disposition": "respond",
+              "unresolved": []
+            },
+            "delivery_phase": null,
+            "before_step_ids": [],
+            "after_step_ids": []
           }
         ]
       }
@@ -199,7 +186,45 @@
           "eye_expression"
         ]
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      },
+      "deep": {
+        "activities": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "早上好！",
+            "function": "respond",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-greet"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我可以先往前走一秒，再眨两下眼睛。这样可以吗？你说“好”，我就开始啦！",
+            "function": "inform",
+            "delivery_phase": "pre_action",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-walk",
+              "goal-blink"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

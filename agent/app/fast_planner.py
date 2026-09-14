@@ -80,26 +80,20 @@ try:
     from chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
-        FastPlannerPresentationCommitModelOutput,
-        FastPlannerStreamingModelOutput,
+        FastPlannerAdvanceModelOutput,
         FastPlannerStreamFailure,
         FastPlannerStreamFrame,
         FastPlannerStreamTerminal,
-        PresentationCommit,
-        validate_communicative_activity_identity,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvance,
-        FastPlannerPresentationCommitModelOutput,
-        FastPlannerStreamingModelOutput,
+        FastPlannerAdvanceModelOutput,
         FastPlannerStreamFailure,
         FastPlannerStreamFrame,
         FastPlannerStreamTerminal,
-        PresentationCommit,
-        validate_communicative_activity_identity,
     )
 
 from .planner_prompt import (
@@ -115,76 +109,6 @@ logger = logging.getLogger("chromie.agent.fast_planner")
 
 
 
-def validate_presentation_commit_request_scope(
-    activity: Any,
-    *,
-    responsibilities: list[CognitiveResponsibilityProposal],
-    interpretation_unresolved: list[str],
-) -> None:
-    """Reject an early observable Activity that is invalid for this exact turn.
-
-    The streaming transport may constrain framing and shape, but the Host remains
-    authoritative for observable effects. Re-run the small
-    request-specific subset that can make an already validated DTO unsafe to yield
-    before terminal-plan validation.
-    """
-
-    if activity is None:
-        return
-    if any(str(item or "").strip() for item in interpretation_unresolved):
-        raise PlannerDTOContractError(
-            "PresentationCommit must remain silent while GI meaning is unresolved"
-        )
-    if getattr(activity, "role", None) != "complete_response":
-        return
-
-    by_ref = {item.local_ref: item for item in responsibilities}
-
-    def sibling_refs(value: Any) -> set[str]:
-        values = value if isinstance(value, list) else [value]
-        return {
-            str(item).strip()
-            for item in values
-            if str(item).strip() in by_ref
-        }
-
-    blocked_speech_refs: set[str] = set()
-    for item in responsibilities:
-        if item.output_mode != "speech":
-            continue
-        if (
-            sibling_refs(item.bindings.get("after"))
-            or sibling_refs(item.bindings.get("follows"))
-            or sibling_refs(item.bindings.get("parallel_with"))
-        ):
-            blocked_speech_refs.add(item.local_ref)
-    for item in responsibilities:
-        for target_ref in (
-            sibling_refs(item.bindings.get("before"))
-            | sibling_refs(item.bindings.get("precedes"))
-            | sibling_refs(item.bindings.get("parallel_with"))
-        ):
-            target = by_ref.get(target_ref)
-            if target is not None and target.output_mode == "speech":
-                blocked_speech_refs.add(target_ref)
-
-    invalid_refs = set(activity.source_responsibility_refs) & blocked_speech_refs
-    if invalid_refs:
-        raise PlannerDTOContractError(
-            "PresentationCommit cannot complete ordered or synchronized speech "
-            "before terminal planning: " + ",".join(sorted(invalid_refs))
-        )
-
-def presentation_commit_id(request: CognitiveWorkRequest) -> str:
-    responsibility_refs = "|".join(
-        str(item.local_ref) for item in request.responsibilities
-    )
-    digest = hashlib.sha256(
-        f"{request.sid}|{responsibility_refs}|presentation".encode("utf-8")
-    ).hexdigest()[:20]
-    return f"present_{digest}"
-
-
 def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     """Reject ambiguous member ownership before a parsed value can be exposed."""
 
@@ -196,106 +120,15 @@ def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return value
 
 
-def _stream_json_member(
-    buffer: str, *, prefix: str, name: str, start: int = 0, final: bool = False,
-) -> tuple[dict[str, Any], int] | None:
-    """Read one ordered object member; incomplete values never escape."""
-
+def parse_fast_work_document(buffer: str) -> dict[str, Any]:
+    """Require one finite, unambiguous complete Work object."""
     def reject_constant(value: str) -> Any:
         raise PlannerDTOContractError(f"Fast Planner JSON contains nonfinite value: {value}")
-
-    decoder = json.JSONDecoder(
-        object_pairs_hook=_unique_json_object, parse_constant=reject_constant,
-    )
-    index = start
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    if index == len(buffer):
-        if not final:
-            return None
-        raise PlannerDTOContractError(f"Fast Planner stream is missing {name}")
-    if buffer[index] != prefix:
-        raise PlannerDTOContractError(f"Fast Planner stream requires {prefix!r} before {name}")
-    index += 1
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    try:
-        key, index = decoder.raw_decode(buffer, index)
-    except json.JSONDecodeError as exc:
-        if not final:
-            return None
-        raise PlannerDTOContractError(f"Fast Planner stream is missing key {name}") from exc
-    if key != name:
-        raise PlannerDTOContractError(f"Fast Planner stream requires {name} in this position")
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    if index == len(buffer) and not final:
-        return None
-    if index == len(buffer) or buffer[index] != ":":
-        raise PlannerDTOContractError(f"Fast Planner stream requires ':' after {name}")
-    index += 1
-    while index < len(buffer) and buffer[index].isspace():
-        index += 1
-    try:
-        value, end = decoder.raw_decode(buffer, index)
-    except json.JSONDecodeError as exc:
-        if not final:
-            return None
-        raise PlannerDTOContractError(f"Fast Planner {name} payload is incomplete or invalid") from exc
+    value = json.loads(buffer, object_pairs_hook=_unique_json_object, parse_constant=reject_constant)
     if not isinstance(value, dict):
-        raise PlannerDTOContractError(f"Fast Planner {name} payload must be a JSON object")
-    return value, end
+        raise PlannerDTOContractError("Fast Planner Work result must be an object")
+    return value
 
-
-def first_presentation_frame(buffer: str) -> dict[str, Any] | None:
-    """Return the complete first member, or None while it is incomplete."""
-
-    parsed = _stream_json_member(buffer, prefix="{", name="presentation_commit")
-    return parsed[0] if parsed is not None else None
-
-
-def parse_fast_stream_document(buffer: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Require exactly two ordered JSON members and a complete outer object."""
-
-    presentation = _stream_json_member(
-        buffer, prefix="{", name="presentation_commit", final=True,
-    )
-    if presentation is None:  # final=True raises instead of returning incomplete
-        raise PlannerDTOContractError("Fast Planner stream is missing presentation_commit")
-    terminal = _stream_json_member(
-        buffer, prefix=",", name="terminal_result", start=presentation[1], final=True,
-    )
-    if terminal is None:
-        raise PlannerDTOContractError("Fast Planner stream is missing terminal_result")
-    if buffer[terminal[1]:].strip() != "}":
-        raise PlannerDTOContractError("Fast Planner stream requires only '}' after terminal_result")
-    return presentation[0], terminal[0]
-
-
-def project_presentation_schema_constants(
-    raw: dict[str, Any],
-    *,
-    responsibility_refs: list[str],
-) -> dict[str, Any]:
-    """Restore only constants intentionally elided by the compact wire Schema."""
-
-    payload = dict(raw)
-    raw_activity = payload.get("activity")
-    if not isinstance(raw_activity, dict):
-        return payload
-    activity = dict(raw_activity)
-    if len(responsibility_refs) == 1:
-        activity.setdefault("source_responsibility_refs", responsibility_refs)
-    activity.setdefault(
-        "role",
-        (
-            "progress"
-            if activity.get("progress_kind") not in (None, "")
-            else "complete_response"
-        ),
-    )
-    payload["activity"] = activity
-    return payload
 
 class FastPlannerResolver:
     """Low-latency semantic planner over the executable common catalog only."""
@@ -327,276 +160,60 @@ class FastPlannerResolver:
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
 
     async def stream_advance(
-        self,
-        request: CognitiveWorkRequest,
+        self, request: CognitiveWorkRequest,
     ) -> AsyncGenerator[FastPlannerStreamFrame, None]:
-        """Stream one Fast Planner result through an immutable typed commit."""
-
-        responsibilities = [
-            CognitiveResponsibilityProposal.model_validate(
-                item.model_dump(mode="json")
-            )
-            for item in request.responsibilities
-        ]
-        responsibility_refs = [item.local_ref for item in responsibilities]
+        """Validate one complete Work decision before releasing any Activity."""
+        responsibilities = list(request.responsibilities)
         turn_id = str(request.sid or "turn-fast-stream")
-        commit_id = presentation_commit_id(request)
-        commit: PresentationCommit | None = None
-        raw_text = ""
-        capabilities = await self.catalog.prompt_entries(
-            scope="common", refresh=False
-        )
-        auxiliary_catalog = await self.catalog.prompt_entries(
-            scope="all", refresh=False
-        )
-        auxiliary_social_capabilities = auxiliary_social_capability_payloads(
-            auxiliary_catalog
-        )
-        request.context["planner_auxiliary_social_context"] = (
-            auxiliary_social_prompt_context(
-                request.context,
-                auxiliary_social_capabilities,
-            )
-        )
-        executable = [
-            item
-            for item in capabilities
-            if item.available
-            and item.interaction_executable
-            and is_planner_step_capability(item.capability_id)
-        ]
-        capability_payload = [
-            fast_capability_payload(item, include_side_effect_free=True)
-            for item in executable[: self.max_capabilities]
-        ]
-        response_schema = fast_streaming_advance_response_schema(
-            responsibility_refs,
-            responsibilities=responsibilities,
-            capabilities=capability_payload,
-            auxiliary_social_capabilities=auxiliary_social_capabilities,
-            interpretation_unresolved=list(request.interpretation_unresolved),
-            language=str(request.language or ""),
-        )
-        if request.interpretation_unresolved:
-            presentation_schema = response_schema["properties"][
-                "presentation_commit"
-            ]
-            presentation_schema["properties"]["activity"] = {"type": "null"}
-            presentation_schema["properties"]["auxiliary_activities"] = {
-                "type": "array",
-                "maxItems": 0,
-            }
-        options = {
-            "temperature": 0,
-            "top_p": 0.9,
-            "num_ctx": self.num_ctx,
-            "num_predict": min(self.num_predict, 2048),
-        }
         try:
-            prompt = fast_advance_layered_prompt(
-                request,
-                responsibilities=responsibilities,
-                capabilities=capability_payload,
-                response_schema=response_schema,
+            catalog = await self.catalog.prompt_entries(scope="common", refresh=False)
+            # Target grounding remains available to requested Work; SC separately
+            # qualifies optional expression against the full social catalog.
+            request = request.model_copy(deep=True)
+            request.context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(request.context, [])
+            capabilities = [fast_capability_payload(item, include_side_effect_free=True)
+                for item in catalog if item.available and item.interaction_executable
+                and is_planner_step_capability(item.capability_id)][:self.max_capabilities]
+            schema = fast_streaming_advance_response_schema(
+                [item.local_ref for item in responsibilities], responsibilities=responsibilities,
+                capabilities=capabilities, interpretation_unresolved=list(request.interpretation_unresolved),
+                language=str(request.language or ""),
             )
+            prompt = fast_advance_layered_prompt(request, responsibilities=responsibilities,
+                capabilities=capabilities, response_schema=schema)
+            raw_text = ""
             async with aclosing(self.ollama.generate_stream(
-                prompt,
-                system=fast_streaming_advance_system_prompt(),
-                options=options,
-                response_format=response_schema,
-                prompt_family="fast_planner.streaming_advance",
-                turn_id=request.sid,
-                attempt=1,
+                prompt, system=fast_streaming_advance_system_prompt(),
+                options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,
+                         "num_predict": min(self.num_predict, 2048)},
+                response_format=schema, prompt_family="fast_planner.streaming_advance",
+                turn_id=request.sid, attempt=1,
             )) as deltas:
                 async for delta in deltas:
                     raw_text += delta
-                    if commit is not None:
-                        continue
-                    raw_presentation = first_presentation_frame(raw_text)
-                    if raw_presentation is None:
-                        continue
-                    projected_presentation = project_presentation_schema_constants(
-                        raw_presentation,
-                        responsibility_refs=responsibility_refs,
-                    )
-                    presentation = (
-                        FastPlannerPresentationCommitModelOutput.model_validate(
-                            projected_presentation
-                        )
-                    )
-                    activity = presentation.activity
-                    validate_presentation_commit_request_scope(
-                        activity,
-                        responsibilities=responsibilities,
-                        interpretation_unresolved=list(request.interpretation_unresolved),
-                    )
-                    if activity is not None:
-                        validate_communicative_activity_identity(
-                            activity_id=activity.activity_id, text=activity.text,
-                            interaction_context=request.context.get("interaction_context"),
-                        )
-                        refs = set(activity.source_responsibility_refs)
-                        if not refs or not refs.issubset(set(responsibility_refs)):
-                            raise PlannerDTOContractError(
-                                "PresentationCommit must cite supplied Responsibility refs"
-                            )
-                        if activity.role == "complete_response":
-                            modes_by_ref = {
-                                item.local_ref: item.output_mode
-                                for item in responsibilities
-                            }
-                            if any(modes_by_ref.get(ref) != "speech" for ref in refs):
-                                raise PlannerDTOContractError(
-                                    "PresentationCommit completion is valid only for direct "
-                                    "speech Responsibilities cited by that Activity"
-                                )
-                    commit = PresentationCommit(
-                        commit_id=commit_id,
-                        turn_id=turn_id,
-                        activity=activity,
-                        auxiliary_activities=presentation.auxiliary_activities,
-                        metadata={
-                            "semantic_authority": "fast_planner_model",
-                            "phase": "streaming_presentation_commit",
-                            "execution_authority": (
-                                "host_communicative_runtime"
-                                if activity is not None
-                                else "none"
-                            ),
-                            "semantic_result_call_count": 1,
-                        },
-                    )
-                    yield commit
-
-            if commit is None:
-                raise PlannerDTOContractError(
-                    "Fast Planner stream ended before a typed PresentationCommit"
-                )
-            raw_presentation, raw_terminal = parse_fast_stream_document(raw_text)
-            projected_presentation = project_presentation_schema_constants(
-                raw_presentation,
-                responsibility_refs=responsibility_refs,
-            )
-            output = FastPlannerStreamingModelOutput.model_validate(
-                {
-                    "presentation_commit": projected_presentation,
-                    "terminal_result": raw_terminal,
-                }
-            )
-            if output.presentation_commit != FastPlannerPresentationCommitModelOutput(
-                activity=commit.activity,
-                auxiliary_activities=commit.auxiliary_activities,
-            ):
-                raise PlannerDTOContractError(
-                    "Fast Planner terminal result changed PresentationCommit"
-                )
-            if any(
-                item.role == "progress"
-                for item in output.terminal_result.activities
-            ):
-                raise PlannerDTOContractError(
-                    "Fast Planner terminal result cannot author a second progress Act"
-                )
-            committed_completion_refs = (
-                set(commit.activity.source_responsibility_refs)
-                if commit.activity is not None
-                and commit.activity.role == "complete_response"
-                else set()
-            )
-            duplicate_completion_refs = {
-                source_ref
-                for item in output.terminal_result.activities
-                if item.role == "complete_response"
-                for source_ref in item.source_responsibility_refs
-                if source_ref in committed_completion_refs
-            }
-            if duplicate_completion_refs:
-                raise PlannerDTOContractError(
-                    "Fast Planner terminal result duplicated presentation speech "
-                    "ownership for Responsibilities: "
-                    + ",".join(sorted(duplicate_completion_refs))
-                )
-            combined_output = output.terminal_result.model_copy(
-                update={
-                    "activities": [
-                        *([commit.activity] if commit.activity is not None else []),
-                        *output.terminal_result.activities,
-                    ],
-                    "auxiliary_activities": [
-                        *commit.auxiliary_activities,
-                        *output.terminal_result.auxiliary_activities,
-                    ],
-                }
-            )
-            validate_fast_advance_output(
-                combined_output,
-                request=request,
-                responsibilities=responsibilities,
-                capabilities=capability_payload,
-            )
-            advance = FastPlannerAdvance(
-                turn_id=turn_id,
-                disposition=combined_output.disposition,
-                coverage=combined_output.coverage,
-                covered_responsibility_refs=(
-                    combined_output.covered_responsibility_refs
-                ),
-                activities=combined_output.activities,
-                auxiliary_activities=combined_output.auxiliary_activities,
-                continuations=combined_output.continuations,
-                confidence=combined_output.confidence,
-                unresolved=combined_output.unresolved,
-                reason_summary=combined_output.reason_summary,
-                metadata={
-                    "semantic_authority": "fast_planner_model",
-                    "phase": "streaming_responsibility_activity_plan",
-                    "presentation_commit_id": commit.commit_id,
-                    "execution_authority": "trusted_capability_runtime",
-                    "semantic_result_call_count": 1,
-                },
-            )
-            yield FastPlannerStreamTerminal(
-                turn_id=turn_id,
-                presentation_commit_id=commit.commit_id,
-                advance=advance,
-            )
+                    if len(raw_text) > 131072 or (raw_text.lstrip() and not raw_text.lstrip().startswith("{")):
+                        raise PlannerDTOContractError("Fast Planner Work stream is oversized or not a JSON object")
+            from jsonschema import Draft202012Validator
+            raw = parse_fast_work_document(raw_text)
+            Draft202012Validator(schema).validate(raw)
+            output = FastPlannerAdvanceModelOutput.model_validate(raw)
+            validate_fast_advance_output(output, request=request,
+                responsibilities=responsibilities, capabilities=capabilities)
+            advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(), metadata={
+                "semantic_authority": "fast_planner_model", "phase": "responsibility_work_plan",
+                "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
+            })
+            yield FastPlannerStreamTerminal(turn_id=turn_id, advance=advance)
         except Exception as exc:
-            failure = (
-                exc.metadata()
-                if isinstance(exc, RequiredPromptProjectionError)
-                else llm_failure_metadata(exc)
-                if isinstance(exc, OllamaGenerationError)
-                else {
-                    "failure_class": "fast_stream_contract_invalid",
-                    "failure_domain": "model_contract",
-                    "architecture_attribution": "not_evaluated",
-                    "retryable": False,
-                }
-            )
-            logger.warning(
-                "fast_planner_stream_fail_closed sid=%s stage=%s error_type=%s "
-                "error=%s failure_class=%s",
-                request.sid,
-                "after_commit" if commit is not None else "before_commit",
-                type(exc).__name__,
-                exc,
-                failure["failure_class"],
-            )
-            yield FastPlannerStreamFailure(
-                turn_id=turn_id,
-                failure_stage=(
-                    "after_commit" if commit is not None else "before_commit"
-                ),
-                presentation_commit_id=(commit.commit_id if commit else None),
-                failure_class=str(failure["failure_class"]),
-                failure_domain=str(failure["failure_domain"]),
-                architecture_attribution=str(
-                    failure.get("architecture_attribution") or "not_evaluated"
-                ),
-                retryable=bool(failure.get("retryable")),
-                error_type=type(exc).__name__,
-                reason=str(exc)[:500],
-            )
+            failure = (exc.metadata() if isinstance(exc, RequiredPromptProjectionError)
+                else llm_failure_metadata(exc) if isinstance(exc, OllamaGenerationError)
+                else {"failure_class": "fast_stream_contract_invalid", "failure_domain": "model_contract",
+                      "architecture_attribution": "fast_planner", "retryable": False})
+            logger.warning("fast_planner_work_fail_closed sid=%s error_type=%s error=%s", request.sid, type(exc).__name__, exc)
+            yield FastPlannerStreamFailure(turn_id=turn_id, failure_stage="before_commit",
+                failure_class=str(failure["failure_class"]), failure_domain=str(failure["failure_domain"]),
+                architecture_attribution=str(failure.get("architecture_attribution") or "fast_planner"),
+                retryable=bool(failure.get("retryable")), error_type=type(exc).__name__, reason=str(exc)[:500])
 
     async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -855,6 +472,7 @@ class FastPlannerResolver:
 
                 validate_goal_responsibility_outcomes(
                     validated_model_output,
+                    responsibilities=list(request.responsibilities),
                     authoritative_goals=authoritative_goals,
                     context=request.context,
                     reentry_scope=request.planner_reentry_scope,

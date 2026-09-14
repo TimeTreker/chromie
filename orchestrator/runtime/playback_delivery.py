@@ -112,6 +112,9 @@ class PlaybackDeliveryLifecycle:
         commitment: str = "",
         fast_activity_id: str = "",
         communicative_activity_ids: list[str] | None = None,
+        addressed_need_ids: list[str] | None = None,
+        source_responsibility_refs: list[str] | None = None,
+        wording_owner: str = "",
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -143,6 +146,11 @@ class PlaybackDeliveryLifecycle:
             normalized_activity_ids.append(normalized_fast_activity_id)
             normalized_activity_ids.sort()
         normalized_goal_ids = self._normalized_text_values(source_goal_ids)
+        communication_binding = {
+            "addressed_need_ids": self._normalized_text_values(addressed_need_ids),
+            "source_responsibility_refs": self._normalized_text_values(source_responsibility_refs),
+            "wording_owner": str(wording_owner or "").strip(),
+        }
         normalized_claims = self._normalized_text_values(claims)
         normalized_subject_refs = self._normalized_text_values(subject_refs)
         normalized_opportunity_id = " ".join(
@@ -243,6 +251,7 @@ class PlaybackDeliveryLifecycle:
                 "fast_activity_id": normalized_fast_activity_id,
                 "communicative_activity_ids": normalized_activity_ids,
                 "claims": normalized_claims,
+                **communication_binding,
                 "must_not_claim_completion": must_not_claim_completion,
                 "cognitive_opportunity_id": normalized_opportunity_id,
                 "situation_signature": normalized_situation_signature,
@@ -256,6 +265,8 @@ class PlaybackDeliveryLifecycle:
         else:
             if existing.get("text") != text:
                 raise ValueError("Communicative Activity wording cannot change under one identity")
+            if any(existing.get(key) != value for key, value in communication_binding.items()):
+                raise ValueError("Communicative Activity communication binding cannot change under one identity")
             if existing.get("delivery_attempt_id") == delivery_attempt_id:
                 return existing
             event = existing

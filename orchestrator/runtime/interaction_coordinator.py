@@ -261,6 +261,33 @@ class InteractionRuntimeCoordinator:
     def capability_definition(self, capability_id: str):
         return self.registry.get(capability_id)
 
+    async def record_social_delivery(
+        self, response: InteractionResponse, execution: CapabilityRuntimeResult,
+        *, session_id: str | None,
+    ) -> None:
+        """Persist SC words only from completed playback, never queue admission."""
+        if self.speech_delivery_waiter is None or self.communicative_delivery_recorder is None:
+            return
+        by_request = {item.request_id: item for item in execution.results}
+        for speech in response.speech:
+            if speech.metadata.get("wording_owner") != "social_cognition":
+                continue
+            result = by_request.get(speech.id)
+            if result is None or result.capability_id != "chromie.speak" or result.status != "completed" or not isinstance(result.output, dict):
+                continue
+            if not await self.speech_delivery_waiter(session_id, result.output):
+                continue
+            self.communicative_delivery_recorder(session_id, speech.text, {
+                "source": "social_cognition_communicative_delivery", "wording_owner": "social_cognition",
+                "turn_id": speech.metadata.get("turn_id"),
+                "communicative_activity_ids": list(speech.metadata.get("communicative_activity_ids") or []),
+                "source_responsibility_refs": list(speech.metadata.get("source_responsibility_refs") or []),
+                "source_goal_ids": list(speech.metadata.get("source_goal_ids") or []),
+                "addressed_need_ids": list(speech.metadata.get("addressed_need_ids") or []),
+                "evidence_refs": list(speech.metadata.get("evidence_refs") or []),
+                "speech_act": speech.metadata.get("speech_act"), "playback_completed": True,
+            })
+
     async def start_fast_planner_communicative_act(
         self,
         activity: FastPlannerCommunicativeAct,

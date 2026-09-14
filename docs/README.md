@@ -41,6 +41,7 @@ When documents disagree, correct the lower-authority document.
 | Question | Owner |
 |---|---|
 | What is Chromie trying to become? | `docs/PROJECT_CHARTER.md` |
+| What owns ordinary communication in the accepted target? | [Social Cognition in the Project Charter](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14); [migration lifecycle](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle) and [implementation status](STATUS.md#social-cognition-migration) |
 | What admits interaction input before semantic cognition? | `docs/COGNITIVE_GATEWAY.md` |
 | What lifecycle carries one admitted turn through execution evidence and a final response? | `docs/COGNITIVE_TURN_LOOP.md` |
 | What exists and what evidence is retained? | `docs/STATUS.md` |

@@ -1774,6 +1774,7 @@
         "docker-compose.yml",
         "orchestrator/.env.local.example",
         "orchestrator/orchestrator.py",
+        "scripts/chromie_psm_live_text_console.py",
         "tts/settings.py"
       ]
     },
@@ -2729,6 +2730,7 @@
       "category": "service_internal",
       "key": "ORCH_LOCK_FILE",
       "owners": [
+        "scripts/chromie_psm_live_text_console.py",
         "scripts/general_ability_acceptance.py"
       ]
     },

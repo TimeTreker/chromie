@@ -54,7 +54,8 @@
         "goal-walk",
         "goal-media"
       ],
-      "escalation_reason": "The peer media provider requires full-catalog planning."
+      "escalation_reason": "The peer media provider requires full-catalog planning.",
+      "communication_needs": []
     },
     "deep_plans": [
       {
@@ -123,23 +124,7 @@
           "unmet_goal_ids": [],
           "unmet_requirements": []
         },
-        "response_text": "",
-        "communicative_acts": [
-          {
-            "activity_id": "scenario-immediate",
-            "text": "I can walk while the peer media provider starts that existing song.",
-            "role": "complete_response",
-            "timing": "parallel",
-            "speech_act": "inform",
-            "source_goal_ids": [
-              "goal-walk",
-              "goal-media"
-            ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
-          }
-        ]
+        "communication_needs": []
       }
     ],
     "capabilities": [
@@ -222,7 +207,32 @@
           "evidence_level": "source_test"
         }
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      },
+      "deep": {
+        "activities": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "I can walk while the peer media provider starts that existing song.",
+            "function": "inform",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-walk",
+              "goal-media"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

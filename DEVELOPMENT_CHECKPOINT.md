@@ -1,6 +1,94 @@
 # Development Checkpoint
 
-## Current resume boundary — native continuation and #67, 2026-09-14
+## Social Cognition implementation — 2026-09-14
+
+Owner-authorized SC ownership transfer is implemented on `main`, base
+`d5a7985ec74b02cd01c11b0d538fca7ae13a3498` as the pre-delivery baseline.
+The owner authorized commit and push to `origin/main`. Resume from the latest
+commit containing this checkpoint and HANDOFF; no future commit hash is assumed.
+SC plans interaction across shared GI/Goal/Work/Evidence/Situation state; Work
+Planner plans actions and communication needs. No additional approval is needed
+for this agreed implementation. This delivery preserves the validated source;
+no service restart or deployment was performed. [STATUS](docs/STATUS.md#social-cognition-migration) owns the four axes.
+
+Implemented: independent GI fan-out; complete word-free Fast/Deep Work results;
+exact Need-to-SC joins; confirmation and before/after-step barriers; independent
+trusted Situation initiative; shared history/Memory/Mind/Goal/task context;
+delivery-qualified dialogue; cancellation/freshness checks; qualified optional
+expression; SGLang foreground priority 400 versus ordinary Planner 300. Required
+communication remains auditable; optional SC cannot hold independent Work.
+The former presentation DTO/schema/stream and executable Planner-wording builders
+are removed. SC replaces the former Situation endpoint. Quiet text-console work
+is preserved with Soridormi enabled and ASR bypassed.
+
+Evidence root: `.chromie/acceptance/social-cognition-mainline-20260914/`.
+These raw artifacts are local and Git-ignored; a clone receives source, frozen
+fixtures and the evidence summary in HANDOFF, not the raw runtime records.
+Pre-commit comparison against `final-worktree-identity.json` found no intervening
+source changes. Only delivery documentation was subsequently refreshed.
+The discussion about generalization did not introduce another implementation
+change or establish new generalization evidence.
+
+- `canonical-sc-closed.log`: exit 0; 3,245 tests / 820 subtests, 145 benchmarks
+  and 20 legacy Agent tests pass, including pinned static, policy, ownership,
+  configuration and docs gates. Two existing FastAPI deprecation warnings.
+- `workflow-sc-closed/`: final 6,000-case strict aggregate after explicit fixture
+  migration: all 6,000 pass and source hashes remain unchanged. Original expected
+  outcomes are preserved. This is controlled architecture evidence only.
+- `general-ability-sc-complete/`: all 45 Level A scenarios pass.
+- `native-final-sc/`: 12/12 Schema/DTO/Host and semantic cases;
+  `native-work-roles-complete-order/`: 8/8, including exact causal ordering.
+  `recorded-sc-final/` and `recorded-work-final/`: current production packets
+  match those native packets exactly; recorded replies pass current resolvers.
+- `workflow-adjudication-current.json`: actual owner I/O, earliest wrong boundary,
+  repairs, native/frozen-fixture provenance and limits.
+
+Target evidence remains separate from implementation completion. A subsequent
+native attempt (`native-sc-retired/`) produced only connection errors; no Docker
+services were running on inspection. No stop cause is inferred. Earlier native
+role proofs use controlled upstream state/catalog. No deployed-current Agent,
+end-to-end native GI→SC/Work cohort, latency/contention improvement, physical
+microphone/speaker or robot proof is claimed. Existing #24/#32 target closure
+remains open; do not resume with another architecture migration.
+
+Next target-validation work: follow the existing service profile in HANDOFF,
+verify deployed source/runtime identity after a deliberate rebuild, then run the
+complete safe automated live cohort and retain/adjudicate one debug bundle.
+Paired contention and physical evidence require their existing declared profile
+and supervision. Do not treat the offline packet replay as fresh inference.
+
+## Previous documentation stage — Social Cognition, 2026-09-14
+
+Repository `main`, base `d5a7985ec74b02cd01c11b0d538fca7ae13a3498`; local changes
+remain uncommitted. The owner agreed to Social Cognition as an independently
+valuable communication responsibility and requested the related documents.
+The [Charter amendment](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+now transfers target speech authority from Planner; GI/GA and Planner Work,
+Memory, Host and Soridormi responsibilities remain distinct. The canonical
+diagrams/principles, lifecycle, acceptance, status and migration order are updated.
+This is the authorized documentation exception to the surface freeze, not a
+claim that new runtime behavior exists or #24/#32 closed.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| Target documentation only; current source retains combined Fast speech/Work and Goal-free Planner communication. Earlier text-console transport edits are preserved. | Canonical gate passes 3,223 tests / 818 subtests, 145 benchmarks, 20 legacy; policy/static/config/docs/ownership pass. No Social Cognition implementation or model cohort is tested. | Not run for this amendment; no runtime/provider/model promotion or restart. | Development only; migration and prior #24/#32 evidence blockers remain open. |
+
+Next work follows [Social Cognition migration](ROADMAP.md#social-cognition-migration):
+settle exact request/result, coverage, depth, confirmation and auxiliary-anchor
+contracts; migrate initial/result/control/Goal-free communication as one coherent
+owner transfer; remove Planner's writable reply fields; then qualify both owners
+and their combined timing/behavior. Use the
+[source inventory](docs/COGNITIVE_TURN_LOOP.md#source-migration-inventory) and
+[acceptance matrix](docs/ACCEPTANCE.md#social-cognition-acceptance). Do not add a
+new microservice, separate state store, same-authority reviewer or permanent
+two-writer switch. Performance benefit remains a hypothesis requiring paired
+first-response and task-completion measurements under actual SGLang/TTS contention.
+
+The prior checkpoint below is retained evidence for its revision. Its Planner
+speech ownership is the old implementation, not the amended target. Exact
+local validation paths and preserved dirty scope are in [HANDOFF](HANDOFF.md).
+
+## Previous delivery boundary — native continuation and #67, 2026-09-14
 
 Current focus: Goal-driven single-authority architecture and current-revision
 evidence closure. Repository `main`; pre-delivery base

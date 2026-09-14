@@ -9,6 +9,53 @@ with a robotic body. She must know the difference between what she heard, what s
 understood, what she can do, what she has committed to do, and what she should say
 next.
 
+## Communication as a primary cognitive responsibility
+
+The owner-approved [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+makes interaction itself a primary responsibility with independent value. Its
+quality includes substantive conversation, continuity, attention to the person,
+appropriate initiative, useful progress and results, and restraint. Fast first
+speech is one outcome; a required discussion must not be reduced to a short
+acknowledgement merely to meet a speed metric.
+
+Social Cognition needs enough shared context to decide whether and how to
+participate: the complete accepted GI result, relevant dialogue and Memory,
+current Goal overview, detailed affected Goals, actual task and evidence state,
+pending questions/confirmations, and what has been queued, heard or interrupted.
+Privacy filtering precedes inference. Context compression cannot remove a
+material obligation, turn an unknown into a fact, or imply that queued speech
+was heard. Goal and task views remain read-only to this owner.
+
+GI is optional for trusted environmental/Goal/Work/Evidence triggers. Interaction
+may be verbal, textual or embodied; Social Cognition decides coherent expression
+from the eligible social Capability catalog in its primary call. It does not turn
+perception into a user command or task completion, create a private Goal list, or
+treat every internal milestone as news. Nonverbal-only interaction requires its
+own explicit delivery evidence. Foreground communication has scheduling priority
+over ordinary planning, with bounded depth and measured Planner liveness.
+
+Useful early communication may proceed alongside planning. No fixed sentence is
+required after GI or every milestone. Social Cognition may remain silent when a
+response would repeat pending/delivered meaning or interfere with the interaction.
+A substantive answer, required clarification or confirmation remains outstanding
+until its own completion/cancellation contract resolves it. Important progress
+requires a real state delta; factual results require qualified Evidence.
+
+Planner retains Work planning and execution-input needs; Host enforces
+confirmation policy against the proposed Plan. Social Cognition supplies the context-appropriate words
+for that established need without changing it. Planner is not a second speaker.
+Host retains mechanical provenance, version, authorization, delivery and safety
+checks; Soridormi retains embodied planning/execution within its capabilities.
+Delayed communication must be checked against newer task and delivery state so
+an outdated promise cannot follow a completed result. A communication failure
+cannot erase completed Work or invite a Host-authored task-result sentence.
+
+The [target lifecycle](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle)
+and [acceptance matrix](ACCEPTANCE.md#social-cognition-acceptance) own migration
+and proof. SC owns ordinary turn and result interaction in the implementation.
+General truth, privacy, safety, continuity and evidence obligations apply to SC,
+while Planner retains task Work and Host/Soridormi retain execution authority.
+
 ## Core rule
 
 This contract applies the Charter requirements `IDENTITY-TRUTH-001`, `ATTENTION-AUTHORITY-001`, `GREETING-GOAL-001`, `SPEECH-OWNER-001`, and `INTERACTION-LATENCY-001`.
@@ -189,11 +236,10 @@ or utterance adds work. It may cancel or supersede them only through an explicit
 deterministic stop/cancel scope or a Core decision that unambiguously authorizes
 foreground interruption; that decision and the affected work remain auditable.
 
-For one simple Communicative Act, one natural response is usually enough. If an accepted
-`PresentationCommit` already answered a simple greeting or clarification, the terminal Planner
-must not answer the same act again. A later Goal-Association, planning, or runtime
+For one simple Communicative Act, one natural response is usually enough. If an SC act already answered a greeting or clarification, a later state update
+must not cause the same answer to be delivered again without a new reason. A later Goal-Association, planning, or runtime
 failure remains visible as failure Evidence/telemetry but must not append a generic
-Host apology over an already committed or delivered Planner Communicative Activity.
+Host apology over an already committed or delivered SC Communicative Activity.
 
 Goal Interpretation reads bounded Session Context: recent admitted dialogue,
 active/recent Goals and versions, current Activity/task state, pending
@@ -564,12 +610,11 @@ chunked prefill, batching, preemption, cache reuse, resource reservation, or sep
 instances. Those are operational controls only. They may not inspect the utterance to
 create a greeting shortcut, reinterpret Goal meaning, select Capabilities, author wording,
 or decide truth. Fast and Deep remain cognition depths of their existing semantic owner;
-Goal Association remains canonical Goal continuity; Planner remains ordinary HOW/wording
-authority.
+Goal Association remains canonical Goal continuity; Planner remains Work HOW authority; SC owns interaction planning and wording.
 
 Latency qualification must include contention, not only an idle-server TTFT. A target run
 must keep deliberative cognition active, inject a real foreground interaction, carry it
-through validated GI and Fast Planner `PresentationCommit`, and include TTS on the shared
+through validated GI and independent SC, and include TTS on the shared
 GPU. Retain P50/P95/P99 first meaningful reaction, foreground queue/TTFT/completion, TTS
 first PCM/playback, deep interruption/resume behavior, GPU/VRAM, cache/preemption, provider
 errors, structured-output validity, and semantic correctness. A longer watchdog or higher
@@ -596,26 +641,18 @@ versions, a Canonical Plan, and evidence when each exists. Neither a response
 delivery transport nor an execution specialist may reinterpret the Goal, widen effects,
 authorize work, or become a second conversation authority. WorkDAG execution follows Planner-authored dependency/concurrency topology; DAGEngine may dispatch only mechanically ready, runtime-qualified nodes.
 
-A provider-free already-complete Communicative Act is selected by Fast Planner from
-Goal Interpretation's Responsibility evidence. Its exact wording is authored in that
-same typed Fast-Planner Activity and may begin through the existing Vocal
-runtime immediately. A simple greeting may be delivered before Goal Association
-finishes, but GA still commits its canonical conversational Goal and later binds the
-delivered Activity to that Goal. This binding is continuity and completion Evidence;
-it never authorizes a second response. If persistent work also exists, Fast Planner may
-author only prospective progress while Goal Association establishes continuity. The compact
-`PresentationCommit` target therefore distinguishes `complete_response`,
-`provisional_response`, prospective progress, and silence. `complete_response` is used when
-current support is sufficient to close an ordinary provider-free conversational
-Responsibility after delivery. `provisional_response` is used only when a substantive current
-judgment is useful, consequence policy permits tentative commitment, and one bounded
-continuation remains warranted; it leaves the Responsibility open. Information and
-observable/stateful WHAT whose answer materially depends on fresh Work can choose only
-prospective progress or silence until the relevant Evidence exists. These are
-model-authored planning decisions, never a Host greeting phrase table, and Goal
-Interpretation does not write the reply. Planner owns
-the Communicative Act and its exact wording; the Host validates and delivers without
-rewriting either. Exact reuse is not a second writer. Complete bounded capability work
+SC authors complete interaction acts from the applicable immutable GI, Goal/Work,
+Situation and delivery context. It can acknowledge sufficient understanding before GA
+and Work planning finish; substantive answers and required questions use exact typed
+communication needs. A scheduled act is not heard speech and cannot complete a
+conversational Goal. Only its correlated completed playback can supply that evidence.
+SC may remain silent when it would repeat a delivered message or add no useful
+information. It must not describe scheduled Work as running, or running Work as
+completed. GI supplies meaning, Work Planner supplies execution and communication
+obligations, and SC supplies words, timing and optional expression. The Host validates
+and delivers their exact decisions without rewriting semantics.
+
+Complete bounded capability work
 belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
 be committed without waiting for Deep. Deep is not a reviewer of a successful Fast
@@ -637,16 +674,11 @@ effect.
 Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
 contracts and must never reach TTS. Goal Interpretation never authors maintained
-speech. Fast Planner is the first HOW owner and may select one complete typed
-immediate Communicative Activity after Responsibility meaning is sufficient. A
-progress, terminal, or clarification Activity carries its exact natural wording
-together with function, timing, semantic provenance, truth stage, and Evidence
-references when applicable. The Host mechanically rejects a pre-evidence Activity
-that claims an unobserved result; it does not author replacement wording. An
-executable non-escalation Activity Plan
-has no Deep continuation and must contain a live Capability Activity. Therefore a
-model cannot hide an unverified result inside a field merely labelled progress or
-claim execution while emitting only conversational status.
+speech. SC owns each complete interaction result, including function, timing,
+provenance and applicable Evidence. Fast Planner emits one complete Work result;
+partial Work output cannot release effects. A pre-evidence SC act cannot claim an
+unobserved result. The Host rejects invalid contracts without supplying replacement
+wording or treating conversational status as executed Work.
 Later `ResponseStage` speech is scheduled only after the applicable Goal/Plan,
 evidence, claim, cancellation, and delivery contracts authorize it. When the earlier
 Activity was provisional, the bounded continuation may produce silence, an additive delta,
@@ -871,22 +903,18 @@ already-scheduled Activity must not be spoken again merely because GA reconcilia
 plan projection, retry, or transport ordering created another delivery attempt. Started,
 completed and interrupted playback remain distinct; partial playback cannot become a
 complete assistant-history record or completed speech Goal. Related same-turn speech is
-read-only context for Planner and grants no authority over sibling Goal/Work state.
+read-only context for SC and Planner and grants no authority over sibling Goal/Work state.
 
-Issue [#32](https://github.com/TimeTreker/chromie/issues/32) proposes a different
-realization of this same courtesy contract: one Fast Planner streaming invocation may
-commit one complete typed `PresentationCommit` before its terminal Plan output. This is
-not current behavior. It must never expose raw tokens or partial JSON to TTS. Speech may
-start only after the entire commit frame is parsed, truth/provenance checked, and accepted
-as immutable. GA and the rest of Fast planning must already be eligible to progress; the
-presentation frame must not remain their sequential gate.
+The accepted SC migration replaces the former Planner presentation frame. SC and
+GA/Work consume the shared GI result independently. Only a complete, validated SC
+result may reach delivery; raw tokens and partial JSON remain private. Optional
+communication does not block Work. Required confirmation and explicit communication
+order remain barriers tied to exact needs and Work steps.
 
-The trigger remains a user-relevant task-state delta—sufficient understanding, a genuine
-clarification/confirmation need, meaningful progress, result, failure, or cancellation—not
-a personality-specific response module. Character affects whether a nonessential progress
-ping adds value and how an accepted act is worded. Optional Social Attention is a separate
-subordinate presentation choice that may accompany a ready Main Activity; it does not make
-speech mandatory and is not itself task progress.
+Interaction may follow a relevant task-state delta or a trusted environmental
+opportunity without GI. SC decides whether speaking, asking, a qualified nonverbal
+act or silence serves the interaction. Optional expression remains subordinate to
+its exact SC act and cannot complete a task Goal.
 
 Foreground interaction deadlines and qualification watchdogs are separate concerns.
 Until the selected model/profile has passed semantic workflow qualification, maintained
@@ -896,7 +924,7 @@ development modes give Goal Association and Fast Planner 60 seconds each, Deep P
 The 3.5-second playback-start hard barrier remains separate.
 If the foreground deadline cancels cognition, Runtime cancels only provisional Fast
 Capability work that never received canonical Goal/Plan binding, preserves already
-scheduled or heard Planner speech evidence, and returns a bounded repair rather than
+scheduled or heard SC speech evidence, and returns a bounded repair rather than
 waiting indefinitely. Explicit qualification/validation mode retains its longer
 120/150/900-second evidence-collection watchdogs. In every mode, a missed 2.0/3.0-second
 target remains a measured failure; no watchdog value can convert it into a latency pass.
@@ -1133,15 +1161,15 @@ expose internal fallback text such as:
 
 A required confirmation remains exact-request-bound and single-use, but it must
 sound like Chromie rather than an operator console. The prospective wording is
-authored by Planner in the same immutable high-level action plan
-that will execute and the typed runtime confirmation requirement. It names the
+authored by SC from the immutable high-level action plan
+and its typed runtime confirmation requirement. It names the
 user-facing actions, explains a material safe adjustment before asking, and says
 naturally how to approve it. The Host validates the structured confirmation
 act and must reuse that exact wording; capability IDs, argument keys, JSON,
 state-machine instructions, and Host phrase templates must never replace it.
 The confirmation state object therefore carries authorization facts (bound request IDs,
 fingerprint/expiry, and typed decision), not user-visible approve/deny/expire/ambiguous
-messages. If Planner did not author valid confirmation wording, confirmation staging fails
+messages. If SC did not author valid confirmation wording, confirmation staging fails
 closed rather than synthesizing a Host prompt. If a later named-Goal cancellation makes a
 pending multi-Goal confirmation stale, the Host revokes that confirmation token as a
 whole. It must not synthesize a narrowed child Plan, replacement confirmation wording, or
@@ -1194,22 +1222,16 @@ qualified subtle body cue. Decoration must not rewrite what Chromie says,
 create an extra user task, or make the greeting fail if the decoration cannot
 run.
 
-The early spoken response is itself a Planner-owned Communicative Main Activity.
-Its `PresentationCommit`, terminal Fast result, and the canonical Fast/Deep Planner may
-include zero or more `auxiliary_activities[]` in
-the same primary result when the exact Activity anchor, recent context, style,
-target evidence, recent auxiliary evidence, and eligible named body capabilities
-are available. An empty list is complete and preferred unless a subtle cue adds
-real interaction value. This is not another model or post-response planning pass.
+SC owns an early spoken response and its optional expression in one complete
+interaction decision. Exact act anchors, trusted target facts, style, recent
+interaction and eligible Capability contracts constrain that expression. The
+primary act is admitted before its optional expression is scheduled. Invalid or
+conflicting expression is suppressed without blocking Work or rewriting speech.
+A nonverbal-only SC act can carry expression without inventing an utterance.
 
-That is the maintained contract. Under Issue
-[#32](https://github.com/TimeTreker/chromie/issues/32), an accepted early
-`PresentationCommit` atomically carries the Communicative Main Activity and any
-optional auxiliary proposal from the same Planner invocation, allowing decoration of an
-early utterance without a second semantic pass. The Main Activity launches first;
-auxiliary scheduling follows and remains fail-soft. This implemented boundary does not change the
-rule that empty decoration is normal or that explicit user-requested gestures are
-Goal-owned Work.
+Planner emits no presentation prefix or social decoration. Requested gestures
+remain its Goal-owned Work; optional acknowledgement remains independent and
+cannot predict a Plan or claim an unobserved effect.
 
 The same motion has different semantics depending on ownership. A user request
 such as "blink twice" makes **blink twice** the semantic primary Activity. A blink
@@ -1221,7 +1243,7 @@ participates in Goal completion.
 An explicit action can also carry social framing. “Blink twice and be cute”
 still makes exactly two blinks mandatory primary Activity; it does not authorize
 optional decoration to replace, repeat, or alter them. From the supplied utterance
-and Core context, the primary Planner may optionally choose a
+and Core context, SC may optionally choose a
 **different**, compatible small cue when that improves the interaction and fits
 the owner-approved style and recent-decoration evidence. "Blink twice" as a
 capability test may naturally receive no extra cue, while "do something cute"

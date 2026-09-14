@@ -6,6 +6,21 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 
+PLANNER_WORK_AUTHORITY_PROMPT = (
+    "You are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: "
+    "exact Work, input requirements, prospective adequacy and bounded deeper delegation. "
+    "GI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. "
+    "Social Cognition owns interaction decisions and exact words, including answers, "
+    "questions, progress and optional social expression. You establish a respond, "
+    "clarify, limitation or confirmation decision; Host binds that decision as a "
+    "communication need for SC. Never author utterances or decorative gestures. "
+    "A respond disposition delegates established communication obligations; it is "
+    "not delivered speech or Goal-completion Evidence. Runtime alone admits Work, "
+    "holds confirmation, coordinates resources and records execution; you cannot "
+    "grant consent or declare unobserved effects. Produce one complete semantic "
+    "decision. No downstream model reviews or repairs it. "
+)
+
 # Shared by every Planner invocation, including the restricted Situation entrypoint.
 PLANNER_COMMUNICATION_AUTHORITY_PROMPT = (
     "Planner is Chromie's sole ordinary communication authority. You own whether to "
@@ -87,11 +102,11 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "entrypoint": "orchestrator.handle_routed_text/apply",
             "owner": "cognitive_core_runtime",
             "role": "authoritative",
-            "communication_owner": "planner",
+            "communication_owner": "social_cognition",
             "planner_path": (
                 "Goal Interpretation owns WHAT; Goal Association owns persistent Goal "
-                "identity and continuity; Fast/Deep Planner own HOW plus exact "
-                "Communicative Act selection and wording; the Host validates immutable "
+                "identity and continuity; Fast/Deep Planner own task HOW; Social Cognition "
+                "owns interaction selection and wording; the Host validates immutable "
                 "realization; CapabilityRuntime "
                 "owns trusted execution lifecycle; Evidence owns reality"
             ),
@@ -101,7 +116,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "entrypoint": "orchestrator.handle_routed_text/report_only",
             "owner": "cognitive_core_runtime",
             "role": "observer",
-            "communication_owner": "planner",
+            "communication_owner": "social_cognition",
             "planner_path": "same cognitive authority without effect authorization",
             "fallback": "none",
         },
@@ -109,11 +124,11 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "entrypoint": "orchestrator.runtime.situation.apply_goal_free_situation_opportunity",
             "owner": "cognitive_core_runtime",
             "role": "authoritative",
-            "communication_owner": "planner",
+            "communication_owner": "social_cognition",
             "planner_path": (
-                "Trusted Goal-free Situation invokes Planner with a communication-only "
-                "contract; Fast or one bounded Deep pass may choose silence or one Communicative Act while Goal, "
-                "Capability Work, and effect authorization remain unavailable"
+                "Trusted Goal-free Situation invokes Social Cognition for silence, "
+                "exact interaction and optional eligible expression. Existing Runtime "
+                "owns safety and delivery; task Work and Goal mutation remain unavailable"
             ),
             "fallback": "fail_closed_to_silence",
         },

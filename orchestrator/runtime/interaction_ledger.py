@@ -248,6 +248,9 @@ class InteractionLedger:
             metadata={
                 "delivery_attempt_id": _normalized_text(event.get("delivery_attempt_id")),
                 "communicative_activity_ids": _normalized_ids(event.get("communicative_activity_ids")),
+                "addressed_need_ids": _normalized_ids(event.get("addressed_need_ids")),
+                "source_responsibility_refs": _normalized_ids(event.get("source_responsibility_refs")),
+                "wording_owner": _normalized_text(event.get("wording_owner")),
                 "delivery_role": _normalized_text(
                     event.get("delivery_role")
                 ),

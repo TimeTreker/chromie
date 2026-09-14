@@ -54,9 +54,10 @@
     "0:date=today",
     "0:period=night"
   ],
-  "require_fast_communicative_act": true,
-  "expected_fast_communicative_speech_acts": [
-    "acknowledge_and_check"
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": [
+    "acknowledge",
+    "inform"
   ],
   "min_new_goal_count": 1,
   "min_goal_outcome_count": 1,

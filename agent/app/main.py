@@ -73,15 +73,15 @@ except ImportError:  # pragma: no cover
     )
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
-from .situational_cognition import SituationalPlannerResolver
+from .social_cognition import SocialCognitionResolver
 from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
 try:
     from chromie_contracts.reflection import ReflectionRequest
-    from chromie_contracts.situation import SituationalCognitionRequest
+    from chromie_contracts.social_cognition import SocialCognitionRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.reflection import ReflectionRequest
-    from shared.chromie_contracts.situation import SituationalCognitionRequest
+    from shared.chromie_contracts.social_cognition import SocialCognitionRequest
 from .schema import HealthResponse
 from .cognitive_core.goal_interpreter import (
     GoalInterpretationRequest,
@@ -330,34 +330,34 @@ fast_planner_resolver = (
     if fast_planner_client is not None
     else None
 )
-situational_cognition_client = (
+social_cognition_client = (
     build_model_client(
         model=settings.fast_planner_model,
         timeout_ms=settings.fast_planner_timeout_ms,
-        purpose="situational_cognition",
+        purpose="social_cognition",
         service_settings=settings,
     )
     if settings.use_llm and settings.fast_planner_enabled
     else None
 )
-situational_deliberative_client = (
+social_cognition_deep_client = (
     build_model_client(
         model=settings.deep_planner_model,
         timeout_ms=settings.deep_planner_timeout_ms,
-        purpose="situational_deliberative_cognition",
+        purpose="social_cognition_deep",
         service_settings=settings,
     )
     if settings.use_llm and settings.deep_planner_enabled
     else None
 )
-situational_planner_resolver = (
-    SituationalPlannerResolver(
-        situational_cognition_client,
-        deliberative_ollama=situational_deliberative_client,
+social_cognition_resolver = (
+    SocialCognitionResolver(
+        social_cognition_client, capability_catalog,
+        deep_model=social_cognition_deep_client,
         num_ctx=max(settings.fast_planner_num_ctx, settings.deep_planner_num_ctx),
         num_predict=min(settings.deep_planner_num_predict, 1024),
     )
-    if situational_cognition_client is not None
+    if social_cognition_client is not None
     else None
 )
 deep_planner_client = (
@@ -608,14 +608,11 @@ async def resolve_deep_plan(request: CognitiveWorkRequest):
     )
 
 
-@app.post("/situational-cognition")
-async def resolve_situational_cognition(request: SituationalCognitionRequest):
-    if situational_planner_resolver is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Situational cognition is disabled with Fast cognition",
-        )
-    return await situational_planner_resolver.resolve(request)
+@app.post("/social-cognition")
+async def resolve_social_cognition(request: SocialCognitionRequest):
+    if social_cognition_resolver is None:
+        raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
+    return await social_cognition_resolver.resolve(request)
 
 
 @app.post("/reflection")

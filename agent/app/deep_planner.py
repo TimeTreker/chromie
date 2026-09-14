@@ -331,6 +331,7 @@ class DeepPlannerResolver:
 
             validate_goal_responsibility_outcomes(
                 validated_model_output,
+                responsibilities=list(request.responsibilities),
                 authoritative_goals=authoritative_goals,
                 context=request.context,
                 reentry_scope=request.planner_reentry_scope,

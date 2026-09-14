@@ -13,7 +13,6 @@ try:
     )
     from chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
-        FastPlannerPresentationCommitModelOutput,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -23,7 +22,6 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
-        FastPlannerPresentationCommitModelOutput,
     )
 
 from .prompt_projection import bounded_json
@@ -71,9 +69,17 @@ def work_change_response_schema(
             required = node.setdefault("required", [])
             if identities and "cancel_activity_ids" not in required:
                 required.append("cancel_activity_ids")
-        for key in ("allOf", "anyOf", "oneOf"):
-            for branch in node.get(key, []):
-                constrain(branch)
+        if isinstance(properties, dict) and "reuse_activity_id" in properties:
+            properties["reuse_activity_id"] = {
+                "type": "string", "enum": ["", *identities],
+                "description": "Empty for new Work; otherwise an exact supplied Activity identity.",
+            }
+        for value in node.values():
+            if isinstance(value, dict):
+                constrain(value)
+            elif isinstance(value, list):
+                for item in value:
+                    constrain(item)
 
     constrain(result)
     return result
@@ -423,7 +429,7 @@ def scoped_reporting_response_schema(
     for variant in [result, *result.get("anyOf", [])]:
         properties = variant["properties"]
         if goal_ids == set(expected_goal_ids):
-            for name in ("steps", "auxiliary_activities", "time_conditions", "cancel_activity_ids"):
+            for name in ("steps", "time_conditions", "cancel_activity_ids"):
                 if name in properties:
                     properties[name]["maxItems"] = 0
             properties["user_confirmation_required"]["enum"] = [False]
@@ -529,9 +535,7 @@ def canonical_plan_response_schema(
         "coverage",
         "confidence",
         "goal_summary",
-        "response_text",
         "steps",
-        "auxiliary_activities",
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
@@ -733,7 +737,6 @@ def canonical_plan_response_schema(
         for field_name in (
             "disposition",
             "coverage",
-            "response_text",
             "unresolved",
             "step_ids",
             "satisfaction",
@@ -789,14 +792,14 @@ def canonical_plan_response_schema(
                 branch_props["step_ids"] = {"minItems": 1}
             elif outcome_name == "respond":
                 branch_props["coverage"] = {"enum": ["complete"]}
-                branch_props["response_text"] = {"minLength": 1}
+                branch["required"] = ["precedes_step_ids", "follows_step_ids"]
                 branch_props["step_ids"] = {"maxItems": 0}
             elif outcome_name == "clarify":
                 branch_props["coverage"] = {"enum": ["partial", "uncertain"]}
                 branch_props["step_ids"] = {"maxItems": 0}
             elif outcome_name == "escalate":
                 branch_props["coverage"] = {"enum": ["partial", "uncertain"]}
-                branch_props["response_text"] = {"maxLength": 0}
+                pass
                 branch_props["step_ids"] = {"maxItems": 0}
             else:
                 branch_props["step_ids"] = {"maxItems": 0}
@@ -923,9 +926,8 @@ def canonical_plan_response_schema(
                                 {
                                     "properties": {
                                         "disposition": {"enum": ["execute"]},
-                                        "response_text": {"maxLength": 0},
-                                    },
-                                    "required": ["disposition", "response_text"],
+                                        },
+                                    "required": ["disposition", ],
                                 },
                                 {
                                     "properties": {
@@ -936,9 +938,8 @@ def canonical_plan_response_schema(
                                                 "refused",
                                             ]
                                         },
-                                        "response_text": {"minLength": 1},
-                                    },
-                                    "required": ["disposition", "response_text"],
+                                        },
+                                    "required": ["disposition", ],
                                 },
                             ]
                         }
@@ -1121,6 +1122,18 @@ def canonical_plan_response_schema(
                     # invariant that execute owns at least one step ID and all
                     # non-executing outcomes own none.
                     specialized.setdefault("allOf", []).append({"anyOf": deep_outcome_branches})
+                    # Native decoders may omit intersections. Complete object
+                    # alternatives retain the same DTO invariant during decoding.
+                    native_outcomes = []
+                    for constraint in deep_outcome_branches:
+                        variant = copy.deepcopy(specialized)
+                        variant.pop("allOf", None)
+                        variant.pop("oneOf", None)
+                        for name, bounds in constraint["properties"].items():
+                            variant["properties"][name].update(bounds)
+                        variant["required"] = list(dict.fromkeys([*variant.get("required", []), *constraint.get("required", [])]))
+                        native_outcomes.append(variant)
+                    specialized["oneOf"] = native_outcomes
                 limitation_condition = {
                     "properties": {"disposition": {"enum": ["clarify", "unavailable", "refused"]}},
                     "required": ["disposition"],
@@ -1157,6 +1170,15 @@ def canonical_plan_response_schema(
                         },
                     }
                 )
+                # Put optional ordering obligations before required assessment;
+                # a response after Work must not disappear at object closure.
+                order = ("disposition", "coverage", "step_ids", "precedes_step_ids", "follows_step_ids")
+                for variant in [specialized, *specialized.get("oneOf", [])]:
+                    fields = variant["properties"]
+                    variant["properties"] = {
+                        **{key: fields[key] for key in order if key in fields},
+                        **{key: value for key, value in fields.items() if key not in order},
+                    }
                 goal_property.clear()
                 goal_property.update(specialized)
                 goal_property["description"] = (
@@ -1254,26 +1276,23 @@ def canonical_plan_response_schema(
                     {
                         "properties": {
                             "disposition": {"enum": ["execute"]},
-                            "response_text": {"maxLength": 0},
                             "steps": {"minItems": 1},
                         },
-                        "required": ["disposition", "response_text", "steps"],
+                        "required": ["disposition", "steps"],
                     },
                     {
                         "properties": {
                             "disposition": {"enum": ["mixed"]},
-                            "response_text": {"minLength": 1},
                             "steps": {"minItems": 1},
                         },
-                        "required": ["disposition", "response_text", "steps"],
+                        "required": ["disposition", "steps"],
                     },
                     {
                         "properties": {
                             "disposition": {"enum": ["clarify", "unavailable", "refused"]},
-                            "response_text": {"minLength": 1},
                             "steps": {"maxItems": 0},
                         },
-                        "required": ["disposition", "response_text", "steps"],
+                        "required": ["disposition", "steps"],
                     },
                 ]
             }
@@ -1374,7 +1393,20 @@ def canonical_plan_response_schema(
             }
             native_branches.append(variant)
         schema["anyOf"] = native_branches
+    # Every step must belong to an outcome and IDs must be unique. Project
+    # those existing per-Goal bounds into the aggregate array as well.
+    if allowed_goals and isinstance(goal_outcomes, dict):
+        capacity = sum(
+            goal_outcomes["properties"][goal_id]["properties"]["step_ids"].get("maxItems", 4)
+            for goal_id in allowed_goals
+        )
+        properties["steps"]["maxItems"] = min(properties["steps"].get("maxItems", capacity), capacity)
     _constrain_terminal_unresolved(schema)
+    preferred = ("goal_summary", "goal_outcomes", "steps", "goal_satisfaction")
+    schema["properties"] = {
+        **{key: properties[key] for key in preferred if key in properties},
+        **{key: value for key, value in properties.items() if key not in preferred},
+    }
     return schema
 
 
@@ -1414,9 +1446,7 @@ def fast_multi_goal_response_schema(
         "coverage",
         "confidence",
         "goal_summary",
-        "response_text",
         "steps",
-        "auxiliary_activities",
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
@@ -1487,8 +1517,8 @@ def fast_multi_goal_response_schema(
                         "required": ["plan_relation", "user_confirmation_required"],
                     },
                     "then": {
-                        "properties": {"response_text": {"maxLength": 0}},
-                        "required": ["response_text"],
+                        "properties": {},
+                        "required": [],
                     },
                 }
             )
@@ -1499,8 +1529,8 @@ def fast_multi_goal_response_schema(
                 "required": ["user_confirmation_required"],
             },
             "then": {
-                "properties": {"response_text": {"minLength": 1}},
-                "required": ["response_text"],
+                "properties": {},
+                "required": [],
             },
         }
     )
@@ -1574,7 +1604,6 @@ def fast_multi_goal_response_schema(
         for field_name in (
             "disposition",
             "coverage",
-            "response_text",
             "unresolved",
             "step_ids",
             "satisfaction",
@@ -1869,10 +1898,9 @@ def fast_multi_goal_response_schema(
                     },
                     "then": {
                         "properties": {
-                            "response_text": {"maxLength": 0},
                             "step_ids": {"maxItems": 0},
                         },
-                        "required": ["response_text", "step_ids"],
+                        "required": ["step_ids"],
                     },
                 }
             )
@@ -1957,11 +1985,6 @@ def fast_multi_goal_response_schema(
                                 ["complete"] if terminal_outcome else ["partial", "uncertain"]
                             ),
                         },
-                        "response_text": (
-                            {"type": "string", "minLength": 1}
-                            if goal_disposition in {"respond", "clarify"}
-                            else {"type": "string", "maxLength": 0}
-                        ),
                         "step_ids": (
                             {"type": "array", "minItems": 1, "maxItems": 1}
                             if goal_disposition == "execute"
@@ -1989,7 +2012,6 @@ def fast_multi_goal_response_schema(
                     "required": [
                         "disposition",
                         "coverage",
-                        "response_text",
                         "step_ids",
                         "satisfaction",
                     ],
@@ -2030,7 +2052,7 @@ def fast_multi_goal_response_schema(
                         else {"type": "string", "maxLength": 0}
                     ),
                     **(
-                        {"response_text": {"type": "string", "minLength": 1}}
+                        {}
                         if aggregate == "respond"
                         else {}
                     ),
@@ -2143,12 +2165,10 @@ def fast_multi_goal_response_schema(
         "goal_summary",
         "goal_outcomes",
         "steps",
-        "auxiliary_activities",
         "goal_satisfaction",
         "disposition",
         "coverage",
         "confidence",
-        "response_text",
         "escalation_reason",
         "unresolved",
         "parameter_resolutions",
@@ -2184,7 +2204,7 @@ def fast_multi_goal_response_schema(
             for goal_id, goal_constraint in constraints["goal_outcomes"]["properties"].items():
                 goal_fields = native_properties["goal_outcomes"]["properties"][goal_id]["properties"]
                 constrained_fields = goal_constraint["properties"]
-                for field_name in ("disposition", "coverage", "response_text", "step_ids"):
+                for field_name in ("disposition", "coverage", "step_ids"):
                     goal_fields[field_name].update(constrained_fields[field_name])
                 satisfaction_restrictions.append((
                     goal_fields["satisfaction"],
@@ -2270,11 +2290,7 @@ def _constrain_plan_relation_confirmation(schema: dict[str, Any]) -> None:
                             "type": "boolean",
                             "enum": [True],
                         },
-                        "response_text": {
-                            "type": "string",
-                            "minLength": 1,
-                        },
-                    }
+                        }
                 },
             ]
         }
@@ -2382,217 +2398,6 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
 # project an already-owned Planner contract; they do not invoke a model or choose HOW.
 
 
-def fast_presentation_commit_response_schema(
-    responsibility_refs: list[str],
-    *,
-    responsibilities: list[CognitiveResponsibilityProposal] | None = None,
-    auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
-    language: str = "",
-) -> dict[str, Any]:
-    """Expose the early typed value inside one streamed Fast Planner result.
-
-    The decoder may choose a complete response only for ordinary speech WHAT that
-    is immediately deliverable. Speech explicitly ordered after or parallel with
-    another Responsibility remains terminal-plan work so its requested timing is
-    preserved. Information, body/media/vocal, and other observable/stateful
-    Responsibilities still need Planner work before they can be completed, so
-    their pre-Evidence early-commit schema exposes only prospective progress or
-    silence. This keeps the decoder from treating a text-only progress
-    acknowledgement as a complete response just because the compact DTO
-    intentionally omits the mechanical ``role`` tag.
-    """
-
-    schema = copy.deepcopy(FastPlannerPresentationCommitModelOutput.model_json_schema())
-    _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
-    required = list(schema.get("required") or [])
-    for field_name in ("activity", "auxiliary_activities"):
-        if field_name not in required:
-            required.append(field_name)
-    schema["required"] = required
-    definitions = schema.get("$defs", {})
-    activity_schema = schema.get("properties", {}).get("activity")
-    immediately_presentable_speech_refs: list[str] = []
-    if isinstance(activity_schema, dict):
-        # Keep the model-facing DTO semantic and tiny. Runtime restores the
-        # discriminating role after decoding from the presence/absence of
-        # progress_kind, so the LLM does not spend tokens on a mechanical tag.
-        activity_schema.clear()
-        supplied_responsibilities = list(responsibilities or [])
-        by_ref = {item.local_ref: item for item in supplied_responsibilities}
-
-        def sibling_refs(value: Any) -> set[str]:
-            values = value if isinstance(value, list) else [value]
-            return {str(item).strip() for item in values if str(item).strip() in by_ref}
-
-        blocked_speech_refs: set[str] = set()
-        for item in supplied_responsibilities:
-            if item.output_mode != "speech":
-                continue
-            if (
-                sibling_refs(item.bindings.get("after"))
-                or sibling_refs(item.bindings.get("follows"))
-                or sibling_refs(item.bindings.get("parallel_with"))
-            ):
-                blocked_speech_refs.add(item.local_ref)
-        for item in supplied_responsibilities:
-            for target_ref in (
-                sibling_refs(item.bindings.get("before"))
-                | sibling_refs(item.bindings.get("precedes"))
-                | sibling_refs(item.bindings.get("parallel_with"))
-            ):
-                target = by_ref.get(target_ref)
-                if target is not None and target.output_mode == "speech":
-                    blocked_speech_refs.add(target_ref)
-        immediately_presentable_speech_refs = [
-            item.local_ref
-            for item in supplied_responsibilities
-            if item.output_mode == "speech" and item.local_ref not in blocked_speech_refs
-        ]
-        direct_conversation = bool(supplied_responsibilities) and all(
-            item.local_ref in immediately_presentable_speech_refs
-            for item in supplied_responsibilities
-        )
-        has_direct_conversation = bool(immediately_presentable_speech_refs)
-        activity_choices: list[dict[str, Any]] = []
-        if has_direct_conversation:
-            activity_choices.append({"$ref": "#/$defs/FastPlannerCompleteResponseAct"})
-        if not direct_conversation:
-            activity_choices.append({"$ref": "#/$defs/FastPlannerProgressAct"})
-        activity_choices.append({"type": "null"})
-        activity_schema.update(
-            {
-                "anyOf": activity_choices,
-                "default": None,
-            }
-        )
-    for contract_name in (
-        "FastPlannerProgressAct",
-        "FastPlannerCompleteResponseAct",
-    ):
-        contract = definitions.get(contract_name)
-        if not isinstance(contract, dict):
-            continue
-        properties = contract.get("properties")
-        if not isinstance(properties, dict):
-            continue
-        for field_name in (
-            "evidence_refs",
-            "timing",
-            "speech_act",
-            "truth_stage",
-            "role",
-        ):
-            properties.pop(field_name, None)
-        activity_id_contract = properties.get("activity_id")
-        if isinstance(activity_id_contract, dict):
-            activity_id_contract["maxLength"] = 48
-            activity_id_contract["pattern"] = r"^[A-Za-z0-9][A-Za-z0-9._-]*$"
-            activity_id_contract["description"] = (
-                "Stable short ID for this committed Communicative Activity. "
-                "Every auxiliary anchor_id must equal this value exactly."
-            )
-        text_contract = properties.get("text")
-        if isinstance(text_contract, dict):
-            text_contract["maxLength"] = 64 if str(language).casefold().startswith("zh") else 120
-            if contract_name == "FastPlannerCompleteResponseAct":
-                prior_utterances = {
-                    str(item.bindings.get("prior_assistant_utterance") or "")
-                    for item in (responsibilities or [])
-                    if str(item.bindings.get("prior_assistant_utterance") or "")
-                }
-                if len(prior_utterances) == 1:
-                    # The user asked for an exact repeat of already accepted
-                    # delivered speech. Projecting that immutable dialogue
-                    # value is not Host-authored wording; it prevents the model
-                    # from substituting the current question or adding a prefix.
-                    prior_utterance = next(iter(prior_utterances))
-                    text_contract["const"] = prior_utterance
-                    text_contract["maxLength"] = max(
-                        int(text_contract["maxLength"]),
-                        len(prior_utterance),
-                    )
-            if contract_name == "FastPlannerProgressAct":
-                semantic_contract = [
-                    {
-                        "relationship": item.relationship,
-                        "outcome": item.outcome,
-                        "target_goal_ids": list(item.target_goal_ids),
-                    }
-                    for item in (responsibilities or [])
-                ]
-                text_contract["pattern"] = r"^[^?？]*$"
-                text_contract["description"] = (
-                    "Exact short speech before any work or Evidence exists. "
-                    "It may acknowledge and prospectively say what Chromie will "
-                    "check/do, but must not name an instrument, source, sensor, "
-                    "screen, or implementation method because no Capability has "
-                    "been selected in this phase. It must not answer the request "
-                    "or imply execution, a result, or completion already happened. "
-                    "For relationship=continue, preserve continuation/resumption "
-                    "of the concrete resolved outcome and never use an onset or "
-                    "progressive predicate before Runtime commitment. Semantic "
-                    "Responsibility context: " + bounded_json(semantic_contract, 1200)
-                )
-        source_refs = properties.get("source_responsibility_refs")
-        if isinstance(source_refs, dict):
-            allowed_refs = (
-                immediately_presentable_speech_refs
-                if contract_name == "FastPlannerCompleteResponseAct"
-                else list(responsibility_refs)
-            )
-            source_refs["items"] = {
-                "type": "string",
-                "enum": list(dict.fromkeys(allowed_refs)),
-            }
-            source_refs["uniqueItems"] = True
-            if len(set(allowed_refs)) == 1 and len(set(responsibility_refs)) == 1:
-                properties.pop("source_responsibility_refs", None)
-        if contract_name == "FastPlannerProgressAct":
-            progress_kind = properties.get("progress_kind")
-            if isinstance(progress_kind, dict):
-                progress_kind["description"] = (
-                    "Select check_information for information acquisition, "
-                    "perform_action for an embodied/media/vocal/state-changing "
-                    "effect, or acknowledge_work for other prospective work."
-                )
-                enum_values = progress_kind.get("enum")
-                if isinstance(enum_values, list):
-                    progress_kind["enum"] = [value for value in enum_values if value != "think"]
-        if contract_name == "FastPlannerProgressAct":
-            ordered: dict[str, Any] = {}
-            for field_name in ("activity_id", "progress_kind", "text"):
-                if field_name in properties:
-                    ordered[field_name] = properties[field_name]
-            for field_name, field_schema in properties.items():
-                if field_name not in ordered:
-                    ordered[field_name] = field_schema
-            contract["properties"] = properties = ordered
-        required = contract.get("required")
-        if isinstance(required, list):
-            required_names = set(required).intersection(properties)
-            if len(set(responsibility_refs)) == 1:
-                required_names.discard("source_responsibility_refs")
-            contract["required"] = [
-                name
-                for name in (
-                    "role",
-                    "activity_id",
-                    "progress_kind",
-                    "source_responsibility_refs",
-                    "text",
-                )
-                if name in required_names
-            ] + sorted(
-                required_names
-                - {
-                    "role",
-                    "activity_id",
-                    "progress_kind",
-                    "source_responsibility_refs",
-                    "text",
-                }
-            )
-    return schema
 
 
 def _fast_terminal_activity_contract() -> dict[str, Any]:
@@ -2649,7 +2454,6 @@ def fast_advance_response_schema(
     """
 
     schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
-    _constrain_auxiliary_activity_schema(schema, auxiliary_social_capabilities)
     unresolved_meaning = {
         " ".join(str(item or "").strip().split())
         for item in (interpretation_unresolved or [])
@@ -2673,10 +2477,6 @@ def fast_advance_response_schema(
                 "may execute only independent Responsibilities not blocked by "
                 "a clarification. Escalation authorizes no Capability work."
             )
-    top_required = list(schema.get("required") or [])
-    if "auxiliary_activities" not in top_required:
-        top_required.append("auxiliary_activities")
-    schema["required"] = top_required
     activities_schema = top_properties.get("activities")
     if isinstance(activities_schema, dict):
         activities_schema["maxItems"] = max(
@@ -2720,6 +2520,7 @@ def fast_advance_response_schema(
     if isinstance(reason_summary, dict):
         reason_summary["maxLength"] = 160
     refs = list(dict.fromkeys(responsibility_refs))
+    schema["properties"]["activities"]["maxItems"] = len(refs)
     responsibility_items = list(responsibilities or [])
     ordinary_speech_refs = {
         item.local_ref for item in responsibility_items if item.output_mode == "speech"
@@ -2789,6 +2590,12 @@ def fast_advance_response_schema(
                             for name in input_schema.get("required") or []
                             if isinstance(input_properties.get(str(name)), dict)
                             and "default" not in input_properties[str(name)]
+                            # This is the same direct-binding exclusion enforced
+                            # by Host. Across several Responsibilities, exclude
+                            # only names bound in every possible source owner.
+                            and not (responsibility_items and all(
+                                str(name) in item.bindings for item in responsibility_items
+                            ))
                         ]
                         if not required_inputs:
                             continue
@@ -2820,7 +2627,14 @@ def fast_advance_response_schema(
                         information_gap_contract.setdefault("allOf", []).append(
                             {"anyOf": execution_input_branches}
                         )
-    clarification_contract = definitions.get("FastPlannerClarificationAct")
+                        native_gaps = []
+                        for constraint in execution_input_branches:
+                            variant = copy.deepcopy(information_gap_contract)
+                            variant.pop("allOf", None)
+                            variant["properties"].update(constraint["properties"])
+                            native_gaps.append(variant)
+                        information_gap_contract["oneOf"] = native_gaps
+    clarification_contract = definitions.get("FastPlannerInputNeed")
     if isinstance(clarification_contract, dict):
         gaps = clarification_contract.get("properties", {}).get("information_gaps")
         if isinstance(gaps, dict):
@@ -2829,34 +2643,9 @@ def fast_advance_response_schema(
             gaps["maxItems"] = min(
                 int(gaps.get("maxItems", 8)), max(1, len(unresolved_meaning))
             )
-    if committed_communicative or suppress_new_communicative:
-        # PresentationCommit already made this invocation's communication decision.
-        # Its terminal portion may still discover a real clarification need, but it
-        # must not manufacture substitute progress/completion speech merely because
-        # execution planning is continuing.
-        activities = top_properties.get("activities")
-        activity_items = activities.get("items") if isinstance(activities, dict) else None
-        allowed_activity_contracts = [
-            "FastPlannerCapabilityActivity",
-            "FastPlannerClarificationAct",
-        ]
-        if isinstance(activity_items, dict):
-            activity_items["oneOf"] = [
-                {"$ref": f"#/$defs/{contract_name}"} for contract_name in allowed_activity_contracts
-            ]
-            discriminator = activity_items.get("discriminator")
-            if isinstance(discriminator, dict):
-                mapping = discriminator.get("mapping")
-                if isinstance(mapping, dict):
-                    discriminator["mapping"] = {
-                        role: ref
-                        for role, ref in mapping.items()
-                        if ref.rsplit("/", 1)[-1] in allowed_activity_contracts
-                    }
     for contract_name in (
-        "FastPlannerCompleteResponseAct",
-        "FastPlannerClarificationAct",
-        "FastPlannerProgressAct",
+        "FastPlannerResponseNeed",
+        "FastPlannerInputNeed",
         "FastPlannerCapabilityActivity",
     ):
         contract = definitions.get(contract_name)
@@ -2870,12 +2659,13 @@ def fast_advance_response_schema(
                 if contract_name == "FastPlannerCapabilityActivity"
                 else (
                     [ref for ref in refs if ref in ordinary_speech_refs]
-                    if (contract_name == "FastPlannerCompleteResponseAct" and responsibility_items)
+                    if (contract_name == "FastPlannerResponseNeed" and responsibility_items)
                     else refs
                 )
             )
             source_refs["items"] = {"type": "string", "enum": allowed_refs}
             source_refs["uniqueItems"] = True
+            source_refs["maxItems"] = len(allowed_refs)
         role = contract_properties.get("role")
         if isinstance(role, dict):
             # Put the discriminating semantic choice before the branch payload.
@@ -2890,12 +2680,10 @@ def fast_advance_response_schema(
     if isinstance(activity_items, dict) and responsibility_items:
         allowed_activity_contracts = [
             "FastPlannerCapabilityActivity",
-            "FastPlannerClarificationAct",
+            "FastPlannerInputNeed",
         ]
-        if not (committed_communicative or suppress_new_communicative or suppress_new_progress):
-            allowed_activity_contracts.append("FastPlannerProgressAct")
         if ordinary_speech_refs and not (committed_communicative or suppress_new_communicative):
-            allowed_activity_contracts.insert(1, "FastPlannerCompleteResponseAct")
+            allowed_activity_contracts.insert(1, "FastPlannerResponseNeed")
         activity_items["oneOf"] = [
             {"$ref": f"#/$defs/{contract_name}"} for contract_name in allowed_activity_contracts
         ]
@@ -2909,22 +2697,6 @@ def fast_advance_response_schema(
                     if ref.rsplit("/", 1)[-1] in allowed_activity_contracts
                 }
     capability_contract = definitions.get("FastPlannerCapabilityActivity")
-    progress_contract = definitions.get("FastPlannerProgressAct")
-    if isinstance(progress_contract, dict):
-        # These values are fixed by the selected progress_kind contract and
-        # Pydantic validation. Omitting their duplicate decoder properties
-        # keeps the low-latency response schema small without moving wording
-        # or semantic-function ownership out of Fast Planner.
-        progress_contract.pop("allOf", None)
-        progress_properties = progress_contract.get("properties")
-        if isinstance(progress_properties, dict):
-            for field_name in (
-                "evidence_refs",
-                "speech_act",
-                "timing",
-                "truth_stage",
-            ):
-                progress_properties.pop(field_name, None)
     allowed_capabilities = [
         item
         for item in (capabilities or [])
@@ -2937,7 +2709,6 @@ def fast_advance_response_schema(
         capability_contract.pop("allOf", None)
         capability_properties = capability_contract.get("properties")
         if isinstance(capability_properties, dict):
-            capability_properties.pop("reason_summary", None)
             capability_required = list(capability_contract.get("required", []))
             for field_name in ("args", "timing"):
                 if field_name not in capability_required:
@@ -2955,6 +2726,8 @@ def fast_advance_response_schema(
                     "enum": [capability_id_value],
                 }
                 branch_properties["args"] = copy.deepcopy(input_schema)
+                if capability.get("can_run_parallel") is False:
+                    branch_properties["timing"] = {"type": "string", "const": "sequential"}
                 branches.append(
                     {
                         "type": "object",
@@ -2965,64 +2738,15 @@ def fast_advance_response_schema(
                 )
             if branches:
                 capability_contract["oneOf"] = branches
+    # Decide local Work before its redundant aggregate disposition.
+    properties = schema["properties"]
+    schema["properties"] = {
+        "activities": properties["activities"],
+        **{key: value for key, value in properties.items() if key != "activities"},
+    }
     return schema
 
 
-def _namespace_local_definitions(
-    schema: dict[str, Any],
-    *,
-    prefix: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Move one standalone schema's definitions into a collision-free namespace."""
-
-    projected = copy.deepcopy(schema)
-    definitions = projected.pop("$defs", {})
-    if not isinstance(definitions, dict):
-        definitions = {}
-
-    def local_definition_refs(node: Any) -> set[str]:
-        refs: set[str] = set()
-        if isinstance(node, dict):
-            ref = node.get("$ref")
-            if isinstance(ref, str) and ref.startswith("#/$defs/"):
-                refs.add(ref.rsplit("/", 1)[-1])
-            for value in node.values():
-                refs.update(local_definition_refs(value))
-        elif isinstance(node, list):
-            for value in node:
-                refs.update(local_definition_refs(value))
-        return refs
-
-    # Pydantic keeps every original union member in $defs after the root has
-    # narrowed its choices. Exclude unreachable branches so the decoder cannot
-    # borrow fields from Activity roles that are invalid in this stream phase.
-    reachable: set[str] = set()
-    pending = list(local_definition_refs(projected))
-    while pending:
-        name = pending.pop()
-        if name in reachable:
-            continue
-        reachable.add(name)
-        definition = definitions.get(name)
-        if definition is not None:
-            pending.extend(local_definition_refs(definition) - reachable)
-    definitions = {name: value for name, value in definitions.items() if name in reachable}
-    renamed = {f"{prefix}{name}": value for name, value in definitions.items()}
-
-    def rewrite(node: Any) -> None:
-        if isinstance(node, dict):
-            ref = node.get("$ref")
-            if isinstance(ref, str) and ref.startswith("#/$defs/"):
-                node["$ref"] = "#/$defs/" + prefix + ref.rsplit("/", 1)[-1]
-            for value in node.values():
-                rewrite(value)
-        elif isinstance(node, list):
-            for value in node:
-                rewrite(value)
-
-    rewrite(projected)
-    rewrite(renamed)
-    return projected, renamed
 
 
 def _ollama_streaming_schema(
@@ -3151,167 +2875,20 @@ def _ollama_streaming_schema(
 
 
 def fast_streaming_advance_response_schema(
-    responsibility_refs: list[str],
-    *,
+    responsibility_refs: list[str], *,
     responsibilities: list[CognitiveResponsibilityProposal] | None = None,
     capabilities: list[dict[str, Any]] | None = None,
     auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     interpretation_unresolved: list[str] | None = None,
     language: str = "",
 ) -> dict[str, Any]:
-    """Build the ordered single-call Fast Planner streaming decoder contract.
-
-    The terminal branch cannot author a second progress Act. It supplies residual
-    Capability/clarification planning and any ordinary speech whose requested
-    ordering made it ineligible for the early commit. The Agent joins the immutable
-    presentation Activity before validating ``FastPlannerAdvance`` and rejects
-    duplicate completion ownership.
-    """
-
-    presentation, presentation_defs = _namespace_local_definitions(
-        fast_presentation_commit_response_schema(
-            responsibility_refs,
-            responsibilities=responsibilities,
-            auxiliary_social_capabilities=auxiliary_social_capabilities,
-            language=language,
-        ),
-        prefix="Presentation_",
-    )
-    terminal_schema = fast_advance_response_schema(
-        responsibility_refs,
-        responsibilities=responsibilities,
-        capabilities=capabilities,
-        auxiliary_social_capabilities=auxiliary_social_capabilities,
+    """One complete Work result; independent SC owns communication latency."""
+    schema = fast_advance_response_schema(
+        responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
         interpretation_unresolved=interpretation_unresolved,
-        committed_communicative=False,
-        suppress_new_communicative=False,
-        suppress_new_progress=True,
     )
-    # Runtime Pydantic and authoritative validation retain these invariants.
-    # Omitting decoder-only conditionals and discriminator annotations avoids
-    # Ollama grammar ambiguity inside the two-member streaming object.
-    terminal_schema.pop("allOf", None)
-    # Retain the small cross-field subset that prevents the decoder from
-    # producing a shape the typed Fast DTO must reject.  The full canonical
-    # condition tree is intentionally not copied into the streaming grammar.
-    terminal_schema["allOf"] = [
-        _fast_terminal_activity_contract(),
-        {
-            "if": {
-                "properties": {"disposition": {"enum": ["escalate"]}},
-                "required": ["disposition"],
-            },
-            "then": {
-                "properties": {
-                    "coverage": {"enum": ["partial", "uncertain"]},
-                    "activities": {"maxItems": 0},
-                    "continuations": {
-                        "items": {"enum": ["deep_planner"]},
-                        "minItems": 1,
-                        "maxItems": 1,
-                    },
-                },
-                "required": ["coverage", "activities", "continuations"],
-            },
-        },
-    ]
-    terminal_definitions = terminal_schema.get("$defs", {})
-    terminal_capability = (
-        terminal_definitions.get("FastPlannerCapabilityActivity")
-        if isinstance(terminal_definitions, dict)
-        else None
-    )
-    if isinstance(terminal_capability, dict):
-        # Native structured streaming is also checked by the full
-        # Pydantic/catalog validators. Keep one common Activity shape here and
-        # put every exact per-Capability args schema once in the prompt catalog;
-        # repeating the whole Activity union made the semantic choice remote and
-        # inflated the primary model surface without adding runtime safety.
-        terminal_capability.pop("oneOf", None)
-        capability_properties = terminal_capability.get("properties")
-        if isinstance(capability_properties, dict):
-            capability_id = capability_properties.get("capability_id")
-            if isinstance(capability_id, dict):
-                capability_id["enum"] = [
-                    str(item.get("capability_id") or "")
-                    for item in (capabilities or [])
-                    if str(item.get("capability_id") or "")
-                ]
-            capability_properties["args"] = {
-                "type": "object",
-                "additionalProperties": True,
-                "description": (
-                    "Must match the selected capability_id's one exact args_schema "
-                    "in the Capability catalog. Omit unrequested optional defaults. "
-                    "Preserve every owning Responsibility semantic binding exactly; "
-                    "for a structured physical-resource capability, entity/item owns "
-                    "resource.description, recipient owns recipient.description, and "
-                    "each location/direction/distance/route owns a separate same-named "
-                    "entry in source.bindings."
-                ),
-            }
-            nonparallel_capability_ids = [
-                str(item.get("capability_id") or "")
-                for item in (capabilities or [])
-                if str(item.get("capability_id") or "") and item.get("can_run_parallel") is False
-            ]
-            if nonparallel_capability_ids:
-                terminal_capability.setdefault("allOf", []).append(
-                    {
-                        "if": {
-                            "properties": {"capability_id": {"enum": nonparallel_capability_ids}},
-                            "required": ["capability_id"],
-                        },
-                        "then": {
-                            "properties": {"timing": {"enum": ["sequential"]}},
-                            "required": ["timing"],
-                        },
-                    }
-                )
-    terminal_activities = terminal_schema.get("properties", {}).get("activities")
-    terminal_items = (
-        terminal_activities.get("items") if isinstance(terminal_activities, dict) else None
-    )
-    if isinstance(terminal_items, dict):
-        terminal_items.pop("discriminator", None)
-    terminal, terminal_defs = _namespace_local_definitions(
-        terminal_schema,
-        prefix="Terminal_",
-    )
-    streaming_schema = {
-        "title": "FastPlannerStreamingAdvanceOutput",
-        "type": "object",
-        "properties": {
-            "presentation_commit": presentation,
-            "terminal_result": terminal,
-        },
-        "required": ["presentation_commit", "terminal_result"],
-        "additionalProperties": False,
-        "$defs": {**presentation_defs, **terminal_defs},
-    }
-    streaming_schema.setdefault("allOf", []).append(
-        {
-            "if": {
-                "properties": {
-                    "terminal_result": {
-                        "properties": {"disposition": {"enum": ["escalate"]}},
-                        "required": ["disposition"],
-                    }
-                },
-                "required": ["terminal_result"],
-            },
-            "then": {
-                "properties": {
-                    "presentation_commit": {
-                        "properties": {"activity": {"type": "null"}},
-                        "required": ["activity"],
-                    }
-                }
-            },
-        }
-    )
-    compiled = _ollama_streaming_schema(streaming_schema, retain_value_constraints=True)
-    compiled["title"] = "FastPlannerStreamingAdvanceOutput"
+    compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
+    compiled["title"] = "FastPlannerWorkAdvanceOutput"
     return compiled
 
 

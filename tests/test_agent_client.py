@@ -9,7 +9,6 @@ from typing import Any
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.semantic_task import SemanticGoal
-from shared.chromie_contracts.plan import PresentationCommit
 from shared.chromie_runtime.runtime_trace import TRACE_CARRIER_KEY, runtime_tracer
 
 try:
@@ -108,18 +107,13 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertAlmostEqual(session.posts[0]["timeout"].total, 65.0)
 
-    async def test_fast_stream_yields_typed_commit_from_single_endpoint(self) -> None:
-        commit = PresentationCommit(
-            commit_id="commit-fast",
-            turn_id="turn-fast",
-            activity={
-                "activity_id": "ack",
-                "role": "progress",
-                "text": "我先看看。",
-                "progress_kind": "check_information",
-                "source_responsibility_refs": ["weather"],
-            },
-        )
+    async def test_fast_stream_yields_word_free_terminal_from_single_endpoint(self) -> None:
+        from shared.chromie_contracts.plan import FastPlannerStreamTerminal, FastPlannerAdvance
+        commit = FastPlannerStreamTerminal(turn_id="turn-fast", advance=FastPlannerAdvance(
+            turn_id="turn-fast", disposition="escalate", coverage="uncertain",
+            covered_responsibility_refs=["weather"], continuations=["deep_planner"],
+            confidence=0.9, unresolved=["No exact current method established."],
+        ))
         session = _FakeSession(_FakeResponse(text=commit.model_dump_json() + "\n"))
 
         frames = [
@@ -145,7 +139,8 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
             )
         ]
 
-        self.assertEqual(frames[0].activity.text, "我先看看。")
+        self.assertEqual(frames[0].advance.continuations, ["deep_planner"])
+        self.assertEqual(frames[0].advance.activities, [])
         self.assertEqual(
             session.posts[0]["url"],
             "http://agent.local/fast-advance",

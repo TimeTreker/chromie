@@ -5901,6 +5901,10 @@ class ConversationStateManager:
                     if isinstance(item, dict)
                     else getattr(item, "metadata", None)
                 )
+                if isinstance(item_metadata, dict) and item_metadata.get("wording_owner") == "social_cognition":
+                    # SC utterances enter dialogue only through the playback-qualified
+                    # recorder. This call may merely bind a proposed response to Work.
+                    continue
                 if (
                     isinstance(item_metadata, dict)
                     and item_metadata.get("reuse_current_turn_speech") is True
@@ -5952,6 +5956,13 @@ class ConversationStateManager:
                 for item in speech_items:
                     item_metadata = item.get("metadata")
                     if not isinstance(item_metadata, dict):
+                        continue
+                    if item_metadata.get("wording_owner") == "social_cognition" and goal_id not in self._string_list(
+                        item_metadata.get("communication_completion_goal_ids")
+                    ):
+                        # Relevant progress is not fulfillment of an answer. SC's
+                        # exact need coverage selects the eligible communication
+                        # Goals; actual Runtime delivery still completes them.
                         continue
                     covered_goal_ids = self._string_list(
                         item_metadata.get("covers_goal_ids")

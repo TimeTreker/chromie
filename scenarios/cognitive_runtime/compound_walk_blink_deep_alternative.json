@@ -37,7 +37,8 @@
       "disposition": "escalate",
       "coverage": "partial",
       "confidence": 0.91,
-      "escalation_reason": "compound goal requires full-catalog planning"
+      "escalation_reason": "compound goal requires full-catalog planning",
+      "communication_needs": []
     },
     "deep_plans": [
       {
@@ -88,23 +89,7 @@
           "plan_relation": "alternative",
           "user_confirmation_required": true
         },
-        "response_text": "",
-        "communicative_acts": [
-          {
-            "activity_id": "scenario-pre_action",
-            "text": "我还不能边走边眨眼，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！",
-            "role": "complete_response",
-            "timing": "parallel",
-            "delivery_phase": "pre_action",
-            "speech_act": "inform",
-            "source_goal_ids": [
-              "goal-compound"
-            ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
-          }
-        ]
+        "communication_needs": []
       }
     ],
     "capabilities": [
@@ -152,7 +137,31 @@
           "eye_expression"
         ]
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      },
+      "deep": {
+        "activities": [
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我还不能边走边眨眼，不过我可以先往前走十五秒，再眨四下眼睛。这样可以吗？你说“好”，我就开始啦！",
+            "function": "ask",
+            "delivery_phase": "pre_action",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-compound"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

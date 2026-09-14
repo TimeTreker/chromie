@@ -1,6 +1,69 @@
 # Chromie Current Status
 
-**Updated:** 2026-09-14
+## Social Cognition migration
+
+**Updated:** 2026-09-14. The owner-authorized
+[interaction-planning responsibility](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+is implemented on the maintained ordinary-turn, result and trusted Situation
+paths. SC and Work Planner share existing state and retain distinct authority.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+|---|---|---|---|
+| Source-complete: shared SC transaction, independent GI fan-out, word-free Work/communication needs, exact confirmation/order joins, delivery-qualified dialogue, cancellation/freshness, trusted environment initiative and qualified optional expression. Retired presentation and executable Planner-wording paths removed. | Canonical `canonical-sc-closed.log` exits 0: 3,245 tests / 820 subtests, 145 benchmarks and 20 legacy tests pass; pinned static, policy, ownership, config and docs checks pass. Strict final 6,000 workflows and all 45 Level A scenarios pass. | Earlier native SC 12/12 and Work 8/8 pass Schema/DTO/Host plus implementer semantic review; current production packets match those exact native packets and recorded replies replay successfully. A later fresh native attempt failed to connect, with zero outputs. No current deployed full-chain, contention/latency or physical proof. | Implementation ready for review; development only. Current-target deployment and existing #24/#32 evidence closure remain open. Owner-authorized Git delivery; no service restart/deployment performed. |
+
+Delivery is from `main` to `origin/main`, with pre-delivery base
+`d5a7985ec74b02cd01c11b0d538fca7ae13a3498`. SC receives shared history,
+Memory/Mind, Goals and task/Work/Evidence state. It may speak, ask, select an
+eligible expression or remain silent. Trusted environment initiative does not
+require synthetic GI or a task Goal. Required needs and communication ordering
+remain exact; optional SC does not block independent Work. Only actual correlated
+completed playback enters heard dialogue or speech completion. Soridormi retains
+embodied execution and safety ownership.
+
+The final strict aggregate (`workflow-sc-closed/`) retains unchanged source and
+all 6,000 declared outcomes: 1,400 successful workflows, 1,800 observed state/fault/
+permission outcomes, 2,580 expected rejections and 220 safe nonexecuting replies.
+These are 60 authored contrast families with controlled providers and scripted SC,
+not 6,000 independent native inferences. Expected outcomes were preserved during
+explicit request recapture, then frozen and strictly replayed; no replay hook
+substitutes candidate decisions or updates expected requests. Existing splits and
+training-ineligible status remain.
+
+Native evidence root is
+`.chromie/acceptance/social-cognition-mainline-20260914/`:
+`native-final-sc/` and `native-work-roles-complete-order/` retain actual packets,
+raw outputs, complete Schema/DTO/Host results and per-case semantic adjudication.
+The Work corpus covers greeting, grounded numeric action, precise weather period,
+unsupported capability and both communication/action orders. The SC corpus covers
+bilingual conversation, missing-input/confirmation needs, independent failure,
+trusted arrival, completed/interrupted speech and scheduled/running distinctions.
+Native upstream inputs/catalog are controlled; expression execution is qualified
+by controlled Runtime tests rather than the empty-catalog native SC cohort.
+`recorded-sc-final/` and `recorded-work-final/` prove exact current-packet equality
+and successful replay; they are not new native inference.
+
+A subsequent native availability attempt (`native-sc-retired/`) retained 12
+connection errors and zero model outputs. Read-only `docker ps` then showed no
+running containers; the cause of the stop is unknown and no restart was attempted.
+Before that, SGLang 0.5.19 / `chromie-gemma4-12b` was observed with higher-first
+priority scheduling, two running-request slots and preemption threshold 10.
+SC foreground/deep priorities are 400/100; ordinary Planner is 300. No speedup,
+starvation prevention, paired contention or audible latency result follows from
+that configuration. Isolated earlier SC calls were roughly 2–5 seconds, excluding
+GI, TTS and playback. Live acceptance now reads SC decisions and completed
+playback, with separate decision and decision-to-playback intervals; silence or
+missing SC output cannot satisfy a speaking-latency bound.
+
+The [source inventory](COGNITIVE_TURN_LOOP.md#source-migration-inventory),
+[checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) retain
+exact evidence, root-cause workflow, remaining target work and resume commands.
+No new document, environment variable or service was introduced; current Markdown
+and core-reading counts remain 102 and 15. Earlier text-console work remains
+preserved: separate dialogue terminal, ASR bypass, Soridormi retained, backend logs
+in the startup terminal.
+
+## Existing implementation and retained qualification
+
 **Current focus:** native #24/#32 qualification and bounded #67 distance containment.
 Pre-delivery base `d7c7f277`; resume from the latest commit containing both handoffs.
 The owner authorized continued fixes, reports, commit/push and solved-Issue closure.
@@ -171,13 +234,13 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
 - Goal Interpretation owns provider-neutral Responsibility meaning, not Work or speech.
 - Goal Association owns canonical Goal identity and continuity, not replanning.
 - Planner is one HOW authority; fast and deep are cognition passes of that same owner.
-- Planner owns ordinary Communicative Activities and exact wording.
-- The same primary Planner result may own bounded `auxiliary_activities[]`; these are
-  fingerprinted Plan truth but never Goal-owned Work or completion Evidence.
+- SC owns ordinary Communicative Acts and exact wording.
+- The same primary SC result may own bounded `auxiliary_activities[]`; these remain
+  interaction expression, never Goal-owned Work or task-completion Evidence.
 - Trusted Capability Runtime and Providers own effect realization/lifecycle, not Goal
   interpretation.
 - Runtime events report what happened. Host-correlated Evidence records what is true.
-- `CognitiveOpportunity` is an ephemeral readiness carrier, not Goal/Evidence/Situation/response/execution truth. Goal-bound readiness may re-enter Planner; exact trusted Goal-free Situation readiness may enter communication-only Planner cognition; either path may do nothing.
+- `CognitiveOpportunity` is an ephemeral readiness carrier, not Goal/Evidence/Situation/response/execution truth. Goal-bound readiness may re-enter Planner; exact trusted Goal-free Situation readiness may enter the shared SC transaction; either path may do nothing.
 - Auxiliary-only events cannot create a `CognitiveOpportunity`; Goal-free readiness requires independently trusted primary Situation/source provenance.
 - Existing-Work comparison, reuse, cancellation, replacement, or supplementation are
   Planner operations, not a mandatory Work-Reconciliation stage.

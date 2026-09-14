@@ -11,6 +11,16 @@ from agent.app.inference_compute import (
 
 
 class InferenceComputePolicyTests(unittest.TestCase):
+    def test_social_response_precedes_work_but_deep_reasoning_is_bounded(self) -> None:
+        self.assertGreater(
+            compute_rank(compute_class_for_purpose("social_cognition")),
+            compute_rank(compute_class_for_purpose("fast_planner")),
+        )
+        self.assertLess(
+            compute_rank(compute_class_for_purpose("social_cognition_deep")),
+            compute_rank(compute_class_for_purpose("fast_planner")),
+        )
+
     def test_relative_rank_protects_foreground_from_deliberation(self) -> None:
         ordered = [
             CognitionComputeClass.REALTIME,

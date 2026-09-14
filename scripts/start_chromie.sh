@@ -11,6 +11,7 @@ BUILD_IMAGES=0
 REBUILD_NO_CACHE=0
 KEEP_SERVICES=0
 START_ORCHESTRATOR=1
+TEXT_CONSOLE=0
 ARCHITECTURE_VALIDATION=0
 TTS_BACKEND="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 
@@ -29,6 +30,7 @@ Options:
                           default: http://127.0.0.1:8000/mcp
   --keep-services         Leave Chromie containers running after exit
   --no-orchestrator       Start/probe services, then skip the host Orchestrator
+  --text-console          Accept dialogue from the separate text client; bypass microphone/ASR
   --architecture-validation
                           Use long-context, long-output, long-timeout validation
                           budgets for primary cognitive model qualification
@@ -44,12 +46,18 @@ while [ "$#" -gt 0 ]; do
     --mcp-url) MCP_URL="${2:?--mcp-url requires a URL}"; shift 2 ;;
     --keep-services) KEEP_SERVICES=1; shift ;;
     --no-orchestrator) START_ORCHESTRATOR=0; shift ;;
+    --text-console) TEXT_CONSOLE=1; shift ;;
     --architecture-validation) ARCHITECTURE_VALIDATION=1; shift ;;
     --tts-backend) TTS_BACKEND="${2:?--tts-backend requires a provider}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[chromie][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [ "$TEXT_CONSOLE" = "1" ] && [ "$START_ORCHESTRATOR" = "0" ]; then
+  echo "[chromie][error] --text-console requires the Host; remove --no-orchestrator." >&2
+  exit 2
+fi
 
 if [ "$ARCHITECTURE_VALIDATION" = "1" ]; then
   export CHROMIE_VALIDATION_PROFILE=architecture
@@ -685,7 +693,9 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${AGENT_LLM_PROVIDER:-ollama}" = "oll
   reset_ollama_before_tts_warmup
 fi
 
-wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"
+if [ "$TEXT_CONSOLE" = "0" ]; then
+  wait_for_ws_health 127.0.0.1 9001 asr 900 "ASR"
+fi
 wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts 1200 "$TTS_READY_LABEL"
 wait_for_http 127.0.0.1 8092 /health 300 "Agent"
 if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
@@ -725,7 +735,9 @@ fi
 check_soridormi_from_agent_container
 run_soridormi_capability_probe
 
-if [ "$START_ORCHESTRATOR" = "1" ]; then
+if [ "$TEXT_CONSOLE" = "1" ]; then
+  READY_NEXT_STEP='Text Host starts next. In another terminal run: python scripts/chromie_psm_live_text_console.py'
+elif [ "$START_ORCHESTRATOR" = "1" ]; then
   if [ "${ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED:-0}" = "1" ]; then
     READY_NEXT_STEP="The host Orchestrator starts next; wait for Chromie's wake-up greeting and 'Microphone started' before speaking."
   else
@@ -762,5 +774,9 @@ if [ "$START_ORCHESTRATOR" = "0" ]; then
   exit 0
 fi
 
+ORCHESTRATOR_ARGS=()
+if [ "$TEXT_CONSOLE" = "1" ]; then
+  ORCHESTRATOR_ARGS+=(--text-console)
+fi
 ORCH_RUNTIME_OVERRIDE_FILE="$ORCH_OVERRIDE" \
-  ./scripts/start_orchestrator.sh
+  ./scripts/start_orchestrator.sh "${ORCHESTRATOR_ARGS[@]}"

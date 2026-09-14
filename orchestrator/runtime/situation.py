@@ -6,7 +6,8 @@ import json
 import time
 from typing import Any, Iterable
 
-from shared.chromie_contracts.plan import validate_communicative_activity_identity
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from orchestrator.runtime.response_plan import build_social_interaction_response
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
 from shared.chromie_contracts.social_world import (
@@ -21,7 +22,6 @@ from shared.chromie_contracts.situation import (
     SituationRevisionObservation,
     SituationProjection,
     SituationSourceRef,
-    SituationalCognitionRequest,
 )
 
 from orchestrator.runtime.session import now_ms, record_session_workflow_stage
@@ -597,11 +597,13 @@ async def apply_goal_free_situation_opportunity(
 
     The typed observation is the trusted ingress boundary. This function never
     fabricates a UserTurn, Responsibility, or Goal. It derives readiness from an
-    actual Situation delta, invokes the same Cognitive Core through its bounded
-    Goal-free situational-cognition contract, and may deliver only speech.
-    Capability Work and effect authorization are structurally unavailable here.
+    actual Situation delta and invokes Social Cognition. Exact speech and optional
+    eligible social expression use existing Runtime delivery and safety. Requested
+    task Work and Goal mutation are structurally unavailable here.
     """
 
+    if host.cognitive_runtime_policy.mode == "off":
+        return "disabled"
     if observation.goal_ids or observation.projection.focus_goal_ids:
         raise ValueError(
             "goal-free Situation cognition cannot carry Goal bindings"
@@ -632,6 +634,8 @@ async def apply_goal_free_situation_opportunity(
     )
     if response is None:
         return "silence"
+    if host.cognitive_runtime_policy.mode != "apply":
+        return "report_only"
     if getattr(response, "capabilities", None):
         raise ValueError(
             "goal-free situational cognition must never emit Capability Work"
@@ -639,11 +643,26 @@ async def apply_goal_free_situation_opportunity(
     deliver = getattr(host, "_execute_cognitive_outcome_response", None)
     if not callable(deliver):
         return "delivery_unavailable"
-    return await deliver(
-        response,
-        session_id=session_id,
-        detached_delivery=True,
-    )
+    resolution = SocialCognitionResolution.model_validate(response.metadata["social_cognition_resolution"])
+    # Both modalities belong to the same admitted decision. Optional expression
+    # uses the existing resource arbiter and cannot authorize requested task Work.
+    expression = any(act.auxiliary_activities for act in resolution.activities)
+    if expression:
+        speech_result, expression_result = await asyncio.gather(
+            deliver(response, session_id=session_id, detached_delivery=True),
+            host.cognitive_runtime.adapter.execute_auxiliary_activities(
+                social_cognition=resolution, session_id=str(response.metadata["session_id"]),
+                turn_id=resolution.request_id, interaction=response,
+                context=host.build_context(session_id),
+                snapshot_is_current=lambda: getattr(host, "_social_situation_revisions", {}).get(observation.source_id)
+                    == (observation.source_revision, observation.projection.digest),
+            ),
+        )
+        host.session_log(session_id, "social_expression_result: %s", expression_result)
+        if not response.speech:
+            return "social_expression_" + str(expression_result["status"])
+        return speech_result
+    return await deliver(response, session_id=session_id, detached_delivery=True)
 
 
 async def resolve_goal_free_situation_response(
@@ -658,7 +677,7 @@ async def resolve_goal_free_situation_response(
 
     This stateless helper coordinates the existing Memory, Interaction Ledger, Agent
     client, and playback-facing response contracts.  The only semantic author remains
-    the restricted Situation invocation of Planner inside the same Cognitive Core.
+    the restricted Situation invocation of Social Cognition inside the same Cognitive Core.
     """
 
     if observation.goal_ids or observation.projection.focus_goal_ids:
@@ -679,6 +698,23 @@ async def resolve_goal_free_situation_response(
             "situational_cognition_rejected: reason=source_provenance_mismatch",
         )
         return None
+
+    observation = observation.model_copy(deep=True)
+    opportunity = opportunity.model_copy(deep=True)
+    # This is source-delivery coordination, not a second Situation/Goal store.
+    # Source revisions span console sessions; an older inference must not write
+    # Memory or speak after a newer observation from the same source is admitted.
+    revisions = getattr(host, "_social_situation_revisions", None)
+    if revisions is None:
+        revisions = {}
+        host._social_situation_revisions = revisions
+    identity = (observation.source_revision, observation.projection.digest)
+    previous = revisions.get(observation.source_id)
+    if previous is not None and previous[0] >= identity[0]:
+        if previous[0] == identity[0] and previous != identity:
+            raise ValueError("trusted Situation source reused a revision with different facts")
+        return None
+    revisions[observation.source_id] = identity
 
     context = host.build_context(session_id)
     context["situation"] = observation.projection.prompt_projection()
@@ -729,15 +765,16 @@ async def resolve_goal_free_situation_response(
     # outward response is worthwhile are model-owned cognition.  Runtime supplies the
     # trusted Situation, disclosure-safe Memory, and actual Interaction context without
     # reducing them to social keyword/priority rules.
-    request = SituationalCognitionRequest(
-        opportunity=opportunity,
+    request = SocialCognitionRequest(
+        request_id=observation.observation_id, trigger="situation",
+        source_refs=list(observation.source_refs), opportunity=opportunity,
         situation=observation.projection,
         language=language or "auto",
         context=context,
     )
     cognition_call = getattr(
         host.agent_client,
-        "resolve_situational_cognition",
+        "resolve_social_cognition",
         None,
     )
     if not callable(cognition_call):
@@ -760,10 +797,10 @@ async def resolve_goal_free_situation_response(
     record_session_workflow_stage(
         host,
         session_id,
-        stage="situational_cognition",
+        stage="social_cognition",
         started_monotonic_ms=started_ms,
         finished_monotonic_ms=now_ms(),
-        status="resolved",
+        status="resolved" if revisions.get(observation.source_id) == identity else "stale",
         input_payload={
             "opportunity_id": opportunity.opportunity_id,
             "situation_digest": observation.projection.digest,
@@ -772,46 +809,30 @@ async def resolve_goal_free_situation_response(
         output_payload=resolution,
         errors=[],
         metadata={
-            "wording_owner": "planner",
+            "wording_owner": "social_cognition",
             "authority_scope": "goal_free_situation",
         },
     )
-    if (
-        resolution.opportunity_id != opportunity.opportunity_id
-        or resolution.situation_digest != observation.projection.digest
-        or set(resolution.source_refs) != set(observation.source_refs)
-        or set(resolution.subject_refs) != set(opportunity.subject_refs)
-    ):
-        raise ValueError(
-            "situational cognition result changed trusted readiness provenance"
-        )
-    activity = resolution.activity
-    if activity is not None:
-        validate_communicative_activity_identity(
-            activity_id=activity.activity_id, text=activity.text,
-            interaction_context=context.get("interaction_context"),
-            repair_of_activity_ids=activity.repair_of_activity_ids,
-        )
-    situation_subjects = {item.subject_ref for item in observation.projection.interpretations}
-    source_refs = set(observation.source_refs)
-    for candidate in resolution.memory_candidates:
-        if not set(candidate.subject_refs).issubset(situation_subjects):
-            raise ValueError("situational memory candidate widened Situation subjects")
-        if not set(candidate.source_refs).issubset(source_refs):
-            raise ValueError("situational memory candidate widened trusted source provenance")
-    for candidate in resolution.self_memory_candidates:
-        if not set(candidate.source_refs).issubset(source_refs):
-            raise ValueError("self-context candidate widened trusted source provenance")
-        # External subjects may be retained only as cues around Chromie's own concern;
-        # the candidate must always include self:chromie by contract.
-        if not set(candidate.subject_refs).issubset(situation_subjects | {"self:chromie"}):
-            raise ValueError("self-context candidate widened Situation subjects")
-    if resolution.memory_candidates:
+    resolution.validate_request(request)
+    if revisions.get(observation.source_id) != identity:
+        return None
+    # Recheck immutable Activity wording against delivery changes that occurred
+    # while inference was running, before committing any proposed Memory.
+    if interaction_ledger is not None:
+        interaction_context = interaction_ledger.context(
+            ledger_scope, goal_ids=[], turn_id=observation.observation_id,
+        ).model_dump(mode="json")
+    else:
+        interaction_context = context.get("interaction_context")
+    response = build_social_interaction_response(
+        request, resolution, session_id=ledger_scope, interaction_context=interaction_context,
+    )
+    if resolution.memory_candidates and host.cognitive_runtime_policy.mode == "apply":
         host.conversation_state.record_cognitive_relational_experience(
             list(resolution.memory_candidates),
             sid=session_id,
         )
-    if resolution.self_memory_candidates:
+    if resolution.self_memory_candidates and host.cognitive_runtime_policy.mode == "apply":
         host.conversation_state.record_cognitive_self_context(
             list(resolution.self_memory_candidates),
             sid=session_id,
@@ -823,52 +844,13 @@ async def resolve_goal_free_situation_response(
             opportunity.opportunity_id,
         )
         return None
-    activity = resolution.activity
-    if activity is None:
-        raise ValueError("communicate situational cognition has no Activity")
-    response = InteractionResponse(
-        speech=[
-            InteractionSpeech(
-                id=f"situational_speech_{activity.activity_id}"[:160],
-                text=activity.text,
-                timing="immediate",
-                style="brief",
-                priority="normal",
-                interruptible=True,
-                metadata={
-                    "source": "situational_cognition",
-                    "wording_owner": "planner",
-                    "authority_scope": "goal_free_situation",
-                    "truth_stage": "context_grounded",
-                    "speech_act": activity.speech_act,
-                    "delivery_role": "situational_response",
-                    "goal_completion_authority": False,
-                    "cognitive_opportunity_id": opportunity.opportunity_id,
-                    "situation_digest": observation.projection.digest,
-                    "situation_signature": opportunity.situation_signature,
-                    "source_situation_refs": list(observation.source_refs),
-                    "subject_refs": list(resolution.subject_refs),
-                    "communicative_activity_ids": [activity.activity_id],
-                    "repair_of_activity_ids": list(activity.repair_of_activity_ids),
-                    "turn_id": observation.observation_id,
-                    "language": language or "auto",
-                    "wait_for_playback_start": True,
-                    "playback_start_required_for_delivery": True,
-                },
-            )
-        ],
-        capabilities=[],
-        metadata={
-            "source": "situational_cognition",
-            "authority_scope": "goal_free_situation",
-            "cognitive_opportunity": opportunity.prompt_projection(),
-            "situation": observation.projection.prompt_projection(),
-            "source_situation_refs": list(observation.source_refs),
-            "goal_ids": [],
-            "language": language or "auto",
-        },
-    )
-    return response if response.speech else None
+    response.metadata.update({
+        "authority_scope": "goal_free_situation",
+        "cognitive_opportunity": opportunity.prompt_projection(),
+        "situation": observation.projection.prompt_projection(),
+        "social_cognition_resolution": resolution.model_dump(mode="json"),
+    })
+    return response
 
 
 async def apply_due_time_condition_opportunity(

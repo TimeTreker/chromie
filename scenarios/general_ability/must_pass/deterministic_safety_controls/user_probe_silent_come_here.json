@@ -47,7 +47,7 @@
   "expect_no_capabilities": true,
   "require_speech": false,
   "expect_no_speech": true,
-  "forbid_fast_communicative_act": true,
+  "forbid_social_communicative_act": true,
   "description": "The negative speech boundary is deterministic. With no trusted speaker target location, Chromie must neither talk nor invent a direction of travel.",
   "general_ability": {
     "memberships": [

@@ -69,7 +69,7 @@ voice / text / trusted interaction event
        deterministic validation and commitment
        agent, tool, memory, and embodied execution coordination
        outcome reconciliation against goal success criteria
-       Planner-owned user-facing Communicative Activities
+       independent SC interaction from shared GI / Goals / Work / Situation / Evidence
   -> trusted Trusted Capability Runtime / tools / memory / Soridormi
   -> execution evidence returned to the Core
   -> validated speech and optional social-attention delivery

@@ -41,7 +41,8 @@
       "disposition": "escalate",
       "coverage": "partial",
       "confidence": 0.88,
-      "escalation_reason": "The request combines a supported gesture with an unavailable manipulation goal."
+      "escalation_reason": "The request combines a supported gesture with an unavailable manipulation goal.",
+      "communication_needs": []
     },
     "deep_plans": [
       {
@@ -80,7 +81,6 @@
             "goal_id": "goal-pickup",
             "disposition": "unavailable",
             "coverage": "complete",
-            "response_text": "我现在没有可靠的拿杯子能力。",
             "rationale": "Manipulation is not available in the trusted capability catalog."
           }
         ],
@@ -97,35 +97,23 @@
             "trusted mug pickup capability"
           ]
         },
-        "response_text": "",
-        "communicative_acts": [
+        "communication_needs": [
           {
-            "activity_id": "scenario-immediate",
-            "text": "我现在没有可靠的拿杯子能力。",
-            "role": "complete_response",
-            "timing": "parallel",
-            "delivery_phase": "immediate",
-            "speech_act": "inform",
+            "need_id": "need:a9ae145d894b566c468f91cc24285f2cd91e6aa2a277efddb01c1d1139e52d55",
+            "owner": "planner",
+            "kind": "result",
             "source_goal_ids": [
               "goal-pickup"
             ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
-          },
-          {
-            "activity_id": "scenario-pre_action",
-            "text": "我可以先点一下头。",
-            "role": "complete_response",
-            "timing": "parallel",
-            "delivery_phase": "pre_action",
-            "speech_act": "inform",
-            "source_goal_ids": [
-              "goal-nod"
-            ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
+            "source_responsibility_refs": [],
+            "reference_id": "deep-nod-pickup",
+            "facts": {
+              "disposition": "unavailable",
+              "unresolved": []
+            },
+            "delivery_phase": null,
+            "before_step_ids": [],
+            "after_step_ids": []
           }
         ]
       }
@@ -153,7 +141,44 @@
           "head_motion"
         ]
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      },
+      "deep": {
+        "activities": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "我现在没有可靠的拿杯子能力。",
+            "function": "inform",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-pickup"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我可以先点一下头。",
+            "function": "inform",
+            "delivery_phase": "pre_action",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-nod"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

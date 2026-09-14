@@ -1933,12 +1933,27 @@ class CapabilityRuntime:
         )
 
     def _scheduled_requests(self, response: InteractionResponse) -> list[CapabilityRequest]:
-        before: list[CapabilityRequest] = []
-        after: list[CapabilityRequest] = []
+        buckets: list[list[CapabilityRequest]] = [[] for _ in range(len(response.capabilities) + 1)]
+        step_positions = {str(request.metadata.get("step_id")): index
+                          for index, request in enumerate(response.capabilities) if request.metadata.get("step_id")}
         for speech in response.speech:
-            request = self._speech_request(speech)
-            (after if speech.timing == "after_capabilities" else before).append(request)
-        scheduled = [*before, *response.capabilities, *after]
+            before_ids = speech.metadata.get("communication_before_step_ids") or []
+            after_ids = speech.metadata.get("communication_after_step_ids") or []
+            if not isinstance(before_ids, list) or not isinstance(after_ids, list):
+                raise ValueError("communication order must contain exact step ID lists")
+            if set(before_ids + after_ids) - set(step_positions):
+                raise ValueError("communication order names an unmaterialized Work step")
+            position = len(response.capabilities) if speech.timing == "after_capabilities" else 0
+            if before_ids or after_ids:
+                position = max((step_positions[key] + 1 for key in after_ids), default=0)
+                if before_ids and position > min(step_positions[key] for key in before_ids):
+                    raise ValueError("communication and Work order are contradictory")
+            buckets[position].append(self._speech_request(speech))
+        scheduled = []
+        for index, capability in enumerate(response.capabilities):
+            scheduled.extend(buckets[index])
+            scheduled.append(capability)
+        scheduled.extend(buckets[-1])
         vocal_positions = [
             index
             for index, request in enumerate(scheduled)

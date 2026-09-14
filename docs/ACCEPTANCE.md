@@ -18,6 +18,7 @@ incomplete result is a failed semantic case.
 | GI DTO and source validator: `goal_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; declared binding, provenance, type and relationship restrictions. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
 | GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, declared binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of GI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation GI never emitted. |
 | Planner: `planner_validation.py`, `planner_fast_validation.py`, `planner_deep_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That response wording or an arbitrary action list realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
+| SC: `social_cognition.py` and exact Host projection | Source/snapshot identity, supplied Need/Goal/Evidence coverage, immutable acts, permitted communication phases, expression anchors and qualified targets. | That a structurally accepted utterance is useful, sufficiently informative or socially appropriate. Actual delivery and semantic adjudication remain separate. |
 | Host and Trusted Capability Runtime | Exact identities/versions, authorization/confirmation, contract validation, lifecycle, dispatch, and retained execution/delivery facts at the exercised boundaries. | User satisfaction or world/physical truth beyond the retained provider/device evidence. An accepted Plan is not completed execution. |
 
 These are scopes of the maintained checks, not proofs that every implementation or
@@ -31,8 +32,8 @@ structural check or aggregate score cannot override or average it into a pass.
 For example, “Say hello and tell me a joke” may receive a Schema-valid GI result
 containing only the greeting. GA can conserve that one Responsibility exactly while
 the joke remains absent. Even with both correct Goals supplied, a Planner result
-can contain every Goal key and claim complete satisfaction while replying only
-“Hello.” These are semantic failures; reference coverage is a different invariant.
+can contain every Goal key while omitting the joke
+obligation; SC can also claim to cover both Needs while saying only “Hello.” These are semantic failures; reference coverage is a different invariant.
 Missing an already-declared Goal key remains a mechanical rejection. Neither
 downstream reconstruction of GI meaning nor an online reviewer is authorized.
 
@@ -57,6 +58,48 @@ These reporting distinctions use the existing four status axes and A–D environ
 levels; they introduce no new evidence ladder or online model invocation.
 
 ## Evidence levels
+
+### Social Cognition acceptance
+
+The [accepted target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+requires new evidence after source migration. Current Planner tests, replay and
+native-provider measurements cannot be relabelled as Social Cognition proof.
+Before implementation qualification, freeze the exact shared-state projection,
+each role's output/coverage contract, permitted depth and call topology under the
+[semantic transaction method](LLM_PROMPT_QUALIFICATION_METHOD.md).
+
+| Contrast / boundary | Required evidence |
+|---|---|
+| Conversation with no effect Work, sharing and sustained discussion | A substantive appropriate response can complete the conversational obligation; no fabricated action or compulsory acknowledgement. Necessary conversational depth is not forced into filler. |
+| Multi-Responsibility turn and active Goal overview | Complete GI meaning remains visible, related history/preferences affect expression appropriately, and read-only sibling context grants no Goal/Work mutation authority. |
+| No prior message / queued / playing / completed / interrupted / failed message | Correct semantic novelty/repetition decisions; exact once-only delivery and truthful partial-delivery state. Silence never drops a required answer. |
+| Slow planning, meaningful progress, terminal result overtaking early speech | Communication and Work progress independently; obsolete progress is rejected before queue/playback; one grounded result and no duplicate Work. |
+| Unknown / planned / committed / running / unavailable / failed / empty / completed | Speech preserves the exact established truth and Evidence scope, including probability and uncertainty. No fabricated completion or future promise. |
+| Planning-input gap, confirmation, correction and cancellation | Social Cognition expresses the authoritative need against exact Plan/request scope; GI interprets replies; Host controls consent, expiry and cancellation. No effect before required confirmation. |
+| Goal-free Situation, audience and relational Memory | No synthetic turn/Goal/Work; disclosure gate before inference; appropriate silence or initiative from trusted context; no inferred consent. |
+| Role failure, malformed output, stale snapshot and restart | No alternative wording owner or semantic repair chain; valid independent Work/Evidence survives; unresolved obligations remain auditable. |
+| Body expression and ordered voice | Social Cognition selects exact eligible social Capability proposals in its primary call; Runtime validates anchors, targets and safety. No decoration-only call; optional failure cannot delay/fail speech or required Work. Nonverbal-only delivery cannot be fabricated from empty speech. |
+| Environment-driven initiative with existing Goals but no GI | Shared Goal state and trusted Situation are read-only inputs; no synthetic user turn, duplicate Goal store or inferred consent. Useful initiative and silence both remain representable. |
+| Foreground communication under SGLang contention | Request priority exceeds ordinary Planner priority, server ordering is enabled and verified, and measured task completion remains live. Deep communication is bounded; configuration proof is distinct from observed latency. |
+
+Retain a bilingual, coverage-designed frozen cohort and judge every case,
+including mechanical passes. Follow focused contracts, the affected general-
+ability classes, complete canonical gates, then the highest safe automated live
+profile. Actual microphone/speaker/physical evidence remains supervised and
+separate. A hard authority, provenance, safety, omission or service failure
+cannot be averaged into a pass.
+
+For performance, compare the current combined Planner transaction and the split
+on the same model, hardware, source baseline, context/workload and TTS conditions;
+record unavoidable differences. Retain idle and contended P50/P95/P99 first
+meaningful response, queue/prefill/TTFT/commit, TTS PCM/playback, task completion,
+call/token cost, cancellation, preemption/resume and Planner starvation. Declare
+the acceptable task-completion tradeoff before measuring. Verify actual SGLang
+version and [scheduling configuration](https://docs.sglang.io/docs/advanced_features/server_arguments);
+session names or an API priority field do
+not prove preemption. No scheduler setting alone establishes a latency pass.
+
+### Existing evidence levels
 
 The frozen [workflow replay](../benchmarks/README.md#offline-workflow-replay)
 is Level A architecture/contract evidence only. GPT-6 Astra-authored reference
@@ -593,16 +636,13 @@ cases, then blocks both later stages. An infrastructure failure that makes
 further cases impossible still leaves the cohort incomplete and cannot support
 a passing claim. See [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
 
-Warm presentation cases use two non-overlapping contract intervals. The Planner
-budget is measured from the retained `fast_planner_presentation_commit.started_elapsed_ms`
-(the validated GI handoff) to its `finished_elapsed_ms` commitment. The delivery
-budget is measured from that commitment to the first retained `playback_start` on
-the same session-relative clock. The report also keeps session-start, GI duration,
-TTS schedule/first-PCM when available, and playback start as diagnostic slices.
-Do not add GI duration to the Planner-local budget or subtract a duration sum from
-an absolute elapsed timestamp. A headless `speaker=false` playback event may prove
-the configured discard transport was reached within budget, but only a supervised
-`speaker=true` run may support an audible-speaker claim.
+Warm interaction cases retain two non-overlapping intervals: the accepted SC
+stage start to its complete decision (`max_warm_sc_decision_ms`), then that
+commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). GI
+remains a separately measured upstream interval. Silence is not a meaningful
+spoken response and cannot satisfy a speaking-latency target. Do not subtract
+duration sums from absolute timestamps. Headless discard playback proves its
+transport only; audible-speaker claims require supervised speaker-enabled runs.
 
 Every retained live general-ability root must contain a portable reviewer packet
 derived from the run rather than from prose. It includes a bounded `summary.json`,
@@ -1036,7 +1076,7 @@ progress, exact operation/state evidence, qualified catalog exposure without a
 backend-name leak, explicit speech-over-media ducking, and distinct
 stop-talking/media/all receipts. The mixed walk+media scenario must preserve two
 Activity Goals and the exact Soridormi and `chromie.media.play` steps through
-Goal Association, both Planner tiers, Planner-owned Communicative Activities, and Host
+Goal Association, both Planner tiers, SC-owned Communicative Acts, and Host
 materialization. The stop-media scenario must take `media_output` with zero
 model calls.
 

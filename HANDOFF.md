@@ -1,6 +1,167 @@
 # Chromie Latest Handoff
 
-## Current delivery — native continuation and #67, 2026-09-14
+## Social Cognition implementation handoff — 2026-09-14
+
+Repository `/home/chromie/github/chromie`, `main`, base
+`d5a7985ec74b02cd01c11b0d538fca7ae13a3498` is the pre-delivery baseline.
+The owner requested commit and push to `origin/main`; a fetch found local HEAD
+and remote main equal before this delivery. Expected resume revision: the latest
+commit containing this handoff and checkpoint. No rebuild, restart or runtime
+profile change was performed. Earlier quiet-console edits are included.
+The [checkpoint](DEVELOPMENT_CHECKPOINT.md) and
+[status](docs/STATUS.md#social-cognition-migration) own implementation/resume claims.
+
+SC is the interaction planner and the sole maintained wording/expression owner.
+It reads shared GI, Goals, Work/task state, history, Memory/Mind, Situation and
+actual delivery. It can act on a trusted Situation without synthetic GI or Work.
+Work Planner emits complete Work and scoped communication needs. Host joins them
+without rewriting semantics, preserves exact confirmation/causal order, rejects
+stale results and records heard dialogue only from correlated completed playback.
+SC expression uses the existing qualified runtime/Soridormi boundary; it never
+completes task Goals. No optional communication blocks independent Work.
+
+The earlier combined writer, `PresentationCommit` DTO/schema/transport and its
+scheduler were removed, as was the Goal-free Situation-only model endpoint.
+The existing common SC endpoint is `/social-cognition`. Its foreground SGLang
+priority is 400; ordinary Planner is 300 and deliberative cognition 100. Before
+services stopped, read-only inspection observed SGLang 0.5.19,
+`chromie-gemma4-12b` / `google/gemma-4-12B-it`, context 65,536, higher-first
+priority enabled, max running requests 2 and preemption threshold 10. These
+settings establish no measured speedup or starvation guarantee.
+
+Evidence root: `.chromie/acceptance/social-cognition-mainline-20260914/`.
+Raw artifacts are local/Git-ignored and are not included in this push. Another
+machine must obtain reviewed evidence separately or rerun the commands below;
+it must not assume those local paths exist after cloning. The delivery check
+matched every changed file to `final-worktree-identity.json` before refreshing
+delivery documentation, so the full code tests did not need a redundant rerun.
+The subsequent generalization discussion changed no code and supplies no new
+ability evidence. Test counts retain their stated contract/fixture scope.
+
+| Retained evidence | What actually passed / limitation |
+|---|---|
+| `canonical-sc-closed.log` | Exit 0: 3,245 tests / 820 subtests, 145 benchmarks, 20 legacy tests; pinned static, policy, ownership, configuration and docs green. Two existing FastAPI deprecation warnings. |
+| `retired-writers-final.log`, `acceptance-sc-checked.log`, `acceptance-sc-timing.log` | Exact SC/Work joins, current source-only writer paths, expression safety, native schema contracts and migrated acceptance assertions. |
+| `workflow-sc-closed/` | Final strict aggregate: all 6,000 declared outcomes pass with unchanged source after explicit fixture migration. Earlier `workflow-sc-final/` also passes all 6,000. |
+| `general-ability-sc-complete/` | 45/45 distinct Level A scenarios; controlled runtime/provider fixtures, not live speech. |
+| `native-final-sc/` | 12/12 native Schema/DTO/Host and reviewed semantic cases, one call per case. Empty expression catalog. |
+| `native-work-roles-complete-order/` | 8/8 native Work transactions; controlled GI/GA/catalog. Deep raw evidence is the client's parsed JSON, not a literal wire-token audit. |
+| `recorded-sc-final/`, `recorded-work-final/` | All 20 current production packets equal retained native packets exactly; current resolver replay passes. No fresh native inference. |
+| `native-sc-retired/` | Failed availability attempt: 12 connection errors, zero native outputs. Subsequent `docker ps` showed no running containers; no stop cause inferred or restart attempted. |
+| `workflow-adjudication-current.json` | Ordered owner/input/output/correlation audit and root-cause/repair evidence, including original-user-trace gaps. |
+
+The 6,000 cases remain 60 authored contrast families expanded over action/value/
+language combinations, with separately scripted SC interaction. Expectations,
+fault/rejection oracles and splits were preserved; all rendered requests were
+explicitly recaptured outside acceptance, then frozen and strictly replayed.
+No acceptance hook auto-records requests or substitutes an expected answer.
+They are not 6,000 independent model inferences and remain training-ineligible.
+`workflow-generator-sc.json` checks all 60 generator families' current Work form.
+Earlier failed iterations remain retained, including the native ordering failure
+that passed structure but failed semantics. Final explicit `precedes_step_ids` /
+`follows_step_ids` and source-relation validation close that role-case defect.
+
+The original user's timing report has no retained source-turn timing trace, so
+no measured original latency cause is claimed. This was an authorized ownership
+change with reproduced model-contract and fixture boundaries. Source complete
+is separate from current deployed behavior, whole-chain native cognition,
+paired contention/latency and physical microphone/speaker/robot qualification.
+Those target evidence gaps and existing #24/#32 remain open.
+
+Current source verification:
+
+```bash
+./scripts/run_tests.sh
+python scripts/general_ability_acceptance.py --mode level-a --evidence-dir .chromie/acceptance/sc-level-a-next
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/sc-workflow-next
+python scripts/check_docs.py
+python scripts/check_test_ownership.py
+git diff --check
+```
+
+Use new evidence directories. Before future native/live testing, verify service
+availability and the intended deployed source/profile; do not use host-default
+Agent model settings as a substitute for the recorded SGLang profile. Complete
+the directory-discovered safe live cohort and retain/adjudicate its debug bundle;
+physical microphone/speaker or robot runs remain supervised.
+
+Quiet interaction retains the existing launch contract:
+
+```bash
+./scripts/start_chromie.sh --text-console
+python scripts/chromie_psm_live_text_console.py
+```
+
+The first terminal owns runtime logs; the second connects to
+`.chromie/text-console/dialogue.sock` for dialogue, bypassing ASR while retaining
+Soridormi and normal runtime capability checks. No service is currently claimed
+running or rebuilt with SC.
+
+Surface accounting: 102 current Markdown files / 15 core reading-path documents,
+unchanged; no new environment variable or service. The owner-approved SC term
+replaces the old interaction responsibility. Most changed files are the 6,000
+frozen generated workflow cases, not new production modules. This delivery
+includes both handoff owners with these evidence limits.
+
+## Previous documentation-stage handoff — Social Cognition, 2026-09-14
+
+Repository `/home/chromie/github/chromie`, branch `main`, base
+`d5a7985ec74b02cd01c11b0d538fca7ae13a3498`. This change records the owner's
+accepted communication/Work authority split in the existing documentation owners.
+No Social Cognition source, endpoint, schema, runtime setting, service restart,
+deployment, commit or push was performed for this amendment. The
+[checkpoint](DEVELOPMENT_CHECKPOINT.md) and
+[target lifecycle/source inventory](docs/COGNITIVE_TURN_LOOP.md#social-cognition-target-lifecycle)
+own resume scope and the current-to-target workflow respectively.
+
+The pre-existing text-console patch remains in
+`scripts/chromie_psm_live_text_console.py`, `scripts/start_chromie.sh`,
+`scripts/start_orchestrator.sh`, `tests/test_psm_live_text_console.py`,
+`config/runtime_configuration_inventory.json`, `docs/USER_MANUAL.md`,
+`docs/API_REFERENCE.md` and `orchestrator/README.md`. The last two also gain
+target/current-source notices here; their local text-transport documentation
+is preserved. Do not attribute those earlier runtime changes to Social Cognition.
+
+Validation artifacts for this documentation change are retained under
+`.chromie/acceptance/social-cognition-docs-20260914/`:
+
+- `canonical-final.log`: exit 0; 3,223 tests / 818 subtests, 145 benchmark tests
+  and 20 legacy Agent tests pass. Two existing FastAPI deprecation warnings.
+  Pinned policy, ownership, Ruff/Mypy, configuration, runtime and docs gates pass.
+- `policy.log` and `ownership.log`: standalone checks exit 0. `docs-final.log`
+  records the corrected documentation check; `docs-after-handoff.log` retains
+  the final documentation recheck after recording these results.
+- `docs.log` and the first `canonical.log` retain the initial duplicate
+  architecture-ID reference failure. The references were corrected without
+  changing the checker; that first canonical attempt stopped before pytest.
+- `preserved-source.json`, `source-identity.json` and `validation.json` retain
+  unchanged earlier runtime-file digests, dirty-tree identity and check results.
+  `git diff --check` passes. No files or reading-path entries were added.
+
+No native model, latency, simulator, audio or physical proof is collected here.
+Historical deployment/model identities below have not been reverified by this
+documentation task. In particular, intended SGLang use is not evidence that a
+deployed version has priority/preemption correctly enabled.
+
+```bash
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/check_test_ownership.py
+git diff --check
+```
+
+Surface impact: Social Cognition target role count `0 -> 1`, replacing Planner's
+communication responsibility. Current Markdown documents `102 -> 102`, core
+reading-path entries `15 -> 15`; environment-variable/service count delta `0` for
+this amendment. Consolidation
+must remove the old writable Planner reply/stream coupling when source migrates.
+Current source assertions and APIs remain documented as migration baseline, not
+as permission to preserve competing speech authors. #24/#32 stay open; the
+canonical gate → narrow supervised voice → default target-evidence closure
+sequence remains the delivery requirement.
+
+## Previous delivery — native continuation and #67, 2026-09-14
 
 Repository `/home/chromie/github/chromie`, `main`; pre-delivery base
 `d7c7f27767d8e137edbf2aa165a11b81d6282527`. Python

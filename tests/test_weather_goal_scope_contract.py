@@ -161,11 +161,7 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
     )
 
     assert "Never narrow broader temporal scope" in goal_prompt
-    assert "Never silently narrow a goal" in fast_prompt
-    assert "Never silently narrow a canonical goal" in deep_prompt
-    assert "Capability domains are not interchangeable" in fast_prompt
-    assert "Capability domains are not interchangeable" in deep_prompt
-    assert "must never rewrite the Goal" in fast_prompt
-    assert "never rewrites the canonical Goal or silently narrows its scope" in deep_prompt
-    assert "do not emit separate parameter_resolutions for them" in fast_prompt
-    assert "do not emit separate parameter_resolutions for them" in deep_prompt
+    for prompt in (fast_prompt, deep_prompt):
+        assert "Compare annual weather." in prompt
+        assert "Preserve exact advertised semantic scope" in prompt
+        assert "never reinterpret or repair WHAT" in prompt

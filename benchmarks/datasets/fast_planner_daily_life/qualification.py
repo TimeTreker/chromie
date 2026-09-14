@@ -36,7 +36,7 @@ if str(ROOT) not in sys.path:
 from agent.app.capabilities.catalog import CatalogCapability  # noqa: E402
 from agent.app.fast_planner import (  # noqa: E402
     FastPlannerResolver,
-    parse_fast_stream_document,
+    parse_fast_work_document,
 )
 from agent.app.planner_context import (  # noqa: E402
     auxiliary_social_capability_payloads,
@@ -298,13 +298,6 @@ def _stream_schema(
         interpretation_unresolved=list(request.interpretation_unresolved),
         language=str(request.language or ""),
     )
-    if request.interpretation_unresolved:
-        presentation = schema["properties"]["presentation_commit"]
-        presentation["properties"]["activity"] = {"type": "null"}
-        presentation["properties"]["auxiliary_activities"] = {
-            "type": "array",
-            "maxItems": 0,
-        }
     return schema
 
 
@@ -853,7 +846,7 @@ def _candidate_prompt(
         "The model_output_text string must contain only the raw JSON object required "
         "by the dynamic production response Schema."
         if transport == "structured_json"
-        else "The model_output_text string must contain only the ordered JSON object with presentation_commit first and terminal_result second "
+        else "The model_output_text string must contain only the single complete Work JSON object "
         "required by the Fast Planner system prompt."
     )
     return (
@@ -1200,11 +1193,7 @@ async def _adjudicate_one(
     try:
         if runtime_variant == "streaming_advance":
             try:
-                presentation, terminal = parse_fast_stream_document(raw_text)
-                raw_value = {
-                    "presentation_commit": presentation,
-                    "terminal_result": terminal,
-                }
+                raw_value = parse_fast_work_document(raw_text)
                 schema_errors = [
                     error.message for error in Draft202012Validator(schema).iter_errors(raw_value)
                 ][:20]
@@ -1229,23 +1218,6 @@ async def _adjudicate_one(
                 ]
                 has_complete_response = any(
                     item.role == "complete_response" for item in advance.activities
-                ) or (
-                    terminal_frame is not None
-                    and any(
-                        getattr(item, "role", "") == "complete_response"
-                        for item in (
-                            next(
-                                (
-                                    frame.activity
-                                    for frame in frames
-                                    if getattr(frame, "frame_type", "") == "presentation_commit"
-                                    and frame.activity is not None
-                                ),
-                                None,
-                            ),
-                        )
-                        if item is not None
-                    )
                 )
                 scope_ids = list(advance.covered_responsibility_refs)
                 if advance.metadata.get("authoritative_arg_repairs"):
@@ -1277,9 +1249,7 @@ async def _adjudicate_one(
             capability_ids = [item.capability_id for item in plan.steps]
             reuse_ids = [item.reuse_activity_id for item in plan.steps if item.reuse_activity_id]
             scope_ids = list(plan.goal_ids)
-            has_complete_response = bool(plan.response_text.strip()) or any(
-                item.role == "complete_response" for item in plan.communicative_acts
-            )
+            has_complete_response = any(need.kind == "answer" for need in plan.communication_needs)
             plan_relation = str(plan.metadata.get("plan_relation") or "")
             raw_confirmation = plan.metadata.get("user_confirmation_required")
             confirmation_required = raw_confirmation if isinstance(raw_confirmation, bool) else None

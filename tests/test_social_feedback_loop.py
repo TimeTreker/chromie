@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 
 from orchestrator.runtime.situation import build_social_feedback_situation_observation
-from shared.chromie_contracts.situation import SituationalCommunicativeAct, SituationSourceRef
+from shared.chromie_contracts.situation import SituationSourceRef
+from shared.chromie_contracts.social_cognition import SocialCommunicativeAct
 from shared.chromie_contracts.social_world import (
     TrustedSocialFeedbackObservation,
     TrustedSocialFeedbackSignal,
@@ -42,15 +43,15 @@ def test_social_feedback_projects_signal_and_exact_activity_target() -> None:
 
 
 def test_repair_act_requires_exact_prior_activity_reference() -> None:
-    repair = SituationalCommunicativeAct(
+    repair = SocialCommunicativeAct(
         activity_id="repair-1",
         text="啊，我刚才说得不太合适。",
-        speech_act="repair",
+        function="repair", truth_stage="context_grounded",
         repair_of_activity_ids=["situational-greeting-1"],
     )
     assert repair.repair_of_activity_ids == ["situational-greeting-1"]
 
-    with pytest.raises(ValueError, match="requires repair_of_activity_ids"):
-        SituationalCommunicativeAct(
-            activity_id="repair-2", text="抱歉。", speech_act="repair"
+    with pytest.raises(ValueError, match="repair acts require delivered repair references"):
+        SocialCommunicativeAct(
+            activity_id="repair-2", text="抱歉。", function="repair", truth_stage="context_grounded"
         )

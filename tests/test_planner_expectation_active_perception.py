@@ -29,7 +29,7 @@ def _active_perception_output(*, expected_outcome: str) -> PlannerModelOutput:
             "coverage": "complete",
             "confidence": 0.94,
             "goal_summary": "Acquire fresh visual grounding for the cup.",
-            "response_text": "",
+
             "steps": [
                 {
                     "step_id": "observe-cup",
@@ -51,7 +51,7 @@ def _active_perception_output(*, expected_outcome: str) -> PlannerModelOutput:
                 goal_id: {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
+
                     "unresolved": [],
                     "step_ids": ["observe-cup"],
                     "satisfaction": _satisfaction(goal_id),
@@ -152,15 +152,21 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         goal_satisfaction=satisfaction,
     )
 
+    from tests.test_cognitive_runtime_pr7 import work_fixture
+    from tests.cognitive_work_test_support import social_fixture_resolution
+
     class Client:
         request = None
 
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            return social_fixture_resolution(request, "I can see it now.")
+
         async def resolve_fast_plan(self, _session, *, request, timeout_ms):
             self.request = request
-            return followup
+            return work_fixture(followup)
 
     class Adapter(CanonicalPlanRuntimeAdapter):
-        async def build_planner_owned_response(self, **_kwargs):
+        async def build_social_cognition_response(self, **_kwargs):
             return InteractionResponse(interaction_id="after-observation", status="ok")
 
     assistant = VoiceAssistant.__new__(VoiceAssistant)

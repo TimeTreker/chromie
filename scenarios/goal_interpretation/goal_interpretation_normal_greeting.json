@@ -69,11 +69,11 @@
       {
         "id": "speech_identity_latency",
         "title": "Speech Identity and Warm Response Latency",
-        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Social Cognition commitment and playback scheduling stay within the declared interactive budgets.",
         "rationale": "Simple social language remains an ordinary conversational WHAT before Planner wording.",
         "root_cause_boundaries": [
           "Mind profile",
-          "Planner communication",
+          "Social Cognition",
           "Playback delivery",
           "Latency evidence"
         ]

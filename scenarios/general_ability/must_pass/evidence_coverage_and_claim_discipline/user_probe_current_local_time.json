@@ -45,7 +45,7 @@
   "text": "帮我看看现在几点。",
   "language": "zh-CN",
   "require_speech": true,
-  "require_fast_communicative_act": true,
+  "require_social_communicative_act": true,
   "expected_capabilities": [
     "chromie.clock.local"
   ],

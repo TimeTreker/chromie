@@ -204,9 +204,9 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
-      "contract": "Map single-invocation streaming failures into typed pre-commit or post-commit frames without authorizing Goal Work. Required-context overflow returns before_commit, no presentation ID and no model invocation; preserve projection diagnostics. Issue #50 regression: tests/test_planner_prompt_module.py.",
+      "contract": "Map single-invocation Work stream failures into an observable typed failure before releasing any Work. Required-context overflow makes no model call. No speech frame or partial Activity is retained; SC independently owns communication. Regression: tests/test_social_cognition.py and tests/test_fast_planner_streaming_commit.py.",
       "review_status": "reviewed",
-      "body_sha256": "0d1eebcb265e7b88ed76ccef8641f08328a38d8dc3c90a4c0438f891c5c9d88e",
+      "body_sha256": "e775357d988849f12469ffc001588edbe6d3f4a0de51dee4366f29f0c1a3736e",
       "failure_signals": [
         "diagnostic",
         "state_update"
@@ -975,19 +975,6 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._execute_presentation_commit_auxiliary_activities",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator.cognitive_runtime",
-      "contract": "Suppress an invalid or failed exact auxiliary proposal without changing its primary presentation or selecting replacement social behavior.",
-      "review_status": "reviewed",
-      "body_sha256": "ed9ee1bf72585996fde3154639d0fb58dd203d9897b540ae4f8614ee798f13dc",
-      "failure_signals": [
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -1010,19 +997,6 @@
       "body_sha256": "dc935d5a7dc66b95c002b59b2f7b1e179f50bb005bc778542c1029743441d60e",
       "failure_signals": [
         "continue"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._execute_resolution_auxiliary_activities",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator.cognitive_runtime",
-      "contract": "Contain optional auxiliary-Activity execution failure as a typed nonblocking workflow-stage failure without changing primary Plan, Goal, speech, or re-entry truth.",
-      "review_status": "reviewed",
-      "body_sha256": "5fe0e7c80984482422f0a38876bb3572d687f9e761e829a0e4a9386c41d38467",
-      "failure_signals": [
-        "return"
       ]
     },
     {
@@ -1084,9 +1058,9 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Contain the owned runtime boundary and return an observable failed result without authorizing unvalidated work.",
+      "contract": "Cancel pending independent SC inference and its queued playback, contain the owned runtime failure, and return an observable failed result without authorizing unvalidated Work. Cancellation failures propagate rather than claiming cleanup succeeded.",
       "review_status": "reviewed",
-      "body_sha256": "548d896104330cc291c4f3b4a7344001db46cdb6925b89ec8b3152c682863319",
+      "body_sha256": "ab4c9b8f7df986beca11b6153a8288191a24f804f1190dca2db6773dad4bdf9a",
       "failure_signals": [
         "return"
       ]

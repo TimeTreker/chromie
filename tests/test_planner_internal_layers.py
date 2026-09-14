@@ -153,10 +153,10 @@ def test_fast_qualification_required_capability_reaches_target_blind_transaction
     )
 
     assert "chromie.reminder.create" in transaction_contract
-    assert (
-        'FINAL ALLOWED EXECUTABLE CAPABILITY IDS JSON:\n["chromie.reminder.create","chromie.weather.lookup"]'
-        in (transaction["user_prompt"])
-    )
+    catalog, _ = json.JSONDecoder().raw_decode(
+        transaction["user_prompt"].split("Executable common capability catalog JSON:\n")[1])
+    assert {item["capability_id"] for item in catalog} == {"chromie.reminder.create", "chromie.weather.lookup"}
+
 
 
 def test_planner_fallback_is_mechanical_materialization_only() -> None:

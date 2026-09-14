@@ -32,7 +32,7 @@ def test_planner_model_time_condition_is_materialized_with_host_plan_identity() 
             "coverage": "complete",
             "confidence": 0.9,
             "goal_summary": "Keep the running work live until a future check.",
-            "response_text": "",
+
             "steps": [
                 {
                     "step_id": "step-read",

@@ -46,6 +46,8 @@ from shared.chromie_contracts.tool_result import canonical_value_sha256
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_cognitive_runtime_pr7 import FakeRuntime
 
+from tests.cognitive_work_test_support import word_free_model_fixture, social_fixture_resolution, social_fixture_response
+
 READ_SCHEMA = {
     "type": "object",
     "properties": {"rain_forecast": {"type": "boolean"}},
@@ -90,7 +92,6 @@ def read_reply(request):
             "coverage": "complete",
             "confidence": 0.99,
             "goal_summary": "Acquire the predicate before deciding the conditional effect.",
-            "response_text": "",
             "plan_relation": "exact",
             "user_confirmation_required": False,
             "steps": [
@@ -108,8 +109,7 @@ def read_reply(request):
                 gid: {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
-                    "step_ids": ["read-forecast"],
+                            "step_ids": ["read-forecast"],
                     "satisfaction": sat,
                 }
             },
@@ -146,6 +146,7 @@ def next_reply(request, rain):
         [
             {
                 "step_id": "create-reminder",
+                "reason_summary": "Create the exact requested conditional reminder.",
                 "timing": "sequential",
                 "capability_id": "chromie.reminder.create",
                 "args": {
@@ -166,7 +167,7 @@ def next_reply(request, rain):
         satisfaction=sat,
         step_ids=["create-reminder"] if rain else [],
     )
-    return PlannerModelOutput.model_validate(raw).model_dump(mode="json")
+    return raw
 
 
 class CheckedReply(ReplayModel):
@@ -177,7 +178,7 @@ class CheckedReply(ReplayModel):
 
 
 async def resolve(request, catalog, raw, tier="deep"):
-    model = CheckedReply(json.dumps(raw))
+    model = CheckedReply(json.dumps(word_free_model_fixture(raw)))
     cls = FastPlannerResolver if tier == "fast" else DeepPlannerResolver
     result = await cls(model, StaticCatalog(catalog)).resolve(request)
     assert model.calls == 1
@@ -297,6 +298,9 @@ async def begin_episode(language, rain):
 async def reenter(request, catalog, plan, adapter, response, bundle, raw):
     class Client:
         seen = None
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            return social_fixture_resolution(request, raw.get("response_text") or "Fixture response.")
 
         async def resolve_fast_plan(self, _session, *, request, timeout_ms):
             self.seen = request
@@ -577,7 +581,10 @@ def test_acquisition_does_not_waive_sibling_adequacy_or_complete_it(weak_sibling
             }
         )
         raw["metadata"]["user_confirmation_required"] = True
-        raw["response_text"] = "Shall I create the independently requested reminder?"
+        raw["communication_needs"] = [{"need_id": "confirm-independent", "owner": "planner",
+            "kind": "confirmation", "reference_id": plan.plan_id,
+            "source_goal_ids": [gid, sibling], "delivery_phase": "pre_action",
+            "facts": {"proposal": "Create the independently requested reminder."}}]
         if weak_sibling:
             raw["goal_satisfaction"]["unmet_goal_ids"].append(sibling)
         else:
@@ -604,7 +611,7 @@ def test_acquisition_does_not_waive_sibling_adequacy_or_complete_it(weak_sibling
             assert errors[0]["goal_id"] == sibling
             return
         runtime, provider = episode_runtime(catalog, True)
-        response = await CanonicalPlanRuntimeAdapter(runtime).build_planner_owned_response(
+        response = await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),
             plan=mixed, session_id=request.sid, language=request.language
         )
         response.metadata["turn_id"] = request.sid
@@ -673,7 +680,7 @@ def test_partial_response_delivery_cannot_erase_deferred_obligation():
 
 @pytest.mark.parametrize("language", ["en", "zh"])
 @pytest.mark.parametrize("reentry", [False, True])
-def test_fast_exact_confirmation_requires_primary_question(language, reentry):
+def test_fast_exact_confirmation_requires_primary_need(language, reentry):
     async def run():
         from agent.app.planner_fast_validation import qualify_fast_canonical_plan
         from benchmarks.datasets.fast_planner_daily_life.qualification import (
@@ -712,7 +719,7 @@ def test_fast_exact_confirmation_requires_primary_question(language, reentry):
         assert plan.disposition == "execute", plan.metadata
         assert plan.metadata["plan_relation"] == "exact"
         runtime, provider = episode_runtime(catalog, True)
-        response = await CanonicalPlanRuntimeAdapter(runtime).build_planner_owned_response(
+        response = await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),
             plan=plan,
             session_id=request.sid,
             language=request.language,
@@ -721,28 +728,14 @@ def test_fast_exact_confirmation_requires_primary_question(language, reentry):
         assert response.requires_confirmation
         assert response.speech
         assert not provider.calls
-        # The emitted Schema now admits the exact question and rejects its absence.
-        missing = copy.deepcopy(raw)
-        missing["response_text"] = ""
-        rejected = await resolve(request, catalog, missing, "fast")
-        assert rejected.disposition != "execute"
-        # The Host independently rejects whitespace or a forged false model flag.
-        for flag in (True, False):
-            invalid = plan.model_copy(
-                update={
-                    "response_text": "   ",
-                    "metadata": {**plan.metadata, "user_confirmation_required": flag},
-                }
-            )
-            qualified = qualify_fast_canonical_plan(
-                invalid,
-                capability_payload=catalog,
-                expected_goal_ids_for_turn=plan.goal_ids,
-                authoritative_goals=[],
-                evidence_reentry_goal_ids=set(),
-            )
-            assert not qualified.accepted
-            assert qualified.reason == "confirmation_question_missing"
+        assert plan.response_text == ""
+        assert any(need.kind == "confirmation" for need in plan.communication_needs)
+        # Work establishes the exact consent Need; SC owns the question.
+        invalid = plan.model_copy(update={"communication_needs": []})
+        qualified = qualify_fast_canonical_plan(invalid, capability_payload=catalog,
+            expected_goal_ids_for_turn=plan.goal_ids, authoritative_goals=[], evidence_reentry_goal_ids=set())
+        assert not qualified.accepted
+        assert qualified.reason == "confirmation_need_missing"
 
     asyncio.run(run())
 

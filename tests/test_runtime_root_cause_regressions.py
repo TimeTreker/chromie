@@ -192,10 +192,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             unavailable_outcome["properties"]["disposition"]["enum"],
             ["unavailable", "refused"],
         )
-        self.assertEqual(
-            unavailable_outcome["properties"]["response_text"]["minLength"],
-            1,
-        )
+        self.assertNotIn("response_text", unavailable_outcome["properties"])
 
         incomplete_resource_schema = canonical_plan_response_schema(
             planner_tier="deep",
@@ -319,7 +316,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             adjusted["properties"]["user_confirmation_required"]["enum"],
             [True],
         )
-        self.assertEqual(adjusted["properties"]["response_text"]["minLength"], 1)
+        self.assertNotIn("response_text", schema["properties"])
 
         fast = canonical_plan_response_schema(
             planner_tier="fast",
@@ -425,10 +422,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             if branch.get("if", {}).get("properties", {}).get("disposition", {}).get("enum")
             == ["escalate"]
         )
-        self.assertEqual(
-            escalation["properties"]["response_text"]["maxLength"],
-            0,
-        )
+        self.assertNotIn("response_text", outcome["properties"])
+        self.assertEqual(escalation["properties"]["step_ids"]["maxItems"], 0)
 
     def test_fast_multi_goal_schema_keeps_effectful_goals_out_of_response(self) -> None:
         schema = fast_multi_goal_response_schema(
@@ -598,12 +593,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]["enum"],
             ["respond", "clarify", "unavailable", "refused"],
         )
-        self.assertEqual(
-            deep_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
-                "response_text"
-            ]["minLength"],
-            1,
-        )
+        self.assertNotIn("response_text", deep_schema["properties"])
 
     def test_single_goal_fast_schema_enforces_respond_text_before_host_dto(self) -> None:
         schema = fast_multi_goal_response_schema(
@@ -625,16 +615,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             for branch in aggregate_constraint["anyOf"]
             if branch["properties"]["disposition"]["enum"] == ["respond"]
         )
-        self.assertEqual(
-            respond_branch["properties"]["response_text"]["minLength"],
-            1,
-        )
-        self.assertEqual(
-            respond_branch["properties"]["goal_outcomes"]["properties"]["goal-status"][
-                "properties"
-            ]["response_text"]["minLength"],
-            1,
-        )
+        self.assertNotIn("response_text", schema["properties"])
+        self.assertEqual(respond_branch["properties"]["steps"]["maxItems"], 0)
 
         satisfaction = {
             "score": 1.0,
@@ -662,7 +644,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "goal-song": {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["wrong-song-step"],
                         "satisfaction": satisfaction,
@@ -698,13 +679,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             joke_outcome["properties"]["disposition"]["enum"],
             ["respond", "clarify", "unavailable", "refused"],
         )
-        self.assertNotIn("oneOf", joke_outcome)
+        self.assertTrue(all(branch["properties"]["step_ids"].get("maxItems") == 0 for branch in joke_outcome["oneOf"]))
         self.assertEqual(
             set(joke_outcome["required"]),
             {
                 "disposition",
                 "coverage",
-                "response_text",
                 "unresolved",
                 "step_ids",
                 "satisfaction",
@@ -795,92 +775,16 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcomes["maxProperties"], 1)
         self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
 
-    def test_tool_route_planner_schema_requires_terminal_limitation_speech(self) -> None:
-        fast = fast_multi_goal_response_schema(
-            expected_goal_ids=["goal-weather"],
-            allowed_capability_ids=["chromie.weather.lookup"],
-            requires_execution=True,
-        )
-        deep = canonical_plan_response_schema(
-            planner_tier="deep",
-            expected_goal_ids=["goal-weather"],
-            allowed_capability_ids=["chromie.weather.lookup"],
-            requires_execution=True,
-        )
-
-        self.assertEqual(
-            fast["properties"]["disposition"]["enum"],
-            ["execute", "clarify", "escalate"],
-        )
-        self.assertEqual(fast["properties"]["response_text"]["maxLength"], 800)
-        exact_response_constraint = next(
-            item
-            for item in fast["allOf"]
-            if item.get("if", {}).get("properties", {}).get("plan_relation", {}).get("const")
-            == "exact"
-        )
-        self.assertEqual(
-            exact_response_constraint["then"]["properties"]["response_text"]["maxLength"],
-            0,
-        )
-        fast_outcome = fast["properties"]["goal_outcomes"]["properties"]["goal-weather"]
-        self.assertEqual(
-            fast_outcome["properties"]["disposition"]["enum"],
-            ["execute", "clarify", "escalate"],
-        )
-        self.assertEqual(
-            fast_outcome["properties"]["response_text"]["maxLength"],
-            0,
-        )
-
-        self.assertEqual(
-            deep["properties"]["disposition"]["enum"],
-            ["execute", "clarify", "unavailable", "refused"],
-        )
-        self.assertEqual(deep["properties"]["response_text"]["maxLength"], 800)
-        terminal_response_branch = next(
-            item
-            for item in deep["allOf"]
-            if any(
-                branch.get("properties", {}).get("disposition", {}).get("enum")
-                == ["clarify", "unavailable", "refused"]
-                for branch in item.get("anyOf", [])
-            )
-        )
-        limitation = terminal_response_branch["anyOf"][1]
-        self.assertEqual(
-            limitation["properties"]["response_text"]["minLength"],
-            1,
-        )
-        deep_outcome = deep["properties"]["goal_outcomes"]["properties"]["goal-weather"]
-        self.assertNotIn(
-            "maxLength",
-            deep_outcome["properties"]["response_text"],
-        )
-        outcome_terminal_branch = next(
-            item
-            for item in deep_outcome["allOf"]
-            if any(
-                branch.get("properties", {}).get("disposition", {}).get("enum")
-                == ["clarify", "unavailable", "refused"]
-                for branch in item.get("anyOf", [])
-            )
-        )
-        self.assertEqual(
-            outcome_terminal_branch["anyOf"][0]["properties"]["response_text"]["maxLength"],
-            0,
-        )
-        self.assertEqual(
-            outcome_terminal_branch["anyOf"][1]["properties"]["response_text"]["minLength"],
-            1,
-        )
-        self.assertNotIn(
-            ["respond"],
-            [
-                branch.get("properties", {}).get("disposition", {}).get("enum")
-                for branch in deep_outcome.get("oneOf", [])
-            ],
-        )
+    def test_tool_route_work_schema_excludes_speech_authority(self) -> None:
+        for tier in ("fast", "deep"):
+            schema = canonical_plan_response_schema(planner_tier=tier,
+                expected_goal_ids=["goal-weather"],
+                allowed_capability_ids=["chromie.weather.lookup"], requires_execution=True)
+            self.assertNotIn("response_text", schema["properties"])
+            self.assertNotIn("auxiliary_activities", schema["properties"])
+            outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-weather"]
+            self.assertNotIn("respond", outcome["properties"]["disposition"]["enum"])
+            self.assertNotIn("response_text", outcome["properties"])
 
     def test_planner_model_output_requires_explicit_timing_for_every_step(self) -> None:
         for step_count in (1, 2):
@@ -1099,16 +1003,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(likely)
 
     def test_planner_prompts_preserve_requested_concurrency(self) -> None:
-        fast_source = inspect.getsource(planner_prompt.fast_plan_prompt)
-        deep_source = inspect.getsource(planner_prompt.deep_plan_prompt)
-        for source in (fast_source, deep_source):
-            self.assertIn(
-                "Never silently rewrite simultaneous independent actions as before/after actions",
-                source,
-            )
-            self.assertIn("timing=parallel", source)
-            self.assertIn("Every executable step must explicitly include timing", source)
-            self.assertIn("Never satisfy a prohibition", source)
+        from tests.cognitive_work_test_support import cognitive_work_request
+        request = cognitive_work_request(text="Run the independent actions together.", context={})
+        for prompt in (planner_prompt.fast_plan_prompt(request, [], response_schema={}),
+                       planner_prompt.deep_plan_prompt(request, [], response_schema={}, expected_goal_ids=[])):
+            self.assertIn("Preserve before/after/parallel_with requirements", prompt)
+            self.assertIn("Run the independent actions together.", prompt)
 
     def test_deep_tool_schema_inlines_required_goal_outcome_fields(self) -> None:
         schema = canonical_plan_response_schema(
@@ -1125,7 +1025,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             {
                 "disposition",
                 "coverage",
-                "response_text",
                 "unresolved",
                 "step_ids",
                 "satisfaction",

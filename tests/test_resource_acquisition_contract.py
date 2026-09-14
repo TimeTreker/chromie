@@ -69,7 +69,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Fetch and deliver the red mug.",
-                "response_text": "",
+
                 "steps": steps,
                 "escalation_reason": "",
                 "unresolved": [],
@@ -78,7 +78,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                     goal_id: {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
+
                         "unresolved": [],
                         "step_ids": step_ids,
                         "satisfaction": satisfaction,

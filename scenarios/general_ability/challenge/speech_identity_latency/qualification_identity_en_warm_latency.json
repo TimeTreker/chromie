@@ -48,9 +48,9 @@
   "language": "en-US",
   "expect_no_capabilities": true,
   "require_speech": true,
-  "require_fast_communicative_act": true,
-  "max_warm_gi_handoff_to_fast_commit_ms": 2000,
-  "max_warm_fast_commit_to_playback_start_ms": 3000,
+  "require_social_communicative_act": true,
+  "max_warm_sc_decision_ms": 2000,
+  "max_warm_sc_to_playback_start_ms": 3000,
   "expect_no_fast_contract_failure": true,
   "min_new_goal_count": 1,
   "min_goal_outcome_count": 1,
@@ -60,11 +60,11 @@
       {
         "id": "speech_identity_latency",
         "title": "Speech Identity and Warm Response Latency",
-        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Social Cognition commitment and playback scheduling stay within the declared interactive budgets.",
         "rationale": "English identity response must preserve the same maintained identity and warm response path without internal implementation narration.",
         "root_cause_boundaries": [
           "Mind profile",
-          "Planner communication",
+          "Social Cognition",
           "Playback delivery",
           "Latency evidence"
         ]

@@ -42,6 +42,7 @@ from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.interaction import CapabilityResult
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_cognitive_runtime_pr7 import FakeRuntime
+from tests.cognitive_work_test_support import social_fixture_response, social_fixture_resolution
 
 
 class UnexpectedAdmission(AssertionError):
@@ -96,6 +97,7 @@ class Episode:
     def __init__(self, case, replay, url, root):
         self.case, self.replay, self.root = case, replay, root
         self.events = []
+        self.social_words = {}
         self.boundary = 'initialization'
         self.contract_failure = None
         self.catalog = case['catalog']
@@ -126,6 +128,11 @@ class Episode:
     def goal_status(self, goal_id=None):
         return self.manager._goal_responsibility_status(self.manager._task_context_by_goal_id(goal_id or self.goal))
 
+    async def resolve_social_cognition(self, session, *, request, **kwargs):
+        words = next((self.social_words[need.reference_id] for need in request.communication_needs
+                      if need.reference_id in self.social_words), "Fixture response.")
+        return social_fixture_resolution(request, words)
+
     async def resolve_fast_plan(self, _session, *, request, timeout_ms):
         self.last_request = request
         return await self.plan(request, 'fast')
@@ -136,7 +143,9 @@ class Episode:
 
     async def plan(self, request, tier):
         self.boundary = tier
+        step_name = self.replay.steps[self.replay.position]["name"]
         result = await self.planners[tier].resolve(request)
+        self.social_words[result.plan_id] = self.case.get("social_cognition", {}).get(step_name, "Fixture response.")
         if result.metadata.get('failure_class'):
             self.contract_failure = result.metadata
             raise AssertionError(f'{tier} contract failure: {result.metadata}')
@@ -194,7 +203,8 @@ class Episode:
         self.request = request
         plan = await self.plan(request, self.case['initial_planner'])
         self.boundary = 'adapter'
-        response = await self.adapter.build_planner_owned_response(plan=plan, session_id=request.sid, language=request.language)
+        response = await social_fixture_response(self.adapter, plan=plan, session_id=request.sid,
+            language=request.language, text=self.social_words.get(plan.plan_id) or "Fixture response.")
         response.metadata.update(turn_id=request.sid, goal_association=association.model_dump(mode='json'),
             goal_interpretation=interpreted.model_dump(mode='json'),
             user_turn_envelope={'turn_id':request.sid, 'original_input':{'text':request.text}, 'normalized_input':{'text':request.text, 'language':request.language}})

@@ -13,6 +13,7 @@ from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts import CognitiveWorkRequest
 from tests.capability_runtime_test_support import submit_and_wait_terminal
+from tests.cognitive_work_test_support import social_fixture_response, word_free_model_fixture, social_fixture_resolution
 from tests.test_planner_staged_progress import episode_runtime, read_reply, resolve, status
 
 
@@ -44,7 +45,7 @@ def test_waiting_acknowledgement_keeps_goal_open_without_provider_work(tier, lan
         plan=await resolve(request,catalog,waiting_reply(request),tier)
         assert plan.disposition=='respond', plan.metadata
         runtime,provider=episode_runtime(catalog,False)
-        response=await CanonicalPlanRuntimeAdapter(runtime).build_planner_owned_response(
+        response=await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),
             plan=plan,session_id=request.sid,language=request.language)
         response.metadata.update(turn_id=request.sid,goal_association=request.context['goal_association_resolution'],
             goal_interpretation={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]},
@@ -133,7 +134,7 @@ def test_old_future_condition_cannot_wake_cancelled_or_replaced_intention(termin
     async def run():
         request,catalog=future_case();plan=await resolve(request,catalog,waiting_reply(request),'fast')
         runtime,_=episode_runtime(catalog,False)
-        response=await CanonicalPlanRuntimeAdapter(runtime).build_planner_owned_response(plan=plan,session_id=request.sid,language=request.language)
+        response=await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),plan=plan,session_id=request.sid,language=request.language)
         response.metadata['goal_interpretation']={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]}
         manager=ConversationStateManager(task_store_enabled=False)
         manager.apply_goal_association_resolution(request.context['goal_association_resolution'],sid=request.sid,user_text=request.text,atomic=True)
@@ -190,7 +191,7 @@ def test_future_wait_preserves_an_independent_ready_action(tier):
         raw['goal_satisfaction']=copy.deepcopy(raw['goal_satisfaction'])
         raw['goal_satisfaction'].update(score=0.5,status='partial',satisfied_goal_ids=['ready-blink'])
         from agent.app.planner_model_contract import PlannerModelOutput
-        raw=PlannerModelOutput.model_validate(raw).model_dump(mode='json')
+        raw=PlannerModelOutput.model_validate(word_free_model_fixture(raw)).model_dump(mode='json')
         plan=await resolve(request,catalog,raw,tier)
         assert plan.disposition=='mixed',plan.metadata
         assert len(plan.steps)==1 and plan.steps[0].source_goal_ids==['ready-blink']
@@ -217,7 +218,7 @@ def test_time_crossing_during_inference_preserves_the_primary_waiting_decision(t
                 answer=await super().generate(prompt,**kwargs)
                 Clock.current=due+1
                 return answer
-        model=SlowReply(json.dumps(waiting_reply(request)))
+        model=SlowReply(json.dumps(word_free_model_fixture(waiting_reply(request))))
         with patch('agent.app.planner_context.datetime',Clock):
             cls=FastPlannerResolver if tier=='fast' else DeepPlannerResolver
             plan=await cls(model,StaticCatalog(catalog)).resolve(request)
@@ -233,11 +234,11 @@ def test_frozen_waiting_reference_rejects_the_original_early_dispatch_shape():
     request,_=future_case();raw=read_reply(request)
     raw['steps'][0]['args']={'location':'Hangzhou','date':'2099-09-04','period':'night'}
     raw['time_conditions']=waiting_reply(request)['time_conditions']
-    old_plan=CanonicalPlan.model_validate(materialize_planner_output(PlannerModelOutput.model_validate(raw),
+    old_plan=CanonicalPlan.model_validate(materialize_planner_output(PlannerModelOutput.model_validate(word_free_model_fixture(raw)),
         planner_tier='fast',plan_id='old-accepted-temporal-plan',expected_goal_ids_for_turn=list(raw['goal_outcomes'])))
     expectation=next(c for c in load_cases() if c['id'].endswith('34_supported_en'))['target']['reference_region']
     assert 'waiting reference forbids current Work or confirmation' in waiting_reference_errors(expectation,old_plan)
-    good=CanonicalPlan.model_validate(materialize_planner_output(PlannerModelOutput.model_validate(waiting_reply(request)),
+    good=CanonicalPlan.model_validate(materialize_planner_output(PlannerModelOutput.model_validate(word_free_model_fixture(waiting_reply(request))),
         planner_tier='fast',plan_id='waiting-plan',expected_goal_ids_for_turn=list(raw['goal_outcomes'])))
     assert waiting_reference_errors(expectation,good)==[]
 
@@ -254,7 +255,7 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
         plan=await resolve(request,catalog,waiting_reply(request),'fast')
         runtime,provider=episode_runtime(catalog,False)
         adapter=CanonicalPlanRuntimeAdapter(runtime)
-        response=await adapter.build_planner_owned_response(plan=plan,session_id=request.sid,language=request.language)
+        response=await social_fixture_response(adapter,plan=plan,session_id=request.sid,language=request.language)
         response.metadata['goal_interpretation']={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]}
         path=tmp_path/'future-goals.json'
         manager=ConversationStateManager(task_store_enabled=True,task_store_path=path)
@@ -271,6 +272,8 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
 
         class Client:
             requests=[]
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                return social_fixture_resolution(request)
             async def resolve_fast_plan(self,_session,*,request,timeout_ms):
                 self.requests.append(request)
                 return await resolve(request,catalog,raw,'fast')
@@ -346,7 +349,7 @@ def test_retained_goal_wake_rejects_unproven_or_stale_identity_before_inference(
         elif invalid=='wrong_snapshot_identity':snapshot['goal']['goal_id']='other-goal'
         else:context['active_goal_snapshots'].append(copy.deepcopy(snapshot))
         incoming=request.model_copy(update={'context':context,'planner_reentry_scope':scope},deep=True)
-        model=ReplayModel(json.dumps(waiting_reply(request)))
+        model=ReplayModel(json.dumps(word_free_model_fixture(waiting_reply(request))))
         resolver=(FastPlannerResolver if tier=='fast' else DeepPlannerResolver)(model,StaticCatalog(catalog))
         with pytest.raises(ValueError):await resolver.resolve(incoming)
         assert model.calls==0

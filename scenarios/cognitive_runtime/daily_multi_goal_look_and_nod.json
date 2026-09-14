@@ -96,23 +96,7 @@
           "goal-nod"
         ]
       },
-      "response_text": "",
-      "communicative_acts": [
-        {
-          "activity_id": "scenario-pre_action",
-          "text": "好，我会先看着你两秒，再点两下头。",
-          "role": "complete_response",
-          "timing": "parallel",
-          "speech_act": "inform",
-          "source_goal_ids": [
-            "goal-look",
-            "goal-nod"
-          ],
-          "truth_stage": "context_grounded",
-          "evidence_refs": [],
-          "information_gaps": []
-        }
-      ]
+      "communication_needs": []
     },
     "capabilities": [
       {
@@ -159,7 +143,28 @@
           "head_motion"
         ]
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "好，我会先看着你两秒，再点两下头。",
+            "function": "inform",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-look",
+              "goal-nod"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

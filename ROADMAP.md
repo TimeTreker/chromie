@@ -33,7 +33,52 @@ labels, #56 complete contract typing, #57 lifecycle regressions, and newly repro
 Charter decisions and bounded maintenance in this session. No new model profile,
 architecture layer or product feature is promoted.
 
-## Current execution order
+## Social Cognition migration
+
+The owner approved the [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+on 2026-09-14 and subsequently authorized implementation, multimodal interaction,
+environment-driven initiative and high-priority foreground scheduling. The communication responsibility
+has moved from Planner to this distinct Core owner; GI/GA, Work planning,
+Memory, Host and Soridormi retain their own truth and permissions. This is the
+explicit migration exception to the architecture/terminology freeze, not a
+new release line. No new document, runtime switch or
+service is needed. The one new role replaces Planner's communication ownership;
+the retired response/critic/Social Attention model paths must not return.
+
+Contract/implementation work below is source-complete, with controlled and
+bounded native evidence in Status. Current deployed end-to-end and performance
+qualification remain open. Existing #24/#32 evidence and failures remain retained; their
+historical single-stream topology does not constrain the accepted destination.
+Do not silently close or redefine a remote Issue from this local documentation.
+
+1. **Fix the transaction contracts before source work.** Use the
+   [source inventory](docs/COGNITIVE_TURN_LOOP.md#source-migration-inventory)
+   to specify Social Cognition input/output, scoped coverage, identity, depth,
+   silence and failure; remove Planner's writable speech/confirmation wording
+   together with the corresponding validators and clients. Settle the exact
+   speech/auxiliary anchor migration, API shape and required-communication
+   completion handoff. Keep one writer per semantic fact.
+2. **Migrate one coherent maintained path.** Reuse shared state, model transport,
+   privacy, correlation, delivery and Runtime infrastructure. Transfer initial,
+   Goal-bound result/control and Goal-free communication together; do not add
+   a permanent two-writer compatibility mode or a separate microservice. Preserve
+   all action/confirmation/cancellation and safe-read prerequisites.
+3. **Prove authority and behavior.** Freeze bilingual contrasting episodes,
+   including substantive dialogue without Work, pending/delivered speech,
+   results overtaking progress, multi-Goal scope, failures and interruption.
+   Apply the [acceptance contract](docs/ACCEPTANCE.md#social-cognition-acceptance)
+   and semantic qualification method to both owners and the combined workflow.
+4. **Measure the scheduling tradeoff.** SGLang is the intended candidate for
+   independently prioritized requests. Verify actual scheduler support/config,
+   measure idle and contended first meaningful response plus task completion
+   and TTS, and rule out Planner starvation. No provider or model is promoted
+   by this design decision.
+5. **Retain the evidence closure sequence.** Canonical local gates, narrow
+   current-revision supervised voice and the default target-evidence profile
+   remain required. Source implementation, automated verification, target
+   validation and release readiness are recorded separately in Status.
+
+## Current execution order — existing implementation and evidence
 
 The owner's September 13 scope completed #59/#61's offline prototype and 1,500-case
 audit, then expanded to 6,000 cases under #65. #60 now connects primary GI temporal
@@ -83,7 +128,7 @@ The current-revision implementation/qualification axes remain separate. The 2026
    count remains evidence of reconstructability cost, not permission to create another
    semantic manager or perform decomposition for its own sake.
 
-## Immediate architecture line — consolidate the reviewed authority baseline
+## Existing architecture line — migration baseline and retained evidence
 
 The broad architecture-discovery phase is closed. New work starts from the canonical
 event/readiness authority seam: Goal Interpretation establishes Responsibility / WHAT;
@@ -719,64 +764,26 @@ Exit criteria:
 
 ### Streaming Planner with Early Typed Presentation Commit — source-gated, qualification open
 
-Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns this replacement. The
-separate `/fast-first-response` path is removed. `/fast-advance` now makes one text-streaming
-Fast Planner invocation while Goal Association starts concurrently, and Runtime
-launches only a complete validated typed presentation value before terminal planning ends.
+The owner-approved SC migration supersedes the earlier #32 presentation-frame
+implementation. `/fast-advance` emits one complete Work decision; `/social-cognition`
+authors interaction from the shared GI result, canonical needs, Work/Evidence state
+or trusted Situation. GA/Work and SC proceed independently until a required
+confirmation or explicit ordering dependency must join.
 
-The maintained path is one Fast Planner semantic invocation, not one raw text stream:
+Maintained exit criteria:
 
-```text
-immutable GI result
-  -> concurrently:
-       Goal Association
-       one Fast Planner stream
-          -> complete presentation_commit JSON member
-          -> zero or one validated PresentationCommit
-          -> complete terminal_result JSON member and outer object
-          -> complete typed Planner result
+- complete validated SC results precede delivery; no raw tokens or partial JSON;
+- exact typed communication needs preserve confirmation, input and before/after
+  Work ordering; optional SC does not delay independent Work;
+- actual playback, interruption and cancellation retain exact identity and truth;
+- trusted environmental initiative needs no synthetic GI or task Goal;
+- optional expression uses qualified targets and providers without task authority;
+- freeze and adjudicate SC and Work transactions, run full local gates, and retain
+  current-target latency/contention and physical-evidence gaps separately.
 
-accepted PresentationCommit
-  -> primary presentation launch
-  -> optional auxiliary scheduling after primary launch
-
-complete Planner result + applicable canonical Goal binding
-  -> complete Plan validation
-  -> confirmation / Work dispatch / Deep escalation / silence / fail closed
-```
-
-`PresentationCommit` is a typed serialization boundary inside the same Planner authority.
-It may carry one immediately truthful Communicative Main Activity or silence together with
-optional subordinate `auxiliary_activities[]`. The model emits those two payloads as
-ordered members of one JSON object. Runtime acts only after the
-whole owning member is parsed and mechanically validated. Raw tokens, incomplete members, and
-partial payloads never reach TTS or a
-Capability. Once accepted, wording, truth stage, anchor, and auxiliary proposal are
-immutable; the terminal result must reference the same commit and cannot regenerate,
-contradict, duplicate, or silently omit it. Goal-owned Work, confirmation/result claims,
-and completion remain unavailable until the full Plan, Goal binding, and Evidence contracts
-permit them.
-
-Source-implemented criteria:
-
-- retain the former sequential-gate regression and prove it cannot return;
-- prove Goal Association and the Planner stream start without waiting for presentation;
-- probe the exact target Ollama/model combination for NDJSON framing, structured streaming,
-  mid-stream errors, malformed/duplicate/contradictory frames, and terminal consistency;
-- measure accepted-commit, TTS first-PCM, playback-start, and terminal-Plan latency instead
-  of treating non-streaming duration as time to first commit;
-- prove failure before commit is silent and failure after a truthful commit dispatches no
-  Goal-owned Work or Host-authored semantic fallback;
-- preserve Goal Progress Communication, auxiliary Goal isolation, post-primary auxiliary
-  scheduling, cancellation, confirmation, Evidence truth, and Interaction Ledger identity;
-- amend Charter principles 23 and 37 and all owned contracts in the same source migration;
-- remove the superseded endpoint, DTO, model/configuration role, tests, and documentation
-  rather than retaining a compatibility path.
-
-Remaining exit criteria:
-
-- complete current-target qualification before Fast-Planner Prompt/model promotion.
-  Issue #24 remains the separate model-role qualification authority.
+Native role cases and controlled runtime tests do not by themselves close #24/#32
+or qualify the deployed end-to-end interaction path. Current evidence is owned by
+[STATUS.md](docs/STATUS.md#social-cognition-migration).
 
 ### Goal-scoped Interaction Ledger and current-turn continuity
 

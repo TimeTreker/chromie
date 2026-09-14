@@ -118,7 +118,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         assistant._auxiliary_schedule_calls = []
 
         class _CognitiveRuntime:
-            def schedule_resolution_auxiliary_activities(self, *args, **kwargs):
+            def schedule_social_expression(self, *args, **kwargs):
                 if not assistant._launch_interaction_calls:
                     raise AssertionError(
                         "auxiliary Activity was scheduled before primary launch"
@@ -168,7 +168,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant.conversation_state.user_turns), 1)
         self.assertEqual(len(assistant.conversation_state.agent_results), 1)
         self.assertEqual(len(assistant._launch_interaction_calls), 1)
-        self.assertEqual(len(assistant._auxiliary_schedule_calls), 1)
+        self.assertEqual(assistant._auxiliary_schedule_calls, [])
         prepared_response = assistant.interaction_runtime.prepared[0][0]
         self.assertEqual(prepared_response.metadata["turn_id"], "sid")
         self.assertEqual(

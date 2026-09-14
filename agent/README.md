@@ -1,15 +1,24 @@
 # Chromie Agent Cognitive Service
 
+[Social Cognition](../docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+owns interaction planning and wording. `POST /social-cognition` serves admitted
+GI, Goal/Work/Evidence state and trusted Situation through one shared transaction.
+Planner retains Work HOW and typed communication needs; GI/GA retain meaning and
+continuity. Foreground SC uses realtime priority; genuine unresolved social
+reasoning has one bounded deliberative continuation. See the
+[source inventory](../docs/COGNITIVE_TURN_LOOP.md#source-migration-inventory) and
+[evidence limits](../docs/STATUS.md#social-cognition-migration).
+
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
 separately testable Goal Interpretation, Goal Association, Planner fast/deep passes,
-restricted Goal-free Situation planning, Reflection, capability-catalog, and WorkDAG diagnostic
+Social Cognition for shared interaction state, Reflection, capability-catalog, and WorkDAG diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
 
 The service is **not** a second orchestration runtime. The retired `AgentRuntime`,
 `InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`,
 `/agents`, independent response-authoring stage, and Tool Result Interpreter
-surfaces have been removed. One Planner authority owns Communicative Activities; its
+surfaces have been removed. SC owns Communicative Acts; Planner
 fast/deep passes receive bounded Responsibility/Goal/Work/Evidence state on initial and
 event-driven re-entry. Re-entry includes one immutable exact affected-Goal scope;
 unrelated sibling Work remains outside the Planner transaction; relevant sibling speech
@@ -26,15 +35,16 @@ honest partial whole-Goal score and explicit per-Goal/aggregate deferred obligat
 The acquisition result leaves the Goal open. Matching completed Evidence and source
 Plan identity permit a new Planner decision; effect confirmation and response-delivery
 barriers remain in Runtime. Failed or mismatched acquisition Evidence cannot establish
-either conditional branch. Canonical Fast must supply its exact confirmation question
-in top-level `response_text` whenever confirmation is required, including exact Plans;
-the Schema and Host reject an empty question before response adaptation. See the [interaction contract](../docs/HUMAN_LIKE_INTERACTION_CONTRACT.md).
+either conditional branch. Work supplies the exact confirmation need and immutable proposed steps; SC authors
+the question. Host requires exact scope and actual consent before effect dispatch.
+See the [interaction contract](../docs/HUMAN_LIKE_INTERACTION_CONTRACT.md).
+
 
 Required Planner projections preserve complete admitted Goals, bindings, Work,
 Evidence, source Plans, delivery context and capability applicability contracts.
 Existing per-section character budgets reject oversized required inputs before
 inference instead of omitting fields or entries. Streaming applies the same rule
-before any presentation commit. Budget rejection retains the full Goal scope,
+before any Work commitment. Budget rejection retains the full Goal scope,
 records zero model attempts, and cannot trigger semantic Deep delegation or
 partial execution. Optional Situation relevance and auxiliary decoration remain
 separate background projections; their omission cannot establish Goal truth.
@@ -89,13 +99,13 @@ Planner                  0..N Activity changes or none (Goal-bound)
 
 Goal-free trusted Situation
           ↓
-/situational-cognition   Planner, communication-only; silence or one Activity; no Work
+/social-cognition        SC interaction planning; exact acts or silence; no task Work
 ```
 
-Optional Social Attention decoration is emitted as `auxiliary_activities[]` in the
-same Fast `PresentationCommit`, terminal result, or canonical Fast/Deep Planner result
-as its Main Activity. It has no Goal-completion authority and there is no second social
-model call.
+Optional Social Attention expression is emitted inside SC's primary interaction
+result, anchored to its exact communicative act. Requested actions remain Planner
+Work. Optional expression has no task Goal-completion authority and requires no
+second decoration model call.
 
 Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
 
@@ -121,7 +131,7 @@ Important endpoints include:
 - `POST /fast-advance`
 - `POST /fast-plan`
 - `POST /deep-plan`
-- `POST /situational-cognition` (restricted Planner Situation contract)
+- `POST /social-cognition` (shared interaction planning, including Goal-free Situation)
 - Agent Skill selection/disclosure endpoints
 - WorkDAG validate/dry-run/guarded execution/trace diagnostics
 

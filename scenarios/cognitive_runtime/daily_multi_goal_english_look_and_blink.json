@@ -94,23 +94,7 @@
           "goal-blink"
         ]
       },
-      "response_text": "",
-      "communicative_acts": [
-        {
-          "activity_id": "scenario-pre_action",
-          "text": "Okay. I’ll look at you for two seconds, then blink twice.",
-          "role": "complete_response",
-          "timing": "parallel",
-          "speech_act": "inform",
-          "source_goal_ids": [
-            "goal-look",
-            "goal-blink"
-          ],
-          "truth_stage": "context_grounded",
-          "evidence_refs": [],
-          "information_gaps": []
-        }
-      ]
+      "communication_needs": []
     },
     "capabilities": [
       {
@@ -157,7 +141,28 @@
           "eye_expression"
         ]
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "Okay. I’ll look at you for two seconds, then blink twice.",
+            "function": "inform",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-look",
+              "goal-blink"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

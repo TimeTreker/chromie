@@ -1,5 +1,90 @@
 # Cognitive Turn Loop / 认知话轮循环
 
+## Social Cognition lifecycle
+
+The [Charter amendment](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+defines the implemented ownership split: Planner decides task Work and SC decides
+interaction. The source paths below describe this split; [STATUS](STATUS.md) records
+which contract, native-model and live evidence has actually passed.
+
+```mermaid
+sequenceDiagram
+    participant GI as Goal Interpretation
+    participant H as Host / shared state
+    participant G as Goal Association
+    participant S as Social Cognition
+    participant P as Planner
+    participant R as Trusted Runtime
+    GI->>H: Complete accepted Responsibilities + immutable source
+    par Canonical continuity
+        H->>G: Same GI result + bounded Goal context
+        G->>H: Validated Goal commit
+    and Communication when eligible
+        H->>S: GI + Goal overview + relevant history / Memory / Work / Evidence
+        S->>H: Complete grounded communicative decision or silence
+        H->>R: Validate identity, versions, claims and delivery eligibility
+    and Work planning when eligible
+        H->>P: GI + relevant Goals / Work / Capability contracts
+        P->>H: Complete Work Plan / no change / grounded input need
+        H->>R: Validate full Plan and required Goal / authorization barriers
+    end
+    R->>H: Correlated lifecycle and qualified terminal Evidence
+    H->>S: New relevant state and delivery records
+    opt New Work decision required
+        H->>P: Exact affected Goal / Work / Evidence scope
+    end
+```
+
+Parallel branches indicate eligibility and distinct ownership, not guaranteed
+simultaneous GPU execution. Neither optional speech nor its silence result is a
+Work-start barrier. A required confirmation remains a causal barrier bound to the
+exact validated Plan/request; Social Cognition receives the established need and
+authors its words, while Host owns consent and expiry. A planning-input question
+likewise cites the Planner-owned gap; GI interprets the next admitted user reply.
+An initial communication result cannot predict an unfinished Planner decision.
+
+Use existing turn, Responsibility, Goal, Plan, request and Activity identities.
+Each invocation captures a source/snapshot version and explicit writable scope.
+Social Cognition may read the current Goal overview for context while its output
+remains bound to exact supplied Responsibilities/Goals or trusted Goal-free
+Situation. It cannot mutate any Goal or task. GA-only identity binding is
+mechanical and does not require another communication or planning invocation.
+
+Host applies an atomic compare-and-commit for each returned act and rechecks
+delivery eligibility before playback. Delivery records include pending, playing,
+completed, interrupted, cancelled and failed states; pending is relevant to
+duplication but is never treated as already heard. Exact identity/version checks
+reject stale commitments, while semantic equivalence and necessary repetition
+remain Social Cognition decisions. If Work finishes before an early progress
+result returns, the obsolete progress cannot be queued after the final result.
+Neither text similarity nor event-name rules may replace this division of work.
+
+Failure handling preserves independent truth. Invalid communication creates no
+utterance and cannot undo valid Work. Invalid planning creates no executable Work
+and cannot invalidate a truthful already-delivered act. Required unanswered
+Responsibilities remain open; a failed output cannot manufacture a retry loop or
+another wording owner. An ordinary new turn does not cancel unrelated tasks.
+Stop/cancel/emergency/silence, shutdown and audio interruption retain their
+deterministic Host/Provider paths.
+
+### Source migration inventory
+
+The ordinary turn and Goal-free Situation paths share the SC transaction.
+
+| Boundary / owner | Implemented contract | Evidence boundary |
+|---|---|---|
+| Host fan-out | One GI result starts SC, GA and Fast Work independently. | SC output cannot predict an unfinished Plan. |
+| Fast Planner | One complete validated Work result, no early presentation. | No partial Work or raw token dispatch. |
+| Canonical Fast/Deep | Word-free Work and exact communication Needs. | SC joins against the immutable Plan and input snapshot. |
+| Goal-free Situation | Trusted revisions/opportunities enter the same SC authority. | Stale revisions fail before delivery or Memory application. |
+| Delivery | Ordered speech, cancellation and actual playback receipts. | Pending or started speech is not heard/completed history. |
+| Optional expression | SC proposals anchor to its exact communicative act. | Runtime validates exact catalog/target/resource authority; optional failure cannot block Work. |
+
+The [acceptance section](ACCEPTANCE.md#social-cognition-acceptance) defines required
+proof; [Roadmap](../ROADMAP.md#social-cognition-migration) owns delivery order.
+
+## Current implemented lifecycle
+
 Status: authoritative design and implemented contract baseline for one complete
 admitted interaction turn. The
 [Cognitive Gateway](COGNITIVE_GATEWAY.md) owns input admission and protective
@@ -10,8 +95,8 @@ turn-loop, delegation, observation, outcome-reconciliation, and final-response
 boundary between them. The host closes effectful cognitive turns through immutable plan/request/result
 correlation, per-Goal reconciliation, Goal-state updates, typed Evidence, and bounded
 Planner re-entry. Result meaning is not composed by Host: trusted terminal truth returns
-to the same Planner, which may answer, create or revise Work, clarify, wait, or emit no
-new Activity. Automated contract evidence exists; retained provider-backed and live robot
+to Planner for Work revision and scoped communication needs, then to SC for
+interaction or silence. Automated contract evidence exists; retained provider-backed and live robot
 evidence remains open and is owned by [STATUS.md](STATUS.md).
 
 ## Bounded addressedness before Core semantics
@@ -144,7 +229,7 @@ composer or execution specialist.
 Progressive conversational deliberation intentionally does **not** add another row or
 module to this table. It is an invocation mode of the existing Core/Planner communication
 authority: the same bounded state is read, no private durable truth is written, and the
-result is either no new Activity or a Planner-owned communicative delta/repair. When the
+result is either no new Activity or an SC-owned communicative delta/repair. When the
 continuation is communication-only it receives no Capability/Work mutation authority; a
 separate need for HOW uses the normal Planner contract.
 
@@ -266,36 +351,24 @@ Interpretation itself stops at Responsibility evidence; once that WHAT is suffic
 Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
 phrase rule, route shortcut, or second semantic authority.
 
-One validated GI result starts Goal Association and one Fast Planner stream concurrently.
-The stream may expose one immediately realizable typed `PresentationCommit` whose
-complete value contains exact truth stage, grounding/provenance, wording, and optional
-anchored auxiliary Activities. No second same-owner model qualifies, reviews, or repairs
-that decision. The same invocation then emits its terminal Activity result and may not
-substitute, repeat, or re-author committed speech. Both branches retain the immutable
-admitted UserTurn as source evidence; the GI Responsibility is a structured projection
-over that source, not a replacement for it. GA remains the only canonical Goal commit
-authority. This is typed incremental readiness inside one Planner, not an independent
-response author.
+One validated GI result starts Goal Association, SC and one Fast Work transaction.
+SC may acknowledge understanding using its captured facts; Work remains independently
+owned. GA alone commits canonical Goal identity. All branches retain the immutable
+admitted user turn. The Host rejects stale SC results and cancels pending delivery
+when a replacement interaction supersedes them.
 
 ```text
 validated GI result
-  -> concurrently:
-       Goal Association -> canonical Goal continuity
-          -> distinct Goal/Work change may start its own Planner call
-       GI-triggered Fast Planner stream
-          -> complete validated PresentationCommit -> non-silent presentation may launch
-          -> complete terminal result -> prepare Work; admit eligible safe reads
-  -> bind accepted Planner Work to applicable canonical Goals
-  -> validate snapshot and commit the exact Plan before further Runtime dispatch
+  -> GA -> canonical Goal continuity
+  -> SC -> complete communicate / silence decision -> qualified delivery
+  -> Fast Work -> complete validated result -> canonical Goal binding
+  -> immutable Plan + required Needs -> SC join when needed
+  -> Runtime authorization, ordered delivery and Work dispatch
 ```
 
-The early item is a closed typed commit, never a raw text/token stream. Its accepted
-wording, truth stage, provenance, Main-Activity anchor, and optional subordinate
-auxiliary activities are immutable. Host may validate, launch, suppress, or fail closed;
-it cannot complete a partial frame, restyle speech, reselect social behavior, or start
-Capability Work from the partial result. Provider failure before commit is silent;
-failure after a truthful commit preserves delivery evidence but authorizes no Goal-owned
-Work or Host-authored replacement response.
+No partial Work result is dispatchable. Optional communication cannot hold Work;
+required confirmation and exact before/after communication preserve causal ordering.
+A failure authorizes no invented replacement words or effects.
 
 GI reports only bounded unresolved meaning; it does not turn every absent value into an
 InformationGap or decide which Capability inputs are required. User-required freshness,
@@ -416,7 +489,7 @@ clarification, safe preparation, refusal, or another harmless branch to advance,
 but it is not execution authorization.
 
 The same principle applies to optional presentation work. Mechanical validation
-and acoustic realization of a Planner-owned Communicative Activity must not become
+and acoustic realization of an SC-owned Communicative Activity must not become
 a barrier to already-authorized work. Social
 Attention is considered only when a concrete semantic primary human-observable
 Activity exists: for example greeting, telling a joke, walking, singing, handover,
@@ -483,7 +556,7 @@ honor it. No scheduler may inspect user content and no compute class may alter t
 GI/GA/Planner transaction.
 
 Accordingly, Goal Association remains logically concurrent but is not on the critical path
-to a first valid `PresentationCommit`. If a single engine can protect foreground tail
+to an eligible independent SC acknowledgement. If a single engine can protect foreground tail
 latency under deep load, keep the simpler single-engine topology. Only measured failure
 justifies separate foreground/deliberative engines, and only further failure justifies
 physical compute isolation. See
@@ -586,7 +659,7 @@ trusted scene / person / interaction state materially changes
   -> source-specific adapter
   -> trusted Situation revision (+ exact audience when resolved)
   -> CognitiveOpportunity
-  -> Planner's restricted Situation invocation decides relevance / silence / speech
+  -> Social Cognition decides relevance / silence / exact interaction
 ```
 
 The second path is not a hidden synthetic user message. It does not pass through GI unless
@@ -623,14 +696,14 @@ The first Goal-free source slice is now implemented. `SituationRevisionObservati
 `CognitiveOpportunity` may carry no Goal IDs only when an exact Situation digest and trusted
 source provenance remain bound; the opportunity also carries bounded subject/source refs.
 `orchestrator.runtime.situation.apply_goal_free_situation_opportunity(...)` admits that typed transition into
-the same Core without fabricating a UserTurn or GI/Goal state. A stateless
-`/situational-cognition` entrypoint runs Planner under its communication-only Situation
-contract. It may return `silence` or one low-commitment context-grounded Activity; Goal and
-Capability Work fields remain unavailable. `local` uses no model; `fast` may delegate once
-while unresolved; `slow` directly uses the configured Deep model under the same restricted
-contract. Unavailable Deep fails quiet, and Deep cannot recurse. Escalation contains neither
-an Activity nor Memory candidates. Complete results retain existing bounded Memory proposals;
-all source/subject, identity and delivered-repair checks precede any Memory write.
+the same Core without fabricating a UserTurn or GI/Goal state. `/social-cognition`
+uses the shared interaction-planning contract; the old dedicated Situation endpoint
+and DTOs are removed. SC may return silence, verbal acts or eligible wordless social
+expression. Local readiness uses no model; unresolved Fast may delegate once, and
+slow readiness directly uses the same Deep scope. Missing Deep reports failure;
+complete decisions have no second review and Deep cannot recurse. All provenance,
+subject, identity, delivered-repair and candidate checks precede Memory writes.
+A newer source revision suppresses an older in-flight reply and Memory decision.
 Source-specific scene/person/social adapters and target qualification remain open.
 
 ## 4. Gateway-to-Core contract
@@ -684,26 +757,17 @@ downstream mismatch is fail-closed evidence, not permission to reconstruct missi
 Goal Interpretation emits provider-neutral contextual Responsibility evidence, including
 the proposed relationship to supplied Goals and bounded unresolved meaning interpreted
 against any pending clarification. It does not create planning InformationGaps. The same
-result starts Goal Association and one Fast Planner stream concurrently. Fast Planner
-authors the early typed presentation and complete terminal Activity decision in one model
-invocation and owns execution-input resolution; GA alone commits the canonical Goal
-relation. This is model-authored planning, never a Host greeting phrase table or
-`route == chat` shortcut.
+result starts GA, SC and Fast Work independently. Fast owns execution-input
+resolution; GA alone commits Goal relationships, and SC alone authors interaction.
 
 ```text
-UserTurnEnvelope + Session Context
-  -> Goal Interpretation
-  -> concurrent
-       |-> one Fast Planner stream
-       |     |-> validated PresentationCommit -> exact wording may launch
-       |     `-> terminal Activity result / Deep continuation / typed failure
-       `-> Goal Association -> canonical Goal commit/version
-  -> terminal result + accepted commit + deterministic Responsibility-to-Goal binding
-  -> Host validates canonical Plan
-  -> Goal-grouped Runtime task-list views
-  -> terminal CanonicalPlan / Plan revision
-  -> deterministic validation
-  -> resource-aware scheduling, confirmation, and commitment
+UserTurnEnvelope + shared context -> GI
+  -> GA canonical commit
+  -> independent SC communicate / silence
+  -> complete Fast Work / designated Deep continuation
+  -> exact Responsibility-to-Goal binding and immutable Plan validation
+  -> required communication join, authorization and resource-aware scheduling
+  -> correlated execution / playback Evidence and scoped cognitive re-entry
 ```
 
 Fast and Deep canonical planning use the same `CanonicalPlan` contract. Fast Goal

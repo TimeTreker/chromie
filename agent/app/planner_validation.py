@@ -153,6 +153,47 @@ _INFORMATION_TEMPORAL_ENTITY_TYPES = frozenset(
 )
 
 
+def _validate_communication_work_order(
+    output: PlannerModelOutput, *, context: dict[str, Any] | None,
+    responsibilities: list[Any] | None,
+) -> None:
+    """Reject reversal/omission of supplied GI order at the exact GA identity join."""
+    association = (context or {}).get("goal_association_resolution") or {}
+    by_ref: dict[str, set[str]] = {}
+    for goal in association.get("new_goals", []):
+        for ref in goal.get("source_responsibility_refs", []):
+            by_ref.setdefault(ref, set()).add(goal.get("goal_id"))
+    for item in association.get("associations", []):
+        for ref in item.get("source_responsibility_refs", []):
+            by_ref.setdefault(ref, set()).update(item.get("target_goal_ids", []))
+    for source in responsibilities or []:
+        for name, relation in (("before", "precedes_step_ids"), ("precedes", "precedes_step_ids"),
+                               ("after", "follows_step_ids"), ("follows", "follows_step_ids")):
+            targets = source.bindings.get(name, [])
+            if isinstance(targets, str):
+                targets = [targets]
+            if not isinstance(targets, list):
+                continue
+            for owner_id in by_ref.get(source.local_ref, set()):
+                own = output.goal_outcomes.get(owner_id)
+                if own is None:
+                    continue
+                for target_ref in targets:
+                    for target_id in by_ref.get(str(target_ref), set()):
+                        target = output.goal_outcomes.get(target_id)
+                        if target is None:
+                            continue
+                        if own.disposition == "respond" and target.disposition == "execute":
+                            if not set(target.step_ids).issubset(getattr(own, relation)):
+                                raise ValueError("communication Work ordering omits or reverses typed Responsibility relation: "
+                                                 + source.local_ref + " " + name + " " + str(target_ref))
+                        elif own.disposition == "execute" and target.disposition == "respond":
+                            opposite = "follows_step_ids" if relation == "precedes_step_ids" else "precedes_step_ids"
+                            if not set(own.step_ids).issubset(getattr(target, opposite)):
+                                raise ValueError("communication Work ordering omits or reverses typed Responsibility relation: "
+                                                 + source.local_ref + " " + name + " " + str(target_ref))
+
+
 def validate_goal_responsibility_outcomes(
     output: PlannerModelOutput,
     *,
@@ -160,8 +201,11 @@ def validate_goal_responsibility_outcomes(
     context: dict[str, Any] | None = None,
     reentry_scope: PlannerReentryScope | None = None,
     future_goal_times: dict[str, int] | None = None,
+    responsibilities: list[Any] | None = None,
 ) -> None:
     """Keep planner outcomes aligned with typed Goal completion contracts."""
+
+    _validate_communication_work_order(output, context=context, responsibilities=responsibilities)
 
     cancellation_goals = goal_cancellation_evidence_reentry_goal_ids(context).intersection(
         str(goal.get("goal_id") or "") for goal in authoritative_goals
@@ -194,7 +238,7 @@ def validate_goal_responsibility_outcomes(
         ):
             raise ValueError("scheduled response requires an exact typed ready_at binding")
     if future_times and set(future_times) == {str(goal.get("goal_id") or "") for goal in authoritative_goals}:
-        if output.steps or output.auxiliary_activities or output.cancel_activity_ids or output.user_confirmation_required:
+        if output.steps or output.cancel_activity_ids or output.user_confirmation_required:
             raise ValueError("waiting acknowledgement cannot authorize or mutate current Work")
     if cancellation_goals:
         # Reporting a control transition neither performs the original effect nor
@@ -213,7 +257,7 @@ def validate_goal_responsibility_outcomes(
         if any(condition.goal_id in cancellation_goals for condition in output.time_conditions):
             raise ValueError("cancellation reporting cannot schedule original Goal")
         if cancellation_goals == {str(goal.get("goal_id") or "") for goal in authoritative_goals}:
-            if output.steps or output.auxiliary_activities or output.cancel_activity_ids or output.user_confirmation_required:
+            if output.steps or output.cancel_activity_ids or output.user_confirmation_required:
                 raise ValueError("cancellation reporting cannot authorize or mutate Work")
 
     unproven_acquisition = acquisition_source_goal_ids(context) - completed_acquisition_goal_ids(
@@ -2872,7 +2916,6 @@ def planner_contract_diagnostics(
 
     disposition = raw.get("disposition")
     coverage = raw.get("coverage")
-    response_text = str(raw.get("response_text") or "").strip()
     if coverage != "complete" and steps:
         add(
             ["steps"],
@@ -2890,12 +2933,6 @@ def planner_contract_diagnostics(
             ["goal_outcomes"],
             "mixed planner output requires goal_outcomes",
             value=raw.get("goal_outcomes"),
-        )
-    if disposition == "respond" and not response_text:
-        add(
-            ["response_text"],
-            "respond planner output requires response_text",
-            value=raw.get("response_text"),
         )
     if disposition not in {"execute", "mixed"} and steps:
         add(
@@ -2975,7 +3012,6 @@ def planner_contract_diagnostics(
                 continue
             outcome_disposition = outcome.get("disposition")
             outcome_coverage = outcome.get("coverage")
-            outcome_response = str(outcome.get("response_text") or "").strip()
             outcome_step_ids = outcome.get("step_ids")
             if isinstance(outcome_step_ids, str):
                 outcome_step_ids = [outcome_step_ids]
@@ -3020,10 +3056,10 @@ def planner_contract_diagnostics(
                     referenced_steps.add(step_id)
                     executable_owners_by_step.setdefault(step_id, set()).add(goal_id)
             elif outcome_disposition == "respond":
-                if outcome_coverage != "complete" or not outcome_response:
+                if outcome_coverage != "complete":
                     add(
                         ["goal_outcomes", goal_id],
-                        "respond goal outcome requires complete coverage and response_text",
+                        "respond goal outcome requires complete coverage",
                         value=outcome,
                     )
                 if normalized_outcome_step_ids:
@@ -3044,12 +3080,6 @@ def planner_contract_diagnostics(
                         ["goal_outcomes", goal_id, "step_ids"],
                         "escalate goal outcome must not reference steps",
                         value=normalized_outcome_step_ids,
-                    )
-                if outcome_response:
-                    add(
-                        ["goal_outcomes", goal_id, "response_text"],
-                        "escalate goal outcome must not claim a conversational answer",
-                        value=outcome_response,
                     )
                 if (
                     not outcome.get("unresolved")
@@ -3074,10 +3104,10 @@ def planner_contract_diagnostics(
                         value=normalized_outcome_step_ids,
                     )
                 unresolved = outcome.get("unresolved")
-                if not outcome_response and not unresolved:
+                if not unresolved:
                     add(
                         ["goal_outcomes", goal_id],
-                        "clarify goal outcome requires an unresolved need or response_text",
+                        "clarify goal outcome requires an unresolved input need",
                         value=outcome,
                     )
             elif outcome_disposition in {"unavailable", "refused"} and normalized_outcome_step_ids:

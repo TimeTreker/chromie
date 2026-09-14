@@ -292,14 +292,35 @@ maintained Host boundary through `VoiceAssistant.handle_routed_text(..., channel
 It is a development runner, not release or microphone evidence, and it does not inject
 expected Goals, routes, social decisions, or response wording.
 
-Start the normal Agent/LLM/TTS services, then run from the Chromie checkout:
+Keep Soridormi running. Stop any previous Chromie Host or standalone text console,
+then start Chromie from its checkout in the first terminal:
 
 ```bash
-conda run -n Chromie python scripts/chromie_psm_live_text_console.py \
-  --no-speaker --no-capabilities
+./scripts/start_chromie.sh --text-console
 ```
 
-Type normal dialogue directly at the `you>` prompt. To exercise the trusted social-world
+This terminal owns the single Host, Soridormi integration, audible replies, and all
+runtime logs. In a second terminal, run the lightweight conversation client:
+
+```bash
+python scripts/chromie_psm_live_text_console.py
+```
+
+The client shows only `you>` prompts and `Chromie>` replies. It sends your text to
+the running Host over a private local socket; it does not start another Host or
+configure robot access. Microphone, VAD, and ASR are bypassed; text startup does not
+wait for ASR readiness. Replies are forwarded
+from recorded Host dialogue while the turn runs; the next prompt appears after the
+turn finishes. `/quit` closes only the client; reconnecting keeps the Host and its
+conversation state. Stop the first terminal with Ctrl+C to shut down Chromie.
+
+The `--serve` entrypoint is used by the launcher, which enables `--capabilities
+--speaker` and retains its generated environment and existing Host lock. Other
+server options are for controlled development runs. Do not combine `--text-console`
+with `--no-orchestrator`. When using Conda to run the client, include
+`conda run --no-capture-output -n Chromie` before `python`.
+
+To exercise the trusted social-world
 PSM ingress without a camera source, use explicit source-fact commands such as:
 
 ```text
@@ -312,7 +333,8 @@ not mean "greet Dad", "Anna is angry", "apologize", or any other social behavior
 The Cognitive Core still owns relevance, silence, wording, repair, deliberation,
 relationship experience, and short-lived self-context. Use `/context`, `/memory`, and
 `/ledger` to inspect the retained development state, and `/help` for the complete command
-surface.
+surface. Diagnostic command output appears in the startup terminal; only actual
+Chromie dialogue is forwarded to the client.
 
 Enable `--speaker` when audible TTS is useful. Enable `--capabilities` only when an
 operator intentionally wants ordinary text turns to reach the supervised Soridormi

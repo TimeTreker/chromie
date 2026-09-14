@@ -621,6 +621,9 @@ class VoiceAssistant:
         commitment: str = "",
         fast_activity_id: str = "",
         communicative_activity_ids: list[str] | None = None,
+        addressed_need_ids: list[str] | None = None,
+        source_responsibility_refs: list[str] | None = None,
+        wording_owner: str = "",
         turn_id: str | None = None,
         source_goal_ids: list[str] | None = None,
         canonical_plan_id: str = "",
@@ -645,6 +648,9 @@ class VoiceAssistant:
             commitment=commitment,
             fast_activity_id=fast_activity_id,
             communicative_activity_ids=communicative_activity_ids,
+            addressed_need_ids=addressed_need_ids,
+            source_responsibility_refs=source_responsibility_refs,
+            wording_owner=wording_owner,
             turn_id=turn_id,
             source_goal_ids=source_goal_ids,
             canonical_plan_id=canonical_plan_id,
@@ -1505,6 +1511,15 @@ class VoiceAssistant:
                             if isinstance(metadata, dict)
                             and isinstance(metadata.get("communicative_activity_ids"), list)
                             else []
+                        ),
+                        addressed_need_ids=(
+                            metadata.get("addressed_need_ids") if isinstance(metadata, dict) else None
+                        ),
+                        source_responsibility_refs=(
+                            metadata.get("source_responsibility_refs") if isinstance(metadata, dict) else None
+                        ),
+                        wording_owner=(
+                            str(metadata.get("wording_owner") or "") if isinstance(metadata, dict) else ""
                         ),
                         turn_id=(
                             str(metadata.get("turn_id") or session_id or "")
@@ -2999,13 +3014,7 @@ class VoiceAssistant:
             response, lambda: self.conversation_state.record_interaction_response(session_id, response),
         )
         self._launch_interaction(
-            response, session_id, reset_playback=not fast_first_scheduled
-        )
-        self.cognitive_runtime.schedule_resolution_auxiliary_activities(
-            resolution,
-            sid=session_id,
-            turn_id=turn_envelope.turn_id,
-            context=context,
+            response, session_id, reset_playback=not (fast_first_scheduled or resolution.metadata.get("social_cognition_started"))
         )
         return True
 
@@ -4108,6 +4117,8 @@ class VoiceAssistant:
                 response,
                 session_id=delivery_session_id,
             )
+            if isinstance(response.metadata.get("social_cognition_resolution"), dict) and response.metadata.get("authority_scope") != "goal_free_situation":
+                self.cognitive_runtime.schedule_social_expression(response, session_id=delivery_session_id)
             execution = await self.interaction_runtime.wait_dispatch(dispatch)
         except asyncio.CancelledError:
             raise
@@ -4192,6 +4203,8 @@ class VoiceAssistant:
                 execution.status,
             )
             return 0
+        if any(speech.metadata.get("wording_owner") == "social_cognition" for speech in delivered_speech):
+            await self.interaction_runtime.record_social_delivery(response, execution, session_id=session_id)
         delivered_response = response.model_copy(
             deep=True,
             update={
@@ -5835,11 +5848,11 @@ class VoiceAssistant:
                 planning_snapshot, plan_id=replanned.plan_id, fingerprint=canonical_plan_fingerprint(replanned),
                 prepared_activity_ids=[*replanned.cancel_activity_ids, *(step.reuse_activity_id for step in replanned.steps)],
             )
-        response = await self.cognitive_runtime.adapter.build_planner_owned_response(
-            plan=replanned,
+        response = await self.cognitive_runtime.resolve_plan_interaction(
+            session, plan=replanned, work_request=request,
             session_id=sid,
             language=language,
-            context=context,
+            context=context, evidence_refs=normalized_evidence_refs,
         )
         response.metadata.update(
             {
@@ -5874,6 +5887,11 @@ class VoiceAssistant:
             )
         evidence_goal_set = set(normalized_evidence_goal_ids)
         for speech in response.speech:
+            if speech.metadata.get("wording_owner") == "social_cognition":
+                # SC's exact scope and truth stage are already validated. The
+                # source Plan/Evidence remains context, not permission to widen
+                # a Goal-free acknowledgement or promote it to a result claim.
+                continue
             existing_source_goal_ids = {
                 str(item).strip()
                 for item in (
@@ -6180,6 +6198,8 @@ class VoiceAssistant:
             )
             raise
 
+        if isinstance(response.metadata.get("social_cognition_resolution"), dict):
+            self.cognitive_runtime.schedule_social_expression(response, session_id=session_id)
         receipt = dispatch.receipt
         record_session_workflow_stage(
             self,
@@ -6679,6 +6699,9 @@ class VoiceAssistant:
         log_event: bool = True,
         cancel_cognitive_work: bool = True,
     ):
+        coordinator = getattr(self, "cognitive_runtime", None)
+        if coordinator is not None:
+            await coordinator.cancel_social_interaction()
         self._invalidate_output_state(
             cancel_cognitive_work=cancel_cognitive_work,
         )

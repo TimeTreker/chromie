@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Iterable
+
+from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
+from shared.chromie_contracts.plan import validate_communicative_activity_identity
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
 
 try:
     from chromie_contracts.semantic_task import ResponsePlan, ResponseStage
@@ -172,3 +178,60 @@ def validate_immediate_response_plan(
             checked_task_ids=(),
         )
     return validate_response_stage(plan.immediate, task_snapshots)
+
+
+def build_social_interaction_response(
+    request: SocialCognitionRequest, result: SocialCognitionResolution, *,
+    session_id: str, interaction_context: dict[str, Any] | None,
+) -> InteractionResponse:
+    """Transport exact independent SC interaction, without Work or Goal completion."""
+    result.validate_request(request)
+    if any(act.delivery_phase != "immediate" for act in result.activities):
+        raise ValueError("ordered SC acts require the immutable Work response projection")
+    speech: list[InteractionSpeech] = []
+    prohibited = user_turn_prohibits_speech(request.context.get("user_turn_envelope"))
+    for act in result.activities:
+        validate_communicative_activity_identity(
+            activity_id=act.activity_id, text=act.text,
+            interaction_context=interaction_context,
+            repair_of_activity_ids=act.repair_of_activity_ids,
+        )
+        if not act.text.strip() or prohibited:
+            continue
+        speech.append(InteractionSpeech(
+            id="sc_" + hashlib.sha256(f"{request.request_id}|{act.activity_id}".encode()).hexdigest()[:24],
+            text=act.text, timing="immediate", style="brief", priority="normal",
+            interruptible=True, metadata={
+                "source": "social_cognition", "wording_owner": "social_cognition",
+                "turn_id": request.request_id, "session_id": session_id,
+                "language": request.language, "speech_act": act.function,
+                "truth_stage": act.truth_stage, "evidence_refs": list(act.evidence_refs),
+                "source_goal_ids": list(act.source_goal_ids),
+                "source_responsibility_refs": list(act.source_responsibility_refs),
+                "addressed_need_ids": list(act.addressed_need_ids),
+                "communicative_activity_ids": [act.activity_id],
+                "repair_of_activity_ids": list(act.repair_of_activity_ids),
+                "social_cognition_snapshot_digest": result.snapshot_digest,
+                "situation_signature": (
+                    request.situation.interpretation_signature() if request.situation else ""
+                ),
+                "source_situation_refs": list(request.source_refs) if request.situation else [],
+                "subject_refs": sorted({
+                    item.subject_ref for item in request.situation.interpretations
+                }) if request.situation else [],
+                "goal_completion_authority": False,
+                "wait_for_playback_start": True,
+                "playback_start_required_for_delivery": True,
+            },
+        ))
+    return InteractionResponse(
+        interaction_id="sc_" + hashlib.sha256(
+            f"{request.request_id}|{result.snapshot_digest}".encode()
+        ).hexdigest()[:24],
+        speech=speech, capabilities=[], metadata={
+            "source": "social_cognition", "turn_id": request.request_id,
+            "session_id": session_id, "social_cognition_snapshot_digest": result.snapshot_digest,
+            "source_refs": list(request.source_refs), "goal_ids": [],
+            "goal_completion_authority": False,
+        },
+    )

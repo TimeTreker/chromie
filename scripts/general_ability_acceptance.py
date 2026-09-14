@@ -79,16 +79,16 @@ class TextScenarioCase:
     allow_expressive_cues: bool = True
     require_speech: bool = True
     expect_no_speech: bool = False
-    require_fast_communicative_act: bool = False
-    forbid_fast_communicative_act: bool = False
-    expected_fast_communicative_speech_acts: tuple[str, ...] = field(
+    require_social_communicative_act: bool = False
+    forbid_social_communicative_act: bool = False
+    expected_social_communicative_functions: tuple[str, ...] = field(
         default_factory=tuple
     )
     require_fast_planner_evidence_reentry: bool = False
     require_work_held_until_canonical_validation: bool = False
     require_canonical_work_reconciliation: bool = False
-    max_warm_gi_handoff_to_fast_commit_ms: float = 0.0
-    max_warm_fast_commit_to_playback_start_ms: float = 0.0
+    max_warm_sc_decision_ms: float = 0.0
+    max_warm_sc_to_playback_start_ms: float = 0.0
     expected_terminal_planner_tier: str = ""
     expected_fast_planner_path: str = ""
     expect_deep_planner_invoked: bool | None = None
@@ -252,37 +252,6 @@ def _speech_text(summary: dict[str, Any]) -> str:
                 if isinstance(item, dict) and str(item.get("text") or "").strip()
             )
 
-    # A first Communicative Act can be realized immediately by the Host. It is
-    # intentionally absent from interaction_response.speech so that the terminal
-    # plan does not play it twice. Complete responses remain semantic acceptance
-    # output; progress belongs in user-outcome acceptance only when the retained
-    # session evidence proves that TTS actually played in this turn.
-    cognitive = summary.get("cognitive_runtime")
-    metadata = cognitive.get("metadata") if isinstance(cognitive, dict) else None
-    presentation_commit = (
-        metadata.get("presentation_commit")
-        if isinstance(metadata, dict)
-        else None
-    )
-    activity = (
-        presentation_commit.get("activity")
-        if isinstance(presentation_commit, dict)
-        else None
-    )
-    session_state = summary.get("session_state")
-    played_tts = (
-        int(session_state.get("played_tts") or 0)
-        if isinstance(session_state, dict)
-        else 0
-    )
-    if isinstance(activity, dict) and (
-        activity.get("role") == "complete_response"
-        or (activity.get("role") == "progress" and played_tts > 0)
-    ):
-        text = str(activity.get("text") or "").strip()
-        if text and text not in texts:
-            texts.append(text)
-
     # Detached terminal-Evidence re-entry may deliver completion speech after
     # the initial interaction response. User-outcome observation collection has
     # already correlated those lines to completed playback in this exact turn;
@@ -322,28 +291,22 @@ def _capability_items(summary: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _fast_progress_activities(summary: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return Fast Planner communicative Activities, including direct answers."""
-    cognitive = summary.get("cognitive_runtime")
-    if not isinstance(cognitive, dict):
-        return []
-    advance = cognitive.get("fast_advance")
-    if not isinstance(advance, dict):
-        metadata = cognitive.get("metadata")
-        advance = (
-            metadata.get("fast_planner_advance")
-            if isinstance(metadata, dict)
-            else None
-        )
-    if not isinstance(advance, dict):
-        return []
-    return [
-        item
-        for item in advance.get("activities") or []
-        if isinstance(item, dict)
-        and item.get("role") in {"progress", "complete_response"}
-        and str(item.get("speech_act") or "").strip()
-    ]
+def _social_activities(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect actual SC decisions; Work Needs and transport counters are not words."""
+    response = summary.get("interaction_response") or {}
+    state = summary.get("session_state") or {}
+    candidates = [(response.get("metadata") or {}).get("social_cognition_resolution")]
+    candidates += [item.get("output") for item in state.get("cognitive_workflow_stages") or []
+        if isinstance(item, dict) and item.get("stage") == "social_cognition"
+        and item.get("status") in {"accepted", "resolved"}]
+    acts = {}
+    for result in candidates:
+        if not isinstance(result, dict) or result.get("semantic_owner") != "social_cognition":
+            continue
+        for act in result.get("activities") or []:
+            if isinstance(act, dict) and act.get("activity_id") and act.get("text"):
+                acts[(result.get("request_id"), act["activity_id"])] = act
+    return list(acts.values())
 
 
 def _is_expressive_cue_capability(item: dict[str, Any]) -> bool:
@@ -502,8 +465,8 @@ def _elapsed_ms(value: Any) -> float | None:
     return elapsed if elapsed >= 0 else None
 
 
-def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
-    """Retain exact anchors and recomputable fast-response timing intervals."""
+def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
+    """Retain exact anchors and recomputable SC response timing intervals."""
 
     session_state = summary.get("session_state")
     if not isinstance(session_state, dict):
@@ -518,17 +481,22 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         for item in session_state.get("workflow_events") or []
         if isinstance(item, dict)
     ]
-    fast_stage = next(
+    social_stage = next(
         (
             item
             for item in stages
-            if item.get("stage") == "fast_planner_presentation_commit"
+            if item.get("stage") == "social_cognition"
+            and item.get("status") in {"accepted", "resolved"}
+            and isinstance(item.get("output"), dict)
+            and item["output"].get("semantic_owner") == "social_cognition"
+            and item["output"].get("disposition") == "communicate"
+            and any(isinstance(act, dict) and act.get("text") for act in item["output"].get("activities") or [])
         ),
         {},
     )
-    fast_start = _elapsed_ms(fast_stage.get("started_elapsed_ms"))
-    fast_finish = _elapsed_ms(fast_stage.get("finished_elapsed_ms"))
-    fast_duration = _elapsed_ms(fast_stage.get("duration_ms"))
+    social_start = _elapsed_ms(social_stage.get("started_elapsed_ms"))
+    social_finish = _elapsed_ms(social_stage.get("finished_elapsed_ms"))
+    social_duration = _elapsed_ms(social_stage.get("duration_ms"))
 
     def first_event(name: str, *, not_before: float | None = None) -> float | None:
         values = [
@@ -548,12 +516,12 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
     )
     session_start = first_event("session_start")
     interpretation_done = first_event("text_check_goal_interpretation_done")
-    tts_schedule = first_event("tts_schedule", not_before=fast_finish)
+    tts_schedule = first_event("tts_schedule", not_before=social_finish)
     first_provider_pcm = first_event(
         "tts_first_provider_pcm",
-        not_before=fast_finish,
+        not_before=social_finish,
     )
-    playback_start = first_event("playback_start", not_before=fast_finish)
+    playback_start = first_event("playback_start", not_before=social_finish)
 
     def interval(start: float | None, finish: float | None) -> float | None:
         if start is None or finish is None or finish < start:
@@ -561,12 +529,12 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         return round(finish - start, 3)
 
     duration_sum = None
-    if goal_interpretation_duration is not None and fast_duration is not None:
-        duration_sum = round(goal_interpretation_duration + fast_duration, 3)
+    if goal_interpretation_duration is not None and social_duration is not None:
+        duration_sum = round(goal_interpretation_duration + social_duration, 3)
     return {
         "schema_version": 1,
         "clock": "session_relative_monotonic_elapsed_ms",
-        "presentation_commit_status": str(fast_stage.get("status") or ""),
+        "social_cognition_status": str(social_stage.get("status") or ""),
         "transport_evidence": (
             "speaker_enabled_playback_start"
             if summary.get("speaker") is True
@@ -576,29 +544,29 @@ def _fast_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
             "session_start_elapsed_ms": session_start,
             "goal_interpretation_done_elapsed_ms": interpretation_done,
             "goal_interpretation_duration_ms": goal_interpretation_duration,
-            "presentation_commit_started_elapsed_ms": fast_start,
-            "presentation_commit_finished_elapsed_ms": fast_finish,
-            "presentation_commit_duration_ms": fast_duration,
+            "social_cognition_started_elapsed_ms": social_start,
+            "social_cognition_finished_elapsed_ms": social_finish,
+            "social_cognition_duration_ms": social_duration,
             "first_tts_schedule_elapsed_ms": tts_schedule,
             "first_tts_provider_pcm_elapsed_ms": first_provider_pcm,
             "first_playback_start_elapsed_ms": playback_start,
         },
         "derived": {
-            "gi_handoff_to_fast_commit_ms": interval(fast_start, fast_finish),
-            "fast_commit_to_tts_schedule_ms": interval(fast_finish, tts_schedule),
-            "fast_commit_to_first_provider_pcm_ms": interval(
-                fast_finish,
+            "sc_decision_ms": interval(social_start, social_finish),
+            "sc_to_tts_schedule_ms": interval(social_finish, tts_schedule),
+            "sc_to_first_provider_pcm_ms": interval(
+                social_finish,
                 first_provider_pcm,
             ),
-            "fast_commit_to_playback_start_ms": interval(
-                fast_finish,
+            "sc_to_playback_start_ms": interval(
+                social_finish,
                 playback_start,
             ),
-            "session_start_to_fast_commit_ms": interval(
+            "session_start_to_sc_ms": interval(
                 session_start,
-                fast_finish,
+                social_finish,
             ),
-            "goal_interpretation_plus_fast_duration_ms": duration_sum,
+            "goal_interpretation_plus_sc_duration_ms": duration_sum,
         },
         "claim_limits": {
             "audible_speaker_proven": summary.get("speaker") is True,
@@ -704,47 +672,29 @@ def validate_live_text_result(
                 )
             )
     internal_diagnostics: list[str] = []
-    fast_communication = _fast_progress_activities(summary)
-    if case.forbid_fast_communicative_act and fast_communication:
-        errors.append("Planner emitted forbidden pre-effect Communicative Activity")
-    if case.require_fast_communicative_act:
-        if fast_communication:
+    social_communication = _social_activities(summary)
+    if case.forbid_social_communicative_act and social_communication:
+        errors.append("SC emitted forbidden pre-effect Communicative Activity")
+    if case.require_social_communicative_act:
+        if social_communication:
             speech_acts = {
-                str(item.get("speech_act") or "").strip()
-                for item in fast_communication
+                str(item.get("function") or "").strip()
+                for item in social_communication
             }
             if (
-                case.expected_fast_communicative_speech_acts
+                case.expected_social_communicative_functions
                 and not speech_acts.intersection(
-                    case.expected_fast_communicative_speech_acts
+                    case.expected_social_communicative_functions
                 )
             ):
                 errors.append(
-                    "Fast Planner Communicative Act speech_act mismatch: expected one of "
-                    f"{list(case.expected_fast_communicative_speech_acts)!r}, got "
+                    "SC communicative function mismatch: expected one of "
+                    f"{list(case.expected_social_communicative_functions)!r}, got "
                     f"{sorted(speech_acts)!r}"
-                )
-            cognitive = summary.get("cognitive_runtime")
-            metadata = (
-                cognitive.get("metadata")
-                if isinstance(cognitive, dict)
-                and isinstance(cognitive.get("metadata"), dict)
-                else {}
-            )
-            realization_status = str(
-                metadata.get("fast_communicative_realization_status") or ""
-            )
-            if (
-                not bool(summary.get("preview_only"))
-                and realization_status != "planner_owned"
-            ):
-                errors.append(
-                    "Fast Planner Communicative Act was not retained as Planner-owned "
-                    "before execution"
                 )
         else:
             errors.append(
-                "Planner omitted the required pending-work Communicative Activity"
+                "SC omitted the required Communicative Activity"
             )
 
     speech = _speech_text(summary)
@@ -862,7 +812,7 @@ def validate_live_text_result(
         != "deferred_until_canonical_validation"
     ):
         errors.append(
-            "Capability Work crossed the PresentationCommit boundary before "
+            "Capability Work crossed the complete Work validation boundary before "
             "canonical validation"
         )
     if (
@@ -873,38 +823,38 @@ def validate_live_text_result(
         errors.append(
             "canonical Fast Planner Work reconciliation did not run"
         )
-    timing_evidence = _fast_response_timing_evidence(summary)
-    summary["fast_response_timing_evidence"] = timing_evidence
+    timing_evidence = _social_response_timing_evidence(summary)
+    summary["social_response_timing_evidence"] = timing_evidence
     timing_derived = timing_evidence["derived"]
-    if case.max_warm_gi_handoff_to_fast_commit_ms > 0:
-        planner_commit_ms = timing_derived["gi_handoff_to_fast_commit_ms"]
+    if case.max_warm_sc_decision_ms > 0:
+        planner_commit_ms = timing_derived["sc_decision_ms"]
         if (
-            timing_evidence["presentation_commit_status"] != "accepted"
+            timing_evidence["social_cognition_status"] not in {"accepted", "resolved"}
             or planner_commit_ms is None
         ):
             errors.append(
-                "validated-GI-handoff to Fast-Planner commitment timing is missing"
+                "Social Cognition decision timing is missing"
             )
-        elif planner_commit_ms > case.max_warm_gi_handoff_to_fast_commit_ms:
+        elif planner_commit_ms > case.max_warm_sc_decision_ms:
             errors.append(
-                "validated-GI-handoff to Fast-Planner commitment exceeded target: "
+                "Social Cognition decision exceeded target: "
                 f"{planner_commit_ms:.1f}ms > "
-                f"{case.max_warm_gi_handoff_to_fast_commit_ms:.1f}ms"
+                f"{case.max_warm_sc_decision_ms:.1f}ms"
             )
     if (
-        case.max_warm_fast_commit_to_playback_start_ms > 0
+        case.max_warm_sc_to_playback_start_ms > 0
         and not bool(summary.get("preview_only"))
     ):
-        playback_ms = timing_derived["fast_commit_to_playback_start_ms"]
+        playback_ms = timing_derived["sc_to_playback_start_ms"]
         if playback_ms is None:
             errors.append(
-                "Fast-Planner commitment to first-playback-start timing is missing"
+                "Social Cognition commitment to first-playback-start timing is missing"
             )
-        elif playback_ms > case.max_warm_fast_commit_to_playback_start_ms:
+        elif playback_ms > case.max_warm_sc_to_playback_start_ms:
             errors.append(
-                "Fast-Planner commitment to first playback start exceeded target: "
+                "Social Cognition commitment to first playback start exceeded target: "
                 f"{playback_ms:.1f}ms > "
-                f"{case.max_warm_fast_commit_to_playback_start_ms:.1f}ms"
+                f"{case.max_warm_sc_to_playback_start_ms:.1f}ms"
             )
     structured_metrics = _structured_case_metrics(case, summary)
     if case.require_safe_idle and structured_metrics["safe_idle"] is not True:
@@ -1046,14 +996,14 @@ def _text_scenario_case(
         allow_expressive_cues=bool(raw.get("allow_expressive_cues", True)),
         require_speech=bool(raw.get("require_speech", True)),
         expect_no_speech=bool(raw.get("expect_no_speech", False)),
-        require_fast_communicative_act=bool(
-            raw.get("require_fast_communicative_act", False)
+        require_social_communicative_act=bool(
+            raw.get("require_social_communicative_act", False)
         ),
-        forbid_fast_communicative_act=bool(
-            raw.get("forbid_fast_communicative_act", False)
+        forbid_social_communicative_act=bool(
+            raw.get("forbid_social_communicative_act", False)
         ),
-        expected_fast_communicative_speech_acts=_tuple_of_strings(
-            raw.get("expected_fast_communicative_speech_acts")
+        expected_social_communicative_functions=_tuple_of_strings(
+            raw.get("expected_social_communicative_functions")
         ),
         require_fast_planner_evidence_reentry=bool(
             raw.get("require_fast_planner_evidence_reentry", False)
@@ -1064,14 +1014,14 @@ def _text_scenario_case(
         require_canonical_work_reconciliation=bool(
             raw.get("require_canonical_work_reconciliation", False)
         ),
-        max_warm_gi_handoff_to_fast_commit_ms=max(
+        max_warm_sc_decision_ms=max(
             0.0,
-            float(raw.get("max_warm_gi_handoff_to_fast_commit_ms", 0.0)),
+            float(raw.get("max_warm_sc_decision_ms", 0.0)),
         ),
-        max_warm_fast_commit_to_playback_start_ms=max(
+        max_warm_sc_to_playback_start_ms=max(
             0.0,
             float(
-                raw.get("max_warm_fast_commit_to_playback_start_ms", 0.0)
+                raw.get("max_warm_sc_to_playback_start_ms", 0.0)
             ),
         ),
         expected_terminal_planner_tier=str(
@@ -1502,16 +1452,16 @@ def validate_library(
                         "both required and forbidden"
                     )
                 if (
-                    case.require_fast_communicative_act
-                    and case.forbid_fast_communicative_act
+                    case.require_social_communicative_act
+                    and case.forbid_social_communicative_act
                 ):
                     errors.append(
                         f"{ability.ability_id}/{case.case_id}: Fast Planner Communicative Activity "
                         "cannot be both required and forbidden"
                     )
                 if (
-                    case.forbid_fast_communicative_act
-                    and case.expected_fast_communicative_speech_acts
+                    case.forbid_social_communicative_act
+                    and case.expected_social_communicative_functions
                 ):
                     errors.append(
                         f"{ability.ability_id}/{case.case_id}: forbidden fast "
@@ -1630,9 +1580,9 @@ def _write_reviewer_packet(
     for item in run_summary.get("cases") or []:
         if not isinstance(item, dict):
             continue
-        timing = item.get("fast_response_timing_evidence")
+        timing = item.get("social_response_timing_evidence")
         if not isinstance(timing, dict):
-            timing = _fast_response_timing_evidence(item)
+            timing = _social_response_timing_evidence(item)
         case_id = str(item.get("case_id") or "")
         case_summaries.append(
             {

@@ -72,8 +72,9 @@ def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_t
         "it will rain",
     ):
         assert literal not in source
-    assert "Preserve Evidence values, scope, and epistemic strength" in source
-    assert "a probability below 100% must remain uncertain" in source
+    assert "Preserve epistemic strength and qualification" in source
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+    assert "Preserve uncertainty and cite supplied Evidence" in SOCIAL_COGNITION_AUTHORITY_PROMPT
 
 
 def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:

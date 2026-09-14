@@ -427,6 +427,16 @@ The retained corpora are:
 
 ## 7. Applying the method to Fast and Deep Planner
 
+**Migration boundary:** the [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+transfers communication out of Planner. The transaction variants below describe
+current source and retained Planner cohorts, not a requirement to keep two
+communication writers after migration. Freeze the Social Cognition and Work-only
+Planner contracts separately, then qualify their combined workflow using the
+[new acceptance matrix](ACCEPTANCE.md#social-cognition-acceptance). Do not reuse
+old speech/streaming results as proof of the new owner or insert an online
+reviewer between the two roles. No new-role prompt optimization is claimed by
+the documentation amendment.
+
 Fast and Deep are cognition-depth passes of one Planner HOW authority, not two
 independent planners and not mutual reviewers. Qualify them in order while preserving
 one shared Planner contract:

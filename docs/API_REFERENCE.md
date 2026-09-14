@@ -1,9 +1,75 @@
 # API and Protocol Reference
 
+The [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+is undergoing source migration. The dedicated transaction below is implemented;
+the existing turn Planner still needs its writable communication fields removed.
+See [migration inventory](COGNITIVE_TURN_LOOP.md#source-migration-inventory).
+
 This document describes interfaces implemented in this repository. Soridormi
 is a separate deployment; only its checked-in capability contract is summarized
 here. Current revision and verification status are maintained in
 [STATUS.md](STATUS.md).
+
+## Social Cognition transaction
+
+`POST /social-cognition` accepts `SocialCognitionRequest` from a trusted state
+owner. Triggers are interpretation, Goal state, Work state, Evidence or Situation;
+GI is optional for non-turn triggers. Input includes exact source references,
+read-only Goal/Responsibility/Evidence scope, communication needs, trusted
+Situation and disclosure-safe shared context. An optional typed `CognitiveOpportunity` preserves existing source, subject, Situation and depth readiness; local mechanical readiness never calls the model. No synthetic user turn is required.
+
+`SocialCognitionResolution` contains request identity and snapshot digest, a
+complete communication/silence decision, exact acts and bounded eligible social
+expression proposals. One source-only deeper call is allowed for unresolved
+cognition; trusted slow readiness enters that same deeper scope directly. Missing
+required cognition is reported as a failure, never a fabricated silence decision. Goals, task Work and effect authorization are not writable fields.
+The Host client rechecks identity/provenance; the runtime entrypoint requires the
+state owner's freshness predicate before and after inference. Expression execution
+uses the existing catalog/target/resource/duplicate-dispatch validators. Empty
+nonverbal text creates no speech delivery or Goal-completion evidence.
+
+Foreground calls use purpose `social_cognition` with the existing realtime compute
+class; `social_cognition_deep` uses deliberative. Both reuse the configured model
+transport and fast/deep profile settings. No new environment variable or service
+is introduced. This endpoint alone does not establish default-turn integration,
+native-model qualification, physical evidence or measured latency improvement.
+
+## Local text console
+
+### Dialogue transport
+
+Owner: `scripts/chromie_psm_live_text_console.py`, the maintained post-ASR text
+runner and its dialogue client. `./scripts/start_chromie.sh --text-console` runs
+the runner's `--serve` entrypoint through `start_orchestrator.sh`; the latter
+retains its generated profile, Soridormi/speaker configuration and exclusive
+`ORCH_LOCK_FILE`. The client starts no Host and has no authority to configure
+providers, author replies, or call cognitive roles directly. Default startup
+without `--text-console` retains the voice path.
+
+The local Unix socket is `.chromie/text-console/dialogue.sock` under the selected
+checkout. Its directory is owned by the current user with mode `0700`; the socket
+has mode `0600`. No TCP port is opened. Only one client is admitted at a time.
+The server holds the existing Host lock before replacing a stale socket, rejects
+non-socket paths, and removes its socket on shutdown. A second Host fails the lock
+before constructing runtime state.
+
+Each request is one UTF-8 JSON string followed by a newline, bounded to 65,536
+encoded bytes including framing. Objects, malformed JSON/UTF-8 and oversized
+requests are rejected before text admission; no client-supplied roles, session
+IDs or semantic metadata are accepted. The Host creates the session and calls
+`handle_routed_text(..., channel="text")`, retaining normal protective controls,
+Goal/Planner authorities, confirmation and Soridormi safety.
+
+Each response is one newline-delimited JSON object: `{"reply":"..."}` carries
+exact newly recorded assistant dialogue; `{"done":true}` permits the next input.
+The client renders only replies and its input prompt. Diagnostics, exceptions,
+timings and development-command output remain in the startup terminal. An error
+does not become an invented Chromie reply. The client displays a plain connection
+notice if transport is unavailable. A client disconnect does not cancel admitted
+Work or shut down the Host; reconnecting retains the same Host/conversation state.
+The Host retains the runner's sequential input and bounded completion wait.
+Only dialogue transport changed; this does not qualify native cognition or physical
+delivery. Evidence levels and deployment closure remain owned by Status/Acceptance.
 
 ## Cognitive Core turn-interpretation API — Agent port 8092
 
@@ -77,7 +143,7 @@ running.
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`; only one mechanical DTO regeneration is permitted. |
-| `POST` | `/situational-cognition` | Invoke Planner through a stateless, communication-only Goal-free Situation contract. Trusted opportunity/Situation provenance bounds silence or one exact low-commitment Activity plus existing private Memory candidates. No Goal or Capability Work permission is supplied. Fast may delegate unresolved meaning once to Deep with no authored Activity/Memory result; complete decisions receive no second review. |
+| `POST` | `/social-cognition` | One interaction-planning transaction for trusted GI, Goal, Work, Evidence and Situation snapshots. Preserves pending communication obligations, exact acts and optional eligible expression; no task Work or Goal mutation. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 
@@ -183,40 +249,21 @@ its maintained schema contains no planning-gap or resolution-policy fields.
 evidence and makes exactly one streaming model invocation. The response media type is
 `application/x-ndjson`. Its ordered typed frames are:
 
-1. exactly one `PresentationCommit` (`frame_type=presentation_commit`) after the complete
-   internal `presentation_commit` JSON member has parsed and
-   validated; it contains intentional silence or one
-   exact immediately truthful `progress`/`complete_response` Communicative Activity and
-   optional auxiliary Activities anchored to that exact Activity;
-2. exactly one `FastPlannerStreamTerminal` (`frame_type=terminal`) whose
-   `presentation_commit_id` and `advance.metadata.presentation_commit_id` reference the
-   same immutable commit and whose `FastPlannerAdvance` contains the complete remaining
-   HOW decision; or
-3. one `FastPlannerStreamFailure` (`frame_type=failure`) identifying failure before or
-   after commit. A pre-commit failure is silent. A post-commit failure preserves only the
-   already-launched truthful presentation and authorizes no Goal Work.
+One `FastPlannerStreamTerminal` (`frame_type=terminal`) is emitted only after the
+complete Work JSON, end of stream, raw Schema, DTO and Host validation succeed.
+Otherwise one `FastPlannerStreamFailure` (`frame_type=failure`) grants no Work.
+There is no presentation frame or partial dispatch. `FastPlannerWorkAdvanceOutput`
+contains Capability Activities and word-free response/input Needs. The Host binds
+accepted Responsibility references to canonical Goals and materializes exact
+`communication_needs`; `/social-cognition` supplies any actual communication.
 
-The internal model stream is one JSON object with exactly two ordered members:
-`presentation_commit` first, `terminal_result` second. Both providers receive the
-structured response Schema. The incremental parser validates the complete first
-member before exposing it; the terminal result also requires the closing outer brace.
-Raw provider tokens, incomplete members, and partial DTOs never reach TTS or a Capability. The
-terminal result cannot repeat, reword, translate, contradict, or omit the accepted
-communication or decoration. No retry/reviewer call repairs this streamed semantic result.
-Duplicate JSON object keys, including escaped and nested duplicates, are rejected
-before a typed frame is exposed; later values cannot replace earlier ownership.
+The single primary invocation cannot retry, review or rewrite its semantic decision.
+Duplicate object keys, non-finite numbers, incomplete JSON and out-of-scope references
+fail closed. Neither raw provider tokens nor an incomplete DTO reaches playback or
+a Capability. Independently delivered SC acknowledgement remains an actual delivery
+fact even when Work planning later fails; it does not authorize that failed Work.
 
-This section owns the current serialization mechanism under Charter principle 23.
-The #32 migration replaces the former tagged-text encoding with the existing
-two-member JSON contract and removes the tagged provider adapter. Future migrations
-must update producer, incremental parser, decoder contract, terminal consistency,
-consumer and retained qualification together, retiring the replaced path. Review
-must demonstrate one semantic invocation, zero or one accepted early commitment,
-immutable delivered content, one complete terminal result, no partial Work, and
-fail-closed cancellation/provider/parse behavior. A new encoding alone grants no
-new semantic decision, execution permission, model retry or release qualification.
-
-A clarification Communicative Act owns one
+A clarification Need owns one
 or more typed Planner `InformationGap` records and no `response_text`. A semantic gap
 must cite one exact GI `unresolved` string; an execution-input gap must cite one exact
 available Capability ID and its genuinely absent, required, non-defaulted schema input.
@@ -233,7 +280,7 @@ GI result and remains the sole canonical
 Goal commit owner; it does not author clarification wording. After deterministic
 Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the exact
 canonical Goal before clarification wording may be delivered. No Capability Activity,
-including a safe read, starts from the presentation commit or before the complete terminal
+including a safe read, starts before the complete terminal
 result, canonical Goal binding, and full trusted Plan validation. GA emits no
 replan or compatibility flag. `/fast-plan` receives the Canonical Goal plus a bounded
 `existing_work_activities` projection of relevant retained Runtime
@@ -245,24 +292,16 @@ validation proves exact request/version/state, Capability IDs, arguments, Goal o
 and multi-Activity timing; otherwise it cancels pending/cancellable retained Work
 after the Planner decision and executes the corrected Plan.
 
-Fast Planner Communicative Activities carry exact text, truth stage, Goal or
-Responsibility provenance, and Evidence references in the Planner result. The
-Host mechanically validates those fields and sends accepted text to ordered TTS;
-it does not call a second wording model or rewrite the act. A pre-evidence act
-cannot cite Evidence or claim a result, while a post-evidence act must cite exact
-Host-admitted Evidence.
+SC Communicative Activities carry exact text, truth stage, supplied provenance and
+Evidence references. The Host validates and transports their words unchanged.
+Planner records answer/input/result obligations and exact `before_step_ids` /
+`after_step_ids`. The response projection joins SC acts to immutable Work without
+copying speech back into the Plan. Required confirmation and communication ordered
+before Work wait for the appropriate delivery/consent barrier; optional progress
+cannot delay task Work. Only an actually delivered covered answer can complete a
+responding Goal. A progress report cannot complete an executable Goal.
 
-Canonical `PlannedCommunicativeAct.delivery_phase` preserves whether that exact
-Planner-owned act is immediate, pre-action, progress, or final. For the streaming
-Fast path, Host derives the phase mechanically from the already-validated unified
-terminal Activity order; it does not reorder or reinterpret the act. In a mixed
-Plan, Response Projection covers exactly the Goal IDs owned by Communicative Acts,
-while executable-only Goals remain covered by their Plan steps. A `final`
-context-grounded speech Goal that is ordered after Work is scheduled after the
-Capability batch only when it does not claim an executable Goal. Result-dependent
-completion wording still waits for terminal Evidence and Planner re-entry.
-
-On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Any post-Evidence wording must establish its exact Goal/Evidence scope, execution status, perspective, and epistemic strength in that same primary Planner result. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. Failure at this boundary escalates to the distinct Deep Planner pass when permitted or fails closed; the Host never rewrites the sentence.
+On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. Failure at this boundary escalates to the distinct Deep Planner pass when permitted or fails closed; the Host never rewrites the sentence.
 
 `POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may finish an easy turn directly after its terminal result is mechanically bound to GA's conserved Responsibility-to-Goal mapping. Creating a new resource Goal from that unchanged Responsibility does not call `/fast-plan` again. Actual provisional or retained Work, a GA-authored change to retained Goal meaning, trusted Evidence/result re-entry, or another material open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
@@ -329,35 +368,38 @@ world truth, and authored assistant text is not automatically audible-delivery
 Evidence. Native canonical speech schemas expose complete aggregate branches,
 while full Schema/DTO/Host validation remains required.
 
-`POST /situational-cognition` is an independent Planner invocation under a restricted
-Situation contract. The existing HTTP path and DTO fields remain; it does not use the
-Goal-bound Plan schema or fabricate a Goal. The trusted request binds a Goal-free
-`situation_revision` opportunity to exact Situation digest, source refs and subjects.
-The model receives bounded Stable Mind, activated disclosure-safe Memory, trusted
-audience and actual delivered/pending Interaction context. Planner owns relevance,
-silence and exact `greeting|acknowledge|inquire|inform|respond|repair` wording.
+Trusted Goal-free Situation uses `POST /social-cognition`; the former dedicated
+Situation endpoint and DTOs have been removed. The request binds its
+`situation_revision` opportunity to the exact Situation digest, sources, subjects
+and audience. Host activates only disclosure-safe Memory and supplies the current
+Interaction Ledger. SC may choose silence, several exact verbal acts, or a wordless
+eligible expression. No UserTurn, Responsibility or task Goal is fabricated.
 
-Normal admission uses the configured Fast model. Unresolved `deliberate` carries no
-Activity or Memory candidate and may enter exactly one configured Deep invocation;
-direct `slow` readiness uses the same Deep scope. Missing Deep fails quiet and Deep
-cannot recurse. Complete Fast decisions are never sent for another model review.
-All Planner variants share the ordinary communication authority contract and exact
-Activity identity/wording checks. A repair must cite an actually delivered Activity.
-Host validates complete response provenance, subjects, identity, repair references
-and all Memory candidates before any Memory write. Existing Memory privacy and
-retention rules still govern those candidates. Accepted speech retains exact text
-and `truth_stage=context_grounded` through the existing delivery runtime. No Goal
-creation/completion or Capability request is authorized, including safe reads.
-Concrete perception adapters and real model/interaction quality remain unqualified.
+The Host rechecks complete result provenance, immutable wording, delivered repair
+references and every Memory candidate before any Memory write. A newer admitted
+revision from the same source suppresses an in-flight older decision. Speech and
+optional expression share the same decision; expression still passes existing
+catalog, target, confirmation, resource and deduplication gates. Playback receipts
+retain SC ownership, addressed communication needs and Responsibility references;
+queued or interrupted output is never completed delivery. Concrete perception
+adapters and current end-to-end model/interaction quality remain unqualified.
+
+`CanonicalPlan.communication_needs` records Planner-established answer, input,
+confirmation or result obligations with exact Plan/Goal provenance and optional
+`delivery_phase` ordering. SC accounts for each as covered or pending. The Host
+joins exact SC acts and immutable Work in `PlannerResponseProjection`; multiple
+acts may share a phase without merging their commitments or coverage. Only an
+explicitly covered answer need for a responding Goal may bind its actual speech
+delivery to Goal completion. Progress and silence cannot complete that Goal.
+Optional progress has no playback-start barrier for task Work; required input,
+confirmation and before-action ordering retain their barriers. The ordinary turn, confirmation and result re-entry paths use this join.
 
 `POST /reflection` reuses the configured Deep Planner model only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition. The Host starts it only after eligible result planning has settled, under one bounded existing background task. Requests carry the privacy-filtered owner-approved Mind. Replan/clarification/correction proposals are retained as diagnostics without current Planner re-entry; only actually applied bounded Memory counts as future adaptation. **Current endpoint semantics remain open-Responsibility-only:** applied actions require runtime-bound trusted evidence and a completed outcome is terminal to this API path. Reflection may propose future replan, clarification, a future user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, reopen the current turn, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary. The accepted architecture now specifies a later contract split in which terminal evidence may support bounded `experience`/`calibration` without reopening Responsibility; that design is not implemented by this endpoint yet.
 
-`PresentationCommit`, terminal Fast Advance, `/fast-plan`, and `/deep-plan` expose
-bounded `auxiliary_activities[]` inside their primary Planner output. Each item is anchored
-to a Planner-authored Main Activity and decoder-constrained to exact eligible live
-catalog candidates. Runtime
-validates or suppresses the exact proposal; it cannot reselect. Auxiliary-only
-events do not create Goal-scoped cognitive re-entry.
+Only `/social-cognition` exposes optional `auxiliary_activities[]`, nested under its
+exact communicative act. Requested gestures remain ordinary Planner Work. SC receives
+eligible catalog candidates and trusted target evidence; Runtime can execute the exact
+validated expression or suppress it without replacing its meaning or blocking Work.
 
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 
@@ -408,7 +450,7 @@ Host validates and correlates the result, binds a `ToolResultEvidence` object to
 the exact immutable request Goal IDs, updates Goal/task state, and reactivates
 `POST /fast-plan` with a bounded Goal/Evidence snapshot. The re-entry Plan cannot
 widen the Goal set or schedule duplicate execution. Any spoken answer is a
-Planner-owned post-evidence Communicative Activity with exact Evidence
+SC-owned post-evidence Communicative Activity with exact Evidence
 references; missing provenance fails closed rather than inferring a Goal from
 provider data.
 
@@ -505,11 +547,10 @@ Evidence qualification.
 `InteractionResponse` can contain speech items and executable Capability requests.
 Shared contracts reject unknown fields and recursively reject low-level motor,
 joint, torque, and actuator fields. The maintained response is projected from
-Planner-owned Communicative and Capability Activities; there is no legacy
-response-adapter/fallback mode. The primary Planner may include advisory
+SC-owned Communicative Acts and Planner-owned Capability Activities. SC may include advisory
 `auxiliary_activities[]` selected from the reviewed `social_attention` behavior
 domain. They cannot author or adapt response text independently. Applied decoration requests carry
-`metadata.source=canonical_plan_auxiliary_activity`,
+`metadata.source=social_cognition_auxiliary_activity`,
 `metadata.auxiliary_plan_activity=true`,
 `metadata.execution_lane=activity`, and
 `metadata.execution_role=social_decoration`; they are excluded from user task

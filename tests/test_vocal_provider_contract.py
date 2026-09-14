@@ -117,7 +117,7 @@ def vocal_model_output(
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": "Perform the requested vocal content.",
-            "response_text": "",
+
             "steps": [
                 {
                     "step_id": "vocal-step",
@@ -132,7 +132,7 @@ def vocal_model_output(
                 "goal-vocal": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
+
                     "unresolved": [],
                     "step_ids": ["vocal-step"],
                     "satisfaction": exact_satisfaction("goal-vocal"),

@@ -1,8 +1,10 @@
 """Cancellation reporting through real Schema, Planner, adapter and delivery owners.
 
+
 Model replies and speech completion are scripted; these are Level A regressions.
 """
 from __future__ import annotations
+from tests.cognitive_work_test_support import word_free_model_fixture, social_fixture_response
 
 import asyncio
 import copy
@@ -50,14 +52,14 @@ def report(request):
     satisfaction = dict(score=0.0, status='unsatisfied', satisfied_goal_ids=[],
                         unmet_goal_ids=[gid], unmet_requirements=['The original reminder is not created.'],
                         rationale='Control reporting does not fulfill the original effect.')
-    return dict(disposition='respond', coverage='complete', confidence=0.99,
+    return word_free_model_fixture(dict(disposition='respond', coverage='complete', confidence=0.99,
                 goal_summary='Report the trusted control result.', response_text=speech,
                 steps=[], auxiliary_activities=[], escalation_reason='', unresolved=[],
                 parameter_resolutions=[], time_conditions=[], plan_relation='exact',
                 user_confirmation_required=False, goal_satisfaction=copy.deepcopy(satisfaction),
                 goal_outcomes={gid: dict(disposition='respond', coverage='complete',
                     response_text=speech, unresolved=[], step_ids=[], satisfaction=satisfaction,
-                    rationale='Report the exact trusted control facts.')})
+                    rationale='Report the exact trusted control facts.')}))
 
 
 @pytest.mark.parametrize('resolver', [FastPlannerResolver, DeepPlannerResolver])
@@ -135,7 +137,7 @@ def test_delivering_control_report_does_not_fulfill_original_goal(control):
         request, entries = case_request('en', control)
         plan = await FastPlannerResolver(ReplayModel(json.dumps(report(request))), StaticCatalog(entries)).resolve(request)
         adapter = CanonicalPlanRuntimeAdapter(FakeRuntime())
-        response = await adapter.build_planner_owned_response(plan=plan, session_id=request.sid, language='en-US')
+        response = await social_fixture_response(adapter,plan=plan, session_id=request.sid, language='en-US')
         manager = ConversationStateManager(base_conversation_id='control-delivery')
         manager.apply_goal_association_resolution(request.context['goal_association_resolution'],
             sid=request.sid, user_text=request.text, atomic=True)

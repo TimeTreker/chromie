@@ -129,7 +129,6 @@ def media_plan(
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": "Apply the exact media lifecycle operation.",
-            "response_text": "",
             "steps": [
                 {
                     "step_id": "media-step",
@@ -144,7 +143,6 @@ def media_plan(
                 "goal-media": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["media-step"],
                     "satisfaction": satisfaction(),

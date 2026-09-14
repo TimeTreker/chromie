@@ -17,7 +17,7 @@ from scripts.general_ability_acceptance import (
     LiveCaseRef,
     TextScenarioCase,
     _exclusive_orchestrator_lock,
-    _fast_response_timing_evidence,
+    _social_response_timing_evidence,
     _run_live_case,
     _runtime_provenance,
     _speech_text,
@@ -247,8 +247,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             case_id="weather",
             text="今天北京下雨了没有？",
             require_speech=False,
-            require_fast_communicative_act=True,
-            expected_fast_communicative_speech_acts=("acknowledge_and_check",),
+            require_social_communicative_act=True,
+            expected_social_communicative_functions=("acknowledge",),
         )
         summary = {
             "interaction_response": {"speech": [], "capabilities": []},
@@ -256,7 +256,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "cognitive_runtime": {},
         }
 
-        missing = validate_live_text_result(case, summary)
+        missing = validate_live_text_result(case, _social_test_summary(summary))
         self.assertTrue(any("omitted" in item for item in missing))
 
         summary["cognitive_runtime"]["fast_advance"] = {
@@ -270,15 +270,15 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 }
             ]
         }
-        self.assertEqual(validate_live_text_result(case, summary), [])
+        self.assertEqual(validate_live_text_result(case, _social_test_summary(summary)), [])
 
     def test_live_validation_accepts_current_progress_communicative_act(self) -> None:
         case = TextScenarioCase(
             case_id="weather",
             text="哎，今天上午重庆会不会下雨？",
             require_speech=False,
-            require_fast_communicative_act=True,
-            expected_fast_communicative_speech_acts=("acknowledge_and_check",),
+            require_social_communicative_act=True,
+            expected_social_communicative_functions=("acknowledge",),
         )
         summary = {
             "interaction_response": {"speech": [], "capabilities": []},
@@ -301,7 +301,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
         }
 
-        self.assertEqual(validate_live_text_result(case, summary), [])
+        self.assertEqual(validate_live_text_result(case, _social_test_summary(summary)), [])
 
     def test_live_validation_gates_fast_commit_and_goal_evidence_reentry(self) -> None:
         case = TextScenarioCase(
@@ -311,8 +311,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             require_fast_planner_evidence_reentry=True,
             require_work_held_until_canonical_validation=True,
             require_canonical_work_reconciliation=True,
-            max_warm_gi_handoff_to_fast_commit_ms=2000,
-            max_warm_fast_commit_to_playback_start_ms=3000,
+            max_warm_sc_decision_ms=2000,
+            max_warm_sc_to_playback_start_ms=3000,
         )
         summary = {
             "preview_only": False,
@@ -331,8 +331,9 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "session_state": {
                 "cognitive_workflow_stages": [
                     {
-                        "stage": "fast_planner_presentation_commit",
+                        "stage": "social_cognition",
                         "status": "accepted",
+                        "output": {"semantic_owner": "social_cognition", "disposition": "communicate", "activities": [{"text": "Hello."}]},
                         "started_elapsed_ms": 500.0,
                         "duration_ms": 600.0,
                         "finished_elapsed_ms": 1100.0,
@@ -359,17 +360,17 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         }
 
         self.assertEqual(validate_live_text_result(case, summary), [])
-        evidence = summary["fast_response_timing_evidence"]
+        evidence = summary["social_response_timing_evidence"]
         self.assertEqual(
-            evidence["derived"]["gi_handoff_to_fast_commit_ms"],
+            evidence["derived"]["sc_decision_ms"],
             600.0,
         )
         self.assertEqual(
-            evidence["derived"]["fast_commit_to_playback_start_ms"],
+            evidence["derived"]["sc_to_playback_start_ms"],
             2300.0,
         )
         self.assertEqual(
-            evidence["derived"]["goal_interpretation_plus_fast_duration_ms"],
+            evidence["derived"]["goal_interpretation_plus_sc_duration_ms"],
             1000.0,
         )
         self.assertFalse(evidence["claim_limits"]["audible_speaker_proven"])
@@ -380,7 +381,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         ] = "completed_before_canonical_dispatch:completed"
         errors = validate_live_text_result(case, premature_summary)
         self.assertTrue(
-            any("crossed the PresentationCommit boundary" in item for item in errors),
+            any("crossed the complete Work validation boundary" in item for item in errors),
             errors,
         )
 
@@ -409,8 +410,9 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "session_state": {
                 "cognitive_workflow_stages": [
                     {
-                        "stage": "fast_planner_presentation_commit",
+                        "stage": "social_cognition",
                         "status": "accepted",
+                        "output": {"semantic_owner": "social_cognition", "disposition": "communicate", "activities": [{"text": "Hello."}]},
                         "started_elapsed_ms": 1300.879,
                         "duration_ms": 1062.218,
                         "finished_elapsed_ms": 2363.097,
@@ -432,22 +434,22 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
         }
 
-        evidence = _fast_response_timing_evidence(summary)
+        evidence = _social_response_timing_evidence(summary)
 
         self.assertEqual(
-            evidence["derived"]["gi_handoff_to_fast_commit_ms"],
+            evidence["derived"]["sc_decision_ms"],
             1062.218,
         )
         self.assertEqual(
-            evidence["derived"]["fast_commit_to_playback_start_ms"],
+            evidence["derived"]["sc_to_playback_start_ms"],
             2496.232,
         )
         self.assertEqual(
-            evidence["derived"]["session_start_to_fast_commit_ms"],
+            evidence["derived"]["session_start_to_sc_ms"],
             2362.831,
         )
         self.assertEqual(
-            evidence["derived"]["goal_interpretation_plus_fast_duration_ms"],
+            evidence["derived"]["goal_interpretation_plus_sc_duration_ms"],
             1888.418,
         )
         self.assertFalse(
@@ -481,13 +483,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "schema_version": 1,
                 "clock": "session_relative_monotonic_elapsed_ms",
                 "raw": {
-                    "presentation_commit_started_elapsed_ms": 100.0,
-                    "presentation_commit_finished_elapsed_ms": 900.0,
+                    "social_cognition_started_elapsed_ms": 100.0,
+                    "social_cognition_finished_elapsed_ms": 900.0,
                     "first_playback_start_elapsed_ms": 2500.0,
                 },
                 "derived": {
-                    "gi_handoff_to_fast_commit_ms": 800.0,
-                    "fast_commit_to_playback_start_ms": 1600.0,
+                    "sc_decision_ms": 800.0,
+                    "sc_to_playback_start_ms": 1600.0,
                 },
             }
             metadata = _write_reviewer_packet(
@@ -510,7 +512,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                             "ability_class": "truthful_embodied_speech",
                             "ok": True,
                             "errors": [],
-                            "fast_response_timing_evidence": timing,
+                            "social_response_timing_evidence": timing,
                         }
                     ],
                 },
@@ -528,7 +530,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             )
             self.assertEqual(
                 timeline["cases"][0]["raw"][
-                    "presentation_commit_finished_elapsed_ms"
+                    "social_cognition_finished_elapsed_ms"
                 ],
                 900.0,
             )
@@ -542,7 +544,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             case_id="weather",
             text="今天北京下雨了没有？",
             require_speech=False,
-            forbid_fast_communicative_act=True,
+            forbid_social_communicative_act=True,
         )
         summary = {
             "interaction_response": {"speech": [], "capabilities": []},
@@ -559,11 +561,11 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
         }
 
-        errors = validate_live_text_result(case, summary)
+        errors = validate_live_text_result(case, _social_test_summary(summary))
         self.assertTrue(any("forbidden pre-effect" in item for item in errors))
 
         summary["cognitive_runtime"]["fast_advance"] = {"activities": []}
-        self.assertEqual(validate_live_text_result(case, summary), [])
+        self.assertEqual(validate_live_text_result(case, _social_test_summary(summary)), [])
 
     def test_live_validation_can_require_complete_silence(self) -> None:
         case = TextScenarioCase(
@@ -571,7 +573,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             text="别说话，过来。",
             require_speech=False,
             expect_no_speech=True,
-            forbid_fast_communicative_act=True,
+            forbid_social_communicative_act=True,
         )
         summary = {
             "interaction_response": {"speech": [], "capabilities": []},
@@ -635,8 +637,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         contradictory = TextScenarioCase(
             case_id="contradictory",
             text="Check something.",
-            require_fast_communicative_act=True,
-            forbid_fast_communicative_act=True,
+            require_social_communicative_act=True,
+            forbid_social_communicative_act=True,
         )
         patched_ability = replace(
             ability,
@@ -664,7 +666,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
                 "metadata": {
-                    "presentation_commit": {
+                    "retired_frame_fixture": {
                         "activity": {
                             "role": "complete_response",
                             "text": "You sound tired; get some rest.",
@@ -679,6 +681,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
         }
 
+        summary["session_state"]["workflow_events"] = [{"event": "tts_schedule", "message": "order=1 text='You sound tired; get some rest.'"}, {"event": "playback_end", "message": "order=1"}]
         self.assertEqual(validate_live_text_result(case, summary), [])
 
     def test_live_validation_counts_played_fast_progress_as_speech(self) -> None:
@@ -691,7 +694,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
                 "metadata": {
-                    "presentation_commit": {
+                    "retired_frame_fixture": {
                         "activity": {
                             "role": "progress",
                             "text": "好，我接着往前走。",
@@ -706,8 +709,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
         }
 
+        summary["session_state"]["workflow_events"] = [{"event": "tts_schedule", "message": "order=1 text='好，我接着往前走。'"}, {"event": "playback_end", "message": "order=1"}]
         self.assertEqual(validate_live_text_result(case, summary), [])
         summary["session_state"]["played_tts"] = 0
+        summary["session_state"]["workflow_events"] = []
         errors = validate_live_text_result(case, summary)
         self.assertTrue(any("speech missing" in item for item in errors))
 
@@ -718,7 +723,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             "interaction_response": {"speech": []},
             "cognitive_runtime": {
                 "metadata": {
-                    "presentation_commit": {
+                    "retired_frame_fixture": {
                         "activity": {
                             "role": "complete_response",
                             "text": "你好！有什么想聊的吗？",
@@ -738,6 +743,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             }
         }
 
+        previous["user_outcome"] = {"observations": [{"type": "speech.output", "status": "completed", "text": "你好！有什么想聊的吗？"}]}
         self.assertEqual(_previous_speech_repeat_error(previous, correct), "")
         self.assertIn(
             "did not repeat",
@@ -1413,3 +1419,30 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _social_test_summary(summary):
+    """Author the new role fixture separately from the retained Work scenario."""
+    cognitive = summary.get("cognitive_runtime", {})
+    metadata = cognitive.get("metadata", {})
+    old = cognitive.get("fast_advance", {}).get("activities", [])
+    result = {"semantic_owner": "social_cognition", "request_id": "sc-test",
+              "disposition": "communicate", "activities": [
+        {"activity_id": act.get("activity_id", "act"), "function": "acknowledge",
+         "text": act.get("text", "I will check."), "truth_stage": "context_grounded"}
+        for act in old]}
+    if old:
+        summary.setdefault("interaction_response", {}).setdefault("metadata", {})["social_cognition_resolution"] = result
+    else:
+        summary.get("interaction_response", {}).get("metadata", {}).pop("social_cognition_resolution", None)
+    return summary
+
+
+def test_silent_or_missing_sc_output_cannot_satisfy_spoken_latency_target():
+    from scripts.general_ability_acceptance import _social_response_timing_evidence
+    for output in (None, {"semantic_owner": "social_cognition", "disposition": "silence", "activities": []}):
+        summary = {"session_state": {"cognitive_workflow_stages": [{
+            "stage": "social_cognition", "status": "accepted", "output": output,
+            "started_elapsed_ms": 100, "finished_elapsed_ms": 200, "duration_ms": 100,
+        }]}}
+        assert _social_response_timing_evidence(summary)["derived"]["sc_decision_ms"] is None

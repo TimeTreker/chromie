@@ -39,10 +39,12 @@ from shared.chromie_contracts.interaction import (
     validate_output_schema_declaration,
 )
 from shared.chromie_contracts.reflection import ReflectionResolution
-from shared.chromie_contracts.situation import SituationalCognitionResolution
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
+    communication_need_id,
     AuxiliaryPlanActivity,
+    SocialCommunicationNeed,
     CanonicalPlan,
     CanonicalPlanStep,
     ClarifyGoalPlanOutcome,
@@ -53,7 +55,6 @@ from shared.chromie_contracts.plan import (
     FastPlannerStreamFailure,
     FastPlannerStreamFrame,
     FastPlannerStreamTerminal,
-    PresentationCommit,
     GoalSatisfactionAssessment,
     PlannerInformationGap,
     PlannedCommunicativeAct,
@@ -77,6 +78,7 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 from orchestrator.runtime.evidence_identity import runtime_identity_reference
 
 from orchestrator.runtime.situation import build_situation_projection
+from orchestrator.runtime.response_plan import build_social_interaction_response
 
 logger = logging.getLogger(__name__)
 
@@ -105,37 +107,6 @@ class CognitiveStageFailure(RuntimeError):
         super().__init__(f"{stage}:{failure_class}:{reason}")
 
 
-def bind_presentation_commit_reference(
-    plan: CanonicalPlan,
-    *,
-    commit_id: str,
-) -> CanonicalPlan:
-    """Attach one transport identity without changing Planner semantics."""
-
-    normalized_commit_id = str(commit_id or "").strip()
-    existing_commit_id = str(
-        plan.metadata.get("presentation_commit_id") or ""
-    ).strip()
-    if not normalized_commit_id or (
-        existing_commit_id and existing_commit_id != normalized_commit_id
-    ):
-        raise CognitiveStageFailure(
-            "terminal_plan_join",
-            {
-                "failure_class": "presentation_commit_reference_mismatch",
-                "failure_domain": "model_contract",
-                "architecture_attribution": "planner_or_transport",
-                "retryable": False,
-            },
-        )
-    return plan.model_copy(
-        update={
-            "metadata": {
-                **plan.metadata,
-                "presentation_commit_id": normalized_commit_id,
-            }
-        }
-    )
 
 
 class CognitiveRuntimeResolution(BaseModel):
@@ -184,6 +155,10 @@ class _GoalAssociationStageResult:
 
 
 class CognitiveAgentClient(Protocol):
+    async def resolve_social_cognition(
+        self, session: Any, **kwargs: Any
+    ) -> SocialCognitionResolution: ...
+
     async def resolve_goal_association(
         self, session: Any, **kwargs: Any
     ) -> GoalAssociationResolution: ...
@@ -196,9 +171,9 @@ class CognitiveAgentClient(Protocol):
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
-    async def resolve_situational_cognition(
+    async def resolve_social_cognition(
         self, session: Any, **kwargs: Any
-    ) -> SituationalCognitionResolution: ...
+    ) -> SocialCognitionResolution: ...
 
     async def resolve_reflection(
         self, session: Any, **kwargs: Any
@@ -515,9 +490,7 @@ class CanonicalPlanRuntimeAdapter:
                     request.metadata.get("primary_activity_vocal_modes") or []
                 ),
                 "canonical_plan_id": request.metadata.get("canonical_plan_id"),
-                "presentation_commit_id": request.metadata.get(
-                    "presentation_commit_id"
-                ),
+                "social_cognition_request_id": request.metadata.get("social_cognition_request_id"),
             }
         )
 
@@ -840,58 +813,39 @@ class CanonicalPlanRuntimeAdapter:
     async def execute_auxiliary_activities(
         self,
         *,
-        plan: CanonicalPlan | None = None,
-        presentation_commit: PresentationCommit | None = None,
+        social_cognition: SocialCognitionResolution,
         session_id: str,
         turn_id: str,
         interaction: InteractionResponse | None,
         context: dict[str, Any] | None = None,
+        snapshot_is_current: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
-        """Validate and execute Planner-owned optional social decoration.
+        """Validate and execute SC-owned optional social expression.
 
         Runtime may accept or suppress the exact proposal. It never reselects the
         Capability, target, arguments, social function, or primary anchor. The
         resulting Activity has no Goal-completion or cognition-reentry authority.
         """
 
-        if (plan is None) == (presentation_commit is None):
-            raise ValueError(
-                "exactly one Planner source is required for auxiliary execution"
-            )
-        if plan is not None:
-            auxiliary_activities = list(plan.auxiliary_activities)
-            primary_steps = list(plan.steps)
-            communicative_ids = {
-                item.activity_id for item in plan.communicative_acts
-            }
-            step_ids = {item.step_id for item in plan.steps}
-            has_plan_response = bool(
-                plan.response_text
-                or any(item.response_text for item in plan.goal_outcomes)
-            )
-            planner_source_id = plan.plan_id
-            planner_source_metadata = {
-                "canonical_plan_id": plan.plan_id,
-                "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
-            }
-            auxiliary_source = "canonical_plan_auxiliary_activity"
-        else:
-            if presentation_commit is None:  # guarded by exclusive-source check
-                raise ValueError("PresentationCommit source is unavailable")
-            auxiliary_activities = list(presentation_commit.auxiliary_activities)
-            primary_steps = []
-            communicative_ids = (
-                {presentation_commit.activity.activity_id}
-                if presentation_commit.activity is not None
-                else set()
-            )
-            step_ids = set()
-            has_plan_response = False
-            planner_source_id = presentation_commit.commit_id
-            planner_source_metadata = {
-                "presentation_commit_id": presentation_commit.commit_id,
-            }
-            auxiliary_source = "presentation_commit_auxiliary_activity"
+        if snapshot_is_current is not None and not snapshot_is_current():
+            return {"status": "suppressed", "materialized_count": 0, "reasons": ["stale_social_snapshot"]}
+        auxiliary_activities = [
+            item for act in social_cognition.activities for item in act.auxiliary_activities
+        ]
+        primary_steps = list(interaction.capabilities) if interaction is not None else []
+        materialized_ids = {str(ref) for speech in (interaction.speech if interaction else [])
+                            for ref in speech.metadata.get("communicative_activity_ids", [])}
+        communicative_ids = {act.activity_id for act in social_cognition.activities
+                             if act.function == "nonverbal" or act.activity_id in materialized_ids}
+        step_ids = set()
+        has_plan_response = False
+        planner_source_id = social_cognition.request_id
+        planner_source_metadata = {
+            "social_cognition_request_id": social_cognition.request_id,
+            "social_cognition_snapshot_digest": social_cognition.snapshot_digest,
+            "semantic_owner": "social_cognition",
+        }
+        auxiliary_source = "social_cognition_auxiliary_activity"
         if not auxiliary_activities:
             return {
                 "status": "not_executed",
@@ -1075,11 +1029,12 @@ class CanonicalPlanRuntimeAdapter:
                     },
                 )
                 requests.append(request)
-                self._record_auxiliary_behavior_request(request, session_id=session_id)
                 seen.add(behavior.capability_id)
             except (TypeError, ValueError, ValidationError, RuntimeError) as exc:
                 reasons.append(f"invalid:{behavior.capability_id}:{type(exc).__name__}")
 
+        if snapshot_is_current is not None and not snapshot_is_current():
+            return {"status": "suppressed", "materialized_count": 0, "reasons": ["stale_social_snapshot"]}
         if not requests:
             return {
                 "status": "rejected" if reasons else "not_executed",
@@ -1105,6 +1060,8 @@ class CanonicalPlanRuntimeAdapter:
             capabilities=requests,
             metadata=response_metadata,
         )
+        for request in requests:
+            self._record_auxiliary_behavior_request(request, session_id=session_id)
         dispatch = await self.interaction_runtime.submit_response(
             response,
             session_id=session_id,
@@ -1117,100 +1074,6 @@ class CanonicalPlanRuntimeAdapter:
             "reasons": reasons,
         }
 
-    def build_fast_advance_response(
-        self,
-        *,
-        advance: FastPlannerAdvance,
-        plan: CanonicalPlan,
-        session_id: str,
-        language: str,
-        preexecuted_activity_ids: set[str] | None = None,
-        context: dict[str, Any] | None = None,
-    ) -> InteractionResponse:
-        """Compile Planner-owned Communicative Activities after GA Goal binding."""
-
-        if plan.steps or plan.disposition not in {"respond", "clarify"}:
-            raise ValueError("Fast Planner vocal response requires a non-executable Plan")
-        runtime_context = context if isinstance(context, dict) else {}
-        preexecuted = set(preexecuted_activity_ids or ())
-        speech_prohibited = user_turn_prohibits_speech(
-            runtime_context.get("user_turn_envelope")
-        )
-        refs_to_goals = plan.metadata.get("goal_ids_by_responsibility")
-        if not isinstance(refs_to_goals, dict):
-            refs_to_goals = {}
-        speech: list[InteractionSpeech] = []
-        for activity in advance.activities:
-            if speech_prohibited:
-                continue
-            if activity.role == "capability" or activity.activity_id in preexecuted:
-                continue
-            source_goal_ids: list[str] = []
-            for responsibility_ref in activity.source_responsibility_refs:
-                raw_goal_ids = refs_to_goals.get(responsibility_ref)
-                if not isinstance(raw_goal_ids, list):
-                    continue
-                for goal_id in raw_goal_ids:
-                    if goal_id not in source_goal_ids:
-                        source_goal_ids.append(goal_id)
-            speech.append(
-                InteractionSpeech(
-                    id=f"fast_activity_speech_{activity.activity_id}",
-                    text=activity.text,
-                    timing=activity.timing,
-                    style="brief",
-                    priority="normal",
-                    interruptible=True,
-                    metadata={
-                        "source": "fast_planner_advance",
-                        "wording_owner": "planner",
-                        "truth_stage": activity.truth_stage,
-                        "evidence_refs": list(activity.evidence_refs),
-                        "phase": "fast_planner_activity",
-                        "speech_act": activity.speech_act,
-                        "turn_id": advance.turn_id,
-                        "session_id": session_id,
-                        "language": language,
-                        "fast_activity_id": activity.activity_id,
-                        "source_responsibility_refs": list(
-                            activity.source_responsibility_refs
-                        ),
-                        "source_goal_ids": source_goal_ids,
-                        "canonical_plan_id": plan.plan_id,
-            "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
-                        "canonical_goal_binding_pending": False,
-                        "goal_completion_authority": activity.role
-                        == "complete_response",
-                        "execution_lane": "vocal",
-                        "delivery_role": activity.role,
-                        "wait_for_playback_start": True,
-                        "playback_start_required_for_delivery": True,
-                    },
-                )
-            )
-        metadata = {
-            "source": "goal_driven_cognitive_runtime",
-            "turn_id": advance.turn_id,
-            "session_id": session_id,
-            "language": language,
-            "canonical_plan": plan.model_dump(mode="json", exclude_none=True),
-            "canonical_plan_id": plan.plan_id,
-            "canonical_plan_fingerprint": canonical_plan_fingerprint(plan),
-            "goal_ids": list(plan.goal_ids),
-            "planner_tier": "fast",
-            "fast_activity_ids": [item.activity_id for item in advance.activities],
-            "preexecuted_fast_activity_ids": sorted(preexecuted),
-            "goal_grouped_task_list": True,
-        }
-        envelope = runtime_context.get("user_turn_envelope")
-        if isinstance(envelope, dict):
-            metadata["user_turn_envelope"] = dict(envelope)
-        return InteractionResponse(
-            interaction_id=f"cognitive_{session_id}",
-            status="clarify" if plan.disposition == "clarify" else "ok",
-            speech=speech,
-            metadata=metadata,
-        )
 
     async def build_execution_only_response(
         self,
@@ -1220,7 +1083,7 @@ class CanonicalPlanRuntimeAdapter:
         language: str,
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse:
-        """Materialize a pure safe-read Plan without a presentation-model barrier."""
+        """Release validated Work without optional communication as a barrier."""
 
         fingerprint = canonical_plan_fingerprint(plan)
         planner_response = PlannerResponseProjection(
@@ -1231,7 +1094,7 @@ class CanonicalPlanRuntimeAdapter:
             response_plan=ResponsePlan(),
             lane_coordination=[],
             confidence=1.0,
-            rationale="Pure safe-read execution does not require pre-evidence planner response projection.",
+            rationale="Work without a required communication need can proceed independently of SC.",
             metadata={
                 "authority": "advisory",
                 "resolver": "readiness_execution",
@@ -1247,322 +1110,71 @@ class CanonicalPlanRuntimeAdapter:
             context=context,
         )
 
-    async def build_planner_owned_response(
-        self,
-        *,
-        plan: CanonicalPlan,
-        session_id: str,
-        language: str,
+    async def build_social_cognition_response(
+        self, *, plan: CanonicalPlan, request: SocialCognitionRequest,
+        resolution: SocialCognitionResolution, session_id: str, language: str,
         context: dict[str, Any] | None = None,
     ) -> InteractionResponse:
-        """Mechanically realize exact Planner wording without another model owner."""
-
-        for activity in plan.communicative_acts:
+        """Join exact SC acts to immutable Work; never copy speech into the Plan."""
+        resolution.validate_request(request)
+        for act in resolution.activities:
             validate_communicative_activity_identity(
-                activity_id=activity.activity_id, text=activity.text,
-                interaction_context=(context or {}).get("interaction_context"),
+                activity_id=act.activity_id, text=act.text,
+                interaction_context=(context or request.context).get("interaction_context"),
+                repair_of_activity_ids=act.repair_of_activity_ids,
             )
-
-        delivered_by_fast_activity_id: dict[str, dict[str, Any]] = {}
-        ambiguous_fast_activity_ids: set[str] = set()
-        if isinstance(context, dict):
-            delivered_rows = context.get("delivered_turn_speech")
-            if isinstance(delivered_rows, list):
-                for row in delivered_rows:
-                    if not isinstance(row, dict):
-                        continue
-                    activity_id = " ".join(
-                        str(row.get("fast_activity_id") or "").strip().split()
-                    )
-                    event_id = " ".join(
-                        str(row.get("event_id") or row.get("speech_event_id") or "")
-                        .strip()
-                        .split()
-                    )
-                    if not activity_id or not event_id:
-                        continue
-                    previous = delivered_by_fast_activity_id.get(activity_id)
-                    if previous is not None and str(previous.get("event_id")) != event_id:
-                        ambiguous_fast_activity_ids.add(activity_id)
-                        continue
-                    delivered_by_fast_activity_id[activity_id] = dict(row)
-        for activity_id in ambiguous_fast_activity_ids:
-            delivered_by_fast_activity_id.pop(activity_id, None)
-
-        confirmation_required = any(
-            self.interaction_runtime.capability_definition(step.capability_id)
-            .requires_confirmation
-            for step in plan.steps
-        )
-
-        if plan.communicative_acts:
-            executable_goal_ids = set(plan.executable_goal_ids())
-
-            def stage_for_acts(
-                acts: list[Any],
-                *,
-                phase: str,
-            ) -> ResponseStage | None:
-                if not acts:
-                    return None
-                text = " ".join(dict.fromkeys(act.text for act in acts))
-                covered = [
-                    goal_id
-                    for goal_id in plan.goal_ids
-                    if any(goal_id in act.source_goal_ids for act in acts)
-                ]
-                reused_event_id = ""
-                if len(acts) == 1:
-                    reused_event = delivered_by_fast_activity_id.get(
-                        str(acts[0].activity_id)
-                    )
-                    if reused_event is not None:
-                        reused_event_id = " ".join(
-                            str(reused_event.get("event_id") or "").strip().split()
-                        )
-                clarification = any(act.role == "clarification" for act in acts)
-                terminal_communication = (
-                    all(act.role == "complete_response" for act in acts)
-                    and not set(covered).intersection(executable_goal_ids)
-                )
-                if clarification:
-                    speech_act = "ask_clarification"
-                    commitment_state = "waiting_for_user"
-                    must_not_claim_completion = True
-                elif phase == "pre_action" and confirmation_required:
-                    speech_act = "ask_confirmation"
-                    commitment_state = "waiting_for_user"
-                    must_not_claim_completion = True
-                elif terminal_communication:
-                    speech_act = acts[0].speech_act
-                    commitment_state = "completed"
-                    must_not_claim_completion = False
-                elif phase in {"pre_action", "progress"}:
-                    speech_act = acts[0].speech_act
-                    commitment_state = "evaluating"
-                    must_not_claim_completion = True
-                else:
-                    speech_act = acts[0].speech_act
-                    commitment_state = "none"
-                    must_not_claim_completion = True
-                return ResponseStage(
-                    text=text,
-                    speech_act=speech_act,
-                    commitment_state=commitment_state,
-                    must_not_claim_completion=must_not_claim_completion,
-                    covers_goal_ids=covered,
-                    reuse_current_turn_speech=bool(reused_event_id),
-                    reused_speech_event_id=reused_event_id or None,
-                    metadata={
-                        "wording_owner": "planner",
-                        "canonical_plan_id": plan.plan_id,
-                        "delivery_phase": phase,
-                        "communicative_activity_ids": [
-                            act.activity_id for act in acts
-                        ],
-                        "truth_stages": list(
-                            dict.fromkeys(act.truth_stage for act in acts)
-                        ),
-                        "evidence_refs": list(
-                            dict.fromkeys(
-                                evidence_ref
-                                for act in acts
-                                for evidence_ref in act.evidence_refs
-                            )
-                        ),
-                    },
-                )
-
-            # ResponsePlan is a transport projection only. It combines exact
-            # Planner-owned Activities that share a delivery phase; it never
-            # invents or rewrites their wording.
-            acts_by_phase = {
-                phase: [
-                    act
-                    for act in plan.communicative_acts
-                    if act.delivery_phase == phase
-                ]
-                for phase in ("immediate", "pre_action", "progress", "final")
-            }
-            response_plan = ResponsePlan(
-                immediate=stage_for_acts(
-                    acts_by_phase["immediate"],
-                    phase="immediate",
-                ),
-                pre_action=stage_for_acts(
-                    acts_by_phase["pre_action"],
-                    phase="pre_action",
-                ),
-                progress=(
-                    [
-                        progress_stage
-                    ]
-                    if (
-                        progress_stage := stage_for_acts(
-                            acts_by_phase["progress"],
-                            phase="progress",
-                        )
-                    )
-                    is not None
-                    else []
-                ),
-                final=stage_for_acts(
-                    acts_by_phase["final"],
-                    phase="final",
-                ),
-            )
-            fingerprint = canonical_plan_fingerprint(plan)
-            planner_response = PlannerResponseProjection(
-                projection_id=f"planner_owned_{fingerprint[:20]}",
-                canonical_plan_id=plan.plan_id,
-                canonical_plan_fingerprint=fingerprint,
-                canonical_plan=plan,
-                response_plan=response_plan,
-                lane_coordination=[],
-                confidence=plan.confidence,
-                rationale="Planner owns exact Communicative Activity wording.",
-                metadata={
-                    "authority": "planner",
-                    "resolver": "planner_owned_communication",
-                    "task_plan_immutable": True,
+        needs = {need.need_id: need for need in plan.communication_needs}
+        responding_goals = {item.goal_id for item in plan.goal_outcomes if item.disposition == "respond"}
+        stages = []
+        for act in resolution.activities:
+            if not act.text.strip():
+                continue
+            addressed = [needs[key] for key in act.addressed_need_ids]
+            kinds = {need.kind for need in addressed}
+            completion_goals = sorted({
+                goal_id for need in addressed
+                if need.kind == "answer" and resolution.need_outcomes[need.need_id] == "covered"
+                for goal_id in need.source_goal_ids if goal_id in responding_goals
+            })
+            confirmation = "confirmation" in kinds
+            waiting = confirmation or "input" in kinds
+            completion = bool(completion_goals) and not set(act.source_goal_ids).intersection(plan.executable_goal_ids())
+            stages.append(ResponseStage(
+                text=act.text, delivery_phase=act.delivery_phase,
+                speech_act="ask_confirmation" if confirmation else "ask_clarification" if waiting else act.function,
+                commitment_state="waiting_for_user" if waiting else "completed" if completion else "none",
+                must_not_claim_completion=not (completion and not waiting),
+                covers_goal_ids=list(act.source_goal_ids), metadata={
+                    "wording_owner": "social_cognition",
+                    "communicative_activity_ids": [act.activity_id],
+                    "truth_stages": [act.truth_stage],
+                    "evidence_refs": list(act.evidence_refs),
+                    "addressed_need_ids": list(act.addressed_need_ids),
+                    "source_responsibility_refs": list(act.source_responsibility_refs),
+                    "communication_completion_goal_ids": completion_goals,
+                    "required_before_work": confirmation or any(need.delivery_phase == "pre_action" or need.before_step_ids for need in addressed),
+                    "communication_before_step_ids": sorted({key for need in addressed for key in need.before_step_ids}),
+                    "communication_after_step_ids": sorted({key for need in addressed for key in need.after_step_ids}),
                 },
-            )
-            return await self.build_response(
-                plan=plan,
-                planner_response=planner_response,
-                session_id=session_id,
-                language=language,
-                context=context,
-            )
-
-        text = " ".join(str(plan.response_text or "").strip().split())
-        if not text:
-            texts = [
-                " ".join(str(item.response_text or "").strip().split())
-                for item in plan.goal_outcomes
-                if " ".join(str(item.response_text or "").strip().split())
-            ]
-            text = " ".join(dict.fromkeys(texts))
-        if not text and plan.communicative_acts:
-            text = " ".join(
-                dict.fromkeys(
-                    item.text for item in plan.communicative_acts if item.text
-                )
-            )
-        pure_silent_execution = (
-            not text
-            and plan.disposition == "execute"
-            and bool(plan.steps)
-            and set(plan.executable_goal_ids()) == set(plan.goal_ids)
-            and not confirmation_required
-        )
-        fail_closed_planner_silence = (
-            not text
-            and not plan.steps
-            and plan.disposition
-            in {"clarify", "unavailable", "refused"}
-            and plan.metadata.get("execution_allowed") is False
-        )
-        if pure_silent_execution or fail_closed_planner_silence:
-            fingerprint = canonical_plan_fingerprint(plan)
-            planner_response = PlannerResponseProjection(
-                projection_id=f"planner_owned_{fingerprint[:20]}",
-                canonical_plan_id=plan.plan_id,
-                canonical_plan_fingerprint=fingerprint,
-                canonical_plan=plan,
-                response_plan=ResponsePlan(),
-                lane_coordination=[],
-                confidence=plan.confidence,
-                rationale=(
-                    "Planner selected complete execution without a communicative act."
-                    if pure_silent_execution
-                    else "Planner failed closed with no authorized communicative act."
-                ),
-                metadata={
-                    "authority": "planner",
-                    "resolver": "planner_owned_communication",
-                    "task_plan_immutable": True,
-                    "fail_closed_planner_silence": fail_closed_planner_silence,
-                },
-            )
-            return await self.build_response(
-                plan=plan,
-                planner_response=planner_response,
-                session_id=session_id,
-                language=language,
-                context=context,
-            )
-        if not text:
-            raise ValueError(
-                "Planner-owned communicative response requires exact text"
-            )
-
-        if plan.disposition == "clarify" or (
-            plan.disposition == "mixed" and not plan.steps and plan.waiting_goal_ids()
-        ):
-            speech_act = "ask_clarification"
-            commitment_state = "waiting_for_user"
-            must_not_claim_completion = True
-        elif confirmation_required:
-            speech_act = "ask_confirmation"
-            commitment_state = "waiting_for_user"
-            must_not_claim_completion = True
-        elif plan.disposition in {"execute", "mixed"} and plan.steps:
-            speech_act = "inform"
-            commitment_state = "evaluating"
-            must_not_claim_completion = True
-        elif plan.disposition == "respond":
-            speech_act = "respond"
-            commitment_state = "completed"
-            must_not_claim_completion = False
-        elif plan.disposition == "refused":
-            speech_act = "refuse"
-            commitment_state = "none"
-            must_not_claim_completion = True
-        else:
-            speech_act = "inform"
-            commitment_state = "none"
-            must_not_claim_completion = True
-
-        stage = ResponseStage(
-            text=text,
-            speech_act=speech_act,
-            commitment_state=commitment_state,
-            must_not_claim_completion=must_not_claim_completion,
-            covers_goal_ids=list(plan.goal_ids),
-            metadata={
-                "wording_owner": "planner",
-                "canonical_plan_id": plan.plan_id,
-            },
-        )
-        response_plan = (
-            ResponsePlan(pre_action=stage)
-            if plan.disposition in {"execute", "mixed"} and plan.steps
-            else ResponsePlan(final=stage)
-        )
+            ))
         fingerprint = canonical_plan_fingerprint(plan)
-        planner_response = PlannerResponseProjection(
-            projection_id=f"planner_owned_{fingerprint[:20]}",
-            canonical_plan_id=plan.plan_id,
-            canonical_plan_fingerprint=fingerprint,
-            canonical_plan=plan,
-            response_plan=response_plan,
-            lane_coordination=[],
-            confidence=plan.confidence,
-            rationale="Planner owns exact Communicative Activity wording.",
-            metadata={
-                "authority": "planner",
-                "resolver": "planner_owned_communication",
-                "task_plan_immutable": True,
-            },
+        projection = PlannerResponseProjection(
+            projection_id=f"sc_{resolution.snapshot_digest[:20]}",
+            canonical_plan_id=plan.plan_id, canonical_plan_fingerprint=fingerprint,
+            canonical_plan=plan, response_plan=ResponsePlan(activities=stages),
+            social_cognition_request=request, social_cognition=resolution,
+            metadata={"authority": "social_cognition", "task_plan_immutable": True},
         )
-        return await self.build_response(
-            plan=plan,
-            planner_response=planner_response,
-            session_id=session_id,
-            language=language,
-            context=context,
+        response = await self.build_response(
+            plan=plan, planner_response=projection, session_id=session_id,
+            language=language, context=context,
         )
+        response.metadata["pending_communication_need_ids"] = [
+            key for key, value in resolution.need_outcomes.items() if value == "pending"
+        ]
+        response.metadata["social_cognition_resolution"] = resolution.model_dump(mode="json")
+        return response
+
 
     async def build_response(
         self,
@@ -1588,7 +1200,8 @@ class CanonicalPlanRuntimeAdapter:
                     )
                     if item is not None
                 )
-                + len(planner_response.response_plan.progress),
+                + len(planner_response.response_plan.progress)
+                + len(planner_response.response_plan.activities),
             },
         ) as span:
             response = await self._build_response(
@@ -1719,12 +1332,8 @@ class CanonicalPlanRuntimeAdapter:
                 "media_ducking_required": True,
                 "coordinated_media_step_ids": media_step_ids,
             }
-        stage_items = [
-            ("immediate", response_plan.immediate),
-            ("pre_action", response_plan.pre_action),
-            *[("progress", item) for item in response_plan.progress],
-            ("final", response_plan.final),
-        ]
+        stage_items = PlannerResponseProjection._stages(response_plan)
+        social_response = planner_response.social_cognition is not None
         effectful_pre_execution = plan.disposition in {"execute", "mixed"} and bool(plan.steps)
         executable_definitions = (
             [self.interaction_runtime.capability_definition(step.capability_id) for step in plan.steps]
@@ -1833,7 +1442,8 @@ class CanonicalPlanRuntimeAdapter:
                 else:
                     selected_pre_execution = list(available_pre_execution)
 
-            stage_items = [*selected_pre_execution, *final_items]
+            stage_items = (PlannerResponseProjection._stages(response_plan) if social_response
+                           else [*selected_pre_execution, *final_items])
 
             selected_keys = {(phase, id(stage)) for phase, stage in stage_items}
             omitted_pre_execution_speech_phases = [
@@ -1968,6 +1578,18 @@ class CanonicalPlanRuntimeAdapter:
                 if stage is not None
             ]
 
+        if social_response:
+            for projected, (_, stage) in zip(projected_speech_stages, stage_items):
+                projected.update({
+                    "source": "social_cognition", "wording_owner": "social_cognition",
+                    "operational_text_source": "social_cognition_wording_runtime_validated",
+                    **{key: stage.metadata[key] for key in (
+                        "addressed_need_ids", "source_responsibility_refs", "evidence_refs",
+                        "communication_completion_goal_ids", "required_before_work",
+                        "communication_before_step_ids", "communication_after_step_ids",
+                    )},
+                })
+
         if speech_prohibited:
             projected_speech_stages = []
 
@@ -1986,6 +1608,8 @@ class CanonicalPlanRuntimeAdapter:
                     and not coordinated_speech
                 )
             )
+            if social_response:
+                playback_barrier = projected.get("required_before_work") is True or not effectful_pre_execution
             speech_metadata = {
                 "source": projected["source"],
                 "session_id": session_id,
@@ -2008,6 +1632,18 @@ class CanonicalPlanRuntimeAdapter:
                 "wait_for_playback_start": playback_barrier,
                 "playback_start_required_for_delivery": playback_barrier,
             }
+            if social_response:
+                speech_metadata.update({key: projected[key] for key in (
+                    "wording_owner", "addressed_need_ids", "source_responsibility_refs",
+                    "evidence_refs", "communication_completion_goal_ids",
+                    "communication_before_step_ids", "communication_after_step_ids",
+                )})
+            if social_response and (
+                projected.get("required_before_work") is True
+                or projected.get("communication_before_step_ids")
+                or projected.get("communication_after_step_ids")
+            ):
+                speech_metadata["wait_for_voice_release"] = True
             ordered_context_grounded_after_work = (
                 phase == "final"
                 and set(speech_metadata["truth_stages"]) == {"context_grounded"}
@@ -2103,7 +1739,9 @@ class CanonicalPlanRuntimeAdapter:
                     }
                 )
             elif effectful_pre_execution:
-                speech_metadata["playback_start_required_for_effects"] = True
+                speech_metadata["playback_start_required_for_effects"] = (
+                    projected.get("required_before_work") is True if social_response else True
+                )
             for key in (
                 "operational_text_source",
                 "runtime_confirmation_required",
@@ -2117,7 +1755,9 @@ class CanonicalPlanRuntimeAdapter:
                         "after_capabilities"
                         if phase == "final" and effectful_pre_execution
                         else "parallel"
-                        if stage_safe_read_parallel or coordinated_speech
+                        if stage_safe_read_parallel or coordinated_speech or (
+                            social_response and effectful_pre_execution and not projected.get("required_before_work")
+                        )
                         else "immediate"
                         if phase == "immediate"
                         else "sequential"
@@ -2326,6 +1966,7 @@ class CanonicalPlanRuntimeAdapter:
             ),
             "omitted_pre_execution_speech_phases": (omitted_pre_execution_speech_phases),
             "operational_speech_authority": (
+                "social_cognition_runtime_validated" if social_response else
                 "llm_optional_micro_ack"
                 if safe_read_speech_optional
                 else "planner_selected_silence"
@@ -2367,7 +2008,7 @@ class CanonicalPlanRuntimeAdapter:
         if confirmation_prompt:
             metadata["confirmation_prompt"] = confirmation_prompt
             metadata["confirmation_prompt_source"] = (
-                "planner_wording_runtime_validated"
+                "social_cognition_runtime_validated" if social_response else "planner_wording_runtime_validated"
             )
         response = InteractionResponse(
             interaction_id=f"cognitive_{session_id}_{fingerprint[:20]}",
@@ -2421,6 +2062,201 @@ class GoalDrivenRuntimeCoordinator:
             None,
         )
         self._auxiliary_execution_tasks: set[asyncio.Task[Any]] = set()
+        self._social_turns: dict[str, tuple[str, asyncio.Task[Any]]] = {}
+        self._social_dispatches: dict[str, str] = {}
+
+    async def cancel_social_interaction(self) -> None:
+        """Deterministic output interruption invalidates pending SC and delivery."""
+        tasks = [entry[1] for entry in self._social_turns.values()]
+        self._social_turns.clear()
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        ids = tuple(self._social_dispatches.values())
+        self._social_dispatches.clear()
+        for interaction_id in ids:
+            await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
+
+    async def _cancel_social_turn(self, previous: tuple[str, asyncio.Task[Any]] | None) -> None:
+        if previous is None:
+            return
+        request_id, task = previous
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        interaction_id = self._social_dispatches.pop(request_id, None)
+        if interaction_id is not None:
+            await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
+
+    def schedule_social_expression(
+        self, response: InteractionResponse, *, session_id: str | None,
+        context: dict[str, Any] | None = None,
+        snapshot_is_current: Callable[[], bool] | None = None,
+    ) -> None:
+        """Realize SC expression after its exact primary response is admitted."""
+        raw = response.metadata.get("social_cognition_resolution")
+        if self.policy.mode != "apply" or not isinstance(raw, dict):
+            return
+        result = SocialCognitionResolution.model_validate(raw)
+        if not any(act.auxiliary_activities for act in result.activities):
+            return
+        if context is None:
+            projection = response.metadata.get("planner_response_projection")
+            request_payload = projection.get("social_cognition_request") if isinstance(projection, dict) else None
+            if isinstance(request_payload, dict):
+                source_request = SocialCognitionRequest.model_validate(request_payload)
+                result.validate_request(source_request)
+                context = source_request.context
+        task = asyncio.create_task(self.adapter.execute_auxiliary_activities(
+            social_cognition=result, interaction=response, session_id=str(session_id or ""),
+            turn_id=str(response.metadata.get("turn_id") or result.request_id), context=context or {},
+            snapshot_is_current=snapshot_is_current,
+        ), name="social-expression:" + result.request_id)
+        self._track_auxiliary_execution_task(task)
+
+    def start_state_interaction(
+        self, session: Any, *, work_request: CognitiveWorkRequest, turn_id: str,
+        plan: CanonicalPlan | None = None,
+    ) -> asyncio.Task[Any] | None:
+        """Let a new GI or committed Plan state invite SC without holding Work."""
+        if self.policy.mode != "apply" or user_turn_prohibits_speech(work_request.context.get("user_turn_envelope")):
+            return None
+        sid = str(work_request.sid or "")
+        key = self._goal_association_lock_key(work_request.context, sid)
+        previous = self._social_turns.get(key)
+        if previous is not None:
+            previous[1].cancel()
+        request = SocialCognitionRequest(
+            request_id="sc:" + hashlib.sha256(("plan:" + plan.plan_id if plan is not None else "gi:" + turn_id).encode("utf-8")).hexdigest(),
+            trigger="work_state" if plan is not None else "interpretation",
+            source_refs=[plan.plan_id] if plan is not None else [turn_id],
+            goal_ids=list(plan.goal_ids) if plan is not None else [],
+            language=work_request.language or "auto", responsibilities=list(work_request.responsibilities),
+            interpretation_unresolved=list(work_request.interpretation_unresolved),
+            source_turn=work_request.source_turn_provenance,
+            context={**work_request.context, "work_decision_pending": plan is None,
+                     **({"canonical_plan_resolution": plan.prompt_projection(), "runtime_admission": "pending"} if plan is not None else {}),
+                     "history": list(work_request.history),
+                     "interaction_context": self._interaction_context(sid=sid, context=work_request.context)},
+        )
+        def current() -> bool:
+            entry = self._social_turns.get(key)
+            return entry is not None and entry[0] == request.request_id
+        async def run() -> None:
+            await self._cancel_social_turn(previous)
+            if not current():
+                return
+            resolved = await self.resolve_social_interaction(
+                session, request=request, session_id=sid, snapshot_is_current=current,
+            )
+            if resolved is None or not current():
+                return
+            result, response = resolved
+            dispatch = None
+            if response.speech:
+                self._social_dispatches[request.request_id] = response.interaction_id
+                dispatch = await self.adapter.interaction_runtime.submit_response(response, session_id=sid)
+            if current():
+                self.schedule_social_expression(response, session_id=sid, context=request.context, snapshot_is_current=current)
+            if dispatch is not None:
+                execution = await self.adapter.interaction_runtime.wait_dispatch(dispatch)
+                await self.adapter.interaction_runtime.record_social_delivery(response, execution, session_id=sid)
+                self._social_dispatches.pop(request.request_id, None)
+        task = asyncio.create_task(run(), name="social-interpretation:" + turn_id)
+        self._social_turns[key] = (request.request_id, task)
+        self._track_auxiliary_execution_task(task)
+        return task
+
+    async def resolve_plan_interaction(
+        self, session: Any, *, plan: CanonicalPlan, work_request: CognitiveWorkRequest,
+        session_id: str, language: str, context: dict[str, Any],
+        evidence_refs: list[str] | None = None,
+    ) -> InteractionResponse:
+        """Let SC fulfill established needs without a second Work judgment."""
+        if plan.response_text or plan.communicative_acts or plan.auxiliary_activities or any(
+            outcome.response_text for outcome in plan.goal_outcomes
+        ):
+            raise ValueError("SC cannot review or rewrite a Planner-authored communicative decision")
+        key = self._goal_association_lock_key(context, session_id)
+        previous = self._social_turns.pop(key, None)
+        await self._cancel_social_turn(previous)
+        source_context = dict(context)
+        # The delivery ledger distinguishes queued/started/completed speech.
+        # Do not retain the retired, ambiguously named Planner history alias.
+        source_context.pop("delivered_turn_speech", None)
+        if source_context.get("canonical_plan_resolution"):
+            source_context["source_canonical_plan"] = source_context["canonical_plan_resolution"]
+        source_context["canonical_plan_resolution"] = plan.prompt_projection()
+        source_context["interaction_context"] = self._interaction_context(
+            sid=session_id, context=context, goal_ids=plan.goal_ids,
+        )
+        request = SocialCognitionRequest(
+            request_id="sc:" + hashlib.sha256(plan.plan_id.encode("utf-8")).hexdigest(), trigger="evidence" if evidence_refs else "work_state",
+            source_refs=[plan.plan_id, *(evidence_refs or [])], goal_ids=list(plan.goal_ids),
+            language=language, responsibilities=list(work_request.responsibilities),
+            interpretation_unresolved=list(work_request.interpretation_unresolved),
+            source_turn=work_request.source_turn_provenance,
+            evidence_refs=list(evidence_refs or []), communication_needs=list(plan.communication_needs),
+            context=source_context,
+        ).model_copy(deep=True)
+        result = await self._observe_workflow_stage(
+            sid=session_id, stage="social_cognition", input_payload=request,
+            operation=self.agent_client.resolve_social_cognition(
+                session, request=request,
+                timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+            ),
+        )
+        result.validate_request(request)
+        current_interaction = self._interaction_context(sid=session_id, context=context, goal_ids=plan.goal_ids)
+        for act in result.activities:
+            validate_communicative_activity_identity(
+                activity_id=act.activity_id, text=act.text, interaction_context=current_interaction,
+                repair_of_activity_ids=act.repair_of_activity_ids,
+            )
+        return await self.adapter.build_social_cognition_response(
+            plan=plan, request=request, resolution=result, session_id=session_id,
+            language=language, context=source_context,
+        )
+
+    async def resolve_social_interaction(
+        self, session: Any, *, request: SocialCognitionRequest,
+        session_id: str, snapshot_is_current: Callable[[], bool],
+    ) -> tuple[SocialCognitionResolution, InteractionResponse] | None:
+        """Resolve trusted state into interaction without creating task Work.
+
+        The calling state owner supplies its exact revision predicate. This
+        makes the same transaction usable after GI, GA, Work, Evidence or a
+        perception change without interpreting event names as social decisions.
+        """
+        if self.policy.mode == "off" or not snapshot_is_current():
+            return None
+        request = request.model_copy(deep=True)
+        started = time.perf_counter() * 1000.0
+        result = await self.agent_client.resolve_social_cognition(
+            session, request=request,
+            timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+        )
+        result.validate_request(request)
+        current = snapshot_is_current()
+        self._record_workflow_stage(
+            sid=session_id, stage="social_cognition", started_monotonic_ms=started,
+            finished_monotonic_ms=time.perf_counter() * 1000.0,
+            status="resolved" if current else "stale", input_payload=request,
+            output_payload=result, errors=[], attempt=1,
+            metadata={"semantic_owner": "social_cognition", "trigger": request.trigger,
+                      "model_call_count": result.model_call_count, "execution_authority": False},
+        )
+        if not current:
+            return None
+        interaction_context = (
+            self.interaction_ledger.context(session_id, goal_ids=request.goal_ids,
+                                            turn_id=request.request_id).model_dump(mode="json")
+            if self.interaction_ledger is not None else request.context.get("interaction_context")
+        )
+        return result, build_social_interaction_response(
+            request, result, session_id=session_id, interaction_context=interaction_context,
+        )
 
     def _track_auxiliary_execution_task(self, task: asyncio.Task[Any]) -> None:
         """Retain fail-soft Runtime execution without creating cognition work."""
@@ -2442,204 +2278,7 @@ class GoalDrivenRuntimeCoordinator:
 
         task.add_done_callback(_done)
 
-    async def _execute_presentation_commit_auxiliary_activities(
-        self,
-        *,
-        commit: PresentationCommit,
-        ready_execution: Any,
-        sid: str,
-        turn_id: str,
-        context: dict[str, Any],
-    ) -> None:
-        """Validate exact commit decoration after its primary speech launches."""
 
-        await asyncio.sleep(0)
-        started_ms = time.perf_counter() * 1000.0
-        try:
-            outcome = await self.adapter.execute_auxiliary_activities(
-                presentation_commit=commit,
-                session_id=sid,
-                turn_id=turn_id,
-                interaction=getattr(
-                    ready_execution, "interaction_response", None
-                ),
-                context=context,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._record_workflow_stage(
-                sid=sid,
-                stage="presentation_commit_auxiliary_execution",
-                started_monotonic_ms=started_ms,
-                finished_monotonic_ms=time.perf_counter() * 1000.0,
-                status="failed",
-                input_payload=commit,
-                output_payload=None,
-                errors=[{"error_type": type(exc).__name__}],
-                attempt=1,
-                metadata={
-                    "blocks_main_activity": False,
-                    "semantic_owner": "fast_planner",
-                    "cognitive_reentry_eligible": False,
-                },
-            )
-            return
-        self._record_workflow_stage(
-            sid=sid,
-            stage="presentation_commit_auxiliary_execution",
-            started_monotonic_ms=started_ms,
-            finished_monotonic_ms=time.perf_counter() * 1000.0,
-            status=(
-                "accepted"
-                if int(outcome.get("materialized_count") or 0) > 0
-                else "suppressed"
-            ),
-            input_payload=commit,
-            output_payload=outcome,
-            errors=[],
-            attempt=1,
-            metadata={
-                "blocks_main_activity": False,
-                "semantic_owner": "fast_planner",
-                "cognitive_reentry_eligible": False,
-            },
-        )
-
-    def schedule_presentation_commit_auxiliary_activities(
-        self,
-        commit: PresentationCommit,
-        *,
-        ready_execution: Any,
-        sid: str,
-        turn_id: str,
-        context: dict[str, Any],
-    ) -> None:
-        """Schedule only exact commit decoration after primary vocal launch."""
-
-        if (
-            self.policy.mode != "apply"
-            or commit.activity is None
-            or not commit.auxiliary_activities
-        ):
-            return
-        task = asyncio.create_task(
-            self._execute_presentation_commit_auxiliary_activities(
-                commit=commit,
-                ready_execution=ready_execution,
-                sid=sid,
-                turn_id=turn_id,
-                context=dict(context),
-            ),
-            name=f"presentation-auxiliary:{sid}:{turn_id}",
-        )
-        self._track_auxiliary_execution_task(task)
-
-    async def _execute_resolution_auxiliary_activities(
-        self,
-        *,
-        resolution: CognitiveRuntimeResolution,
-        sid: str,
-        turn_id: str,
-        context: dict[str, Any],
-    ) -> None:
-        """Execute the exact terminal-Plan decoration after the main turn yields."""
-
-        plan = resolution.terminal_plan
-        interaction = resolution.interaction_response
-        if plan is None or not plan.auxiliary_activities or interaction is None:
-            return
-        # Give the caller one event-loop turn to submit the primary InteractionResponse.
-        # This is scheduling only; no semantic decision is deferred to this task.
-        await asyncio.sleep(0)
-        started_ms = time.perf_counter() * 1000.0
-        try:
-            outcome = await self.adapter.execute_auxiliary_activities(
-                plan=plan,
-                session_id=sid,
-                turn_id=turn_id,
-                interaction=interaction,
-                context=context,
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # fail-soft optional execution boundary
-            self._record_workflow_stage(
-                sid=sid,
-                stage="auxiliary_activity_execution",
-                started_monotonic_ms=started_ms,
-                finished_monotonic_ms=time.perf_counter() * 1000.0,
-                status="failed",
-                input_payload={
-                    "canonical_plan_id": plan.plan_id,
-                    "auxiliary_activities": plan.auxiliary_activities,
-                },
-                output_payload=None,
-                errors=[{"error_type": type(exc).__name__}],
-                attempt=1,
-                metadata={
-                    "blocks_main_activity": False,
-                    "semantic_owner": "planner",
-                    "cognitive_reentry_eligible": False,
-                },
-            )
-            return
-        self._record_workflow_stage(
-            sid=sid,
-            stage="auxiliary_activity_execution",
-            started_monotonic_ms=started_ms,
-            finished_monotonic_ms=time.perf_counter() * 1000.0,
-            status=(
-                "accepted"
-                if int(outcome.get("materialized_count") or 0) > 0
-                else "suppressed"
-            ),
-            input_payload={
-                "canonical_plan_id": plan.plan_id,
-                "auxiliary_activities": plan.auxiliary_activities,
-            },
-            output_payload=outcome,
-            errors=[],
-            attempt=1,
-            metadata={
-                "blocks_main_activity": False,
-                "semantic_owner": "planner",
-                "cognitive_reentry_eligible": False,
-            },
-        )
-
-    def schedule_resolution_auxiliary_activities(
-        self,
-        resolution: CognitiveRuntimeResolution,
-        *,
-        sid: str,
-        turn_id: str,
-        context: dict[str, Any],
-    ) -> None:
-        """Start decoration only after Host has committed and launched the main response.
-
-        The caller deliberately invokes this after the primary dispatch task is created.
-        Confirmation-held or rejected primary work never reaches this boundary.
-        """
-
-        plan = resolution.terminal_plan
-        if (
-            self.policy.mode != "apply"
-            or plan is None
-            or not plan.auxiliary_activities
-            or resolution.interaction_response is None
-        ):
-            return
-        task = asyncio.create_task(
-            self._execute_resolution_auxiliary_activities(
-                resolution=resolution,
-                sid=sid,
-                turn_id=turn_id,
-                context=dict(context),
-            ),
-            name=f"auxiliary-activity:{sid}:{turn_id}",
-        )
-        self._track_auxiliary_execution_task(task)
 
     _CONTINUITY_REFRESH_KEYS = frozenset(
         {
@@ -2906,9 +2545,9 @@ class GoalDrivenRuntimeCoordinator:
             if not isinstance(turn, dict) or turn.get("role") != "assistant":
                 continue
             metadata = turn.get("metadata")
-            if not isinstance(metadata, dict) or metadata.get("source") != (
-                "fast_planner_communicative_delivery"
-            ):
+            if not isinstance(metadata, dict) or metadata.get("source") not in {
+                "fast_planner_communicative_delivery", "social_cognition_communicative_delivery",
+            }:
                 continue
             text = " ".join(str(turn.get("text") or "").strip().split())
             if not text:
@@ -2917,7 +2556,7 @@ class GoalDrivenRuntimeCoordinator:
                 str(metadata.get("turn_id") or turn.get("sid") or "").strip().split()
             )
             activity_id = " ".join(
-                str(metadata.get("fast_activity_id") or "").strip().split()
+                str(metadata.get("fast_activity_id") or next(iter(metadata.get("communicative_activity_ids") or []), "")).strip().split()
             )
             identity = hashlib.sha256(
                 json.dumps(
@@ -2934,16 +2573,20 @@ class GoalDrivenRuntimeCoordinator:
                     "domain": "vocal",
                     "event_type": "speech_playback_completed",
                     "state": "playback_completed",
-                    "goal_ids": [],
+                    "goal_ids": list(metadata.get("source_goal_ids") or []),
                     "subject_id": activity_id or f"speech_{identity}",
                     "speech_act": str(metadata.get("speech_act") or ""),
                     "text": text,
-                    "evidence_refs": [],
+                    "evidence_refs": list(metadata.get("evidence_refs") or []),
                     "metadata": {
                         "delivery_role": str(
                             metadata.get("delivery_role") or ""
                         ),
-                        "source": "fast_planner_communicative_delivery",
+                        "source": metadata["source"],
+                        "wording_owner": metadata.get("wording_owner"),
+                        "communicative_activity_ids": list(metadata.get("communicative_activity_ids") or []),
+                        "addressed_need_ids": list(metadata.get("addressed_need_ids") or []),
+                        "source_responsibility_refs": list(metadata.get("source_responsibility_refs") or []),
                     },
                 }
             )
@@ -3067,13 +2710,6 @@ class GoalDrivenRuntimeCoordinator:
     ) -> CanonicalPlan:
         """Bind Fast Planner's first Activity Plan to GA's canonical Goals."""
 
-        presentation_commit_id = str(
-            advance.metadata.get("presentation_commit_id") or ""
-        ).strip()
-        if not presentation_commit_id:
-            raise ValueError(
-                "Fast Planner terminal result must reference its PresentationCommit"
-            )
         if advance.disposition == "escalate":
             raise ValueError(
                 "escalating Fast Planner advance cannot become a terminal canonical Plan"
@@ -3120,72 +2756,30 @@ class GoalDrivenRuntimeCoordinator:
                     )
                 )
 
-        auxiliary_activities = []
-        capability_activity_ids = {
-            item.activity_id
-            for item in advance.activities
-            if isinstance(item, FastPlannerCapabilityActivity)
-        }
-        for auxiliary in advance.auxiliary_activities:
-            auxiliary_activities.append(
-                auxiliary.model_copy(
-                    update={
-                        "anchor_kind": (
-                            "plan_step"
-                            if auxiliary.anchor_id in capability_activity_ids
-                            else "communicative_act"
-                        )
-                    }
-                )
-            )
-
         outcomes: list[Any] = []
         unresolved = list(advance.unresolved)
-        communicative_acts: list[PlannedCommunicativeAct] = []
-        capability_activity_indexes = [
-            index
-            for index, activity in enumerate(advance.activities)
-            if activity.role == "capability"
-        ]
-        for activity_index, activity in enumerate(advance.activities):
+        plan_seed = json.dumps(advance.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+        plan_id = "fast_activity_plan_" + hashlib.sha256(plan_seed.encode()).hexdigest()[:20]
+        needs: list[SocialCommunicationNeed] = []
+        capability_indexes = [index for index, item in enumerate(advance.activities) if item.role == "capability"]
+        for index, activity in enumerate(advance.activities):
             if activity.role == "capability":
                 continue
-            activity_goal_ids: list[str] = []
-            for responsibility_ref in activity.source_responsibility_refs:
-                for goal_id in refs_to_goals[responsibility_ref]:
-                    if goal_id not in activity_goal_ids:
-                        activity_goal_ids.append(goal_id)
-            communicative_acts.append(
-                PlannedCommunicativeAct(
-                    activity_id=activity.activity_id,
-                    text=activity.text,
-                    role=activity.role,
-                    timing=activity.timing,
-                    delivery_phase=(
-                        "immediate"
-                        if activity.role == "clarification"
-                        else "pre_action"
-                        if activity.role == "progress"
-                        else "final"
-                        if capability_activity_indexes
-                        and activity_index > max(capability_activity_indexes)
-                        else "pre_action"
-                        if capability_activity_indexes
-                        else "immediate"
-                    ),
-                    speech_act=activity.speech_act,
-                    source_goal_ids=activity_goal_ids,
-                    source_responsibility_refs=list(
-                        activity.source_responsibility_refs
-                    ),
-                    truth_stage=activity.truth_stage,
-                    evidence_refs=list(activity.evidence_refs),
-                    information_gaps=list(
-                        getattr(activity, "information_gaps", [])
-                    ),
-                    progress_kind=getattr(activity, "progress_kind", None),
-                )
-            )
+            activity_goal_ids = list(dict.fromkeys(goal_id for ref in activity.source_responsibility_refs
+                                                   for goal_id in refs_to_goals[ref]))
+            # This preserves the validated ordered Work obligation. SC supplies
+            # words later without moving that obligation across task Activities.
+            phase = ("final" if capability_indexes and index > max(capability_indexes)
+                     else "immediate" if capability_indexes and index > min(capability_indexes)
+                     else "pre_action" if capability_indexes else "immediate") if activity.timing == "sequential" else "immediate"
+            needs.append(SocialCommunicationNeed(
+                need_id=communication_need_id(plan_id, activity.activity_id), owner="planner",
+                kind="input" if activity.role == "clarification" else "answer",
+                source_goal_ids=activity_goal_ids, source_responsibility_refs=list(activity.source_responsibility_refs),
+                reference_id=plan_id, delivery_phase=phase, facts=activity.model_dump(mode="json"),
+                before_step_ids=[item.activity_id for item in advance.activities[index+1:] if item.role == "capability"] if activity.timing == "sequential" else [],
+                after_step_ids=[item.activity_id for item in advance.activities[:index] if item.role == "capability"] if activity.timing == "sequential" else [],
+            ))
         for goal_id in goal_ids:
             goal_activities = activities_by_goal.get(goal_id, [])
             goal_steps = [
@@ -3225,7 +2819,6 @@ class GoalDrivenRuntimeCoordinator:
                         disposition="clarify",
                         coverage="uncertain",
                         unresolved=(unresolved or ["user_clarification_required"]),
-                        response_text=clarifications[0].text,
                         rationale=(
                             "A source-proven Planner InformationGap blocks this Goal's Work."
                         ),
@@ -3236,14 +2829,13 @@ class GoalDrivenRuntimeCoordinator:
                     score=max(0.95, advance.confidence),
                     status="exact",
                     satisfied_goal_ids=[goal_id],
-                    rationale="Fast Planner supplied the complete Communicative Act.",
+                    rationale="Fast Planner established an ordinary answer obligation.",
                 )
                 outcomes.append(
                     RespondGoalPlanOutcome(
                         goal_id=goal_id,
                         disposition="respond",
                         coverage="complete",
-                        response_text=responses[0].text,
                         satisfaction=satisfaction,
                         rationale="No Capability Evidence is required for this Goal.",
                     )
@@ -3279,6 +2871,17 @@ class GoalDrivenRuntimeCoordinator:
                     f"Fast Planner supplied no terminal Activity for Goal {goal_id!r}"
                 )
 
+        for outcome in outcomes:
+            if outcome.disposition in {"unavailable", "refused"}:
+                needs.append(SocialCommunicationNeed(
+                    need_id=communication_need_id(plan_id, outcome.goal_id),
+                    owner="planner", kind="result", reference_id=plan_id,
+                    source_goal_ids=[outcome.goal_id],
+                    source_responsibility_refs=[
+                        ref for ref, ids in refs_to_goals.items() if outcome.goal_id in ids
+                    ],
+                    facts=outcome.model_dump(mode="json", exclude_none=True),
+                ))
         dispositions = {item.disposition for item in outcomes}
         disposition = (
             next(iter(dispositions)) if len(dispositions) == 1 else "mixed"
@@ -3303,26 +2906,15 @@ class GoalDrivenRuntimeCoordinator:
                 rationale="Every canonical Goal has a complete Fast Planner outcome.",
             )
         return CanonicalPlan(
-            plan_id=(
-                "fast_activity_plan_"
-                + hashlib.sha256(plan_seed.encode("utf-8")).hexdigest()[:20]
-            ),
+            plan_id=plan_id,
             planner_tier="fast",
             disposition=disposition,
             coverage=top_coverage,
             confidence=advance.confidence,
             goal_ids=goal_ids,
             goal_summary=user_text,
-            response_text=" ".join(
-                dict.fromkeys(
-                    activity.text
-                    for activity in advance.activities
-                    if activity.role in {"complete_response", "clarification"}
-                )
-            ),
-            communicative_acts=communicative_acts,
+            communication_needs=needs,
             steps=steps,
-            auxiliary_activities=auxiliary_activities,
             unresolved=(
                 unresolved
                 if disposition in {"clarify", "mixed", "unavailable", "refused"}
@@ -3337,7 +2929,6 @@ class GoalDrivenRuntimeCoordinator:
                 "task_list_revision": 1,
                 "goal_grouped_task_list": True,
                 "goal_ids_by_responsibility": refs_to_goals,
-                "presentation_commit_id": presentation_commit_id,
             },
         )
 
@@ -4072,7 +3663,6 @@ class GoalDrivenRuntimeCoordinator:
         timings: dict[str, float] = {}
         association: GoalAssociationResolution | None = None
         fast_advance: FastPlannerAdvance | None = None
-        presentation_commit: PresentationCommit | None = None
         fast_plan: CanonicalPlan | None = None
         terminal_plan: CanonicalPlan | None = None
         interaction: InteractionResponse | None = None
@@ -4087,6 +3677,7 @@ class GoalDrivenRuntimeCoordinator:
         gi_planning_superseded = False
         planning_snapshot: dict[str, Any] | None = None
         planning_commit: dict[str, Any] | None = None
+        initial_social_task: asyncio.Task[Any] | None = None
 
         def goal_planning_started() -> bool:
             return bool(association_task is not None and association_task.done()
@@ -4107,16 +3698,10 @@ class GoalDrivenRuntimeCoordinator:
                 deep_planner_invocation_reasons[0] if deep_planner_invocation_reasons else ""
             )
             return {
+                "social_cognition_started": initial_social_task is not None,
                 "fast_planner_advance": (
                     fast_advance.model_dump(mode="json", exclude_none=True)
                     if fast_advance is not None
-                    else None
-                ),
-                "presentation_commit": (
-                    presentation_commit.model_dump(
-                        mode="json", exclude_none=True
-                    )
-                    if presentation_commit is not None
                     else None
                 ),
                 "fast_planner_advance_continuations": (
@@ -4254,11 +3839,13 @@ class GoalDrivenRuntimeCoordinator:
         try:
             turn_id = self._context_turn_id(context, sid)
 
+            initial_social_task = self.start_state_interaction(
+                session, work_request=work_request, turn_id=turn_id,
+            )
             responsibility_proposals = list(work_request.responsibilities)
             if responsibility_proposals:
                 # GA and one Fast Planner model stream consume the same immutable
-                # GI result concurrently. Only a complete typed PresentationCommit
-                # may cross the early realization boundary; Capability Work remains
+                # GI result concurrently with independent SC. Capability Work remains
                 # held until terminal output, GA binding, and CanonicalPlan validation.
                 fast_started = time.perf_counter()
                 association_task = asyncio.create_task(
@@ -4275,7 +3862,7 @@ class GoalDrivenRuntimeCoordinator:
                 )
                 await asyncio.sleep(0)
                 async def plan_current_responsibilities() -> None:
-                    nonlocal presentation_commit, fast_advance, needs_deep_planner
+                    nonlocal fast_advance, needs_deep_planner
                     nonlocal fast_communicative_realization_status
                     nonlocal ready_fast_capability_execution, ready_fast_capability_status
                     stream_request = work_request.model_copy(
@@ -4288,143 +3875,26 @@ class GoalDrivenRuntimeCoordinator:
                     )
                     terminal_frame: FastPlannerStreamTerminal | None = None
                     async for frame in self.agent_client.stream_fast_advance(
-                        session,
-                        request=stream_request,
-                        timeout_ms=self.policy.fast_planner_timeout_ms,
+                        session, request=stream_request, timeout_ms=self.policy.fast_planner_timeout_ms,
                     ):
-                        if isinstance(frame, PresentationCommit):
-                            if presentation_commit is not None:
-                                raise CognitiveStageFailure(
-                                    "fast_planner_stream",
-                                    {
-                                        "failure_class": "duplicate_presentation_commit",
-                                        "failure_domain": "model_contract",
-                                        "architecture_attribution": "fast_planner",
-                                        "retryable": False,
-                                    },
-                                )
-                            presentation_commit = frame
-                            commit_finished_ms = time.perf_counter() * 1000.0
-                            timings["fast_planner_commit"] = (
-                                time.perf_counter() - fast_started
-                            ) * 1000.0
-                            self._record_workflow_stage(
-                                sid=sid,
-                                stage="fast_planner_presentation_commit",
-                                started_monotonic_ms=fast_started * 1000.0,
-                                finished_monotonic_ms=commit_finished_ms,
-                                status="accepted",
-                                input_payload={
-                                    "user_text": text,
-                                    "responsibilities": responsibility_proposals,
-                                },
-                                output_payload=frame,
-                                errors=[],
-                                attempt=1,
-                                metadata={
-                                    "semantic_owner": "fast_planner",
-                                    "model_invocation": "streaming_advance",
-                                    "immutable": True,
-                                },
-                            )
-                            activity = frame.activity
-                            if activity is not None:
-                                fast_communicative_realization_status = "planner_owned"
-                            if (
-                                activity is not None
-                                and self.policy.mode == "apply"
-                                and not goal_planning_started()
-                                and not user_turn_prohibits_speech(context.get("user_turn_envelope"))
-                            ):
-                                ready_execution = await self.adapter.interaction_runtime.start_fast_planner_communicative_act(
-                                    activity,
-                                    session_id=sid,
-                                    turn_id=turn_id,
-                                    language=language,
-                                )
-                                if activity.role == "complete_response":
-                                    ready_fast_communicative_executions.append(
-                                        ready_execution
-                                    )
-                                fast_vocal_activity_ids.append(activity.activity_id)
-                                self.schedule_presentation_commit_auxiliary_activities(
-                                    frame,
-                                    ready_execution=ready_execution,
-                                    sid=sid,
-                                    turn_id=turn_id,
-                                    context=context,
-                                )
-                        elif isinstance(frame, FastPlannerStreamFailure):
-                            raise CognitiveStageFailure(
-                                "fast_planner_stream",
-                                frame.model_dump(mode="json", exclude_none=True),
-                            )
-                        elif isinstance(frame, FastPlannerStreamTerminal):
-                            if terminal_frame is not None:
-                                raise CognitiveStageFailure(
-                                    "fast_planner_stream",
-                                    {
-                                        "failure_class": "duplicate_stream_terminal",
-                                        "failure_domain": "model_contract",
-                                        "architecture_attribution": "fast_planner",
-                                        "retryable": False,
-                                    },
-                                )
-                            terminal_frame = frame
-                            self._record_workflow_stage(
-                                sid=sid,
-                                stage="fast_planner_stream_terminal",
-                                started_monotonic_ms=fast_started * 1000.0,
-                                finished_monotonic_ms=time.perf_counter() * 1000.0,
-                                status="resolved",
-                                input_payload={
-                                    "presentation_commit_id": (
-                                        presentation_commit.commit_id
-                                        if presentation_commit is not None
-                                        else None
-                                    )
-                                },
-                                output_payload=frame,
-                                errors=[],
-                                attempt=1,
-                                metadata={
-                                    "semantic_owner": "fast_planner",
-                                    "model_invocation": "streaming_advance",
-                                    "work_dispatch_allowed": False,
-                                },
-                            )
-                    if presentation_commit is None or terminal_frame is None:
-                        raise CognitiveStageFailure(
-                            "fast_planner_stream",
-                            {
-                                "failure_class": "incomplete_fast_planner_stream",
-                                "failure_domain": "model_contract",
-                                "architecture_attribution": "fast_planner",
-                                "retryable": False,
-                            },
-                        )
-                    if (
-                        terminal_frame.presentation_commit_id
-                        != presentation_commit.commit_id
-                        or terminal_frame.turn_id != presentation_commit.turn_id
-                        or str(
-                            terminal_frame.advance.metadata.get(
-                                "presentation_commit_id"
-                            )
-                            or ""
-                        )
-                        != presentation_commit.commit_id
-                    ):
-                        raise CognitiveStageFailure(
-                            "fast_planner_stream",
-                            {
-                                "failure_class": "presentation_commit_reference_mismatch",
-                                "failure_domain": "model_contract",
-                                "architecture_attribution": "fast_planner",
-                                "retryable": False,
-                            },
-                        )
+                        if isinstance(frame, FastPlannerStreamFailure):
+                            raise CognitiveStageFailure("fast_planner_stream", frame.model_dump(mode="json"))
+                        if not isinstance(frame, FastPlannerStreamTerminal) or terminal_frame is not None:
+                            raise ValueError("Fast Work stream must contain exactly one terminal decision")
+                        if frame.turn_id != turn_id or frame.advance.turn_id != turn_id:
+                            raise ValueError("Fast Work stream changed turn identity")
+                        terminal_frame = frame
+                    if terminal_frame is None:
+                        raise ValueError("Fast Work stream ended without a terminal decision")
                     fast_advance = terminal_frame.advance
+                    self._record_workflow_stage(
+                        sid=sid, stage="fast_planner_stream_terminal",
+                        started_monotonic_ms=fast_started * 1000.0,
+                        finished_monotonic_ms=time.perf_counter() * 1000.0,
+                        status="resolved", input_payload=stream_request,
+                        output_payload=terminal_frame, errors=[], attempt=1,
+                        metadata={"semantic_owner": "planner", "communication_authority": False},
+                    )
                     timings["fast_planner_activity_plan"] = (
                         time.perf_counter() - fast_started
                     ) * 1000.0
@@ -4433,7 +3903,9 @@ class GoalDrivenRuntimeCoordinator:
                     ]
                     ready_fast_capability_status = "prepared_until_canonical_validation"
                     capability_activities = [item for item in fast_advance.activities if isinstance(item, FastPlannerCapabilityActivity)]
-                    if self.policy.mode == "apply" and capability_activities and not goal_planning_started():
+                    if self.policy.mode == "apply" and capability_activities and not goal_planning_started() and not any(
+                        item.role != "capability" and item.timing == "sequential" for item in fast_advance.activities
+                    ):
                         eligible = await self.adapter.interaction_runtime.prepare_fast_planner_capability_activities(
                             capability_activities, turn_id=turn_id,
                         )
@@ -4820,14 +4292,20 @@ class GoalDrivenRuntimeCoordinator:
                 terminal_plan = fast_plan
                 fast_planner_path = "terminal"
 
+            await self.adapter.interaction_runtime.ensure_capability_definitions([step.capability_id for step in terminal_plan.steps])
+            confirmation_steps = [step for step in terminal_plan.steps
+                if self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation]
+            if confirmation_steps and not any(need.kind == "confirmation" for need in terminal_plan.communication_needs):
+                terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
+                    "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
+                        need_id=communication_need_id(terminal_plan.plan_id, "confirmation"), owner="runtime", kind="confirmation",
+                        reference_id=terminal_plan.plan_id, source_goal_ids=list(dict.fromkeys(
+                            goal_id for step in confirmation_steps for goal_id in step.source_goal_ids)),
+                        delivery_phase="pre_action", facts={"provider_confirmation_steps": [step.model_dump(mode="json") for step in confirmation_steps]},
+                    )]})
             known_work_ids = {item["activity_id"] for item in planning_context.get("existing_work_activities", [])}
             if set(terminal_plan.cancel_activity_ids) - known_work_ids:
                 raise ValueError("Planner cancellation names unknown Work")
-
-            if presentation_commit is not None:
-                terminal_plan = bind_presentation_commit_reference(
-                    terminal_plan, commit_id=presentation_commit.commit_id,
-                )
 
             runtime = self.adapter.interaction_runtime.runtime
             if association_stage.planning_task is None:
@@ -4947,60 +4425,15 @@ class GoalDrivenRuntimeCoordinator:
                 goal_ids=terminal_plan.goal_ids,
             )
 
-            if (
-                terminal_plan.metadata.get("resolver") == "fast_planner_advance"
-                and not terminal_plan.steps
-                and terminal_plan.disposition in {"respond", "clarify"}
+            if terminal_plan.steps and not terminal_plan.communication_needs and not any(
+                self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation
+                for step in terminal_plan.steps
             ):
-                timings["planner_communicative_activity_validation"] = 0.0
                 if self.policy.mode == "apply":
-                    interaction = self.adapter.build_fast_advance_response(
-                        advance=fast_advance,
-                        plan=terminal_plan,
-                        session_id=sid,
-                        language=language,
-                        preexecuted_activity_ids=set(fast_vocal_activity_ids),
-                        context=planning_context,
+                    initial_social_task = self.start_state_interaction(
+                        session, work_request=work_request.model_copy(update={"context": planning_context}),
+                        turn_id=turn_id, plan=terminal_plan,
                     )
-                    interaction.metadata["goal_association"] = association.model_dump(
-                        mode="json", exclude_none=True
-                    )
-                    if goal_state_commit_stage.startswith("goal_association"):
-                        interaction.metadata["goal_state_results"] = goal_state_results
-                    return self._finish(
-                        mode="apply",
-                        status="applied",
-                        association=association,
-                        fast_plan=fast_plan,
-                        terminal_plan=terminal_plan,
-                        interaction=interaction,
-                        goal_state_results=goal_state_results,
-                        timings=timings,
-                        started=started,
-                        metadata={
-                            "fast_activity_response": True,
-                            "fast_vocal_activity_ids": list(fast_vocal_activity_ids),
-                            "stage_diagnostics": stage_diagnostics,
-                            **path_metadata(),
-                        },
-                    )
-                return self._finish(
-                    mode="report_only",
-                    status="report_only",
-                    association=association,
-                    fast_plan=fast_plan,
-                    terminal_plan=terminal_plan,
-                    timings=timings,
-                    started=started,
-                    metadata={
-                        "fast_activity_response": True,
-                        "stage_diagnostics": stage_diagnostics,
-                        **path_metadata(),
-                    },
-                )
-
-            if self.adapter.is_pure_safe_read_plan(terminal_plan):
-                if self.policy.mode == "apply":
                     stage = time.perf_counter()
                     interaction = await self._observe_workflow_stage(
                         sid=sid,
@@ -5082,13 +4515,11 @@ class GoalDrivenRuntimeCoordinator:
                     stage="planner_communicative_activity_validation",
                     input_payload={
                         "canonical_plan": terminal_plan,
-                        "wording_owner": "planner",
+                        "wording_owner": "social_cognition",
                     },
-                    operation=self.adapter.build_planner_owned_response(
-                        plan=terminal_plan,
-                        session_id=sid,
-                        language=language,
-                        context=planner_response_context,
+                    operation=self.resolve_plan_interaction(
+                        session, plan=terminal_plan, work_request=work_request,
+                        session_id=sid, language=language, context=planner_response_context,
                     ),
                 )
                 timings["runtime_adapter"] = (time.perf_counter() - stage) * 1000.0
@@ -5136,9 +4567,11 @@ class GoalDrivenRuntimeCoordinator:
             # The Host owns the outer foreground deadline. If it cancels this
             # pipeline, stop only Fast work that never reached canonical Goal/Plan
             # binding, then propagate cancellation so the Host records the timeout.
+            await self.cancel_social_interaction()
             await cancel_uncommitted_fast_work("foreground_deadline")
             raise
         except CognitiveStageFailure as exc:
+            await self.cancel_social_interaction()
             await cancel_uncommitted_fast_work(exc.stage)
             failure_metadata = {
                 **exc.failure_metadata,
@@ -5160,6 +4593,7 @@ class GoalDrivenRuntimeCoordinator:
                 metadata=failure_metadata,
             )
         except Exception as exc:
+            await self.cancel_social_interaction()
             await cancel_uncommitted_fast_work(type(exc).__name__)
             return self._finish(
                 mode=self.policy.mode,

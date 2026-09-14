@@ -34,7 +34,7 @@ class SemanticAuthorityTests(unittest.TestCase):
             },
         )
         self.assertEqual({row["owner"] for row in matrix}, {"cognitive_core_runtime"})
-        self.assertEqual({row["communication_owner"] for row in matrix}, {"planner"})
+        self.assertEqual({row["communication_owner"] for row in matrix}, {"social_cognition"})
 
     def test_machine_audit_rejects_second_authority_architecture(self) -> None:
         report = audit()

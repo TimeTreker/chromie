@@ -39,7 +39,6 @@
         "goal-chat"
       ],
       "goal_summary": "Respond naturally to the greeting.",
-      "response_text": "",
       "goal_satisfaction": {
         "score": 1.0,
         "status": "exact",
@@ -47,21 +46,45 @@
           "goal-chat"
         ]
       },
-      "communicative_acts": [
+      "communication_needs": [
         {
-          "activity_id": "scenario-final",
-          "text": "你好，很高兴见到你。",
-          "role": "complete_response",
-          "timing": "parallel",
-          "speech_act": "inform",
+          "need_id": "need:bb4bb0a14610f9502739f5357ba40adbaca1676327032f1bd39e89a3579941c3",
+          "owner": "planner",
+          "kind": "answer",
           "source_goal_ids": [
             "goal-chat"
           ],
-          "truth_stage": "context_grounded",
-          "evidence_refs": [],
-          "information_gaps": []
+          "source_responsibility_refs": [],
+          "reference_id": "plan-chat",
+          "facts": {
+            "disposition": "respond",
+            "unresolved": []
+          },
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
         }
       ]
+    },
+    "social_cognition": {
+      "fast": {
+        "activities": [
+          {
+            "activity_id": "scenario-final",
+            "text": "你好，很高兴见到你。",
+            "function": "respond",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-chat"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
     }
   },
   "expect": {
@@ -81,11 +104,11 @@
       {
         "id": "speech_identity_latency",
         "title": "Speech Identity and Warm Response Latency",
-        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Social Cognition commitment and playback scheduling stay within the declared interactive budgets.",
         "rationale": "Grounded conversational response traverses the maintained cognitive runtime without tool impersonation.",
         "root_cause_boundaries": [
           "Mind profile",
-          "Planner communication",
+          "Social Cognition",
           "Playback delivery",
           "Latency evidence"
         ]

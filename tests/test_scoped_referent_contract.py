@@ -27,7 +27,7 @@ def _execute_output(*, goal_id: str, capability_id: str, args: dict) -> dict:
             goal_id: {
                 "disposition": "execute",
                 "coverage": "complete",
-                "response_text": "",
+
                 "unresolved": [],
                 "step_ids": ["weather-read-operation"],
                 "satisfaction": _satisfaction(goal_id),
@@ -48,7 +48,7 @@ def _execute_output(*, goal_id: str, capability_id: str, args: dict) -> dict:
         "disposition": "execute",
         "coverage": "complete",
         "confidence": 1.0,
-        "response_text": "",
+
         "escalation_reason": "",
         "unresolved": [],
         "parameter_resolutions": [],

@@ -725,7 +725,7 @@ Source may therefore expose an **opt-in candidate runtime integration** without 
 the default deployment. `AGENT_LLM_PROVIDER=sglang` selects an SGLang transport at the Agent
 composition root and translates existing provider-neutral compute classes into the already
 qualified priority wire field. Ollama remains the default and is not deleted. The Host separately
-owns the presentation-compute lease around real Vocal delivery; Planner owns wording/HOW and the
+owns the presentation-compute lease around real Vocal delivery; SC owns interaction wording, Planner owns Work HOW, and the
 provider merely executes pause/resume resource commands. A newly admitted foreground input revokes
 an active engine pause before its routed GI transaction begins.
 

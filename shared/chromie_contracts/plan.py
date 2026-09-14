@@ -16,6 +16,36 @@ from .semantic_task import (
 )
 
 
+def communication_need_id(plan_id: str, reference_id: str) -> str:
+    """Stable bounded identity; exact source identifiers remain in the Need."""
+    payload = json.dumps([plan_id, reference_id], ensure_ascii=False, separators=(",", ":"))
+    return "need:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+class SocialCommunicationNeed(BaseModel):
+    """An upstream-owned obligation; Social Cognition supplies its expression."""
+
+    model_config = ConfigDict(extra="forbid")
+    need_id: str = Field(min_length=1, max_length=160)
+    owner: Literal["goal_interpretation", "planner", "runtime"]
+    kind: Literal["answer", "input", "confirmation", "result"]
+    source_goal_ids: list[str] = Field(default_factory=list)
+    source_responsibility_refs: list[str] = Field(default_factory=list)
+    reference_id: str = Field(min_length=1, max_length=200)
+    facts: dict[str, Any] = Field(default_factory=dict)
+    delivery_phase: Literal["immediate", "pre_action", "final"] | None = None
+    before_step_ids: list[str] = Field(default_factory=list, max_length=64)
+    after_step_ids: list[str] = Field(default_factory=list, max_length=64)
+
+    @model_validator(mode="after")
+    def validate_facts(self) -> "SocialCommunicationNeed":
+        reject_forbidden_low_level_fields(self.facts)
+        if set(self.before_step_ids).intersection(self.after_step_ids):
+            raise ValueError("a communication need cannot precede and follow the same step")
+        return self
+
+
+
 def validate_communicative_activity_identity(
     *,
     activity_id: str,
@@ -488,85 +518,34 @@ FastPlannerImmediateCommunicativeAct = Annotated[
 ]
 
 
-class FastPlannerPresentationCommitModelOutput(BaseModel):
-    """First complete value in one streamed Fast Planner semantic result.
-
-    The model may commit one immediately realizable communicative Activity and
-    social decoration anchored to that Activity, or explicitly commit silence.
-    Capability Work and clarification remain in the terminal result.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    activity: FastPlannerImmediateCommunicativeAct | None = None
-    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
-        default_factory=list,
-        max_length=3,
-    )
 
 
-class PresentationCommit(BaseModel):
-    """Immutable early presentation accepted from one Fast Planner stream.
 
-    This is a typed commit boundary, never a partial-token or partial-JSON
-    boundary. It carries no Goal IDs, completion authority, or executable Work.
-    The terminal stream frame references ``commit_id`` and may only add the
-    still-needed terminal planning fields.
-    """
+
+class FastPlannerResponseNeed(BaseModel):
+    """Work disposition requiring an ordinary answer; SC owns the utterance."""
 
     model_config = ConfigDict(extra="forbid")
+    role: Literal["complete_response"]
+    activity_id: str = Field(min_length=1, max_length=160)
+    source_responsibility_refs: list[str] = Field(min_length=1)
+    timing: PlanTiming = "parallel"
+    rationale: str = Field(min_length=1, max_length=1200)
 
-    frame_type: Literal["presentation_commit"] = "presentation_commit"
-    schema_version: int = Field(default=1, ge=1)
-    commit_id: str = Field(min_length=1, max_length=160)
-    turn_id: str = Field(min_length=1, max_length=160)
-    planner_tier: Literal["fast"] = "fast"
-    activity: FastPlannerImmediateCommunicativeAct | None = None
-    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
-        default_factory=list,
-        max_length=3,
-    )
-    metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("commit_id", "turn_id", mode="before")
-    @classmethod
-    def normalize_identity(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+class FastPlannerInputNeed(BaseModel):
+    """Work-owned missing input and provenance; SC owns the question."""
 
-    @field_validator("metadata")
-    @classmethod
-    def reject_commit_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
-
-    @model_validator(mode="after")
-    def validate_presentation_boundary(self) -> "PresentationCommit":
-        if self.activity is None and self.auxiliary_activities:
-            raise ValueError("a silent PresentationCommit cannot carry auxiliary Activities")
-        if self.activity is None:
-            return self
-        auxiliary_ids = [item.auxiliary_activity_id for item in self.auxiliary_activities]
-        if len(auxiliary_ids) != len(set(auxiliary_ids)):
-            raise ValueError("PresentationCommit auxiliary Activity IDs must be unique")
-        for auxiliary in self.auxiliary_activities:
-            if auxiliary.anchor_kind != "communicative_act":
-                raise ValueError(
-                    "PresentationCommit auxiliary Activities must anchor to its "
-                    "communicative Activity"
-                )
-            if auxiliary.anchor_id != self.activity.activity_id:
-                raise ValueError(
-                    "PresentationCommit auxiliary Activity references an unknown primary Activity"
-                )
-        return self
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["clarification"]
+    activity_id: str = Field(min_length=1, max_length=160)
+    source_responsibility_refs: list[str] = Field(min_length=1)
+    timing: PlanTiming = "parallel"
+    information_gaps: list[PlannerInformationGap] = Field(min_length=1, max_length=8)
 
 
 FastPlannerActivity = Annotated[
-    Union[
-        FastPlannerCompleteResponseAct,
-        FastPlannerProgressAct,
-        FastPlannerClarificationAct,
-        FastPlannerCapabilityActivity,
-    ],
+    Union[FastPlannerResponseNeed, FastPlannerInputNeed, FastPlannerCapabilityActivity],
     Field(discriminator="role"),
 ]
 
@@ -615,10 +594,6 @@ class FastPlannerAdvance(BaseModel):
     coverage: PlanCoverage
     covered_responsibility_refs: list[str] = Field(default_factory=list)
     activities: list[FastPlannerActivity] = Field(default_factory=list, max_length=24)
-    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
-        default_factory=list,
-        max_length=3,
-    )
     continuations: list[FastPlannerContinuation] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     unresolved: list[str] = Field(default_factory=list)
@@ -678,41 +653,6 @@ class FastPlannerAdvance(BaseModel):
         activity_ids = [item.activity_id for item in self.activities]
         if len(activity_ids) != len(set(activity_ids)):
             raise ValueError("Fast Planner Activity IDs must be unique")
-        auxiliary_ids = [item.auxiliary_activity_id for item in self.auxiliary_activities]
-        if len(auxiliary_ids) != len(set(auxiliary_ids)):
-            raise ValueError("Fast Planner auxiliary Activity IDs must be unique")
-        if self.disposition == "escalate" and self.auxiliary_activities:
-            raise ValueError("an escalating Fast Planner result cannot author auxiliary Activities")
-        activity_id_set = set(activity_ids)
-        capability_activity_ids = {
-            item.activity_id
-            for item in self.activities
-            if isinstance(item, FastPlannerCapabilityActivity)
-        }
-        primary_capability_ids = {
-            item.capability_id
-            for item in self.activities
-            if isinstance(item, FastPlannerCapabilityActivity)
-        }
-        for auxiliary in self.auxiliary_activities:
-            if auxiliary.anchor_id not in activity_id_set:
-                raise ValueError(
-                    "Fast Planner auxiliary Activity references an unknown primary Activity"
-                )
-            expected_kind = (
-                "plan_step"
-                if auxiliary.anchor_id in capability_activity_ids
-                else "communicative_act"
-            )
-            if auxiliary.anchor_kind != expected_kind:
-                raise ValueError(
-                    "Fast Planner auxiliary Activity anchor_kind does not match its "
-                    "primary Activity"
-                )
-            if auxiliary.capability_id in primary_capability_ids:
-                raise ValueError(
-                    "an auxiliary Activity cannot duplicate a primary Capability Activity"
-                )
         for activity in self.activities:
             unknown = set(activity.source_responsibility_refs) - set(
                 self.covered_responsibility_refs
@@ -755,10 +695,6 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     activities: list[FastPlannerActivity]
     # Python callers may omit the empty list in deterministic fixtures. The
     # model-facing JSON schema still requires the primary Planner to emit it.
-    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
-        default_factory=list,
-        max_length=3,
-    )
     continuations: list[FastPlannerContinuation]
     confidence: float = Field(ge=0.0, le=1.0)
     unresolved: list[str]
@@ -775,19 +711,6 @@ class FastPlannerAdvanceModelOutput(BaseModel):
         return normalize_whitespace(value)
 
 
-class FastPlannerStreamingModelOutput(BaseModel):
-    """One model-authored Fast result with an early ordered presentation value.
-
-    JSON object member order is part of this transport contract even though it
-    is not ordinary JSON semantics: ``presentation_commit`` must be emitted and
-    validated before ``terminal_result`` begins. The Agent rejects a stream that
-    does not preserve that order.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    presentation_commit: FastPlannerPresentationCommitModelOutput
-    terminal_result: FastPlannerAdvanceModelOutput
 
 
 class FastPlannerStreamTerminal(BaseModel):
@@ -798,10 +721,9 @@ class FastPlannerStreamTerminal(BaseModel):
     frame_type: Literal["terminal"] = "terminal"
     schema_version: int = Field(default=1, ge=1)
     turn_id: str = Field(min_length=1, max_length=160)
-    presentation_commit_id: str = Field(min_length=1, max_length=160)
     advance: FastPlannerAdvance
 
-    @field_validator("turn_id", "presentation_commit_id", mode="before")
+    @field_validator("turn_id", mode="before")
     @classmethod
     def normalize_terminal_identity(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -851,7 +773,6 @@ class FastPlannerStreamFailure(BaseModel):
 
 FastPlannerStreamFrame = Annotated[
     Union[
-        PresentationCommit,
         FastPlannerStreamTerminal,
         FastPlannerStreamFailure,
     ],
@@ -1189,6 +1110,7 @@ class CanonicalPlan(BaseModel):
     goal_ids: list[str] = Field(default_factory=list)
     goal_summary: str = ""
     response_text: str = ""
+    communication_needs: list[SocialCommunicationNeed] = Field(default_factory=list, max_length=32)
     communicative_acts: list[PlannedCommunicativeAct] = Field(
         default_factory=list,
         max_length=24,
@@ -1350,6 +1272,7 @@ class CanonicalPlan(BaseModel):
                 raise ValueError("mixed plan without steps cannot authorize or schedule Work")
         if self.disposition == "respond" and not (
             self.response_text
+            or any(need.kind == "answer" for need in self.communication_needs)
             or any(item.role == "complete_response" for item in self.communicative_acts)
         ):
             raise ValueError(
@@ -1374,6 +1297,21 @@ class CanonicalPlan(BaseModel):
             raise ValueError("executable plans cannot retain blocking parameter resolutions")
 
         goal_id_set = set(self.goal_ids)
+        need_ids = [need.need_id for need in self.communication_needs]
+        if len(need_ids) != len(set(need_ids)):
+            raise ValueError("canonical communication needs must have unique identities")
+        for need in self.communication_needs:
+            if need.owner not in {"planner", "runtime"} or (need.owner == "runtime" and need.kind != "confirmation") or need.reference_id != self.plan_id:
+                raise ValueError("canonical communication need must bind its exact Planner decision")
+            positions = {step.step_id: index for index, step in enumerate(self.steps)}
+            if set(need.before_step_ids + need.after_step_ids) - set(positions):
+                raise ValueError("communication order references an unknown Work step")
+            if need.before_step_ids and need.after_step_ids and max(positions[key] for key in need.after_step_ids) >= min(positions[key] for key in need.before_step_ids):
+                raise ValueError("communication order contradicts Work step order")
+            if not need.source_goal_ids or not set(need.source_goal_ids).issubset(goal_id_set):
+                raise ValueError("canonical communication need requires exact known Goal scope")
+        if self.disposition == "escalate" and self.communication_needs:
+            raise ValueError("an unresolved Planner decision cannot commit communication needs")
         condition_ids = [item.condition_id for item in self.time_conditions]
         if len(condition_ids) != len(set(condition_ids)):
             raise ValueError("time condition IDs must be unique")
@@ -1496,6 +1434,8 @@ class CanonicalPlan(BaseModel):
             for outcome in self.goal_outcomes:
                 if outcome.disposition == "respond" and not (
                     outcome.response_text
+                    or any(need.kind == "answer" and outcome.goal_id in need.source_goal_ids
+                           for need in self.communication_needs)
                     or any(
                         act.role == "complete_response" and outcome.goal_id in act.source_goal_ids
                         for act in self.communicative_acts

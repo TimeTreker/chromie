@@ -257,19 +257,19 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
                     model = SequencedOllama([raw])
                     asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
                     packet = str(model.prompts[0][0])
-                    projected, _ = json.JSONDecoder().raw_decode(packet.split("Recent prior dialogue JSON:\n", 1)[1])
-                    self.assertEqual(projected, [{**entry, "metadata": {"source": entry["metadata"]["source"]}}])
+                    projected, _ = json.JSONDecoder().raw_decode(packet.split("Trusted Work planning facts JSON:\n", 1)[1])
+                    self.assertEqual(projected["Prior dialogue"], [{**entry, "metadata": {"source": entry["metadata"]["source"]}}])
                     self.assertNotIn("obsolete_private_lane", packet)
                     self.assertNotIn("shadow_context_history", packet)
                     self.assertEqual(len(model.prompts), 1)
 
     def test_deep_prior_dialogue_does_not_silently_truncate_required_text(self):
         run_request, raw = self.speech_outcomes("unavailable")
-        run_request = run_request.model_copy(update={"history": [{"role": "assistant", "text": "x" * 6500}]})
+        run_request = run_request.model_copy(update={"history": [{"role": "assistant", "text": "x" * 32000}]})
         model = SequencedOllama([raw])
         plan = asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
         self.assertEqual(len(model.prompts), 0)
-        self.assertIn("Deep Planner prior dialogue exceeds", plan.metadata["error"])
+        self.assertIn("deep Planner complete Work facts exceeds", plan.metadata["error"])
         self.assertEqual(plan.steps, [])
 
     def test_all_planner_packets_preserve_authoritative_unresolved_meaning(self):
@@ -320,13 +320,11 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
             "disposition": "mixed" if sibling and not fulfilled else disposition,
             "coverage": "complete" if sibling or fulfilled else "partial",
             "confidence": 1.0, "goal_summary": "Preserve independent speech outcomes.",
-            "response_text": texts[disposition] + (" Goodnight." if sibling else ""),
-            "steps": [], "auxiliary_activities": [], "escalation_reason": "",
+            "steps": [], "escalation_reason": "",
             "unresolved": [], "parameter_resolutions": [], "time_conditions": [],
             "goal_outcomes": {
                 gid: {"disposition": value, "coverage": "complete" if value == "respond" else "partial",
-                      "response_text": texts[disposition] if index == 0 else "Goodnight.",
-                      "unresolved": [], "step_ids": [], "satisfaction": satisfaction([gid], value == "respond"),
+                      "unresolved": ["Source sentence is ambiguous."] if value == "clarify" else [], "step_ids": [], "satisfaction": satisfaction([gid], value == "respond"),
                       "rationale": "Preserve this Goal's outcome."}
                 for index, (gid, value) in enumerate(zip(ids, dispositions))
             },
@@ -335,7 +333,8 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
         run_request = request("Say the sentence, then say goodnight.", goal_ids=ids)
         for goal in run_request.context["goal_association_resolution"]["new_goals"]:
             goal["metadata"] = {"output_mode": "speech"}
-        return run_request, raw
+        from tests.cognitive_work_test_support import word_free_model_fixture
+        return run_request, word_free_model_fixture(raw)
 
     def test_deep_speech_limitations_survive_schema_host_and_materialization(self):
         for disposition in ("respond", "clarify", "unavailable", "refused"):
@@ -478,13 +477,11 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": "Answer from trusted terminal Evidence.",
-            "response_text": "The current state is available.",
             "steps": [],
             "goal_outcomes": {
                 "goal-info": {
                     "disposition": "respond",
                     "coverage": "complete",
-                    "response_text": "The current state is available.",
                     "step_ids": [],
                 }
             },
@@ -499,39 +496,18 @@ class DeepPlannerResolverTests(unittest.TestCase):
         plan = asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(plan.disposition, "respond")
-        self.assertEqual(plan.response_text, "The current state is available.")
+        self.assertEqual([(need.kind, need.source_goal_ids) for need in plan.communication_needs], [("answer", ["goal-info"])])
         self.assertEqual(len(ollama.prompts), 1)
         prompt = str(ollama.prompts[0][0])
-        self.assertIn(
-            "trusted terminal-Evidence Planner re-entry, not a new user turn",
-            prompt,
-        )
-        self.assertIn(
-            "A source-Plan step reported completed is prior Work",
-            prompt,
-        )
-        self.assertIn("FINAL TRUSTED EXECUTION OUTCOME JSON", prompt)
-        self.assertIn(
-            "describe that exact source-Plan effect as completed",
-            prompt,
-        )
-        self.assertIn("never describe it as future, starting, or ongoing", prompt)
-        self.assertIn(
-            "failed safe-read request is still-open recovery Work",
-            prompt,
-        )
-        self.assertIn(
-            "no later model will audit or repair its semantics", planner_prompt.deep_system_prompt()
-        )
+        self.assertIn('Host-bound terminal Evidence JSON', prompt)
         schema = ollama.prompts[0][1]["response_format"]
         self.assertIn("respond", schema["properties"]["disposition"].get("enum", []))
-        self.assertGreater(schema["properties"]["steps"].get("maxItems", 0), 0)
+        self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
 
     def test_deep_primary_contract_owns_terminal_response_truth(self):
         prompt = planner_prompt.deep_system_prompt()
 
-        self.assertIn("exact response truth", prompt)
-        self.assertIn("no later model will audit or repair its semantics", prompt)
+        self.assertIn('Social Cognition owns interaction decisions and exact words', prompt)
 
     def test_canonical_body_goal_is_planned_from_goal_state(self):
         raw = {
@@ -539,7 +515,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 0.96,
             "goal_summary": "Blink twice.",
-            "response_text": "",
             "steps": [
                 {
                     "step_id": "blink",
@@ -554,7 +529,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["blink"],
                     "satisfaction": {
@@ -603,9 +577,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": "Walk forward for fifteen seconds.",
-            "response_text": "I did it.",
             "steps": [],
-            "goal_outcomes": {'goal-walk': {'disposition': 'respond', 'coverage': 'complete', 'response_text': 'I did it.', 'step_ids': [], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-walk'], 'unmet_goal_ids': [], 'unmet_requirements': [], 'rationale': 'Incorrectly declares the physical Goal complete.'}}},
+            "goal_outcomes": {'goal-walk': {'disposition': 'respond', 'coverage': 'complete', 'step_ids': [], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-walk'], 'unmet_goal_ids': [], 'unmet_requirements': [], 'rationale': 'Incorrectly declares the physical Goal complete.'}}},
             "goal_satisfaction": {
                 "score": 1.0,
                 "status": "exact",
@@ -670,7 +643,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": reason,
-            "response_text": "",
             "steps": [
                 {
                     "step_id": "walk",
@@ -688,7 +660,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 goal_id: {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["walk"],
                     "satisfaction": satisfaction,
@@ -754,7 +725,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": reason,
-            "response_text": "",
             "steps": [
                 {
                     "step_id": "acquire",
@@ -780,7 +750,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 goal_id: {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["acquire", "deliver"],
                     "satisfaction": satisfaction,
@@ -877,18 +846,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
         catalog_section = prompt.split(
             "Executable capability catalog JSON:\n",
             1,
-        )[1].split("Verified tool-memory index JSON", 1)[0]
+        )[1].split("Trusted Work planning facts JSON", 1)[0]
         self.assertIn("soridormi.walk_forward", catalog_section)
         self.assertLess(catalog_section.index("rare.capability_0"), catalog_section.index("soridormi.walk_forward"))
         self.assertNotIn("args has unknown fields", prompt)
-        self.assertIn(
-            "Response text is audible language, never a stage direction",
-            prompt,
-        )
-        self.assertIn(
-            "must not narrate, role-play, or claim another executable Goal's action",
-            prompt,
-        )
         self.assertIn("rare.capability_0", catalog_section)
 
     def test_compact_catalog_keeps_terminal_numeric_capability_visible(self):
@@ -961,7 +922,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         catalog_section = prompt.split(
             "Executable capability catalog JSON:\n",
             1,
-        )[1].split("Verified tool-memory index JSON", 1)[0]
+        )[1].split("Trusted Work planning facts JSON", 1)[0]
 
         self.assertLessEqual(len(catalog_section.strip()), 12003)
         self.assertIn("soridormi.walk_velocity", catalog_section)
@@ -986,19 +947,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             layered.render().count("Executable capability catalog JSON:\n"),
             1,
         )
-        self.assertIn("score at least 0.83 and below 0.95", str(layered))
-        self.assertIn(
-            "do not call retry unsafe unless trusted Evidence separately establishes a safety reason",
-            str(layered),
-        )
-        self.assertIn(
-            "the cancelled original effect Goal remains unsatisfied",
-            str(layered),
-        )
-        self.assertIn(
-            "An unavailable composite Capability does not make its available component Capabilities unavailable",
-            str(layered),
-        )
+        self.assertEqual(json.JSONDecoder().raw_decode(str(layered).split("Trusted Work planning facts JSON:\n", 1)[1])[0]["minimum_goal_satisfaction"], 0.83)
 
     def test_clear_goal_without_matching_capability_is_unavailable_not_clarify(self):
         planner_request = request("Find a restaurant that is open now near People's Square.")
@@ -1012,19 +961,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             expected_goal_ids=["goal-action"],
         )
 
-        self.assertIn(
-            "Clarification is only for ambiguous user meaning or missing material information that the user can supply",
-            prompt,
-        )
-        self.assertIn(
-            "no exact available capability covers the required outcome, return unavailable",
-            prompt,
-        )
-        self.assertIn("Required response language: zh-CN", prompt)
-        self.assertIn(
-            "Do not switch languages merely because internal Goals",
-            prompt,
-        )
+        self.assertIn('"language":"zh-CN"', prompt)
         self.assertIn("ledger-deep-marker", prompt)
 
     def test_deep_decoder_requires_explicit_step_timing(self):
@@ -1083,7 +1020,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk"
@@ -1103,7 +1039,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": "Walk safely after user approval.",
-            "response_text": "I cannot verify overlap safety; may I walk first?",
             "steps": [
                 {
                     "step_id": "walk",
@@ -1166,7 +1101,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk"
@@ -1237,7 +1171,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-song": {
                     "disposition": "respond",
                     "coverage": "complete",
-                    "response_text": "啦啦啦。",
                     "step_ids": [],
                 },
             },
@@ -1261,9 +1194,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
     def test_deep_primary_contract_owns_coverage_and_confirmation(self):
         prompt = planner_prompt.deep_system_prompt()
 
-        self.assertIn("complete per-Goal coverage", prompt)
-        self.assertIn("exact response truth", prompt)
-        self.assertIn("no later model will audit or repair its semantics", prompt)
+        self.assertIn('authoritative Goals', prompt)
+        self.assertIn('Social Cognition owns interaction decisions and exact words', prompt)
 
     def test_semantic_primary_plan_has_one_model_call_budget(self):
         goal_ids = ["goal-walk", "goal-sing"]
@@ -1301,7 +1233,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk while singing.",
-                "response_text": "I can walk, but I can't sing right now.",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -1319,7 +1250,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal-walk": {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["walk"],
                         "satisfaction": {
@@ -1335,7 +1265,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal-sing": {
                         "disposition": "unavailable",
                         "coverage": "partial",
-                        "response_text": "",
                         "unresolved": ["singing provider unavailable"],
                         "step_ids": [],
                         "satisfaction": {
@@ -1367,9 +1296,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "mixed")
-        self.assertIn(
-            "no later model will audit or repair its semantics", planner_prompt.deep_system_prompt()
-        )
 
     def test_full_catalog_exact_plan(self):
         raw = {
@@ -1377,7 +1303,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk",
@@ -1430,7 +1355,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk"
@@ -1492,13 +1416,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "execute")
-        self.assertIn(
-            "Optional coordinated social expression may appear only in auxiliary_activities",
-            ollama.prompts[0][0],
-        )
-        self.assertIn(
-            "no later model will audit or repair its semantics", planner_prompt.deep_system_prompt()
-        )
 
     def test_invalid_first_plan_is_revised_once_in_same_tier(self):
         invalid = {
@@ -1522,7 +1439,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "blink"
@@ -1565,7 +1481,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk"
@@ -1625,7 +1540,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk"
@@ -1681,7 +1595,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "walk",
@@ -1842,7 +1755,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "disposition": "respond",
                     "coverage": "complete",
                     "step_ids": [],
-                    "response_text": "Why did the robot nap? It needed to recharge.",
                     "satisfaction": {"score": 1.0, "status": "exact"},
                 },
             },
@@ -1859,10 +1771,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "mixed")
         self.assertEqual(plan.goal_outcomes[1].disposition, "respond")
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(
-            plan.goal_outcomes[1].response_text,
-            "Why did the robot nap? It needed to recharge.",
-        )
+        self.assertEqual(plan.goal_outcomes[1].response_text, '')
 
     def test_vocal_compound_primary_result_preserves_body_execution_and_unavailability(self):
         goal_ids = ["goal-walk", "goal-sing", "goal-blink"]
@@ -1929,7 +1838,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "confidence": 0.95,
             "goal_summary": "Walk, sing, and blink together.",
-            "response_text": "",
             "steps": steps,
             "escalation_reason": "",
             "unresolved": ["singing provider unavailable"],
@@ -1937,7 +1845,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "goal_outcomes": {
                 "goal-walk": {
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["walk"],
                     "satisfaction": None,
@@ -1945,7 +1852,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 },
                 "goal-sing": {
                     "coverage": "partial",
-                    "response_text": "",
                     "unresolved": ["singing provider unavailable"],
                     "step_ids": [],
                     "satisfaction": None,
@@ -1953,7 +1859,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 },
                 "goal-blink": {
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["blink"],
                     "satisfaction": None,
@@ -1985,7 +1890,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
         repaired = {
             **invalid,
             "confidence": 1.0,
-            "response_text": "I can walk and blink, but I can't sing right now.",
             "parameter_resolutions": [
                 {
                     "step_id": "walk",
@@ -2002,7 +1906,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-walk": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["walk"],
                     "satisfaction": exact("goal-walk"),
@@ -2011,7 +1914,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-sing": {
                     "disposition": "unavailable",
                     "coverage": "partial",
-                    "response_text": "",
                     "unresolved": ["singing provider unavailable"],
                     "step_ids": [],
                     "satisfaction": {
@@ -2027,7 +1929,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-blink": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["blink"],
                     "satisfaction": exact("goal-blink"),
@@ -2061,22 +1962,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.goal_satisfaction.status, "partial")
         self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, ["goal-sing"])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn(
-            "An unavailable provider-backed vocal mode remains wholly unavailable",
-            ollama.prompts[0][0],
-        )
-        self.assertIn(
-            "without promising a substitute effect",
-            ollama.prompts[0][0],
-        )
-        self.assertIn(
-            "Complete plan coverage means every Goal has an explicit outcome",
-            ollama.prompts[0][0],
-        )
-        self.assertNotIn(
-            "unavailable and refused goal outcomes must not reference steps",
-            ollama.prompts[0][0],
-        )
+        self.assertIn('playing a recording is not singing', ollama.prompts[0][0])
         schema = ollama.prompts[0][1]["response_format"]
         vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-sing"]
         walk_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-walk"]
@@ -2092,10 +1978,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             vocal_outcome["properties"]["disposition"]["enum"],
             ["clarify", "unavailable", "refused"],
         )
-        self.assertEqual(
-            vocal_outcome["properties"]["response_text"]["maxLength"],
-            800,
-        )
         step_branches = schema["$defs"]["PlannerModelStep"]["oneOf"]
         self.assertTrue(step_branches)
         for branch in step_branches:
@@ -2103,19 +1985,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-sing",
                 branch["properties"]["source_goal_ids"]["items"]["enum"],
             )
-        self.assertIn(
-            "cannot be performed with the available capabilities",
-            vocal_outcome["properties"]["response_text"]["description"],
-        )
-        self.assertIn(
-            "Never claim or promise",
-            vocal_outcome["properties"]["response_text"]["description"],
-        )
         self.assertEqual(
             vocal_outcome["properties"]["step_ids"]["maxItems"],
             0,
         )
-        self.assertEqual(schema["properties"]["response_text"]["maxLength"], 800)
 
     def test_mixed_primary_result_uses_required_goal_outcome_schema(self):
         goal_ids = ["goal-blink", "goal-joke"]
@@ -2149,7 +2022,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-joke": {
                     "disposition": "respond",
                     "coverage": "complete",
-                    "response_text": "Why did the robot take a break? It needed to recharge.",
                     "step_ids": [],
                     "satisfaction": {"score": 1.0, "status": "exact"},
                 },
@@ -2187,14 +2059,13 @@ class DeepPlannerResolverTests(unittest.TestCase):
         outcome = schema["$defs"]["PlannerModelGoalOutcome"]
         self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])
 
-    def test_deep_adapter_preserves_execute_response_text_for_later_delta_review(self):
+    def test_deep_adapter_materializes_work_without_communication_barrier(self):
         model_output = validate_planner_model_output(
             {
                 "disposition": "execute",
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk forward for 15 seconds.",
-                "response_text": "好，我可以先做这个动作。",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -2208,7 +2079,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal-action": {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "好，我可以先做这个动作。",
                         "step_ids": ["walk"],
                     }
                 },
@@ -2232,23 +2102,19 @@ class DeepPlannerResolverTests(unittest.TestCase):
             expected_goal_ids_for_turn=["goal-action"],
         )
 
-        self.assertEqual(normalized["response_text"], "好，我可以先做这个动作。")
-        self.assertEqual(
-            normalized["goal_outcomes"][0]["response_text"],
-            "好，我可以先做这个动作。",
-        )
+        self.assertNotIn("response_text", normalized)
+        self.assertEqual(normalized["communication_needs"], [])
         self.assertEqual(
             normalized["steps"][0]["capability_id"],
             "soridormi.walk_forward",
         )
 
-    def test_model_outcome_accepts_execute_response_text_before_materialization(self):
+    def test_model_outcome_contains_work_without_utterance_before_materialization(self):
         output = validate_planner_model_output(
             {
                 "disposition": "execute",
                 "coverage": "complete",
                 "confidence": 0.95,
-                "response_text": "Hello!",
                 "steps": [
                     {
                         "step_id": "blink",
@@ -2262,7 +2128,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "goal-greet": {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "Hello!",
                         "unresolved": [],
                         "step_ids": ["blink"],
                         "satisfaction": {
@@ -2290,8 +2155,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
             planner_tier="deep",
             expected_goal_ids_for_turn=["goal-greet"],
         )
-        self.assertEqual(output.response_text, "Hello!")
-        self.assertEqual(output.goal_outcomes["goal-greet"].response_text, "Hello!")
+        self.assertNotIn("response_text", output.model_dump())
+        self.assertEqual(output.goal_outcomes["goal-greet"].step_ids, ["blink"])
 
     def test_goal_outcome_schema_uses_exact_unique_goal_key_map(self):
         schema = planner_schema.deep_plan_response_schema(["goal-look", "goal-blink"])
@@ -2332,8 +2197,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             {
                 "disposition",
                 "coverage",
-                "response_text",
-                "unresolved",
+                    "unresolved",
                 "step_ids",
                 "satisfaction",
                 "rationale",
@@ -2341,7 +2205,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         for goal_id in ("goal-look", "goal-blink"):
             outcome = outcomes["properties"][goal_id]
-            self.assertNotIn("oneOf", outcome)
+            branches = {item["properties"]["disposition"]["enum"][0]: item
+                        for item in outcome["oneOf"]}
+            self.assertEqual(branches["execute"]["properties"]["step_ids"]["minItems"], 1)
+            self.assertEqual(branches["respond"]["properties"]["step_ids"]["maxItems"], 0)
             self.assertEqual(
                 outcome["properties"]["disposition"]["enum"],
                 [
@@ -2357,8 +2224,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 {
                     "disposition",
                     "coverage",
-                    "response_text",
-                    "unresolved",
+                            "unresolved",
                     "step_ids",
                     "satisfaction",
                     "rationale",
@@ -2546,7 +2412,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "disposition": "respond",
                     "coverage": "complete",
                     "step_ids": [],
-                    "response_text": "Why don't robots panic? They keep their cache.",
                     "satisfaction": outcome_satisfaction("goal-joke"),
                 },
             },
@@ -2570,7 +2435,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             ["execute", "respond"],
         )
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("Generic speech transport is never an executable", ollama.prompts[0][0])
         skill_enum = ollama.prompts[0][1]["response_format"]["$defs"]["PlannerModelStep"][
             "properties"
         ]["capability_id"]["enum"]
@@ -2610,7 +2474,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-joke": {
                     "disposition": "respond",
                     "coverage": "complete",
-                    "response_text": "Why did the robot cross the road? To recharge its batteries.",
                     "metadata": {"step_ids": []},
                     "satisfaction": satisfaction("goal-joke"),
                 },
@@ -2645,7 +2508,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                     "disposition": "respond",
                     "coverage": "complete",
                     "step_ids": [],
-                    "response_text": "Why did the robot cross the road? To recharge its batteries.",
                     "satisfaction": satisfaction("goal-joke"),
                 },
             },
@@ -2665,7 +2527,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual([outcome.goal_id for outcome in plan.goal_outcomes], goal_ids)
         self.assertEqual([step.step_id for step in plan.steps], ["step_blink"])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("Keep the plan minimal", ollama.prompts[0][0])
+        self.assertIn('Compose at most four exact steps', ollama.prompts[0][0])
 
     def test_per_goal_satisfaction_cannot_claim_another_goal(self):
         goal_ids = ["goal-blink", "goal-joke"]
@@ -2696,7 +2558,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-joke": {
                     "disposition": "respond",
                     "coverage": "complete",
-                    "response_text": "A short joke.",
                     "satisfaction": {
                         "score": 1.0,
                         "status": "exact",
@@ -2839,7 +2700,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.goal_satisfaction.status, "exact")
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("prospective plan adequacy", ollama.prompts[0][0])
+        self.assertIn('Satisfaction measures prospective Goal fulfillment', ollama.prompts[0][0])
 
     def test_typed_material_alternative_is_host_materialized_for_confirmation(self):
         raw = {
@@ -2847,7 +2708,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "blink"
@@ -2866,7 +2726,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "disposition": "execute",
             "coverage": "complete",
             "confidence": 0.96,
-            "response_text": "I can do the safe adjusted version. Shall I proceed?",
             "steps": [
                 {
                     "step_id": "blink",
@@ -2921,7 +2780,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 expected_goal_ids_for_turn=["goal-action"],
             )
 
-    def test_material_alternative_without_explanation_is_rejected(self):
+    def test_material_alternative_without_goal_accounting_is_rejected(self):
         raw = {
             "disposition": "execute",
             "coverage": "complete",
@@ -2940,7 +2799,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "user_confirmation_required": True,
         }
 
-        with self.assertRaisesRegex(ValueError, "require response_text"):
+        with self.assertRaisesRegex(ValueError, "goal_outcomes keys must cover exactly"):
             validate_planner_model_output(
                 raw,
                 planner_tier="deep",
@@ -3060,7 +2919,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.goal_ids, ["goal-look"])
         self.assertEqual(len(plan.steps), 1)
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("Do not create goals for internal status checks", ollama.prompts[0][0])
 
     def test_transport_failure_does_not_consume_contract_retry(self):
         error = OllamaGenerationError(
@@ -3116,7 +2974,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": [
                         "blink"
@@ -3208,7 +3065,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-action": {
                     "disposition": "clarify",
                     "coverage": "partial",
-                    "response_text": "你希望我往前走多久？",
                     "unresolved": [
                         "walking duration"
                     ],
@@ -3230,7 +3086,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
             "coverage": "partial",
             "confidence": 0.84,
             "goal_summary": "walk forward",
-            "response_text": "你希望我往前走多久？",
             "steps": [],
             "unresolved": ["walking duration"],
         }
@@ -3256,8 +3111,8 @@ class DeepPlannerResolverTests(unittest.TestCase):
         asyncio.run(DeepPlannerResolver(ollama, FullCatalog()).resolve(request("看看门口。")))
         prompt = ollama.prompts[0][0]
         system = ollama.prompts[0][1]["system"]
-        self.assertIn("Deep planning is terminal", prompt)
-        self.assertIn("never call or return to the Fast Planner", system)
+        self.assertIn('This is the sole Deep decision', prompt)
+        self.assertIn("Return only", system)
 
     def test_mixed_plan_checks_executable_goal_not_global_average(self):
         raw = {
@@ -3289,7 +3144,6 @@ class DeepPlannerResolverTests(unittest.TestCase):
                 "goal-coffee": {
                     "disposition": "unavailable",
                     "coverage": "uncertain",
-                    "response_text": "Coffee preparation is unavailable.",
                     "satisfaction": {
                         "score": 0.0,
                         "status": "unsatisfied",

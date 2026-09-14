@@ -281,7 +281,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         capability_layer = "".join(prompt.capability_contract)
         self.assertIn("Owner-approved passive Agent Skill", capability_layer)
         self.assertIn("No trusted semantic target evidence", capability_layer)
-        self.assertIn("No auxiliary candidates; use []", capability_layer)
+        self.assertNotIn("auxiliary candidates", capability_layer)
         self.assertIn("Executable common capability catalog JSON", capability_layer)
 
 

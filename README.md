@@ -8,6 +8,16 @@ optional Soridormi-backed simulator or robot skills.
 The long-term goal and ownership boundaries are defined in the
 [Project Charter](docs/PROJECT_CHARTER.md).
 
+The owner-approved [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+treats communication with people as a primary cognitive responsibility with
+independent value. It separates ordinary communication from Planner's Work
+planning while preserving GI understanding, GA continuity and trusted execution.
+SC is integrated into ordinary turns, required communication, result re-entry and
+trusted Situation wakes. Work Planner returns tasks and communication Needs;
+SC returns grounded interaction or silence. See [current evidence](docs/STATUS.md#social-cognition-migration)
+and the [shared lifecycle](docs/COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle).
+
+
 Chromie can retain correlated traces, events, resource samples, and reviewed
 experience artifacts. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md).
@@ -35,7 +45,7 @@ experience artifacts. See
 > decision while independent sibling Work is still running. Newly planned Work
 > returns through the same trusted asynchronous Runtime; confirmation, privacy,
 > safety, resource and provider contracts remain authoritative, and an internal
-> event is never user consent. Planner-owned Social Attention remains optional
+> event is never user consent. SC-owned social expression remains optional
 > body-only decoration in the same primary Plan as a concrete Main Activity and never delays or
 > completes the primary Responsibility. Current implementation and qualification
 > evidence are tracked separately in [Status](docs/STATUS.md).
@@ -51,7 +61,7 @@ experience artifacts. See
 > by planning from exact registered semantic scope. See
 > [Resource Acquisition and Delivery](docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
 > Chromie has two execution lanes beneath the one Cognitive Core: Vocal and
-> Activity. Social Attention is a Planner-owned behavior domain, not a
+> Activity. Social Attention is an SC-used behavior domain, not a
 > third lane or second cognitive stage; accepted decoration executes through Activity with no Goal-completion
 > authority. Soridormi remains a peer Capability Provider beneath Activity and
 > owns its subtle-expression, locomotion/whole-body, and safety arbitration. See
@@ -67,7 +77,7 @@ experience artifacts. See
 · [Open the detailed architecture reference](docs/assets/chromie-event-driven-cognition-flow-light.svg)
 
 <details>
-<summary>Text fallback: canonical ownership path</summary>
+<summary>Text fallback: current implementation before Social Cognition migration</summary>
 
 ```text
 Person / World
@@ -117,7 +127,7 @@ Protective Reflex stays deterministic and may stop/cancel without model wait.
 
 </details>
 
-The overview and text fallback above show the same canonical ownership path. The
+The overview and text fallback above show the same current implementation path. The
 detailed reference expands the Runtime-event, Work-state, Host-validation, Evidence,
 safety, and Planner re-entry boundaries without adding another semantic authority. The
 complementary

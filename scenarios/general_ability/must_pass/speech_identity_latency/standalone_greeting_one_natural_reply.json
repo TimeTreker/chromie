@@ -58,23 +58,23 @@
   "language": "zh-CN",
   "expect_no_capabilities": true,
   "require_speech": true,
-  "require_fast_communicative_act": true,
+  "require_social_communicative_act": true,
   "expect_no_fast_contract_failure": true,
   "min_new_goal_count": 1,
   "min_goal_outcome_count": 1,
-  "max_warm_gi_handoff_to_fast_commit_ms": 2000,
-  "max_warm_fast_commit_to_playback_start_ms": 3000,
+  "max_warm_sc_decision_ms": 2000,
+  "max_warm_sc_to_playback_start_ms": 3000,
   "description": "The originating greeting defect probes Planner-owned conversational response semantics and warm interaction latency.",
   "general_ability": {
     "memberships": [
       {
         "id": "speech_identity_latency",
         "title": "Speech Identity and Warm Response Latency",
-        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
-        "rationale": "A standalone greeting is the smallest complete conversational turn and must exercise the same Planner speech owner and latency contract as richer dialogue.",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Social Cognition commitment and playback scheduling stay within the declared interactive budgets.",
+        "rationale": "A standalone greeting is the smallest complete conversational turn and must exercise the same SC speech owner and latency contract as richer dialogue.",
         "root_cause_boundaries": [
           "Mind profile",
-          "Planner communication",
+          "Social Cognition",
           "Playback delivery",
           "Latency evidence"
         ]

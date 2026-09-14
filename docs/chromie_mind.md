@@ -48,8 +48,8 @@ Core -> communication and, when HOW exists, Planner Work
 
 The non-turn path does not fabricate a UserTurn, Responsibility, or Goal. The first
 Goal-free source slice is implemented: an exact trusted Situation revision may create a
-provenance-bound Goal-free `CognitiveOpportunity` and enter stateless same-Core situational
-cognition, which can only remain silent or author one low-commitment speech Activity.
+provenance-bound Goal-free `CognitiveOpportunity` and enter the shared SC
+transaction, which may remain silent or author grounded interaction without task Work.
 Concrete social/perception adapters and model/live qualification remain target work.
 
 The profile may shape interpretation, planning, language style, and optional Social
@@ -59,11 +59,11 @@ In particular:
 - Goal Interpretation owns provider-neutral Responsibility meaning only;
 - Goal Association owns canonical Goal identity and continuity;
 - Fast and Deep are cognition depths/passes of the same Planner HOW authority;
-- Planner owns ordinary Communicative Activities and their exact wording;
-- Social Attention may author only optional auxiliary expression and may choose none;
+- SC owns ordinary Communicative Acts and their exact wording;
+- SC may select optional Social Attention expression in the same result, or choose none;
 - Runtime/Providers own effect realization and lifecycle facts; and
-- trusted Evidence records what actually happened before Planner interprets what it means
-  for the person.
+- trusted Evidence records what actually happened before Planner revises Work and SC decides
+  what interaction is useful.
 
 A configured reflex policy is guidance/background context. Deterministic protective
 reflex authority still belongs to the Cognitive Gateway/Host safety boundary, not to the

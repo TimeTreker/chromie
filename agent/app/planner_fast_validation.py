@@ -236,8 +236,8 @@ def qualify_fast_canonical_plan(
         allowed.get(step.capability_id, {}).get("requires_confirmation", False)
         for step in plan.steps
     )
-    if requires_confirmation and not plan.response_text.strip():
-        return reject("confirmation_question_missing")
+    if requires_confirmation and not any(need.kind == "confirmation" for need in plan.communication_needs):
+        return reject("confirmation_need_missing")
     _, requires_execution = planner_goal_execution_requirements([
         goal for goal in authoritative_goals
         if goal.get("goal_id") not in (nonfulfilling_response_goal_ids or set())
@@ -384,12 +384,6 @@ def validate_fast_advance_output(
     responsibilities: list[CognitiveResponsibilityProposal],
     capabilities: list[dict[str, Any]],
 ) -> None:
-    for activity in output.activities:
-        if activity.role != "capability":
-            validate_communicative_activity_identity(
-                activity_id=activity.activity_id, text=activity.text,
-                interaction_context=request.context.get("interaction_context"),
-            )
     responsibility_refs = [item.local_ref for item in responsibilities]
     if set(output.covered_responsibility_refs) != set(responsibility_refs):
         raise PlannerDTOContractError(

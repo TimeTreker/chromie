@@ -116,6 +116,13 @@
           "goal-old-walk",
           "goal-old-blink"
         ]
+      },
+      "communication_needs": []
+    },
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
       }
     }
   },

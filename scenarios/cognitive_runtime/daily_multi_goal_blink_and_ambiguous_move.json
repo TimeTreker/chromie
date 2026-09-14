@@ -41,7 +41,8 @@
       "disposition": "escalate",
       "coverage": "uncertain",
       "confidence": 0.86,
-      "escalation_reason": "One independent goal is executable and the referential manipulation goal is unresolved."
+      "escalation_reason": "One independent goal is executable and the referential manipulation goal is unresolved.",
+      "communication_needs": []
     },
     "deep_plans": [
       {
@@ -93,7 +94,6 @@
             "goal_id": "goal-move",
             "disposition": "clarify",
             "coverage": "uncertain",
-            "response_text": "你想移动哪个东西，放到哪里？",
             "unresolved": [
               "object",
               "destination"
@@ -114,52 +114,26 @@
             "destination reference"
           ]
         },
-        "response_text": "",
-        "communicative_acts": [
+        "communication_needs": [
           {
-            "activity_id": "scenario-immediate",
-            "text": "你想移动哪个东西，放到哪里？",
-            "role": "clarification",
-            "timing": "parallel",
-            "delivery_phase": "immediate",
-            "speech_act": "ask_clarification",
+            "need_id": "need:f65c36e7230b6ab4ee27dfa743fc1e04d7f9ea9d6dbf11976efbb269aa11dd9f",
+            "owner": "planner",
+            "kind": "input",
             "source_goal_ids": [
               "goal-move"
             ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": [
-              {
-                "gap_id": "scenario-immediate-gap",
-                "description": "你想移动哪个东西，放到哪里？",
-                "blocking": true,
-                "required_for": [
-                  "goal-move"
-                ],
-                "preferred_resolution": "ask_user",
-                "owner": "fast_planner",
-                "source_kind": "execution_input",
-                "source_reference": "retained Level A parameter ambiguity",
-                "resolution_sources_considered": [
-                  "authoritative_context",
-                  "capability_schema"
-                ]
-              }
-            ]
-          },
-          {
-            "activity_id": "scenario-pre_action",
-            "text": "我可以先眨两下眼睛。",
-            "role": "complete_response",
-            "timing": "parallel",
-            "delivery_phase": "pre_action",
-            "speech_act": "inform",
-            "source_goal_ids": [
-              "goal-blink"
-            ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
+            "source_responsibility_refs": [],
+            "reference_id": "deep-blink-move",
+            "facts": {
+              "disposition": "clarify",
+              "unresolved": [
+                "object",
+                "destination"
+              ]
+            },
+            "delivery_phase": null,
+            "before_step_ids": [],
+            "after_step_ids": []
           }
         ]
       }
@@ -187,7 +161,44 @@
           "eye_expression"
         ]
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      },
+      "deep": {
+        "activities": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "你想移动哪个东西，放到哪里？",
+            "function": "ask",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-move"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          },
+          {
+            "activity_id": "scenario-pre_action",
+            "text": "我可以先眨两下眼睛。",
+            "function": "inform",
+            "delivery_phase": "pre_action",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-blink"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",

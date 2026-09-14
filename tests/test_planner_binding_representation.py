@@ -83,7 +83,6 @@ def _weather_output(
             "coverage": "complete",
             "confidence": 1.0,
             "goal_summary": "Look up tonight's Chongqing weather.",
-            "response_text": "",
             "steps": [
                 {
                     "step_id": "weather",
@@ -104,7 +103,6 @@ def _weather_output(
                 goal_id: {
                     "disposition": "execute",
                     "coverage": "complete",
-                    "response_text": "",
                     "unresolved": [],
                     "step_ids": ["weather"],
                     "satisfaction": _satisfaction(goal_id),
@@ -480,7 +478,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk at 0.2 for 10 seconds.",
-                "response_text": "",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -498,7 +495,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                     goal_id: {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["walk"],
                         "satisfaction": _satisfaction(goal_id),
@@ -541,7 +537,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk at 0.2 for 10 seconds.",
-                "response_text": "",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -567,7 +562,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                     goal_id: {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["walk"],
                         "satisfaction": _satisfaction(goal_id),
@@ -628,7 +622,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Bring the milk.",
-                "response_text": "",
                 "steps": [
                     {
                         "step_id": "fetch",
@@ -650,7 +643,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                     goal_id: {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["fetch"],
                         "satisfaction": _satisfaction(goal_id),
@@ -694,7 +686,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Walk at 0.2 for 10 seconds.",
-                "response_text": "",
                 "steps": [
                     {
                         "step_id": "walk",
@@ -747,7 +738,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                     goal_id: {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["walk"],
                         "satisfaction": _satisfaction(goal_id),
@@ -783,7 +773,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "goal_summary": "Blink twice.",
-                "response_text": "",
                 "steps": [
                     {
                         "step_id": "blink",
@@ -812,7 +801,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                     goal_id: {
                         "disposition": "execute",
                         "coverage": "complete",
-                        "response_text": "",
                         "unresolved": [],
                         "step_ids": ["blink"],
                         "satisfaction": _satisfaction(goal_id),
@@ -1270,3 +1258,35 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_communication_order_preserves_gi_relation_after_exact_ga_join():
+    from agent.app.planner_model_contract import PlannerModelOutput
+    from agent.app.planner_validation import validate_goal_responsibility_outcomes
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    import pytest
+    output = PlannerModelOutput.model_validate({
+        "disposition": "mixed", "coverage": "complete", "confidence": 1,
+        "goal_satisfaction": {"score": 1, "status": "exact", "satisfied_goal_ids": ["g-action", "g-answer"]},
+        "steps": [{"step_id": "motion", "capability_id": "soridormi.blink_eyes",
+                   "args": {"count": 2}, "timing": "sequential", "source_goal_ids": ["g-action"]}],
+        "goal_outcomes": {
+            "g-action": {"disposition": "execute", "coverage": "complete", "step_ids": ["motion"]},
+            "g-answer": {"disposition": "respond", "coverage": "complete", "follows_step_ids": ["motion"]},
+        },
+    })
+    context = {"goal_association_resolution": {"new_goals": [
+        {"goal_id": "g-action", "source_responsibility_refs": ["action"]},
+        {"goal_id": "g-answer", "source_responsibility_refs": ["answer"]},
+    ]}}
+    responsibilities = [CognitiveResponsibilityProposal(local_ref="answer", outcome="Speak after the action.",
+        output_mode="speech", confidence=1, bindings={"after": ["action"]})]
+    validate_goal_responsibility_outcomes(output, authoritative_goals=[], context=context,
+                                         responsibilities=responsibilities)
+    for before, after in ((["motion"], []), ([], [])):
+        bad = output.model_copy(deep=True)
+        bad.goal_outcomes["g-answer"].precedes_step_ids = before
+        bad.goal_outcomes["g-answer"].follows_step_ids = after
+        with pytest.raises(ValueError, match="omits or reverses"):
+            validate_goal_responsibility_outcomes(bad, authoritative_goals=[], context=context,
+                                                 responsibilities=responsibilities)

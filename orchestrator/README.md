@@ -1,5 +1,12 @@
 # Chromie Orchestrator
 
+[Social Cognition](../docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+plans interaction independently of Work. The Host supplies shared conversation,
+Goal/Work/Evidence and trusted Situation state, and owns privacy, exact joins,
+freshness, confirmation, cancellation and ordered delivery. It has no semantic
+wording authority. See the [lifecycle](../docs/COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle)
+and [current evidence](../docs/STATUS.md#social-cognition-migration).
+
 The Orchestrator is Chromie's host-side realtime runtime. It stays outside
 Docker because it owns microphone capture, VAD, utterance boundaries, speaker
 playback, barge-in, short-term conversation state, and Trusted Capability Runtime
@@ -86,7 +93,7 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
   -> exact plan/request/result/trace join -> per-Goal outcome/Evidence update
-  -> Goal-bound CognitiveOpportunity -> same Planner -> speech / follow-up Work / wait / silence
+  -> Goal-bound CognitiveOpportunity -> Planner Work/needs + SC interaction / wait / silence
   -> Goal-free trusted Situation -> CognitiveOpportunity -> same Core situational cognition
        -> silence or one low-commitment speech Activity; never Capability Work
   -> validated Core-authored speech -> TTS -> playback
@@ -148,13 +155,13 @@ semantic path.
 
 `orchestrator/runtime/observability_recording.py` owns fail-soft recording containment for Experience/Episode and Cognitive Evidence writes plus optional accelerator sample scheduling/task tracking/trace attachment; it is not a semantic owner and observability failure cannot alter Goal, Planner, speech, or execution truth.
 `orchestrator/runtime/shutdown_lifecycle.py` owns only final process teardown sequencing. It reuses the existing InputTurn/Playback/Session owners, closes concrete transports/resources, and may abandon unfinished session traces during process exit; it cannot interpret user intent, cancel Goals semantically, author speech, or fabricate completion Evidence.
-`orchestrator/runtime/confirmation.py` also owns the mechanical lifetime and fixed-reflex revocation/audit policy for request-bound confirmation tokens. Goal Association still interprets confirmation meaning, Planner still owns confirmation wording, and the Host/runtime still owns cancellation effects.
+`orchestrator/runtime/confirmation.py` also owns the mechanical lifetime and fixed-reflex revocation/audit policy for request-bound confirmation tokens. Goal Association still interprets confirmation meaning, SC owns confirmation wording, and the Host/runtime still owns cancellation effects.
 
 `orchestrator/runtime/planner_reentry.py` owns the pure mechanical policy used when
 terminal Runtime Evidence may reactivate Planner. It checks the exact current
 Goal/Plan/request binding, reuses only the originating GI Responsibility provenance,
 constructs an immutable typed scope for the exact affected Goal/Evidence/Plan set,
-rejects repeated completed Work, and leaves validated Planner speech intact. Related
+rejects repeated completed Work, and leaves validated SC speech intact. Related
 same-turn speech facts are read-only context and do not widen the re-entry scope.
 It does not decide whether Evidence is interesting, reinterpret a Goal, author a
 response, or execute Work. Missing Responsibility provenance retains the Evidence but
@@ -213,6 +220,14 @@ ORCH_AUDIO_INPUT_MODE=device
 ORCH_AUDIO_OUTPUT_MODE=device
 ```
 
+For a separate dialogue-only terminal, `./scripts/start_chromie.sh --text-console`
+launches the existing text Host runner under the normal startup environment and
+Orchestrator lock. The default `scripts/chromie_psm_live_text_console.py` invocation
+is a local client, not another Host. Diagnostics stay in the startup terminal;
+only recorded assistant dialogue crosses back to the client. This transport skips
+microphone/VAD/ASR and preserves `handle_routed_text(..., channel="text")` admission.
+See the [local text transport contract](../docs/API_REFERENCE.md#local-text-console).
+
 The alpha automatic runner can instead set:
 
 ```text
@@ -243,18 +258,13 @@ This generates runtime configuration, activates the selected Conda environment,
 checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
 duplicate processes, and starts the module from the repository root.
 
-The Orchestrator has a fast-first presentation path for Goal Progress
-Communication, but Goal Interpretation does not author that speech. Goal
-Interpretation emits provider-neutral Responsibility only. Fast Planner is the
-first HOW owner and may select one immediate Communicative Act while
-canonical Goal/Plan work continues. Pre-evidence progress is one typed
-Planner-owned Activity: Fast Planner selects its bounded `progress_kind`, exact
-wording, truth stage, and provenance. The Host rejects unverified-result claims
-but does not rewrite the sentence. Open answers and clarification acts follow
-the same ownership. Interaction Context,
-claim/evidence checks, cancellation, and playback lifecycle remain the
-deterministic delivery boundaries. Maintained turns do not fall back to the old
-retired Goal-Interpreter response, route, or intent contract.
+One complete GI result independently enables SC and GA/Work planning. SC may
+acknowledge understanding while Work proceeds, and may also interact from trusted
+state without a new GI. Work results establish scoped answer/input/confirmation
+needs; SC authors the corresponding acts. Host accepts only complete typed
+results, preserves explicit communication-to-Work order, and suppresses stale
+output. Raw tokens and partial JSON never reach playback or execution. Actual
+playback receipts, rather than authored text, establish heard dialogue.
 
 Manual development start:
 

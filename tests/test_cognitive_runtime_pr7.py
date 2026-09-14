@@ -11,7 +11,6 @@ from unittest import mock
 from pathlib import Path
 
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
-from agent.app.fast_planner import validate_presentation_commit_request_scope
 from agent.app.planner_model_contract import PlannerDTOContractError
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
@@ -42,13 +41,15 @@ from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
+    FastPlannerResponseNeed,
+    FastPlannerInputNeed,
+    SocialCommunicationNeed,
     FastPlannerCapabilityActivity,
     FastPlannerClarificationAct,
     FastPlannerCompleteResponseAct,
     FastPlannerProgressAct,
     FastPlannerStreamFailure,
     FastPlannerStreamTerminal,
-    PresentationCommit,
 )
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
@@ -146,21 +147,15 @@ class RecordingPlannerAdapter(CanonicalPlanRuntimeAdapter):
         super().__init__(runtime)
         self.planner_response_contexts: list[dict] = []
 
-    def build_fast_advance_response(self, **kwargs):
-        self.planner_response_contexts.append(dict(kwargs.get("context") or {}))
-        return super().build_fast_advance_response(**kwargs)
 
-    async def build_planner_owned_response(self, **kwargs):
+    async def build_social_cognition_response(self, **kwargs):
         self.planner_response_contexts.append(dict(kwargs.get("context") or {}))
-        return await super().build_planner_owned_response(**kwargs)
+        return await super().build_social_cognition_response(**kwargs)
 
 
 class FailingPlannerAdapter(CanonicalPlanRuntimeAdapter):
-    def build_fast_advance_response(self, **kwargs):
-        del kwargs
-        raise RuntimeError("planner activity validation unavailable")
 
-    async def build_planner_owned_response(self, **kwargs):
+    async def build_social_cognition_response(self, **kwargs):
         del kwargs
         raise RuntimeError("planner activity validation unavailable")
 
@@ -247,86 +242,13 @@ def _stream_advance_from_canonical_plan(
             )
         )
 
-    for act in plan.communicative_acts:
-        source_refs = list(act.source_responsibility_refs) or [
-            ref
-            for goal_id in act.source_goal_ids
-            for ref in refs_by_goal.get(goal_id, [])
-        ] or list(all_refs)
-        if act.role == "complete_response":
-            activities.append(
-                FastPlannerCompleteResponseAct(
-                    activity_id=act.activity_id,
-                    role="complete_response",
-                    text=act.text,
-                    timing=act.timing,
-                    speech_act=act.speech_act,
-                    source_responsibility_refs=source_refs,
-                    truth_stage=act.truth_stage,
-                    evidence_refs=list(act.evidence_refs),
-                )
-            )
-        elif act.role == "clarification":
-            activities.append(
-                FastPlannerClarificationAct(
-                    activity_id=act.activity_id,
-                    role="clarification",
-                    text=act.text,
-                    timing=act.timing,
-                    speech_act="ask_clarification",
-                    source_responsibility_refs=source_refs,
-                    truth_stage="context_grounded",
-                    information_gaps=list(act.information_gaps),
-                )
-            )
-        elif act.role == "progress":
-            activities.append(
-                FastPlannerProgressAct(
-                    activity_id=act.activity_id,
-                    role="progress",
-                    text=act.text,
-                    timing=act.timing,
-                    progress_kind=act.progress_kind or "think",
-                    source_responsibility_refs=source_refs,
-                )
-            )
-
-    for outcome in plan.goal_outcomes:
-        if outcome.disposition != "respond" or not outcome.response_text:
-            continue
-        source_refs = list(refs_by_goal.get(outcome.goal_id, [])) or list(all_refs)
-        if any(
-            item.role == "complete_response"
-            and set(item.source_responsibility_refs).intersection(source_refs)
-            for item in activities
-        ):
-            continue
-        activities.append(
-            FastPlannerCompleteResponseAct(
-                activity_id=f"fixture-response-{outcome.goal_id}",
-                role="complete_response",
-                text=outcome.response_text,
-                speech_act="respond",
-                source_responsibility_refs=source_refs,
-                truth_stage="context_grounded",
-            )
-        )
-
-    if (
-        plan.response_text
-        and plan.disposition in {"respond", "mixed"}
-        and not any(item.role == "complete_response" for item in activities)
-    ):
-        activities.append(
-            FastPlannerCompleteResponseAct(
-                activity_id="fixture-complete-response",
-                role="complete_response",
-                text=plan.response_text,
-                speech_act="respond",
-                source_responsibility_refs=list(all_refs),
-                truth_stage="context_grounded",
-            )
-        )
+    for need in plan.communication_needs:
+        refs = list(need.source_responsibility_refs) or [ref for goal_id in need.source_goal_ids for ref in refs_by_goal.get(goal_id, [])] or all_refs
+        if need.kind == "answer":
+            activities.append(FastPlannerResponseNeed(activity_id=need.need_id, role="complete_response",
+                source_responsibility_refs=refs, timing="sequential", rationale="The scripted Work fixture establishes an answer obligation."))
+        elif need.kind == "input":
+            raise ValueError("Script an explicit FastPlannerInputNeed with exact GI gap provenance for input cases.")
 
     return FastPlannerAdvance(
         turn_id="test-fast-advance",
@@ -360,6 +282,31 @@ def _stream_advance_from_canonical_plan(
     )
 
 
+def work_fixture(plan: CanonicalPlan) -> CanonicalPlan:
+    """Migrate a historical test scenario to a word-free Work decision.
+
+    ScriptedClient retains the scenario's words separately for the SC response.
+    Production code never performs this legacy fixture conversion.
+    """
+    data = plan.model_dump(mode="json")
+    needs = list(data["communication_needs"])
+    for goal_id in plan.goal_ids:
+        outcome = next((row for row in plan.goal_outcomes if row.goal_id == goal_id), None)
+        disposition = outcome.disposition if outcome is not None else plan.disposition
+        if disposition in {"respond", "clarify", "unavailable", "refused"} and not any(goal_id in need["source_goal_ids"] for need in needs):
+            needs.append(SocialCommunicationNeed(need_id=f"fixture:{plan.plan_id}:{goal_id}", owner="planner",
+                kind="answer" if disposition == "respond" else "input" if disposition == "clarify" else "result",
+                source_goal_ids=[goal_id], reference_id=plan.plan_id,
+                facts={"rationale": "Established by the explicit Work fixture."}).model_dump(mode="json"))
+    data["communication_needs"] = needs
+    data["response_text"] = ""
+    data["communicative_acts"] = []
+    data["auxiliary_activities"] = []
+    for outcome in data["goal_outcomes"]:
+        outcome["response_text"] = ""
+    return CanonicalPlan.model_validate(data)
+
+
 class ScriptedClient:
     def __init__(
         self,
@@ -368,12 +315,19 @@ class ScriptedClient:
         fast_plans: list[CanonicalPlan],
         deep_plans: list[CanonicalPlan] | None = None,
         fast_advances: list[FastPlannerAdvance] | None = None,
-        presentation_commits: list[PresentationCommit] | None = None,
     ):
         self.association = association
-        self.fast_plans = list(fast_plans)
+        self.social_requests = []
+        self.social_words = {}
+        for plan in [*fast_plans, *(deep_plans or [])]:
+            for goal_id in plan.goal_ids:
+                outcome = next((item for item in plan.goal_outcomes if item.goal_id == goal_id), None)
+                words = (outcome.response_text if outcome is not None else "") or plan.response_text
+                if words:
+                    self.social_words[goal_id] = words
+        self.fast_plans = [work_fixture(plan) for plan in fast_plans]
         self._explicit_fast_advances = fast_advances is not None
-        self.deep_plans = list(deep_plans or [])
+        self.deep_plans = [work_fixture(plan) for plan in (deep_plans or [])]
         self.fast_advances = list(
             fast_advances
             if fast_advances is not None
@@ -401,66 +355,33 @@ class ScriptedClient:
         )
         self.deep_contexts: list[dict] = []
         self.calls: list[str] = []
-        self.presentation_commits = list(
-            presentation_commits
-            if presentation_commits is not None
-            else [
-                PresentationCommit(
-                    commit_id="test-presentation-commit",
-                    turn_id="test-fast-advance",
-                    activity=None,
-                    metadata={"semantic_authority": "test"},
-                )
-            ]
-        )
 
     async def stream_fast_advance(self, *args, **kwargs):
-        del args, kwargs
         self.calls.append("stream")
-        if not self.presentation_commits or not self.fast_advances:
+        if not self.fast_advances:
             raise AssertionError("unexpected Fast Planner stream")
-        commit = self.presentation_commits.pop(0)
         advance = self.fast_advances.pop(0)
-        if commit.activity is None and self._explicit_fast_advances:
-            immediate = next(
-                (
-                    item
-                    for item in advance.activities
-                    if item.role in {"progress", "complete_response"}
-                ),
-                None,
-            )
-            if immediate is not None:
-                commit = commit.model_copy(update={"activity": immediate})
-        yield commit
-        committed_activities = (
-            [commit.activity]
-            if commit.activity is not None
-            and all(
-                item.activity_id != commit.activity.activity_id
-                for item in advance.activities
-            )
-            else []
-        )
-        combined_advance = advance.model_copy(
-            update={
-                "turn_id": commit.turn_id,
-                "activities": [*committed_activities, *advance.activities],
-                "auxiliary_activities": [
-                    *commit.auxiliary_activities,
-                    *advance.auxiliary_activities,
-                ],
-                "metadata": {
-                    **advance.metadata,
-                    "presentation_commit_id": commit.commit_id,
-                },
-            }
-        )
-        yield FastPlannerStreamTerminal(
-            turn_id=commit.turn_id,
-            presentation_commit_id=commit.commit_id,
-            advance=combined_advance,
-        )
+        request = kwargs["request"]
+        advance = advance.model_copy(update={"turn_id": request.sid})
+        yield FastPlannerStreamTerminal(turn_id=request.sid, advance=advance)
+
+    async def resolve_social_cognition(self, session, *, request, **kwargs):
+        from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+        self.social_requests.append(request)
+        acts = []
+        for index, need in enumerate(request.communication_needs):
+            text = next((self.social_words[g] for g in need.source_goal_ids if g in self.social_words), "Fixture response.")
+            if need.kind in {"input", "confirmation"}:
+                text = "Please confirm." if need.kind == "confirmation" else "Which input do you mean?"
+            acts.append({"activity_id": f"{request.request_id}:act:{index}", "text": text,
+                "function": "ask" if need.kind in {"input", "confirmation"} else "respond",
+                "truth_stage": "context_grounded", "delivery_phase": need.delivery_phase or "immediate",
+                "source_goal_ids": need.source_goal_ids, "source_responsibility_refs": need.source_responsibility_refs,
+                "addressed_need_ids": [need.need_id]})
+        return SocialCognitionResolution(request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+            disposition="communicate" if acts else "silence", activities=acts,
+            need_outcomes={need.need_id: "covered" for need in request.communication_needs},
+            reason_summary="Explicit test SC result, separate from the Work fixture.", model_call_count=1)
 
     async def resolve_goal_association(self, *args, **kwargs):
         self.calls.append("association")
@@ -678,63 +599,6 @@ def walk_definition() -> CapabilityDefinition:
 
 
 class GoalDrivenRuntimeTests(unittest.TestCase):
-    def test_presentation_commit_rejects_ordered_complete_response_before_yield(self):
-        body = CognitiveResponsibilityProposal(
-            local_ref="r1",
-            outcome="nod once",
-            output_mode="body_action",
-            confidence=1.0,
-        )
-        speech = CognitiveResponsibilityProposal(
-            local_ref="r2",
-            outcome="say hello",
-            output_mode="speech",
-            bindings={"after": ["r1"]},
-            confidence=1.0,
-        )
-        activity = FastPlannerCompleteResponseAct(
-            activity_id="speak-too-early",
-            role="complete_response",
-            text="你好！",
-            speech_act="greeting",
-            source_responsibility_refs=["r2"],
-        )
-
-        with self.assertRaisesRegex(
-            PlannerDTOContractError,
-            "ordered or synchronized speech",
-        ):
-            validate_presentation_commit_request_scope(
-                activity,
-                responsibilities=[body, speech],
-                interpretation_unresolved=[],
-            )
-
-    def test_presentation_commit_rejects_any_activity_while_gi_meaning_unresolved(self):
-        responsibility = CognitiveResponsibilityProposal(
-            local_ref="r1",
-            outcome="answer after resolving the referent",
-            output_mode="speech",
-            confidence=0.7,
-        )
-        activity = FastPlannerCompleteResponseAct(
-            activity_id="answer-too-early",
-            role="complete_response",
-            text="好的。",
-            speech_act="respond",
-            source_responsibility_refs=["r1"],
-        )
-
-        with self.assertRaisesRegex(
-            PlannerDTOContractError,
-            "GI meaning is unresolved",
-        ):
-            validate_presentation_commit_request_scope(
-                activity,
-                responsibilities=[responsibility],
-                interpretation_unresolved=["which person the user means"],
-            )
-
     def test_new_resource_goal_preserves_one_fast_decision_and_binds_goal_id(self):
         advance = FastPlannerAdvance(
             turn_id="turn-perception",
@@ -1330,122 +1194,47 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
 
 
-    def test_fast_planner_progress_starts_before_goal_association(self):
-        events: list[str] = []
+    def test_social_acknowledgement_can_start_before_goal_association_finishes(self):
+        from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+        from types import SimpleNamespace
+        started = asyncio.Event()
+        events = []
 
-        class Runtime(FastAdvanceRuntime):
-            async def start_fast_planner_communicative_act(
-                self, activity, *, session_id: str, turn_id: str, language: str
-            ):
-                events.append("vocal_activity_started")
-                return await super().start_fast_planner_communicative_act(
-                    activity,
-                    session_id=session_id,
-                    turn_id=turn_id,
-                    language=language,
-                )
+        class Runtime(FakeRuntime):
+            async def submit_response(self, response, **kwargs):
+                events.append("social_submitted")
+                started.set()
+                return response
+
+            async def wait_dispatch(self, dispatch):
+                return SimpleNamespace(results=[])
+
+            async def record_social_delivery(self, *args, **kwargs):
+                # Submission is not a playback receipt.
+                pass
 
         class Client(ScriptedClient):
-            async def stream_fast_advance(self, *args, **kwargs):
-                events.append("stream_started")
-                async for frame in super().stream_fast_advance(*args, **kwargs):
-                    yield frame
-
             async def resolve_goal_association(self, *args, **kwargs):
-                events.append("association_started")
-                await asyncio.sleep(0.01)
-                result = await super().resolve_goal_association(*args, **kwargs)
-                events.append("association_completed")
-                return result
+                await asyncio.wait_for(started.wait(), 1)
+                events.append("association_finished")
+                return await super().resolve_goal_association(*args, **kwargs)
 
-            async def resolve_fast_plan(self, *args, **kwargs):
-                events.append("fast")
-                return await super().resolve_fast_plan(*args, **kwargs)
+            async def resolve_social_cognition(self, session, *, request, **kwargs):
+                if request.trigger == "interpretation":
+                    return SocialCognitionResolution(request_id=request.request_id,
+                        snapshot_digest=request.snapshot_digest(), model_call_count=1,
+                        disposition="communicate", reason_summary="Acknowledge the admitted request.",
+                        activities=[{"activity_id": "initial-ack", "text": "我听到了。",
+                            "function": "acknowledge", "truth_stage": "context_grounded"}])
+                return await super().resolve_social_cognition(session, request=request, **kwargs)
 
-        advance = FastPlannerAdvance(
-            turn_id="turn-weather",
-            disposition="unavailable",
-            coverage="uncertain",
-            covered_responsibility_refs=["weather"],
-            activities=[],
-            continuations=[],
-            confidence=0.96,
-            reason_summary="Fresh weather needs continuity while progress can speak now.",
-        )
-        client = Client(
-            association=new_goal_association(source_ref="weather"),
-            fast_plans=[respond_plan()],
-            fast_advances=[advance],
-            presentation_commits=[
-                PresentationCommit(
-                    commit_id="weather-presentation",
-                    turn_id="turn-weather",
-                    activity=FastPlannerProgressAct(
-                        activity_id="weather-progress",
-                        role="progress",
-                        text="我先看看能不能查到。",
-                        progress_kind="check_information",
-                        speech_act="acknowledge_and_check",
-                        source_responsibility_refs=["weather"],
-                    ),
-                )
-            ],
-        )
-        runtime = Runtime()
-        coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(runtime),
-            policy=CognitiveRuntimePolicy(mode="apply"),
-        )
-        core, envelope = admitted_core(
-            "今天下午重庆会下雨吗？",
-            sid="turn-weather",
-            language="zh-CN",
-            responsibilities=[
-                {
-                    "local_ref": "weather",
-                    "outcome": "Tell the user whether it will rain in Chongqing this afternoon.",
-                    "bindings": {"location": "重庆", "day_part": "afternoon"},
-                    "confidence": 0.96,
-                }
-            ],
-        )
-        async def resolve_and_drain_auxiliary_work():
-            result = await coordinator.resolve(
-                object(),
-                text="今天下午重庆会下雨吗？",
-                sid="turn-weather",
-                core_interpretation=core,
-                turn_envelope=envelope,
-                context={"history": [], "active_goal_snapshots": []},
-                history=[],
-                language="zh-CN",
-            )
-            if coordinator._auxiliary_execution_tasks:
-                await asyncio.gather(
-                    *tuple(coordinator._auxiliary_execution_tasks),
-                    return_exceptions=True,
-                )
-            return result
-
-        result = asyncio.run(resolve_and_drain_auxiliary_work())
-
-        self.assertEqual(result.status, "applied")
-        self.assertLess(
-            events.index("stream_started"),
-            events.index("vocal_activity_started"),
-        )
-        self.assertLess(
-            events.index("association_started"),
-            events.index("vocal_activity_started"),
-        )
-        self.assertLess(
-            events.index("vocal_activity_started"),
-            events.index("association_completed"),
-        )
-        self.assertNotIn("social_attention_started", events)
-        self.assertEqual(runtime.started_fast_activities[0][1], "我先看看能不能查到。")
-        self.assertCountEqual(client.calls, ["stream", "association"])
+        client = Client(association=new_goal_association(), fast_plans=[respond_plan()])
+        coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(Runtime()), policy=CognitiveRuntimePolicy(mode="apply"))
+        result = self.run_resolution(coordinator, client)
+        self.assertEqual(result.status, "applied", result.fallback_reason)
+        self.assertLess(events.index("social_submitted"), events.index("association_finished"))
+        self.assertEqual(result.interaction_response.speech[0].metadata["wording_owner"], "social_cognition")
 
     def test_gi_fans_out_to_fast_planner_and_ga_without_second_fast_plan(self):
         advance = FastPlannerAdvance(
@@ -1454,13 +1243,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="complete",
             covered_responsibility_refs=["r1"],
             activities=[
-                FastPlannerCompleteResponseAct(
-                    activity_id="greeting-response",
-                    role="complete_response",
-                    text="你好呀！",
-                    speech_act="greeting",
-                    source_responsibility_refs=["r1"],
-                )
+                FastPlannerResponseNeed(activity_id='greeting-response', role='complete_response', source_responsibility_refs=['r1'], rationale='The scripted Work decision establishes an answer obligation.'),
             ],
             confidence=0.98,
             reason_summary="The greeting is ready to answer.",
@@ -1484,8 +1267,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertCountEqual(client.calls, ["stream", "association"])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.terminal_plan.goal_ids, ["goal-1"])
-        self.assertEqual(runtime.started_fast_activities[0][1], "你好呀！")
-        self.assertEqual(result.interaction_response.speech, [])
+        self.assertEqual(runtime.started_fast_activities, [])
+        self.assertEqual(result.interaction_response.speech[0].metadata["wording_owner"], "social_cognition")
         self.assertEqual(result.terminal_plan.auxiliary_activities, [])
         self.assertTrue(result.metadata["gi_fanout_concurrent"])
 
@@ -1593,14 +1376,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["tea"],
             activities=[
-                FastPlannerClarificationAct(
-                    activity_id="ask-tea-kind",
-                    role="clarification",
-                    text="你想喝什么茶？",
-                    information_gaps=[gap],
-                    speech_act="ask_clarification",
-                    source_responsibility_refs=["tea"],
-                )
+                FastPlannerInputNeed(activity_id='ask-tea-kind', role='clarification', information_gaps=[gap], source_responsibility_refs=['tea']),
             ],
             unresolved=["tea kind"],
             confidence=0.96,
@@ -1652,7 +1428,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.terminal_plan.disposition, "clarify")
         self.assertEqual(runtime.started_fast_activities, [])
-        self.assertEqual(result.interaction_response.speech[0].text, "你想喝什么茶？")
+        self.assertEqual(result.interaction_response.speech[0].text, "Which input do you mean?")
         snapshot = manager.active_goal_snapshots()[0]
         self.assertEqual(snapshot["goal_id"], "goal-tea")
         self.assertEqual(
@@ -1716,14 +1492,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["r1"],
             activities=[
-                FastPlannerClarificationAct(
-                    activity_id="ask-old-scope",
-                    role="clarification",
-                    text="你说的是哪个范围？",
-                    information_gaps=[gap],
-                    speech_act="ask_clarification",
-                    source_responsibility_refs=["r1"],
-                )
+                FastPlannerInputNeed(activity_id='ask-old-scope', role='clarification', information_gaps=[gap], source_responsibility_refs=['r1']),
             ],
             unresolved=["scope"],
             confidence=0.9,
@@ -2392,14 +2161,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["fetch-water"],
             activities=[
-                FastPlannerProgressAct(
-                    activity_id="fetch-progress",
-                    role="progress",
-                    text="我先想想怎么做。",
-                    progress_kind="perform_action",
-                    speech_act="acknowledge",
-                    source_responsibility_refs=["fetch-water"],
-                )
             ],
             continuations=["deep_planner"],
             unresolved=["multi-step physical dependencies"],
@@ -2512,18 +2273,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         stage_names = [item[0] for item in observed]
-        self.assertCountEqual(
-            stage_names[:3],
-            [
-                "goal_association",
-                "fast_planner_presentation_commit",
-                "fast_planner_stream_terminal",
-            ],
-        )
-        self.assertEqual(
-            stage_names[3:],
-            ["canonical_plan_validation"],
-        )
+        self.assertTrue({"goal_association", "fast_planner_stream_terminal", "canonical_plan_validation", "social_cognition"}.issubset(stage_names))
+        self.assertNotIn("fast_planner_presentation_commit", stage_names)
         for _, stage in observed:
             self.assertIn("input_payload", stage)
             self.assertIn("output_payload", stage)
@@ -2597,13 +2348,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "plan_resolved",
             {
                 item["event_type"]
-                for item in adapter.planner_response_contexts[0]["interaction_context"][
+                for item in client.social_requests[-1].context["interaction_context"][
                     "goal_history"
                 ]
             },
         )
         association_situation = client.association_contexts[0]["situation"]
-        adapter_situation = adapter.planner_response_contexts[0]["situation"]
+        adapter_situation = client.social_requests[-1].context["situation"]
         self.assertEqual(association_situation["revision"], 1)
         self.assertEqual(association_situation["focus_goal_ids"], [])
         # Fast starts concurrently from the immutable GI result, before GA has
@@ -2695,7 +2446,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(result.status, "error")
+        self.assertEqual(result.status, "applied")
         self.assertIsNotNone(result.goal_association)
         self.assertEqual(result.metadata["authoritative_goal_count"], 1)
         self.assertCountEqual(client.calls[:2], ["stream", "association"])
@@ -2881,13 +2632,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coverage="uncertain",
             covered_responsibility_refs=["r1"],
             activities=[
-                FastPlannerClarificationAct(
-                    activity_id="ask-destination",
-                    role="clarification",
-                    text="你说的那里是哪里？",
-                    information_gaps=[gap],
-                    source_responsibility_refs=["r1"],
-                )
+                FastPlannerInputNeed(activity_id='ask-destination', role='clarification', information_gaps=[gap], source_responsibility_refs=['r1']),
             ],
             confidence=0.8,
             unresolved=["which destination 'there' refers to"],
@@ -2928,7 +2673,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result.status, "applied")
         self.assertEqual(result.terminal_plan.disposition, "clarify")
-        self.assertEqual(result.interaction_response.speech[0].text, "你说的那里是哪里？")
+        self.assertEqual(result.interaction_response.speech[0].text, "Which input do you mean?")
         self.assertCountEqual(client.calls, ["stream", "association"])
         snapshot = manager.active_goal_snapshots()[0]
         self.assertEqual(
@@ -3408,85 +3153,19 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             response.speech[0].metadata["reuse_current_turn_speech"]
         )
 
-    def test_planner_owned_response_reuses_delivered_matching_fast_activity(self):
-        fast_activity_id = "progress_walk_ten_seconds"
-        fast_text = "好，我这就往前走十秒。"
-        plan = CanonicalPlan(
-            plan_id="plan-walk-fast-identity",
-            planner_tier="fast",
-            disposition="execute",
-            coverage="complete",
-            confidence=0.98,
-            goal_ids=["goal-walk"],
-            goal_summary="Walk forward for ten seconds.",
-            communicative_acts=[
-                {
-                    "activity_id": fast_activity_id,
-                    "text": fast_text,
-                    "role": "progress",
-                    "speech_act": "acknowledge",
-                    "source_goal_ids": ["goal-walk"],
-                    "source_responsibility_refs": ["walk"],
-                    "truth_stage": "pre_evidence",
-                    "progress_kind": "perform_action",
-                }
-            ],
-            steps=[
-                {
-                    "step_id": "walk",
-                    "capability_id": "soridormi.walk_forward",
-                    "args": {"duration_s": 10},
-                    "timing": "sequential",
-                    "source_goal_ids": ["goal-walk"],
-                }
-            ],
-            goal_outcomes=[
-                {
-                    "goal_id": "goal-walk",
-                    "disposition": "execute",
-                    "coverage": "complete",
-                    "step_ids": ["walk"],
-                }
-            ],
-        )
-
-        response = asyncio.run(
-            CanonicalPlanRuntimeAdapter(
-                FakeRuntime([walk_definition()])
-            ).build_planner_owned_response(
-                plan=plan,
-                session_id="sid-walk-fast-identity",
-                language="zh-CN",
-                context={
-                    "delivered_turn_speech": [
-                        {
-                            "event_id": "speech_event_walk_fast_identity",
-                            "status": "playback_started",
-                            "text": fast_text,
-                            "fast_activity_id": fast_activity_id,
-                            "generation": 7,
-                            "orders": [12],
-                        }
-                    ]
-                },
-            )
-        )
-
-        self.assertEqual(len(response.speech), 1)
-        self.assertTrue(response.speech[0].metadata["reuse_current_turn_speech"])
-        self.assertEqual(
-            response.speech[0].metadata["session_id"],
-            "sid-walk-fast-identity",
-        )
-        self.assertEqual(
-            response.speech[0].metadata["reused_speech_event_id"],
-            "speech_event_walk_fast_identity",
-        )
-        self.assertEqual(len(response.capabilities), 1)
-        self.assertEqual(
-            response.capabilities[0].capability_id,
-            "soridormi.walk_forward",
-        )
+    def test_sc_silence_after_delivered_acknowledgement_does_not_block_work(self):
+        from tests.cognitive_work_test_support import social_fixture_response
+        plan = work_fixture(execute_plan())
+        context = {"interaction_context": {"already_spoken": [{
+            "text": "I will blink next.", "state": "completed",
+            "metadata": {"communicative_activity_ids": ["ack-blink"]},
+        }]}}
+        response = asyncio.run(social_fixture_response(CanonicalPlanRuntimeAdapter(
+            FakeRuntime([blink_definition()])), plan=plan, session_id="sid",
+            language="en", context=context))
+        self.assertEqual(response.speech, [])
+        self.assertEqual([item.capability_id for item in response.capabilities], ["soridormi.blink_eyes"])
+        self.assertEqual(response.metadata["social_cognition_resolution"]["disposition"], "silence")
 
     def test_safe_read_may_start_silently_without_delivery_barrier(self):
         plan = CanonicalPlan(
@@ -3542,34 +3221,32 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertTrue(response.capabilities[0].metadata["retryable_safe_read"])
         self.assertTrue(response.metadata["safe_read_parallel_execution"])
 
-    def test_canonical_planner_preserves_activity_identity_against_delivery_context(self):
+    def test_sc_preserves_activity_identity_against_delivery_context(self):
+        from tests.cognitive_work_test_support import social_fixture_resolution
+        from shared.chromie_contracts.social_cognition import SocialCognitionRequest
         for tier in ("fast", "deep"):
             for activity_id, text in (("spoken-1", "Changed words."),
                                       ("spoken-1", "Original words."),
                                       ("new-2", "Original words.")):
                 with self.subTest(tier=tier, activity_id=activity_id, text=text):
-                    plan = CanonicalPlan(
-                        plan_id="speech-identity", planner_tier=tier,
-                        disposition="respond", coverage="complete", confidence=1.0,
-                        goal_ids=["goal-1"], response_text=text,
-                        communicative_acts=[{
-                            "activity_id": activity_id, "text": text,
-                            "role": "complete_response", "speech_act": "respond",
-                            "source_goal_ids": ["goal-1"], "truth_stage": "pre_evidence",
-                        }],
-                    )
+                    plan = work_fixture(respond_plan()).model_copy(update={"planner_tier": tier})
                     context = {"interaction_context": {"already_spoken": [{
                         "text": "Original words.",
                         "metadata": {"communicative_activity_ids": ["spoken-1"]},
                     }]}}
-                    response_call = CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
-                        plan=plan, session_id="sid", language="en", context=context,
-                    )
+                    request = SocialCognitionRequest(request_id="identity", trigger="work_state",
+                        source_refs=[plan.plan_id], goal_ids=plan.goal_ids,
+                        communication_needs=plan.communication_needs,
+                        context={**context, "canonical_plan_resolution": plan.prompt_projection()})
+                    resolution = social_fixture_resolution(request, text)
+                    resolution = resolution.model_copy(update={"activities": [resolution.activities[0].model_copy(update={"activity_id": activity_id})]})
+                    call = CanonicalPlanRuntimeAdapter(FakeRuntime()).build_social_cognition_response(
+                        plan=plan, request=request, resolution=resolution, session_id="sid", language="en", context=context)
                     if activity_id == "spoken-1" and text == "Changed words.":
                         with self.assertRaisesRegex(ValueError, "wording cannot change"):
-                            asyncio.run(response_call)
+                            asyncio.run(call)
                     else:
-                        response = asyncio.run(response_call)
+                        response = asyncio.run(call)
                         self.assertEqual([item.text for item in response.speech], [text])
                         self.assertEqual(response.capabilities, [])
 
@@ -3581,7 +3258,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         response = asyncio.run(
-            adapter.build_planner_owned_response(
+            adapter.build_execution_only_response(
                 plan=plan,
                 session_id="sid-blink-silent",
                 language="zh-CN",
@@ -3610,11 +3287,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     PlannerModelOutput.model_validate(raw), planner_tier="deep",
                     plan_id="mixed-speech", expected_goal_ids_for_turn=list(raw["goal_outcomes"]),
                 ))
-                response = asyncio.run(CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
-                    plan=plan, session_id="mixed-speech", language="en", context={},
-                ))
+                work_request, _ = CanonicalDeepPlanContractTests.speech_outcomes(disposition, sibling=True)
+                client = ScriptedClient(association=new_goal_association(), fast_plans=[])
+                coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
+                    adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()), policy=CognitiveRuntimePolicy(mode="apply"))
+                response = asyncio.run(coordinator.resolve_plan_interaction(None, plan=plan,
+                    work_request=work_request, session_id="mixed-speech", language="en", context={}))
                 self.assertEqual(response.capabilities, [])
-                self.assertEqual([item.text for item in response.speech], [raw["response_text"]])
+                self.assertEqual(len(response.speech), 2)
+                self.assertTrue(all(item.metadata["wording_owner"] == "social_cognition" for item in response.speech))
                 self.assertEqual(plan.goal_outcomes[1].disposition, "respond")
                 self.assertEqual(plan.waiting_goal_ids(), ["goal-speech"] if disposition == "clarify" else [])
 
@@ -3627,10 +3308,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ValueError,
-            "Planner-owned communicative response requires exact text",
+            "ask_confirmation speech covering every confirmation goal",
         ):
             asyncio.run(
-                adapter.build_planner_owned_response(
+                adapter.build_execution_only_response(
                     plan=plan,
                     session_id="sid-blink-confirmation",
                     language="zh-CN",
@@ -3660,7 +3341,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         adapter = CanonicalPlanRuntimeAdapter(FakeRuntime([weather_definition()]))
 
         response = asyncio.run(
-            adapter.build_planner_owned_response(
+            adapter.build_execution_only_response(
                 plan=plan,
                 session_id="sid-truth-rejected-silent",
                 language="en-US",
@@ -3698,7 +3379,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     if error is not None:
                         self.assertEqual(plan.metadata["error"], str(error))
                     response = asyncio.run(
-                        CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_planner_owned_response(
+                        CanonicalPlanRuntimeAdapter(FakeRuntime([])).build_execution_only_response(
                             plan=plan, session_id=request.sid, language="en-US", context={},
                         )
                     )
@@ -3719,12 +3400,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ValueError,
-            "Planner-owned communicative response requires exact text",
+            "terminal canonical plans require at least one spoken response stage",
         ):
             asyncio.run(
                 CanonicalPlanRuntimeAdapter(
                     FakeRuntime([weather_definition()])
-                ).build_planner_owned_response(
+                ).build_execution_only_response(
                     plan=plan,
                     session_id="sid-missing-text",
                     language="en-US",
@@ -4170,17 +3851,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             async def stream_fast_advance(self, *args, **kwargs):
                 del args, kwargs
                 self.calls.append("stream")
-                yield PresentationCommit(
-                    commit_id="commit-before-fast-failure",
-                    turn_id="sid-pr7",
-                    activity=None,
-                    metadata={"semantic_authority": "test"},
-                )
+                await asyncio.sleep(0)
                 await committed.wait()
                 yield FastPlannerStreamFailure(
                     turn_id="sid-pr7",
-                    presentation_commit_id="commit-before-fast-failure",
-                    failure_stage="after_commit",
+                    failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
@@ -4244,16 +3919,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             async def stream_fast_advance(self, *args, **kwargs):
                 del args, kwargs
                 self.calls.append("stream")
-                yield PresentationCommit(
-                    commit_id="contract-failure-presentation",
-                    turn_id="sid-pr7",
-                    activity=None,
-                    metadata={"semantic_authority": "test"},
-                )
+                await asyncio.sleep(0)
                 yield FastPlannerStreamFailure(
                     turn_id="sid-pr7",
-                    presentation_commit_id="contract-failure-presentation",
-                    failure_stage="after_commit",
+                    failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
@@ -4309,16 +3978,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             async def stream_fast_advance(self, *args, **kwargs):
                 del args, kwargs
                 self.calls.append("stream")
-                yield PresentationCommit(
-                    commit_id="contract-failure-presentation",
-                    turn_id="sid-pr7",
-                    activity=None,
-                    metadata={"semantic_authority": "test"},
-                )
+                await asyncio.sleep(0)
                 yield FastPlannerStreamFailure(
                     turn_id="sid-pr7",
-                    presentation_commit_id="contract-failure-presentation",
-                    failure_stage="after_commit",
+                    failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
@@ -4406,7 +4069,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             result.interaction_response.speech[0].text,
-            "你愿意让我眨四下眼睛吗？如果可以，我就开始。",
+            "Please confirm.",
         )
         self.assertEqual(
             result.interaction_response.metadata["confirmation_prompt"],
@@ -4419,7 +4082,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(
             result.interaction_response.metadata["confirmation_prompt_source"],
-            "planner_wording_runtime_validated",
+            "social_cognition_runtime_validated",
         )
         self.assertTrue(
             result.interaction_response.speech[0].metadata[
@@ -4693,20 +4356,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = ScriptedClient(
             association=new_goal_association(),
             fast_plans=[respond_plan()],
-            presentation_commits=[
-                PresentationCommit(
-                    commit_id="greeting-presentation",
-                    turn_id="turn-greeting",
-                    activity=FastPlannerCompleteResponseAct(
-                        activity_id="greeting-complete",
-                        role="complete_response",
-                        speech_act="respond",
-                        text="你好呀！",
-                        truth_stage="context_grounded",
-                        source_responsibility_refs=["r1"],
-                    ),
-                )
-            ],
+
         )
         runtime = Runtime()
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -4721,10 +4371,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client)
 
         self.assertEqual(result.status, "applied")
-        self.assertEqual(
-            runtime.bound_communicative_goals,
-            [("sid-pr7", {"r1": ["goal-1"]})],
-        )
+        self.assertEqual(runtime.bound_communicative_goals, [])
+        speech = result.interaction_response.speech[0]
+        self.assertEqual(speech.metadata["source_goal_ids"], ["goal-1"])
+        self.assertEqual(speech.metadata["wording_owner"], "social_cognition")
+        self.assertEqual(speech.metadata["communication_completion_goal_ids"], ["goal-1"])
 
     def test_followup_context_can_see_goal_while_planner_is_still_running(self):
         manager = ConversationStateManager(enabled=True)
@@ -4916,7 +4567,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             all(item.metadata["wait_for_playback_start"] for item in response.speech)
         )
 
-    def test_planner_owned_mixed_response_covers_only_communicative_goal(self):
+    def test_sc_mixed_response_covers_only_communicative_goal(self):
         plan = CanonicalPlan(
             plan_id="plan-nod-greeting",
             planner_tier="fast",
@@ -4925,19 +4576,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=1.0,
             goal_ids=["goal-nod", "goal-greeting"],
             goal_summary="Nod twice, then say hello.",
-            communicative_acts=[
-                {
-                    "activity_id": "greeting",
-                    "text": "你好",
-                    "role": "complete_response",
-                    "timing": "sequential",
-                    "delivery_phase": "final",
-                    "speech_act": "greeting",
-                    "source_goal_ids": ["goal-greeting"],
-                    "source_responsibility_refs": ["r2"],
-                    "truth_stage": "context_grounded",
-                }
-            ],
+            communication_needs=[{
+                "need_id": "greeting", "owner": "planner", "kind": "answer",
+                "reference_id": "plan-nod-greeting", "source_goal_ids": ["goal-greeting"],
+                "delivery_phase": "final",
+                "after_step_ids": ["nod"],
+            }],
             steps=[
                 {
                     "step_id": "nod",
@@ -4979,10 +4623,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             requires_confirmation=False,
         )
 
+        from tests.cognitive_work_test_support import social_fixture_response
         response = asyncio.run(
-            CanonicalPlanRuntimeAdapter(
-                FakeRuntime([nod])
-            ).build_planner_owned_response(
+            social_fixture_response(CanonicalPlanRuntimeAdapter(FakeRuntime([nod])), text="你好",
                 plan=plan,
                 session_id="sid-nod-greeting",
                 language="zh-CN",
@@ -5107,10 +4750,6 @@ class DeterministicInterruptResponseTests(unittest.TestCase):
                 client = ScriptedClient(
                     association=new_goal_association(), fast_plans=[respond_plan()]
                 )
-                activity = client.fast_advances[0].activities[0]
-                client.presentation_commits[0] = client.presentation_commits[0].model_copy(
-                    update={"activity": activity}
-                )
                 runtime = FastAdvanceRuntime()
                 coordinator = GoalDrivenRuntimeCoordinator(
                     agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
@@ -5122,8 +4761,8 @@ class DeterministicInterruptResponseTests(unittest.TestCase):
                     history=[], language="en-US",
                 ))
                 self.assertEqual(result.status, "applied", result.fallback_reason)
-                self.assertEqual(len(runtime.started_fast_activities), 0 if quiet else 1)
-                self.assertEqual(result.interaction_response.speech, [])
+                self.assertEqual(len(runtime.started_fast_activities), 0)
+                self.assertEqual(len(result.interaction_response.speech), 0 if quiet else 1)
                 self.assertEqual(result.interaction_response.capabilities, [])
                 if quiet:
                     self.assertFalse(result.metadata.get("fast_vocal_activity_ids"))
@@ -5357,7 +4996,7 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
                 association_returned = True
                 return await super().resolve_goal_association(*args, **kwargs)
 
-        client = Client(association=association, fast_plans=[], fast_advances=[advance], presentation_commits=[PresentationCommit(commit_id="early-commit", turn_id="early-read", activity=None)])
+        client = Client(association=association, fast_plans=[], fast_advances=[advance])
         coordinator = GoalDrivenRuntimeCoordinator(agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(mode="apply"))
         core, envelope = admitted_core("查询重庆天气", sid="early-read", language="zh-CN", responsibilities=[{

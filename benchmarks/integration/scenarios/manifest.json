@@ -1,17 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-09-13",
+  "frozen_on": "2026-09-14",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "8c6ad4cf8e17ca350a62354c12870b6a9036a2619bf201aeb46d2e801dc4faac",
-    "workflow-conditional-dry.json": "2feb448e2e85bfd4d047805a93e7d0d0b81d17d7276554650987211e3f1d15cc",
-    "workflow-conditional-rain.json": "9ba5b21da88c61f046f139126d846028088c9d71f0041c7e4046efd1d088c00f",
-    "workflow-delayed.json": "c0a1a6138eca60b1e3b8fdd4dbea9376ae6c57a66bfc9897f4254f2cd2c2817a",
-    "workflow-normal.json": "d15f6c1ce51347ab7e6fffcceb9f2dac4442864ce3fd689e064e52b9795f662d"
+    "workflow-cancellation.json": "ad3fc1147fc66babccfbba09e3bd2e04b1eb161ead20bd4a9ee57e13e919fe35",
+    "workflow-conditional-dry.json": "9e5c8eecb203d6cf82265b0c52884303adb82c31683e1822f7dbe88f0a4111c8",
+    "workflow-conditional-rain.json": "ee397e3745d70f6908bb4f3e27cabcfc89f02cbebf72de2a4c406d7f36b36920",
+    "workflow-delayed.json": "1e7689dee6e6782c9f2ff21d6447be2ac3aa1816d17ee7e952b87d7e32c45a4b",
+    "workflow-normal.json": "e3d8ca2d59b60370b57d49ff2a8752b95f29e539fc3bfbd8bf577e370f49cdf6"
   },
-  "freeze_revision": 3,
-  "freeze_note": "Final reference review corrected conditional GI source span to t0\u2013t7, covering the full condition and location. Unique deterministic UUID prefixes retained. Preparation evidence is separate."
+  "freeze_revision": 4,
+  "freeze_note": "Final reference review corrected conditional GI source span to t0\u2013t7, covering the full condition and location. Unique deterministic UUID prefixes retained. Preparation evidence is separate.",
+  "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

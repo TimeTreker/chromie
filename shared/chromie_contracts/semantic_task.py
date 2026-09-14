@@ -325,6 +325,7 @@ class ResponseStage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str = Field(min_length=1)
+    delivery_phase: Literal["immediate", "pre_action", "progress", "final"] = "immediate"
     speech_act: str = Field(default="inform", min_length=1)
     commitment_state: CommitmentState = "none"
     must_not_claim_completion: bool = True
@@ -429,6 +430,13 @@ class ResponsePlan(BaseModel):
     pre_action: ResponseStage | None = None
     progress: list[ResponseStage] = Field(default_factory=list)
     final: ResponseStage | None = None
+    activities: list[ResponseStage] = Field(default_factory=list, max_length=24)
+
+    @model_validator(mode="after")
+    def validate_single_stage_representation(self) -> "ResponsePlan":
+        if self.activities and (self.immediate or self.pre_action or self.progress or self.final):
+            raise ValueError("response activities cannot be combined with phase-bucket stages")
+        return self
 
 
 class SemanticTaskOperation(BaseModel):

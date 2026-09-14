@@ -1,5 +1,22 @@
 # Single Semantic Planning Authority
 
+## Accepted target and current-source boundary
+
+The [Charter's Social Cognition amendment](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+splits ordinary communication from Work planning inside the same Cognitive Core.
+Single semantic authority means one writer per semantic decision, not one model
+invocation for every responsibility in a turn. Social Cognition owns exact
+Communicative Activities; Planner owns Capability/Work decisions. GI and GA keep
+WHAT and canonical continuity respectively. Neither downstream role reinterprets
+GI or reviews/repairs the other's output.
+
+The `context.semantic_authority` guard prevents a second Core or retired planner
+from acquiring the turn. Within that Core, `/social-cognition` owns interaction
+and exact input-snapshot binding. Fast/Deep Planner model DTOs contain Work and
+communication Needs, with no writable utterance or social-expression fields.
+The Host joins these distinct decisions without allowing either to repair the other.
+Implementation evidence and remaining qualification gaps are owned by [STATUS](STATUS.md).
+
 ## Purpose
 
 Chromie permits exactly one semantic planning authority for one routed turn.
@@ -89,19 +106,12 @@ author its exact next revision, merge coherent planned Work, or create a new Wor
 DAGEngine advances execution state and reports Evidence only; normal node completion may
 continue mechanically without a Planner turn, while material invalidation re-enters Planner.
 
-Planner also owns ordinary Goal-free communication. Trusted Situation may trigger an
-independent communication-only Planner task through the existing `/situational-cognition`
-entrypoint. Endpoint names and model depth do not create another author. The request has
-no Responsibility, Goal, Capability Work, or effect permissions; it may produce silence or
-one context-grounded Activity. This differs from GI-triggered planning before GA binding,
-which already has Responsibility provenance and its separately approved safe-read contract.
-Every Planner prompt receives the same ordinary communication authority contract. Shared
-mechanical checks preserve exact Activity identity/wording and delivered repair references;
-Runtime retains #41 delivery truth and never chooses semantic equivalence. An unresolved
-Fast Situation result may delegate once with no Activity or Memory result. Direct Deep
-readiness has the same restricted scope; unavailable Deep fails quiet and cannot recurse.
-No completed decision receives a second model review. All response source/subject and
-candidate checks precede Memory writes; existing Memory ownership/privacy remains unchanged.
+Social Cognition owns Goal-free communication through `/social-cognition`, using
+the same complete transaction as other trusted state triggers. The request grants
+no Responsibility, task Goal, requested Work or effect authorization. It may produce
+silence, exact verbal acts and optional eligible social expression. Existing Runtime
+owns all safety and delivery. Environment source adapters still own perception facts;
+SC does not infer missing identity or audience. Ordinary turns and trusted Situation wakes use the same interaction authority.
 
 ## Entrypoint ownership
 
@@ -109,18 +119,15 @@ candidate checks precede Memory writes; existing Memory ownership/privacy remain
 |---|---|---|---|---|
 | Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
-| Trusted Goal-free Situation | Goal-Driven Cognitive Core; Planner owns communication | authoritative, communication-only | Situation → independent bounded Fast/Deep Planner invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
+| Trusted Goal-free Situation | Goal-Driven Cognitive Core; SC owns communication | authoritative, communication-only | Situation → bounded Social Cognition invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
-| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner (including optional auxiliary activities), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
+| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Work Planner, Social Cognition (including optional expression), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
-The maintained first user-facing speech path is Planner-owned. Goal
-Interpretation emits Responsibility evidence only. Planner's fast pass may author one
-immediately realizable Communicative Activity before Goal Association has
-finished committing canonical Goal identity. Once GA commits, Runtime binds that
-same delivered/scheduled Activity to the canonical Goal; Goal binding is not a
-reason to author or play a second equivalent utterance. This changes latency,
-not semantic or effect authority. Capability-dependent factual answers still
-require matching trusted Evidence.
+The first user-facing speech path belongs to SC. One accepted GI result can start
+SC, GA and Work planning independently. At that point SC may acknowledge understanding
+or remain silent; it cannot predict unfinished Work decisions. Canonical Goal binding
+does not itself require another utterance. Required answer/input/confirmation Needs
+are joined to the exact validated Plan; factual results require admitted Evidence.
 
 For Goal-bound planning, each Fast or Deep invocation authors its complete Plan,
 per-Goal outcomes and grounding/coverage evidence in its primary result. A Goal

@@ -4,6 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+ORCHESTRATOR_ARGS=()
+case "${1:-}" in
+  --text-console) ORCHESTRATOR_ARGS+=(--text-console); shift ;;
+  -h|--help) echo "Usage: ./scripts/start_orchestrator.sh [--text-console]"; exit 0 ;;
+esac
+if [ "$#" -gt 0 ]; then
+  echo "[orchestrator][error] Unknown argument: $1" >&2
+  exit 2
+fi
+
 export CHROMIE_OPERATOR_MODE="${CHROMIE_OPERATOR_MODE:-speech}"
 
 echo "[orchestrator] Project root: $ROOT_DIR"
@@ -103,4 +113,8 @@ if [ "${WARM_OLLAMA_BEFORE_ORCH:-1}" = "1" ]; then
   ./scripts/warm_ollama.sh "${WARM_MODELS[@]}"
 fi
 echo "[orchestrator] Starting..."
-python -m orchestrator.orchestrator
+if [ "${#ORCHESTRATOR_ARGS[@]}" -gt 0 ]; then
+  python scripts/chromie_psm_live_text_console.py --serve --capabilities --speaker
+else
+  python -m orchestrator.orchestrator
+fi

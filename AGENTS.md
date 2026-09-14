@@ -21,6 +21,14 @@ archives, and old milestone prose are context only.
 
 ## Current delivery constraint
 
+The owner-approved [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+is an owner-authorized documentation and implementation exception for the
+communication-authority amendment. Source ownership migration is implemented;
+current-target qualification remains open. Former Planner speech/presentation
+contracts are retired, not permission for two wording owners. Follow the
+[checkpoint](DEVELOPMENT_CHECKPOINT.md) and [migration order](ROADMAP.md#social-cognition-migration)
+for scope; the amendment does not waive the delivery/evidence gates below.
+
 Until the canonical local gate, narrow current-revision live voice proof, and
 default target-evidence closure are retained and reviewed, treat that sequence
 as the only active delivery line. Do not add a new architecture layer, ordinary

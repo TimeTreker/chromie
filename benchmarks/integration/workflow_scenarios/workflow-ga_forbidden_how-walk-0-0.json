@@ -553,5 +553,6 @@
   ],
   "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
   "probe": "ga_forbidden_how",
-  "expected_rejection": "ga"
+  "expected_rejection": "ga",
+  "social_cognition": {}
 }

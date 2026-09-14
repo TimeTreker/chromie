@@ -42,7 +42,8 @@
       "goal_ids": [
         "goal-recitation"
       ],
-      "escalation_reason": "The rare qualified vocal capability requires full-catalog planning."
+      "escalation_reason": "The rare qualified vocal capability requires full-catalog planning.",
+      "communication_needs": []
     },
     "deep_plans": [
       {
@@ -89,22 +90,7 @@
           "unmet_goal_ids": [],
           "unmet_requirements": []
         },
-        "response_text": "",
-        "communicative_acts": [
-          {
-            "activity_id": "scenario-immediate",
-            "text": "I can use the qualified recitation mode for that greeting.",
-            "role": "complete_response",
-            "timing": "parallel",
-            "speech_act": "inform",
-            "source_goal_ids": [
-              "goal-recitation"
-            ],
-            "truth_stage": "context_grounded",
-            "evidence_refs": [],
-            "information_gaps": []
-          }
-        ]
+        "communication_needs": []
       }
     ],
     "capabilities": [
@@ -154,7 +140,31 @@
           "evidence_level": "source_test"
         }
       }
-    ]
+    ],
+    "social_cognition": {
+      "fast": {
+        "activities": [],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      },
+      "deep": {
+        "activities": [
+          {
+            "activity_id": "scenario-immediate",
+            "text": "I can use the qualified recitation mode for that greeting.",
+            "function": "inform",
+            "delivery_phase": "immediate",
+            "truth_stage": "context_grounded",
+            "source_goal_ids": [
+              "goal-recitation"
+            ],
+            "evidence_refs": [],
+            "source_responsibility_refs": [],
+            "addressed_need_ids": []
+          }
+        ],
+        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
+      }
+    }
   },
   "expect": {
     "status": "applied",
@@ -219,11 +229,11 @@
       {
         "id": "speech_identity_latency",
         "title": "Speech Identity and Warm Response Latency",
-        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Fast-Planner commitment and playback scheduling stay within the declared interactive budgets.",
+        "general_rule": "Chromie should answer ordinary identity turns in her maintained person identity, in the user language, without backend narration, while warm Social Cognition commitment and playback scheduling stay within the declared interactive budgets.",
         "rationale": "Vocal realization preserves exact Planner/provider authority rather than backend narration.",
         "root_cause_boundaries": [
           "Mind profile",
-          "Planner communication",
+          "Social Cognition",
           "Playback delivery",
           "Latency evidence"
         ]

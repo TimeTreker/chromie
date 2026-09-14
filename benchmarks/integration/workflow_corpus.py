@@ -51,6 +51,24 @@ def action_text(action, value, form):
     return (en.capitalize()+'.', f'Please {en}.', zh+'。', '请'+zh+'。', '请 '+en+'。')[form]
 
 
+def _separate_interaction(case):
+    """Freeze authored SC words beside, never inside, a Work model reply."""
+    words = case.setdefault("social_cognition", {})
+    for step in case["model_steps"]:
+        if step.get("role", step["name"].split("-")[0]) not in {"fast", "deep"}:
+            continue
+        raw = step["response"]
+        if "social_fixture_text" in raw:
+            words[step["name"]] = raw.pop("social_fixture_text") or "Fixture response."
+        raw.pop("auxiliary_activities", None)
+        for outcome in raw.get("goal_outcomes", {}).values():
+            outcome.pop("social_fixture_text", None)
+            if outcome.get("disposition") == "respond":
+                outcome.setdefault("precedes_step_ids", [])
+                outcome.setdefault("follows_step_ids", [])
+    return case
+
+
 def reference_case(family, action, value_index, form):
     """Assemble authored primary results, never fit an oracle to a runtime verdict."""
     if family in NEW_FAMILIES:
@@ -126,21 +144,23 @@ def reference_case(family, action, value_index, form):
         step.pop('request', None)
         role = step['name'].split('-')[0]
         if role in {'fast','deep'}:
+            source_step_name = step['name']
             role = case['initial_planner'] if step['name'].endswith('initial') else role
             step['name'] = role + '-' + step['name'].split('-',1)[1]
             raw = step['response']
+            raw.setdefault('social_fixture_text', case.get('social_cognition', {}).get(source_step_name, ''))
             raw['goal_summary'] = 'Honor the admitted action, parameter, and any condition or readiness.'
             for work in raw['steps']:
                 if work['capability_id'] == 'soridormi.blink_eyes':
                     work.update(capability_id=capability, args={argument:value}, expected_outcome='The requested action and exact parameter are completed.')
                 elif work['capability_id'] == 'chromie.weather.lookup':
                     work['args']['location'] = location
-            if family == 'conditional_dry' and not zh and raw['response_text']:
-                raw['response_text'] = 'No rain is forecast, so I will not perform the requested action.'
-                raw['goal_outcomes']['${goal}']['response_text'] = raw['response_text']
-            if zh and raw['response_text']:
-                raw['response_text'] = '我会保留任务，等到指定时间再执行。' if delayed else '预报没有雨，因此这次无需执行该动作。'
-                raw['goal_outcomes']['${goal}']['response_text'] = raw['response_text']
+            if family == 'conditional_dry' and not zh and raw['social_fixture_text']:
+                raw['social_fixture_text'] = 'No rain is forecast, so I will not perform the requested action.'
+                raw['goal_outcomes']['${goal}']['social_fixture_text'] = raw['social_fixture_text']
+            if zh and raw['social_fixture_text']:
+                raw['social_fixture_text'] = '我会保留任务，等到指定时间再执行。' if delayed else '预报没有雨，因此这次无需执行该动作。'
+                raw['goal_outcomes']['${goal}']['social_fixture_text'] = raw['social_fixture_text']
         step['role'] = role
     case['expected_provider_calls'] = [
         {'capability':'chromie.weather.lookup','args':{'location':location}}
@@ -236,13 +256,13 @@ def reference_case(family, action, value_index, form):
             'authored_reference'
         )
         step['training_eligible'] = False
-    return case
+    return _separate_interaction(case)
 
 
 def _speech_plan(raw, text, *, clarify=False):
-    raw.update(disposition='clarify' if clarify else 'respond', steps=[], response_text=text)
+    raw.update(disposition='clarify' if clarify else 'respond', steps=[], social_fixture_text=text)
     outcome = raw['goal_outcomes']['${goal}']
-    outcome.update(disposition=raw['disposition'], step_ids=[], response_text=text)
+    outcome.update(disposition=raw['disposition'], step_ids=[], social_fixture_text=text)
     if clarify:
         raw['coverage'] = outcome['coverage'] = 'partial'
         raw['unresolved'] = outcome['unresolved'] = ['The requested time or referent is not determined.']
@@ -295,7 +315,7 @@ def extended_case(family, action, value_index, form):
             wait.update(role='fast')
             wait['response']['time_conditions'][0]['due_at_ms'] = int(datetime.fromisoformat(instant).timestamp()*1000)
             if zh:
-                wait['response']['response_text'] = wait['response']['goal_outcomes']['${goal}']['response_text'] = '我会等到指定时间再执行。'
+                wait['response']['social_fixture_text'] = wait['response']['goal_outcomes']['${goal}']['social_fixture_text'] = '我会等到指定时间再执行。'
             case['model_steps'] = case['model_steps'][:2] + [wait]
             case.update(family='delayed', initial_goal_resolution=None, expected_ready_at=instant,
                 scope='New admitted request: primary GI → GA → wait → restart → due wake → actual controlled Runtime.')
@@ -362,11 +382,11 @@ def extended_case(family, action, value_index, form):
             extra.update(source_responsibility_refs=['r2'],output_mode='speech',bindings=[{'name':'proposition','entity_type':'proposition','value':reply,'confidence':1.0}])
             ga['new_goals'].append(extra)
             extra_outcome = copy.deepcopy(raw['goal_outcomes']['${goal}'])
-            extra_outcome.update(disposition='respond',step_ids=[],response_text=reply)
+            extra_outcome.update(disposition='respond',step_ids=[],social_fixture_text=reply)
             extra_outcome['satisfaction']['satisfied_goal_ids'] = ['${goal2}']
             raw['goal_outcomes']['${goal2}'] = extra_outcome
             raw['goal_satisfaction']['satisfied_goal_ids'].append('${goal2}')
-            raw['response_text'] = reply
+            raw['social_fixture_text'] = reply
             raw['disposition'] = 'mixed'
         else:
             case['input']['text'] = asks
@@ -384,7 +404,7 @@ def extended_case(family, action, value_index, form):
         if family.startswith('confirmation_'):
             next(c for c in case['catalog'] if c['capability_id']==cap)['requires_confirmation'] = True
             raw['user_confirmation_required'] = True
-            raw['response_text'] = ('确认执行这个动作吗？' if zh else 'Do you confirm this action?')
+            raw['social_fixture_text'] = ('确认执行这个动作吗？' if zh else 'Do you confirm this action?')
     elif family.startswith('plan_'):
         work = raw['steps'][0]
         if family == 'plan_duplicate_step': raw['steps'].append(copy.deepcopy(work))
@@ -423,7 +443,7 @@ def extended_case(family, action, value_index, form):
         step['required_prompt_fragments'] = [case['followup']['text'] if step['name']=='gi-cancel' else case['input']['text']] if step['role']=='gi' else ['${goal}'] if step['role'] in {'fast','deep'} else []
         step['fixture_kind'] = 'fault_injection' if case.get('expected_rejection') and index==len(case['model_steps'])-1 else 'authored_reference'
         step['training_eligible'] = False
-    return case
+    return _separate_interaction(case)
 
 
 def reject(case, role):
