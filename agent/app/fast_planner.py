@@ -419,7 +419,10 @@ class FastPlannerResolver:
             ),
         }
         if not reporting_goal_ids and not request.planner_reentry_scope:
-            response_schema = planner_readiness_response_schema(response_schema, expected_goal_ids_for_turn)
+            response_schema = planner_readiness_response_schema(
+                response_schema, expected_goal_ids_for_turn,
+                confirmation_required_capability_ids=[item["capability_id"] for item in capability_payload if item.get("requires_confirmation")],
+            )
         if not loaded_capability_ids:
             response_schema = capability_lookup_response_schema(response_schema, [
                 item for item in indexed_catalog if item.capability_id not in {known.capability_id for known in selected_catalog}

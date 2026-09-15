@@ -48,7 +48,7 @@ The [Cognitive Gateway / 认知网关](../docs/COGNITIVE_GATEWAY.md) is the logi
 boundary between interaction transport and semantic cognition. It owns input
 normalization, deterministic protective reflexes, attention review, bounded
 context assembly, and turn admission. The Goal-Driven Cognitive Core owns
-ordinary intent and goal understanding, Planner-owned communication/work,
+ordinary intent and goal understanding, SC-owned communication and Planner-owned Work,
 execution coordination, and outcome reconciliation.
 
 The frozen version 1 `UserTurnEnvelope`, shared deterministic reflex contract,
@@ -80,22 +80,22 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> local suppression: record the envelope and start no ordinary cognition
   -> explicit text: transport-addressed admission -> admitted UserTurnEnvelope
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> Goal Interpretation: contextual Responsibility + Goal relation + bounded unresolved meaning
+  -> Goal Interpretation: complete intent + result type + source evidence + unresolved meaning
   -> same GI result, concurrent fan-out
-       |-> Fast Planner: input resolution + exact Communicative/Capability Activity Plan
-       |     `-> Host truth/provenance validation -> Vocal/TTS realization
+       |-> SC: complete interaction + optional expression -> validated delivery
+       |-> Fast Planner: input resolution + exact Capability Work + communication Needs
        |     `-> Deep Planner only when HOW exceeds the Fast budget
        `-> Goal Association: sole canonical Goal commit/version authority
-  -> Fast Advance / canonical Plan may include optional auxiliary social Activities
+  -> SC acts may include optional auxiliary social expression
   -> bind Activities into one Runtime task-list view per Goal
   -> start ready side-effect-free reads; hold effects for Goal/confirmation authority
-  -> Planner-owned exact communication is mechanically materialized when needed
+  -> SC owns all ordinary wording against exact Needs and trusted facts
   -> InteractionCoordinator -> Trusted Capability Runtime
       -> Soridormi or peer provider
   -> exact plan/request/result/trace join -> per-Goal outcome/Evidence update
   -> Goal-bound CognitiveOpportunity -> Planner Work/needs + SC interaction / wait / silence
   -> Goal-free trusted Situation -> CognitiveOpportunity -> same Core situational cognition
-       -> silence or one low-commitment speech Activity; never Capability Work
+       -> silence or qualified interaction through SC; never requested Capability Work
   -> validated Core-authored speech -> TTS -> playback
 ```
 
@@ -104,7 +104,7 @@ when plan ID/fingerprint, step, capability, arguments, timing, goal ownership, a
 output-schema identity match. Terminal `CapabilityResult` and `CapabilityTrace` records
 then produce an immutable `ExecutionOutcomeBundle`; missing results become
 `not_run`, and trusted terminal truth is projected as Evidence for the same Planner.
-Any result speech must therefore be Planner-authored and Evidence-bound. Barge-in may invalidate stale audible output, but an
+Any result speech must therefore be SC-authored and Evidence-bound. Barge-in may invalidate stale audible output, but an
 ordinary newer turn does not cancel the earlier routed turn or discard its Goal
 and outcome evidence. Explicit deterministic control or a Core-authorized
 foreground interruption may cancel only its bound scope. A recoverable
@@ -143,8 +143,9 @@ confirmation regardless of the provider declaration.
 ### Maintained authority path
 
 ```text
-ASR -> Cognitive Gateway -> Goal Interpretation -> Fast/Deep Planner
-    -> Trusted Capability Runtime / Vocal Runtime -> Evidence -> Planner re-entry
+ASR -> Gateway -> GI -> independent SC / GA / Work Planner
+    -> validated communication / Goal commit / Work -> Runtime -> Evidence
+    -> scoped Planner Work and independent SC interaction
 ```
 
 If the Goal-driven Runtime is disabled or fails after admission, ordinary cognition

@@ -1,12 +1,111 @@
 # Chromie project principles and implementation audit
 
-**Updated:** 2026-09-14. **Pre-delivery base:** `d7c7f27767d8e137edbf2aa165a11b81d6282527`, `main`. The exact resume revision is the delivery commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md), and [handoff](HANDOFF.md).
+**Updated:** 2026-09-16. **Pre-delivery base:** `f90dff450357cd49358bb49f03a4930a4d33a8d4`, `main`, fetched and equal to upstream before development. The delivery revision is the commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md) and [handoff](HANDOFF.md).
 
-**Audience:** project owner and maintainers reviewing or continuing the Issues. **Owner:** the project owner owns principle decisions; each linked Issue owns its acceptance. This report records evidence and decisions under the existing [Charter](docs/PROJECT_CHARTER.md), [Status](docs/STATUS.md), and [Roadmap](ROADMAP.md).
+**Audience:** project owner and maintainers. **Owner:** the project owner owns principle decisions; implementation and evidence remain with their existing component owners. The owner explicitly authorized a project-wide audit, design/implementation repairs, up to 18 full-test iterations, commit and push. This authorizes reconciliation of obsolete wording ownership, not weakening safety or declaring unobserved success.
 
-The owner explicitly authorized implementation, principle decisions, bounded maintenance, publication and closure of solved Issues in this session. The repairs preserve GI ownership of WHAT, GA ownership of Goal continuity, Planner ownership of HOW/speech, and Runtime ownership of execution and Evidence. Three decisions follow natural, grounded behavior: reporting a cancellation does not fulfill the original request; remembering a future intention is different from doing it now; optional learning follows the ready response. None needs another semantic reviewer or a phrase-based router.
+## Current conclusion and scope
 
-Earlier source repairs and native failures remain revision-bound evidence below. The September 14 continuation investigates native GI without promoting a model or changing semantic authority, and repairs a reproduced distance-provenance gap (#67). #24/#32 retain their separate native/target requirements.
+The implemented authority split is coherent at maintained ingress boundaries: **GI preserves complete intent; GA owns Goal continuity; Planner owns Work and scheduling; SC owns communication and optional expression; Host/Runtime owns admission, authorization, delivery and Evidence.** A compound intent can remain one Responsibility and one Goal while Planner creates several Activities. New GI parameter tables and Planner-authored ordinary speech are forbidden.
+
+The audit reproduced and repaired a mixed future/ready Goal contract gap, removed a dead wording-authority export and reconciled current architecture/API/interaction documentation. A Planner prompt cleanup was evaluated and rejected after new truncation failures; its original instructions remain an open finding. Native model reliability remains a release blocker. A structurally accepted result can still map right to left; source citations and JSON validation are not semantic proof. No model or release profile is promoted by this audit.
+
+This is a cross-component source, authority and executable-workflow audit, not an assertion that every line, every model utterance, every external dependency or physical deployment has been proved correct. Existing owner-reported microphone/ASR acceptance remains separate. No physical microphone, audible speaker or robot test is fabricated.
+
+## Coverage and findings
+
+| Area and reviewed owners | Evidence and finding | Disposition |
+| --- | --- | --- |
+| Governance: Charter, Human-Like Interaction Contract, semantic authority, architecture, turn loop, API and component READMEs | Current paragraphs simultaneously assigned words to Planner and SC, timestamps/parameters to GI and Planner, and treated implemented SC as unimplemented. An old HLIC paragraph forbade source quotations required by the newer intent-only contract. | Reconciled in existing owners. Current source-bound quotations remain required where declared; retired typed resource authoring is explicitly retained-state history. No new semantic owner/document/runtime switch. |
+| Gateway/admission/reflex | Distinct pre-semantic protective controls, immutable admitted envelope, no Host semantic phrase routing; covered by canonical Gateway/reflex, cancellation and unusable-audio tests. | No new reproduced defect in inspected paths; native addressedness and physical input quality are separate qualification. |
+| GI | Closed intent/source/result-type wire rejects parameter/relationship fields. Baseline compound case preserves all three actions and has no false actor uncertainty. | Intent-only design preserved. Prior 19/24 native semantic result remains historical; this audit does not qualify the whole GI role. |
+| GA and Goal state | New Goal meaning/type inherited from exact GI ref; continuity and retained typed-state conservation remain Host checked. Concurrent baseline GA commits the intact compound Goal. | No new writer introduced. Retained typed corrections must use a source-bound replacement when an intent-only update would leave contradictory typed state. Existing 200 rejected legacy-update references are not new successful continuity evidence. |
+| Fast Planner Schema / Deep validation | Two independently accepted intents, one future and one ready: Fast Schema forbids the correct mixed result; Deep admits the JSON but rejects honest unmet future satisfaction. | Fixed at these two boundaries; new tests cover Schema, Host, actual controlled Runtime dispatch, completed acknowledgement, durable restart and one-shot wake. |
+| Planner prompt and catalog | Fast inherited canonical `source_quote`/strategy instructions inside an `argument_sources` transaction. Another sentence implied one Activity per Responsibility despite compositional Work. Full turn-sign contract was present in retained packets. | Tested separate provenance instructions and clarified Activity/ref cardinality, then rejected that candidate: two new truncations fail non-regression. Original prompt retained; wording ambiguity and native failures remain open. No phrase-to-action rules or second semantic reviewer. |
+| SC and interaction | Complete snapshot/identity/Need validation exists; SC independently sees GI and actual Work facts. Baseline SC chooses silence partly because Needs are empty despite the standing interaction duty. | Native relevance/latency remains open. No forced acknowledgement template or Planner wording fallback. Removing the unused `PLANNER_COMMUNICATION_AUTHORITY_PROMPT` prevents accidental restoration of the retired writer. |
+| Runtime, WorkDAG and provider boundary | Registry availability/version, input/output schema, confirmation, monitor, exact Plan/request/result ownership, resource arbitration and scoped cancellation checked in source and canonical suites. Paired Soridormi owns physical execution/safety. | No new reproduced safety/provenance bypass in reviewed paths. Wrong model semantics can pass mechanical checks; no universal safety proof is claimed. |
+| Voice / TTS / delivery | Ordered playback and generation, cancellation generations, interruption and completion-qualified speech ledger remain Host-owned; relevant playback/TTS/VAD/barge-in suites run in canonical gates. | No new source defect reproduced. Discarded TTS in live text is not audible delivery evidence. |
+| Memory / stable Mind / Reflection | Disclosure gate precedes model context; private/unknown relational memory stays hidden, audience-limited memory requires supplied audience, ordinary proposals cannot grant disclosure. Durable personal facts require explicit consent. Reflection is advisory and cannot rewrite policy/history. | No new reproduced defect in inspected/tested boundaries. No live multi-person privacy or perceptual-identity qualification claim. |
+| Configuration / deployment / CI | Generated runtime env, source/image identity, pinned static checks, test ownership and GitHub Python 3.11/3.12 workflow inspected. Deployed Agent/ASR/LLM/TTS bind host ports to `127.0.0.1`. | Local source/image matching is required for each live candidate. Local Python 3.13 execution does not claim those CI jobs ran remotely. Ollama priority metadata does not prove SGLang scheduling or latency. |
+| Evidence and regression corpus | Baseline strict 6,000 passes. Readiness Schema change exposes 400 frozen-request mismatches, including four canonical test failures. | Retained failures, then explicit request-only refreeze; a second refreeze removes the rejected prompt candidate. Final diff: 400 workflow cases, zero prototype cases. All 6,000 scenario inputs, reference replies, fault injections and behavior oracles stay unchanged. Strict replay remains strict; final counts/hashes are in the handoff. |
+
+## Actual baseline workflow and earliest failures
+
+Originating admitted input: “walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left”. Loop 1 SID `c0c5a0b6`; loop 2 SID `84b2e74d`. Each is a complete cohort invocation stopped at its first hard contract failure, not a successful aggregate.
+
+```text
+admitted source -> GI complete intent
+                    |-> SC independent interaction -> silence
+                    |-> GA continuity -> one canonical compound Goal
+                    `-> Fast Work -> source/provenance rejection
+                                      `-> no body dispatch; retained Goal; safe idle
+```
+
+| Module / role | Authoritative input and actual output | Expected output / verdict |
+| --- | --- | --- |
+| Gateway/source | Original admitted text and exact source identity | Correct for the exercised text ingress; no ASR was invoked. |
+| GI / WHAT | Full source -> one body-action Responsibility containing walking speed/duration, two nods and left turn; unresolved empty | Correct in these two traces. Three Activities do not require three GI Responsibilities. |
+| Concurrent SC / interaction | Same accepted GI; Work pending; no external Needs -> silence, with absence of Needs included in its rationale | Mechanically accepted. Relevance rationale is not qualified; absence of Needs alone is not permission to ignore its standing interaction duty. No claimed physical progress. |
+| Concurrent GA / continuity | Exact `r1` -> one new Goal with inherited complete text/type | Correct; preserved canonical state is not proof that Work ran. |
+| Fast / HOW | All required Capability contracts supplied, including positive yaw = left. Loop 1 returns three steps with decorated/unsupported source strings and negative yaw for left. Loop 2 returns mostly valid quotes but omits speed provenance and again selects negative yaw. | First wrong semantic output is Fast. Prompt wire/cardinality contradictions were contributing contract defects; correcting them alone did not qualify the model. |
+| Host / containment | Exact owned-source and argument-grounding checks reject before Capability dispatch | Correct rejection. Host does not strip decorations, invent a missing quote, flip yaw or ask another model to repair the Plan. |
+| Deep / execution / post-effect evidence | Deep not invoked to repair invalid Fast; body provider never called | Correct containment. Safe idle observed in headless simulator; no physical effect evidence. |
+
+## Mixed timing: reproduced contract failure and repair
+
+The retained probe has two current GI Responsibilities: “Nod twice at 2099-09-04T19:00:00+08:00” and “Blink three times now”. GA inherits two Goals without typed GI time fields. One authored primary Planner reply proposes a blink step owned only by the ready Goal, one exact source-bound future condition, an unmet future outcome, and partial aggregate satisfaction.
+
+| Boundary | Before | After / regression |
+| --- | --- | --- |
+| Fast dynamic Schema | Ordinary alternative requires execution outcomes; waiting alternative requires all Goals waiting. Correct mixed reply is unrepresentable. Host alone can accept it when the test bypasses decoder enforcement. | Alternative preserves the already compiled Capability/argument/Work constraints and independently constrains each timed Goal. Linear per-Goal conditions avoid enumerating all ready/future subsets. |
+| Deep Schema → DTO/Host | Correct mixed reply is schema-valid; deterministic adequacy rejects future outcome score 0 as below 0.75. | Only already provenance-validated new readiness conditions join existing nonfulfilling reporting scope. A deliberately unmet future effect is not failed planning. No score is raised. |
+| SC / adapter / Runtime | Required acknowledgement still belongs to SC; Work and timer must retain independent Goal ownership. | Explicit controlled SC receipt plus real adapter/runtime dispatches exactly the ready blink; completed receipt does not close the future Goal. This is test-fixture speech, not native-model evidence. |
+| Goal store / restart / wake | Original future effect must remain open and cannot execute early. | Durable restart retains the timer; due−1 produces no opportunity, due produces only the future Goal, subsequent drain produces none. |
+| Negative controls | Early Work, fabricated fulfillment, foreign source time, duplicate timer | All remain rejected before dispatch for both planning depths, with one primary call. |
+
+Initial focused proof: **2 failing positive cases, 8 passing negative cases**, then **99/99** related tests. The extended Runtime fixture initially selected an execution-only adapter for a Plan with communication Needs and then supplied an incomplete mock output schema; those harness defects were corrected to the maintained SC join and strict provider contract. They are not reported as production defects. The final integrated mixed-timing controls pass.
+
+## Native transaction comparisons
+
+Twelve individually frozen source cases cover six bilingual contrasts: compound sequence, reversed sequence, left, right, explicit walking speed/duration and counted nodding. The same complete captured production catalog, primary streaming transaction, context/output budgets (49,152 / 4,096), temperature 0, top-p 0.9 and `think:false` were used. Targets stayed outside inference. This is controlled accepted-GI → native Fast evidence with no Runtime effects, not full pipeline qualification.
+
+| Candidate | Schema / Host accepted | Reviewed semantic pass | Decision |
+| --- | --- | --- | --- |
+| Existing Qwen3.5 4B prompt | 12/12 Schema, 1/12 Host | 1/12 | Baseline retained. |
+| Role-specific provenance/cardinality instructions, same 4B | 10/12 Schema, 2/12 Host | 2/12 | Rejected: left-turn EN/ZH now truncate at 4,096 tokens. One additional semantic pass does not offset new hard failures. |
+| Same candidate transaction, installed Qwen3.5 9B | 12/12 Schema, 3/12 Host | 2/12 | No promotion. “Turn right” mechanically passes with positive/left yaw. |
+
+Every raw result, including mechanical passes, was reviewed. Remaining defects include source-map omission, ungrounded count, inappropriate clarification/escalation, wrong direction and candidate truncation. A bigger model did not establish semantic improvement. The candidate's active prompt changes were reverted; only its unused import cleanup remains. Further example-specific prompt additions would not be an evidenced general repair, so this audit stops that local optimization and retains the open qualification blocker. No online critic, Host direction rule or model/profile change was added.
+
+## Validation ledger and delivery boundary
+
+Final loop 3 passes **3,471 tests / 1,017 subtests, 145 benchmarks, 20 legacy,
+6,000 strict replay outcomes and 45 Level A cases**. All required static/policy,
+ownership, configuration and docs gates pass; two existing FastAPI deprecations.
+The first loop passed local gates; loop 2 retained four canonical/400 replay request
+mismatches that the explicit refreeze corrected. Three of at most eighteen loops
+were used; rejected role comparisons are separate.
+
+Final rebuilt/source-verified live SID `9a5a54b0` selects all 74 cases but stops at
+the first Fast contract failure: **0/1, 73 unrun**, safe idle, zero body calls. GI
+and GA preserve the complete intent. Fast still decorates exact source strings,
+omits speed/yaw citations and chooses negative yaw for left. SC independently
+mistakes the high-level request for forbidden low-level body control, invents a
+capability/safety limitation and returns silence. The log's one speech item is an
+acceptance-harness error diagnostic, not SC output. Deep is not invoked to repair
+the invalid Fast result. Every attempted case and all twelve native calls across
+the three aggregates are reviewed in `loop-*/adjudication.json`.
+
+The exact final test counts, source/image identities, final cohort stop and commands are recorded in the current [checkpoint](DEVELOPMENT_CHECKPOINT.md) and [handoff](HANDOFF.md). The maximum was 18 complete candidate loops; focused tests and role-only comparisons are separately labelled. An incomplete native cohort is never counted as a pass.
+
+Private evidence root: `.chromie/acceptance/full-audit-20260916-f90dff450/`.
+`iterations.json`, each `loop-*/`, `fast-corpus/`, `fast-{baseline,candidate,qwen9b}/`, `packet-migration.json`, and retained red/green logs preserve the evidence. These artifacts are local and private, not fabricated remote attachments. Reference scenarios remain `training_eligible=false` and same-agent/non-independent evidence.
+
+No new current Markdown document, runtime environment variable, product flag, architecture layer or semantic authority was introduced. Existing documentation owners were consolidated: Markdown files 102 → 102, docs-root Markdown 58 → 58, core reading path 15 → 15, checked by `check_docs.py`. Retired HLIC communication/result sections were merged into current SC ownership instead of adding another design document. File size is a review measurement, not the reason for the changes. This audit does not close native GI/GA/Planner/SC coverage, foreground latency, concrete perception/audience adapters, remote target evidence, #24/#32, or physical commissioning.
+
+## Historical audit records
+
+The sections below retain their original revisions and superseded contracts. In particular, older GI binding/`ready_at`, Planner wording and live-pass claims are historical evidence, not current implementation instructions.
 
 ## Native GI continuation and distance containment — #24/#32/#67
 

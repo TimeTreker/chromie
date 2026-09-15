@@ -45,6 +45,14 @@ fail in the retained aggregate. Source completion is not release closure. See th
 current checkpoint for the actual workflow, 200 retained typed-update limitations,
 and exact next evidence work. No remote Issue is silently closed by this amendment.
 
+The subsequent owner-authorized full audit reconciles stale current authority prose
+and repairs independently ready/newly scheduled Goal handling in Fast Schema and
+Deep adequacy, with controlled Runtime/restart proof. Its native prompt candidate
+is rejected for new truncations; no model/profile is promoted. The audit's maximum
+18 test loops is a ceiling, not a completion criterion. Source repair and local
+regression success do not close the native Fast/SC and target-evidence blockers.
+The current checkpoint and audit retain failed iterations as well as passing gates.
+
 ## Social Cognition migration
 
 The owner approved the [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)

@@ -17,9 +17,9 @@ from .cognitive_identity import (
 )
 from .goal_progress_communication import goal_progress_communication_prompt
 try:
-    from chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT, PLANNER_WORK_AUTHORITY_PROMPT
+    from chromie_contracts.semantic_authority import PLANNER_WORK_AUTHORITY_PROMPT
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.semantic_authority import PLANNER_COMMUNICATION_AUTHORITY_PROMPT, PLANNER_WORK_AUTHORITY_PROMPT
+    from shared.chromie_contracts.semantic_authority import PLANNER_WORK_AUTHORITY_PROMPT
 
 from .prompt_projection import bounded_json, required_json
 from .planner_context import (

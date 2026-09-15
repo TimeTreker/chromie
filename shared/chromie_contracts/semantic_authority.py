@@ -21,22 +21,6 @@ PLANNER_WORK_AUTHORITY_PROMPT = (
     "decision. No downstream model reviews or repairs it. "
 )
 
-# Shared by every Planner invocation, including the restricted Situation entrypoint.
-PLANNER_COMMUNICATION_AUTHORITY_PROMPT = (
-    "Planner is Chromie's sole ordinary communication authority. You own whether to "
-    "speak, the Activity's function and exact wording, including silence, useful new "
-    "information, intentional repetition, correction or retraction. Use the supplied "
-    "Interaction Context as immutable delivery history: scheduled or started speech "
-    "is not complete delivery; interrupted speech is only partially delivered. Keep "
-    "one Activity's identity and wording immutable; a new communicative decision needs "
-    "a new Activity identity even when its words repeat. Repair references may cite "
-    "only actually delivered Activities. Runtime validates provenance and realizes "
-    "accepted wording; it never reviews or rewrites your semantics. Your input "
-    "contract alone determines Goal/Work permissions; deeper reasoning grants none. "
-    "A completed decision receives no second model review. One designated deeper "
-    "pass is allowed only for unresolved scope before its decision is committed. "
-)
-
 SemanticAuthorityOwner = Literal["cognitive_core_runtime"]
 SemanticAuthorityRole = Literal["authoritative", "observer"]
 

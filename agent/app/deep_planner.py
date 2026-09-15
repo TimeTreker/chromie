@@ -64,6 +64,7 @@ from .planner_validation import (
 )
 from .planner_deep_validation import deep_plan_validation_errors
 from .planner_fast_validation import validate_work_reuse_selection
+from .planner_grounding import planner_readiness_times
 from .planner_fallback import (
     materialize_deep_clarify,
     materialize_deep_unavailable,
@@ -249,7 +250,10 @@ class DeepPlannerResolver:
             future_goal_times=future_goal_times,
         )
         if not reporting_goal_ids and not request.planner_reentry_scope:
-            response_schema = planner_readiness_response_schema(response_schema, expected_goal_ids_for_turn)
+            response_schema = planner_readiness_response_schema(
+                response_schema, expected_goal_ids_for_turn,
+                confirmation_required_capability_ids=[item["capability_id"] for item in payload if item.get("requires_confirmation")],
+            )
         generation_options = {
             "temperature": 0,
             "top_p": 0.9,
@@ -423,6 +427,9 @@ class DeepPlannerResolver:
                 },
             )
 
+        # Only the already validated primary conditions qualify as waiting.
+        # A future Goal is deliberately unmet; that is not inadequate planning.
+        reporting_goal_ids.update(planner_readiness_times(validated_model_output, authoritative_goals, request.context))
         errors = deep_plan_validation_errors(
             plan,
             payload,

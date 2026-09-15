@@ -50,18 +50,18 @@ state-commit failure is fail-closed. The same turn cannot transfer semantic auth
 
 Speech composition and user-task execution may be prepared or scheduled
 independently from immutable projections of that authoritative turn. Parallel
-output preparation does not create another semantic owner. Planner owns each
+output preparation does not create another semantic owner. SC owns each
 Communicative Activity's function, exact words, timing, truth stage, provenance,
 and constraints; Goal Interpretation owns none of those fields. Trusted Runtime
 and Host bind terminal results to exact request/Goal provenance as Evidence, then
-reactivate Planner with a bounded current-state view. Result contents cannot bypass
-Planner or infer their own Goal. Confirmation/cancellation mechanisms likewise own
+reactivate Planner for Work and SC for communication with bounded current-state
+views. Result contents cannot bypass those authorities or infer their own Goal. Confirmation/cancellation mechanisms likewise own
 only authorization/control facts and may not turn those facts into ordinary dialogue.
 Named-Goal cancellation records bounded `GoalCancellationEvidence` after deterministic
 dispatch/reconciliation and re-enters the same Planner state path used for trusted runtime
 Evidence. If cancellation invalidates a pending confirmation, Host revokes the stale token
 as a whole; it never invents a narrowed child Plan, replacement prompt, or sibling
-remainder speech. A later Planner pass may answer, author genuinely new Work,
+remainder speech. A later Planner pass may establish an answer Need, author genuinely new Work,
 reuse/cancel/replace current Work, wait, or emit no Activity; it must not repeat the
 terminal or cancelled Activity merely because Evidence arrived.
 
@@ -70,10 +70,9 @@ adaptation are not additional semantic owners. They refine factual/context input
 existing owners and cannot inherit downstream Goal, Plan, authorization, or effect
 authority.
 
-Optional social decoration is part of that same Planner authority, not a separate
-semantic owner. Fast Advance and canonical Fast/Deep results may carry bounded
-`auxiliary_activities[]` alongside their Main Activities. The field is fingerprinted
-Plan truth but is structurally outside Goal-owned `steps[]`; Runtime may validate,
+Optional social decoration belongs to SC in the same complete interaction decision.
+`SocialCommunicativeAct.auxiliary_activities[]` is bound to its exact SC snapshot and
+act identity and is structurally outside Goal-owned `steps[]`; Runtime may validate,
 execute, or suppress the exact proposal, never reselect it. Auxiliary-only events
 cannot create a Goal-scoped `CognitiveOpportunity` or borrow Goal identity.
 
@@ -90,8 +89,9 @@ capability name, is the decomposition boundary.
 ## Approved semantic boundary
 
 Goal Interpretation performs WHAT-only semantic interpretation. Its target model-facing
-contract emits provider-neutral `responsibilities[]`, material bindings,
-Goal relationships, and bounded unresolved meaning. It does not author Work, Primary
+contract emits complete provider-neutral `responsibilities[]`, requested result
+types, source evidence and bounded unresolved meaning. It emits neither parameter
+bindings nor Goal relationships. It does not author Work, Primary
 Activities, Plan structure, execution lanes, realization, Capability IDs, executable
 arguments, provider requests, planning InformationGaps, input-source/default policy,
 clarification selection, or `actions[]`; Goal Association owns canonical Goal state and
@@ -117,7 +117,7 @@ SC does not infer missing identity or audience. Ordinary turns and trusted Situa
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → concurrent Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
+| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → independent SC / Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Trusted Goal-free Situation | Goal-Driven Cognitive Core; SC owns communication | authoritative, communication-only | Situation → bounded Social Cognition invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |

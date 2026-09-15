@@ -27,9 +27,9 @@ incomplete result is a failed semantic case.
 | Responsible owner | Deterministically checked scope | What acceptance does not establish |
 |---|---|---|
 | Dynamic response Schema: GI `model_interpreter.py`, `goal_association_schema.py`, `planner_schema.py` | Required fields, closed vocabulary, permitted branches, supplied IDs/token references and applicable cardinalities for that exact request. | That free-text meaning follows the source, that all obligations were emitted, or that a reply answers the request. Schema descriptions instruct the model; they do not execute semantic checks. |
-| GI DTO and source validator: `goal_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; declared binding, provenance, type and relationship restrictions. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
-| GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, declared binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of GI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation GI never emitted. |
-| Planner: `planner_validation.py`, `planner_fast_validation.py`, `planner_deep_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That response wording or an arbitrary action list realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
+| GI DTO and source validator: `goal_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; source provenance and result-type restrictions; parameter and relationship fields are forbidden on live GI wire. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
+| GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, inherited intent/result type, retained typed-binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of GI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation GI never emitted. |
+| Planner: `planner_validation.py`, `planner_fast_validation.py`, `planner_deep_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That an arbitrary action list or communication Need realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
 | SC: `social_cognition.py` and exact Host projection | Source/snapshot identity, supplied Need/Goal/Evidence coverage, immutable acts, permitted communication phases, expression anchors and qualified targets. | That a structurally accepted utterance is useful, sufficiently informative or socially appropriate. Actual delivery and semantic adjudication remain separate. |
 | Host and Trusted Capability Runtime | Exact identities/versions, authorization/confirmation, contract validation, lifecycle, dispatch, and retained execution/delivery facts at the exercised boundaries. | User satisfaction or world/physical truth beyond the retained provider/device evidence. An accepted Plan is not completed execution. |
 
@@ -121,9 +121,10 @@ validation, state and Capability Runtime run against controlled providers/audio.
 Initial admission and role scheduling remain explicit test-driver inputs. Each run
 retains source/corpus hashes and per-call requests/replies; mismatches fail closed.
 Retained-timer cases start from prior Goals; new-request cases separately prove GI/GA
-admission of exact temporal WHAT, waiting across restart, no early work and one due wake.
-The simulator already returns the authored answer; the original #60 failure was the
-Schema/Host rejecting its readiness field. These passes cannot close #24/#32 or replace
+admission of temporal intent followed by source-bound Planner readiness, waiting
+across restart, no early work and one due wake. The simulator returns authored
+reference replies; the historical #60 GI timestamp wire has been superseded by
+the intent-only contract. These passes cannot close #24/#32 or replace
 native streaming, voice or robot evidence. The expanded cohort has 60 authored contrasts
 and 6,000 parameter/language variants, not 6,000 independent inferences or abilities.
 Report contract rejection, safe nonexecution, state handling and completed workflows

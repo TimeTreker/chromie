@@ -1,8 +1,8 @@
 # API and Protocol Reference
 
 The [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
-is undergoing source migration. The dedicated transaction below is implemented;
-the existing turn Planner still needs its writable communication fields removed.
+is source-implemented. The dedicated transaction below owns communication;
+maintained Planner model outputs reject writable wording and decoration.
 See [migration inventory](COGNITIVE_TURN_LOOP.md#source-migration-inventory).
 
 This document describes interfaces implemented in this repository. Soridormi
@@ -214,7 +214,7 @@ Important interaction-related endpoints are:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/fast-advance` | Stream one Fast Planner semantic result as typed NDJSON: an early presentation commit, then a terminal result or typed failure. |
+| `POST` | `/fast-advance` | Stream one complete Fast Work result or typed failure as NDJSON; no presentation prefix. One bounded catalog lookup may precede the Work decision. |
 | `POST` | `/goal-association` | Commit no Host state; return the model-authored canonical Goal association/segmentation proposal for Host application. |
 | `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
 | `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
@@ -229,20 +229,21 @@ ordinary initial requests omit it. They do not accept a Goal-Interpreter `route_
 
 The maintained Cognitive Core interpretation result contains first-class
 `responsibilities` as provider-neutral Goal-Interpretation evidence: a local reference,
-human outcome, material semantic bindings, Goal relationship, exact output mode, and
+complete human outcome, requested result type (`output_mode`), and
 the primary-result source evidence required for mechanical coverage validation.
 Effectful or multi-Responsibility results do not cross a second LLM coverage reviewer.
 Responsibility evidence is the authoritative WHAT handoff
 for downstream cognition; it is not a Goal, Plan, or Goal-Association-only DTO.
-Capability IDs, executable args/actions, provider identity, execution methods,
+Parameter bindings, Goal relationships, activation timestamps, Capability IDs,
+executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
 
-For short fresh turns of at most 40 normalized characters without retained semantic
-context strings, GI's dynamic Schema restricts location and duration/speed string
-values to untyped exact source substrings. It does not choose the dimension or
-meaning. Numeric measurement branches remain available; longer/context-backed
-turns keep the existing provenance validators. Source spelling alone does not
-establish complete units, correct typing or Responsibility coverage.
+GI primary and depth use the same closed intent-only wire. Exact source spans are
+validated for identity, ordering and non-overlap. GI does not receive Capability
+argument schemas or normalize duration, speed, direction or activation time into
+execution fields. GA inherits new Goal meaning and result type from the accepted
+source ref; Planner realizes inputs and scheduling. Source membership alone does
+not establish semantic completeness or correct conversion.
 
 Planning `InformationGap` creation/resolution, execution-input completeness, blocking
 status, source/default selection, and clarification selection belong to Fast Planner.
@@ -361,7 +362,7 @@ nonempty top-level `response_text` containing the exact confirmation question wh
 rejects blank confirmation speech for any selected confirmation-gated Capability. Other Goal outcomes retain
 independent adequacy and completion checks.
 
-`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association result, applicable Fast Planner continuation/escalation context, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. Ordinary speech Goals use `respond` only when their requested content can be supplied truthfully; they may instead clarify, report unavailable, or refuse. An independent completed speech Goal may coexist with such a limitation in a zero-step `mixed` Plan. Every unmet Goal must remain unmet in per-Goal and aggregate satisfaction; complete coverage is accounting, not fulfillment. Zero-step mixed speech grants no executable work or confirmation authority. An explicit future `ready_at` may instead receive a scoped waiting acknowledgement with its exact Planner-authored time condition and original Goal still unmet. That condition wakes cognition later; it does not delay a step listed in the current Plan. Ready independent siblings and a timer for monitoring already-running Work retain their normal contracts. A trusted state wake with no new Goal Association result resolves only its exact persisted open Goal snapshots, bound to the matching CognitiveOpportunity. Missing, duplicated, mismatched or terminal snapshots fail before inference; no new Goal or association is authored by this projection. The primary request carries the captured Host clock comparison, including exact already-reached readiness times; old future-tense source wording cannot reschedule that same instant. Readiness itself grants no execution or completion authority. Canonical and streamed Fast may combine an independent response with clarification without a Capability Activity; whole-scope Fast escalation remains atomic. Runtime preserves the question/waiting lifecycle or final limitation speech instead of labeling every mixed response pre-action. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. The current Deep implementation uses one primary model invocation and fails closed on invalid output. Semantic grounding, responsibility coverage, capability applicability, confidence/satisfaction, and safety rejection are not rewritten by another Deep model pass.
+`POST /deep-plan` is available when `AGENT_DEEP_PLANNER_ENABLED=1`. It receives the original turn, active-goal context, Goal Association result, applicable Fast Planner continuation/escalation context, and the full capability catalog. It returns the same `CanonicalPlan` contract with `planner_tier=deep`. Deep planning is terminal: it may execute, respond, clarify, report unavailable, or refuse, but cannot return to Fast Planner. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. Ordinary speech Goals use `respond` only when their requested content can be supplied truthfully; they may instead clarify, report unavailable, or refuse. An independent completed speech Goal may coexist with such a limitation in a zero-step `mixed` Plan. Every unmet Goal must remain unmet in per-Goal and aggregate satisfaction; complete coverage is accounting, not fulfillment. Zero-step mixed speech grants no executable work or confirmation authority. An explicit future `ready_at` may instead receive a scoped waiting acknowledgement with its exact Planner-authored time condition and original Goal still unmet. That condition wakes cognition later; it does not delay a step listed in the current Plan. New intent-only scheduling uses a Planner-authored exact `source_quote` and future time condition, without a GI timer field. A newly waiting Goal may coexist with independently ready sibling Work; it remains unmet, owns no current executable step and wakes only at its validated time. Ready independent siblings and a timer for monitoring already-running Work retain their normal contracts. A trusted state wake with no new Goal Association result resolves only its exact persisted open Goal snapshots, bound to the matching CognitiveOpportunity. Missing, duplicated, mismatched or terminal snapshots fail before inference; no new Goal or association is authored by this projection. The primary request carries the captured Host clock comparison, including exact already-reached readiness times; old future-tense source wording cannot reschedule that same instant. Readiness itself grants no execution or completion authority. Canonical and streamed Fast may combine an independent response with clarification without a Capability Activity; whole-scope Fast escalation remains atomic. Runtime preserves the question/waiting lifecycle or final limitation speech instead of labeling every mixed response pre-action. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. The current Deep implementation uses one primary model invocation and fails closed on invalid output. Semantic grounding, responsibility coverage, capability applicability, confidence/satisfaction, and safety rejection are not rewritten by another Deep model pass.
 
 Canonical Fast requires an empty `escalation_reason` on every non-escalating
 result; Schema and Host enforce the same field contract. Fast and Deep receive
@@ -477,11 +478,14 @@ canonical Goal, current trusted state/Evidence, and the available Capability cat
 selected Capability/Activity records carry Runtime execution facts separately. This
 keeps Goal identity stable across provider changes and prevents Goal Association from
 quietly taking back planning authority.
-For a resource responsibility, the live schema likewise has one writable nested
-authority: `resource_responsibility.resource`, `.source`, `.recipient`, and
-`.delivery_mode`. Resource identity, normalized numeric quantity, query-scope
-attributes, source bindings, recipient, and delivery are authored there exactly
-once. A resource Goal's generic `bindings` must be empty. The Host creates an
+The live GA new-Goal schema contains only source Responsibility refs, related Goal
+IDs and superseded Goal IDs. Description, criteria and result type are inherited
+mechanically from GI. Resource details remain in that complete intention for Planner.
+
+Existing typed resource Goals retain one nested authority:
+`resource_responsibility.resource`, `.source`, `.recipient`, and `.delivery_mode`.
+These are retained-state contracts, not writable fields of the current GA new-Goal
+wire. A retained resource Goal's generic `bindings` must be empty. The Host creates an
 output-only frozen flat grounding view for Planner consumers and records exact
 canonical-field provenance; neither the model nor a downstream consumer may
 write that view back into Goal semantics. Goal descriptions remain summaries and

@@ -97,7 +97,7 @@ An owner-approved Fast-to-Deep path is permitted only as the role's designated,
 source-based cognition-depth delegation before semantic commitment for the unresolved
 scope. Deep receives authoritative source/context, not a Fast candidate answer to judge
 or rewrite. Once a semantic fact is accepted or committed, Deep cannot reopen it. A
-Planner stream whose typed presentation and terminal frames come from the same declared
+Planner stream whose complete Work result comes from the same declared
 invocation is likewise one primary transaction, not a reviewer chain.
 
 A post-hoc model reviewer used during offline adjudication is evaluation evidence, not
@@ -428,9 +428,8 @@ The retained corpora are:
 ## 7. Applying the method to Fast and Deep Planner
 
 **Migration boundary:** the [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
-transfers communication out of Planner. The transaction variants below describe
-current source and retained Planner cohorts, not a requirement to keep two
-communication writers after migration. Freeze the Social Cognition and Work-only
+is implemented: Planner owns Work and SC owns ordinary communication. Retained
+pre-migration speech cohorts are historical evidence, not the current Planner wire. Freeze the Social Cognition and Work-only
 Planner contracts separately, then qualify their combined workflow using the
 [new acceptance matrix](ACCEPTANCE.md#social-cognition-acceptance). Do not reuse
 old speech/streaming results as proof of the new owner or insert an online
@@ -473,9 +472,9 @@ Use deterministic gates for:
 - step IDs, Capability IDs, argument Schema, and source Goal IDs;
 - parameter-resolution provenance and whether a blocking value is actually resolved;
 - dependency, sequential/parallel timing, resource, confirmation, and safety contracts;
-- truthful response text and Evidence scope;
-- no premature completion speech;
-- no duplicate Communicative Activity after early Fast presentation;
+- truthful communication Needs and exact Evidence scope;
+- no Planner-authored words or optional decoration;
+- no promotion of planned Work or an answer Need into completed delivery;
 - revision/re-entry scope and no replay of closed siblings;
 - no executable partial plan after a hard validation failure.
 
@@ -484,24 +483,24 @@ Use semantic review for:
 - whether the Plan completely and naturally realizes the Goals;
 - whether chosen Capabilities and arguments are appropriate alternatives;
 - whether clarification, escalation, refusal, or unavailability is genuinely needed;
-- whether response wording is concise, grounded, and consistent with the Plan;
+- whether communication Needs preserve established facts and unresolved obligations;
 - whether Deep reasoning improves a complex case without inventing work.
 
 ### 7.3 Suggested frozen contrast families
 
 Fast Planner should cover at least:
 
-- direct truthful conversation with no effect Work;
+- a direct-response obligation with no effect Work, expressed separately by SC;
 - one complete common Capability action;
 - multiple compatible Goals;
 - information acquisition followed by evidence-grounded response;
 - explicit and defaulted parameter resolution;
 - confirmation-held material alternatives;
 - unavailable or invalid Capability;
-- early Communicative Activity plus later GA binding;
+- independent SC interaction and later GA binding without Work/wording transfer;
 - streaming advance and terminal Fast result;
 - ordinary Evidence/Situation/time re-entry;
-- Social Attention as optional subordinate activity;
+- SC optional expression that cannot replace requested Planner Work;
 - cancellation/supersession containment.
 
 Deep Planner should cover at least:
@@ -528,7 +527,9 @@ and Deep cohorts.
 - A correct Capability with guessed consequential arguments is not a semantic pass.
 - Deep recovery does not erase a technical Fast failure.
 - Fast/Deep may not judge or repair each other's meaning.
-- A mechanical repair may fix structure only; it may not choose new Work.
+- There is no generic Planner retry permission for malformed or semantic output.
+  Only the role-specific declared lossless DTO-repair path may repair structure;
+  it cannot choose new Work.
 - Host validation may reject or contain a Plan but may not substitute a Capability,
   fill semantic arguments, or rewrite Plan meaning.
 - Exact plan equality is usually too narrow; use deterministic invariants plus an

@@ -174,10 +174,6 @@ class CognitiveAgentClient(Protocol):
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
-    async def resolve_social_cognition(
-        self, session: Any, **kwargs: Any
-    ) -> SocialCognitionResolution: ...
-
     async def resolve_reflection(
         self, session: Any, **kwargs: Any
     ) -> ReflectionResolution: ...

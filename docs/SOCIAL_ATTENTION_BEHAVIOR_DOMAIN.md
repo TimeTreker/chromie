@@ -70,7 +70,7 @@ model-facing low-level motor fields, and explicitly tagged for the behavior doma
 Provider, backend, calibration, controller, joint, and actuator identity are not
 shown to the model.
 
-The Planner emits an empty list unless expression materially improves a particular
+SC emits an empty list unless expression materially improves a particular
 Main Activity. Each `AuxiliaryPlanActivity` contains:
 
 - a stable auxiliary activity ID;
@@ -82,8 +82,8 @@ Main Activity. Each `AuxiliaryPlanActivity` contains:
 
 Internal milestones such as understanding ready, Goal Association, planning,
 waiting, Work start, Evidence arrival, or lane transition are never anchors. Valid
-anchors are Planner-authored human-observable Activities: a Communicative Act,
-canonical Plan step, or canonical Plan response.
+anchors are immutable SC communicative acts from the same result. Requested body
+Work remains Planner-owned and does not grant SC a substitute task or anchor.
 
 ## Runtime authority
 

@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Intent ownership and Fast capability library — 2026-09-16 (current)
+## Project audit and mixed readiness — 2026-09-16 (current)
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Independent ready and newly scheduled Goals can share one Fast/Deep primary Plan; source-bound future conditions remain unmet and cannot execute early. SC acknowledgement does not complete the future effect. Existing authority documentation reconciled; dead Planner wording export and duplicate SC Protocol method removed. | Final loop: 3,471 tests / 1,017 subtests, 145 benchmarks, 20 legacy; 6,000 strict replay outcomes, source unchanged; Level A 45/45. Ten new timing/negative/Runtime/restart cases pass. Four hundred request-only fixtures refrozen without changing responses or behavior oracles. Three full loops out of maximum eighteen; earlier failures retained. | Three all-74-case live invocations stop at first hard Fast contract failure; 0/1 each, 73 unrun, safe idle. Final GI/GA correct; Fast citation/direction and SC invented limitation/silence fail. Native 12-case prompt candidate rejected for two new truncations; 9B comparison not promoted. Original prompt retained. | Development delivery only. Native Fast provenance/direction, SC relevance/latency, full current-revision live cohort and #24/#32 target evidence remain open. No physical or release promotion. |
+
+[Audit](../ARCHITECTURE_AUDIT.md), [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and
+[handoff](../HANDOFF.md) own findings, exact results and operational identities.
+Evidence: `.chromie/acceptance/full-audit-20260916-f90dff450/`. Earlier rows below
+are historical; independently timed Goals now have controlled integration proof,
+while temporal composition inside a single compound Goal is not qualified here.
+
+## Intent ownership and Fast capability library — 2026-09-16 (historical)
 
 | Implementation | Automated verification | Target validation | Release readiness |
 | --- | --- | --- | --- |

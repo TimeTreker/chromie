@@ -72,11 +72,12 @@ resolutions and time conditions) prove provenance, not semantic conversion accur
 Runtime retains canonical binding, confirmation, sequential physical execution,
 cancellation, restart-safe timers and evidence.
 
-GI, GA, execution events and trusted Situation can trigger independent Planner tasks.
+GI, committed Goal changes and trusted execution state may trigger scoped Planner Work.
+Those owners and trusted Situation may independently request SC communication.
 Goal-free Situation supplies no Responsibility, Goal or Capability Work permission,
-including safe reads. `SituationalPlannerResolver` keeps the existing endpoint/DTO
-surface and configured Fast/Deep clients; it shares the ordinary communication
-contract and Activity identity checks with Goal-bound planning. Only an unresolved
+including safe reads. `SocialCognitionResolver` serves the `/social-cognition` contract and configured
+Fast/Deep clients, with the same interaction authority and immutable Activity checks
+for ordinary turns and trusted Situation. Only an unresolved
 Fast decision with no Activity/Memory result may delegate once; direct Deep readiness
 has the same restricted scope. A complete decision has no second model reviewer.
 Runtime validates all returned provenance, identity, delivered repair references and
@@ -99,15 +100,15 @@ Perception
 Cognitive Gateway
   ↓
 Goal Interpretation     WHAT only
-  ├───────────────┐
-  ↓               ↓
-Planner           Goal Association
-fast/deep passes  canonical Goal continuity
-  ↓               │
-Plan / Activities │
-  └───────┬───────┘
-          ↓
-CapabilityRuntime       trusted execution lifecycle
+  ├──────────────────┬───────────────────┐
+  ↓                  ↓                   ↓
+SC                   Goal Association    Planner
+communication        Goal continuity     Work HOW
+  ↓                  │                   ↓
+Communicative Acts   │                   Plan / Activities
+  └──────────────────┴───────────────────┘
+                     ↓
+Host / CapabilityRuntime   correlation, admission and trusted delivery/execution
           ↓
 Provider events         what happened
           ↓
@@ -159,9 +160,9 @@ See [`../docs/API_REFERENCE.md`](../docs/API_REFERENCE.md) for the exact maintai
 
 ## Auxiliary social decoration
 
-Planner schemas receive only exact eligible catalog candidates; provider-owned body
+SC schemas receive only exact eligible expression catalog candidates; provider-owned body
 calibration, backend identity, joint targets, and low-level controller parameters are
-excluded. Runtime validates or suppresses the exact Planner proposal and Soridormi
+excluded. Runtime validates or suppresses the exact SC proposal and Soridormi
 resolves an accepted semantic target for its active embodiment. No independent
 social-decoration model configuration surface exists.
 

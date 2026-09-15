@@ -3,10 +3,19 @@
 ## Status
 
 The provider-neutral semantic contract is implemented in
-`shared.chromie_contracts.resource`. Goal Association may attach one
-`resource_responsibility` to a `SemanticGoal`. Fast Planner and Deep Planner
+`shared.chromie_contracts.resource` for retained typed Goals and provider contracts.
+The current GI/GA wire preserves complete resource intention in natural language;
+GA inherits that intent and does not author `resource_responsibility` or normalized
+parameters. Fast Planner and Deep Planner
 select an exact registered capability later; neither Goal Association nor the
 Host chooses a provider from resource kind, keywords, or hardcoded routing.
+
+The typed examples and GA authoring descriptions below document the retained
+pre-intent-migration representation and its conservation rules, not current model
+instructions. A current correction that would contradict retained typed fields
+requires an explicitly source-bound replacement Goal. Planner owns new resource
+argument realization and capability selection. See the current
+[intent and continuity wire](API_REFERENCE.md#cognitive-planning-and-interaction-support).
 
 The information-provider adapter `chromie.external_information.retrieve` is
 implemented but disabled until `AGENT_EXTERNAL_INFORMATION_ENABLED=1` and an

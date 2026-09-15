@@ -206,11 +206,11 @@ is its executable coding-agent entrypoint; the method document remains authorita
    ```
 
 3. Reconstruct the actual turn from the workflow artifacts: admitted input and
-   Gateway decision; Goal Interpretation; the same-result Fast-Planner first
-   Communicative Activity and concurrent Goal Association/remaining Fast planning;
+   Gateway decision; Goal Interpretation; independent SC communication,
+   Goal Association and complete Fast Work planning from the same GI result;
    optional Deep planning when actually invoked; deterministic Goal binding;
    Trusted Capability Runtime and provider work; Host-bound Evidence re-entry into
-   Fast Planner; and delivered speech or effect. Include optional Agent Skill and
+   Planner and SC; and actual delivered speech or effect. Include optional Agent Skill and
    Social Attention branches only when present or materially absent. Record every
    participating module's authoritative input, actual output, expected output,
    correlation/handoff, and evidence verdict using the report table above. Show

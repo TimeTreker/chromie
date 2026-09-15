@@ -2020,7 +2020,7 @@ def fast_multi_goal_response_schema(
                                     "type": "string",
                                     "enum": (
                                         nonexact_statuses
-                                        if goal_id in cancellation_goal_set
+                                        if goal_id in cancellation_goal_set and goal_disposition == "respond"
                                         else ["exact", "substantial", "partial"]
                                         if goal_disposition == "execute"
                                         else ["exact", "substantial"]
@@ -3095,12 +3095,15 @@ def capability_lookup_response_schema(schema: dict[str, Any], entries: list[Any]
 
 
 
-def planner_readiness_response_schema(schema: dict[str, Any], goal_ids: list[str]) -> dict[str, Any]:
+def planner_readiness_response_schema(
+    schema: dict[str, Any], goal_ids: list[str], *,
+    confirmation_required_capability_ids: list[str] | None = None,
+) -> dict[str, Any]:
     """Allow source-bound waiting without letting a response fulfill an effect.
 
-    This is the existing complete Work DTO. The alternative has no current Work,
-    an unmet outcome and a cited future condition for every scoped Goal. Runtime
-    still validates provenance and holds the Goal open until its due wake.
+    Each waiting Goal has an unmet outcome and a cited future condition. Other
+    Goals may retain their independent ready Work. Runtime validates provenance,
+    prohibits early Work and holds waiting Goals open until their due wake.
     """
     if not goal_ids:
         return schema
@@ -3116,6 +3119,10 @@ def planner_readiness_response_schema(schema: dict[str, Any], goal_ids: list[str
         variant["properties"]["cancel_activity_ids"] = {
             "type": "array", "items": {"type": "string"}, "maxItems": 0,
         }
+    if len(goal_ids) > 1:
+        waiting = _mixed_readiness_schema(
+            schema, goal_ids, confirmation_required_capability_ids or [],
+        )
     # Keep independently specialized definitions distinct between the two shapes.
     def rename(value: Any) -> Any:
         if isinstance(value, dict):
@@ -3131,3 +3138,55 @@ def planner_readiness_response_schema(schema: dict[str, Any], goal_ids: list[str
     return {"$defs": definitions, "anyOf": [
         {key: value for key, value in schema.items() if key != "$defs"}, rename(waiting),
     ]}
+
+
+def _mixed_readiness_schema(
+    schema: dict[str, Any], goal_ids: list[str], confirmation_ids: list[str],
+) -> dict[str, Any]:
+    """Preserve the ordinary step contract while allowing independently timed Goals.
+
+    Conditions are linear in Goal count; do not enumerate future/ready subsets.
+    The Host repeats these constraints for decoders without cross-field support.
+    """
+    step = schema["$defs"]["PlannerModelStep"]
+    mixed = fast_multi_goal_response_schema(
+        expected_goal_ids=goal_ids,
+        allowed_capability_ids=step["properties"]["capability_id"].get("enum", []),
+        nonfulfilling_response_goal_ids=goal_ids,
+        confirmation_required_capability_ids=confirmation_ids,
+    )
+    # Retain all catalog, typed-binding, resource and Work-reuse restrictions
+    # already compiled by the ordinary entrypoint. Waiting grants no new Work.
+    mixed["$defs"]["PlannerModelStep"] = copy.deepcopy(step)
+    fields = mixed["properties"]
+    ordinary = schema["properties"]
+    for name in ("steps", "cancel_activity_ids", "user_confirmation_required"):
+        fields[name] = copy.deepcopy(ordinary[name])
+    fields["steps"]["minItems"] = 0
+    fields["time_conditions"].update(minItems=1, maxItems=len(goal_ids), uniqueItems=True)
+    for goal_id in goal_ids:
+        timer = {"contains": {"type": "object", "properties": {
+            "goal_id": {"const": goal_id}, "source_quote": {"type": "string", "minLength": 1}},
+            "required": ["goal_id", "source_quote"]}, "minContains": 1, "maxContains": 1}
+        scoped = scoped_reporting_response_schema(
+            mixed, goal_ids={goal_id}, expected_goal_ids=goal_ids,
+            future_goal_times={goal_id: None},
+        )["properties"]
+        mixed.setdefault("allOf", []).append({
+            "if": {"properties": {"time_conditions": timer}},
+            "then": {"properties": {
+                "goal_outcomes": {"properties": {goal_id: scoped["goal_outcomes"]["properties"][goal_id]}},
+                "goal_satisfaction": scoped["goal_satisfaction"],
+                "steps": {"items": {"properties": {"source_goal_ids": {
+                    "not": {"contains": {"const": goal_id}}}}}},
+            }},
+        })
+        # An effect cannot turn into an untimed response through this alternative.
+        dispositions = ordinary["goal_outcomes"]["properties"][goal_id]["properties"]["disposition"]["enum"]
+        if "respond" not in dispositions:
+            mixed["allOf"].append({
+                "if": {"properties": {"goal_outcomes": {"properties": {goal_id: {
+                    "properties": {"disposition": {"const": "respond"}}}}}}},
+                "then": {"properties": {"time_conditions": timer}},
+            })
+    return mixed

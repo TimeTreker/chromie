@@ -1,6 +1,125 @@
 # Chromie Latest Handoff
 
-## Intent ownership and capability library delivery — 2026-09-16 (current)
+## Project audit delivery — 2026-09-16 (current)
+
+Owner authorized project-wide audit/repairs, at most 18 loops, commit and push.
+Repo `/home/chromie/github/chromie`, `main`; pre-delivery base
+`f90dff450357cd49358bb49f03a4930a4d33a8d4`. Resume from the newest commit containing
+this file and DEVELOPMENT_CHECKPOINT.md. Initial fetch was current, 0/0 divergence;
+the repeated pre-delivery fetch also found 0/0 divergence. Preserve local work and
+never force-push. Soridormi remains
+`codex/turn-count` at `fa6331f1344ce26154b197ca7d7c49badea292ad`; unrelated dirty
+playground content is preserved.
+
+### Delivered scope and evidence
+
+Fast Schema now represents an independently ready Goal alongside a newly scheduled
+Goal; Deep adequacy respects the future Goal's deliberately unmet outcome after
+source validation. Actual controlled SC/Runtime/restart proof dispatches only ready
+Work and retains a one-shot future wake. GI still authors no parameters/timestamps.
+Removed unused contradictory Planner wording constant and duplicate SC Protocol
+method. Existing authority/interaction/API documentation is reconciled. See the
+[audit](ARCHITECTURE_AUDIT.md) for the actual module workflow and reviewed coverage.
+
+The tested Planner prompt cleanup was **rejected and reverted**: 12-case baseline
+1 semantic pass, candidate 2 but two new truncations; 9B comparison 2 and an accepted
+wrong-direction result. No profile change. Native qualification remains open.
+
+**A = `.chromie/acceptance/full-audit-20260916-f90dff450/`**, ignored local evidence:
+
+- `iterations.json`, `loop-01/`, `loop-02/`: complete local gates plus each immutable
+  all-74-case live invocation, both stopped at first hard failure. Loop 1 canonical
+  3,461 / 1,017 subtests, 145 benchmarks, 20 legacy; 6,000 strict outcomes; Level A
+  45/45. Loop 2 has four canonical and 400 replay request-Schema mismatches; these
+  are retained failures, not behavioral oracle changes. Level A remains 45/45.
+- `readiness-red.log`, `readiness-green.log`, `readiness-runtime-green-complete.log`:
+  fail-first 2/10, related 99-pass proof and final 10-case Runtime/restart proof.
+  Earlier adapter/mock-output-schema fixture failures are retained separately.
+- `fast-corpus/`, `fast-baseline/`, `fast-candidate/`, `fast-qwen9b/`: exact frozen
+  inputs/catalog and target-blind raw primary requests/results; `adjudication.json`
+  reviews every case. Same-agent/non-independent, no runtime effects or promotion.
+- `packet-migration.json` records the initially captured rejected-prompt candidate;
+  `refreeze-final/packet-migration.json` records its removal. Both explicitly assert
+  unchanged scenario inputs, model replies, fault injections and behavior oracles.
+  Only request contracts and their hashes are updated. `final-request-only-proof.json`
+  independently compares Git HEAD: exactly 400 workflow cases change, no prototype
+  cases change, every input/reference/fault/oracle is preserved. Unchanged prototype
+  manifest metadata is restored. Final workflow manifest SHA256:
+  `6c7454a8c50ec440f2079afdd7d29ebd100bb8e6bd65372818671fdb2097ecd0`.
+- `loop-03/canonical.log`: **3,471 tests / 1,017 subtests, 145 benchmarks,
+  20 legacy tests** pass, including policy, ownership, Ruff/mypy, configuration and
+  docs. Two existing FastAPI deprecation warnings. `workflow/summary.json`:
+  **6,000/6,000**, source unchanged (1,400 pass, 1,800 observed state, 2,500 expected
+  rejection, 300 expected nonexecuting rejection). `level-a/`: **45/45**.
+- `loop-03/live/`: all 74 discovered cases selected, hard stop at first: **0/1,
+  73 unrun**, SID `9a5a54b0`. GI/GA correct; Fast decorated/missing argument sources
+  and wrong left-turn sign; SC silence based on an invented low-level-control
+  prohibition/capability limitation. Host rejects, zero body calls, safe idle true.
+  Only harness error speech exists. Each `loop-*/adjudication.json` records review
+  of all attempted cases and native packets; raw harness summaries are retained.
+
+Exactly one bundle was collected after each completed/stopped aggregate:
+
+1. `/home/chromie/Downloads/chromie_debug_bundle_20260916_034645.tar.gz` — SID `c0c5a0b6`.
+2. `/home/chromie/Downloads/chromie_debug_bundle_20260916_040258.tar.gz` — SID `84b2e74d`.
+3. `/home/chromie/Downloads/chromie_debug_bundle_20260916_042954.tar.gz` — SID `9a5a54b0`.
+
+### Evaluated identity and shutdown state
+
+Three full candidate loops completed out of the maximum eighteen; native comparison
+runs are separately labelled. Final `loop-03/runtime-identity.json` SHA256:
+`4234c4680eddc377c2128ae8cd355a7ae960be66db95dac2ccf17af66b03c416`;
+evaluated dirty tree `17db4289803184b679862e0e277681d50d6c384423669622584bedc7440c8365`.
+`candidate.patch` retains that evaluated change. Final handoff/document edits and
+restoring unchanged prototype manifest metadata follow it; executable source does
+not change. Rebuilt Agent checkout/container digests match:
+`fdebbdf7ae894d6d63a47a0de3a1836d2f773cc1a02ecec30bb224cde79ef0cf`.
+`agent-source.json`, `build.log`, `services.log` and `identity.log` retain verification.
+
+Local RTX 4090 Laptop, Ollama 0.33.2 / existing Qwen3.5 4B profile. Context/output:
+GI 16,384/512; GA 32,768/2,048; Fast/Deep 49,152/4,096; SC 49,152/1,024.
+Final primary elapsed times: GI 6.93 s, GA 7.80 s, SC 14.85 s, Fast 26.37 s;
+these overlap after GI and include provider load. No priority/latency qualification.
+No profile, weights or training promotion; remote Gemma evidence not reproduced.
+
+After retained safe idle, the owned headless Soridormi launcher was terminated and
+simulator/MCP containers stopped. Agent/ASR/LLM/TTS remain healthy; no persistent
+Host Orchestrator, physical microphone, audible speaker or robot session. Generated
+runtime env is untouched by hand edits. No native, audible, physical or release
+success is inferred from controlled tests. #24/#32 and current-revision target
+closure remain open. Existing owner-reported microphone/ASR acceptance is unchanged.
+
+### Cross-machine resume commands
+
+Use fresh evidence directories and first fetch/reconcile the configured upstream.
+Do not reuse rejected prompt packets as the current baseline.
+
+```bash
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir /tmp/chromie-audit-next-replay
+python scripts/general_ability_acceptance.py --mode level-a --evidence-dir /tmp/chromie-audit-next-level-a
+```
+
+For automated live evidence, start `./scripts/start_soridormi_mujoco.sh --no-viewer`
+from the paired repo. From Chromie, rebuild Agent when source differs using the
+generated `.env.runtime` and `.chromie/voice-runtime/compose.voice-mujoco.yaml`, then
+`./scripts/start_chromie.sh --no-orchestrator --keep-services`. Verify source:
+`python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent`.
+Capture a new identity with `--orchestrator-env .chromie/voice-runtime/orchestrator.env
+--capability-manifest capabilities/soridormi.json --compose-override
+.chromie/voice-runtime/compose.voice-mujoco.yaml --output NEW/runtime-identity.json`;
+use `--allow-dirty` only for explicitly retained diagnostic changes. Source the
+generated Orchestrator env with export enabled. Run
+`python scripts/general_ability_acceptance.py --mode live-text --execute
+--soridormi-repo /home/chromie/github/soridormi --runtime-identity
+NEW/runtime-identity.json --evidence-dir NEW/live` **without a stage filter** to
+discover all 74 current cases. Keep source/services immutable during the cohort;
+collect `./scripts/collect_debug_bundle.sh` exactly once after completion/hard stop
+and review every attempted case. A hard stop leaves the remaining cohort unrun.
+
+## Intent ownership and capability library delivery — 2026-09-16 (historical)
 
 Owner authorized implementation and commit/push. Repo `/home/chromie/github/chromie`,
 branch `main`, pre-delivery base `6fca5be2b590a4b1ca83d49fb197cdd74b50b2d0`.

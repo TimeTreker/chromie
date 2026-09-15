@@ -268,16 +268,16 @@ composer or execution specialist.
 | Goal Association | unchanged GI result plus bounded retained Goals | Canonical Goal create/associate/update DTO | `requires_replan`, Work compatibility, Capability, cancellation, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | validated Plan plus exact live request/version/state/resource/safety bindings | accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | semantic compatibility, Goal meaning, or rewritten SC wording |
-| Runtime event/state transition → Evidence or bounded Situation observation → `CognitiveOpportunity` | exact authority-owned source provenance plus affected Goal IDs when continuing an existing Responsibility; target situation-only social/world readiness may instead be Goal-free | ephemeral readiness signal for the same Core; no fabricated user turn/Responsibility/Goal and no response decision. Terminal qualified observations enter through Evidence. Meaningful live/provider/perception/interaction state enters Situation with exact provenance and does **not** become Evidence merely to wake cognition. Current production provider-state/restart paths remain Goal-bound; Goal-free Situation wake is approved target work. | Goal ownership, Evidence truth, relationship/authorization truth, or any Activity by itself |
+| Runtime event/state transition → Evidence or bounded Situation observation → `CognitiveOpportunity` | exact authority-owned source provenance plus affected Goal IDs when continuing an existing Responsibility; target situation-only social/world readiness may instead be Goal-free | ephemeral readiness signal for the same Core; no fabricated user turn/Responsibility/Goal and no response decision. Terminal qualified observations enter through Evidence. Meaningful live/provider/perception/interaction state enters Situation with exact provenance and does **not** become Evidence merely to wake cognition. Provider-state/restart Work paths remain Goal-bound; the implemented trusted Goal-free Situation path invokes SC without task Work authority. | Goal ownership, Evidence truth, relationship/authorization truth, or any Activity by itself |
 
 Progressive conversational deliberation intentionally does **not** add another row or
-module to this table. It is an invocation mode of the existing Core/Planner communication
+module to this table. It is an invocation mode of the existing Core/SC communication
 authority: the same bounded state is read, no private durable truth is written, and the
 result is either no new Activity or an SC-owned communicative delta/repair. When the
 continuation is communication-only it receives no Capability/Work mutation authority; a
 separate need for HOW uses the normal Planner contract.
 
-`situation_revision` and `time_condition` have bounded source contracts without gaining semantic authority, but their implementation state is deliberately distinguished. `SituationProjection` v3 already carries bounded current interpretations plus exact authority-owned source references and can conceptually represent social meaning without creating a `SocialSituation`. Meaningful provider Runtime-state transitions are the first production `SituationRevisionObservation` ingress: blocked/waiting/degraded/paused/recovering or material phase/member-state changes may revise Situation and wake the **same Planner**, while heartbeat/percentage churn is filtered. Provider Runtime state is not fabricated Evidence, so this re-entry carries zero Evidence refs and cannot by itself mark speech `post_evidence`; the **current source** accepts a `situation_digest` opportunity only with exact validated Situation/Goal binding. The approved target generalizes Situation readiness so trusted scene/person/interaction changes may wake the same Core with no Goal when no Responsibility exists. That target must preserve exact source/subject provenance, never synthesize GI meaning, and may validly choose silence. Broader scene/body/environment/social ingress still needs source-specific trusted adapters. `GoalTimeCondition` remains Goal/current-Plan-bound because it continues a concrete Responsibility. Host still must not parse free-form Goal/deadline text into timers or run an ambient semantic-thinking loop.
+`situation_revision` and `time_condition` have bounded source contracts without gaining semantic authority, but their implementation state is deliberately distinguished. `SituationProjection` v3 already carries bounded current interpretations plus exact authority-owned source references and can conceptually represent social meaning without creating a `SocialSituation`. Meaningful provider Runtime-state transitions are the first production `SituationRevisionObservation` ingress: blocked/waiting/degraded/paused/recovering or material phase/member-state changes may revise Situation and wake the **same Planner**, while heartbeat/percentage churn is filtered. Provider Runtime state is not fabricated Evidence, so this re-entry carries zero Evidence refs and cannot by itself mark speech `post_evidence`; the **current source** accepts a `situation_digest` opportunity only with exact validated Situation/Goal binding. The implemented source-neutral Goal-free Situation path may independently invoke SC when no Responsibility exists. It preserves exact source/subject provenance, never synthesizes GI meaning or task Work, and may validly choose silence. Broader scene/body/environment/social ingress still needs source-specific trusted adapters. `GoalTimeCondition` remains Goal/current-Plan-bound because it continues a concrete Responsibility. Host still must not parse free-form Goal/deadline text into timers or run an ambient semantic-thinking loop.
 
 ## 3. Turn state machine
 
@@ -326,14 +326,13 @@ score is evidence, not the sole escalation switch. Harmless ordinary conversatio
 should not pay a Deep-thinking tax merely because confidence is imperfectly calibrated.
 
 The word **deep** is owner-scoped. Deep GI, GA, Planner and Reflection keep their
-separate semantic responsibilities. Planner owns ordinary communication as well as
-Work planning, with permissions fixed by each invocation's input contract. Its restricted
-Situation pass may choose silence or one low-consequence utterance with no Goal/Work
-authority. Fast may delegate unresolved scope once before producing an Activity or
+separate semantic responsibilities. Planner owns Work planning and SC owns ordinary communication, with permissions
+fixed by each invocation's input contract. SC's restricted Situation pass may choose
+silence or qualified interaction with no task Goal/Work authority. Fast may delegate unresolved scope once before producing an Activity or
 Memory result; a completed decision receives no model review. A provider-free provisional
 Responsibility may retain the separately authorized bounded communication continuation;
 it preserves prior delivered speech and the explicitly unfinished scope. Depth alone
-never grants Capability Work. Shared Planner communication and validation contracts
+never grants Capability Work. Shared SC communication and validation contracts
 apply across these independent calls.
 
 The stage boundary remains exact. Fast Goal Interpretation may escalate once to Deep
@@ -659,7 +658,7 @@ Interaction-Ledger delivery state by the same ordinary communication authority. 
 results are `silence`, a still-needed additive delta, intentional repetition, `repair`, or `retract + repair`.
 Pending unheard speech may be superseded rather than verbally repaired. Delivered speech
 remains append-only history. Host prevents duplicate delivery of the same Activity/submission;
-text equality alone cannot suppress a new Planner Activity. Related same-turn speech facts
+text equality alone cannot suppress a new SC communicative Activity. Related same-turn speech facts
 remain visible across sibling Goals without expanding the exact re-entry Goal/Work scope.
 
 ### 3.2 General Progress inside the Continuous Mind baseline
@@ -1082,7 +1081,7 @@ a `ModelObservation` through a deterministic projection that:
   truncation or redaction flags.
 
 Only that bounded observation may reach Core reconciliation, replanning, or
-Planner-authored result communication. The retained audit record preserves the validation and
+SC-authored result communication. The retained audit record preserves the validation and
 projection decision plus a content digest under the evidence-retention policy;
 it does not make raw secrets model-visible. Schema failure, projection failure,
 or an empty required observation fails closed as `observation_unavailable`.
@@ -1166,8 +1165,8 @@ may suppress that future result obligation.
 ### Goal meaning inheritance
 
 GI authors current WHAT. GA authors its relationship to canonical Goals. A new GA
-model Goal contains `source_responsibility_refs` and provider-neutral representation
-fields, without `description`. The Host directly copies the one referenced GI outcome
+model Goal contains only `source_responsibility_refs`, `related_goal_ids` and
+`supersedes_goal_ids`, without a model-authored `description` or parameter table. The Host directly copies the one referenced GI outcome
 into canonical `description` and `success_criteria`; no second wording decision occurs.
 
 For `modify`/`clarify`, `requirement_changes` identifies a target Goal, zero-based
@@ -1177,9 +1176,10 @@ Empty indices add requirements; unselected entries remain. Only a complete curre
 outcome may replace a whole requirement. Unsupported/incomplete meaning is not repaired
 by Host concatenation or GA prose. `updated_description` is forbidden.
 
-Optional `binding_changes` name an explicit path under the retained Goal's `object`,
-`constraints` or `resource_responsibility`, plus the accepted GI ref and binding name
-whose value is copied. Overlapping paths, unavailable sources, conflicting named values,
+Retained typed `binding_changes` are an internal conservation contract, not
+permission for the current GI to author parameters. A new intent-only correction
+that would leave incompatible old typed fields must use an explicitly sourced
+replacement Goal. Internal binding selectors require exact retained source values. Overlapping paths, unavailable sources, conflicting named values,
 out-of-range requirements and changed modalities reject; modality replacement uses the
 existing explicit new-Goal/supersession contract. Requirement selection remains GA's
 semantic responsibility; exact reference/field validation is not a proof of model quality.
@@ -1321,7 +1321,7 @@ After service readiness, if a restored Goal has a prior provider-backed Capabili
 binding, the Host obtains a fresh provider/catalog projection. Only then may it
 create `CognitiveOpportunity(trigger=provider_state)` and re-enter the same Planner
 with the durable Goal, original Responsibility provenance, and fresh provider
-truth. Planner decides whether to produce new Work, communicate, wait, or remain
+truth. Planner decides whether to produce new Work, establish a communication Need, wait, or remain
 silent. The old Plan is never dispatched. Once Planner has successfully consumed
 the fresh state, the stale request/Plan binding is invalidated before any newly
 planned Work is recorded. Missing original Responsibility provenance or unavailable
@@ -1496,7 +1496,7 @@ Failures remain attributed to their earliest responsible boundary:
 - deterministic validation or authorization;
 - Agent/tool/provider execution;
 - outcome correlation and reconciliation;
-- final Planner communication or delivery.
+- final SC communication or delivery.
 
 ## 11. Observability
 
@@ -1541,7 +1541,7 @@ The contract-first loop baseline is implemented:
 5. `ExecutionOutcomeBundle` joins results and traces to the immutable plan,
    retains exact per-goal states, and commits them to goal state;
 6. bounded schema-validated `ModelObservation` values are the only provider
-   payloads visible to Planner post-Evidence communication;
+   payloads visible to Planner post-Evidence Work and SC communication;
 7. ordinary overlapping turns retain independent lifecycle identity, while
    explicitly cancelled, superseded, stale-output, or recovery-waiting turns
    retain their evidence and suppress only invalid late final speech;

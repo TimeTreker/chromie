@@ -171,8 +171,8 @@ The architecture separates four questions that must not collapse into one callba
 This state view is reconstructable context, not another persistent Mind object or
 manager. A `CognitiveOpportunity` is an ephemeral readiness signal tied to exact Goal
 and Evidence provenance. It may reactivate Planner, but it owns neither the Goal, the
-Evidence, nor the resulting action. Planner may author speech, body/tool/information
-Work, reuse/cancellation/replacement, clarification, waiting, or no new Activity.
+Evidence, nor the resulting action. Planner may author body/tool/information Work, reuse/cancellation/replacement,
+communication Needs, waiting, or no new Work. SC independently authors interaction.
 
 Goal Association is used when person-authored semantics need canonical continuity. A
 Runtime result is not a new utterance: exact request/Activity/Goal provenance already
@@ -186,8 +186,8 @@ authority. The fast pass should produce a complete detailed Plan whenever HOW is
 sufficiently clear; the deep Planner pass is reserved for genuinely complex dependencies,
 alternatives, resource, or safety reasoning. Separately, a valid provisional conversational
 Activity may keep its Responsibility open and authorize one bounded communication-only
-Planner continuation. Its deeper invocation retains the communication-only contract and
-gains no Work authority; it uses the same Planner communication authority. The depth label
+SC continuation. Its deeper invocation retains the communication-only contract and
+gains no Work authority; it uses the same SC communication authority. The depth label
 never changes the input contract's permissions.
 
 A safe, side-effect-free read may begin before Goal Association finishes when the
@@ -685,16 +685,15 @@ ontology. Social Attention may decorate a semantic primary Activity, but it is n
 third responsibility or execution channel.
 
 Every admitted turn still has one Core-owned semantic and conversational
-authority. Fast Planner authors the exact Communicative Activity while user-task
+authority. SC authors the exact Communicative Activity while user-task
 execution may be prepared or scheduled independently, only from applicable
 immutable authoritative state: the same turn, plus Goal versions, a Canonical
 Plan, and Evidence when each exists. Host presentation cannot rewrite the
-Planner-owned words or authorize an effect, and an execution specialist cannot
+SC-owned words or authorize an effect, and an execution specialist cannot
 become conversation authority. Every primary request remains correlated to its
 owning turn and, when they exist, Goal and Plan identities.
 
-Background Social Attention may additionally propose small body decoration for
-the same interaction. That decoration must not alter the primary response text,
+SC may include optional social expression in that same primary interaction result. That decoration must not alter the primary response text,
 create a Goal, delay the primary path, or acquire completion authority. An
 accepted decoration is materialized as auxiliary Activity.
 
@@ -1586,7 +1585,7 @@ owner they may establish or revise:
 - qualified cognition may revise soft/reconstructable Situation interpretation but does
   not rewrite trusted Evidence;
 - Goal Association owns canonical Goal identity, association, versioning, and continuity;
-- Planner owns chosen Work/Plan semantics, communication, and current-state Work changes
+- Planner owns chosen Work/Plan semantics, communication Needs, and current-state Work changes
   without rewriting user Responsibility meaning or execution history;
 - trusted validation/runtime owns authorization, request correlation, execution,
   and outcome records but does not reinterpret user meaning;
@@ -1636,7 +1635,7 @@ The synthesis above reduces to a small set of invariants:
 16. **Later cognition reconciles against what was actually delivered: unchanged meaning
     stays silent, additive meaning emits only the delta, and contradiction repairs forward.**
 17. **Deliberation is bounded work of the existing Core, not a persistent Belief Manager,
-    semantic reviewer, or ambient background loop; Planner also owns ordinary communication
+    semantic reviewer, or ambient background loop; SC owns ordinary communication
     and deeper reasoning retains the invocation's exact Goal/Work permissions.**
 18. **Chromie is one persistent social Self; family/friend/stranger are relationships and
     Situation, not Persona modes.**
@@ -1724,7 +1723,7 @@ flowchart TD
     GI --> GA["Goal Association<br/>canonical continuity when needed"]
     PLAN --> WORK["Communicative / Capability Activities"]
     PLAN --> PROV{"Provisional conversation?"}
-    PROV -->|"yes"| DELIB["Bounded Planner deliberation<br/>communication-only; no permission widening"]
+    PROV -->|"yes"| DELIB["Bounded SC deliberation<br/>communication-only; no permission widening"]
     PROV -->|"no"| WORK
     PLAN --> DEEP["Deep Planner pass<br/>same authority and admitted scope"]
     DELIB --> RECON["Delivered-claim reconciliation<br/>silence / delta / repair"]
@@ -1844,7 +1843,7 @@ trusted world/social transition
     -> Situation revision -> derived relational/situational salience
     -> CognitiveOpportunity (Goal-bound when continuing Responsibility,
                              Goal-free when only Situation itself is salient)
-    -> Planner inside the same Core (communication-only for Goal-free input)
+    -> SC inside the same Core (communication-only for Goal-free input)
 
 same Core
     -> silence / observe / speak / form Work only with admitted Goal/Work authority
@@ -1948,15 +1947,15 @@ Goal Association is therefore always the sole canonical Responsibility/continuit
 boundary. It runs concurrently rather than acting as a wall-clock gate. Fast
 Planner is the
 exclusive intention-forming owner of Capability selection and executable arguments.
-Fast Planner owns each still-needed communicative delta and any optional decoration
-for its concrete primary observable Activities in that same result; cognition
+SC owns each still-needed communicative delta and any optional expression
+for its concrete immutable communicative acts in that same result; cognition
 milestones do not create anchors. Decoration never independently owns response
 wording. Provider observations are cognition events, not merely terminal inputs to
 a speech formatter.
 
 The implemented Fast substrate covers provider-neutral Responsibility evidence,
-immediate native conversation, explicit Goal binding, Planner-owned Capability
-selection, and primary-Activity-anchored Social Attention decoration. Sections 4.11–4.13 retain the broader
+independent SC interaction, explicit Goal binding, Planner-owned Capability
+selection, and SC-act-anchored optional expression. Sections 4.11–4.13 retain the broader
 problem-space inventory and the compression discipline that produced Section
 4.14. They are no longer an instruction to pre-create the candidate concepts as
 persistent state; future implementation starts from the compressed baseline and
@@ -1972,8 +1971,9 @@ directly to the language model. Its model-facing output is intentionally small
 and explicitly discriminated:
 
 - `associate` for relationships to exact active goal IDs;
-- `create_goals` for one natural-language description per independent new goal;
-- `clarify` for one concise user-facing question.
+- `create_goals` for source refs and Goal relationship IDs, with meaning inherited
+  from GI;
+- `clarify` for unresolved continuity facts, expressed to the user by SC.
 
 Goal Association has one bounded semantic transaction. Its primary model result
 conserves the accepted GI Responsibilities while deciding only canonical Goal
@@ -2012,29 +2012,28 @@ fields are rejected rather than ignored or merged into canonical state; the
 bounded model may revise one invalid schema result, but the Host never treats
 transport noise as semantic input.
 
-A new Goal preserves exactly one model-authored human-facing modality: `output_mode`
-(plus `media_operation` only for media lifecycle meaning). It is WHAT, not an execution
+A new Goal inherits GI's requested result type as `output_mode`; GA does not author
+another modality or media-operation field. It is WHAT, not an execution
 truth. `responsibility_kind`, `execution_lane`, and `provider_required` are not Goal fields,
 not Host projections, and not compatibility inputs. Goal Association commits only the
-provider-neutral modality and semantic bindings. Planner later decides whether current
+provider-neutral intent and inherited result type. Planner later decides whether current
 trusted state already satisfies the Goal or whether Capability-backed Work is needed; the
 selected Capability/Activity then carries its own Runtime execution-lane facts. There is no
 legacy responsibility/lane tuple to reverse-map and no `capability_work` bridge.
 
-Typed entity provenance begins at Goal Interpretation and remains binding at Goal
-Association. A directly named entity is preserved in the user's own surface form
-rather than translated, transliterated, or provider-canonicalized inside WHAT.
-For locations, Goal Interpretation rejects a model-authored spelling that has
-neither a current-turn surface nor bounded semantic-context provenance; the one
-canonical semantic binding name is `location`, so renaming that dimension cannot
-bypass the same provenance contract. When
-Goal Association declares a new directly named location binding without a
-supplied referent, its value must likewise remain a contiguous verbatim span of
-the authoritative current user turn in the user's language. An ungrounded value
-is rejected terminally and cannot enter the mechanical DTO repair. Indirect references instead retain the
-canonical value and referent ID selected from supplied bounded discourse state.
-Deterministic code checks provenance shape; it does not extract a place name,
-choose a referent, translate an entity, or decide the user's meaning.
+The live GI contract preserves named entities, quantities and temporal meaning in
+the complete natural-language outcome. It emits no typed parameter bindings or
+Goal relationships. GA inherits new Goal description, success criteria and result
+type from the exact GI source ref; it does not classify a resource or author a
+parameter table. Existing typed Goals remain supported as retained authority, not
+as a second live GI wire.
+
+Planner performs unit conversion, defaults, capability argument mapping and new
+future readiness. New intent-derived arguments carry exact owned quotations;
+retained typed values remain binding and cannot be overridden by a quote. These
+are mechanical provenance checks, not proof of meaning or semantic conversion.
+Missing execution data is a Planner input gap; genuine ambiguous intent remains
+GI-owned. Host never extracts place names, chooses referents or rewrites meaning.
 
 Goal semantic information and Planner execution information are distinct. A
 material entity or parameter that determines what Chromie owes the user must be
@@ -2337,16 +2336,16 @@ outcome. The Host must not reproduce that judgment with verbs, regexes, action
 lists, provider names, or a second LLM reviewer. The primary GI result therefore
 contains the complete Responsibility inventory and the minimum source-grounding
 evidence needed to validate each item. The same item owns its provider-neutral
-mode, material bindings, relationship, and sibling references; no parallel
+result type, complete natural-language outcome and source span; no parallel
 `audit_ref`/candidate-mapping representation rewrites those facts.
 
 Trusted validation checks only mechanics:
 
-- Responsibility identities and sibling references are closed and unique;
+- Responsibility identities are closed and unique;
 - source references belong to the authoritative admitted turn;
-- explicit material numbers and directly named entities retain valid provenance;
-- modes and relationship tokens belong to the closed provider-neutral contract;
-- ordered and parallel bindings reference actual sibling Responsibilities;
+- source spans are ordered, known and non-overlapping;
+- result types belong to the closed provider-neutral contract;
+- parameter, relationship and execution fields are forbidden on live GI output;
 - unavailable provider support does not remove the semantic Responsibility.
 
 Completeness and independence remain one model-authored semantic decision in the
@@ -2361,7 +2360,7 @@ follows the single Deep-GI, user-clarification, or fail-closed path.
 Goal Association consumes the accepted GI inventory and must conserve it while
 deciding canonical Goal identity and continuity. Its primary result may be checked
 mechanically for one-to-one Responsibility conservation, source provenance, and
-typed binding preservation, but GA does not invoke another model to decide whether
+inherited intent and retained typed-state conservation, but GA does not invoke another model to decide whether
 GI understood the user correctly. Planner likewise consumes canonical WHAT and
 cannot reinterpret it from Capability availability. This keeps the earliest
 semantic boundary responsible without paying for a live confirmation chain.
@@ -2376,34 +2375,33 @@ This is one goal with a conditional plan, not two user goals.
 
 ### 7.3 Segmentation output
 
+For three independently accepted GI Responsibilities, GA's new-Goal model wire is:
+
 ```json
 {
-  "associations": [],
+  "decision": "create_goals",
   "new_goals": [
-    {
-      "description": "remember that the user drinks only Americano",
-      "independent": true
-    },
-    {
-      "description": "obtain a coffee for the user",
-      "independent": true
-    },
-    {
-      "description": "report the current weather",
-      "independent": true
-    }
-  ]
+    {"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []},
+    {"source_responsibility_refs": ["r2"], "related_goal_ids": [], "supersedes_goal_ids": []},
+    {"source_responsibility_refs": ["r3"], "related_goal_ids": [], "supersedes_goal_ids": []}
+  ],
+  "referent_updates": [],
+  "resolved_references": [],
+  "confidence": 1.0,
+  "reason_summary": "Three independent new intentions."
 }
 ```
 
+One complete compound Responsibility may instead remain one Goal and require
+several Planner Activities. Goal cardinality is not action cardinality.
+
 ### 7.4 Planner communication across multiple Goals
 
-Multiple Goals do not require multiple awkward acknowledgements. Fast or Deep
-Planner may author one Communicative Activity that naturally consolidates the
+Multiple Goals do not require multiple awkward acknowledgements. SC may author one Communicative Activity that naturally consolidates the
 still-needed user-facing delta while preserving each Goal's independent lifecycle
 and Evidence provenance.
 
-Semantic communication belongs to Planner. The Orchestrator validates references,
+Semantic communication belongs to SC. The Orchestrator validates references,
 commitments, versions, and Evidence; it does not concatenate strings or author a
 second response to imitate understanding.
 
@@ -3065,10 +3063,10 @@ become terminal Capability results. Runtime cancellation continues to invoke pro
 using the provider activity ID, while canonical request/capability/Goal identity remains Host-owned. The
 current named-skill wire protocol has no status/event surface, so Chromie does not invent one.
 
-Planner-authored speech timed `after_capabilities` is not dispatched before terminal
+SC-authored speech bound to final delivery Needs is not dispatched before terminal
 Evidence on detached execution paths. Before terminal Evidence exists it is only prospective
 wording and therefore cannot own a completion claim. Terminal Evidence re-enters the same
-Planner, which may author a new trustworthy communicative delta, new Work, or silence. When
+Planner for new Work/Needs and SC for a trustworthy communicative delta or silence. When
 an originating interaction contains multiple Capability requests, each per-request Runtime
 event can re-enter Planner immediately, but its transaction contains only that result's
 bound GI Responsibilities, Goals, source-Plan steps, and Evidence. The retained original
@@ -3184,22 +3182,20 @@ promoting the Ledger into long-term memory.
 
 ### 15.1.2 Goal Progress Communication
 
-Goal Progress Communication is a user-facing responsibility across the lifetime
-of Work, but its first maintained owner is **Fast Planner**, not Goal
-Interpretation. Goal Interpretation ends at provider-neutral Responsibility:
-WHAT the user wants, material bindings, uncertainty, and whether fresh work or
-Evidence remains. It has no speech/progress Activity contract.
+Goal Progress Communication belongs to SC across the lifetime of Work. GI supplies
+complete provider-neutral intent and genuine uncertainty. Planner determines Work
+and input needs; neither GI nor Planner authors progress speech.
 
-After Responsibility meaning is sufficient, Fast Planner may select one tiny
+After Responsibility meaning is sufficient, SC may select one useful
 immediately-ready Communicative Act while downstream work continues. A
-pre-evidence progress act is structurally bounded: Planner chooses a `progress_kind` such
+pre-evidence progress act is structurally bounded: SC chooses a `progress_kind` such
 as `check_information`, `perform_action`, `think`, or `acknowledge_work` **and authors the
 exact bounded prospective wording**. The Host validates truth stage and provenance but does
 not rewrite that sentence. The progress contract cannot make an unverified result admissible
 merely by labelling it `role=progress`. A substantive immediate answer
 or clarification uses its own typed Activity and truth requirements instead.
 
-Later planning or Planner Evidence re-entry may communicate a genuinely new trustworthy
+Later planning or Evidence state may supply SC with a new trustworthy
 user-relevant delta: a material
 limitation, meaningful wait state, achieved milestone, failure/retry, correction,
 or completion. Interaction Context and playback Evidence prevent duplicate
@@ -3268,7 +3264,7 @@ Fast current judgment
 ```
 
 Reconciliation is **not** a new stage owner. The Interaction Ledger supplies immutable
-actually-delivered speech and pending-delivery state; the same Core/Planner communication
+actually-delivered speech and pending-delivery state; the same Core/SC communication
 authority that owns ordinary wording reasons from that evidence on re-entry. Delivered
 speech is never edited or "upgraded" after the fact. Unheard pending speech may be cancelled
 or superseded without a spoken repair because it never became common ground. Host and Runtime
@@ -3338,21 +3334,24 @@ Examples:
 
 ### 15.5 Natural multi-goal communication
 
-Fast Planner may author one natural Communicative Activity that covers several
+SC may author one natural Communicative Activity that covers several
 Goal updates:
 
 > 我已经记住你只喝美式。咖啡我先看看怎么拿，天气也在查。
 
 The individual goals remain separately tracked even when speech is consolidated.
 
-The model-facing Fast-Planner contract carries exact wording, truth stage,
-Evidence references, Vocal/Activity timing, Goal coverage, and optional bounded
-`auxiliary_activities[]` constrained to the immutable Goal/Plan snapshot. On terminal
-Capability Evidence the Host reactivates Fast Planner with the exact Goal/Evidence
-snapshot; there is no post-execution wording model. The Host retains the Planner,
-canonical Plan, and execution-outcome fingerprints. A mechanically malformed Plan
-DTO may be regenerated once with the same meaning; semantic/truth rejection is
-terminal and cannot trigger another semantic planner or response author.
+The model-facing Fast Planner contract carries one complete Work result: ordered
+Activities, exact Responsibility ownership, capability arguments, provenance,
+coverage and unresolved planning needs. It contains no wording, presentation frame
+or optional decoration. A single batch of library detail lookup may precede the
+complete decision; it cannot repair a completed Plan.
+
+The separate SC transaction carries exact words, truth stage, Evidence refs,
+delivery phase and optional expression bound to its immutable act. Terminal
+Evidence may re-enter Planner for Work and SC for interaction. Host retains exact
+source, Plan, request, outcome and SC snapshot identities. Invalid output fails
+closed at its owner; no generic malformed-Plan retry or semantic reviewer is added.
 
 ## 16. Scenario-driven development
 
@@ -3680,7 +3679,7 @@ Evolution rules:
 - preserve deterministic safety, authorization, cancellation, and evidence boundaries;
 - keep Cognitive Gateway normalization, protective reflex, attention, context, and
   admission distinct from Core semantics;
-- keep Goal Interpretation WHAT-only: Responsibility meaning, material bindings,
+- keep Goal Interpretation WHAT-only: complete natural-language intent, source evidence,
   confidence, provider-neutral output modality, and unresolved meaning;
 - make `CognitiveWorkRequest` the typed WHAT-to-HOW handoff; do not tunnel semantic
   authority through anonymous context dictionaries;

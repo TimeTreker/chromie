@@ -564,12 +564,12 @@ Read the diagram with these boundaries:
   choosing an acquisition method or deciding that remembered information satisfies them.
   It does **not** decide
   whether downstream work or fresh Evidence is required. It may interpret a reply
-  against a pending clarification in Session Context and propose the resulting Goal
-  relationship, but it does not create or resolve planning `InformationGap` objects,
+  against a pending clarification in Session Context and preserve the understood
+  intention; GA alone determines its Goal relationship. GI does not create or resolve planning `InformationGap` objects,
   declare Capability or execution inputs missing, classify them as blocking, or
   choose `ask_user`, context, observation, query, or default as their resolution.
-  Absence of external result Evidence is not unresolved user meaning. GI may propose
-  Goal relationships but cannot commit canonical Goal state. Neither GI depth may
+  Absence of external result Evidence is not unresolved user meaning. GI cannot author
+  Goal relationships or commit canonical Goal state. Neither GI depth may
   author conversational response wording, Work, a Primary-Activity contract, Plan
   steps, execution lanes, realization, Capability selection, executable arguments,
   provider requests, authorization, or readiness flags. Planner derives whether work
@@ -611,12 +611,15 @@ Read the diagram with these boundaries:
   The owner authorized the future-readiness correction on 2026-09-12: a Goal
   with an explicit future `ready_at` may receive an acknowledgement and an exact
   Planner-authored time condition while its original effect remains unmet.
-  The owner authorized completion of the new-request path on 2026-09-13 (#60):
-  GI's one primary WHAT result may author the exact timezone-qualified `ready_at`
-  activation instant while preserving source temporal meaning. GA conserves it;
-  Planner owns the resulting HOW/time condition. The Gateway's immutable receipt
+  The intent-only amendment supersedes the September 13 (#60) GI timestamp wire:
+  GI preserves requested temporal meaning in the complete natural-language outcome;
+  GA conserves that intention. Planner alone authors the exact activation instant
+  and its source-bound time condition. Existing typed `ready_at` constraints remain
+  binding. New waiting Goals may coexist with independently ready Work; neither a
+  waiting acknowledgement nor a scheduled wake fulfills the future effect. The Gateway's immutable receipt
   instant supplies elapsed-time context, never an assumed user-local timezone.
-  Missing clock/date/timezone meaning stays unresolved, with no invented activation.
+  Missing clock/date/timezone needed for scheduling is a Planner input gap, with no
+  invented activation. Genuine ambiguity about user meaning remains GI-owned.
   Host validates typed timestamps and provenance; it neither interprets free-form
   time nor supplies a second semantic normalization call.
   It owns no current executable Work. A time condition wakes cognition later;
@@ -1010,8 +1013,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    internal stage boundary does not. Qualified warm rapid-response targets remain
    at most 2.0 seconds from validated GI handoff to a valid communication commitment
    and 3.0 seconds from commitment to playback start. Preserve GI, queue, inference,
-   TTS and delivery anchors separately. These are targets, not observed performance
-   of the unimplemented Social Cognition path. Qualify semantic correctness, first
+   TTS and delivery anchors separately. These are qualification targets, not established performance
+   of the source-implemented Social Cognition path. Qualify semantic correctness, first
    meaningful response and Work completion under contention together. Watchdog
    increases and skipped validation cannot establish a latency pass.
 
@@ -1412,15 +1415,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    replacement act. Social Cognition may select only exact eligible social-domain
    Capability IDs and schema-valid arguments, never task Work. Missing anchors/candidates yield no
    decoration and never delay communication or create a decoration-only model call.
-   The old single-result speech/auxiliary representation requires an explicit
-   migration of anchor identity and validation together. Until that migration is
-   implemented and qualified, source behavior is reported under its old contract;
-   the new communication target is not claimed operational. Empty remains normal.
+   The source migration binds expression to the SC request snapshot and immutable
+   communicative act. Native-model, latency and physical qualification remain
+   separate evidence gates. Empty remains normal.
 
-   `CanonicalPlan.auxiliary_activities[]` is structurally separate from Goal-owned
-   `steps[]`: it is included in Plan validation, fingerprinting, and revision truth,
-   but carries no Goal IDs, cannot satisfy or complete a Goal, and cannot authorize
-   an effect. An explicitly requested gesture remains ordinary Goal-owned Work in
+   `SocialCommunicativeAct.auxiliary_activities[]` is structurally separate from
+   Goal-owned `CanonicalPlan.steps[]`. It carries no Goal IDs, cannot satisfy or
+   complete a Goal, and cannot authorize a task effect. Planner-authored decoration
+   is rejected at maintained ingress boundaries. An explicitly requested gesture remains ordinary Goal-owned Work in
    `steps[]`, even when the same Capability can also be used as optional decoration.
    The Host may validate the exact proposed Capability, schema, anchor, target
    freshness, availability, confirmation, safety, parallelism, repetition, and

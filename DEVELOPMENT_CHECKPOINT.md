@@ -1,6 +1,99 @@
 # Development Checkpoint
 
-## Intent ownership and Fast capability library — 2026-09-16 (current)
+## Project audit and mixed readiness repair — 2026-09-16 (current)
+
+The owner authorized a full project audit, design/Charter reconciliation, repairs,
+up to 18 test loops and normal commit/push. Pre-delivery base:
+`f90dff450357cd49358bb49f03a4930a4d33a8d4`; resume on `main` at the newest commit
+containing this checkpoint and HANDOFF.md. Upstream was fetched before development
+and again before delivery; both checks found 0/0 divergence.
+No new service, runtime flag, current document or semantic owner was added.
+
+### Implemented scope and actual workflow
+
+The [current audit](ARCHITECTURE_AUDIT.md) owns the cross-component findings,
+concurrent native module I/O and failed experiments. GI intent-only, GA continuity,
+Planner Work and SC communication remain the accepted authority split. This audit
+repairs a narrower contract failure inside Planner; it does not restore GI fields.
+
+| Owner / boundary | Reproduced input → failure | Implemented contract and evidence |
+| --- | --- | --- |
+| GI → GA | Two complete intents: nod twice at a future timestamp; blink three times now. Correct inherited Goals contain no GI-authored timer. | Existing ownership preserved in controlled accepted-GI/real-GA test path. |
+| Fast decoder Schema | One ready step plus one future condition is rejected because old alternatives require either all ordinary Work or all waiting Goals. | Per-Goal waiting permits independent ready Work, preserves compiled Capability/argument/confirmation restrictions, forbids early Work and fabricated future fulfillment. |
+| Deep Host adequacy | The same valid primary reply is rejected for the future Goal's honest zero satisfaction. | Only already validated source-bound future conditions receive the nonfulfilling reporting exemption. No score inflation or semantic repair call. |
+| SC → adapter → Runtime | Required acknowledgement must not close the scheduled effect or block unrelated ready Work. | Controlled SC fixture, real adapter/Runtime: exactly the ready blink dispatches; completed speech leaves the future Goal open. This is controlled evidence, not native SC success. |
+| Durable Goal store / wake | Scheduled effect must survive restart without early or repeated dispatch. | Restored state yields no opportunity before due time, one for the future Goal at due time, none on the next drain. |
+
+Ten new Fast/Deep regression cases cover positive execution/restart and early Work,
+false fulfillment, foreign time quotation and duplicate timer rejection. The initial
+red proof had two positive failures and eight passing negative controls. Related
+green proof passed 99 tests; extended Runtime proof passed all ten cases. Earlier
+Runtime fixture failures were harness adapter/mock-schema defects and are retained.
+This does not qualify timing of multiple Activities inside one compound Goal.
+
+Removed a dead shared constant assigning ordinary wording to Planner and a duplicate
+SC method declaration in the client Protocol. Reconciled existing Charter,
+interaction, API, architecture and component documentation with implemented GI/GA
+and SC ownership. Retained typed resource examples are explicitly historical.
+
+### Rejected semantic candidate and open failures
+
+Original compound baseline: correct GI and GA, concurrent SC silence, Fast invalid
+parameter provenance and negative yaw for left. Host rejects before body execution;
+safe idle is observed. Full catalog contained the correct turn-sign contract.
+
+Frozen 12-case bilingual Fast comparison: baseline 12 Schema / 1 Host / 1 semantic;
+prompt candidate 10 Schema / 2 Host / 2 semantic, with two new output truncations;
+installed 9B comparison 12 Schema / 3 Host / 2 semantic. A Host-accepted 9B right turn
+uses left yaw. The prompt candidate is rejected and reverted; the default model is
+unchanged. Original mixed wire/cardinality instructions remain an open finding.
+All raw replies, including accepted ones, were reviewed by this same task, not an
+independent reviewer. No extra online critic, Host direction rule or model promotion.
+
+### Validation and active delivery line
+
+Evidence root **A**: `.chromie/acceptance/full-audit-20260916-f90dff450/`.
+Loop 1: canonical 3,461 tests / 1,017 subtests, 145 benchmarks, 20 legacy;
+strict replay 6,000/6,000; Level A 45/45. Live selected all 74 discovered cases,
+stopped at the first contract failure: 0/1, 73 unrun, SID `c0c5a0b6`.
+Loop 2: canonical 3,467 pass / 4 frozen-request failures; replay 5,600 pass / 400
+request mismatches; Level A 45/45. Live again stopped at first case, SID `84b2e74d`.
+The four affected families were explicitly refrozen after proving all scenario
+inputs, reference replies, faults and behavior oracles unchanged. Strict replay
+matching is unchanged. Final Git comparison proves exactly 400 changed workflow
+cases and no changed prototype case; every change is request-only.
+
+**Final loop 3:** canonical **3,471 tests / 1,017 subtests, 145 benchmarks,
+20 legacy tests** pass, including policy, test ownership, Ruff, mypy, configuration
+and documentation gates (two existing FastAPI deprecation warnings). Strict replay
+**6,000/6,000** declared outcomes, source unchanged; Level A **45/45**. Final frozen
+manifest: `6c7454a8c50ec440f2079afdd7d29ebd100bb8e6bd65372818671fdb2097ecd0`.
+
+Rebuilt/source-verified live aggregate selected all **74** cases and stopped at
+the first hard failure: **0/1, 73 unrun**, SID `9a5a54b0`. GI and GA are correct;
+Fast decorates duration/count quotes, omits speed/yaw provenance and selects negative
+yaw for left. Concurrent SC returns silence after misreading high-level actions as
+prohibited low-level controls and inventing a capability/safety limitation. These
+are separate primary semantic failures. Host rejects before body dispatch; safe
+idle true. The sole speech item is an acceptance-harness error diagnostic, not SC.
+All three attempted live cases and all twelve primary packets were reviewed.
+
+Three full candidate loops were used out of the maximum eighteen. Native prompt
+comparisons are separate, rejected experiments. Later edits finalize documentation
+and restore unchanged prototype freeze metadata only; executable source is unchanged.
+Release remains blocked by native semantics/SC relevance and
+latency, incomplete current-revision live coverage, #24/#32 and remote target
+qualification. Existing 200 old typed GA update references are expected rejections,
+not qualified continuity. Physical microphone/speaker/robot evidence is unchanged.
+
+Next work starts from the final retained cohort and primary packets, with the frozen
+qualification method. Resolve Fast provenance/direction and SC relevance in their
+own primary authorities; reject semantic/non-regression failures before promotion.
+Then rerun the complete discovered live cohort on one verified revision. Do not use
+the 18-loop ceiling as a reason for unsupported prompt changes or repeated identical
+tests. Handoff owns current deployed identity, bundle locations and exact commands.
+
+## Intent ownership and Fast capability library — 2026-09-16 (historical)
 
 The owner authorized this implementation and commit/push after discussing the
 GI/GA/Planner/SC boundaries. Resume on `main` at the latest commit containing this

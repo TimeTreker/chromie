@@ -264,6 +264,104 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("tier", ["fast", "deep"])
+@pytest.mark.parametrize("fault", [None, "early_work", "false_fulfillment", "foreign_quote", "duplicate_timer"])
+async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp_path):
+    from pathlib import Path
+    from agent.app.deep_planner import DeepPlannerResolver
+    from agent.app.planner_model_contract import PlannerModelOutput
+
+    due = "2099-09-04T19:00:00+08:00"
+    request = request_for("Nod twice at " + due)
+    request.responsibilities.append(request_for("Blink three times now").responsibilities[0].model_copy(
+        update={"local_ref": "r2"}))
+    request.text += "; blink three times now"
+    ga = Model([{"decision": "create_goals", "new_goals": [
+        {"source_responsibility_refs": [ref], "related_goal_ids": [], "supersedes_goal_ids": []}
+        for ref in ("r1", "r2")], "confidence": 1.0, "referent_updates": [],
+        "resolved_references": [], "reason_summary": "Two independent intentions."}])
+    association = await GoalAssociationResolver(ga).resolve(request)
+    request.context["goal_association_resolution"] = association.model_dump(mode="json")
+    future, ready = [goal.goal_id for goal in association.new_goals]
+    raw = json.loads(Path("benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
+    raw = json.loads(json.dumps(raw).replace("${goal}", future))
+    raw.update(disposition="mixed", steps=[{"step_id": "blink-now", "capability_id": "test.blink",
+        "args": {"count": 3}, "timing": "sequential", "source_goal_ids": [ready]}])
+    raw["parameter_resolutions"] = [{"step_id": "blink-now", "parameter": "count",
+        "strategy": "semantic_realization", "value": 3, "source_quote": "three times",
+        "source_goal_ids": [ready], "confidence": 1.0, "blocking": False}]
+    raw["time_conditions"][0]["source_quote"] = due
+    raw["goal_outcomes"][ready] = {"disposition": "execute", "coverage": "complete", "step_ids": ["blink-now"],
+        "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": [ready],
+                         "unmet_goal_ids": [], "unmet_requirements": [], "rationale": "Immediate action."}}
+    raw["goal_satisfaction"].update(score=0.5, status="partial", satisfied_goal_ids=[ready])
+    if fault == "early_work":
+        raw["steps"][0]["source_goal_ids"].append(future)
+    elif fault == "false_fulfillment":
+        raw["goal_outcomes"][future]["satisfaction"].update(score=1.0, status="exact",
+            satisfied_goal_ids=[future], unmet_goal_ids=[], unmet_requirements=[])
+    elif fault == "foreign_quote":
+        raw["time_conditions"][0]["source_quote"] = "at midnight"
+    elif fault == "duplicate_timer":
+        raw["time_conditions"].append(copy.deepcopy(raw["time_conditions"][0]))
+    raw = PlannerModelOutput.model_validate(raw).model_dump(mode="json")
+    model = Model([raw])
+    resolver = FastPlannerResolver if tier == "fast" else DeepPlannerResolver
+    plan = await resolver(model, Catalog([capability("blink", {"count": {"type": "integer", "minimum": 1}})])).resolve(request)
+    assert len(model.packets) == 1
+    if fault:
+        assert not plan.steps and plan.metadata.get("failure_class"), plan.model_dump()
+    else:
+        Draft202012Validator(model.packets[0][1]["response_format"]).validate(raw)
+        assert plan.disposition == "mixed", plan.model_dump()
+        assert [step.source_goal_ids for step in plan.steps] == [[ready]]
+        assert [condition.goal_id for condition in plan.time_conditions] == [future]
+        assert plan.goal_outcomes[0].satisfaction.unmet_goal_ids == [future]
+        from orchestrator.runtime.capability_runtime import (
+            CapabilityDefinition, MockCapabilityProvider, LocalSpeechCapabilityProvider, local_speech_definition,
+        )
+        from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+        from orchestrator.runtime.conversation_state import ConversationStateManager
+        from tests.test_cognitive_runtime_pr7 import FakeRuntime
+        from tests.capability_runtime_test_support import submit_and_wait_terminal
+        from tests.cognitive_work_test_support import social_fixture_response
+
+        runtime = FakeRuntime([CapabilityDefinition(capability_id="test.blink", provider_id="mock",
+            output_schema={"type": "object", "additionalProperties": False, "required": ["args"],
+                "properties": {"args": {"type": "object", "additionalProperties": False,
+                    "properties": {"count": {"type": "integer"}}, "required": ["count"]}}},
+            input_schema={"type": "object", "properties": {"count": {"const": 3}}, "required": ["count"]}),
+            local_speech_definition()])
+        provider = MockCapabilityProvider()
+        runtime.runtime.register_provider(provider)
+        runtime.runtime.register_provider(LocalSpeechCapabilityProvider(
+            lambda _args: {"played": True, "playback_started": True, "voice_released": True}))
+        response = await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),
+            plan=plan, session_id=request.sid, language="en-US",
+            text="The nod is scheduled for the requested time.")
+        response.metadata["goal_interpretation"] = {
+            "responsibilities": [item.model_dump(mode="json") for item in request.responsibilities]}
+        path = tmp_path / "goals.json"
+        manager = ConversationStateManager(task_store_enabled=True, task_store_path=path)
+        manager.apply_goal_association_resolution(association.model_dump(mode="json"),
+            sid=request.sid, user_text=request.text, atomic=True)
+        manager.record_interaction_response(request.sid, response)
+        result = await submit_and_wait_terminal(runtime.runtime, response)
+        assert result.status == "completed"
+        assert [(call.capability_id, call.args) for call in provider.calls] == [("test.blink", {"count": 3})]
+        for speech in response.speech:
+            manager.update_pending_task_status_for_request_id(request_id=speech.id, status="completed")
+        assert manager._goal_responsibility_status(manager._task_context_by_goal_id(future)) == "open"
+        assert manager.persist_task_contexts()
+        restored = ConversationStateManager(task_store_enabled=True, task_store_path=path)
+        due_ms = plan.time_conditions[0].due_at_ms
+        assert restored.due_time_condition_opportunities(now_ms=due_ms - 1) == []
+        wake = restored.due_time_condition_opportunities(now_ms=due_ms)
+        assert [item["condition"]["goal_id"] for item in wake] == [future]
+        assert restored.due_time_condition_opportunities(now_ms=due_ms + 1) == []
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("available,locked", [(False, False), (True, True)])
 async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(available, locked):
     entry = capability("turn", {"rotation_degrees": {"type": "number"}}, tier="rare")
