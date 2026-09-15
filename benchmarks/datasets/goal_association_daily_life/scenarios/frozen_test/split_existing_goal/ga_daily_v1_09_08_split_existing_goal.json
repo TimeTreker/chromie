@@ -96,36 +96,26 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "First separated outcome for 在用户谈论“我想念以前的班级”时给予倾听和支持。",
+          "outcome": "First separated outcome for 在用户谈论“我想念以前的班级”时给予倾听和支持。 (把这个目标拆成两个分别负责的结果。)",
           "output_mode": "speech",
-          "relationship": "split",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_09_08_a"
-          ]
+          }
         },
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r2",
-          "outcome": "Second separated outcome for 在用户谈论“我想念以前的班级”时给予倾听和支持。",
+          "outcome": "Second separated outcome for 在用户谈论“我想念以前的班级”时给予倾听和支持。 (把这个目标拆成两个分别负责的结果。)",
           "output_mode": "speech",
-          "relationship": "split",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r2_end",
             "source_start_token_ref": "tok_r2_start"
-          },
-          "target_goal_ids": [
-            "goal_09_08_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -156,7 +146,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is split.",
+          "reason_summary": "The source-grounded continuity relationship is split.",
           "relationship": "split",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [

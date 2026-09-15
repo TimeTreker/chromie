@@ -51,21 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "event": "feed the cat",
-            "time_scope": "before school"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Create a reminder to feed the cat before school.",
+          "outcome": "Create a reminder to feed the cat before school. (Remind me to feed the cat before school.)",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -97,27 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "event",
-              "name": "event",
-              "referent_id": "",
-              "value": "feed the cat"
-            },
-            {
-              "confidence": 1.0,
-              "entity_type": "temporal_scope",
-              "name": "time_scope",
-              "referent_id": "",
-              "value": "before school"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "stateful_effect",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

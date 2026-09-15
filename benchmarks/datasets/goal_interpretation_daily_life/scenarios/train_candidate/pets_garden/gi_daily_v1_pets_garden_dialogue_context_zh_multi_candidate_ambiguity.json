@@ -41,11 +41,6 @@
         {
           "local_ref": "r1",
           "outcome": "把猫粮碗拿给那个人",
-          "binding_items": {
-            "entity": "猫粮碗",
-            "location": "阳台门边",
-            "recipient": "那个人"
-          },
           "output_mode": "body_action",
           "confidence": 0.75,
           "source_evidence": {
@@ -56,8 +51,7 @@
       ],
       "unresolved": [
         "“那个人”在两个可用人物指代之间不明确。"
-      ],
-      "coordination": []
+      ]
     },
     "semantic_expectations": {
       "responsibility_count": 1,
@@ -70,41 +64,42 @@
             "递",
             "交给"
           ],
-          "required_bindings": {
+          "required_intent_details": {
             "entity": "猫粮碗",
             "location": "阳台门边",
             "recipient": "那个人"
-          },
-          "forbidden_binding_keys": [
-            "actor"
-          ]
+          }
         }
       ],
-      "coordination": [],
-      "unresolved": true
+      "unresolved": true,
+      "intent_order": []
     }
   },
   "invariants": {
     "one_semantic_authority_call": true,
-    "bindings_are_sparse_and_source_or_context_grounded": true,
     "source_evidence_is_current_turn_only": true,
-    "binding_keys_lexicographic": true,
     "must_not_emit_fields": [
       "actions",
       "activities",
+      "binding_items",
+      "bindings",
       "capability_id",
+      "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
       "plan",
       "provider_id",
+      "relationship",
       "response_text",
       "route",
       "skill_id",
+      "target_goal_ids",
       "task_id",
       "tool_name",
       "work_items"
-    ]
+    ],
+    "complete_intent_is_source_or_context_grounded": true
   },
   "adversarial_design": {
     "phenomena": [

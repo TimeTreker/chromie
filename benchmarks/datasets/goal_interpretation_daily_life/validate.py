@@ -43,6 +43,7 @@ TOP_LEVEL_KEYS = {
     "review",
 }
 FORBIDDEN_WIRE_KEYS = {
+    "binding_items", "bindings", "coordination", "relationship", "target_goal_ids",
     "actions",
     "activities",
     "capability_id",
@@ -142,8 +143,6 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
     responsibilities = wire["responsibilities"]
     if semantic["responsibility_count"] != len(responsibilities):
         raise ValueError(f"{case_id}: responsibility count expectation drift")
-    if semantic["coordination"] != wire["coordination"]:
-        raise ValueError(f"{case_id}: coordination expectation drift")
     if semantic["unresolved"] != bool(wire["unresolved"]):
         raise ValueError(f"{case_id}: unresolved expectation drift")
     if len(semantic["responsibilities"]) != len(responsibilities):
@@ -151,15 +150,13 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
     for reference, expectation in zip(
         responsibilities, semantic["responsibilities"], strict=True
     ):
-        bindings = reference["binding_items"]
+        bindings = expectation["required_intent_details"]
         if list(bindings) != sorted(bindings):
             raise ValueError(f"{case_id}: binding keys are not lexicographic")
         if expectation["local_ref"] != reference["local_ref"]:
             raise ValueError(f"{case_id}: local_ref expectation drift")
         if expectation["output_mode"] != reference["output_mode"]:
             raise ValueError(f"{case_id}: output_mode expectation drift")
-        if expectation["required_bindings"] != bindings:
-            raise ValueError(f"{case_id}: binding expectation drift")
         if not expectation["outcome_contains_any"]:
             raise ValueError(f"{case_id}: missing flexible outcome oracle")
 
@@ -176,9 +173,8 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
         invariants[name]
         for name in (
             "one_semantic_authority_call",
-            "bindings_are_sparse_and_source_or_context_grounded",
+            "complete_intent_is_source_or_context_grounded",
             "source_evidence_is_current_turn_only",
-            "binding_keys_lexicographic",
         )
     ):
         raise ValueError(f"{case_id}: required invariant disabled")
@@ -324,8 +320,8 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
         context_scenarios += bool(case["input"]["context"])
         wire = case["target"]["reference_wire_output"]
         unresolved_scenarios += bool(wire["unresolved"])
-        for responsibility in wire["responsibilities"]:
-            binding_items = responsibility["binding_items"]
+        for responsibility, expectation in zip(wire["responsibilities"], case["target"]["semantic_expectations"]["responsibilities"], strict=True):
+            binding_items = expectation["required_intent_details"]
             actual_dimensions.update(binding_items.keys())
             digit_measurement_surface_bindings += sum(
                 name in DIGIT_MEASUREMENT_DIMENSIONS
@@ -334,14 +330,13 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
                 for name, value in binding_items.items()
             )
             actual_modes[responsibility["output_mode"]] += 1
-            actual_relationships[responsibility.get("relationship", "new")] += 1
+
     actual_semantic_coverage = {
         "context_scenarios": context_scenarios,
         "unresolved_scenarios": unresolved_scenarios,
         "digit_measurement_surface_bindings": digit_measurement_surface_bindings,
         "binding_dimensions": dict(sorted(actual_dimensions.items())),
         "output_modes": dict(sorted(actual_modes.items())),
-        "relationships": dict(sorted(actual_relationships.items())),
     }
     if actual_semantic_coverage != coverage["semantic_coverage"]:
         errors.append(
@@ -362,7 +357,6 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
         "builders": dict(sorted(actual_builders.items())),
         "binding_dimensions": dict(sorted(actual_dimensions.items())),
         "output_modes": dict(sorted(actual_modes.items())),
-        "relationships": dict(sorted(actual_relationships.items())),
         "context_scenarios": context_scenarios,
         "unresolved_scenarios": unresolved_scenarios,
         "digit_measurement_surface_bindings": digit_measurement_surface_bindings,

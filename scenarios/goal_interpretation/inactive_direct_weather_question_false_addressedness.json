@@ -43,15 +43,8 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "告知用户北京今天是否下雨",
-              "bindings": {
-                "location": "北京",
-                "time_scope": "today",
-                "proposition": "rain"
-              },
+              "outcome": "今天北京下雨了吗？",
               "confidence": 0.95,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "information",
               "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -74,15 +67,8 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "告知用户北京今天是否下雨",
-        "bindings": {
-          "location": "北京",
-          "time_scope": "today",
-          "proposition": "rain"
-        },
+        "outcome": "今天北京下雨了吗？",
         "confidence": 0.95,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "information"
       }
     ]

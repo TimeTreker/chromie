@@ -20,7 +20,8 @@
     "model_ability_evaluated": false,
     "training_eligible": false,
     "authoring_method": "GPT-6 Astra authored 60 contrasts; deterministic 4 actions × 5 values × 5 language forms expansion",
-    "independent_inference_per_case": false
+    "independent_inference_per_case": false,
+    "authority_migration": "GI preserves complete intent/type, GA inherits intent and owns continuity, Planner authors arguments and source-bound readiness."
   },
   "catalog": [
     {
@@ -408,14 +409,10 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t4"
-            },
-            "binding_items": {
-              "count": 8
             }
           }
         ],
-        "unresolved": [],
-        "coordination": []
+        "unresolved": []
       },
       "role": "gi",
       "required_prompt_fragments": [
@@ -431,7 +428,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "020a3cb7f55dc9e80bfc872bc79b57af3d7e8cd35a6f2b04f9214221b708f8fc"
+              "$artifact": "4dd082f6a24a1d7600bcbd856e46ccfdc50a83dc98bc11dc3c966cea59591356"
             }
           },
           {
@@ -446,7 +443,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "f12adf82a30c99ec8d85ce3decea81d95f7a703405017521dcabf983293e5193"
+          "$artifact": "bd4541ed0dddf81d6bf3b1e2b1b1a9e246428e4039e2c75bfdddaf700482fb16"
         }
       }
     },
@@ -459,20 +456,8 @@
             "source_responsibility_refs": [
               "r1"
             ],
-            "output_mode": "body_action",
-            "media_operation": "none",
-            "bindings": [
-              {
-                "name": "count",
-                "entity_type": "count",
-                "value": "8",
-                "confidence": 1.0
-              }
-            ],
             "related_goal_ids": [],
             "supersedes_goal_ids": [],
-            "resource_kind": "none",
-            "resource_responsibility": null,
             "capability_id": "soridormi.nod_yes"
           }
         ],
@@ -491,12 +476,12 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "23eddaa2c17ad6a88d1b11e9149aee6a7c174552da4f585a7f7af690bffc8998"
+              "$artifact": "d1bf34fc222ac80a0d8cc883cda5bb7676a9be4c0a2f37a7a7d11a8d3d8fa921"
             }
           },
           {
             "role": "user",
-            "content": "Owner-approved Chromie identity JSON:\nnull\n\nPreserve the human-facing WHAT category from Goal Interpretation exactly. Goal Association may refine semantic bindings, resource structure, references, and canonical continuity, but it does not decide whether a Capability, provider, execution lane, fresh Evidence, or Work is required. Use information when the person wants Chromie to determine or provide information, whether that information is already available to reasoning/context or must later be acquired. Use stateful_effect only for a durable or future state change outside embodiment, such as recording, scheduling, changing a setting, or sending later. Locomotion, posture, gaze, gesture, physical manipulation, carrying, and handover use body_action even when they change location or another lasting physical state; lifecycle control of media uses media_playback; authored vocal performances use their exact vocal mode. Ordinary directly authored conversation uses speech. Capability and provider applicability are Planner concerns and must not be encoded into Goal output_mode or metadata. A negative instruction that limits another outcome is a constraint, not a separate Goal. A manner, mood, persona, or social-presentation directive attached to another effect is expression framing, not an extra spoken Goal. Coordination grammar still requires one Goal per independently satisfiable observable outcome. Never invent an audible modality from style wording alone.\n\nThere are no active or retained recent Goals. Association is impossible; create new Goals only. Goal Association receives provider-neutral Responsibility evidence, not a route, Capability, plan, or response draft. The authoritative user turn and the supplied GI Responsibilities are the only sources of owed human outcomes. Fast Planner Activity is HOW authored concurrently and must never become, justify, or be copied into a Goal. Responsibility conservation is strict: create exactly one Goal for each independently satisfiable Responsibility, copy its local_ref into source_responsibility_refs, and neither merge independent effects nor add acknowledgement, progress, delivery, personality, or implementation Goals. A manner, prohibition, timing, or social-presentation modifier stays on the outcome it constrains. A greeting attached to substantive work is framing; a standalone social act is one speech Goal. Information acquisition and a requested interpretation of that same evidence are one Goal. Acquisition, carrying, return, and handoff are stages of one requested physical delivery, not sibling Goals.\n\nPreserve the supplied Responsibility WHAT output_mode exactly in the canonical Goal. information keeps one information resource_responsibility when grounded information acquisition is the human outcome; stateful_effect keeps ordinary typed bindings and no information resource. This semantic preservation never selects a Capability, provider, executable operation, or Plan. Preserve every supplied material binding verbatim, including counts, durations, speeds, directions, targets, severity, thresholds, negation, comparison, and scope. For a non-resource Goal, put these in top-level typed bindings; the action remains in GI outcome. Do not emit a Goal description: Host inherits it and success_criteria from GI. Do not claim completion or choose a Capability. \n\nUse resource_responsibility only when obtaining and making a resource available to a recipient is the human outcome. A physical_object is a distinct concrete object independent of Chromie's body and requires acquisition plus physical_handover. Locomotion, gaze, blinking, gesture, turning, posture, and other self-motion are non-resource body_action Goals; never describe Chromie's body, position, displacement, or motion as an object to acquire or hand over. A physical resource keeps top-level bindings empty; its identity/quantity belong to description/quantity and its supplied location, distance, direction, and route belong in source.acquisition_bindings. Preserve separately supplied GI bindings separately, but never decompose one GI-owned composite binding: retain its complete source value in one typed acquisition binding. Supplied spatial grounding requires source.status=known; source.status=unknown is allowed only when none was supplied.\n\nAn information resource uses output_mode=information and one exact information_domain: local_clock, weather_forecast, external_grounded_information, direct_environment_perception, or private_runtime_information. Its query_scope conserves the declared GI bindings without adding duplicate classification. It may be empty: Host inherits the complete query from the GI outcome. A declared location binding remains location. Current nearby people/objects/events require direct_environment_perception, not weather. A public source uses source.status=provider_resolved; source.status=unknown preserves an unavailable local/private/runtime source; source.status=known is only for an explicitly named source. Never invent location, timezone, source, provider, device, coordinates, or another query fact. Preserve source-grounded temporal wording as human semantic scope in query_scope. A compound natural expression stays intact instead of being decomposed into Capability date, period, or clock-range arguments. A duration remains duration. Never narrow broader temporal scope.\n\nResolve a pronoun, demonstrative, ellipsis, correction, or task mention only from explicit current meaning, a supplied scoped discourse referent, a candidate binding, or accepted dialogue, in that order. There are no candidate Goals in this request. If evidence does not select one meaning, keep the narrowest source-grounded provisional Goal and do not invent the referent; Fast Planner owns any clarification. resolved_references may copy only a supplied referent_id. Ordinary explicit mentions are bindings, not resolved references. referent_updates require supplied provenance; never invent IDs. Tool results and runtime diagnostics are not semantic authority.\n\nThe Host owns IDs, versions, lifecycle, source text, persistence, plans, and canonical construction. Emit none of those fields. Return only the exact GoalSegmentationModelOutput JSON Schema: decision=create_goals, new_goals, referent_updates, resolved_references, confidence, and compact reason_summary. Goal Association never executes, commits, asks a question, creates a planning InformationGap, or pretends work is complete.\n\nResponsibility evidence JSON:\n[{\"bindings\":{\"count\":8},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"点头8次\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t4\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]}]\n\nGI unresolved-meaning evidence JSON:\n[]\n\nScoped discourse referents JSON:\n[]\n\nRecent accepted conversation JSON (reference evidence only):\n[]\n\nLanguage hint: zh-CN\nIMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"点头8次。\",\"authority\":\"normalized_transport_fallback\"}"
+            "content": "Owner-approved Chromie identity JSON:\nnull\n\n\nAssociate the complete accepted GI intentions with the supplied Goals. Every Responsibility ref must occur exactly once across associations and new_goals. Preserve compound intentions intact; Planner decomposes Activities. Choose continuity from the accepted meaning, candidate requirements, state and dialogue. Candidate presence, lexical overlap or recency alone is insufficient. GI does not supply relationship labels; you own that judgment. Use exact supplied IDs. Recent terminal Goals may be referenced but not reopened. For changed requirements, select the exact target and replaced requirement indices; Host inherits the complete new requirements from the cited GI outcomes. Keep unrelated retained requirements. Supersede a Goal only when the accepted intent explicitly replaces it; an additional intention leaves it intact. A replaced Goal must not also be listed as related context. No candidates means new_goals only. Emit source_responsibility_refs, related_goal_ids and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. Host inherits GI's expected result type unchanged. Do not extract duration, direction, count, speed, resource fields, or reclassify output modes or other execution details. Planner owns parameter realization and Work. Preserve GI uncertainty; do not resolve it or choose a clarification strategy. SC owns communication. Return the supplied schema only.\n\nCandidate Goal evidence JSON:\n[]\nGI complete intentions JSON:\n[{\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"点头8次\",\"output_mode\":\"body_action\",\"source_evidence\":{\"source_end_token_ref\":\"t4\",\"source_start_token_ref\":\"t0\"}}]\nGI unresolved meaning JSON:\n[]\nScoped discourse referents JSON:\n[]\nAccepted dialogue JSON:\n[]\nIMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"点头8次。\",\"authority\":\"normalized_transport_fallback\"}"
           }
         ],
         "stream": false,
@@ -508,7 +493,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "34d72f2b91275e9a9cd7c2f47374dd5dea88ee69763ef2e7427a5689dfed3999"
+          "$artifact": "eb062474d7b065371ffa6a100224248d348bc1514c5f5b7701369d4f8aaeaa6e"
         }
       }
     }
@@ -522,11 +507,14 @@
     }
   ],
   "expected_goal_status": "satisfied",
+  "social_cognition": {
+    "fast-initial": "预报没有雨，因此这次无需执行该动作。"
+  },
   "coverage_family": "ga_forbidden_how",
   "contrast_set": "nod-4",
   "split": "held_out",
   "training_eligible": false,
-  "reference_review": "Astra-authored parameterized reference; non-independent review",
+  "reference_review": "Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.",
   "expected_verdict": "expected_rejection",
   "parameters": {
     "action": "nod",
@@ -546,6 +534,5 @@
   ],
   "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
   "probe": "ga_forbidden_how",
-  "expected_rejection": "ga",
-  "social_cognition": {}
+  "expected_rejection": "ga"
 }

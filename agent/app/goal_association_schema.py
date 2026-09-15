@@ -892,6 +892,29 @@ def goal_association_response_schema(
             if isinstance(branch, dict):
                 branch["type"] = "object"
                 branch["additionalProperties"] = False
+    # GA owns identity and continuity. Complete intent is inherited by Host;
+    # no classification, resource decomposition or parameter extraction is needed.
+    schema["$defs"]["GoalAssociationModelGoal"] = {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "source_responsibility_refs": {
+                "type": "array", "items": {"type": "string", "enum": responsibility_refs},
+                "minItems": 1, "maxItems": 1, "uniqueItems": True,
+            },
+            **{name: {"type": "array", "items": {"type": "string", "enum": active_ids},
+                      "maxItems": len(active_ids), "uniqueItems": True}
+               for name in ("related_goal_ids", "supersedes_goal_ids")},
+        },
+        "required": ["source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids"],
+    }
+    if active_ids:
+        schema["$defs"]["GoalAssociationModelGoal"]["allOf"] = [
+            {"not": {"properties": {
+                "related_goal_ids": {"contains": {"const": goal_id}},
+                "supersedes_goal_ids": {"contains": {"const": goal_id}},
+            }, "required": ["related_goal_ids", "supersedes_goal_ids"]}}
+            for goal_id in active_ids
+        ]
     _expose_intersection_shapes(schema)
     return _prune_unreferenced_definitions(schema)
 

@@ -43,15 +43,8 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "answer whether the user is correct that the sun is hot and round",
-        "bindings": {
-          "proposition": "the sun is hot and round",
-          "speech_act": "request_agreement"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.94,
         "output_mode": "information"
       }

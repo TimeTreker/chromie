@@ -97,7 +97,7 @@ architecture/terminology freeze; it does not close #24/#32 or authorize a releas
 
 | Owner | Complete semantic responsibility | Authority it does not acquire |
 |---|---|---|
-| Goal Interpretation | Current-turn WHAT, including every accepted Responsibility, material binding and unresolved meaning | Communication wording, Capability choice, Work planning |
+| Goal Interpretation | Complete current-turn intent in natural language, source provenance, confidence and unresolved meaning | Communication wording, Capability choice, Work planning |
 | Goal Association | Canonical Goal identity, continuity and source-preserving updates | Reinterpreting WHAT, communication, Work compatibility |
 | Social Cognition | Whether, when and how to interact with people; exact grounded communication and bounded eligible social-expression Capability proposals | Reinterpreting GI, changing Goals or Work, planning requested tasks, authorizing effects |
 | Planner | Capability selection, execution-input resolution, complete Work plans, dependencies, reuse/revision and planning limitations | Ordinary reply wording or review of Social Cognition's decision |
@@ -554,9 +554,9 @@ work, not a synthetic person utterance.
 Read the diagram with these boundaries:
 
 - Goal Interpretation owns **provider-neutral contextual Responsibility evidence**:
-  what human outcome appears to be wanted, material semantic bindings already
-  present in the turn/context, and whether the Responsibility creates, continues,
-  modifies, clarifies, or otherwise relates to a supplied Goal. It may preserve a
+  complete natural-language intent with its material details and unresolved meaning.
+  GA owns how that intention relates to supplied Goals; GI does not author
+  relationship labels or parameter bindings. It may preserve a
   requested human-level modality such as speech, information, an embodied effect, or
   a durable state change when that modality is part of WHAT. Explicit requirements for
   freshness, a new observation, repeated action, or a particular historical result remain
@@ -1030,8 +1030,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    dialogue admitted after itself. This keeps conversational continuity responsive
    without letting the Host infer semantics from recency or wording. Planner
    provenance remains downstream fail-closed: a value labelled `user_supplied`
-   must be traceable to an authoritative typed Goal binding rather than model
-   memory or an invented contextual guess.
+   must be traceable to an exact owning intent excerpt or retained typed Goal
+   binding; model memory or an invented contextual guess is not provenance.
 
 25. **Progress is gated by local readiness without crossing semantic authority.**
    GI emits one complete contextual Responsibility result. GA, Social Cognition
@@ -1116,32 +1116,43 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    event important enough to change what Chromie should do must escalate through
    normal Cognitive Core / Goal reasoning. Unanchored baseline embodiment remains a
    separate concern.
-30. **Semantic decomposition must carry source-grounded Responsibility-coverage
-   evidence in its primary result, not through a reviewer chain.** The model that owns a semantic stage
-   must author the complete set of independently satisfiable outcomes, their
-   provider-neutral modes, complete material constraints, source-grounding evidence, and typed
-   order/concurrency relations in that stage's primary result. That result is the
-   one model-authored semantic source of truth. A second LLM invocation must not be
-   added merely to confirm, criticize, score, audit, resegment, or repair the same
-   semantic decision. Calling such an invocation an auditor, verifier, critic,
-   qualification pass, or fresh interpretation does not create a distinct
-   authority and does not exempt it from this rule.
+30. **Each semantic owner produces its complete decision once, with source
+   provenance and no reviewer chain.** The primary GI result preserves complete
+   user intent, including every requested effect, modifier, quantity, condition,
+   negation and relation. It is not a Capability argument table. A compound intent
+   may remain one Responsibility; Planner owns decomposition into Activities.
+   No later model may confirm, criticize, resegment or repair an accepted GI result.
 
-   **Owner-approved GI handoff simplification (2026-09-15).** GI owns complete
-   intended outcomes with their referents, restrictions and scope attachment.
-   The Host passes the full immutable original input alongside that result; GI
-   must not regenerate the source copy. A complete information query need not
-   duplicate its subject, property, place or relative period into a semantic
-   classification table. Planner owns mapping that already-interpreted query to
-   the selected Capability's arguments. An absent duplicate binding is not itself
-   missing meaning. A required non-numeric string may use literal evidence present
-   in both its owning outcome and the original input; source text alone cannot
-   lend a sibling's value, override a binding, authorize new effects or resolve
-   GI's declared ambiguity. Literal provenance does not prove the model's semantic
-   mapping. Counts, measurements, explicit activation and field-specific updates
-   retain their existing typed conservation contracts. This amendment removes
-   mandatory redundant classification, not those execution-safety checks or GI's
-   completeness obligation. SC remains the sole ordinary response-wording owner.
+   **Owner-approved intent and communication amendment (2026-09-16).** GI's model
+   output contains complete outcomes, local refs, the provider-neutral requested result type, confidence,
+   source evidence and genuine unresolved meaning. It does not author `binding_items`, `bindings`,
+   Goal relationships, activation timestamps or execution fields.
+   Durations, directions, counts, speed, units and sequencing remain attached to
+   their actions in the complete outcome. The Host passes immutable original input
+   alongside it. GA owns relationships to existing Goals and source-preserving
+   requirement updates. Planner owns Capability selection, parameter extraction,
+   normalization, defaults, Activity decomposition, dependencies and planning gaps.
+   Missing execution inputs are not GI uncertainty.
+
+   The same accepted intent fans out concurrently to SC, GA and Fast Planner. SC
+   has the highest communication compute priority and reports actual module state;
+   understood, checking, planned, running and completed are distinct facts. GI, GA,
+   Planner and Runtime may request communication. SC owns exact speech and eligible
+   Social Attention expression, including nonverbal-only communication; a requested
+   gesture remains Planner Work. Runtime retains admission, confirmation, resource
+   safety, stale-plan rejection, cancellation and Evidence authority. Concurrent
+   cognition grants no permission to execute before canonical validation.
+
+   **Owner-approved Planner library amendment (2026-09-16).** Fast Planner receives
+   complete common Capability contracts and the full Capability library index,
+   including explicit availability and restriction metadata.
+   Before authoring a Plan it may request one bounded batch of exact indexed IDs
+   for their full contracts. The lookup contains no candidate Plan or Activities;
+   after the read, the original intent/context and retrieved contracts feed one
+   complete planning decision. It is not a semantic repair or review. A second
+   lookup, unknown ID, or mixed lookup/executable output rejects. An uncommon
+   Capability alone does not require Deep Planner; consequential planning complexity
+   still uses the existing depth boundary. Restricted providers stay restricted.
 
    At a trusted validation boundary, **proof** means only the explicitly named
    invariant checked over the primary result and its authoritative input. It does
@@ -1156,8 +1167,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    defines the mechanical owners, reporting distinctions, and evidence limits.
 
    Trusted code validates only mechanical invariants over the primary result:
-   schema shape, bounded source provenance, exact references, typed cardinality,
-   closed output modes, and sibling relation integrity. It must not recover user
+   schema shape, bounded source provenance, exact references, declared cardinality,
+   Capability argument contracts and execution dependency integrity. It must not recover user
    meaning with phrase rules, action dictionaries, a second writable semantic
    representation, or a downstream model's preferred interpretation. A
    mechanically malformed DTO may be regenerated once at the same stage only when
@@ -1167,11 +1178,6 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    authoritative source to the designated deeper cognition, ask a genuine
    user-resolvable clarification, or fail closed; it must not enter a chain of
    same-authority model calls.
-
-   A GI speed binding that fails source or dimension validation rejects the
-   interpretation; Host must not delete it to salvage the remaining WHAT.
-   An absent speed binding is valid when no speed was requested; Planner owns
-   any permitted execution default under the Capability and safety contracts.
 
    GA's one DTO repair must retain the complete primary parsed output before
    preprocessing. Trusted code must first prove that only an unambiguous container
@@ -1194,9 +1200,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    model-authored branch decision that can erase mixed continuity-plus-creation
    meaning. Planner must consume the committed Goals while owning only HOW. Neither
    downstream authority may reinterpret or repair GI meaning. Provider availability
-   never erases a requested Responsibility. Material cross-Responsibility order remains in
-   `before`/`after` sibling-`local_ref` bindings and requested concurrency in
-   `parallel_with`; these are WHAT relations, not Runtime scheduling permission.
+   never erases a requested Responsibility. Material order and concurrency remain in complete GI outcomes; Planner realizes
+   them into Activity dependencies. They never grant Runtime scheduling permission.
 
    Exact admitted wording is provenance, not a second writable semantic result.
    `UserTurnEnvelope.original_input.text` remains the one immutable stored source;
@@ -1226,16 +1231,14 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Development must improve the primary prompt, schema, model choice, or
    deterministic mechanics when that primary result is unreliable instead of
    inserting a semantic confirmation or repair chain into the live robot path.
-   Goal Interpretation therefore authors `output_mode` once as the provider-neutral
-   completion category of each current-turn Responsibility. Goal Association must
-   preserve that accepted value while owning only canonical Goal identity and
-   continuity; it must not re-author or reinterpret the mode. The Host derives
-   responsibility kind, execution lane, and provider requirement only after
-   validation and may retain those projections in canonical metadata for downstream
-   use. Missing `output_mode`, a conflicting Goal-Association value, or model-authored
-   copies of those Host projections are schema defects, not invitations for
-   compatibility inference. Do not accept a reverse mapping that can silently
-   manufacture or downgrade semantic intent.
+   GI retains its existing provider-neutral `output_mode` as the requested result
+   type. It does not choose Capabilities or execution lanes. New Goals inherit that
+   type and complete intention text without a second GA-authored category or
+   parameter table. Ordinary communication cannot stand in for a requested physical
+   effect; compound intent preserves every requested result. Older retained typed Goal constraints remain authoritative for
+   their exact revisions; an unspecified internal projection grants no semantic
+   permission. Planner judges whether supplied context/Evidence can satisfy an
+   intent through communication, or which Activities are needed.
 
    Goal WHAT is inherited, not summarized again by Goal Association. New Goal
    descriptions and success criteria are Host projections of the exact accepted GI
@@ -1243,8 +1246,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    be retained, supplemented, or explicitly replaced using current GI sources. GA
    selects the target Goal and affected requirements; unselected requirements remain.
    A partial fragment cannot replace a complete retained requirement. Semantic field
-   changes copy a named accepted GI binding to an explicit Goal field, never a new
-   GA-authored value. Changed modality uses an explicitly sourced replacement Goal.
+   updates inherit complete accepted intent; GA does not extract new parameter
+   fields. A retained typed Goal whose fields cannot be updated without reinterpreting
+   intent requires an explicitly sourced replacement, not silent field deletion.
    The existing Goal-state owner commits description, requirements, bindings and
    provenance together against the exact supplied version/snapshot. It preserves
    prior Goal revisions, resource fields and execution Evidence; stale updates reject.
@@ -1252,13 +1256,18 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    then decides Work compatibility. A display description is never another WHAT
    authority. These guarantees do not add executable multi-Goal merge/split support.
 
-   The same rule applies to parameter provenance. Planner owns Capability choice,
+   The same rule applies to parameter provenance. Exact owned intent excerpts may
+   ground Planner argument realization without duplicated GI parameters. Host checks
+   citation ownership and argument consistency, not the correctness of natural-language
+   interpretation or unit conversion. Those remain primary Planner decisions requiring
+   semantic qualification. Planner owns Capability choice,
    exact executable argument values, semantic realization, and step-to-Goal
    ownership. When an already-authored argument has exactly one source in an
    immutable non-resource Goal binding, or a selected Capability explicitly
    declares how one typed Goal binding is realized into that argument, the duplicate
    `PlanParameterResolution` is a Host projection rather than a second model-writable
-   semantic fact. Trusted code may add or correct only that provenance record; it
+   semantic fact. Trusted code may add or correct only that mechanically duplicated provenance record;
+   an authored intent quote is validated unchanged and is never overwritten. It
    may not change Capability, argument, step, timing, outcome, or wording. Ambiguous
    provenance remains unprojected and must pass ordinary Planner validation or fail
    closed.
@@ -1342,7 +1351,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
    **Fast outcome types do not borrow authority from each other.** Fast Goal
    Interpretation emits provider-neutral Responsibility evidence with material
-   semantic bindings and bounded unresolved meaning, preserving any user-required
+   details inside complete natural-language outcomes and bounded unresolved meaning, preserving any user-required
    freshness, new observation, repetition, or historical-result scope. Planner decides
    whether additional Work or fresh Evidence is needed from that immutable meaning,
    applicable Goal state, actual Work, trusted context/Evidence and Capability contracts.

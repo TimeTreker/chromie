@@ -16,54 +16,42 @@
           "行走",
           "走"
         ],
-        "required_bindings": {
-          "direction": [
-            "往前",
-            "forward",
-            "ahead"
-          ],
-          "duration": [
-            "三秒"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "count",
-          "time_scope"
-        ],
         "source_spans": [
           "麻烦你往前走三秒"
+        ],
+        "required_intent_fragments": [
+          [
+            "麻烦你往前走三秒"
+          ]
         ]
       }
     ],
     "coordination": [],
-    "unresolved": false
+    "unresolved": false,
+    "intent_relations": []
   },
   "contrast_set": "polite_walk_three_seconds",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "walk forward",
         "output_mode": "body_action",
+        "outcome": "麻烦你往前走三秒，谢谢。",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t7"
-        },
-        "binding_items": {
-          "direction": "往前",
-          "duration": "三秒"
+          "source_end_token_ref": "t11"
         }
       }
     ],
-    "unresolved": [],
-    "coordination": []
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

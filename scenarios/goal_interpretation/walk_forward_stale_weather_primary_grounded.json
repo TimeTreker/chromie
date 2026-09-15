@@ -24,15 +24,8 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "walk forward quickly for 15 seconds",
-              "bindings": {
-                "direction": "forward",
-                "speed": "quickly",
-                "duration": "15 seconds"
-              },
+              "outcome": "walk forward for 15 seconds quickly",
               "confidence": 0.97,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -55,15 +48,8 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "walk forward quickly for 15 seconds",
-        "bindings": {
-          "direction": "forward",
-          "speed": "quickly",
-          "duration": "15 seconds"
-        },
+        "outcome": "walk forward for 15 seconds quickly",
         "confidence": 0.97,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "body_action"
       }
     ]

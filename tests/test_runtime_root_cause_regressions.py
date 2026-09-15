@@ -733,7 +733,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                         {
                             "source_responsibility_refs": ["test_responsibility"],
 
-                            "output_mode": "speech",
+                            "related_goal_ids": [],
+                            "supersedes_goal_ids": [],
                         }
                     ],
                     "confidence": 1.0,

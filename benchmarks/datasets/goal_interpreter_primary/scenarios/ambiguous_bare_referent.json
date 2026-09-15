@@ -15,47 +15,42 @@
           "search",
           "check"
         ],
-        "required_bindings": {
-          "entity": [
-            "天信"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "location"
-        ],
         "source_spans": [
           "你能查天信"
+        ],
+        "required_intent_fragments": [
+          [
+            "你能查天信"
+          ]
         ]
       }
     ],
     "coordination": [],
-    "unresolved": false
+    "unresolved": false,
+    "intent_relations": []
   },
   "contrast_set": "ambiguous_bare_referent",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "look up 天信",
         "output_mode": "information",
+        "outcome": "你能查天信吗？",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t4"
-        },
-        "binding_items": {
-          "entity": "天信"
+          "source_end_token_ref": "t6"
         }
       }
     ],
-    "unresolved": [],
-    "coordination": []
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

@@ -331,21 +331,19 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         )
         self.assertEqual(len(manifest["manifest_sha256"]), 64)
 
-    def test_current_oracle_preserves_units_and_rejects_trailing_source_particles(self) -> None:
+    def test_current_oracle_preserves_units_and_source_provenance(self) -> None:
         manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
         cases = {case["id"]: case for case in manifest["cases"]}
-        threshold = cases["weather_explicit_threshold"]
-        self.assertEqual(threshold["expected"]["responsibilities"][0]["required_bindings"]["threshold"],
-                         ["30度"])
-        self.assertFalse(cases["ambiguous_bare_referent"]["expected"]["unresolved"])
-        case = cases["filler_blink_twice"]
+        case = cases["weather_explicit_threshold"]
         wire = copy.deepcopy(case["reference_wire_output"])
-        decision = {"responsibilities": wire["responsibilities"], "unresolved": []}
-        self.assertEqual(_evaluate_goal_interpreter_case(case, decision, wire), [])
-        wire["responsibilities"][0]["source_evidence"]["source_end_token_ref"] = "t12"
-        verdict = _evaluate_goal_interpreter_case_dimensions(case, decision, wire)
-        self.assertTrue(verdict["source_evidence"])
-        self.assertEqual(verdict["bindings"], [])
+        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        wire["responsibilities"][0]["outcome"] = case["text"].replace("30度", "30")
+        self.assertTrue(_evaluate_goal_interpreter_case_dimensions(case, wire, wire)["intent_details"])
+        wire = copy.deepcopy(cases["filler_blink_twice"]["reference_wire_output"])
+        wire["responsibilities"][0]["source_evidence"]["source_end_token_ref"] = "t999"
+        self.assertTrue(_evaluate_goal_interpreter_case_dimensions(
+            cases["filler_blink_twice"], wire, wire)["source_evidence"])
+        self.assertFalse(cases["ambiguous_bare_referent"]["expected"]["unresolved"])
 
     def test_binding_match_normalizes_text_and_integral_float(self) -> None:
         self.assertTrue(_binding_value_matches("  Tonight  ", ["tonight"]))
@@ -355,54 +353,33 @@ class InferenceProviderQualificationTests(unittest.TestCase):
     def test_case_evaluator_binds_modifiers_to_their_own_responsibility(self) -> None:
         manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
         case = next(item for item in manifest["cases"] if item["id"] == "parallel_gaze_blink")
-        decision = {
-            "responsibilities": [
-                {
-                    "local_ref": "gaze",
-                    "outcome": "look at the user",
-                    "output_mode": "body_action",
-                    "bindings": {},
-                },
-                {
-                    "local_ref": "blink",
-                    "outcome": "blink eyes",
-                    "output_mode": "body_action",
-                    "bindings": {},
-                },
-            ],
-            "unresolved": [],
-        }
-        wire = {
-            "responsibilities": [
-                {
-                    "local_ref": "gaze",
-                    "output_mode": "body_action",
-                    "binding_items": {"entity": "我", "duration": "三秒"},
-                    "source_evidence": {"source_start_token_ref": "t0", "source_end_token_ref": "t4"},
-                },
-                {
-                    "local_ref": "blink",
-                    "output_mode": "body_action",
-                    "binding_items": {"count": 2},
-                    "source_evidence": {"source_start_token_ref": "t8", "source_end_token_ref": "t12"},
-                },
-            ],
-            "coordination": [{"kind": "parallel", "refs": ["gaze", "blink"]}],
-        }
+        wire = copy.deepcopy(case["reference_wire_output"])
+        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        wire["responsibilities"][0]["outcome"] = "看着我两秒，同时眨三下眼睛。"
+        dimensions = _evaluate_goal_interpreter_case_dimensions(case, wire, wire)
+        self.assertTrue(dimensions["intent_details"])
+        self.assertEqual(dimensions["intent_relations"], [])
 
-        self.assertEqual(_evaluate_goal_interpreter_case(case, decision, wire), [])
-        dimensions = _evaluate_goal_interpreter_case_dimensions(case, decision, wire)
-        self.assertTrue(all(errors == [] for errors in dimensions.values()))
-
-        wire["responsibilities"][0]["binding_items"] = {"entity": "我", "count": 2}
-        wire["responsibilities"][1]["binding_items"] = {"duration": 3}
-        errors = _evaluate_goal_interpreter_case(case, decision, wire)
-        dimensions = _evaluate_goal_interpreter_case_dimensions(case, decision, wire)
-
-        self.assertTrue(any("missing required binding duration" in error for error in errors))
-        self.assertTrue(any("contains forbidden binding count" in error for error in errors))
-        self.assertTrue(dimensions["bindings"])
-        self.assertEqual(dimensions["outcome"], [])
+    def test_compound_intent_accepts_grouping_without_losing_order_or_effects(self):
+        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        case = next(item for item in manifest["cases"] if item["id"] == "compound_numeric_sequence")
+        wire = copy.deepcopy(case["reference_wire_output"])
+        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+        units = ["walk ahead at 0.2 speed for 10 seconds", "then nod your head twice", "then turn left"]
+        tokens = _source_tokens(case["text"])
+        wire["responsibilities"] = []
+        cursor = 0
+        for i, outcome in enumerate(units):
+            start = case["text"].index(outcome, cursor)
+            cursor = start + len(outcome)
+            wire["responsibilities"].append({"local_ref": f"r{i+1}", "outcome": outcome,
+                "output_mode": "body_action", "confidence": 1.0,
+                "source_evidence": {"source_start_token_ref": next(t["ref"] for t in tokens if t["start"] == start),
+                    "source_end_token_ref": next(t["ref"] for t in tokens if t["end"] == cursor)}})
+        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        wire["responsibilities"].pop()
+        self.assertTrue(_evaluate_goal_interpreter_case(case, wire, wire))
 
 
 class GoalInterpreterCompletionIntegrityTests(unittest.IsolatedAsyncioTestCase):

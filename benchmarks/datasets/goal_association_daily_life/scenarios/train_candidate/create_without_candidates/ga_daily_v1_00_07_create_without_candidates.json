@@ -51,20 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "topic": "迷路的风筝"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "讲一个关于迷路的风筝的短故事。",
+          "outcome": "给我讲一个关于迷路的风筝的短故事。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -96,20 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "topic",
-              "name": "topic",
-              "referent_id": "",
-              "value": "迷路的风筝"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "speech",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

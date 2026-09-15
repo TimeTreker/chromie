@@ -24,14 +24,8 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "向前走十五秒",
-              "bindings": {
-                "direction": "forward",
-                "duration": "十五秒"
-              },
+              "outcome": "往前走十五秒。",
               "confidence": 0.96,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -54,14 +48,8 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "向前走十五秒",
-        "bindings": {
-          "direction": "forward",
-          "duration": "十五秒"
-        },
+        "outcome": "往前走十五秒。",
         "confidence": 0.96,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "body_action"
       }
     ]

@@ -20,12 +20,8 @@
           "confidence": 0.35,
           "responsibilities": [
             {
-              "schema_version": 1,
               "local_ref": "r1",
-              "outcome": "carry out the action the user refers to as it",
-              "bindings": {},
-              "relationship": "new",
-              "target_goal_ids": [],
+              "outcome": "Please do it.",
               "confidence": 0.35,
               "output_mode": "speech",
               "source_evidence": {
@@ -45,12 +41,8 @@
           "confidence": 0.35,
           "responsibilities": [
             {
-              "schema_version": 1,
               "local_ref": "r1",
-              "outcome": "carry out the action the user refers to as it",
-              "bindings": {},
-              "relationship": "new",
-              "target_goal_ids": [],
+              "outcome": "Please do it.",
               "confidence": 0.35,
               "output_mode": "speech",
               "source_evidence": {
@@ -78,12 +70,8 @@
     ],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
-        "outcome": "carry out the action the user refers to as it",
-        "bindings": {},
-        "relationship": "new",
-        "target_goal_ids": [],
+        "outcome": "Please do it.",
         "confidence": 0.35,
         "output_mode": "speech"
       }

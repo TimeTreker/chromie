@@ -2,7 +2,7 @@
   "schema_version": 1,
   "dataset_id": "chromie.goal_interpretation_daily_life.v1",
   "description": "One-file-per-scenario adversarial daily-life Goal Interpretation assets with current primary-wire references and semantic invariants.",
-  "claim_boundary": "Synthetic assistant-authored candidate evidence for isolated GI prompt/schema/model evaluation only; not independent semantic qualification, deployed service, voice, simulator, target, or robot evidence.",
+  "claim_boundary": "Intent-contract reference candidates; detail dimensions describe semantic review targets, not model-authored bindings. Mechanically validated references are not native model or deployment qualification.",
   "authoring": {
     "origin": "assistant_authored_contrast_sets",
     "review_status": "mechanically_validated_dataset_candidate",
@@ -99,14 +99,6 @@
         "speech": 204,
         "stateful_effect": 204,
         "styled_speech": 34
-      },
-      "relationships": {
-        "cancel": 34,
-        "clarify": 34,
-        "continue": 34,
-        "modify": 34,
-        "new": 1496,
-        "resume": 34
       }
     }
   },

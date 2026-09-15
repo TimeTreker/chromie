@@ -20,14 +20,8 @@
           "confidence": 0.78,
           "responsibilities": [
             {
-              "schema_version": 1,
               "local_ref": "r1",
-              "outcome": "move a short distance to the location the user indicates",
-              "bindings": {
-                "distance": "a little"
-              },
-              "relationship": "new",
-              "target_goal_ids": [],
+              "outcome": "Can you move over there a little?",
               "confidence": 0.78,
               "output_mode": "body_action",
               "source_evidence": {
@@ -47,14 +41,8 @@
           "confidence": 0.78,
           "responsibilities": [
             {
-              "schema_version": 1,
               "local_ref": "r1",
-              "outcome": "move a short distance to the location the user indicates",
-              "bindings": {
-                "distance": "a little"
-              },
-              "relationship": "new",
-              "target_goal_ids": [],
+              "outcome": "Can you move over there a little?",
               "confidence": 0.78,
               "output_mode": "body_action",
               "source_evidence": {
@@ -82,14 +70,8 @@
     ],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
-        "outcome": "move a short distance to the location the user indicates",
-        "bindings": {
-          "distance": "a little"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
+        "outcome": "Can you move over there a little?",
         "confidence": 0.78,
         "output_mode": "body_action"
       }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from datetime import datetime, timezone
 import re
 from typing import Any
 
@@ -34,6 +35,16 @@ def literal_intent_argument(value: Any, *, outcome: str, source_text: str) -> bo
     if value[-1].isascii() and (value[-1].isalnum() or value[-1] == "_"):
         pattern += r"(?![A-Za-z0-9_])"
     return bool(re.search(pattern, outcome) and re.search(pattern, source_text))
+
+def intent_source_quote(quote: Any, *, outcome: str) -> bool:
+    """Check an exact owning-intent citation, never infer an argument from words.
+
+    The Planner authors the argument and its mapping in its primary result. This
+    check proves only that its cited evidence exists within the owned meaning.
+    Semantic conversion/completeness requires qualification, not a Host word table.
+    """
+    return isinstance(quote, str) and bool(quote.strip()) and quote == quote.strip() and quote in outcome
+
 
 def _normalized_material_value(value: Any) -> Any:
     """Normalize only representation details for exact semantic comparisons."""
@@ -326,3 +337,47 @@ def semantic_numeric_values(value: Any) -> set[Decimal]:
             for number in semantic_numeric_values(item)
         }
     return set()
+
+
+def planner_readiness_times(output: Any, goals: list[dict[str, Any]], context: dict[str, Any]) -> dict[str, int]:
+    """Validate newly Planner-authored readiness provenance, without reading intent.
+
+    Exact ISO instants have a mechanical value check. Relative/local-time
+    interpretation remains the Planner's semantic result and requires both an
+    owned quote and a trusted receipt clock; this is not proof of its conversion.
+    """
+    by_id = {goal["goal_id"]: goal for goal in goals}
+    envelope = context.get("user_turn_envelope") or {}
+    raw_clock = envelope.get("received_at") if isinstance(envelope, dict) else None
+    try:
+        clock = datetime.fromisoformat(str(raw_clock).replace("Z", "+00:00")) if raw_clock else None
+    except ValueError:
+        clock = None
+    if clock is not None and clock.tzinfo is None:
+        clock = None
+    now_ms = int((clock or datetime.now(timezone.utc)).timestamp() * 1000)
+    result: dict[str, int] = {}
+    for condition in output.time_conditions:
+        if not condition.source_quote:
+            continue
+        goal = by_id.get(condition.goal_id)
+        if goal is None or not intent_source_quote(condition.source_quote, outcome=goal.get("description", "")):
+            raise ValueError("Planner readiness requires an exact owned Goal source quote")
+        quote = condition.source_quote
+        if re.match(r"^\d{4}-\d{2}-\d{2}[T ]", quote):
+            try:
+                instant = datetime.fromisoformat(quote.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("Planner readiness source timestamp is invalid") from exc
+            if instant.tzinfo is None or "T" not in quote:
+                raise ValueError("Planner readiness requires an explicit timezone-qualified timestamp")
+            if int(instant.timestamp() * 1000) != condition.due_at_ms:
+                raise ValueError("Planner readiness must preserve the exact source timestamp")
+        elif clock is None:
+            raise ValueError("normalized Planner readiness requires the trusted Gateway receipt clock")
+        if condition.due_at_ms <= now_ms:
+            raise ValueError("new future readiness must follow the admitted clock")
+        if condition.goal_id in result:
+            raise ValueError("new readiness requires one condition per Goal")
+        result[condition.goal_id] = condition.due_at_ms
+    return result

@@ -129,8 +129,8 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             ["goal_interpretation"],
         )
         self.assertEqual(
-            turns[2]["interpretation"]["responsibilities"][0]["bindings"],
-            {"direction": "forward", "duration": "15 seconds", "speed": "quickly"},
+            turns[2]["interpretation"]["responsibilities"][0]["outcome"],
+            "walk forward for 15 seconds quickly",
         )
         self.assertIn(
             "What is the weather in Beijing today?",
@@ -146,7 +146,8 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         actual = report["cases"][0]["actual"]
 
         self.assertTrue(report["ok"], report["cases"][0]["errors"])
-        self.assertEqual(actual["responsibilities"][0]["bindings"]["location"], "北京")
+        self.assertFalse(actual["responsibilities"][0]["bindings"])
+        self.assertIn("北京", actual["responsibilities"][0]["outcome"])
         self.assertEqual(
             actual["llm_stages"],
             ["goal_interpretation"],

@@ -143,7 +143,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
 
     def test_goal_association_prompt_contains_authoritative_identity_section(self) -> None:
         resolver = GoalAssociationResolver(_Dummy())
-        prompt = ga_prompt.build_prompt(
+        prompt = ga_prompt.layered_prompt(
             self.request,
             [],
             output_type=GoalSegmentationModelOutput,

@@ -96,36 +96,26 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Continue: 讲一个关于月亮兔子的短故事。",
+          "outcome": "Continue: 讲一个关于月亮兔子的短故事。 (继续原来的目标，同时眨两下眼睛。)",
           "output_mode": "speech",
-          "relationship": "continue",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_00_05_a"
-          ]
+          }
         },
         {
-          "bindings": {
-            "count": 2
-          },
           "confidence": 1.0,
           "local_ref": "r2",
-          "outcome": "眨两下眼睛。",
+          "outcome": "继续原来的目标，同时眨两下眼睛。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r2_end",
             "source_start_token_ref": "tok_r2_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -156,7 +146,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is continue.",
+          "reason_summary": "The source-grounded continuity relationship is continue.",
           "relationship": "continue",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [
@@ -170,20 +160,7 @@
       "confidence": 1.0,
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "count",
-              "name": "count",
-              "referent_id": "",
-              "value": "2"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "body_action",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r2"
           ],

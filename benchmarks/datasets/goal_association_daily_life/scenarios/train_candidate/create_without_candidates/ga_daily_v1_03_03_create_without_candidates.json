@@ -51,21 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "direction": "toward me",
-            "duration": "6 seconds"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "Move toward me for 6 seconds.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -97,27 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "direction",
-              "name": "direction",
-              "referent_id": "",
-              "value": "toward me"
-            },
-            {
-              "confidence": 1.0,
-              "entity_type": "duration",
-              "name": "duration",
-              "referent_id": "",
-              "value": "6 seconds"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "body_action",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

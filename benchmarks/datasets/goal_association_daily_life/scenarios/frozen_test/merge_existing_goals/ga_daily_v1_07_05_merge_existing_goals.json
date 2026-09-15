@@ -188,21 +188,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Merge two retained Goals for: 用简单的话说明分数。",
+          "outcome": "Merge two retained Goals for: 用简单的话说明分数。 (把这两个目标合并为同一个责任。)",
           "output_mode": "information",
-          "relationship": "merge",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_07_05_a",
-            "goal_07_05_b"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -233,7 +227,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is merge.",
+          "reason_summary": "The source-grounded continuity relationship is merge.",
           "relationship": "merge",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [

@@ -24,7 +24,9 @@ from .planner_model_contract import (
     stable_plan_id,
 )
 from .planner_schema import (
+    capability_lookup_response_schema,
     scoped_reporting_response_schema,
+    planner_readiness_response_schema,
     work_change_response_schema,
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
@@ -38,6 +40,7 @@ from .planner_context import (
     auxiliary_social_prompt_context,
     cancellation_capability_facts,
     fast_capability_payload,
+    fast_capability_context,
     planner_effectful_goal_ids,
     planner_goal_context,
 )
@@ -132,7 +135,7 @@ def parse_fast_work_document(buffer: str) -> dict[str, Any]:
 
 
 class FastPlannerResolver:
-    """Low-latency semantic planner over the executable common catalog only."""
+    """Fast planning with common contracts and one indexed capability-detail lookup."""
 
     TRACE_MODULE = TraceModule(
         name="agent.fast_planner",
@@ -160,6 +163,8 @@ class FastPlannerResolver:
         )
         self.max_capabilities = max(1, min(64, int(max_capabilities)))
 
+
+
     async def stream_advance(
         self, request: CognitiveWorkRequest,
     ) -> AsyncGenerator[FastPlannerStreamFrame, None]:
@@ -167,42 +172,55 @@ class FastPlannerResolver:
         responsibilities = list(request.responsibilities)
         turn_id = str(request.sid or "turn-fast-stream")
         try:
-            catalog = await self.catalog.prompt_entries(scope="common", refresh=False)
-            # Target grounding remains available to requested Work; SC separately
-            # qualifies optional expression against the full social catalog.
-            request = request.model_copy(deep=True)
-            request.context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(request.context, [])
-            capabilities = [fast_capability_payload(item, include_side_effect_free=True)
-                for item in catalog if item.available and item.interaction_executable
-                and is_planner_step_capability(item.capability_id)][:self.max_capabilities]
-            schema = fast_streaming_advance_response_schema(
-                [item.local_ref for item in responsibilities], responsibilities=responsibilities,
-                capabilities=capabilities, interpretation_unresolved=list(request.interpretation_unresolved),
-                language=str(request.language or ""),
-            )
-            prompt = fast_advance_layered_prompt(request, responsibilities=responsibilities,
-                capabilities=capabilities, response_schema=schema)
-            raw_text = ""
-            async with aclosing(self.ollama.generate_stream(
-                prompt, system=fast_streaming_advance_system_prompt(),
-                options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,
-                         "num_predict": min(self.num_predict, 2048)},
-                response_format=schema, prompt_family="fast_planner.streaming_advance",
-                turn_id=request.sid, attempt=1,
-            )) as deltas:
-                async for delta in deltas:
-                    raw_text += delta
-                    if len(raw_text) > 131072 or (raw_text.lstrip() and not raw_text.lstrip().startswith("{")):
-                        raise PlannerDTOContractError("Fast Planner Work stream is oversized or not a JSON object")
-            from jsonschema import Draft202012Validator
-            raw = parse_fast_work_document(raw_text)
-            Draft202012Validator(schema).validate(raw)
-            output = FastPlannerAdvanceModelOutput.model_validate(raw)
-            validate_fast_advance_output(output, request=request,
-                responsibilities=responsibilities, capabilities=capabilities)
+            loaded_ids: tuple[str, ...] = ()
+            for invocation in range(2):
+                current, catalog, entries = await fast_capability_context(self.catalog, request, loaded_ids)
+                current.context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(current.context, [])
+                capabilities = [fast_capability_payload(item, include_side_effect_free=True)
+                    for item in catalog if item.available and item.interaction_executable
+                    and is_planner_step_capability(item.capability_id)]
+                if len(capabilities) > self.max_capabilities + len(loaded_ids):
+                    raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
+                schema = fast_streaming_advance_response_schema(
+                    [item.local_ref for item in responsibilities], responsibilities=responsibilities,
+                    capabilities=capabilities, interpretation_unresolved=list(request.interpretation_unresolved),
+                    language=str(request.language or ""),
+                )
+                if not loaded_ids:
+                    schema = capability_lookup_response_schema(schema, [
+                        item for item in entries if item.capability_id not in {known.capability_id for known in catalog}
+                    ])
+                prompt = fast_advance_layered_prompt(current, responsibilities=responsibilities,
+                    capabilities=capabilities, response_schema=schema)
+                raw_text = ""
+                async with aclosing(self.ollama.generate_stream(
+                    prompt, system=fast_streaming_advance_system_prompt(),
+                    options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,
+                             "num_predict": self.num_predict},
+                    response_format=schema, prompt_family="fast_planner.streaming_advance",
+                    turn_id=request.sid, attempt=invocation + 1,
+                )) as deltas:
+                    async for delta in deltas:
+                        raw_text += delta
+                        if len(raw_text) > 131072 or (raw_text.lstrip() and not raw_text.lstrip().startswith("{")):
+                            raise PlannerDTOContractError("Fast Planner Work stream is oversized or not a JSON object")
+                from jsonschema import Draft202012Validator
+                raw = parse_fast_work_document(raw_text)
+                if "requested_capability_ids" in raw:
+                    Draft202012Validator(schema).validate(raw)
+                    loaded_ids = tuple(raw["requested_capability_ids"])
+                    continue
+                output = FastPlannerAdvanceModelOutput.model_validate(raw)
+                validate_fast_advance_output(output, request=current,
+                    responsibilities=responsibilities, capabilities=capabilities)
+                Draft202012Validator(schema).validate(raw)
+                break
+            else:
+                raise PlannerDTOContractError("Capability detail lookup budget exhausted before a Plan")
             advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(), metadata={
                 "semantic_authority": "fast_planner_model", "phase": "responsibility_work_plan",
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
+                "capability_detail_lookups": int(bool(loaded_ids)),
             })
             yield FastPlannerStreamTerminal(turn_id=turn_id, advance=advance)
         except Exception as exc:
@@ -210,11 +228,11 @@ class FastPlannerResolver:
                 else llm_failure_metadata(exc) if isinstance(exc, OllamaGenerationError)
                 else {"failure_class": "fast_stream_contract_invalid", "failure_domain": "model_contract",
                       "architecture_attribution": "fast_planner", "retryable": False})
-            logger.warning("fast_planner_work_fail_closed sid=%s error_type=%s error=%s", request.sid, type(exc).__name__, exc)
+            logger.warning("fast_planner_work_fail_closed sid=%s error_type=%s error=%s", request.sid, type(exc).__name__, getattr(exc, "message", str(exc)))
             yield FastPlannerStreamFailure(turn_id=turn_id, failure_stage="before_commit",
                 failure_class=str(failure["failure_class"]), failure_domain=str(failure["failure_domain"]),
                 architecture_attribution=str(failure.get("architecture_attribution") or "fast_planner"),
-                retryable=bool(failure.get("retryable")), error_type=type(exc).__name__, reason=str(exc)[:500])
+                retryable=bool(failure.get("retryable")), error_type=type(exc).__name__, reason=str(getattr(exc, "message", str(exc)))[:500])
 
     async def resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
         trace_scope = runtime_tracer.continue_from_context(request.context)
@@ -248,7 +266,8 @@ class FastPlannerResolver:
         runtime_tracer.attach_fragment(result.metadata, trace_scope)
         return result
 
-    async def _resolve(self, request: CognitiveWorkRequest) -> CanonicalPlan:
+    async def _resolve(self, request: CognitiveWorkRequest, loaded_capability_ids: tuple[str, ...] = ()) -> CanonicalPlan:
+        request, selected_catalog, indexed_catalog = await fast_capability_context(self.catalog, request, loaded_capability_ids)
         plan_id = stable_plan_id(request, "fast")
         context = request.context if isinstance(request.context, dict) else {}
         goal_context = planner_goal_context(
@@ -266,7 +285,7 @@ class FastPlannerResolver:
         reporting_goal_ids = cancellation_reentry_goal_ids | set(future_goal_times)
         response_only = goal_context.response_only
         requires_execution = goal_context.requires_execution
-        capabilities = await self.catalog.prompt_entries(scope="common", refresh=False)
+        capabilities = selected_catalog
         auxiliary_catalog = await self.catalog.prompt_entries(scope="all", refresh=False)
         context["planner_cancellation_capability_facts"] = (
             cancellation_capability_facts(auxiliary_catalog)
@@ -299,7 +318,7 @@ class FastPlannerResolver:
             projected_payload,
             authoritative_goals=authoritative_goals,
             retained_capability_ids=retained_capability_ids,
-        )[: self.max_capabilities]
+        )
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         contract_schema = (
             "FastPlannerMultiGoalPlanOutput" if multi_goal_contract else "FastPlannerModelOutput"
@@ -399,6 +418,12 @@ class FastPlannerResolver:
                 else self.num_predict
             ),
         }
+        if not reporting_goal_ids and not request.planner_reentry_scope:
+            response_schema = planner_readiness_response_schema(response_schema, expected_goal_ids_for_turn)
+        if not loaded_capability_ids:
+            response_schema = capability_lookup_response_schema(response_schema, [
+                item for item in indexed_catalog if item.capability_id not in {known.capability_id for known in selected_catalog}
+            ])
         raw: Any = None
         parameter_provenance_repairs: list[dict[str, Any]] = []
         try:
@@ -414,8 +439,16 @@ class FastPlannerResolver:
                     response_format=response_schema,
                     prompt_family="fast_planner.primary",
                     turn_id=request.sid,
-                    attempt=1,
+                    attempt=1 + int(bool(loaded_capability_ids)),
                 )
+                if isinstance(raw, dict) and "requested_capability_ids" in raw:
+                    from jsonschema import Draft202012Validator
+                    Draft202012Validator(response_schema).validate(raw)
+                    looked_up = await self._resolve(request, tuple(raw["requested_capability_ids"]))
+                    return looked_up.model_copy(update={"metadata": {
+                        **looked_up.metadata, "capability_detail_lookups": 1,
+                        "semantic_result_call_count": 1,
+                    }})
                 if not isinstance(raw, dict):
                     raise ValueError("fast planner response is not a JSON object")
                 raw, common_repairs = normalize_common_planner_output(
@@ -648,6 +681,7 @@ class FastPlannerResolver:
                     },
                 )
 
+        reporting_goal_ids |= {condition.goal_id for condition in plan.time_conditions if condition.source_quote}
         qualification = qualify_fast_canonical_plan(
                 plan,
                 capability_payload=capability_payload,

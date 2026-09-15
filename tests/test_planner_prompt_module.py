@@ -288,7 +288,7 @@ def test_streaming_capability_applicability_and_resource_tail_are_exact():
     for key in ("description", "resource_claims", "effects"):
         assert projected[key] == capability[key]
     for key, value in capability["hints"].items():
-        assert projected[key] == value
+        assert projected["hints"][key] == value
     assert projected["args_schema"] == capability["input_schema"]
     deep = planner_prompt.prompt_capability_contract(capability)
     assert deep["when_to_use"] == capability["hints"]["when_to_use"]

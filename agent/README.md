@@ -55,13 +55,22 @@ The existing provider preflight still checks the complete request's model budget
 
 ## Authority boundary
 
-GI hands off complete intended outcomes alongside Host-projected original input.
-Information-query details need no duplicate semantic classification; Fast Planner
-can realize exact non-numeric source strings present in their owning outcome.
-Counts, measurements, activation and field-specific Goal updates retain their typed
-conservation checks. Full source text is evidence and does not authorize Planner
-to add omitted outcomes or resolve GI uncertainty.
+GI hands off complete natural-language intentions, their existing provider-neutral
+`output_mode`, confidence and source evidence alongside immutable original input.
+All actions, modifiers, quantities, units, negation and relations stay in `outcome`.
+One compound intention can remain one Responsibility. GI authors no argument table,
+Goal relationship or activation timestamp. GA owns continuity; its new Goal text and
+result type are exact Host projections of GI. SC owns communication and Social
+Attention, receives the same intent concurrently, and has first compute priority.
 
+Planner owns Activity decomposition, capability choice, argument realization and
+waiting. Fast receives complete common contracts plus the full library index; one
+bounded detail request can precede its complete plan. Indexed rare entries do not
+by themselves require Deep. Locked or unavailable capabilities grant no execution.
+Exact `argument_sources` (Fast Activities) / `source_quote` (canonical parameter
+resolutions and time conditions) prove provenance, not semantic conversion accuracy.
+Runtime retains canonical binding, confirmation, sequential physical execution,
+cancellation, restart-safe timers and evidence.
 
 GI, GA, execution events and trusted Situation can trigger independent Planner tasks.
 Goal-free Situation supplies no Responsibility, Goal or Capability Work permission,
@@ -73,15 +82,15 @@ has the same restricted scope. A complete decision has no second model reviewer.
 Runtime validates all returned provenance, identity, delivered repair references and
 Memory candidates before committing Memory or preserving exact speech for delivery.
 
-Primary and Deep GI reject a speed binding with invalid source or dimension
-provenance; Host does not delete the binding to accept the rest of the result.
-No speed requirement is invented when the user supplies none. Planner may select
-execution defaults only under the existing Capability and safety contracts.
+Primary and Deep GI reject downstream parameter/relationship fields. Missing
+execution inputs belong to Planner; only genuine uncertainty about user meaning
+can enter the single source-based Deep GI path.
 
 GA inherits new Goal WHAT directly from accepted GI references. Existing Goals use
 source-bound `requirement_changes`, without model-authored descriptions. Host validates
-the original Goal snapshot and commits the selected requirements, typed fields and
-provenance atomically; Planner retains Work decisions. See
+the original Goal snapshot and commits the selected requirements and provenance
+atomically. Updates that would leave incompatible retained typed constraints require
+an explicitly sourced replacement Goal; Planner retains Work decisions. See
 [Goal meaning inheritance](../docs/COGNITIVE_TURN_LOOP.md#goal-meaning-inheritance).
 
 ```text

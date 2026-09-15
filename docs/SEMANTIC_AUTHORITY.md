@@ -162,14 +162,12 @@ because it uses no model. Primary and designated Deep use the same boundary.
 | Operation | Maintained rule and owner |
 | --- | --- |
 | JSON transport wrapper | GI parser accepts a complete object or one complete JSON fence. It rejects leading/trailing prose, duplicate keys and non-finite constants; it cannot select a convenient object or silently replace an earlier claim. |
-| Binding object/entry-array | An exact unique string key and value may move losslessly into the canonical object. Unknown entry fields, duplicate/empty/altered keys or ambiguous shapes reject. |
-| Typed `binding_items` and `coordination` | Existing GI projection moves authored values and exact sequence/parallel refs into canonical bindings. Unknown group fields and invalid/duplicate refs reject. It does not infer effects or topology from wording. |
+| Retired `binding_items`, `bindings`, `coordination`, relationship or capability fields | Reject live GI output. Preserve complete intent in `outcome`; GA owns continuity and Planner owns decomposition/parameters. Persisted older Goal constraints remain immutable for their versions. |
 | Missing confidence or required Responsibility meaning | Reject; Host does not derive aggregate confidence from sibling scores or invent required output mode, outcome or local reference. |
 | Unresolved values | Preserve authored non-empty strings, including their order; a single string may be wrapped losslessly. Null, empty and non-string entries reject instead of disappearing or becoming text. |
-| Outcome/action, language or whole-turn binding pollution | Reject at the existing authority/provenance checks; never delete a claim to salvage an otherwise acceptable interpretation. The existing context-bound clarification exception remains. |
-| Fused count key/value | Reject malformed keys; never extract an integer from a key while discarding the associated value or trailing text. |
-| IDs and text | Required meaning must already be text. Supplied target Goal refs must be exact unique strings; ordinary canonical whitespace handling cannot drop duplicate refs or convert arbitrary objects into meaning. |
-| Numeric provenance | Compare explicit signed integer/decimal tokens and exact model-authored values. Sentence punctuation after a decimal is not part of that number; `0.35.` and `0.35` both establish 0.35. Embedded identifiers and multi-dot forms do not establish a partial number. This is numeric evidence, not unit conversion or semantic intent selection. |
+| Source evidence | Validate exact known token references, source order and non-overlap. This does not prove semantic completeness or permit Host resegmentation. |
+| IDs and text | Require authored local refs, result type, text and confidence; do not invent missing meaning. |
+| Planner argument and time citations | Check exact owning intent excerpts and DTO/argument consistency. Planner owns extraction and conversion; semantic correctness requires native qualification. |
 | Semantic reconsideration | No retry for invalid GI semantics. Only an accepted result with genuinely unresolved meaning permits its one designated source-based Deep invocation. |
 
 These rules do not make all natural-language meaning mechanically provable. GA's

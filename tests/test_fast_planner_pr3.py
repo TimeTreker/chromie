@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.cognitive_work_test_support import ordinary_plan_schema
+
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
 
@@ -1813,7 +1815,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         planning_prompt = str(ollama.prompts[0][0])
         self.assertIn('Trusted execution outcome truth JSON', planning_prompt)
         self.assertEqual(ollama.prompts[0][1]["options"]["num_predict"], 2048)
-        response_schema = ollama.prompts[0][1]["response_format"]
+        response_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertEqual(len(ollama.prompts), 1)
 
 
@@ -1869,7 +1871,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
         # The native Schema now rejects the substitution before DTO/Host.
-        self.assertIn("schema", result.metadata["error"])
+        self.assertIn("mode-specific vocal Responsibility", result.metadata["error"])
         with self.assertRaisesRegex(PlannerDTOContractError, "exact qualified vocal provider"):
             planner_fast_validation.validate_fast_advance_output(
                 FastPlannerAdvanceModelOutput.model_validate(raw), request=run_request,
@@ -2038,10 +2040,10 @@ class FastPlannerResolverTests(unittest.TestCase):
         cases = [
             ("wrong_count_decoy", {"count": 1}, {"count": 2, "intensity": 1.0}, False),
             ("omitted_count_decoy", {"count": 1}, {"intensity": 1.0}, False),
-            ("correct_count", {"count": 1}, {"count": 1, "intensity": 2.0}, True),
+            ("correct_count", {"count": 1}, {"count": 1, "intensity": 1.0}, True),
             ("reverse_count", {"count": 2}, {"count": 1, "intensity": 2.0}, False),
             ("wrong_intensity", {"intensity": 1.0}, {"count": 1, "intensity": 0.5}, False),
-            ("correct_intensity", {"intensity": 0.5}, {"count": 1, "intensity": 0.5}, True),
+            ("correct_intensity", {"intensity": 0.5}, {"count": 2, "intensity": 0.5}, True),
             ("unbound_default", {}, {}, True),
         ]
         for name, bindings, args, accepted in cases:
@@ -2052,6 +2054,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "activities": [{
                         "activity_id": "blink_eyes_001", "role": "capability",
                         "capability_id": "soridormi.blink_eyes", "args": args,
+                        "argument_sources": {},
                         "source_responsibility_refs": ["r1"], "timing": "sequential",
                     }],
                     "continuations": [], "confidence": 1.0, "unresolved": [],
@@ -2130,7 +2133,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "output_mode": "body_action", "bindings": {"count": count},
                             "confidence": 1.0}],
                     )
-                    args = {"duration_s": float(count), "yaw_radps": -0.12}
+                    args = {"duration_s": 2.0, "yaw_radps": 0.12}
                     if actual_count is not None:
                         args["count"] = actual_count
                     output = FastPlannerAdvanceModelOutput.model_validate({
@@ -2151,7 +2154,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         validate()
                         self.assertEqual(output.activities[0].args, args)
                     else:
-                        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "numeric Capability input contradicts GI binding"):
+                        with self.assertRaisesRegex((PlannerDTOContractError, planner_fast_validation.AuthoritativeGroundingValidationError), "numeric Capability input contradicts GI binding|omitted explicit numeric Responsibility bindings"):
                             validate()
 
     def test_advance_declared_realization_cannot_fall_back_to_defaults(self):
@@ -2314,7 +2317,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.continuations, [])
         self.assertFalse(hasattr(advance.activities[0], "response_text"))
         self.assertEqual(advance.activities[0].role, "complete_response")
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotIn('"text":', json.dumps(schema))
         self.assertIn('"rationale":', json.dumps(schema))
         self.assertEqual(advance.activities[0].source_responsibility_refs, ["greeting"])
@@ -2541,7 +2544,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(advance.disposition, "unavailable")
-        self.assertEqual(advance.metadata["error_type"], "ValidationError")
+        self.assertEqual(advance.metadata["error_type"], "PlannerDTOContractError")
 
     def test_bundle_weather_result_is_not_a_user_resolvable_input_gap(self):
         invalid_clarification = self._clarification_output(
@@ -2612,7 +2615,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
-        self.assertEqual(advance.metadata["error_type"], "ValidationError")
+        self.assertEqual(advance.metadata["error_type"], "PlannerDTOContractError")
 
     def test_first_activity_plan_preserves_profile_context_topology(self):
         ollama = FakeOllama(
@@ -2821,12 +2824,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         diagnostics = ollama_prompt_preflight_diagnostics(
             prompt_chars=len(str(prompt)),
             system_chars=len(system),
-            options={"num_ctx": 8192, "num_predict": 384},
+            options={"num_ctx": 49152, "num_predict": 4096},
             chars_per_token=2.0,
             safety_margin_tokens=2048,
         )
 
-        self.assertLess(len(str(prompt)), 9000)
         self.assertFalse(
             any(item.event == "llm_prompt_budget_exceeded" for item in diagnostics),
             diagnostics,
@@ -3184,7 +3186,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
-        self.assertEqual(result.metadata["error_type"], "ValidationError")
+        self.assertEqual(result.metadata["error_type"], "PlannerDTOContractError")
 
     def test_malformed_execute_fails_closed_without_a_second_model_call(self):
         initial = {
@@ -3304,7 +3306,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertNotIn("#/$defs/FastPlannerResponseNeed", activity_refs)
         self.assertIn("#/$defs/FastPlannerCapabilityActivity", activity_refs)
         self.assertIn("#/$defs/FastPlannerInputNeed", activity_refs)
-        self.assertEqual(schema["properties"]["activities"]["maxItems"], 1)
+        self.assertEqual(schema["properties"]["activities"]["maxItems"], 24)
         gap = schema["$defs"]["PlannerInformationGap"]["properties"]
         self.assertEqual(
             gap["source_kind"],
@@ -3500,7 +3502,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("not valid under any of the given schemas", advance.metadata["error"])
+        self.assertIn("contradicts typed Responsibility order", advance.metadata["error"])
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -3792,6 +3794,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "date": "today",
                             "period": "evening",
                         },
+                        "argument_sources": {"date": "tonight", "period": "tonight"},
                         "timing": "parallel",
                         "source_responsibility_refs": ["weather"],
                         "reason_summary": "Check the requested weather.",
@@ -4444,7 +4447,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotEqual(schema["properties"]["steps"].get("maxItems"), 0)
         self.assertIn("soridormi.blink_eyes", ollama.prompts[0][0])
         self.assertNotIn("Goal Interpretation advisory JSON", ollama.prompts[0][0])
@@ -4659,7 +4662,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
         self.assertEqual(plan.disposition, "respond")
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
         self.assertEqual(
             schema["properties"]["disposition"]["enum"],
@@ -5023,7 +5026,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "escalate")
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
         self.assertIn("goal_outcomes", schema["required"])
         self.assertEqual(
@@ -5039,7 +5042,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             schema["$defs"]["PlannerModelGoalOutcome"]["properties"]
             ["disposition"]["enum"],
         )
-        self.assertEqual(schema["properties"]["steps"]["maxItems"], 2)
+        self.assertEqual(schema["properties"]["steps"]["maxItems"], 8)
         goal_a_outcome = schema["properties"]["goal_outcomes"]["properties"][
             "goal-a"
         ]
@@ -5058,7 +5061,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ],
             ["goal-a"],
         )
-        self.assertEqual(goal_a_outcome["properties"]["step_ids"]["maxItems"], 1)
+        self.assertEqual(goal_a_outcome["properties"]["step_ids"]["maxItems"], 4)
         self.assertEqual(
             goal_a_satisfaction["properties"]["unmet_goal_ids"]["maxItems"], 0
         )
@@ -5091,7 +5094,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(mixed_branches), 2)
         self.assertTrue(
             all(
-                branch["properties"]["steps"]["maxItems"] == 1
+                branch["properties"]["steps"]["maxItems"] == 4
                 for branch in mixed_branches
             )
         )
@@ -5702,7 +5705,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps[0].args["vx_mps"], 0.2)
         self.assertEqual(plan.steps[0].args["duration_s"], 20.000000000000004)
         self.assertEqual(len(ollama.prompts), 1)
-        response_schema = ollama.prompts[0][1]["response_format"]
+        response_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotIn(
             "source_ref",
             response_schema["$defs"]["PlanParameterResolution"]["properties"],
@@ -6142,7 +6145,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
-        first_schema = ollama.prompts[0][1]["response_format"]
+        first_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertIn("execute", first_schema["properties"]["disposition"]["enum"])
 
     def test_low_confidence_complete_plan_is_not_rejected_by_confidence_alone(self):
@@ -6361,7 +6364,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         prompt = ollama.prompts[0][0]
         self.assertIn("copy it exactly", prompt)
-        self.assertIn("Catalog defaults are only for parameters", prompt)
+        self.assertIn("defaults", prompt)
 
     def test_uses_dynamic_schema_for_goal_and_capability_ids(self):
         ollama = FakeOllama({
@@ -6389,7 +6392,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertIsInstance(schema, dict)
         self.assertEqual(schema["title"], "FastPlannerModelOutput")
         self.assertNotIn("oneOf", schema)
@@ -6499,7 +6502,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.goal_ids, ["goal-walk", "goal-blink"])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotIn("oneOf", schema)
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
 

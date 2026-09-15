@@ -42,16 +42,8 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "remember within the session that the user favorite color is blue",
-        "bindings": {
-          "preference": "favorite color",
-          "value": "blue",
-          "scope": "session"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.96,
         "output_mode": "stateful_effect"
       }

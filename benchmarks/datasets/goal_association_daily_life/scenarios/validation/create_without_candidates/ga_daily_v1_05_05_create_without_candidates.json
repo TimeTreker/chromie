@@ -51,21 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "message_topic": "晚饭好了",
-            "recipient": "妈妈"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "为妈妈起草一条说明“晚饭好了”的短消息。",
+          "outcome": "为妈妈起草一条说明“晚饭好了”的短消息。 (帮我给妈妈写一条短消息，说晚饭好了。)",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -97,27 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "topic",
-              "name": "message_topic",
-              "referent_id": "",
-              "value": "晚饭好了"
-            },
-            {
-              "confidence": 1.0,
-              "entity_type": "person",
-              "name": "recipient",
-              "referent_id": "",
-              "value": "妈妈"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "speech",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

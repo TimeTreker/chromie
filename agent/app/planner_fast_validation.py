@@ -44,6 +44,7 @@ from .planner_grounding import (
     _argument_realization_contract,
     _material_values_equal,
     literal_intent_argument,
+    intent_source_quote,
     missing_argument_realizations,
     semantic_numeric_values,
 )
@@ -498,7 +499,10 @@ def validate_fast_advance_output(
     for activity in complete_response_activities:
         for source_ref in activity.source_responsibility_refs:
             source = by_ref.get(source_ref)
-            if source is not None and source.output_mode != "speech":
+            mixed_work = source is not None and source.output_mode == "other" and any(
+                source_ref in item.source_responsibility_refs for item in capability_activities
+            )
+            if source is not None and source.output_mode != "speech" and not mixed_work:
                 raise PlannerDTOContractError(
                     "complete_response Activity may satisfy only an ordinary "
                     "speech Responsibility; observable, informational, vocal, "
@@ -698,17 +702,28 @@ def validate_fast_advance_output(
                         f"{activity.capability_id}.{name}; source_ref={source_ref} "
                         f"expected={expected!r} actual={actual!r}"
                     )
+        for parameter, quote in activity.argument_sources.items():
+            if parameter not in activity.args or not any(
+                intent_source_quote(quote, outcome=by_ref[ref].outcome)
+                for ref in activity.source_responsibility_refs
+            ):
+                raise AuthoritativeGroundingValidationError(
+                    "Fast Planner argument source must cite an exact owned intent: "
+                    f"{activity.activity_id}.{parameter}"
+                )
         required_inputs = set(input_schema.get("required") or [])
         authoritative_bindings = {
             str(name): value
             for ref in activity.source_responsibility_refs
             for name, value in by_ref[ref].bindings.items()
         }
-        for parameter in sorted(required_inputs):
+        for parameter in sorted(required_inputs | set(activity.args)):
             parameter_schema = properties.get(parameter)
             if not isinstance(parameter_schema, dict):
                 continue
-            if "default" in parameter_schema:
+            if "default" in parameter_schema and (
+                parameter not in activity.args or activity.args[parameter] == parameter_schema["default"]
+            ):
                 continue
             # target_ref is not authored from a GI scalar binding.  GI owns the
             # person/addressee meaning; the Planner realizes that meaning against
@@ -774,6 +789,8 @@ def validate_fast_advance_output(
                         )
                 continue
             if parameter not in authoritative_bindings:
+                if parameter in activity.argument_sources:
+                    continue
                 # Planner owns the mapping to the selected Capability. GI need
                 # not duplicate an exact named value already in its complete
                 # outcome. Check both source provenance and Responsibility scope;

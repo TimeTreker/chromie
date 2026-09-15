@@ -27,14 +27,8 @@
               "responsibilities": [
                 {
                   "local_ref": "r1",
-                  "outcome": "provide today's Beijing weather",
-                  "bindings": {
-                    "location": "Beijing",
-                    "time_scope": "today"
-                  },
+                  "outcome": "What is the weather in Beijing today?",
                   "confidence": 0.96,
-                  "relationship": "new",
-                  "target_goal_ids": [],
                   "output_mode": "information",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
@@ -55,11 +49,7 @@
         "responsibilities": [
           {
             "local_ref": "r1",
-            "outcome": "provide today's Beijing weather",
-            "bindings": {
-              "location": "Beijing",
-              "time_scope": "today"
-            },
+            "outcome": "What is the weather in Beijing today?",
             "confidence": 0.96,
             "output_mode": "information"
           }
@@ -79,15 +69,8 @@
               "responsibilities": [
                 {
                   "local_ref": "r1",
-                  "outcome": "walk forward quickly for 15 seconds",
-                  "bindings": {
-                    "direction": "forward",
-                    "speed": "quickly",
-                    "duration": "15 seconds"
-                  },
+                  "outcome": "walk forward for 15 seconds quickly",
                   "confidence": 0.97,
-                  "relationship": "new",
-                  "target_goal_ids": [],
                   "output_mode": "body_action",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
@@ -108,12 +91,7 @@
         "responsibilities": [
           {
             "local_ref": "r1",
-            "outcome": "walk forward quickly for 15 seconds",
-            "bindings": {
-              "direction": "forward",
-              "speed": "quickly",
-              "duration": "15 seconds"
-            },
+            "outcome": "walk forward for 15 seconds quickly",
             "confidence": 0.97,
             "output_mode": "body_action"
           }
@@ -136,15 +114,8 @@
               "responsibilities": [
                 {
                   "local_ref": "r1",
-                  "outcome": "walk forward quickly for 15 seconds",
-                  "bindings": {
-                    "direction": "forward",
-                    "speed": "quickly",
-                    "duration": "15 seconds"
-                  },
+                  "outcome": "walk forward for 15 seconds quickly",
                   "confidence": 0.97,
-                  "relationship": "new",
-                  "target_goal_ids": [],
                   "output_mode": "body_action",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
@@ -165,12 +136,7 @@
         "responsibilities": [
           {
             "local_ref": "r1",
-            "outcome": "walk forward quickly for 15 seconds",
-            "bindings": {
-              "direction": "forward",
-              "speed": "quickly",
-              "duration": "15 seconds"
-            },
+            "outcome": "walk forward for 15 seconds quickly",
             "confidence": 0.97,
             "output_mode": "body_action"
           }

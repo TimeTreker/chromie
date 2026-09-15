@@ -93,7 +93,12 @@ def test_bad_effect_reply_rejected_before_provider_dispatch(count, tmp_path):
             with pytest.raises(AssertionError, match='contract failure'):
                 await episode.begin()
             assert not episode.provider.calls
-            assert replay.records[-1]['schema_errors']
+            if count is None:
+                assert replay.records[-1]['schema_errors']
+            else:
+                # Numeric arguments are Planner-owned now. Their explicit
+                # value/proof mismatch rejects at Host, not a GI-derived enum.
+                assert not replay.records[-1]['schema_errors']
     asyncio.run(check())
 
 
@@ -121,7 +126,10 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(tier, mut
                 raw['goal_outcomes'][gid]['satisfaction']['unmet_requirements'] = []
             elif mutation == 'information_quantity':
                 request.context['goal_association_resolution']['new_goals'][0]['metadata']['output_mode'] = 'information'
-                request.context['active_goal_snapshots'][0]['metadata']['output_mode'] = 'information'
+                request.context['active_goal_snapshots'][0]['goal']['metadata']['output_mode'] = 'information'
+                typed = {'count':{'name':'count','entity_type':'count','value':2,'confidence':1.0}}
+                request.context['goal_association_resolution']['new_goals'][0]['object'] = {'bindings':typed}
+                request.context['active_goal_snapshots'][0]['goal']['object'] = {'bindings':copy.deepcopy(typed)}
             model = ReplayModel(json.dumps(raw))
             resolver = FastPlannerResolver if tier == 'fast' else DeepPlannerResolver
             result = await resolver(model, StaticCatalog(catalog)).resolve(request)
@@ -139,13 +147,11 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(tier, mut
 def test_seeded_timer_does_not_authorize_unsourced_gi_ready_at():
     case = load('delayed')
     raw = copy.deepcopy(case['model_steps'][0]['response'])
-    raw['responsibilities'][0]['binding_items']['ready_at'] = '2099-09-04T19:00:00+08:00'
-    assert Draft202012Validator(case['model_steps'][0]['request']['format']).is_valid(raw)
+    raw['responsibilities'][0]['binding_items'] = {'ready_at':'2099-09-04T19:00:00+08:00'}
+    assert not Draft202012Validator(case['model_steps'][0]['request']['format']).is_valid(raw)
     from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
     from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
-    raw['responsibilities'][0].pop('target_goal_ids')
-    raw['responsibilities'][0]['relationship'] = 'new'
-    with pytest.raises(ValueError,match='ready_at'):
+    with pytest.raises(ValueError,match='binding_items'):
         OllamaGoalInterpreter._validate_interpretation_content(
             GoalInterpretationRequest(**case['input']),json.dumps(raw),
             response_schema=case['model_steps'][0]['request']['format'])

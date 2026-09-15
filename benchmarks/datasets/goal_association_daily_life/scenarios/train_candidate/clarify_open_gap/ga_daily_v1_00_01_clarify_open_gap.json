@@ -114,20 +114,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Tell a short story about a tiny dragon. Use the supplied missing detail.",
+          "outcome": "Tell a short story about a tiny dragon. Use the supplied missing detail. (Use the detail I just supplied for the missing field.)",
           "output_mode": "speech",
-          "relationship": "clarify",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_00_01_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -153,12 +148,12 @@
   "schema_version": 1,
   "split": "train_candidate",
   "target": {
-    "contract_gap": null,
+    "contract_gap": "Retained typed Goal update has no current GI binding provenance. Reject this transition without mutating the old Goal; a complete source-backed replacement Goal is required. Source input and original intended continuity reference retained.",
     "reference_model_output": {
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is clarify.",
+          "reason_summary": "The source-grounded continuity relationship is clarify.",
           "relationship": "clarify",
           "requirement_changes": [
             {
@@ -187,7 +182,7 @@
       "referent_updates": [],
       "resolved_references": []
     },
-    "schema_expectation": "accept",
+    "schema_expectation": "accept_host_reject",
     "semantic_expectations": {
       "candidate_goal_ids": [
         "goal_00_01_a"

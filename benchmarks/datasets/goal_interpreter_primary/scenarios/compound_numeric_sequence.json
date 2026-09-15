@@ -16,19 +16,13 @@
           "行走",
           "走"
         ],
-        "required_bindings": {
-          "speed": [
-            0.2
-          ],
-          "duration": [
-            "10 seconds"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "count"
-        ],
         "source_spans": [
           "walk ahead at 0.2 speed for 10 seconds"
+        ],
+        "required_intent_fragments": [
+          [
+            "walk ahead at 0.2 speed for 10 seconds"
+          ]
         ]
       },
       {
@@ -37,18 +31,13 @@
           "nod",
           "点头"
         ],
-        "required_bindings": {
-          "count": [
-            2
-          ]
-        },
-        "forbidden_binding_keys": [
-          "duration",
-          "speed",
-          "direction"
-        ],
         "source_spans": [
           "nod your head twice"
+        ],
+        "required_intent_fragments": [
+          [
+            "nod your head twice"
+          ]
         ]
       },
       {
@@ -57,94 +46,46 @@
           "turn",
           "转"
         ],
-        "required_bindings": {
-          "direction": [
-            "left"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "duration",
-          "speed",
-          "count"
-        ],
         "source_spans": [
           "turn left"
+        ],
+        "required_intent_fragments": [
+          [
+            "turn left"
+          ]
         ]
       }
     ],
-    "coordination": [
-      {
-        "kind": "sequence",
-        "responsibility_indexes": [
-          0,
-          1,
-          2
-        ]
-      }
-    ],
-    "unresolved": false
+    "coordination": [],
+    "unresolved": false,
+    "intent_relations": [
+      [
+        "then"
+      ]
+    ]
   },
   "contrast_set": "compound_numeric_sequence",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "walk ahead",
         "output_mode": "body_action",
+        "outcome": "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t9"
-        },
-        "binding_items": {
-          "duration": "10 seconds",
-          "speed": 0.2
-        }
-      },
-      {
-        "local_ref": "r2",
-        "outcome": "nod your head",
-        "output_mode": "body_action",
-        "confidence": 1.0,
-        "source_evidence": {
-          "source_start_token_ref": "t12",
-          "source_end_token_ref": "t15"
-        },
-        "binding_items": {
-          "count": 2
-        }
-      },
-      {
-        "local_ref": "r3",
-        "outcome": "turn left",
-        "output_mode": "body_action",
-        "confidence": 1.0,
-        "source_evidence": {
-          "source_start_token_ref": "t18",
           "source_end_token_ref": "t19"
-        },
-        "binding_items": {
-          "direction": "left"
         }
       }
     ],
-    "unresolved": [],
-    "coordination": [
-      {
-        "kind": "sequence",
-        "refs": [
-          "r1",
-          "r2",
-          "r3"
-        ]
-      }
-    ]
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

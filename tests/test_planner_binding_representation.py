@@ -179,7 +179,7 @@ def _weather_capability_with_temporal_realization() -> dict:
 class PlannerBindingRepresentationTests(unittest.TestCase):
     def test_numeric_prompt_requires_quantitative_pace_argument(self):
         self.assertIn(
-            "enum labels never preserve an explicit quantitative pace",
+            "Use exact numeric values when the Capability units agree",
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
 
@@ -279,11 +279,11 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
 
     def test_numeric_grounding_prompt_forbids_sibling_goal_borrowing(self):
         self.assertIn(
-            "Never borrow a numeric literal or typed binding from a sibling Goal",
+            "Never borrow a sibling Goal's values",
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
         self.assertIn(
-            "strategy=schema_default and no source_goal_ids",
+            "Omit unspecified optional inputs or use their declared schema_default",
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
 

@@ -40,12 +40,8 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "sing a song for the user",
-        "bindings": {},
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.91,
         "output_mode": "singing"
       }

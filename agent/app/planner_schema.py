@@ -421,7 +421,7 @@ def canonical_goal_binding_argument_response_schema(
 
 def scoped_reporting_response_schema(
     schema: dict[str, Any], *, goal_ids: set[str], expected_goal_ids: list[str],
-    future_goal_times: dict[str, int] | None = None,
+    future_goal_times: dict[str, int | None] | None = None,
 ) -> dict[str, Any]:
     """Bound control/waiting reports separately from effect fulfillment and Work."""
     if not goal_ids:
@@ -441,7 +441,9 @@ def scoped_reporting_response_schema(
             conditions["minItems"] = len(future_goal_times)
             conditions.setdefault("allOf", []).extend({"contains": {
                 "type": "object", "properties": {"goal_id": {"const": goal_id},
-                    "due_at_ms": {"const": due_ms}}, "required": ["goal_id", "due_at_ms"],
+                    "due_at_ms": {"const": due_ms} if due_ms is not None else {"type": "integer", "minimum": 1},
+                    **({"source_quote": {"type": "string", "minLength": 1}} if due_ms is None else {})},
+                    "required": ["goal_id", "due_at_ms", *(["source_quote"] if due_ms is None else [])],
             }} for goal_id, due_ms in future_goal_times.items())
             if goal_ids == set(expected_goal_ids):
                 conditions["maxItems"] = len(future_goal_times)
@@ -1566,15 +1568,11 @@ def fast_multi_goal_response_schema(
 
     steps = properties.get("steps")
     if isinstance(steps, dict):
-        # Fast multi-goal terminal scope is deliberately limited to simple
-        # goals: at most one executable step per authoritative goal.  Besides
-        # documenting that boundary, the decoder limit prevents a malformed
-        # model response from repeating one physical step until num_predict is
-        # exhausted.  A goal that needs multiple capabilities belongs in Deep
-        # Planning through a model-authored semantic escalation.
-        steps["maxItems"] = len(allowed_goals)
+        # One complete intent may require several Activities. Bound composition
+        # independently of GI segmentation; repetitions still use count arguments.
+        steps["maxItems"] = len(allowed_goals) * 4
         steps["description"] = (
-            "At most one executable step per authoritative goal. A skill's "
+            "At most four executable steps per authoritative goal. A skill's "
             "count argument represents repeated motions; never duplicate a "
             "step to implement count. Conversational respond goals have no step."
         )
@@ -1931,7 +1929,7 @@ def fast_multi_goal_response_schema(
             )
             step_ids = specialized_outcome_properties.get("step_ids")
             if isinstance(step_ids, dict):
-                step_ids["maxItems"] = 0 if goal_id in response_goal_set else 1
+                step_ids["maxItems"] = 0 if goal_id in response_goal_set else 4
                 step_ids["uniqueItems"] = True
                 step_ids["description"] = (
                     "No executable step may be owned by this direct-response Goal."
@@ -2011,7 +2009,7 @@ def fast_multi_goal_response_schema(
                             ),
                         },
                         "step_ids": (
-                            {"type": "array", "minItems": 1, "maxItems": 1}
+                            {"type": "array", "minItems": 1, "maxItems": 4}
                             if goal_disposition == "execute"
                             else {"type": "array", "maxItems": 0}
                         ),
@@ -2051,7 +2049,7 @@ def fast_multi_goal_response_schema(
                     "steps": {
                         "type": "array",
                         "minItems": execute_count,
-                        "maxItems": execute_count,
+                        "maxItems": execute_count * 4,
                     },
                     "goal_satisfaction": {
                         "type": "object",
@@ -2518,13 +2516,8 @@ def fast_advance_response_schema(
                 "a clarification. Escalation authorizes no Capability work."
             )
     activities_schema = top_properties.get("activities")
-    if isinstance(activities_schema, dict):
-        activities_schema["maxItems"] = max(
-            1,
-            len(responsibility_refs)
-            if (committed_communicative or suppress_new_communicative or suppress_new_progress)
-            else len(responsibility_refs) * 2,
-        )
+    # One complete intent may require several Activities. Preserve the DTO bound;
+    # Responsibility count is not an execution-step budget.
     schema.setdefault("allOf", []).extend(
         [
             {
@@ -2559,13 +2552,14 @@ def fast_advance_response_schema(
     reason_summary = top_properties.get("reason_summary")
     if isinstance(reason_summary, dict):
         reason_summary["maxLength"] = 160
+    top_properties["activities"]["maxItems"] = 24
     refs = list(dict.fromkeys(responsibility_refs))
-    schema["properties"]["activities"]["maxItems"] = len(refs)
     responsibility_items = list(responsibilities or [])
     ordinary_speech_refs = {
-        item.local_ref for item in responsibility_items if item.output_mode == "speech"
+        item.local_ref for item in responsibility_items if item.output_mode in {"speech", "other"}
     }
-    capability_refs = [ref for ref in refs if ref not in ordinary_speech_refs]
+    speech_only = {item.local_ref for item in responsibility_items if item.output_mode == "speech"}
+    capability_refs = [ref for ref in refs if ref not in speech_only]
     vocal_modes = {item.local_ref: item.output_mode for item in responsibility_items
                    if item.output_mode in set(VOCAL_MODES) - {"speech"}}
     # Project already-authored GI timing onto both ends of each relation.
@@ -2800,6 +2794,29 @@ def fast_advance_response_schema(
                             timings_by_refs.setdefault(compatible, []).append(timing)
                     for compatible, timings in timings_by_refs.items():
                         properties = copy.deepcopy(branch_properties)
+                        required = list(capability_required)
+                        # Optional numeric inputs need provenance too when the
+                        # Planner supplies a nondefault value. Give the decoder
+                        # an explicit closed map even when no input is required.
+                        # Defaults may keep it empty; Host checks actual coverage.
+                        if responsibilities and all(
+                            not item.bindings for item in responsibilities
+                            if item.local_ref in compatible
+                        ):
+                            input_properties = input_schema.get("properties", {})
+                            numeric_inputs = [name for name, contract in input_properties.items()
+                                if contract.get("type") in ("number", "integer")]
+                            numeric_sources = [name for name in numeric_inputs
+                                if name in input_schema.get("required", [])
+                                and "default" not in input_properties[name]]
+                            if numeric_inputs:
+                                required.append("argument_sources")
+                                properties["argument_sources"] = {
+                                    "type": "object", "properties": {
+                                        name: {"type": "string", "minLength": 1, "maxLength": 500}
+                                        for name in input_properties
+                                    }, "required": numeric_sources, "additionalProperties": False,
+                                }
                         if mode is not None:
                             properties["args"]["properties"]["mode"] = {**mode_contract, "enum": [mode]}
                         properties["timing"] = {"type": "string", "enum": timings}
@@ -2807,7 +2824,7 @@ def fast_advance_response_schema(
                         properties["source_responsibility_refs"]["maxItems"] = len(compatible)
                         branches.append({
                             "type": "object", "properties": properties,
-                            "required": capability_required, "additionalProperties": False,
+                            "required": required, "additionalProperties": False,
                         })
             if branches:
                 capability_contract["oneOf"] = branches
@@ -3058,3 +3075,59 @@ def deep_plan_response_schema(
         confirmation_required_capability_ids=(confirmation_required_capability_ids),
         nonparallel_capability_ids=nonparallel_capability_ids,
     )
+
+
+def capability_lookup_response_schema(schema: dict[str, Any], entries: list[Any]) -> dict[str, Any]:
+    """One read-only request or one complete Plan; never both."""
+    ids = [item.capability_id for item in entries]
+    if not ids:
+        return schema
+    definitions = schema.get("$defs", {})
+    plan = {key: value for key, value in schema.items() if key != "$defs"}
+    return {"$defs": definitions, "oneOf": [plan, {
+        "type": "object", "additionalProperties": False,
+        "required": ["requested_capability_ids"],
+        "properties": {"requested_capability_ids": {
+            "type": "array", "items": {"type": "string", "enum": ids},
+            "minItems": 1, "maxItems": 8, "uniqueItems": True,
+        }},
+    }]}
+
+
+
+def planner_readiness_response_schema(schema: dict[str, Any], goal_ids: list[str]) -> dict[str, Any]:
+    """Allow source-bound waiting without letting a response fulfill an effect.
+
+    This is the existing complete Work DTO. The alternative has no current Work,
+    an unmet outcome and a cited future condition for every scoped Goal. Runtime
+    still validates provenance and holds the Goal open until its due wake.
+    """
+    if not goal_ids:
+        return schema
+    waiting = fast_multi_goal_response_schema(
+        expected_goal_ids=goal_ids, allowed_capability_ids=[], response_only=True,
+        response_goal_ids=goal_ids, nonfulfilling_response_goal_ids=goal_ids,
+    )
+    waiting = scoped_reporting_response_schema(
+        waiting, goal_ids=set(goal_ids), expected_goal_ids=goal_ids,
+        future_goal_times={goal_id: None for goal_id in goal_ids},
+    )
+    for variant in [waiting, *waiting.get("anyOf", [])]:
+        variant["properties"]["cancel_activity_ids"] = {
+            "type": "array", "items": {"type": "string"}, "maxItems": 0,
+        }
+    # Keep independently specialized definitions distinct between the two shapes.
+    def rename(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: rename(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [rename(item) for item in value]
+        if isinstance(value, str) and value.startswith("#/$defs/"):
+            return value.replace("#/$defs/", "#/$defs/Waiting", 1)
+        return value
+    definitions = {**schema.get("$defs", {}), **{
+        "Waiting" + name: rename(value) for name, value in waiting.pop("$defs", {}).items()
+    }}
+    return {"$defs": definitions, "anyOf": [
+        {key: value for key, value in schema.items() if key != "$defs"}, rename(waiting),
+    ]}

@@ -28,7 +28,7 @@ class SocialCommunicationNeed(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     need_id: str = Field(min_length=1, max_length=160)
-    owner: Literal["goal_interpretation", "planner", "runtime"]
+    owner: Literal["goal_interpretation", "goal_association", "planner", "runtime"]
     kind: Literal["answer", "input", "confirmation", "result"]
     source_goal_ids: list[str] = Field(default_factory=list)
     source_responsibility_refs: list[str] = Field(default_factory=list)
@@ -330,6 +330,15 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     role: Literal["capability"]
     activity_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
+    argument_sources: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "For each argument realized from user intent, cite an exact excerpt of "
+            "an owning Responsibility outcome. Planner owns the mapping and any "
+            "conversion; this records provenance, not a second semantic decision. "
+            "Omit declared defaults and trusted Runtime target references."
+        ),
+    )
     timing: PlanTiming = "sequential"
     source_responsibility_refs: list[str] = Field(min_length=1)
     reason_summary: str = ""
@@ -671,7 +680,7 @@ class FastPlannerAdvance(BaseModel):
             terminal_roles = roles.intersection(
                 {"capability", "complete_response", "clarification"}
             )
-            if len(terminal_roles) > 1:
+            if "clarification" in terminal_roles and len(terminal_roles) > 1:
                 raise ValueError(
                     "one Responsibility cannot have conflicting terminal Fast "
                     f"Planner Activities: {responsibility_ref}={sorted(terminal_roles)}"
@@ -844,6 +853,10 @@ class PlanParameterResolution(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     blocking: bool = False
     rationale: str = ""
+    source_quote: str = Field(
+        default="", max_length=500,
+        description="Exact owning Goal requirement excerpt supporting a Planner-authored argument realization.",
+    )
     source_goal_ids: list[str] = Field(default_factory=list)
 
     @field_validator("step_id", "parameter", "rationale", mode="before")
@@ -948,6 +961,7 @@ class PlannedGoalTimeCondition(BaseModel):
     condition_id: str = Field(min_length=1, max_length=200)
     goal_id: str = Field(min_length=1, max_length=160)
     due_at_ms: int = Field(ge=1)
+    source_quote: str = Field(default="", max_length=500)
     reason_code: str = Field(default="planner_time_condition", min_length=1, max_length=120)
 
     @field_validator("condition_id", "goal_id", "reason_code", mode="before")

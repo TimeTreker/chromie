@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.cognitive_work_test_support import ordinary_plan_schema
+
 from agent.app import planner_validation
 from agent.app import planner_deep_validation
 from agent.app import planner_schema
@@ -584,7 +586,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
         prompt = str(ollama.prompts[0][0])
         self.assertIn('Host-bound terminal Evidence JSON', prompt)
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertIn("respond", schema["properties"]["disposition"].get("enum", []))
         self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
 
@@ -651,7 +653,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotEqual(schema["properties"]["steps"].get("maxItems"), 0)
         self.assertNotIn("authoritative source route", ollama.prompts[0][0].casefold())
 
@@ -2060,17 +2062,10 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, ["goal-sing"])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertIn('playing a recording is not singing', ollama.prompts[0][0])
-        schema = ollama.prompts[0][1]["response_format"]
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-sing"]
         walk_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-walk"]
-        self.assertEqual(
-            walk_outcome["properties"]["step_ids"]["maxItems"],
-            1,
-        )
-        self.assertIn(
-            "Optional or decorative effects require their own authoritative Goal",
-            walk_outcome["properties"]["step_ids"]["description"],
-        )
+        self.assertNotEqual(walk_outcome["properties"]["step_ids"].get("maxItems"), 1)
         self.assertEqual(
             vocal_outcome["properties"]["disposition"]["enum"],
             ["clarify", "unavailable", "refused"],
@@ -2139,7 +2134,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(len(ollama.prompts), 1)
         for _, kwargs in ollama.prompts:
-            schema = kwargs["response_format"]
+            schema = ordinary_plan_schema(kwargs["response_format"])
             self.assertIn("goal_outcomes", schema["required"])
             self.assertEqual(
                 schema["properties"]["goal_outcomes"]["required"],
@@ -2396,7 +2391,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
             [[goal_ids[0]], [goal_ids[1]]],
         )
         self.assertEqual(len(ollama.prompts), 1)
-        response_schema = ollama.prompts[0][1]["response_format"]
+        response_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotIn("oneOf", response_schema)
 
     def test_multi_goal_step_ownership_is_never_filled_from_all_host_goals(self):
@@ -3110,7 +3105,7 @@ class DeepPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.steps[0].capability_id, "soridormi.blink_eyes")
         self.assertEqual(plan.steps[0].args, {"count": 2})
         self.assertEqual(len(ollama.prompts), 1)
-        response_schema = ollama.prompts[0][1]["response_format"]
+        response_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertIsInstance(response_schema, dict)
         self.assertEqual(response_schema.get("title"), "DeepPlannerModelOutput")
 

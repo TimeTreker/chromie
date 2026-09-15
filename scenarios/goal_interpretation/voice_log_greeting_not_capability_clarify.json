@@ -22,11 +22,8 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "respond to the user's greeting",
-              "bindings": {},
+              "outcome": "Hello, how are you.",
               "confidence": 0.94,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "speech",
               "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -49,11 +46,8 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "respond to the user's greeting",
-        "bindings": {},
+        "outcome": "Hello, how are you.",
         "confidence": 0.94,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "speech"
       }
     ]

@@ -26,13 +26,8 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "点头一次",
-              "bindings": {
-                "count": 1
-              },
+              "outcome": "你点点头",
               "confidence": 0.98,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -41,14 +36,8 @@
             },
             {
               "local_ref": "r2",
-              "outcome": "眨眼两次",
-              "bindings": {
-                "count": 2,
-                "after": "r1"
-              },
+              "outcome": "再 眨两下眼睛",
               "confidence": 0.98,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t5",
@@ -71,25 +60,14 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "点头一次",
-        "bindings": {
-          "count": 1
-        },
+        "outcome": "你点点头",
         "confidence": 0.98,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "body_action"
       },
       {
         "local_ref": "r2",
-        "outcome": "眨眼两次",
-        "bindings": {
-          "count": 2,
-          "after": "r1"
-        },
+        "outcome": "再 眨两下眼睛",
         "confidence": 0.98,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "body_action"
       }
     ]

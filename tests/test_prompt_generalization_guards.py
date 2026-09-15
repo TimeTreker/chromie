@@ -27,16 +27,16 @@ def test_goal_interpretation_prompt_uses_general_rules_not_casebook_literals() -
         "'tonight'",
     ):
         assert literal not in prompt
-    assert "coordination grammar in any language" in prompt.casefold()
-    assert "verbatim contiguous span" in prompt
-    assert "Preserve question mood in the outcome" in prompt
+    assert "ordering and concurrency" in prompt.casefold()
+    assert "inclusive source-token span" in prompt
+    assert "difference between asking whether" in prompt
 
 
 def test_deep_goal_interpretation_atomicity_rule_is_language_independent() -> None:
     source = _text("agent/app/cognitive_core/goal_interpreter/model_interpreter.py")
     assert "Chinese 边…边…" not in source
-    assert "coordination" in source
-    assert "grammar in any language" in source
+    assert "source" in source
+    assert "original" in source
 
 
 def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -> None:
@@ -55,8 +55,8 @@ def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -
         "tonight uses one constraint",
     ):
         assert literal not in source
-    assert "every GI Responsibility ref must map to exactly one association or new Goal" in source
-    assert "Information acquisition and a requested interpretation of that same evidence" in source
+    assert "Every Responsibility ref must occur exactly once across" in source
+    assert "Preserve compound intentions intact; Planner decomposes Activities" in source
 
 
 def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_table() -> None:
@@ -72,9 +72,9 @@ def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_t
         "it will rain",
     ):
         assert literal not in source
-    assert "Preserve epistemic strength and qualification" in source
+    assert "never reinterpret or repair WHAT" in source
     from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
-    assert "Preserve uncertainty and cite supplied Evidence" in SOCIAL_COGNITION_AUTHORITY_PROMPT
+    assert "upstream-authored uncertainty and cite supplied Evidence" in SOCIAL_COGNITION_AUTHORITY_PROMPT
 
 
 def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:
@@ -88,11 +88,15 @@ def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:
 
 
 def test_concrete_cases_remain_as_regression_evidence_outside_production_prompts() -> None:
-    gi_tests = _text("tests/test_goal_interpreter_llm_prompt.py")
+    gi_tests = _text("tests/test_goal_interpreter_llm_prompt.py") + "\n".join(
+        p.read_text() for p in (ROOT / "benchmarks/datasets/goal_interpretation_daily_life/scenarios").rglob("*.json"))
     fast_tests = _text("tests/test_fast_planner_pr3.py")
-    ga_tests = _text("tests/test_goal_association_pr2.py")
-    assert "边走边唱歌" in gi_tests
-    assert "今天晚上重庆热不热" in gi_tests
+    ga_tests = _text("tests/test_goal_association_pr2.py") + "\n".join(
+        p.read_text() for p in (ROOT / "benchmarks/datasets/goal_association_daily_life/scenarios").rglob("*.json"))
+    primary = "\n".join(p.read_text() for p in
+        (ROOT / "benchmarks/datasets/goal_interpreter_primary/scenarios").glob("*.json"))
+    assert "Sing a short song while waving." in primary
+    assert "今晚重庆会不会下雨哦？" in primary
     assert "76%" in fast_tests
     assert "不是确定会下雨" in fast_tests
     assert "tonight" in ga_tests

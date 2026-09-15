@@ -12,16 +12,13 @@
           "nod",
           "点头"
         ],
-        "required_bindings": {
-          "count": [
-            2
-          ]
-        },
-        "forbidden_binding_keys": [
-          "duration"
-        ],
         "source_spans": [
           "点两下头"
+        ],
+        "required_intent_fragments": [
+          [
+            "点两下头"
+          ]
         ]
       },
       {
@@ -33,71 +30,46 @@
           "你好",
           "问候"
         ],
-        "required_bindings": {},
-        "forbidden_binding_keys": [
-          "count",
-          "duration"
-        ],
         "source_spans": [
           "跟我说声你好"
+        ],
+        "required_intent_fragments": [
+          [
+            "跟我说声你好"
+          ]
         ]
       }
     ],
-    "coordination": [
-      {
-        "kind": "sequence",
-        "responsibility_indexes": [
-          0,
-          1
-        ]
-      }
-    ],
-    "unresolved": false
+    "coordination": [],
+    "unresolved": false,
+    "intent_relations": [
+      [
+        "再"
+      ]
+    ]
   },
   "contrast_set": "speech_and_body_siblings",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "nod twice",
-        "output_mode": "body_action",
+        "output_mode": "other",
+        "outcome": "点两下头，再跟我说声你好。",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t3"
-        },
-        "binding_items": {
-          "count": 2
+          "source_end_token_ref": "t12"
         }
-      },
-      {
-        "local_ref": "r2",
-        "outcome": "say hello to me",
-        "output_mode": "speech",
-        "confidence": 1.0,
-        "source_evidence": {
-          "source_start_token_ref": "t6",
-          "source_end_token_ref": "t11"
-        },
-        "binding_items": {}
       }
     ],
-    "unresolved": [],
-    "coordination": [
-      {
-        "kind": "sequence",
-        "refs": [
-          "r1",
-          "r2"
-        ]
-      }
-    ]
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

@@ -161,7 +161,7 @@ def _request_schema(request: CognitiveWorkRequest) -> tuple[type[Any], dict[str,
     return output_type, schema, candidates
 
 
-def _responsibility_map(reference: dict[str, Any]) -> list[dict[str, Any]]:
+def _responsibility_map(reference: dict[str, Any], request: CognitiveWorkRequest) -> list[dict[str, Any]]:
     mapped: list[dict[str, Any]] = []
     for association in reference.get("associations", []):
         for source_ref in association["source_responsibility_refs"]:
@@ -178,7 +178,7 @@ def _responsibility_map(reference: dict[str, Any]) -> list[dict[str, Any]]:
                 "operation": "new_goal",
                 "relationship": "new",
                 "target_goal_ids": [],
-                "output_mode": goal["output_mode"],
+                "output_mode": next(item.output_mode for item in request.responsibilities if item.local_ref == source_ref),
                 "supersedes_goal_ids": goal["supersedes_goal_ids"],
             })
     return sorted(mapped, key=lambda item: item["source_ref"])
@@ -226,7 +226,7 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
             if forbidden:
                 raise ValueError(f"reference crosses authority boundary: {sorted(forbidden)}")
             expected_map = target["semantic_expectations"]["responsibility_map"]
-            if _responsibility_map(reference) != expected_map:
+            if _responsibility_map(reference, request) != expected_map:
                 raise ValueError("semantic responsibility map drift")
             source_refs = sorted(item.local_ref for item in request.responsibilities)
             mapped_refs = sorted(item["source_ref"] for item in expected_map)
@@ -239,19 +239,27 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
                 raise ValueError("candidate Goal projection drift")
             schema_errors = list(Draft202012Validator(schema).iter_errors(reference))
             expectation = target["schema_expectation"]
-            if expectation == "accept":
-                if target["contract_gap"] is not None:
+            if expectation in {"accept", "accept_host_reject"}:
+                if expectation == "accept" and target["contract_gap"] is not None:
                     raise ValueError("accepted reference must not declare a contract gap")
+                if expectation == "accept_host_reject" and not target["contract_gap"]:
+                    raise ValueError("retained-state negative requires its explicit contract limitation")
                 if schema_errors:
                     raise ValueError(f"reference schema failure: {schema_errors[0].message}")
                 output_type.model_validate(reference)
                 model = _ReferenceModel(reference)
                 resolution = await GoalAssociationResolver(model).resolve(request)
-                if resolution.resolution_status != "resolved" or model.calls != 1:
+                required_status = "fail_closed" if expectation == "accept_host_reject" else "resolved"
+                if resolution.resolution_status != required_status or model.calls != 1:
                     raise ValueError(
                         f"production resolver reference failed: status={resolution.resolution_status} calls={model.calls}"
                     )
-                counts["host_accepted"] += 1
+                if expectation == "accept_host_reject":
+                    if resolution.new_goals or resolution.associations:
+                        raise ValueError("rejected legacy update leaked a state transition")
+                    counts["known_contract_gaps"] += 1
+                else:
+                    counts["host_accepted"] += 1
             else:
                 raise ValueError(f"unknown schema expectation {expectation!r}")
 

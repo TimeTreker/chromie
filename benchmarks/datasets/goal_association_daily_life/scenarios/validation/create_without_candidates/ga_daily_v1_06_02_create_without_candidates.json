@@ -51,22 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "item": "the small towel",
-            "location": "the sofa",
-            "recipient": "me"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Acquire the small towel from the sofa and hand it to me.",
+          "outcome": "Acquire the small towel from the sofa and hand it to me. (Bring the small towel from the sofa to me.)",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -98,34 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [],
-          "media_operation": "none",
-          "output_mode": "body_action",
           "related_goal_ids": [],
-          "resource_kind": "physical_object",
-          "resource_responsibility": {
-            "delivery_mode": "physical_handover",
-            "description": "the small towel",
-            "kind": "physical_object",
-            "quantity": "",
-            "recipient": {
-              "description": "me",
-              "referent_id": null
-            },
-            "source": {
-              "acquisition_bindings": [
-                {
-                  "confidence": 1.0,
-                  "entity_type": "relative_location",
-                  "name": "location",
-                  "referent_id": "",
-                  "value": "the sofa"
-                }
-              ],
-              "description": "the sofa",
-              "status": "known"
-            }
-          },
           "source_responsibility_refs": [
             "r1"
           ],

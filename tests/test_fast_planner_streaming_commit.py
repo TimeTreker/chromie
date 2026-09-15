@@ -172,7 +172,10 @@ def test_fast_decision_projection_localizes_coverage_bindings_and_relations() ->
     look = CognitiveResponsibilityProposal(local_ref='r1', outcome='look at the person', output_mode='body_action', bindings={'entity': 'me', 'parallel_with': ['r2']}, confidence=1.0)
     blink = CognitiveResponsibilityProposal(local_ref='r2', outcome='blink twice', output_mode='body_action', bindings={'count': 2, 'parallel_with': 'r1'}, confidence=1.0)
     projection = fast_responsibility_decision_projection([look, blink])
-    assert projection == [{'ref': 'r1', 'outcome': 'look at the person', 'output_mode': 'body_action', 'semantic_bindings': {'entity': 'me'}, 'relations': {'before': [], 'after': [], 'parallel_with': ['r2']}, 'goal_relationship': 'new', 'target_goal_ids': [], 'terminal_owner_required': True}, {'ref': 'r2', 'outcome': 'blink twice', 'output_mode': 'body_action', 'semantic_bindings': {'count': 2}, 'relations': {'before': [], 'after': [], 'parallel_with': ['r1']}, 'goal_relationship': 'new', 'target_goal_ids': [], 'terminal_owner_required': True}]
+    assert projection == [
+        {"ref": "r1", "outcome": "look at the person", "output_mode": "body_action", "source_evidence": None},
+        {"ref": "r2", "outcome": "blink twice", "output_mode": "body_action", "source_evidence": None},
+    ]
 
 @pytest.mark.asyncio
 async def test_declared_addressee_target_realization_accepts_exact_trusted_ref() -> None:
@@ -302,7 +305,7 @@ def test_native_work_schema_conserves_declared_parallel_permission(parallel):
 @pytest.mark.parametrize("list_binding", [False, True])
 def test_native_work_timing_preserves_both_ends_of_typed_source_relation(relation, list_binding):
     responsibilities = [CognitiveResponsibilityProposal(
-        local_ref=ref, outcome="perform bounded action", output_mode="body_action", confidence=1,
+        local_ref=ref, outcome="perform bounded action for 10 seconds", output_mode="body_action", confidence=1,
         bindings={relation: ["second"] if list_binding else "second"} if ref == "first" else {},
     ) for ref in ("first", "second", "independent")]
     capability = {**_walk_capability(), "can_run_parallel": True}
@@ -312,7 +315,8 @@ def test_native_work_timing_preserves_both_ends_of_typed_source_relation(relatio
     for ref in ("first", "second", "independent"):
         for timing in ("sequential", "parallel"):
             act = {"role": "capability", "activity_id": ref, "capability_id": capability["capability_id"],
-                   "args": {"duration_s": 10}, "timing": timing, "source_responsibility_refs": [ref]}
+                   "args": {"duration_s": 10}, "argument_sources": {"duration_s": "10 seconds"},
+                   "timing": timing, "source_responsibility_refs": [ref]}
             # Exercise the exact compiled item union, including native branches.
             errors = list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
             assert bool(errors) == (ref != "independent" and timing != expected)
@@ -368,7 +372,7 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID, vocal_performance_input_schema
     responsibilities = [
         CognitiveResponsibilityProposal(local_ref="voice", outcome="perform requested vocal effect", output_mode=mode, confidence=1),
-        CognitiveResponsibilityProposal(local_ref="body", outcome="walk", output_mode="body_action", confidence=1),
+        CognitiveResponsibilityProposal(local_ref="body", outcome="walk for 10 seconds", output_mode="body_action", confidence=1),
     ]
     capabilities = [_walk_capability()]
     if provider_modes is not None:
@@ -378,11 +382,13 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
         [x.local_ref for x in responsibilities], responsibilities=responsibilities, capabilities=capabilities)
     validator = Draft202012Validator(schema["properties"]["activities"]["items"])
     body = {"role": "capability", "activity_id": "act", "capability_id": capabilities[0]["capability_id"],
-        "args": {"duration_s": 10}, "timing": "sequential", "source_responsibility_refs": ["body"]}
+        "args": {"duration_s": 10}, "argument_sources": {"duration_s": "10 seconds"},
+        "timing": "sequential", "source_responsibility_refs": ["body"]}
     validator.validate(body)
     assert not validator.is_valid({**body, "source_responsibility_refs": ["voice"]})
     for candidate_mode in ["speech", "styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"]:
         vocal = {**body, "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
+            "argument_sources": {},
             "args": {"text": "authored performance", "mode": candidate_mode}, "source_responsibility_refs": ["voice"]}
         assert validator.is_valid(vocal) == (provider_modes is not None and mode in provider_modes and candidate_mode == mode)
     # An unavailable mode can still delegate its unresolved work without inventing another effect.

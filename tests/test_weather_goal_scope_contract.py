@@ -15,7 +15,7 @@ from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app import goal_association_prompt as ga_prompt
 from agent.app import planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
-from tests.test_goal_association_pr2 import FakeOllama, binding, create_goals, goal, resource_responsibility
+from tests.test_goal_association_pr2 import FakeOllama, create_goals, intent_goal
 from tests.test_fast_planner_pr3 import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
@@ -54,72 +54,55 @@ def test_weather_capability_declares_bounded_temporal_scope() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["information", "speech"])
-@pytest.mark.parametrize("explicit_provenance", [False, True])
-@pytest.mark.parametrize("separate_query_scope,separate_location", [(True, True), (False, True), (False, False)])
-async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(mode, explicit_provenance, separate_query_scope, separate_location):
-    request = CognitiveWorkRequest(
-        sid="weather-contract", text="Check tomorrow morning's Chongqing weather.",
-        language="en-US", interpretation_confidence=1.0,
-        responsibilities=[{
-            "local_ref": "r1", "outcome": "Acquire and explain tomorrow morning's Chongqing weather.",
-            "output_mode": "information", "confidence": 1.0,
-            "bindings": {**({"location": "Chongqing"} if separate_location else {}), **(
-                {"date": "tomorrow", "period": "morning"} if separate_query_scope else {}
-            )},
-        }],
+@pytest.mark.parametrize("mode_override", [None, "speech"])
+@pytest.mark.parametrize("foreign_quote", [False, True])
+@pytest.mark.parametrize("text,location,date,period", [
+    ("Check tomorrow morning's Chongqing weather.", "Chongqing", "tomorrow", "morning"),
+    ("查一下明天早上重庆的天气。", "重庆", "tomorrow", "morning"),
+])
+async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
+    mode_override, foreign_quote, text, location, date, period,
+):
+    source = GoalInterpretationRequest(text=text)
+    schema = OllamaGoalInterpreter._goal_interpretation_response_schema(admitted_turn=text)
+    primary = {"confidence": 1.0, "responsibilities": [{
+        "local_ref": "r1", "outcome": text, "output_mode": "information", "confidence": 1.0,
+        "source_evidence": {"source_start_token_ref": "t0",
+            "source_end_token_ref": _source_tokens(text)[-1]["ref"]},
+    }], "unresolved": []}
+    interpreted = OllamaGoalInterpreter._validate_interpretation_content(
+        source, json.dumps(primary), response_schema=schema,
     )
-    if not separate_query_scope:
-        # Exercise the actual GI Host handoff before GA: time is retained in the
-        # complete query, without manufacturing provider date/period bindings.
-        source = GoalInterpretationRequest(text=request.text)
-        schema = OllamaGoalInterpreter._goal_interpretation_response_schema(
-            new_relationship_only=True, admitted_turn=request.text,
-        )
-        primary = {"confidence": 1.0, "responsibilities": [{
-            "local_ref": "r1", "outcome": request.responsibilities[0].outcome,
-            "output_mode": "information", "binding_items": ({"location": "Chongqing"} if separate_location else {}),
-            "confidence": 1.0, "source_evidence": {
-                "source_start_token_ref": "t0",
-                "source_end_token_ref": _source_tokens(request.text)[-2]["ref"],
-            },
-        }], "coordination": [], "unresolved": []}
-        interpreted = OllamaGoalInterpreter._validate_interpretation_content(
-            source, json.dumps(primary), response_schema=schema,
-        )
-        request = request.model_copy(update={"responsibilities": interpreted.responsibilities})
-    association_model = FakeOllama(create_goals(goal(
-        request.responsibilities[0].outcome, mode,
-        resource=resource_responsibility(
-            kind="information", description="Chongqing weather", quantity="",
-            source_status="provider_resolved", attributes=[
-                *([binding("location", "location", "Chongqing")] if separate_location else []),
-                *([binding("date", "date", "tomorrow"),
-                   binding("period", "day_part", "morning")] if separate_query_scope else []),
-            ],
-        ),
-    )))
+    request = CognitiveWorkRequest(sid="weather-contract", text=text,
+        responsibilities=interpreted.responsibilities, interpretation_confidence=1.0)
+    assert not request.responsibilities[0].bindings
+    ga_wire = intent_goal(text, "information")
+    if mode_override:
+        ga_wire["output_mode"] = mode_override
+    association_model = FakeOllama(create_goals(ga_wire))
     resolution = await GoalAssociationResolver(association_model).resolve(request)
-    if mode == "speech":
-        assert resolution.resolution_status != "resolved"
+    assert len(association_model.prompts) == 1
+    if mode_override:
+        assert resolution.resolution_status == "fail_closed"
         assert not resolution.new_goals
         return
     assert resolution.resolution_status == "resolved"
-    assert len(association_model.prompts) == 1
     canonical = resolution.new_goals[0]
     assert canonical.metadata["output_mode"] == "information"
     assert canonical.source_responsibility_refs == ["r1"]
-    assert canonical.description == request.responsibilities[0].outcome
+    assert canonical.description == text
+    assert not canonical.object.get("bindings")
     goal_id = canonical.goal_id
-    arguments = {"location": "Chongqing", "date": "tomorrow", "period": "morning"}
+    arguments = {"location": location, "date": date, "period": period}
     planner_model = FakeOllama(multi_goal_plan(
-        disposition="execute", coverage="complete", goal_summary=canonical.description,
+        disposition="execute", coverage="complete", goal_summary=text,
         steps=[execute_step("weather", "chromie.weather.lookup", arguments, [goal_id], "Acquire the forecast.")],
         goal_outcomes={goal_id: execute_outcome(goal_id, ["weather"], "Acquire before explaining.")},
         goal_satisfaction=exact_satisfaction([goal_id]),
-        parameter_resolutions=([{"step_id": "weather", "parameter": "location",
-            "strategy": "user_supplied", "value": "Chongqing", "confidence": 1.0,
-            "source_goal_ids": [goal_id]}] if explicit_provenance else []),
+        parameter_resolutions=[{"step_id": "weather", "parameter": name,
+            "strategy": "semantic_realization", "value": value, "confidence": 1.0,
+            "source_quote": "Check next year's Paris weather." if foreign_quote else text,
+            "source_goal_ids": [goal_id]} for name, value in arguments.items()],
     ))
     tool = next(t for a in chromie_capability_bundle().agents for t in a.tools if t.name == "chromie.weather.lookup")
 
@@ -133,10 +116,14 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
 
     request.context["goal_association_resolution"] = resolution.model_dump(mode="json")
     plan = await FastPlannerResolver(planner_model, WeatherCatalog()).resolve(request)
-    assert plan.disposition == "execute", plan.metadata
     assert len(planner_model.prompts) == 1
-    assert plan.steps[0].args == arguments
-    assert plan.steps[0].source_goal_ids == [goal_id]
+    if foreign_quote:
+        assert plan.disposition == "escalate"
+        assert not plan.steps
+    else:
+        assert plan.disposition == "execute", plan.metadata
+        assert plan.steps[0].args == arguments
+        assert plan.steps[0].source_goal_ids == [goal_id]
     assert not plan.response_text
 
 
@@ -192,7 +179,7 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
         expected_goal_ids=["goal-weather"],
     )
 
-    assert "Never narrow broader temporal scope" in goal_prompt
+    assert "Host supplies descriptions and IDs" in goal_prompt
     for prompt in (fast_prompt, deep_prompt):
         assert "Compare annual weather." in prompt
         assert "Preserve exact advertised semantic scope" in prompt

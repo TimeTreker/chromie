@@ -16,53 +16,44 @@
           "交给",
           "give"
         ],
-        "required_bindings": {
-          "entity": [
-            "那个"
-          ],
-          "recipient": [
-            "我"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "location"
-        ],
         "source_spans": [
           "把那个拿给我"
+        ],
+        "required_intent_fragments": [
+          [
+            "把那个拿给我"
+          ]
         ]
       }
     ],
     "coordination": [],
-    "unresolved": true
+    "unresolved": true,
+    "intent_relations": []
   },
   "contrast_set": "ambiguous_deictic_object",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "bring that to me",
         "output_mode": "body_action",
+        "outcome": "把那个拿给我。",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t5"
-        },
-        "binding_items": {
-          "entity": "那个",
-          "recipient": "我"
+          "source_end_token_ref": "t6"
         }
       }
     ],
     "unresolved": [
       "which object is indicated"
-    ],
-    "coordination": []
-  }
+    ]
+  },
+  "intent_only_contract": true
 }

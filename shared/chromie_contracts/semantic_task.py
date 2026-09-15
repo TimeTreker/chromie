@@ -136,6 +136,12 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
                           "goal_version": goal.version, "requirement_index": index,
                           "outcome": outcome} for index, outcome in enumerate(criteria)]
     kept = [index for index in range(len(criteria)) if index not in replaced]
+    if (not any(source.bindings for source in sources)
+            and (goal.object.get("bindings") or goal.constraints or goal.resource_responsibility)):
+        raise ValueError(
+            "An intent-only update cannot reconcile retained typed Goal constraints; "
+            "use an explicitly sourced replacement Goal"
+        )
     criteria = [criteria[index] for index in kept] + [item.outcome for item in sources]
     provenance = [copy.deepcopy(prior_sources[index]) for index in kept] + [
         {"origin": "gi", "turn_id": turn_id, "responsibility": item.model_dump(mode="json")}

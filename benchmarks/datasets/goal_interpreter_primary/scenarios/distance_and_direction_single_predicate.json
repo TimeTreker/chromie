@@ -15,53 +15,42 @@
           "行走",
           "走"
         ],
-        "required_bindings": {
-          "direction": [
-            "forward"
-          ],
-          "distance": [
-            "five meters"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "duration",
-          "count",
-          "location"
-        ],
         "source_spans": [
           "Walk forward five meters"
+        ],
+        "required_intent_fragments": [
+          [
+            "Walk forward five meters"
+          ]
         ]
       }
     ],
     "coordination": [],
-    "unresolved": false
+    "unresolved": false,
+    "intent_relations": []
   },
   "contrast_set": "distance_and_direction_single_predicate",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "walk forward",
         "output_mode": "body_action",
+        "outcome": "Walk forward five meters.",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t3"
-        },
-        "binding_items": {
-          "direction": "forward",
-          "distance": "five meters"
+          "source_end_token_ref": "t4"
         }
       }
     ],
-    "unresolved": [],
-    "coordination": []
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

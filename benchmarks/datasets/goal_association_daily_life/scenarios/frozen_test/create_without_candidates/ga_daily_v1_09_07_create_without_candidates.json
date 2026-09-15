@@ -51,20 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "situation": "我有点担心明天"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "在用户谈论“我有点担心明天”时给予倾听和支持。",
+          "outcome": "在用户谈论“我有点担心明天”时给予倾听和支持。 (我有点担心明天，先听我说一会儿。)",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -96,20 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "situation",
-              "name": "situation",
-              "referent_id": "",
-              "value": "我有点担心明天"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "speech",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

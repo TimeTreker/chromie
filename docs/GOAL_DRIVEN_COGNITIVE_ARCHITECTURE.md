@@ -1682,11 +1682,15 @@ payloads remain outside Situation. Meaningful provider Runtime-state transitions
 are the first production trusted ingress and are explicitly not promoted to
 Evidence; broader scene/body/environment adapters remain source-specific future
 work. The owner-approved #60 new-request contract separates requested temporal WHAT
-from its planned HOW. GI's primary result authors `ready_at` as an exact timezone-aware
-activation instant, retaining source time/time_scope when normalized. GA conserves it.
-The Gateway's immutable `received_at` may anchor elapsed time; it does not establish
-the user's local timezone. Without reliable clock/date/timezone meaning GI retains
-uncertainty; Host never parses human time or manufactures a missing instant.
+from its planned HOW. GI preserves the complete requested time wording in its
+outcome. Planner authors the normalized `due_at_ms` and exact `source_quote` in
+its time condition; GA does not normalize or bind a timestamp. The Gateway's
+immutable `received_at` anchors elapsed time but does not establish the user's
+local timezone. Missing clock or timezone meaning is a Planner gap. Host checks
+source ownership, explicit ISO timestamp consistency and future readiness; it
+never infers a human time from prose. The initial source-bound waiting branch
+currently scopes all selected Goals to waiting; mixed newly scheduled and ready
+Goals require further qualification. Older typed `ready_at` remains enforced.
 Structured time-condition registration remains Planner-owned HOW: a canonical Plan may
 carry bounded Goal/time conditions for executable Work, while ConversationState adds
 only Plan identity and immutable Responsibility provenance before durable registration.
@@ -2508,8 +2512,9 @@ For an explicit numeric parameter, the planner also authors the step ID,
 argument key, resolved value, strategy, and `source_goal_ids`. Deterministic
 validation checks that the value equals the claimed step argument and that
 every explicit numeric value in an executable Goal is accounted for by a
-resolution owned by that Goal. Provenance does not require the model to copy a
-second free-text excerpt: the immutable Goal ID is the stable reference. The
+resolution owned by that Goal. Retained typed constraints keep their exact conservation checks. New intent-only
+Goals use exact owning excerpts in Planner parameter provenance; no duplicate
+GI argument table is required. The
 Host neither infers the argument mapping nor substitutes a default. At the
 pre-Association Fast Activity boundary, when a selected capability has an
 identically named input and every cited Responsibility supplies one agreeing
@@ -2518,17 +2523,14 @@ even if the provider schema marks that input optional with a default. This is
 provenance preservation after model-owned capability selection; conflicting,
 transformed, or differently named inputs remain Planner-owned and fail closed.
 
-For a Fast Planner request containing multiple authoritative goals, the model
-emits one required decision record per Goal ID rather than a CanonicalPlan-shaped
-step/outcome graph. Each decision selects exactly one common-catalog skill, a
-direct conversational response, or semantic escalation. The host generates
-step IDs and compiles ownership mechanically from the keyed decisions before
-shared CanonicalPlan validation. Simple common-catalog `execute + respond`
-combinations may terminate as `mixed`; goals requiring more than one skill,
-clarification, unavailable or refused judgment, material alternatives, rare
-capabilities, or broader context escalate. Contract failure is not semantic
-escalation. The implemented contract and qualification matrix are defined in
-[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
+For multiple authoritative Goals, Fast returns the complete Plan with an exact
+`goal_outcomes` entry per Goal. It can compose up to four steps per Goal; the
+pre-GA Activity result is bounded to 24 Activities. A connected intent can own
+several sequential Activities. Fast receives full common contracts plus the full
+library index and may read one bounded batch of missing contracts before its
+complete planning decision. A rare capability alone does not require Deep.
+Genuine unresolved planning can use the designated depth boundary. No candidate
+Plan is passed for review or semantic repair; Runtime retains all safety gates.
 
 ### 8.2 Deep Planner
 

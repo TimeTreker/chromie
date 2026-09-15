@@ -63,6 +63,8 @@ from .planner_grounding import (
     _material_values_equal,
     _normalized_entity_type,
     literal_intent_argument,
+    intent_source_quote,
+    planner_readiness_times,
     missing_argument_realizations,
     semantic_numeric_values,
 )
@@ -208,6 +210,15 @@ def validate_goal_responsibility_outcomes(
 
     _validate_communication_work_order(output, context=context, responsibilities=responsibilities)
 
+    for goal_id, outcome in output.goal_outcomes.items():
+        owned = [step for step in output.steps if goal_id in step.source_goal_ids]
+        if owned and all(step.step_purpose == "acquire_information" for step in owned):
+            for assessment in (outcome.satisfaction, output.goal_satisfaction):
+                if (assessment is None or goal_id in assessment.satisfied_goal_ids
+                        or goal_id not in assessment.unmet_goal_ids
+                        or not assessment.unmet_requirements or assessment.status == "exact"):
+                    raise ValueError("Acquisition Work cannot fulfill its deferred Goal: " + goal_id)
+
     cancellation_goals = goal_cancellation_evidence_reentry_goal_ids(context).intersection(
         str(goal.get("goal_id") or "") for goal in authoritative_goals
     )
@@ -215,6 +226,12 @@ def validate_goal_responsibility_outcomes(
     # crossing the due instant during inference must not reinterpret its result.
     future_times = dict(future_goal_times) if future_goal_times is not None else future_goal_readiness_times(authoritative_goals)
     readiness_times = goal_readiness_times(authoritative_goals)
+    authored_times = planner_readiness_times(output, authoritative_goals, context or {})
+    for goal_id, due_ms in authored_times.items():
+        if goal_id in readiness_times and readiness_times[goal_id] != due_ms:
+            raise ValueError("Planner readiness contradicts retained typed readiness")
+        readiness_times[goal_id] = due_ms
+        future_times[goal_id] = due_ms
     for goal_id in cancellation_goals:
         future_times.pop(goal_id, None)
     for goal_id, due_ms in future_times.items():
@@ -237,7 +254,7 @@ def validate_goal_responsibility_outcomes(
             condition.goal_id not in future_times
             or readiness_times.get(condition.goal_id) != condition.due_at_ms
         ):
-            raise ValueError("scheduled response requires an exact typed ready_at binding")
+            raise ValueError("scheduled response requires an exact retained or source-bound Planner readiness condition")
     if future_times and set(future_times) == {str(goal.get("goal_id") or "") for goal in authoritative_goals}:
         if output.steps or output.cancel_activity_ids or output.user_confirmation_required:
             raise ValueError("waiting acknowledgement cannot authorize or mutate current Work")
@@ -1722,6 +1739,30 @@ def validate_user_supplied_parameter_provenance(
     if output.disposition not in {"execute", "mixed"}:
         return
 
+    steps = {step.step_id: step for step in output.steps}
+    goals = {goal.get("goal_id"): goal for goal in authoritative_goals}
+    for resolution in output.parameter_resolutions:
+        if not resolution.source_quote:
+            continue
+        step = steps.get(resolution.step_id)
+        if (
+            resolution.strategy not in {"semantic_realization", "user_supplied"} or step is None
+            or not resolution.source_goal_ids
+            or not set(resolution.source_goal_ids).issubset(step.source_goal_ids)
+            or any(
+                goal_id not in goals or not intent_source_quote(
+                    resolution.source_quote, outcome=str(goals[goal_id].get("description") or ""),
+                ) for goal_id in resolution.source_goal_ids
+            )
+        ):
+            raise ValueError("Planner argument source must cite an exact owned Goal requirement")
+        if resolution.strategy == "user_supplied" and not (
+            semantic_numeric_values(resolution.value).intersection(semantic_numeric_values(resolution.source_quote))
+            or literal_intent_argument(resolution.value, outcome=resolution.source_quote, source_text=resolution.source_quote)
+        ):
+            raise ValueError("user_supplied argument must copy its cited source value; conversion is Planner realization")
+
+
     bindings_by_goal: dict[str, dict[str, dict[str, Any]]] = {}
     for goal in authoritative_goals:
         if not isinstance(goal, dict):
@@ -1731,7 +1772,7 @@ def validate_user_supplied_parameter_provenance(
             bindings_by_goal[goal_id] = _goal_binding_map(goal)
 
     for resolution in output.parameter_resolutions:
-        if resolution.strategy != "user_supplied":
+        if resolution.strategy != "user_supplied" or resolution.source_quote:
             continue
         value = resolution.value
         if (not isinstance(value, bool) and isinstance(value, (int, float, Decimal))) or (
@@ -1903,6 +1944,7 @@ def validate_external_response_evidence_boundary(
     # validate_goal_responsibility_outcomes has already required an exact typed
     # wake condition, zero Work, and honest unmet satisfaction for these Goals.
     readiness_times = goal_readiness_times(authoritative_goals) if output.time_conditions else {}
+    readiness_times.update(planner_readiness_times(output, authoritative_goals, context))
     waiting_goal_ids = {condition.goal_id for condition in output.time_conditions
                        if readiness_times.get(condition.goal_id) == condition.due_at_ms}
     unsupported -= waiting_goal_ids
@@ -2066,7 +2108,13 @@ def validate_explicit_numeric_parameter_grounding(
                 f"{resolution_location(resolution)}"
             )
 
-        if resolution.strategy != "user_supplied" or resolved_number is None:
+        quoted_retained_value = (
+            resolution.strategy == "semantic_realization" and bool(resolution.source_quote)
+            and bool(resolution.source_goal_ids)
+            and all(resolved_number in goal_numeric_values.get(goal_id, set())
+                    for goal_id in resolution.source_goal_ids)
+        )
+        if (resolution.strategy != "user_supplied" and not quoted_retained_value) or resolved_number is None:
             continue
         source_goal_ids = list(dict.fromkeys(resolution.source_goal_ids))
         if not source_goal_ids:
@@ -2078,6 +2126,13 @@ def validate_explicit_numeric_parameter_grounding(
             goal_id
             for goal_id in source_goal_ids
             if resolved_number not in goal_numeric_values.get(goal_id, set())
+            and not (
+                goal_id in step.source_goal_ids
+                and resolved_number in semantic_numeric_values(resolution.source_quote)
+                and any(goal.get("goal_id") == goal_id and intent_source_quote(
+                    resolution.source_quote, outcome=str(goal.get("description") or ""),
+                ) for goal in authoritative_goals)
+            )
         ]
         if unsupported_goal_ids:
             unsupported_user_numeric_resolutions.append(
@@ -2454,7 +2509,8 @@ def normalize_mechanically_derivable_parameter_provenance(
         if existing_indexes:
             index = existing_indexes[0]
             existing = resolutions[index]
-            if not isinstance(existing, dict) or existing.get("blocking") is True:
+            if (not isinstance(existing, dict) or existing.get("blocking") is True
+                    or existing.get("source_quote")):
                 continue
             mechanically_owned_fields = {
                 name: expected[name]

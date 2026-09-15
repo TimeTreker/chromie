@@ -28,15 +28,8 @@
               "responsibilities": [
                 {
                   "local_ref": "r1",
-                  "outcome": "告知用户重庆今天的天气、冷热和降雨情况",
-                  "bindings": {
-                    "location": "重庆",
-                    "time_scope": "today",
-                    "attribute": "weather, temperature, rain"
-                  },
+                  "outcome": "你好，今天重庆天气咋样？热不热，下雨了没？",
                   "confidence": 0.96,
-                  "relationship": "new",
-                  "target_goal_ids": [],
                   "output_mode": "information",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
@@ -57,12 +50,7 @@
         "responsibilities": [
           {
             "local_ref": "r1",
-            "outcome": "告知用户重庆今天的天气、冷热和降雨情况",
-            "bindings": {
-              "location": "重庆",
-              "time_scope": "today",
-              "attribute": "weather, temperature, rain"
-            },
+            "outcome": "你好，今天重庆天气咋样？热不热，下雨了没？",
             "confidence": 0.96,
             "output_mode": "information"
           }
@@ -82,15 +70,8 @@
               "responsibilities": [
                 {
                   "local_ref": "r1",
-                  "outcome": "告知用户河南省内乡县现在是否下雨",
-                  "bindings": {
-                    "location": "河南省内乡县",
-                    "time_scope": "today",
-                    "proposition": "rain"
-                  },
+                  "outcome": "那个河南省内乡县现在下雨了没有？",
                   "confidence": 0.97,
-                  "relationship": "new",
-                  "target_goal_ids": [],
                   "output_mode": "information",
                   "source_evidence": {
                     "source_start_token_ref": "t0",
@@ -111,12 +92,7 @@
         "responsibilities": [
           {
             "local_ref": "r1",
-            "outcome": "告知用户河南省内乡县现在是否下雨",
-            "bindings": {
-              "location": "河南省内乡县",
-              "time_scope": "today",
-              "proposition": "rain"
-            },
+            "outcome": "那个河南省内乡县现在下雨了没有？",
             "confidence": 0.97,
             "output_mode": "information"
           }

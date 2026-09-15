@@ -1,6 +1,168 @@
 # Chromie Latest Handoff
 
-## Source-backed lightweight handoff delivery — 2026-09-15 (current)
+## Intent ownership and capability library delivery — 2026-09-16 (current)
+
+Owner authorized implementation and commit/push. Repo `/home/chromie/github/chromie`,
+branch `main`, pre-delivery base `6fca5be2b590a4b1ca83d49fb197cdd74b50b2d0`.
+Resume from the latest commit containing this handoff and DEVELOPMENT_CHECKPOINT.md.
+Fetch was repeated before delivery with 0/0 divergence; never force-push. Paired
+Soridormi remains `codex/turn-count` at
+`fa6331f1344ce26154b197ca7d7c49badea292ad`; its dirty playground content is untouched.
+Prior source-unchanged baselines and rejected experiments below are historical.
+
+### Delivered boundary and remaining failure
+
+GI owns complete intent plus provider-neutral result type/source evidence; no
+capability arguments or Goal relationships. GA owns continuity and new Goal refs;
+Host inherits GI text/type. Fast/Deep own realization and time conditions. Fast has
+all-capability index plus full common contracts and one bounded missing-detail
+lookup before a complete Plan. SC owns words/Social Attention and existing highest
+request priority; any relevant owner can supply communication facts. The checkpoint
+contains the actual concurrent module I/O, regression mechanism and claim limits.
+
+**Native qualification still fails.** Latest SID `888a52e9`: GI and GA preserve the
+complete compound; Fast now emits the explicit source map but decorates quotes with
+canonical-DTO notation, omits speed/yaw provenance, and chooses negative yaw for
+left. SC returns silence with incorrect task-state/control reasoning. Host rejects
+before Work; zero body calls, safe idle true. No acknowledgement or live execution
+success is established. Do not strip/repair quotes or override the direction in Host.
+Next semantic work starts from these retained packets and frozen role contrasts.
+
+N = `.chromie/acceptance/intent-authority-20260916/` (local ignored evidence):
+
+- `canonical-r19.log`: **3,461 tests / 1,017 subtests, 145 benchmarks, 20 legacy**
+  pass; policy, ownership, static, configuration and docs included; two existing
+  FastAPI warnings. `focused-r19.log`: 246 tests / 68 subtests.
+- `workflow-strict-r19/summary.json`: **6,000/6,000** declared outcomes, aggregate
+  source unchanged; counts 1,400 pass / 1,800 observed state / 2,500 expected
+  rejection / 300 expected nonexecuting rejection. Manifest
+  `9ebcef14e70dfab229441fc6a38ed7b3a793fcbe8c96efd09c581befccff6449`.
+  `level-a-r19/summary.json`: **45/45**, all 15 ability classes. Subsequent changes
+  finalize documentation only; final documentation/policy checks are retained below.
+- `asset-contract-migration.json`, `primary-intent-migration.json`,
+  `ga-test-migration.json`, `workflow-freeze-ledger.json`, `seed-migration.json`
+  record authorized wire/reference migration with original inputs, contrast sets,
+  splits and provider/safety outcomes retained. Four readiness fault families move
+  GI → Planner. Strict ModelReplay request comparison is unchanged.
+- `retained-goal-reference-limitations.json`: 200 of 1,500 GA references are explicit
+  Schema/DTO-valid Host rejections for old typed-state updates. Use an explicitly
+  sourced replacement Goal; do not preserve stale typed parameters. The other
+  1,300 are Host-accepted references. None is native-model/training qualification.
+- `native-gi-r5/adjudication.json`: **19/24 semantic, 24/24 mechanical**. R6 is
+  rejected (14/24 semantic), R5 prompt restored. `native-ga-current/summary.json`:
+  **24/24 native new-Goal** transactions using controlled correct GI input; no
+  native continuity or 1,500-case GA claim. Reviews are non-independent.
+- `live/`, `live-r16/`, `live-r19/`: three complete discovered 51-case invocations,
+  each stopped at first hard failure, **0/1, 50 unrun**. Native packets and all-call
+  adjudication are in `live-native/`, `live-r16-native/`, `live-r19-native/`.
+  Exactly one bundle per stopped aggregate, respectively:
+  `/home/chromie/Downloads/chromie_debug_bundle_20260916_014540.tar.gz`,
+  `/home/chromie/Downloads/chromie_debug_bundle_20260916_032148.tar.gz`,
+  `/home/chromie/Downloads/chromie_debug_bundle_20260916_033536.tar.gz`.
+  Raw private evidence is not committed or suitable for publication without review.
+- `runtime-identity-r19.json`: identity
+  `cb8d923a51850ad769e0682de783c207b54a1021d814f15cf24a58414406c32f`,
+  evaluated dirty source tree
+  `f5186e4b63d08d2bce868e3ec0a8a098314fc6e2bc3fb677fcd954d0f021ca58`;
+  `evaluated-r19.patch` retains tracked changes before final handoff edits.
+  `agent-source-r19.json`: checkout/container both
+  `1a59ecdb05fe8bbc9decac004e168f7f9e8f657c76b770942fb3eb910fc54894`.
+
+### Runtime and cross-machine resume
+
+Local RTX 4090 Laptop, Ollama 0.33.2 / Qwen3.5 4B, existing interactive
+voice_mujoco profile. GI context/output 16384/512; GA 32768/2048;
+Fast/Deep 49152/4096; SC 49152/1024, temperature 0, top_p 0.9, think false.
+Configured priority does not establish Ollama preemption or a 2-second response.
+Remote Gemma evidence remains unavailable here. No profile or training promotion.
+Newly source-based waiting supports all selected Goals waiting; mixed new
+waiting/ready Goals need further qualification. #24/#32 remain open.
+
+After retained safe idle, the owned headless simulator/MCP launcher was terminated;
+those containers stopped. Agent/ASR/LLM/TTS remain healthy, no Host Orchestrator.
+No physical microphone, speaker or robot session occurred. TTS warm-up/harness audio
+was discarded. Existing owner microphone/ASR acceptance is unchanged.
+
+Reproduce using fresh evidence directories; preserve local work and fetch first:
+
+```bash
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir /tmp/chromie-intent-next-replay
+python scripts/general_ability_acceptance.py --mode level-a --evidence-dir /tmp/chromie-intent-next-level-a
+```
+
+For another automated aggregate, start `./scripts/start_soridormi_mujoco.sh
+--no-viewer` from the paired repo, then `./scripts/start_chromie.sh --no-orchestrator
+--keep-services` from Chromie. Verify `python scripts/capture_runtime_identity.py
+--verify-agent-source chromie-agent`; rebuild through `./scripts/start_voice_mujoco.sh
+--build` for a personal supervised voice session when source differs.
+For headless automation, capture a fresh identity with `--orchestrator-env
+.chromie/voice-runtime/orchestrator.env --capability-manifest capabilities/soridormi.json
+--compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml --allow-dirty
+--output NEW/runtime-identity.json`. Source the generated Orchestrator environment,
+then run `python scripts/general_ability_acceptance.py --mode live-text --stage
+must_pass --execute --soridormi-repo /home/chromie/github/soridormi --runtime-identity
+NEW/runtime-identity.json --evidence-dir NEW/live`. Keep one source/deployment for
+all cases; collect exactly one debug bundle after completion or hard stop and review
+every attempted case. Final native failure is retained, not converted to a pass.
+
+
+## Cross-machine resume baseline — 2026-09-15 (historical)
+
+Owner requested upstream update and continued development. Fetched both remotes;
+Chromie `main` is already `6fca5be2b590a4b1ca83d49fb197cdd74b50b2d0`, Soridormi
+`codex/turn-count` is `fa6331f1344ce26154b197ca7d7c49badea292ad`, both current.
+No merge or stash was needed. Preserve Soridormi's local playground-submodule
+content and uninitialized Mini Runtime submodule. No commit/push was performed.
+Only this handoff, checkpoint and Status gain the new evidence state.
+
+R = `.chromie/acceptance/resume-20260915-6fca5be2/` (local, ignored):
+
+- `canonical.log`: 3,510 tests / 1,164 subtests, 145 benchmarks, 20 legacy tests;
+  policy, ownership, static, configuration and documentation gates pass; two
+  existing FastAPI warnings. `level-a/`: 45/45. `workflow/summary.json`: all
+  6,000 expected outcomes, source unchanged, manifest
+  `31ff225d1b84ab34946d135e420c48664ff23f369c07f4fb814ed9f563768083`.
+- `agent-build.log`, `services-start.log`, `agent-source.json`: stale Agent rebuilt
+  and recreated; host/container digest both
+  `eb3839ab3ac4c6b283b6c569ff691d5be3a8867724d325324ba4a99a61ca3a7a`.
+- `runtime-identity.json`: clean evaluated revision, identity
+  `3a88193a0a59d954a0e869679e3ae0e9729fd0eff718aa5afcbd5a74d6a5aad5`;
+  RTX 4090 Laptop, interactive voice_mujoco profile, Ollama 0.33.2 / Qwen3.5 4B.
+  `ollama-models.json` retains installed model digests. This is not the remote
+  Gemma profile. Subsequent documentation edits are outside that clean identity.
+- `live-manifest.json`, `live/`, `live.log`: one discovered 51-case must-pass
+  invocation with execution enabled and discarded audio; first case failed,
+  50 unrun. `native-calls.json` and `adjudication.json` retain/review GI primary,
+  source-based Deep, GA and late SC outputs. Fast advance was cancelled without
+  a completed raw response. See checkpoint for actual module I/O and attribution.
+- Exactly one aggregate bundle:
+  `/home/chromie/Downloads/chromie_debug_bundle_20260915_232529.tar.gz`;
+  `debug-bundle.log` records collection. Private evidence is not publishable raw.
+
+The owned headless Soridormi launcher was stopped after retained safe idle.
+Agent/ASR/LLM/TTS services remain available with refreshed local configuration;
+no Host Orchestrator or physical microphone/speaker session was started. Startup
+TTS synthesis discarded PCM. Previous manual microphone/ASR acceptance is unchanged.
+The native GI/GA failures remain unresolved; no experimental prompt was restored,
+model replaced, validator weakened, or training reference promoted.
+
+Resume by fetching/checking both branches, preserving local work, and inspecting
+R/`adjudication.json`. Reproduce source checks using new evidence directories.
+For personal voice testing use `./scripts/start_voice_mujoco.sh`; packaged Agent
+source matches the current executable checkout. For another automated baseline,
+start Soridormi headless, use `./scripts/start_chromie.sh --no-orchestrator
+--keep-services`, verify packaged source and capture a fresh runtime identity.
+Run `scripts/general_ability_acceptance.py --mode live-text --stage must_pass
+--execute` with the current generated Orchestrator environment, explicit identity,
+paired repository and a new evidence directory. Keep one source/runtime throughout,
+collect exactly one bundle at completion/hard stop, and judge every attempted case.
+GI remains the earliest semantic failure; a downstream GA quantity-format repair
+alone cannot establish whole-transaction correctness. No new qualification claim.
+
+## Source-backed lightweight handoff delivery — 2026-09-15 (historical)
 
 Owner authorized commit/push and asked to finish quickly. Deliver the validated
 interface changes and earlier completed engineering work; do not continue tuning.

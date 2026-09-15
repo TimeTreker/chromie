@@ -55,34 +55,33 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
 
 
+CAPABILITY_LOOKUP_PROMPT = (
+    "You have complete common Capability contracts and an index of the available library. "
+    "If planning needs another Capability's details, return only requested_capability_ids "
+    "with exact index IDs, up to eight in one batch, before authoring any Plan. "
+    "The Host supplies their full contracts with the original source context. One lookup "
+    "batch is allowed; after it, produce the complete Plan or the existing non-executing "
+    "outcome. Never guess missing schemas or use a lookup to revise a completed decision. "
+    "An uncommon Capability does not itself require Deep Planner. Restricted entries "
+    "remain restricted. Catalog lookup authorizes no execution. "
+)
+
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
-    "Treat an explicit numeric value in authoritative Goal text or a typed "
-    "Goal binding as a "
-    "user-supplied candidate for the matching catalog argument. When "
-    "the value and units are unambiguous and the value is within the "
-    "catalog schema, copy it exactly; never silently replace it with "
-    "a schema default or describe it only in prose. Select a capability "
-    "whose argument schema can represent the supplied value. Catalog enum labels "
-    "never preserve an explicit quantitative pace merely because an "
-    "enum sounds qualitatively similar; when the Goal supplies a numeric pace or "
-    "velocity, select a qualified numeric argument and put that exact value there. "
-    "Catalog defaults are only for parameters the user did not supply. If the "
-    "units, argument mapping, or validity are uncertain, clarify or "
-    "escalate according to the planner tier instead of claiming exact "
-    "coverage. A material adjustment must use a non-exact plan_relation, "
-    "require confirmation, and explain the change. The model owns the exact "
-    "argument value and source_goal_ids on its executable step. Trusted code "
-    "mechanically projects the duplicate user_supplied parameter provenance "
-    "only when that argument has one exact owning Goal source; the model need "
-    "not restate that derivable proof. A typed binding is the model-owned canonical "
-    "provenance for a quantity stated in words by the user. Never borrow a numeric "
-    "literal or typed binding from "
-    "a sibling Goal to fill another step. When an optional catalog argument was not "
-    "supplied by the owning Goal, omit that argument and its resolution so the "
-    "provider applies its declared default, or copy the exact catalog default with "
-    "strategy=schema_default and no source_goal_ids. Never label a catalog default "
-    "as user_supplied. "
-    "do not copy, paraphrase, or annotate Goal text into another field. "
+    "Planner owns decomposition of complete intent into Activities, Capability choice, "
+    "arguments, units, defaults, dependencies and scheduling. GI supplies complete "
+    "natural-language intent, not an argument table. Preserve every requested action, "
+    "modifier and relation. One Responsibility may require several Activities. "
+    "Use exact numeric values when the Capability units agree; normalize number words "
+    "and units only when the interpretation and conversion are unambiguous. Never "
+    "substitute a default for an explicit requested value. For an intent-derived "
+    "argument, cite its exact owning intent excerpt: argument_sources[parameter] in "
+    "Fast Activities; source_quote with strategy=semantic_realization and exact "
+    "source_goal_ids in a canonical Plan parameter_resolution. The citation records "
+    "provenance; you remain responsible for correct mapping, conversion and coverage. "
+    "Existing typed Goal constraints remain binding and cannot be overridden by a "
+    "quote. Omit unspecified optional inputs or use their declared schema_default. "
+    "Never borrow a sibling Goal's values. Missing consequential input must use "
+    "a genuine Planner gap or the declared depth path, without invented Work. "
 )
 
 # Planner prompt/projection mechanics only. This module does not invoke a model,
@@ -283,7 +282,10 @@ def _canonical_work_prompt(
         projections, None, label=tier + " Planner complete Work facts",
     ))
     sections.append(
-        "\n" + PLANNER_WORK_AUTHORITY_PROMPT +
+        "\n" + PLANNER_WORK_AUTHORITY_PROMPT + CAPABILITY_LOOKUP_PROMPT +
+        "Capability library index JSON:\n" + required_json(context.get("capability_index", []), None, label="Capability index") +
+        "Loaded capability details JSON:\n" + json.dumps(context.get("capability_details_loaded", [])) +
+        "\nTrusted admitted clock JSON:\n" + json.dumps((context.get("user_turn_envelope") or {}).get("received_at")) +
         "Read output_mode as provider-neutral WHAT, not permission or an execution lane. "
         "Ordinary language generation, creative/social responses and answers grounded in "
         "supplied context use respond with no Capability: SC will compose the actual words. "
@@ -357,12 +359,16 @@ def _canonical_work_prompt(
         "Only the exact recoverable Runtime binding plus explicit retryable provider outcome may "
         "justify retrying failed Work; nonretryable does not itself mean unsafe. Cancellation "
         "attempts, resource release and speech completion are not physical stop Evidence.\n"
-        "Future ready_at uses its exact typed due_at_ms in time_conditions. While not yet due, "
+        "Planner owns new scheduling interpretation. For new future readiness, time_conditions "
+        "must cite the exact owned time phrase in source_quote and realize due_at_ms. An exact "
+        "ISO timestamp must retain its timezone and instant; relative time requires the supplied "
+        "Gateway received_at clock. Missing timezone/clock is a real input gap. For retained "
+        "ready_at, copy its exact typed due_at_ms. While not yet due, "
         "respond with no current Goal-owned steps and retain its future requirement as unmet; "
         "a timer cannot postpone an already executable step. Never parse deadlines into fake "
         "capabilities or put executable scheduling in prose.\n"
         + (
-            "Fast may author at most one executable step per Goal. If HOW requires unresolved "
+            "Fast may compose at most four executable steps per Goal. If HOW requires unresolved "
             "composition, delegate once with escalate, no steps, no committed outcome or "
             "communication, and an explicit unresolved need for every scoped Goal. Existing "
             "Capabilities remain present when composition is the gap; do not call them missing. "
@@ -409,13 +415,13 @@ def fast_advance_layered_prompt(
         "needs, mixed when distinct Responsibilities require different roles, or escalate. "
         "complete_response establishes a context-grounded speech obligation, never delivered speech; "
         "include its rationale. clarification supplies typed information_gaps, never wording. "
-        "Only ordinary speech Responsibilities admit complete_response; information acquisition, "
+        "Ordinary speech admits complete_response; a mixed-mode other Responsibility may include it only alongside its Capability Work; information acquisition, "
         "physical/durable effects, vocal performance and media need their qualified providers. "
         "Do not confuse the person's intended activity with a robot action. "
         "Match each whole requested outcome against Capability semantic_scope, effects and "
         "resource_contract; select only a complete realization with valid arguments. "
         "A prerequisite is not fulfillment. If several steps are needed "
-        "and no listed Capability owns the complete workflow, delegate once to Deep before dispatch; "
+        "compose them within the Fast budget or delegate once to Deep before dispatch; "
         "never mark a partial first action as complete or leave intended later Work only in reason_summary. "
         "Preserve every numeric and named binding through declared argument_realization; "
         "repetition requires a supported count argument. A required non-numeric string may "
@@ -453,9 +459,11 @@ def fast_advance_layered_prompt(
         "language": request.language,
         "situation": situation_prompt_projection(context),
         "capabilities": fast_advance_streaming_capability_prompt_projection(capabilities),
+        "capability_index": context.get("capability_index", []),
+        "capability_details_loaded": context.get("capability_details_loaded", []),
     }
     rendered = (
-        role_memory_context(context, role="planner") + contract
+        role_memory_context(context, role="planner") + contract + EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT + CAPABILITY_LOOKUP_PROMPT
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
         + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context)
@@ -479,34 +487,12 @@ def _normalized_sibling_refs(value: Any) -> list[str]:
 def fast_responsibility_decision_projection(
     responsibilities: list[CognitiveResponsibilityProposal],
 ) -> list[dict[str, Any]]:
-    """Project GI WHAT into a small, local Planner coverage/scheduling table.
-
-    This is a lossless mechanical rearrangement of already-authoritative GI fields.
-    It neither selects a Capability nor changes a relation.  Keeping relation edges
-    beside their owner makes the model's coverage and timing choice local instead of
-    asking it to recover those constraints from a large DTO plus two schemas.
-    """
-
-    projected: list[dict[str, Any]] = []
-    relation_names = ("before", "after", "parallel_with")
-    for responsibility in responsibilities:
-        bindings = dict(responsibility.bindings or {})
-        relations = {
-            name: _normalized_sibling_refs(bindings.pop(name, None)) for name in relation_names
-        }
-        projected.append(
-            {
-                "ref": responsibility.local_ref,
-                "outcome": responsibility.outcome,
-                "output_mode": responsibility.output_mode,
-                "semantic_bindings": bindings,
-                "relations": relations,
-                "goal_relationship": responsibility.relationship,
-                "target_goal_ids": list(responsibility.target_goal_ids),
-                "terminal_owner_required": responsibility.output_mode != "speech",
-            }
-        )
-    return projected
+    """Pass complete owned intent without imposing an Activity count or lane."""
+    return [
+        {"ref": item.local_ref, "outcome": item.outcome, "output_mode": item.output_mode,
+         "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None}
+        for item in responsibilities
+    ]
 
 
 def fast_advance_semantic_capability_projection(
@@ -535,13 +521,10 @@ def fast_advance_streaming_capability_prompt_projection(
     arguments against that authoritative catalog after the JSON document is parsed.
     """
 
-    semantic_projection = fast_advance_semantic_capability_projection(capabilities)
     return [
-        {
-            **semantic,
-            "args_schema": dict(capability.get("input_schema") or {}),
-        }
-        for semantic, capability in zip(semantic_projection, capabilities)
+        {**{key: value for key, value in capability.items() if key != "input_schema"},
+         "args_schema": dict(capability.get("input_schema") or {})}
+        for capability in capabilities
     ]
 
 

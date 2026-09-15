@@ -41,15 +41,8 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "tell the user whether it will rain today at their intended location",
-        "bindings": {
-          "date": "today",
-          "question": "rain"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.84,
         "output_mode": "information"
       }

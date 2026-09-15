@@ -141,7 +141,7 @@ running.
 | `POST` | `/capabilities/search` | Return a bounded model-neutral catalog view for inspection; it never scores language, suggests an ordinary route, or selects agents. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog LLM context; `text` is accepted at the interface but does not filter capabilities. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
-| `POST` | `/fast-plan` | Produce a complete common-catalog `CanonicalPlan` or terminal Deep Planner escalation. |
+| `POST` | `/fast-plan` | Produce a complete `CanonicalPlan`, with one optional indexed capability-detail read before planning, or terminal Deep escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`; only one mechanical DTO regeneration is permitted. |
 | `POST` | `/social-cognition` | One interaction-planning transaction for trusted GI, Goal, Work, Evidence and Situation snapshots. Preserves pending communication obligations, exact acts and optional eligible expression; no task Work or Goal mutation. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
@@ -179,8 +179,12 @@ whether this independent selection boundary is enabled plus its model and candid
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
-Fast Planner uses unlocked `common` entries for its bounded low-latency catalog;
-Deep Planner may use the full qualified catalog. Goal Interpretation remains WHAT-only
+Fast Planner receives full unlocked `common` contracts and an index of every
+entry, including unavailable and locked entries. Before its complete Plan it may
+request one batch of 1–8 unique indexed IDs using `requested_capability_ids`; the
+Host supplies unlocked contracts and reruns the original context once. A lookup
+contains no candidate Plan, cannot repeat, and never authorizes unavailable or
+restricted execution. Deep Planner may use the full qualified catalog. Goal Interpretation remains WHAT-only
 and does not gain Capability-selection authority from catalog projection. Safety-locked
 entries remain visible in the full catalog but are excluded from the fast
 common prompt even when an experience overlay requests `common`. The initial
@@ -188,10 +192,10 @@ preset is data in `capabilities/prompt_tiers.json`, not a Python skill list.
 `chromie.speak` remains a trusted Vocal transport capability, but the Goal-driven
 Fast and Deep Planner schemas exclude it as a task-plan response-transport leaf. A mixed
 conversational/body turn may use a goal-scoped `respond` outcome plus executable
-body steps, and executable planner outcomes may carry prospective
-`response_text` for a new conversational delta. The Planner's Communicative
-Activity coordinates final delivery against Interaction Context; none of that speech authorizes or
-proves the body effect. Search scores are relevance signals for catalog
+body steps, and executable planner outcomes carry word-free communication Needs. SC owns
+exact wording and Social Attention expression, including whether to speak, act
+nonverbally or stay silent; neither communication nor catalogue visibility proves
+or authorizes the requested effect. Search scores are relevance signals for catalog
 inspection endpoints, not Goal Interpretation execution authorization.
 
 `POST /agent-skills/disclose` accepts a previously validated selection and loads
@@ -242,11 +246,13 @@ establish complete units, correct typing or Responsibility coverage.
 
 Planning `InformationGap` creation/resolution, execution-input completeness, blocking
 status, source/default selection, and clarification selection belong to Fast Planner.
-GI carries only Responsibility meaning, Goal relation, and bounded unresolved meaning;
+GI carries complete Responsibility meaning, requested result type, source evidence
+and bounded unresolved meaning. GA owns Goal relations;
 its maintained schema contains no planning-gap or resolution-policy fields.
 
 `POST /fast-advance` consumes the authoritative user turn plus contextual Responsibility
-evidence and makes exactly one streaming model invocation. The response media type is
+evidence and makes one complete planning invocation, optionally preceded by the
+bounded catalog-detail lookup. Neither call receives a candidate Plan to repair. The response media type is
 `application/x-ndjson`. Its ordered typed frames are:
 
 One `FastPlannerStreamTerminal` (`frame_type=terminal`) is emitted only after the

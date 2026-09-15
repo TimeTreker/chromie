@@ -91,15 +91,13 @@ class ResponsibilitySourceEvidence(BaseModel):
 
 
 class CognitiveResponsibilityProposal(BaseModel):
-    """Context-bound WHAT understood by Goal Interpretation.
+    """Complete human intention and expected result type understood by GI.
 
-    The Responsibility remains provider-neutral and contains no Activity/Work,
-    Capability, provider, execution, realization, or response wording.  It does,
-    however, preserve the current turn's model-authored relationship to supplied
-    Goal context so a short clarification answer can update the Responsibility it
-    actually belongs to instead of becoming an isolated turn. Planning
-    InformationGaps, their blocking state, and their resolution strategy belong to
-    Planner. Goal Association remains the sole canonical Goal-state commit boundary.
+    Live GI supplies natural-language meaning and current-turn provenance only.
+    Planner selects Capabilities, realizes parameters and decomposes Activities.
+    GA alone selects canonical Goal relationships; SC owns communication wording.
+    Retained typed fields below describe existing persisted sources, not permission
+    for the live GI decoder to author parameter or continuity contracts.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -110,13 +108,9 @@ class CognitiveResponsibilityProposal(BaseModel):
         min_length=1,
         max_length=500,
         description=(
-            "Exactly one independently satisfiable provider-neutral human outcome "
-            "Chromie still owes. Never combine two requested positive effects merely "
-            "because the user coordinates them with while, simultaneously, at the "
-            "same time, a conjunction, or an equivalent construction; each effect "
-            "that can be independently accepted or rejected requires its own sibling "
-            "Responsibility. Preserve material details and their attachment in the "
-            "complete outcome; optional duplicate classification is not required. Preserve the "
+            "Complete provider-neutral user intent, including every material detail, "
+            "condition and relation. A compound request may remain one outcome; "
+            "Planner owns its Activity decomposition. Preserve the "
             "requested answer or judgment and proposition polarity: a question about "
             "whether P is true must not be rewritten as the assertion that P is true. "
             "For conversational speech, describe the communicative obligation or "

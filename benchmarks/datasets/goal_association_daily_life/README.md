@@ -13,14 +13,17 @@ expanded into the same 15-member Goal-continuity contrast set. Unlike the GI cor
 every case supplies a production-shaped `CognitiveWorkRequest` containing accepted GI
 Responsibilities and bounded existing/recent Goal state.
 
-The owner-authorized [#39](https://github.com/TimeTreker/chromie/issues/39) contract
-migration removes model-authored new-Goal descriptions and replaces
-`updated_description` with source-referenced requirement selection. Case inputs,
-semantic expectations, splits and review status are unchanged; the manifest digest
-identifies the migrated wire references. This is mechanical reference migration,
-not fresh model inference. Original references are retained in local Issue evidence
-and the prior Git revision. Merge/split references test model representation only;
-the runtime still rejects their unimplemented state transactions.
+The owner-authorized intent-only migration keeps complete GI outcomes and the
+existing expected result type as new Goal authority. GA's model output contains
+source refs and continuity IDs; it no longer extracts capability/resource fields.
+Input text, retained Goal snapshots, contrast sets and splits remain frozen.
+
+Two hundred retained typed-state update references (100 modify and 100 clarification
+answers) are explicit `accept_host_reject` cases. Their JSON/Schema/DTO remains valid,
+but the transition must fail closed because new GI supplies no replacement typed
+binding provenance. A complete source-backed replacement Goal is required; preserving
+stale resource/parameter fields would be incorrect. Their original intended continuity
+references stay visible as known contract limitations, not successful updates.
 
 The corpus covers new creation, continue, modify, clarification answers, confirm,
 reject, cancel, pause, resume, terminal reference, replacement, unrelated new work,
@@ -38,9 +41,10 @@ python benchmarks/datasets/goal_association_daily_life/validate.py
 The validator discovers all 1,500 separate scenario files, reconstructs each production
 decoder Schema, checks the accepted reference DTO through the real
 `GoalAssociationResolver`, verifies Responsibility conservation and contrast membership,
-and binds the complete sorted scenario tree to the manifest digest. All 1,500 references,
-including the 100 mixed continuity-plus-creation cases, must pass the exact dynamic
-Schema, model DTO, resolver conservation checks, and canonical Host DTO.
+and binds the complete sorted scenario tree to the manifest digest. All 1,500
+references pass exact Schema/DTO checks: 1,300 must be Host-accepted and 200 must
+fail closed without a state transition. These include the 100 mixed continuity-plus-
+creation cases. A rejection cannot be counted as successful user-goal fulfillment.
 
 All scenarios remain `training_eligible=false` and lack independent semantic review.
 Mechanical validity does not qualify the prompt, a deployed model, service behavior,

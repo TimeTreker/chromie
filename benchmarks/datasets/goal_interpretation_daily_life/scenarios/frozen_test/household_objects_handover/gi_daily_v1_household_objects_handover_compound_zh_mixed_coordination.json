@@ -21,11 +21,7 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "outcome": "向后走",
-          "binding_items": {
-            "direction": "向后",
-            "duration": "4秒"
-          },
+          "outcome": "向后走4秒",
           "output_mode": "body_action",
           "confidence": 1.0,
           "source_evidence": {
@@ -35,10 +31,7 @@
         },
         {
           "local_ref": "r2",
-          "outcome": "眨眼",
-          "binding_items": {
-            "count": 3
-          },
+          "outcome": "眨眼3次",
           "output_mode": "body_action",
           "confidence": 1.0,
           "source_evidence": {
@@ -49,10 +42,6 @@
         {
           "local_ref": "r3",
           "outcome": "告诉爸爸工具已经放回抽屉",
-          "binding_items": {
-            "proposition": "工具已经放回抽屉",
-            "recipient": "爸爸"
-          },
           "output_mode": "speech",
           "confidence": 1.0,
           "source_evidence": {
@@ -61,8 +50,47 @@
           }
         }
       ],
-      "unresolved": [],
-      "coordination": [
+      "unresolved": []
+    },
+    "semantic_expectations": {
+      "responsibility_count": 3,
+      "responsibilities": [
+        {
+          "local_ref": "r1",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "走",
+            "移动"
+          ],
+          "required_intent_details": {
+            "direction": "向后",
+            "duration": "4秒"
+          }
+        },
+        {
+          "local_ref": "r2",
+          "output_mode": "body_action",
+          "outcome_contains_any": [
+            "眨眼"
+          ],
+          "required_intent_details": {
+            "count": 3
+          }
+        },
+        {
+          "local_ref": "r3",
+          "output_mode": "speech",
+          "outcome_contains_any": [
+            "告诉"
+          ],
+          "required_intent_details": {
+            "proposition": "工具已经放回抽屉",
+            "recipient": "爸爸"
+          }
+        }
+      ],
+      "unresolved": false,
+      "intent_order": [
         {
           "kind": "sequence",
           "refs": [
@@ -78,87 +106,33 @@
           ]
         }
       ]
-    },
-    "semantic_expectations": {
-      "responsibility_count": 3,
-      "responsibilities": [
-        {
-          "local_ref": "r1",
-          "output_mode": "body_action",
-          "outcome_contains_any": [
-            "走",
-            "移动"
-          ],
-          "required_bindings": {
-            "direction": "向后",
-            "duration": "4秒"
-          },
-          "forbidden_binding_keys": []
-        },
-        {
-          "local_ref": "r2",
-          "output_mode": "body_action",
-          "outcome_contains_any": [
-            "眨眼"
-          ],
-          "required_bindings": {
-            "count": 3
-          },
-          "forbidden_binding_keys": []
-        },
-        {
-          "local_ref": "r3",
-          "output_mode": "speech",
-          "outcome_contains_any": [
-            "告诉"
-          ],
-          "required_bindings": {
-            "proposition": "工具已经放回抽屉",
-            "recipient": "爸爸"
-          },
-          "forbidden_binding_keys": []
-        }
-      ],
-      "coordination": [
-        {
-          "kind": "sequence",
-          "refs": [
-            "r1",
-            "r2"
-          ]
-        },
-        {
-          "kind": "parallel",
-          "refs": [
-            "r2",
-            "r3"
-          ]
-        }
-      ],
-      "unresolved": false
     }
   },
   "invariants": {
     "one_semantic_authority_call": true,
-    "bindings_are_sparse_and_source_or_context_grounded": true,
     "source_evidence_is_current_turn_only": true,
-    "binding_keys_lexicographic": true,
     "must_not_emit_fields": [
       "actions",
       "activities",
+      "binding_items",
+      "bindings",
       "capability_id",
+      "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
       "plan",
       "provider_id",
+      "relationship",
       "response_text",
       "route",
       "skill_id",
+      "target_goal_ids",
       "task_id",
       "tool_name",
       "work_items"
-    ]
+    ],
+    "complete_intent_is_source_or_context_grounded": true
   },
   "adversarial_design": {
     "phenomena": [

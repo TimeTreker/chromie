@@ -15,57 +15,42 @@
           "气温",
           "温度"
         ],
-        "required_bindings": {
-          "location": [
-            "重庆"
-          ],
-          "time_scope": [
-            "今天"
-          ],
-          "threshold": [
-            "30度"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "time",
-          "duration",
-          "count"
-        ],
         "source_spans": [
           "重庆今天会超过30度"
+        ],
+        "required_intent_fragments": [
+          [
+            "重庆今天会超过30度"
+          ]
         ]
       }
     ],
     "coordination": [],
-    "unresolved": false
+    "unresolved": false,
+    "intent_relations": []
   },
   "contrast_set": "weather_explicit_threshold",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "determine whether 重庆 temperature exceeds 30度 today",
         "output_mode": "information",
+        "outcome": "重庆今天会超过30度吗？",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t8"
-        },
-        "binding_items": {
-          "location": "重庆",
-          "threshold": "30度",
-          "time_scope": "今天"
+          "source_end_token_ref": "t10"
         }
       }
     ],
-    "unresolved": [],
-    "coordination": []
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

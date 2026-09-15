@@ -189,6 +189,7 @@ class PlannerModelTimeCondition(BaseModel):
 
     goal_id: str = Field(min_length=1, max_length=160)
     due_at_ms: int = Field(ge=1)
+    source_quote: str = Field(default="", max_length=500, description="Exact owned Goal time phrase; required for newly interpreted future readiness.")
     reason_code: str = Field(
         default="planner_time_condition", min_length=1, max_length=120
     )
@@ -468,6 +469,7 @@ def materialize_planner_output(
                 condition_id=f"{plan_id}:time:{index}",
                 goal_id=condition.goal_id,
                 due_at_ms=condition.due_at_ms,
+                source_quote=condition.source_quote,
                 reason_code=condition.reason_code,
             ).model_dump(mode="python")
         )

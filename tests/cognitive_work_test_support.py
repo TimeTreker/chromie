@@ -79,3 +79,10 @@ async def social_fixture_response(adapter, *, plan, session_id, language, contex
     return await adapter.build_social_cognition_response(plan=plan, request=request,
         resolution=social_fixture_resolution(request, text), session_id=session_id,
         language=language, context=context)
+
+
+def ordinary_plan_schema(schema):
+    """Inspect the ordinary branch; callers retain the original for wire validation."""
+    if "anyOf" in schema and any(name.startswith("Waiting") for name in schema.get("$defs", {})):
+        return {**schema["anyOf"][0], "$defs": schema["$defs"]}
+    return schema

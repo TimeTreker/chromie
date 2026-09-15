@@ -51,22 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "aspect": "rain",
-            "location": "Chongqing",
-            "time_scope": "tonight"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Determine whether it will rain in Chongqing tonight.",
+          "outcome": "Determine whether it will rain in Chongqing tonight. (Tell me whether it will rain in Chongqing tonight.)",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -98,51 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [],
-          "media_operation": "none",
-          "output_mode": "information",
           "related_goal_ids": [],
-          "resource_kind": "information",
-          "resource_responsibility": {
-            "delivery_mode": "spoken_explanation",
-            "description": "Determine whether it will rain in Chongqing tonight.",
-            "information_domain": "weather_forecast",
-            "kind": "information",
-            "quantity": "",
-            "query_scope": [
-              {
-                "confidence": 1.0,
-                "entity_type": "information_aspect",
-                "name": "aspect",
-                "referent_id": "",
-                "value": "rain"
-              },
-              {
-                "confidence": 1.0,
-                "entity_type": "location",
-                "name": "location",
-                "referent_id": "",
-                "value": "Chongqing"
-              },
-              {
-                "confidence": 1.0,
-                "entity_type": "temporal_scope",
-                "name": "time_scope",
-                "referent_id": "",
-                "value": "tonight"
-              }
-            ],
-            "recipient": {
-              "description": "requester",
-              "referent_id": null
-            },
-            "source": {
-              "confidence": 1.0,
-              "referent_id": "",
-              "source_name": "",
-              "status": "provider_resolved"
-            }
-          },
           "source_responsibility_refs": [
             "r1"
           ],

@@ -591,6 +591,7 @@ class GoalAssociationModelGoal(BaseModel):
 
     source_responsibility_refs: list[str] = Field(min_length=1, max_length=1)
     output_mode: GoalOutputMode = Field(
+        default="other",
         description=(
             "Provider-neutral human outcome modality copied from Goal Interpretation. "
             "information says the person wants information; stateful_effect says the "

@@ -20,7 +20,8 @@
     "model_ability_evaluated": false,
     "training_eligible": false,
     "authoring_method": "GPT-6 Astra authored 60 contrasts; deterministic 4 actions × 5 values × 5 language forms expansion",
-    "independent_inference_per_case": false
+    "independent_inference_per_case": false,
+    "authority_migration": "GI preserves complete intent/type, GA inherits intent and owns continuity, Planner authors arguments and source-bound readiness."
   },
   "catalog": [
     {
@@ -408,9 +409,6 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t4"
-            },
-            "binding_items": {
-              "count": 2
             }
           },
           {
@@ -421,14 +419,10 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t4"
-            },
-            "binding_items": {
-              "count": 2
             }
           }
         ],
-        "unresolved": [],
-        "coordination": []
+        "unresolved": []
       },
       "role": "gi",
       "required_prompt_fragments": [
@@ -444,7 +438,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "020a3cb7f55dc9e80bfc872bc79b57af3d7e8cd35a6f2b04f9214221b708f8fc"
+              "$artifact": "4dd082f6a24a1d7600bcbd856e46ccfdc50a83dc98bc11dc3c966cea59591356"
             }
           },
           {
@@ -459,7 +453,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "f059f7014d94a490574e66e410934e05b59ea7f20ea9eeca5e8ab5b2e8d1307f"
+          "$artifact": "bd4541ed0dddf81d6bf3b1e2b1b1a9e246428e4039e2c75bfdddaf700482fb16"
         }
       }
     }
@@ -473,11 +467,14 @@
     }
   ],
   "expected_goal_status": "satisfied",
+  "social_cognition": {
+    "fast-initial": "Fixture response."
+  },
   "coverage_family": "gi_duplicate_ref",
   "contrast_set": "blink-1",
   "split": "train_candidate",
   "training_eligible": false,
-  "reference_review": "Astra-authored parameterized reference; non-independent review",
+  "reference_review": "Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.",
   "expected_verdict": "expected_rejection",
   "parameters": {
     "action": "blink",
@@ -497,6 +494,5 @@
   ],
   "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
   "probe": "gi_duplicate_ref",
-  "expected_rejection": "gi",
-  "social_cognition": {}
+  "expected_rejection": "gi"
 }

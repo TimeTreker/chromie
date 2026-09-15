@@ -51,20 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "situation": "my friend ignored me"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Listen supportively while the user discusses: my friend ignored me.",
+          "outcome": "Listen supportively while the user discusses: my friend ignored me. (my friend ignored me. Please listen for a moment.)",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -96,20 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "situation",
-              "name": "situation",
-              "referent_id": "",
-              "value": "my friend ignored me"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "speech",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

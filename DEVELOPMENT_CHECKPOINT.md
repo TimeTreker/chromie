@@ -1,6 +1,190 @@
 # Development Checkpoint
 
-## Source-backed lightweight GI handoff — 2026-09-15 (current)
+## Intent ownership and Fast capability library — 2026-09-16 (current)
+
+The owner authorized this implementation and commit/push after discussing the
+GI/GA/Planner/SC boundaries. Resume on `main` at the latest commit containing this
+checkpoint and HANDOFF.md; pre-delivery base is
+`6fca5be2b590a4b1ca83d49fb197cdd74b50b2d0`. Upstream was fetched before source work
+and again during validation, with 0/0 divergence. The preceding source-unchanged
+baseline and rejected experiments below are historical, not the current contract.
+
+### Implemented authority and contract
+
+- GI emits complete natural-language intent, existing provider-neutral `output_mode`,
+  source-token evidence, confidence and genuine unresolved meaning. It cannot author
+  capability fields, typed parameters, unit conversions, execution readiness, steps
+  or canonical Goal relationships. One complete compound Responsibility can own
+  several Planner Activities. Preserving `output_mode` prevents a body request being
+  mechanically accepted as a zero-Work answer; it is not a capability contract.
+- The same GI result enters concurrent SC, GA and Fast paths. SC owns words and
+  optional Social Attention, communicates each module's actual facts, and retains
+  the existing highest foreground request priority. Other owners may supply SC
+  communication needs. The local Ollama profile does not prove priority preemption
+  or the desired response deadline; independent dispatch is not a latency guarantee.
+- GA authors canonical Goal identity/continuity. New Goal results contain source,
+  related and superseded refs only; Host inherits the full GI intent and result type.
+  Planner owns Activities, capabilities, arguments, conversions and readiness.
+- Fast receives all capability index entries plus full common contracts. It may
+  request one batch of up to eight missing full contracts before its one complete
+  Plan, with the original context retained. No candidate Plan is executed or
+  semantically reviewed during lookup. Unknown/repeated/mixed requests and locked
+  or unavailable execution fail closed. Rare capability use alone does not require Deep.
+- Planner quotes exact owning intent for realized parameters/readiness. Host checks
+  ownership, values against retained typed constraints, capability schemas, clock
+  evidence, confirmation and execution safety. A matching quote is provenance,
+  not proof that a conversion or interpretation is semantically correct. Fast's
+  decoder exposes a closed source map for optional as well as required numeric
+  inputs; Host still rejects missing nondefault-value provenance. Defaults remain
+  provider-owned. Runtime binds quotes to exact new or retained Goal descriptions.
+- Source-based future waiting keeps Goals unmet and persists exact wake times;
+  current new waiting DTO covers all selected Goals. Mixed newly waiting/ready
+  Goals need separate qualification. Information acquisition alone cannot declare
+  the complete user outcome satisfied. Existing physical Work remains sequential.
+
+### Reference and evidence migration
+
+Inputs, contrast families, splits and provider/safety outcomes were retained while
+GI/GA wire references were deliberately migrated to the owner-approved authority.
+The 1,496 GI and 1,500 GA cases remain reference candidates, not native-model passes.
+Two hundred GA cases involving old typed Goals now explicitly expect Host rejection:
+an intent-only update cannot silently keep stale typed constraints. An explicitly
+sourced replacement Goal is required. Do not report these as successful updates.
+Five prototype episodes and 6,000 workflow packets were recaptured through the real
+role/Host path, then strictly replayed with unchanged request matching. Four readiness
+fault families (400 cases) now fail at Planner rather than requiring GI time fields.
+Retired tests that required GI/GA parameter authorship were replaced by current
+ownership/provenance regressions; retained typed conservation and execution guards
+remain covered. No native observed output was promoted into the reference answers.
+
+Native GI R5: 24/24 mechanical acceptance, 19/24 semantic acceptance; failures include
+missing referent uncertainty and mixed/physical result misclassification. R6 regressed
+to 14/24 and was rejected; the R5 prompt is retained. Controlled correct GI inputs
+through native GA pass 24/24 new-Goal transactions; this does not qualify continuity,
+old typed updates or the full 1,500-case native GA corpus. All reviews are same-task,
+non-independent. No training or model-profile promotion.
+
+### Final validation and actual deployed workflow
+
+Evidence root **N**: `.chromie/acceptance/intent-authority-20260916/` (local, ignored).
+`canonical-r19.log`: **3,461 tests / 1,017 subtests, 145 benchmark tests and
+20 legacy tests pass**, including policy, ownership, Ruff, mypy (34 files),
+configuration and docs; two existing FastAPI deprecation warnings.
+`workflow-strict-r19/summary.json`: **6,000/6,000 declared outcomes**, aggregate
+source unchanged: 1,400 pass, 1,800 observed states, 2,500 expected rejections,
+300 expected nonexecuting rejections. Manifest SHA256
+`9ebcef14e70dfab229441fc6a38ed7b3a793fcbe8c96efd09c581befccff6449`.
+`level-a-r19/`: **45/45**, 15 ability classes. `focused-r19.log`: 246 tests and
+68 subtests. Later edits only finalize documentation; docs/policy checks are rerun.
+
+Three immutable changed-source 51-case live-text/MuJoCo aggregate invocations
+(`live`, `live-r16`, `live-r19`) each stop on the first hard contract failure:
+**0/1 passed, 50 unrun**. Each has exactly one retained debug bundle, listed in
+HANDOFF.md. Current SID `888a52e9` uses verified Agent source
+`1a59ecdb05fe8bbc9decac004e168f7f9e8f657c76b770942fb3eb910fc54894`.
+All completed raw model responses and attempted cases were reviewed, including
+mechanical GI/GA passes. The final run is not a successful live execution proof.
+
+| Owner / actual boundary | Authoritative input → actual output / expected result | Verdict and next handoff |
+| --- | --- | --- |
+| Gateway | Exact text: walk ahead at 0.2 speed for 10 seconds, nod twice, then turn left; empty prior Goals → admitted unchanged. | Correct text ingress; microphone/ASR not invoked. |
+| GI primary | Source tokens t0..t19 → one complete body_action Responsibility r1, confidence 0.98, unresolved empty; no capability fields. | Correct for this episode; primary model 4.87s. Same accepted result dispatches to SC/GA/Fast. |
+| GA primary / Host Goal commit | r1 and no existing Goals → one source-only new Goal, related/supersedes empty; Host inherits full text/type. | Correct; primary 5.91s. Canonical Goal commit precedes the later Fast rejection. |
+| Concurrent SC primary | GI understood; no established Work/communication needs → silence. Rationale wrongly calls Work scheduled and treats low-level-control prohibition as inability to perform high-level Work. | Desired acknowledgement not delivered; primary 12.23s. Rationale is not spoken output. No social expression. |
+| Concurrent Fast primary | Complete r1, full common contracts and all-capability index → three sequential Activities, walk duration 10/speed 0.2, nod count 2, but negative yaw for left. Source values are decorated strings such as `source_quote: ... strategy=semantic_realization`, not exact excerpts; speed/yaw sources are absent. | First wrong task boundary; primary 21.95s, normal stop. The provider contract states positive yaw is left. No detail lookup was needed. |
+| Host validation / Runtime | Fast's first decorated duration quote → exact-owned-intent rejection before any Activity commit. | Correct containment, Runtime error; no canonical Deep planning or body provider invocation. No automatic stripping or semantic repair. |
+| Harness / Soridormi | Runtime failure → harness warning with discarded audio, zero body executions; safe idle true, empty lanes, no active task/fall/emergency. | Failure warning is not SC acknowledgement. Physical speaker/robot behavior remains unproven. |
+
+```mermaid
+flowchart LR
+  Input[Admitted text] --> GI[GI: complete r1]
+  GI --> SC[SC: silence]
+  GI --> GA[GA: one inherited Goal]
+  GI --> Fast[Fast: three Activities with invalid quotes]
+  GA --> Commit[Host: Goal commit]
+  Fast --> Reject[Host: reject before Work]
+  Reject --> Idle[Zero body calls; safe idle]
+```
+
+The originating source-unchanged SID `af612ec5` is retained in the historical
+baseline. Its earlier claim that merely grouping three actions was wrong is
+superseded: one complete compound is now explicitly allowed. False actor ambiguity,
+misplaced parameter authorship and downstream failures remain actual defects.
+The first changed-source attempt `cd5ab66a` omitted all argument sources. The
+required-only Schema correction still missed optional numeric inputs (`f587b6ba`).
+The final closed-map correction makes the field explicit and keeps default use
+valid; native output now includes the map, but its contents remain invalid.
+Shared Fast/canonical provenance prose is a possible contributor to notation
+confusion, not a proven sole cause. No prompt workaround was promoted from this
+one episode, no Host guard was relaxed, and wrong yaw/SC remain open.
+
+### Current claim boundary and next work
+
+This is an implementation/development delivery. Native semantic qualification,
+SC's first meaningful response, narrow supervised voice and #24/#32 target closure
+remain open. The remote Gemma evidence is not present on this laptop. Existing
+owner microphone/ASR acceptance is unchanged; automated text/MuJoCo and discarded
+TTS do not prove physical microphone, speaker or robot behavior.
+
+Continue from the latest retained aggregate diagnosis, keeping each owner's facts
+separate. Qualify optional-argument provenance, direction/unit realization and SC
+communication on frozen contrasts and one immutable complete live cohort. Do not
+repair upstream meaning in GA/Planner, add a second semantic reviewer, infer
+capabilities from hardcoded phrases, or call existing reference passes native proof.
+No new current document or runtime variable was added: 102 Markdown files,
+15 core reading-path documents and 381 configuration keys remain unchanged.
+
+
+## Cross-machine resume and current-source baseline — 2026-09-15 (historical)
+
+The owner requested an upstream update and continued development. Fetch verified
+clean Chromie `main` already at `6fca5be2b590a4b1ca83d49fb197cdd74b50b2d0` and
+paired Soridormi `codex/turn-count` at `fa6331f1344ce26154b197ca7d7c49badea292ad`,
+both equal to upstream. Preserve local playground-submodule content. This session
+changes operational/evidence state only; no executable source, prompt, Schema,
+model selection, reference output, commit or push changed.
+
+The stale local Agent was rebuilt and recreated through the maintained startup
+flow. Packaged and checkout Agent source now match. This machine uses the existing
+RTX 4090 Laptop / Ollama Qwen3.5 4B profile, not the other machine's Gemma cohort.
+The latest private remote evidence directories are absent here; their recorded
+results remain historical, not locally reproduced native evidence.
+
+Fresh canonical gate passes **3,510 tests / 1,164 subtests, 145 benchmarks and
+20 legacy tests** (two existing FastAPI warnings). Level A passes **45/45**.
+All **6,000** frozen replay outcomes pass with source unchanged: 1,400 workflows,
+1,800 state outcomes, 2,580 rejections and 220 nonexecuting rejections.
+
+The complete discovered 51-case must-pass text/MuJoCo cohort stopped on its first
+case, SID `af612ec5`: **0/1 passed, 50 unrun**. The source stayed fixed throughout.
+Input requested walking ahead at 0.2 speed for 10 seconds, nodding twice, then
+turning left. Evidence root: `.chromie/acceptance/resume-20260915-6fca5be2/`.
+
+| Actual boundary / owner | Input → actual output / expected result | Verdict |
+| --- | --- | --- |
+| Gateway | Exact explicit text, empty prior Goal state → admitted unchanged | Correct transport; no microphone/ASR invocation. |
+| Primary GI | Three independent effects plus explicit atomicity/uncertainty rules → one Responsibility and actor uncertainty | First wrong semantic boundary; raw Schema passes, normal stop at 217 output tokens. |
+| Source-based Deep GI | Original source, no prior candidate DTO → same merged outcome, nod/turn hidden in subtype, unit/sequencing uncertainty | Semantic failure persists; normal stop at 318 tokens. No truncation explanation. |
+| Concurrent GA | Accepted r1 → physical-object handover of Chromie, quantity `{"count":1}` encoded as a string | Wrong resource meaning; raw Schema accepts, existing numeric-string DTO rejects. No semantic repair call. |
+| Concurrent Fast / SC | Same admitted turn → Fast stream cancelled; SC silence completes after Host cancellation | No applied Plan or delivered SC communication established. Harness warning text is not SC speech. |
+| Host / provider | GA failure → Runtime error, zero body capabilities | Contained; post-case simulator safe idle, no active task/lanes, no fall/emergency. |
+
+`native-calls.json` retains four completed packets; `adjudication.json` reviews
+all four and the attempted case, including the cancelled Fast branch. Exact GI
+prompts already demand independent effects and exclude execution-input uncertainty;
+model-inference fault is supported for this observed GI failure, not as a blanket
+explanation of all failures. GA also exposes a separate Schema/DTO quantity gap.
+No prompt change or model promotion is supported by this one failed baseline.
+
+Next: preserve these failures and begin any further semantic work at primary GI
+decomposition/uncertainty under the frozen-cohort method. Keep the GA quantity
+Schema/DTO discrepancy separate; fixing it cannot qualify GI or resource meaning.
+Do not substitute this laptop baseline for remote Gemma nonregression. Supervised
+physical evidence is unchanged; microphone/ASR remain owner-accepted. #24/#32 and
+native semantic qualification remain open. See HANDOFF.md for runtime identity,
+the one aggregate bundle, shutdown state and resume commands.
+
+## Source-backed lightweight GI handoff — 2026-09-15 (historical)
 
 **Interface support is implemented; default GI prompt simplification is not.**
 The owner authorized implementation, commit and push, then requested immediate

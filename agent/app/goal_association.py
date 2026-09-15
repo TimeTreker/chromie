@@ -246,6 +246,11 @@ class GoalAssociationResolver:
                     architecture_attribution="not_evaluated",
                     retryable=False,
                 )
+            for goal in value.get("new_goals", []):
+                if isinstance(goal, dict) and set(goal) - {
+                    "source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids",
+                }:
+                    raise ValueError("GA new Goals contain identity/continuity only; intent is inherited")
             normalized, recovered = normalize_resource_binding_branches(value)
             redundant_resource_binding_recovery.extend(
                 {"stage": stage, **entry} for entry in recovered
@@ -454,6 +459,16 @@ class GoalAssociationResolver:
                 "target Goals: "
                 + ",".join(sorted(set(invalid_resolved_gaps)))
             )
+        # Preserve GI's human-level result type without letting GA re-author it.
+        by_ref = {item.local_ref: item for item in request.responsibilities}
+        model_output = model_output.model_copy(update={"new_goals": [
+            item.model_copy(update={"output_mode": (
+                by_ref[item.source_responsibility_refs[0]].output_mode
+                if item.source_responsibility_refs[0] in by_ref
+                and by_ref[item.source_responsibility_refs[0]].output_mode != "unspecified"
+                else "other"
+            )}) for item in model_output.new_goals
+        ]})
         collection_bindings = action_collection_bindings(model_output)
         if collection_bindings:
             raise ValueError(

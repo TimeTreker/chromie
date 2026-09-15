@@ -114,20 +114,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "reject: 从矮架子上取得玩具汽车并交给我。",
+          "outcome": "reject: 从矮架子上取得玩具汽车并交给我。 (不，不要接受那个待确认的目标。)",
           "output_mode": "body_action",
-          "relationship": "reject",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_06_08_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -158,7 +153,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is reject.",
+          "reason_summary": "The source-grounded continuity relationship is reject.",
           "relationship": "reject",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [

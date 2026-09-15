@@ -201,7 +201,7 @@ class CapabilityInvoker(Protocol):
 
 
 class CapabilityCatalog:
-    """Shared, queryable catalog for Goal Interpretation and interaction handling.
+    """Shared, queryable catalog for Planner and trusted interaction handling.
 
     Static entries come from Chromie's capability registry. Soridormi named
     capabilities are refreshed from the live provider because those exact IDs are the
@@ -258,11 +258,11 @@ class CapabilityCatalog:
     async def prompt_entries(
         self,
         *,
-        scope: Literal["common", "all"] = "common",
+        scope: Literal["common", "all", "index"] = "common",
         refresh: bool = False,
     ) -> list[CatalogCapability]:
         await self.refresh_live_named_capabilities(force=refresh)
-        entries = [item for item in self.entries() if item.available]
+        entries = [item for item in self.entries() if scope == "index" or item.available]
         if scope == "common":
             entries = [
                 item

@@ -38,12 +38,8 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "respond to the user greeting and wellbeing question",
-        "bindings": {},
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.82,
         "output_mode": "speech"
       }

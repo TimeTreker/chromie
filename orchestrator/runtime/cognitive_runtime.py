@@ -49,6 +49,7 @@ from shared.chromie_contracts.plan import (
     SocialCommunicationNeed,
     CanonicalPlan,
     CanonicalPlanStep,
+    PlanParameterResolution,
     ClarifyGoalPlanOutcome,
     ExecuteGoalPlanOutcome,
     FastPlannerAdvance,
@@ -2780,6 +2781,7 @@ class GoalDrivenRuntimeCoordinator:
         advance: FastPlannerAdvance,
         association: GoalAssociationResolution,
         user_text: str,
+        retained_goals: list[dict[str, Any]] | None = None,
     ) -> CanonicalPlan:
         """Bind Fast Planner's first Activity Plan to GA's canonical Goals."""
 
@@ -2828,6 +2830,30 @@ class GoalDrivenRuntimeCoordinator:
                         },
                     )
                 )
+
+        quote_owners = {
+            str(snapshot.get("goal_id")): str(snapshot["goal"].get("description") or "")
+            for snapshot in (retained_goals or [])
+            if isinstance(snapshot, dict) and isinstance(snapshot.get("goal"), dict)
+            and snapshot["goal"].get("goal_id") == snapshot.get("goal_id")
+        }
+        quote_owners.update({goal.goal_id: goal.description for goal in association.new_goals})
+        parameter_resolutions = [
+            PlanParameterResolution(
+                step_id=activity.activity_id, parameter=parameter,
+                strategy="semantic_realization", value=activity.args[parameter],
+                source_quote=quote, confidence=advance.confidence,
+                source_goal_ids=list(dict.fromkeys(
+                    goal_id for ref in activity.source_responsibility_refs
+                    for goal_id in refs_to_goals[ref]
+                    if quote in quote_owners.get(goal_id, "")
+                )),
+            )
+            for activity in advance.activities if isinstance(activity, FastPlannerCapabilityActivity)
+            for parameter, quote in activity.argument_sources.items()
+        ]
+        if any(not item.source_goal_ids for item in parameter_resolutions):
+            raise ValueError("Fast argument citation has no exact canonical Goal owner")
 
         outcomes: list[Any] = []
         unresolved = list(advance.unresolved)
@@ -2987,6 +3013,7 @@ class GoalDrivenRuntimeCoordinator:
             goal_ids=goal_ids,
             goal_summary=user_text,
             communication_needs=needs,
+            parameter_resolutions=parameter_resolutions,
             steps=steps,
             unresolved=(
                 unresolved
@@ -4361,6 +4388,7 @@ class GoalDrivenRuntimeCoordinator:
                     advance=fast_advance,
                     association=association,
                     user_text=text,
+                    retained_goals=planning_context.get("active_goal_snapshots", []),
                 )
                 terminal_plan = fast_plan
                 fast_planner_path = "terminal"

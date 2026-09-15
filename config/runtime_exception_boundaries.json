@@ -204,9 +204,9 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
-      "contract": "Map single-invocation Work stream failures into an observable typed failure before releasing any Work. Required-context overflow makes no model call. No speech frame or partial Activity is retained; SC independently owns communication. Regression: tests/test_social_cognition.py and tests/test_fast_planner_streaming_commit.py.",
+      "contract": "Map primary Work and bounded capability lookup failures into a typed failure before any Activity is released. No partial plan or semantic repair is admitted. Required-context overflow makes no model call. SC owns communication. Regression: tests/test_intent_only_handoff.py and tests/test_fast_planner_streaming_commit.py.",
       "review_status": "reviewed",
-      "body_sha256": "e775357d988849f12469ffc001588edbe6d3f4a0de51dee4366f29f0c1a3736e",
+      "body_sha256": "52ec999e9c161732b5c220ab033eff2503719e0ab46d00716898705b00906630",
       "failure_signals": [
         "diagnostic",
         "state_update"

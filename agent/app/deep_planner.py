@@ -31,6 +31,7 @@ from .planner_model_contract import (
 )
 from .planner_schema import (
     scoped_reporting_response_schema,
+    planner_readiness_response_schema,
     work_change_response_schema,
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
@@ -202,16 +203,6 @@ class DeepPlannerResolver:
             # its original provider contract; the Planner and evidence validator
             # retain authority over that match.
             unavailable_information_goal_ids.clear()
-        single_step_goal_ids = [
-            str(goal.get("goal_id") or "").strip()
-            for goal in authoritative_goals
-            if isinstance(goal, dict)
-            and str(goal.get("goal_id") or "").strip()
-            and not goal.get("resource_responsibility")
-            and isinstance(goal.get("metadata"), dict)
-            and str(goal["metadata"].get("output_mode") or "").strip()
-            in {"body_action", "media_playback", "stateful_effect"}
-        ]
         response_schema = deep_plan_response_schema(
             expected_goal_ids_for_turn,
             allowed_capability_ids=[item["capability_id"] for item in payload],
@@ -233,7 +224,7 @@ class DeepPlannerResolver:
             ),
             unavailable_information_goal_ids=sorted(unavailable_information_goal_ids),
             unavailable_resource_goal_ids=sorted(unavailable_resource_goal_ids),
-            single_step_goal_ids=single_step_goal_ids,
+            single_step_goal_ids=[],
             required_numeric_goal_values=explicit_numeric_goal_values(authoritative_goals),
             confirmation_required_capability_ids=[
                 item["capability_id"] for item in payload if item.get("requires_confirmation")
@@ -257,6 +248,8 @@ class DeepPlannerResolver:
             expected_goal_ids=expected_goal_ids_for_turn,
             future_goal_times=future_goal_times,
         )
+        if not reporting_goal_ids and not request.planner_reentry_scope:
+            response_schema = planner_readiness_response_schema(response_schema, expected_goal_ids_for_turn)
         generation_options = {
             "temperature": 0,
             "top_p": 0.9,

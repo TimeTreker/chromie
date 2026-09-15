@@ -27,15 +27,9 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "walk forward for 20 seconds",
-              "binding_items": {
-                "direction": "forward",
-                "duration": "20 seconds"
-              },
+              "outcome": "Please walk forward for 20 seconds",
               "output_mode": "body_action",
               "confidence": 0.91,
-              "relationship": "new",
-              "target_goal_ids": [],
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
@@ -43,14 +37,9 @@
             },
             {
               "local_ref": "r2",
-              "outcome": "blink six times after walking",
-              "binding_items": {
-                "count": 6
-              },
+              "outcome": "after that blink your little eyes 6 times",
               "output_mode": "body_action",
               "confidence": 0.86,
-              "relationship": "new",
-              "target_goal_ids": [],
               "source_evidence": {
                 "source_start_token_ref": "t10",
                 "source_end_token_ref": "t15"
@@ -58,35 +47,16 @@
             },
             {
               "local_ref": "r3",
-              "outcome": "tell a joke while walking",
-              "binding_items": {},
+              "outcome": "tell me a joke when you are walking",
               "output_mode": "speech",
               "confidence": 0.88,
-              "relationship": "new",
-              "target_goal_ids": [],
               "source_evidence": {
                 "source_start_token_ref": "t17",
                 "source_end_token_ref": "t24"
               }
             }
           ],
-          "unresolved": [],
-          "coordination": [
-            {
-              "kind": "sequence",
-              "refs": [
-                "r1",
-                "r2"
-              ]
-            },
-            {
-              "kind": "parallel",
-              "refs": [
-                "r1",
-                "r3"
-              ]
-            }
-          ]
+          "unresolved": []
         }
       }
     ]
@@ -101,45 +71,21 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "walk forward for 20 seconds",
-        "bindings": {
-          "direction": "forward",
-          "duration": "20 seconds",
-          "parallel_with": [
-            "r3"
-          ]
-        },
+        "outcome": "Please walk forward for 20 seconds",
         "output_mode": "body_action",
-        "confidence": 0.91,
-        "relationship": "new",
-        "target_goal_ids": []
+        "confidence": 0.91
       },
       {
         "local_ref": "r2",
-        "outcome": "blink six times after walking",
-        "bindings": {
-          "after": [
-            "r1"
-          ],
-          "count": 6
-        },
+        "outcome": "after that blink your little eyes 6 times",
         "output_mode": "body_action",
-        "confidence": 0.86,
-        "relationship": "new",
-        "target_goal_ids": []
+        "confidence": 0.86
       },
       {
         "local_ref": "r3",
-        "outcome": "tell a joke while walking",
-        "bindings": {
-          "parallel_with": [
-            "r1"
-          ]
-        },
+        "outcome": "tell me a joke when you are walking",
         "output_mode": "speech",
-        "confidence": 0.88,
-        "relationship": "new",
-        "target_goal_ids": []
+        "confidence": 0.88
       }
     ]
   },

@@ -51,22 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "item": "密封水瓶",
-            "location": "门口",
-            "recipient": "我"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "从门口取得密封水瓶并交给我。",
+          "outcome": "从门口取得密封水瓶并交给我。 (把门口的密封水瓶拿给我。)",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -98,34 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [],
-          "media_operation": "none",
-          "output_mode": "body_action",
           "related_goal_ids": [],
-          "resource_kind": "physical_object",
-          "resource_responsibility": {
-            "delivery_mode": "physical_handover",
-            "description": "密封水瓶",
-            "kind": "physical_object",
-            "quantity": "",
-            "recipient": {
-              "description": "我",
-              "referent_id": null
-            },
-            "source": {
-              "acquisition_bindings": [
-                {
-                  "confidence": 1.0,
-                  "entity_type": "relative_location",
-                  "name": "location",
-                  "referent_id": "",
-                  "value": "门口"
-                }
-              ],
-              "description": "门口",
-              "status": "known"
-            }
-          },
           "source_responsibility_refs": [
             "r1"
           ],

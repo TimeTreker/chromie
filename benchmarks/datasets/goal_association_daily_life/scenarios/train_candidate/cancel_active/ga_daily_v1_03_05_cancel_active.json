@@ -102,20 +102,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Cancel: 向前移动3秒。",
+          "outcome": "Cancel: 向前移动3秒。 (取消刚才那个目标。)",
           "output_mode": "body_action",
-          "relationship": "cancel",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_03_05_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -146,7 +141,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is cancel.",
+          "reason_summary": "The source-grounded continuity relationship is cancel.",
           "relationship": "cancel",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [

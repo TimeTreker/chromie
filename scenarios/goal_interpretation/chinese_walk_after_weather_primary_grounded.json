@@ -25,15 +25,8 @@
           "responsibilities": [
             {
               "local_ref": "r1",
-              "outcome": "快速向前移动十来秒",
-              "bindings": {
-                "direction": "forward",
-                "speed": "速度点",
-                "duration": "十来秒"
-              },
+              "outcome": "往前跑个十来秒，速度点。",
               "confidence": 0.97,
-              "relationship": "new",
-              "target_goal_ids": [],
               "output_mode": "body_action",
               "source_evidence": {
                 "source_start_token_ref": "t0",
@@ -56,15 +49,8 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "快速向前移动十来秒",
-        "bindings": {
-          "direction": "forward",
-          "speed": "速度点",
-          "duration": "十来秒"
-        },
+        "outcome": "往前跑个十来秒，速度点。",
         "confidence": 0.97,
-        "relationship": "new",
-        "target_goal_ids": [],
         "output_mode": "body_action"
       }
     ]

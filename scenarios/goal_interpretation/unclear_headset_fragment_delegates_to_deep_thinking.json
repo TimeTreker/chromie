@@ -23,14 +23,8 @@
           "confidence": 0.45,
           "responsibilities": [
             {
-              "schema_version": 1,
               "local_ref": "r1",
-              "outcome": "understand and respond to what the user means about their headset",
-              "bindings": {
-                "entity": "headset"
-              },
-              "relationship": "new",
-              "target_goal_ids": [],
+              "outcome": "嗯，我用的耳麦，他那个。",
               "confidence": 0.45,
               "output_mode": "information",
               "source_evidence": {
@@ -50,14 +44,8 @@
           "confidence": 0.45,
           "responsibilities": [
             {
-              "schema_version": 1,
               "local_ref": "r1",
-              "outcome": "understand and respond to what the user means about their headset",
-              "bindings": {
-                "entity": "headset"
-              },
-              "relationship": "new",
-              "target_goal_ids": [],
+              "outcome": "嗯，我用的耳麦，他那个。",
               "confidence": 0.45,
               "output_mode": "information",
               "source_evidence": {
@@ -85,14 +73,8 @@
     ],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
-        "outcome": "understand and respond to what the user means about their headset",
-        "bindings": {
-          "entity": "headset"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
+        "outcome": "嗯，我用的耳麦，他那个。",
         "confidence": 0.45,
         "output_mode": "information"
       }

@@ -42,15 +42,8 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "tell the user a short joke about robots",
-        "bindings": {
-          "topic": "robots",
-          "length": "short"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.91,
         "output_mode": "speech"
       }

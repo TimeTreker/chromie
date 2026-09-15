@@ -15,53 +15,42 @@
           "气温",
           "温度"
         ],
-        "required_bindings": {
-          "location": [
-            "上海"
-          ],
-          "time_scope": [
-            "明天"
-          ]
-        },
-        "forbidden_binding_keys": [
-          "time",
-          "duration",
-          "threshold"
-        ],
         "source_spans": [
           "明天上海冷不冷"
+        ],
+        "required_intent_fragments": [
+          [
+            "明天上海冷不冷"
+          ]
         ]
       }
     ],
     "coordination": [],
-    "unresolved": false
+    "unresolved": false,
+    "intent_relations": []
   },
   "contrast_set": "weather_tomorrow_location",
   "split": "frozen_test",
   "training_eligible": false,
   "provenance": {
     "origin": "primary v1 retained regression",
-    "review": "assistant canonical-contract review; not independent"
+    "review": "Owner-approved intent-only migration; raw input/split unchanged; lexical probes require manual semantic review, not independent."
   },
   "reference_wire_output": {
     "confidence": 1.0,
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "determine whether 上海 will be cold tomorrow",
         "output_mode": "information",
+        "outcome": "明天上海冷不冷？",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t6"
-        },
-        "binding_items": {
-          "location": "上海",
-          "time_scope": "明天"
+          "source_end_token_ref": "t7"
         }
       }
     ],
-    "unresolved": [],
-    "coordination": []
-  }
+    "unresolved": []
+  },
+  "intent_only_contract": true
 }

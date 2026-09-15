@@ -1057,6 +1057,8 @@ def _evaluate_goal_interpreter_case_dimensions(
     decision_payload: dict[str, Any],
     wire_payload: dict[str, Any],
 ) -> dict[str, list[str] | None]:
+    if case.get("intent_only_contract"):
+        return _evaluate_complete_intent(case, decision_payload, wire_payload)
     dimensions: dict[str, list[str] | None] = {
         "decomposition": [],
         "outcome": [],
@@ -1182,6 +1184,62 @@ def _evaluate_goal_interpreter_case_dimensions(
             "unresolved presence did not equal " + str(expected["unresolved"]),
         )
     return dimensions
+
+
+def _evaluate_complete_intent(
+    case: dict[str, Any], decision: dict[str, Any], wire: dict[str, Any],
+) -> dict[str, list[str] | None]:
+    """Frozen lexical probes, not a semantic judge or a runtime intent classifier.
+
+    An authored intent unit must appear intact in one Responsibility. Several
+    units may share that Responsibility; splitting must neither omit nor duplicate
+    units. Manual review remains required for paraphrases and semantic correctness.
+    """
+    from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+
+    errors: dict[str, list[str]] = {key: [] for key in (
+        "decomposition", "outcome", "output_mode", "intent_details",
+        "source_evidence", "intent_relations", "unresolved",
+    )}
+    responsibilities = decision.get("responsibilities") or []
+    modes: list[set[str]] = [set() for _ in responsibilities]
+    for unit in case["expected"]["responsibilities"]:
+        matches = [index for index, item in enumerate(responsibilities)
+                   if all(any(fragment.casefold() in str(item.get("outcome", "")).casefold()
+                              for fragment in alternatives)
+                          for alternatives in unit["required_intent_fragments"])]
+        if len(matches) != 1:
+            errors["intent_details"].append(
+                f"Intent unit must have exactly one owner, found {len(matches)}: "
+                f"{unit['required_intent_fragments']!r}"
+            )
+        for index in matches:
+            modes[index].add(unit["output_mode"])
+    for index, item in enumerate(responsibilities):
+        if not modes[index]:
+            errors["decomposition"].append(f"Responsibility {index} has no requested intent unit")
+        expected_mode = next(iter(modes[index])) if len(modes[index]) == 1 else "other"
+        if item.get("output_mode") != expected_mode:
+            errors["output_mode"].append(f"Responsibility {index} result type must be {expected_mode}")
+    joined = " ".join(str(item.get("outcome", "")) for item in responsibilities).casefold()
+    for alternatives in case["expected"].get("intent_relations", []):
+        if not any(fragment.casefold() in joined for fragment in alternatives):
+            errors["intent_relations"].append(f"Missing requested relation: {alternatives!r}")
+    tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
+    previous_end = -1
+    for item in wire.get("responsibilities", []):
+        if set(item) - {"local_ref", "outcome", "output_mode", "confidence", "source_evidence"}:
+            errors["intent_details"].append("GI authored a downstream contract field")
+        evidence = item.get("source_evidence") or {}
+        first = tokens.get(evidence.get("source_start_token_ref"))
+        last = tokens.get(evidence.get("source_end_token_ref"))
+        if not first or not last or first["start"] < previous_end or last["end"] <= first["start"]:
+            errors["source_evidence"].append("Invalid, reversed or overlapping source span")
+        else:
+            previous_end = last["end"]
+    if bool(decision.get("unresolved")) != case["expected"]["unresolved"]:
+        errors["unresolved"].append("Unresolved presence differs from reviewed intent ambiguity")
+    return errors
 
 
 def _candidate_compatible_schema(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:

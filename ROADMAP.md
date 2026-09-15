@@ -7,7 +7,7 @@ criteria; current implementation and evidence state live in
 The current focus is a **Goal-driven single semantic authority**. The Cognitive
 Gateway owns ingress, protective reflexes, and attention admission. The
 Goal-driven Cognitive Core owns ordinary semantic interpretation, goal
-association, Planner-authored communication/work, and outcome reconciliation.
+association, Planner-authored Work, Social Cognition communication, and outcome reconciliation.
 Provider and Host boundaries remain the only authorities for effects.
 The core embodied target is a qualified simulator provider. Chromie's cognition
 must remain backend-neutral; physical-robot commissioning is optional
@@ -32,6 +32,18 @@ labels, #56 complete contract typing, #57 lifecycle regressions, and newly repro
 #58 future-readiness/persisted-wake handoff. The owner authorized the corresponding
 Charter decisions and bounded maintenance in this session. No new model profile,
 architecture layer or product feature is promoted.
+
+The September 16 owner-authorized continuation makes GI's complete natural-language
+intent and provider-neutral result type authoritative, with no capability parameters
+or canonical Goal relationships. GA owns continuity; Host inherits GI meaning;
+Planner owns realization and readiness. Fast's all-capability index plus full common
+contracts supports one bounded detail lookup before its complete Plan. This is the
+explicit amendment to the existing delivery constraint; no new service, current
+document or runtime switch was added. The latest canonical/replay gates pass, but
+native qualification remains open: Fast provenance/direction and SC communication
+fail in the retained aggregate. Source completion is not release closure. See the
+current checkpoint for the actual workflow, 200 retained typed-update limitations,
+and exact next evidence work. No remote Issue is silently closed by this amendment.
 
 ## Social Cognition migration
 
@@ -81,8 +93,8 @@ Do not silently close or redefine a remote Issue from this local documentation.
 ## Current execution order — existing implementation and evidence
 
 The owner's September 13 scope completed #59/#61's offline prototype and 1,500-case
-audit, then expanded to 6,000 cases under #65. #60 now connects primary GI temporal
-WHAT to GA conservation and Planner waiting/re-entry without a pre-seeded Goal. #66
+audit, then expanded to 6,000 cases under #65. #60 connects complete temporal intent
+to Planner-authored waiting/re-entry without a pre-seeded Goal; GI does not extract time fields. #66
 rejects empty, absent and foreign single-Goal outcome maps before canonical execution.
 The final replay requires all 6,000 declared outcomes, including genuine resource
 conflicts and expected nonexecution; exact counts and gates belong to Status/handoffs.
@@ -98,9 +110,11 @@ frozen staged/readiness oracle amendments. The coverage-designed 204 Fast/40 Dee
 corpora plus boundary contrasts replace #35's earlier numeric-size proposal; a
 surrogate pass is not a native provider or target claim.
 
-Then continue #24/#32 from the actual primary GI failure before GA/Planner/Runtime.
-The latest aggregate live cohort is incomplete and failed; the Qwen9b output-budget
-contrast also retains semantic/binding/truncation failures. Do not bypass GI to reach
+Then continue #24/#32 from the latest retained complete-workflow diagnosis.
+GI still has failures in its wider contrast cohort; in the latest original compound
+GI/GA are correct, while Fast provenance/direction and SC communication fail.
+The latest aggregate live cohort is incomplete; historical Qwen9b output-budget
+contrasts also retain semantic/binding/truncation failures. Do not bypass GI to reach
 downstream tests or promote a profile from isolated role results. Keep canonical
 source gate → narrow current-revision live voice → default target-evidence closure
 as the active delivery line. Numeric class/document sizes remain review measurements,

@@ -96,20 +96,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "confirm: Listen supportively while the user discusses: I feel nervous about tomorrow.",
+          "outcome": "confirm: Listen supportively while the user discusses: I feel nervous about tomorrow. (Yes, confirm and proceed with that goal.)",
           "output_mode": "speech",
-          "relationship": "confirm",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_09_02_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -140,7 +135,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is confirm.",
+          "reason_summary": "The source-grounded continuity relationship is confirm.",
           "relationship": "confirm",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [

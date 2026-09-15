@@ -39,7 +39,8 @@ def test_goal_association_daily_life_corpus_is_complete_and_mechanically_valid()
         "validation": 450,
     }
     assert summary["runtime"] == {
-        "host_accepted": 1_500,
+        "host_accepted": 1_300,
+        "known_contract_gaps": 200,
         "validated": 1_500,
     }
     assert set(summary["categories"]) == set(FAMILIES)

@@ -4,7 +4,7 @@
     "contrast_set_size": 15,
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 1500,
-    "scenario_tree_sha256": "fada97f1bd717c63ff326b674cbda1a2b1bf4502314460c75a34ab732cd75d15",
+    "scenario_tree_sha256": "6ee3aac66f7f8498a202dd243ca61e64a8d85a686d7cd4f99f49f3d9ffe1da7e",
     "semantic_seed_count": 100
   },
   "authority": "offline qualification evidence only; never production Goal policy",
@@ -34,7 +34,8 @@
     },
     "scenario_count": 1500,
     "schema_expectations": {
-      "accept": 1500
+      "accept": 1300,
+      "accept_host_reject": 200
     },
     "splits": {
       "frozen_test": 450,

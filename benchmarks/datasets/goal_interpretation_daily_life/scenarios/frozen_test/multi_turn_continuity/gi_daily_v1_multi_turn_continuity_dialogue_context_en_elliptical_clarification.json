@@ -46,26 +46,16 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "outcome": "remind me tomorrow afternoon to Dad take an umbrella when he leaves",
-          "binding_items": {
-            "proposition": "Dad take an umbrella when he leaves",
-            "recipient": "me",
-            "time_scope": "Tomorrow afternoon"
-          },
+          "outcome": "remind me tomorrow afternoon to Dad take an umbrella when he leaves (Tomorrow afternoon)",
           "output_mode": "stateful_effect",
           "confidence": 1.0,
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t1"
-          },
-          "relationship": "clarify",
-          "target_goal_ids": [
-            "goal-multi_turn_continuity-en-reminder"
-          ]
+          }
         }
       ],
-      "unresolved": [],
-      "coordination": []
+      "unresolved": []
     },
     "semantic_expectations": {
       "responsibility_count": 1,
@@ -76,19 +66,15 @@
           "outcome_contains_any": [
             "remind"
           ],
-          "required_bindings": {
+          "required_intent_details": {
             "proposition": "Dad take an umbrella when he leaves",
             "recipient": "me",
             "time_scope": "Tomorrow afternoon"
-          },
-          "forbidden_binding_keys": [
-            "duration",
-            "time"
-          ]
+          }
         }
       ],
-      "coordination": [],
-      "unresolved": false
+      "unresolved": false,
+      "intent_order": []
     },
     "host_validation_expectation": {
       "status": "accept"
@@ -96,25 +82,29 @@
   },
   "invariants": {
     "one_semantic_authority_call": true,
-    "bindings_are_sparse_and_source_or_context_grounded": true,
     "source_evidence_is_current_turn_only": true,
-    "binding_keys_lexicographic": true,
     "must_not_emit_fields": [
       "actions",
       "activities",
+      "binding_items",
+      "bindings",
       "capability_id",
+      "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
       "plan",
       "provider_id",
+      "relationship",
       "response_text",
       "route",
       "skill_id",
+      "target_goal_ids",
       "task_id",
       "tool_name",
       "work_items"
-    ]
+    ],
+    "complete_intent_is_source_or_context_grounded": true
   },
   "adversarial_design": {
     "phenomena": [

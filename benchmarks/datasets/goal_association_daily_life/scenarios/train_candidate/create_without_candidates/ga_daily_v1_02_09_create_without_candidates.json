@@ -51,21 +51,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {
-            "event": "喂猫",
-            "time_scope": "上学前"
-          },
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "创建一个上学前喂猫的提醒。",
+          "outcome": "创建一个上学前喂猫的提醒。 (提醒我上学前喂猫。)",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
@@ -97,27 +91,7 @@
       "decision": "create_goals",
       "new_goals": [
         {
-          "bindings": [
-            {
-              "confidence": 1.0,
-              "entity_type": "event",
-              "name": "event",
-              "referent_id": "",
-              "value": "喂猫"
-            },
-            {
-              "confidence": 1.0,
-              "entity_type": "temporal_scope",
-              "name": "time_scope",
-              "referent_id": "",
-              "value": "上学前"
-            }
-          ],
-          "media_operation": "none",
-          "output_mode": "stateful_effect",
           "related_goal_ids": [],
-          "resource_kind": "none",
-          "resource_responsibility": null,
           "source_responsibility_refs": [
             "r1"
           ],

@@ -381,6 +381,7 @@ def planner_effectful_goal_ids(
     """
 
     effect_modes = {
+        "other",
         "styled_speech",
         "recitation",
         "singing",
@@ -1040,6 +1041,7 @@ def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False
         "description": item.description,
         "input_schema": item.input_schema,
         "requires_confirmation": item.requires_confirmation,
+        "execution_constraints": dict(item.execution_constraints),
         "can_run_parallel": item.can_run_parallel,
         "parallel_metadata_declared": item.parallel_metadata_declared,
         "exclusive_group": item.exclusive_group,
@@ -1210,3 +1212,31 @@ def auxiliary_social_prompt_context(
         "recent_auxiliary_behavior_evidence": recent,
         "max_activities": 3,
     }
+
+
+async def fast_capability_context(catalog: Any, request: CognitiveWorkRequest, loaded_ids: tuple[str, ...] = ()):
+    """Keep the available library index and retrieve exact selected contracts.
+
+    This read-only lookup never chooses a capability, changes a Plan, or grants
+    runtime permission. The model may request one bounded detail batch before
+    authoring its complete planning decision.
+    """
+    common = await catalog.prompt_entries(scope="common", refresh=False)
+    entries = await catalog.prompt_entries(scope="index", refresh=False)
+    by_id = {item.capability_id: item for item in entries}
+    if len(loaded_ids) != len(set(loaded_ids)) or any(key not in by_id for key in loaded_ids):
+        raise ValueError("Capability lookup requires unique exact current catalog IDs")
+    request = request.model_copy(deep=True)
+    request.context["capability_index"] = [
+        {"capability_id": item.capability_id, "description": item.description,
+         "available": item.available, "interaction_executable": item.interaction_executable,
+         "requires_confirmation": item.requires_confirmation,
+         "restricted": item.prompt_tier_locked,
+         "when_to_use": item.hints.get("when_to_use", ""),
+         "when_not_to_use": item.hints.get("when_not_to_use", "")}
+        for item in entries
+    ]
+    request.context["capability_details_loaded"] = list(loaded_ids)
+    merged = {item.capability_id: item for item in common}
+    merged.update({key: by_id[key] for key in loaded_ids if not by_id[key].prompt_tier_locked})
+    return request, list(merged.values()), entries

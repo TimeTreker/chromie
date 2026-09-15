@@ -69,7 +69,7 @@ def _separate_interaction(case):
     return case
 
 
-def reference_case(family, action, value_index, form):
+def _raw_reference_case(family, action, value_index, form):
     """Assemble authored primary results, never fit an oracle to a runtime verdict."""
     if family in NEW_FAMILIES:
         return extended_case(family, action, value_index, form)
@@ -275,7 +275,7 @@ def _speech_plan(raw, text, *, clarify=False):
 def extended_case(family, action, value_index, form):
     """Additional authored state/authority contrasts; references precede execution."""
     base = 'multi_goal' if family == 'plan_conflicting_resource' else 'normal_deep' if family.startswith('plan_') or family in {'speech_deep','mixed_action_speech'} else 'normal_fast'
-    case = reference_case(base, action, value_index, form)
+    case = _raw_reference_case(base, action, value_index, form)
     old_id = case['id']
     case = json.loads(json.dumps(case).replace(old_id, old_id.replace(base,family)))
     case.update(coverage_family=family)
@@ -306,33 +306,34 @@ def extended_case(family, action, value_index, form):
         if family == 'readiness_missing_clock': case['input'].pop('context')
         if family == 'readiness_foreign_source': responsibility['binding_items']['time_scope'] = 'at a time never stated'
         ga['new_goals'][0]['bindings'] = [{'name':key,'entity_type':key,'value':str(val),'confidence':1.0} for key,val in responsibility['binding_items'].items()]
+        from datetime import datetime
+        wait = json.loads((SEEDS/'workflow-delayed.json').read_text())['model_steps'][2]
+        wait.pop('request',None)
+        wait.update(role='fast')
+        wait['response']['time_conditions'][0]['due_at_ms'] = int(datetime.fromisoformat(instant).timestamp()*1000)
+        if zh:
+            wait['response']['social_fixture_text'] = wait['response']['goal_outcomes']['${goal}']['social_fixture_text'] = '我会等到指定时间再执行。'
+        wait['response']['time_conditions'][0]['source_quote'] = responsibility['binding_items'].get('time_scope', responsibility['binding_items']['ready_at'])
+        case['model_steps'] = case['model_steps'][:2] + [wait]
+        case.update(family='delayed', initial_goal_resolution=None, expected_ready_at=instant,
+            scope='New admitted request: primary GI → GA → wait → restart → due wake → actual controlled Runtime.')
         if family.startswith('readiness_'):
-            reject(case,'gi')
+            case.pop('expected_ready_at', None)
+            reject(case,'fast')
+        elif family in {'new_timer_cancellation','new_timer_terminal'}:
+            case['probe'] = 'cancel_timer' if family == 'new_timer_cancellation' else 'terminal_timer'
+            if family == 'new_timer_cancellation':
+                followup = '取消刚才安排的任务。' if zh else 'Cancel that scheduled task.'
+                case['followup'] = {'sid':case['id']+'-cancel','text':followup,'language':case['input']['language']}
+                cancelled = copy.deepcopy(gi)
+                cancelled['responsibilities'][0].update(outcome=followup.rstrip('.。'), relationship='cancel',
+                    target_goal_ids=['${goal}'], binding_items={}, source_evidence=source_evidence(followup))
+                association = GoalAssociationModelOutput.model_validate({'confidence':1.0,'associations':[{
+                    'relationship':'cancel','source_responsibility_refs':['r1'],'target_goal_ids':['${goal}'],
+                    'confidence':1.0,'reason_summary':'Cancel the explicitly referenced newly scheduled Goal.'}]}).model_dump(mode='json')
+                case['model_steps'] += [{'name':'gi-cancel','role':'gi','response':cancelled},{'name':'ga-cancel','role':'ga','response':association}]
         else:
-            from datetime import datetime
-            wait = json.loads((SEEDS/'workflow-delayed.json').read_text())['model_steps'][2]
-            wait.pop('request',None)
-            wait.update(role='fast')
-            wait['response']['time_conditions'][0]['due_at_ms'] = int(datetime.fromisoformat(instant).timestamp()*1000)
-            if zh:
-                wait['response']['social_fixture_text'] = wait['response']['goal_outcomes']['${goal}']['social_fixture_text'] = '我会等到指定时间再执行。'
-            case['model_steps'] = case['model_steps'][:2] + [wait]
-            case.update(family='delayed', initial_goal_resolution=None, expected_ready_at=instant,
-                scope='New admitted request: primary GI → GA → wait → restart → due wake → actual controlled Runtime.')
-            if family in {'new_timer_cancellation','new_timer_terminal'}:
-                case['probe'] = 'cancel_timer' if family == 'new_timer_cancellation' else 'terminal_timer'
-                if family == 'new_timer_cancellation':
-                    followup = '取消刚才安排的任务。' if zh else 'Cancel that scheduled task.'
-                    case['followup'] = {'sid':case['id']+'-cancel','text':followup,'language':case['input']['language']}
-                    cancelled = copy.deepcopy(gi)
-                    cancelled['responsibilities'][0].update(outcome=followup.rstrip('.。'), relationship='cancel',
-                        target_goal_ids=['${goal}'], binding_items={}, source_evidence=source_evidence(followup))
-                    association = GoalAssociationModelOutput.model_validate({'confidence':1.0,'associations':[{
-                        'relationship':'cancel','source_responsibility_refs':['r1'],'target_goal_ids':['${goal}'],
-                        'confidence':1.0,'reason_summary':'Cancel the explicitly referenced newly scheduled Goal.'}]}).model_dump(mode='json')
-                    case['model_steps'] += [{'name':'gi-cancel','role':'gi','response':cancelled},{'name':'ga-cancel','role':'ga','response':association}]
-            else:
-                case['model_steps'].append({'name':'fast-due','role':'fast','response':raw})
+            case['model_steps'].append({'name':'fast-due','role':'fast','response':raw})
     elif family in {'ambiguous_readiness','gi_depth_resolved','gi_depth_unresolved'}:
         if family == 'ambiguous_readiness':
             scope = '明天七点' if zh else 'tomorrow at seven'
@@ -451,6 +452,59 @@ def reject(case, role):
     case['expected_rejection'] = role
     if case['expected_verdict'] != 'known_contract_gap': case['expected_verdict'] = 'expected_rejection'
     case['model_steps'] = case['model_steps'][:{'gi':1,'ga':2,'deep':3,'fast':3}[role]]
+
+
+def reference_case(family, action, value_index, form):
+    """Migrate reviewed reference authorship; fault intent and source inputs stay fixed."""
+    return _intent_reference(_raw_reference_case(family, action, value_index, form))
+
+
+def _intent_reference(case):
+    family = case.get('coverage_family',case['family'])
+    primary = case['model_steps'][0]['response']['responsibilities']
+    descriptions = {('${goal}' if i == 0 else '${goal'+str(i+1)+'}'): r['outcome']
+                    for i,r in enumerate(primary)}
+    prior = case.get('initial_goal_resolution') or {}
+    for goal in prior.get('new_goals', []):
+        descriptions['${goal}'] = goal['description']
+    expected_calls = {item['capability']:item['args'] for item in case['expected_provider_calls']}
+    for step in case['model_steps']:
+        raw = step['response']
+        if step['role'] == 'gi':
+            raw.pop('coordination', None)
+            for r in raw['responsibilities']:
+                forbidden = r.get('binding_items', {}).get('invented_owner_field')
+                for key in ('binding_items', 'bindings', 'relationship', 'target_goal_ids', 'schema_version'):
+                    r.pop(key, None)
+                if forbidden is not None:
+                    r['binding_items'] = {'invented_owner_field':forbidden}
+        elif step['role'] == 'ga':
+            for g in raw.get('new_goals', []):
+                mutant = g.get('bindings') if family == 'ga_binding_mutation' else None
+                for key in tuple(g):
+                    if key not in {'source_responsibility_refs','related_goal_ids','supersedes_goal_ids','capability_id'}:
+                        g.pop(key)
+                g.setdefault('related_goal_ids', [])
+                g.setdefault('supersedes_goal_ids', [])
+                if mutant is not None:
+                    g['bindings'] = mutant
+        elif step['role'] in {'fast','deep'}:
+            # Parameter values here come from the pre-authored expected provider contract,
+            # never from observed runtime output. A wrong argument conflicts with its proof.
+            proofs = []
+            for work in raw['steps']:
+                sources = work['source_goal_ids']
+                quote = descriptions.get(sources[0], '') if len(sources) == 1 else ''
+                for name, actual in {**expected_calls.get(work['capability_id'], {}), **work['args']}.items():
+                    value = expected_calls.get(work['capability_id'], {}).get(name, actual)
+                    proofs.append({'step_id':work['step_id'], 'parameter':name,
+                        'strategy':'semantic_realization','value':value,'confidence':1.0,
+                        'blocking':False,'rationale':'Realize the exact owning intent through the selected capability.',
+                        'source_goal_ids':sources,'source_quote':quote})
+            raw['parameter_resolutions'] = proofs
+    case['reference_review'] = 'Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.'
+    case['provenance']['authority_migration'] = 'GI preserves complete intent/type, GA inherits intent and owns continuity, Planner authors arguments and source-bound readiness.'
+    return case
 
 
 def cases():

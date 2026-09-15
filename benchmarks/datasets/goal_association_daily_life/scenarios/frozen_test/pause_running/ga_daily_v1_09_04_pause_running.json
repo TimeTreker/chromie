@@ -96,20 +96,15 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "Pause: Listen supportively while the user discusses: I had a difficult day.",
+          "outcome": "Pause: Listen supportively while the user discusses: I had a difficult day. (Pause that running goal for now.)",
           "output_mode": "speech",
-          "relationship": "pause",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_09_04_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -140,7 +135,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is pause.",
+          "reason_summary": "The source-grounded continuity relationship is pause.",
           "relationship": "pause",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [

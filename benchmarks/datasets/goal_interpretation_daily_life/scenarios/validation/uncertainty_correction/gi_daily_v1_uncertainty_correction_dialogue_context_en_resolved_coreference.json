@@ -34,12 +34,7 @@
       "responsibilities": [
         {
           "local_ref": "r1",
-          "outcome": "bring the green mug to my aunt",
-          "binding_items": {
-            "entity": "green mug",
-            "location": "the hallway cabinet",
-            "recipient": "my aunt"
-          },
+          "outcome": "bring the green mug to my aunt (Please bring the one we discussed to my aunt)",
           "output_mode": "body_action",
           "confidence": 1.0,
           "source_evidence": {
@@ -48,8 +43,7 @@
           }
         }
       ],
-      "unresolved": [],
-      "coordination": []
+      "unresolved": []
     },
     "semantic_expectations": {
       "responsibility_count": 1,
@@ -62,41 +56,42 @@
             "hand",
             "deliver"
           ],
-          "required_bindings": {
+          "required_intent_details": {
             "entity": "green mug",
             "location": "the hallway cabinet",
             "recipient": "my aunt"
-          },
-          "forbidden_binding_keys": [
-            "actor"
-          ]
+          }
         }
       ],
-      "coordination": [],
-      "unresolved": false
+      "unresolved": false,
+      "intent_order": []
     }
   },
   "invariants": {
     "one_semantic_authority_call": true,
-    "bindings_are_sparse_and_source_or_context_grounded": true,
     "source_evidence_is_current_turn_only": true,
-    "binding_keys_lexicographic": true,
     "must_not_emit_fields": [
       "actions",
       "activities",
+      "binding_items",
+      "bindings",
       "capability_id",
+      "coordination",
       "execution_lane",
       "goal_id",
       "information_gaps",
       "plan",
       "provider_id",
+      "relationship",
       "response_text",
       "route",
       "skill_id",
+      "target_goal_ids",
       "task_id",
       "tool_name",
       "work_items"
-    ]
+    ],
+    "complete_intent_is_source_or_context_grounded": true
   },
   "adversarial_design": {
     "phenomena": [

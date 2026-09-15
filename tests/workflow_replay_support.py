@@ -195,13 +195,19 @@ class Episode:
         self.events.append({'boundary':'ga', 'resolution':association.model_dump(mode='json')})
         if self.case.get('expected_ready_at'):
             assert not self.case.get('initial_goal_resolution'), 'New readiness must never be pre-seeded'
-            assert interpreted.responsibilities[0].bindings['ready_at'] == self.case['expected_ready_at']
-            actual = association.new_goals[0].object['bindings']['ready_at']
-            assert actual['value'] == self.case['expected_ready_at']
+            assert not interpreted.responsibilities[0].bindings
+            assert not association.new_goals[0].object.get('bindings')
         request.context['goal_association_resolution'] = association.model_dump(mode='json')
         request.context['active_goal_snapshots'] = self.manager.active_goal_snapshots()
         self.request = request
         plan = await self.plan(request, self.case['initial_planner'])
+        if self.case.get('expected_ready_at'):
+            from datetime import datetime
+            assert len(plan.time_conditions) == 1
+            condition = plan.time_conditions[0]
+            assert condition.due_at_ms == int(datetime.fromisoformat(self.case['expected_ready_at']).timestamp()*1000)
+            assert condition.source_quote in interpreted.responsibilities[0].outcome
+            assert not plan.steps and self.goal in plan.goal_satisfaction.unmet_goal_ids
         self.boundary = 'adapter'
         response = await social_fixture_response(self.adapter, plan=plan, session_id=request.sid,
             language=request.language, text=self.social_words.get(plan.plan_id) or "Fixture response.")

@@ -256,30 +256,23 @@ For a conversational Responsibility, GI describes the communicative obligation o
 proposition and never the sentence Chromie will say; Social Cognition remains the
 only exact-wording owner. Absence of accepted assistant dialogue is represented once by the empty
 bounded dialogue, never by a textual sentinel that a model could repeat as semantic
-content. A `prior_assistant_utterance` binding is available only when the same bounded
-request supplies a real accepted assistant utterance, and its value must equal the
-exact projected text. New item and repetition quantities cross GI under the single
-canonical positive-integer binding `count`.
-The complete GI outcome preserves material details and their attachment. The Host
-also passes the full immutable original input to Planner without asking GI to
-copy it. A clear information query can retain its subject, place and relative
-period in that outcome without duplicate entity/attribute/time classification;
-Planner maps it to provider parameters. Original wording is evidence, not permission
-to add an omitted Responsibility. Counts, measurements, activation and field-specific
-Goal updates still carry the typed evidence required by their mechanical guards.
-The primary GI result owns its complete Responsibility inventory and cites the
-authoritative admitted turn directly. Each Responsibility carries the inclusive
-source-token span grounding its complete positive predicate, its provider-neutral
-`output_mode`, material bindings, Goal relationship, and typed sibling relations.
-GI authors that completion category once; GA preserves it while owning canonical
-Goal identity and continuity, and the Host derives execution projections only after
-validation. A measured binding with an explicit unit preserves the exact contiguous
-number-and-unit source/context surface; downstream planning may normalize execution
-quantities without rewriting GI's human-semantic value.
-The Host rejects duration/distance string bindings without a current-turn or
-semantic-continuity source value, including values copied from static prompt
-examples or operational metadata. This is mechanical containment, not validation
-of GI's number-word normalization or complete understanding of the request.
+content. Prior accepted dialogue may resolve the current intent without inventing
+an additional request. GI preserves complete natural-language intent and cites its
+source and requested result type; it does not extract parameter bindings or Goal
+relationships. The result type keeps ordinary communication distinct from requested
+physical effects without selecting any Capability.
+A compound request may remain one Responsibility. GA relates that intent to retained
+Goals; Planner decomposes Activities and resolves their parameters against full
+Capability contracts. Missing execution details are Planner gaps, not GI uncertainty.
+SC communicates the actual state reported by these owners through speech and eligible
+Social Attention. Runtime admission and execution safety remain independent.
+
+Fast Planner receives common Capability contracts and the available library index.
+It may read one bounded batch of indexed contracts before its complete planning
+result; lookup output has no executable work and cannot repair an existing Plan.
+Argument citations prove owned source presence, not semantic understanding. Complete
+meaning, conversions and Plan coverage still require retained semantic qualification.
+
 Trusted code checks only closed references, source membership and ordering,
 non-overlap, explicit-value provenance, and DTO shape. It does not use
 conjunction/action phrase rules, a second model auditor, or source resegmentation to

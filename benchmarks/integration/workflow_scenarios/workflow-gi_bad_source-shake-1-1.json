@@ -20,7 +20,8 @@
     "model_ability_evaluated": false,
     "training_eligible": false,
     "authoring_method": "GPT-6 Astra authored 60 contrasts; deterministic 4 actions × 5 values × 5 language forms expansion",
-    "independent_inference_per_case": false
+    "independent_inference_per_case": false,
+    "authority_migration": "GI preserves complete intent/type, GA inherits intent and owns continuity, Planner authors arguments and source-bound readiness."
   },
   "catalog": [
     {
@@ -408,14 +409,10 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t9999"
-            },
-            "binding_items": {
-              "count": 3
             }
           }
         ],
-        "unresolved": [],
-        "coordination": []
+        "unresolved": []
       },
       "role": "gi",
       "required_prompt_fragments": [
@@ -431,7 +428,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "020a3cb7f55dc9e80bfc872bc79b57af3d7e8cd35a6f2b04f9214221b708f8fc"
+              "$artifact": "4dd082f6a24a1d7600bcbd856e46ccfdc50a83dc98bc11dc3c966cea59591356"
             }
           },
           {
@@ -446,7 +443,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "fc3d4d20324ae40165df4c64f0d8a004eb811fb4d28a733d3ddbcd110831dc7e"
+          "$artifact": "65654011ece2015fd6a3c4a757b2e58feb3c2b983241e42171fc5df69b134b90"
         }
       }
     }
@@ -460,11 +457,14 @@
     }
   ],
   "expected_goal_status": "satisfied",
+  "social_cognition": {
+    "fast-initial": "Fixture response."
+  },
   "coverage_family": "gi_bad_source",
   "contrast_set": "shake-1",
   "split": "train_candidate",
   "training_eligible": false,
-  "reference_review": "Astra-authored parameterized reference; non-independent review",
+  "reference_review": "Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.",
   "expected_verdict": "expected_rejection",
   "parameters": {
     "action": "shake",
@@ -484,6 +484,5 @@
   ],
   "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
   "probe": "gi_bad_source",
-  "expected_rejection": "gi",
-  "social_cognition": {}
+  "expected_rejection": "gi"
 }

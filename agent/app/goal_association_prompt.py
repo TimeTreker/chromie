@@ -102,120 +102,9 @@ def situation_projection(request: CognitiveWorkRequest) -> dict[str, Any]:
         return {}
 
 
-def build_segmentation_prompt(
-    request: CognitiveWorkRequest,
-) -> str:
-    """Render the complete no-candidate Goal contract without continuity prose.
-
-    The former shared prompt repeated association, planning, resource, and
-    coverage rules even when no Goal existed to associate.  Besides making the
-    semantic boundary harder to review, that forced qualified small models into
-    a much larger context allocation.  This prompt keeps the same authorities
-    and failure semantics while stating each no-candidate rule once.
-    """
-
-    context = request.context if isinstance(request.context, dict) else {}
-    identity_json = goal_segmentation_identity_json(context)
-    identity_contract = (
-        _GOAL_SEGMENTATION_IDENTITY_CONTRACT
-        if identity_json != "null"
-        else ""
-    )
-    responsibilities_json = required_json(
-        [
-            item.model_dump(mode="json", exclude_none=True)
-            for item in request.responsibilities
-        ],
-        16000,
-        label="GI Responsibility evidence",
-    )
-    return (
-        "There are no active or retained recent Goals. Association is impossible; "
-        "create new Goals only. Goal Association receives provider-neutral "
-        "Responsibility evidence, not a route, Capability, plan, or response draft. "
-        "The authoritative user turn and the supplied GI Responsibilities are the "
-        "only sources of owed human outcomes. Fast Planner Activity is HOW authored "
-        "concurrently and must never become, justify, or be copied into a Goal. "
-        "Responsibility conservation is strict: create exactly one Goal for each "
-        "independently satisfiable Responsibility, copy its local_ref into "
-        "source_responsibility_refs, and neither merge independent effects nor add "
-        "acknowledgement, progress, delivery, personality, or implementation Goals. "
-        "A manner, prohibition, timing, or social-presentation modifier stays on the "
-        "outcome it constrains. A greeting attached to substantive work is framing; "
-        "a standalone social act is one speech Goal. "
-        "Information acquisition and a requested interpretation of that same evidence "
-        "are one Goal. Acquisition, carrying, return, "
-        "and handoff are stages of one requested physical delivery, not sibling Goals.\n\n"
-        "Preserve the supplied Responsibility WHAT output_mode exactly in the canonical Goal. "
-        "information keeps one information resource_responsibility when grounded "
-        "information acquisition is the human outcome; stateful_effect keeps ordinary "
-        "typed bindings and no information resource. This semantic preservation never "
-        "selects a Capability, provider, executable operation, or Plan. Preserve every supplied material "
-        "binding verbatim, including counts, durations, speeds, directions, targets, "
-        "severity, thresholds, negation, comparison, and scope. For a non-resource "
-        "Goal, put these in top-level typed bindings; the action remains in GI outcome. "
-        "Do not emit a Goal description: Host inherits it and success_criteria from GI. "
-        "Do not claim completion or choose a Capability. "
-        f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
-        "Use resource_responsibility only when obtaining and making a resource "
-        "available to a recipient is the human outcome. A physical_object is a "
-        "distinct concrete object independent of Chromie's body and requires "
-        "acquisition plus physical_handover. Locomotion, gaze, blinking, gesture, "
-        "turning, posture, and other self-motion are non-resource body_action Goals; "
-        "never describe Chromie's body, position, displacement, or motion as an "
-        "object to acquire or hand over. A physical resource keeps top-level bindings "
-        "empty; its identity/quantity belong to description/quantity and its supplied "
-        "location, distance, direction, and route belong in source.acquisition_bindings. "
-        "Preserve separately supplied GI bindings separately, but never decompose one "
-        "GI-owned composite binding: retain its complete source value in one typed "
-        "acquisition binding. Supplied spatial grounding requires "
-        "source.status=known; source.status=unknown is allowed only when none was "
-        "supplied.\n\n"
-        "An information resource uses output_mode=information and one exact "
-        "information_domain: local_clock, weather_forecast, "
-        "external_grounded_information, direct_environment_perception, or "
-        "private_runtime_information. Its query_scope conserves the declared GI bindings "
-        "without adding duplicate classification. It may be empty: Host inherits the "
-        "complete query from the GI outcome. A declared location binding remains "
-        "location. Current nearby people/objects/events require "
-        "direct_environment_perception, not weather. A public source uses "
-        "source.status=provider_resolved; source.status=unknown preserves an "
-        "unavailable local/private/runtime source; source.status=known is only for an "
-        "explicitly named source. Never invent location, timezone, source, provider, "
-        "device, coordinates, or another query fact. Preserve source-grounded "
-        "temporal wording as human semantic scope in query_scope. A compound natural "
-        "expression stays intact instead of being decomposed into Capability date, period, "
-        "or clock-range arguments. A duration remains duration. Never narrow broader "
-        "temporal scope.\n\n"
-        "Resolve a pronoun, demonstrative, ellipsis, correction, or task mention only "
-        "from explicit current meaning, a supplied scoped discourse referent, a "
-        "candidate binding, or accepted dialogue, in that order. There are no "
-        "candidate Goals in this request. If evidence does not select one meaning, "
-        "keep the narrowest source-grounded provisional Goal and do not invent the "
-        "referent; Fast Planner owns any clarification. resolved_references may copy "
-        "only a supplied referent_id. Ordinary explicit mentions are bindings, not "
-        "resolved references. referent_updates require supplied provenance; never "
-        "invent IDs. Tool results and runtime diagnostics are not semantic authority.\n\n"
-        f"{identity_contract}"
-        "The Host owns IDs, versions, lifecycle, source text, persistence, plans, and "
-        "canonical construction. Emit none of those fields. Return only the exact "
-        "GoalSegmentationModelOutput JSON Schema: decision=create_goals, new_goals, "
-        "referent_updates, resolved_references, confidence, and compact reason_summary. "
-        "Goal Association never executes, commits, asks a question, creates a planning "
-        "InformationGap, or pretends work is complete.\n\n"
-        "Owner-approved Chromie identity JSON:\n"
-        f"{identity_json}\n\n"
-        + "Responsibility evidence JSON:\n"
-        f"{responsibilities_json}\n\n"
-        "GI unresolved-meaning evidence JSON:\n"
-        f"{bounded_json(request.interpretation_unresolved, 1600)}\n\n"
-        "Scoped discourse referents JSON:\n"
-        f"{bounded_json(discourse_referents(request), 3000)}\n\n"
-        "Recent accepted conversation JSON (reference evidence only):\n"
-        f"{bounded_json((context.get('history') or request.history or [])[-6:], 2600)}\n\n"
-        f"Language hint: {request.language or 'auto'}\n"
-        f"{immutable_source_turn_prompt(request)}"
-    )
+def build_segmentation_prompt(request: CognitiveWorkRequest) -> str:
+    """No candidate Goals: preserve each complete intent in one new Goal."""
+    return build_association_prompt(request, [])
 
 
 def goal_segmentation_identity_json(context: dict[str, Any]) -> str:
@@ -341,141 +230,43 @@ def association_dialogue_projection(history: Any) -> list[dict[str, Any]]:
 
 
 def build_association_prompt(
-    request: CognitiveWorkRequest,
-    candidate_goals: list[dict[str, Any]],
+    request: CognitiveWorkRequest, candidate_goals: list[dict[str, Any]],
 ) -> str:
-    """Render existing-Goal continuity without unrelated planning prose."""
-
-    context = request.context if isinstance(request.context, dict) else {}
-    identity_json = goal_segmentation_identity_json(context)
-    identity_section = (
-        "Owner-approved Chromie identity JSON:\n"
-        f"{identity_json}\n\n"
-    )
-    identity_contract = (
-        _GOAL_SEGMENTATION_IDENTITY_CONTRACT
-        if identity_json != "null"
-        else ""
-    )
-    responsibilities = [
-        item.model_dump(mode="json", exclude_none=True)
-        for item in request.responsibilities
-    ]
-    history = context.get("history") or request.history or []
+    """GI owns meaning; GA chooses canonical identity and continuity only."""
     return (
-        "Resolve canonical Goal continuity from the authoritative user turn, GI "
-        "Responsibilities, bounded candidate Goals, scoped referents, and accepted "
-        "dialogue. This boundary owns Goal association/creation only: never choose "
-        "a Capability, Plan, execution method, response wording, clarification "
-        "policy, or completion claim. The Host owns IDs, versions, persistence, "
-        "lifecycle mechanics, and canonical construction.\n\n"
-        "Resolve each GI Responsibility independently in this order, then verify that "
-        "every GI Responsibility ref must map to exactly one association or new Goal: (1) when "
-        "both the source directly says a specific candidate must stop and it presents the "
-        "new outcome as that candidate's substitute, while GI supplies relationship=new "
-        "with no target_goal_ids, emit a replacement new_goal with only that candidate in "
-        "supersedes_goal_ids; if either replacement condition is missing, row (1) is "
-        "forbidden. (2) For a supplied non-new relationship "
-        "with target_goal_ids, emit an association with that exact relationship and those "
-        "targets when source and candidate evidence confirm it; (3) for relationship=new "
-        "with no target_goal_ids and without both replacement conditions, emit the default "
-        "independent new_goal "
-        "with empty supersedes_goal_ids and related_goal_ids. Candidate presence, topic "
-        "overlap, recency, or having only one candidate is never enough to turn row (3) "
-        "into an association. Never invert source polarity: an instruction to keep, retain, "
-        "preserve, or continue the old Goal, or its equivalent in any language, means that "
-        "Goal must not stop. The invariant is retain_old=true implies "
-        "supersedes_goal_ids=[]; superseding requires retain_old=false. These collections "
-        "are not mutually exclusive: a turn that "
-        "continues retained work and adds an independent Responsibility must emit both in "
-        "one complete result, preserving each Responsibility's own local_ref; never reuse "
-        "one ref for another. Verify GI relationship and target_goal_ids against the "
-        "authoritative source and supplied candidates. Never merge independent effects or "
-        "add progress, acknowledgement, delivery, personality, or implementation Goals. "
-        "For unchanged unfinished/recoverable work use continue. "
-        "Use resume only for paused work. Use reference for retrieval, restatement, "
-        "explanation, comparison, or another answer from retained Goal meaning "
-        "without lifecycle change. A new reaction, feeling, evaluation, practical "
-        "decision, or independently satisfiable conversation is a new speech Goal. "
-        "Use clarify only when this turn supplies missing Goal meaning; confirm and "
-        "reject apply only to a pending proposal. Copy relationship exactly from "
-        "continue, modify, clarify, confirm, reject, cancel, pause, resume, merge, "
-        "split, or reference. Target only supplied Goal IDs. A modify association "
-        "must supply requirement_changes with target_goal_id, zero-based "
-        "replace_requirement_indices into supplied success_criteria, and current "
-        "source_responsibility_refs. Empty indices add; unselected requirements remain. "
-        "Replace only requirements completely restated by current GI; never substitute "
-        "a partial fragment for a long Goal. Host copies outcomes and derives description/criteria. "
-        "clarify supplies changes or resolved_gap_ids. binding_changes copy one exact GI "
-        "source_binding/source_responsibility_ref to a named path under object, constraints "
-        "or resource_responsibility; unselected fields remain. Keep those fields consistent "
-        "with GI. Never author updated_description or success_criteria. Rationale "
-        "does not mutate Goal meaning. Association confidence measures certainty "
-        "about Goal ownership and the continuity relationship, not whether linked "
-        "Planner input gaps are resolved or the Goal is executable. Keep "
-        "resolved_gap_ids empty when resolution is unproven, but do not lower an "
-        "otherwise explicit targeted association's confidence for that reason.\n\n"
-        "An association preserves unselected Goal requirements, provenance and resource "
-        "fields. Source-bound requirement_changes may refine the retained Responsibility; "
-        "GA does not decide whether its Work must be reused or cancelled. "
-        "Explicit lifecycle replacement or abandonment remains replacement even when the "
-        "new outcome's WHAT, modality, or entity is wholly different. Apply replacement "
-        "only to that explicit same-Responsibility case; a separate new Responsibility is "
-        "independent. Source evidence that the retained Goal must remain while the new "
-        "outcome is additional or separate is decisive coexistence evidence and forbids "
-        "replacement: keep "
-        "supersedes_goal_ids empty and leave the retained Goal untouched. Put an ID in "
-        "supersedes_goal_ids only when direct source evidence commands that Goal to stop, "
-        "be abandoned, or be replaced; a different entity or output_mode alone is not "
-        "replacement. Replacement never overrides a supplied association relationship or "
-        "its target_goal_ids. In particular, merge and split remain associations rather "
-        "than replacement Goals. A superseded ID belongs only in supersedes_goal_ids and must "
-        "never also appear in related_goal_ids; related_goal_ids retains only "
-        "non-replacement context. If current meaning is genuinely independent, create "
-        "a new Goal without reopening the old one. A recent "
-        "terminal Goal may be referenced but not reopened. Preserve unresolved human "
-        "meaning in the narrowest provisional Goal; Fast Planner alone decides any "
-        "question.\n\n"
-        "For a new Goal, emit its source_responsibility_refs, never a description. Host "
-        "inherits the exact GI outcome and successful-outcome requirements. Preserve every material binding exactly and preserve the GI "
-        "WHAT modality exactly: information keeps one information resource_responsibility "
-        "when the outcome is grounded information acquisition; stateful_effect keeps "
-        "ordinary typed bindings and no information resource; every other explicit "
-        "output_mode is copied exactly. "
-        "Use resource_responsibility only when the owed outcome is to acquire and "
-        "make a resource available. A physical_object is a concrete object independent "
-        "of Chromie's body and uses physical_handover; locomotion, gaze, blinking, "
-        "gesture, and posture are non-resource body_action. An information resource "
-        "uses information and keeps declared query bindings in query_scope, which may "
-        "be empty when the full query is in the inherited outcome. Never invent a "
-        "source, location, provider, device, "
-        "timezone, or execution fact. Directly named entities preserve the exact "
-        "current-turn surface. resolved_references and referent_updates may copy only "
-        "supplied referent IDs.\n\n"
-        "Return only the exact GoalAssociationModelOutput JSON. Emit associations and "
-        "new_goals as the sole authoritative per-Responsibility continuity result, then "
-        "referent_updates, resolved_references, confidence, and a compact "
-        "non-authoritative reason_summary describing the emitted result. Do not emit a "
-        "branch decision.\n\n"
-        f"{identity_section}"
-        f"{identity_contract}"
-        f"{_EXECUTION_CONTRACT_PROMPT}\n\n"
-        "Candidate Goal semantic evidence JSON:\n"
-        f"{required_json(association_goal_projection(candidate_goals), 2600, label='Goal requirement evidence')}\n\n"
-        "GI Responsibility evidence JSON:\n"
-        f"{required_json(responsibilities, 16000, label='GI Responsibility evidence')}\n\n"
-        "GI unresolved-meaning evidence JSON:\n"
-        f"{bounded_json(request.interpretation_unresolved, 800)}\n\n"
-        "Goal interaction evidence JSON:\n"
-        f"{bounded_json(context.get('interaction_context') or {}, 900)}\n\n"
-        "Scoped discourse referents JSON:\n"
-        f"{bounded_json(discourse_referents(request), 1400)}\n\n"
-        "Accepted dialogue JSON:\n"
-        f"{bounded_json(association_dialogue_projection(history), 1400)}\n\n"
-        f"Language hint: {request.language or 'auto'}\n"
-        f"{immutable_source_turn_prompt(request)}\n\n"
-        "FINAL CANDIDATE GOAL IDS JSON:\n"
-        f"{bounded_json([item.get('goal_id') for item in candidate_goals], 900)}"
+        "Associate the complete accepted GI intentions with the supplied Goals. "
+        "Every Responsibility ref must occur exactly once across associations and "
+        "new_goals. Preserve compound intentions intact; Planner decomposes Activities. "
+        "Choose continuity from the accepted meaning, candidate requirements, state and "
+        "dialogue. Candidate presence, lexical overlap or recency alone is insufficient. "
+        "GI does not supply relationship labels; you own that judgment. "
+        "Use exact supplied IDs. Recent terminal Goals may be referenced but not reopened. "
+        "For changed requirements, select the exact target and replaced requirement indices; "
+        "Host inherits the complete new requirements from the cited GI outcomes. "
+        "Keep unrelated retained requirements. Supersede a Goal only when the accepted "
+        "intent explicitly replaces it; an additional intention leaves it intact. "
+        "A replaced Goal must not also be listed as related context. "
+        "No candidates means new_goals only. Emit source_responsibility_refs, related_goal_ids "
+        "and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. "
+        "Host inherits GI's expected result type unchanged. Do not extract duration, "
+        "direction, count, speed, resource fields, or reclassify output modes "
+        "or other execution details. Planner owns parameter realization and Work. "
+        "Preserve GI uncertainty; do not resolve it or choose a clarification strategy. "
+        "SC owns communication. Return the supplied schema only.\n\n"
+        "Candidate Goal evidence JSON:\n"
+        + required_json(association_goal_projection(candidate_goals), None, label="Goal requirement evidence")
+        + "\nGI complete intentions JSON:\n"
+        + required_json([
+            {"local_ref": item.local_ref, "outcome": item.outcome,
+             "confidence": item.confidence, "output_mode": item.output_mode,
+             "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None}
+            for item in request.responsibilities
+        ], None, label="GI intent evidence")
+        + "\nGI unresolved meaning JSON:\n" + bounded_json(request.interpretation_unresolved, 800)
+        + "\nScoped discourse referents JSON:\n" + bounded_json(discourse_referents(request), 1400)
+        + "\nAccepted dialogue JSON:\n"
+        + bounded_json(association_dialogue_projection(request.history or request.context.get("history") or []), 1400)
+        + "\n" + immutable_source_turn_prompt(request)
     )
 
 
@@ -559,7 +350,7 @@ def layered_prompt(
         if identity_json != "null"
         else ()
     )
-    rendered = role_memory_context(context, role="ga") + build_prompt(
+    rendered = identity_world + "\n".join(identity_contracts) + "\n" + role_memory_context(context, role="ga") + build_prompt(
         request,
         candidate_goals,
         output_type=output_type,
@@ -567,10 +358,7 @@ def layered_prompt(
     return LayeredPrompt.promote(
         rendered,
         identity_world=(identity_world,),
-        operating_contract=(
-            *identity_contracts,
-            _EXECUTION_CONTRACT_PROMPT,
-        ),
+        operating_contract=identity_contracts,
     )
 
 
@@ -621,7 +409,7 @@ def system_prompt(
     if output_type is GoalSegmentationModelOutput:
         return (
             "You are Chromie's Goal Segmentation model. No active or retained recent Goal IDs exist, so association with existing work is impossible. "
-            "Use semantic reasoning to resolve current-turn references from scoped discourse context and preserve independently satisfiable user responsibilities as separate new Goals, but never turn plan steps into goals. "
+            "Preserve each accepted GI Responsibility as one new Goal, including compound intent. GI owns current-turn meaning; do not resegment it or resolve its uncertainty. "
             "Conversational framing attached to a substantive responsibility is not independently satisfiable work: do not create a separate Goal for its greeting or politeness preamble. A standalone social interaction remains one conversational Goal. "
             "When one evidence acquisition satisfies both a factual lookup and the requested interpretation of its result, preserve them as one Goal. "
             "Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
@@ -632,7 +420,7 @@ def system_prompt(
         "Produce one complete candidate-aware result; existing-Goal associations and independent new Goals may coexist in that result. "
         "Apply continuity before creation. Resolve references from current user meaning, scoped discourse referents/focus, bounded candidate Goals and their bindings, and dialogue context. Candidate Goals may be active, recoverable, or recently terminal; referencing a terminal Goal does not reopen it. Tool-result memory is not reference-resolution authority. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
         "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
-        "Preserve independent user responsibilities as separate goals, but never turn plan steps into goals. "
+        "Preserve GI Responsibility ownership, including compound intent; do not resegment, reclassify or repair its meaning. Planner decomposes Activities. "
         "Conversational framing attached to substantive work is not a separate Goal; a standalone social interaction remains one conversational Goal. A new reaction, feeling, evaluation, acknowledgement, or practical decision after a prior result is a current conversational responsibility, not continuation of the completed lookup. One lookup and an interpretation requested as part of that same lookup are one Goal. "
         "You are advisory only and never execute or commit. Return JSON only."
     )

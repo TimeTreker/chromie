@@ -57,27 +57,14 @@
     "unresolved": [],
     "responsibilities": [
       {
-        "schema_version": 1,
         "local_ref": "r1",
         "outcome": "向前移动十五秒",
-        "bindings": {
-          "direction": "forward",
-          "duration_s": 15
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.95,
         "output_mode": "body_action"
       },
       {
-        "schema_version": 1,
         "local_ref": "r2",
         "outcome": "在向前移动时眨眼",
-        "bindings": {
-          "timing": "while moving forward"
-        },
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.95,
         "output_mode": "body_action"
       }

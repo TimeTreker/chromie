@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.cognitive_work_test_support import ordinary_plan_schema
+
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 
 import asyncio
@@ -275,7 +277,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             VOCAL_PERFORMANCE_CAPABILITY_ID,
         )
         self.assertEqual(plan.steps[0].args["mode"], "singing")
-        schema = model.calls[0][1]["response_format"]
+        schema = ordinary_plan_schema(model.calls[0][1]["response_format"])
         vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-vocal"]
         self.assertIn(
             "execute",

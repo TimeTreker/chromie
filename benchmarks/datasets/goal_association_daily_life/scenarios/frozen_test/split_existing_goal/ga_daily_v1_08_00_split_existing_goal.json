@@ -102,36 +102,26 @@
       "planner_reentry_scope": null,
       "responsibilities": [
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r1",
-          "outcome": "First separated outcome for Set the desk lamp to on.",
+          "outcome": "First separated outcome for Set the desk lamp to on. (Split this goal into two separately owed outcomes.)",
           "output_mode": "stateful_effect",
-          "relationship": "split",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
             "source_start_token_ref": "tok_r1_start"
-          },
-          "target_goal_ids": [
-            "goal_08_00_a"
-          ]
+          }
         },
         {
-          "bindings": {},
           "confidence": 1.0,
           "local_ref": "r2",
-          "outcome": "Second separated outcome for Set the desk lamp to on.",
+          "outcome": "Second separated outcome for Set the desk lamp to on. (Split this goal into two separately owed outcomes.)",
           "output_mode": "stateful_effect",
-          "relationship": "split",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r2_end",
             "source_start_token_ref": "tok_r2_start"
-          },
-          "target_goal_ids": [
-            "goal_08_00_a"
-          ]
+          }
         }
       ],
       "schema_version": 1,
@@ -162,7 +152,7 @@
       "associations": [
         {
           "confidence": 1.0,
-          "reason_summary": "The accepted GI relationship is split.",
+          "reason_summary": "The source-grounded continuity relationship is split.",
           "relationship": "split",
           "resolved_gap_ids": [],
           "source_responsibility_refs": [
